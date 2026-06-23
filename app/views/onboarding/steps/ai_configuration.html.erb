@@ -1,0 +1,50 @@
+<%= render(Campbooks::OnboardingProgress.new(current_step: @step, previous_step: @previous_step)) %>
+
+<div class="mb-6">
+  <h2 class="text-lg font-semibold text-gray-900"><%= t(".heading") %></h2>
+  <p class="text-sm text-gray-500 mt-1"><%= t(".subheading") %></p>
+</div>
+
+<%= form_with url: onboarding_path(step: :ai_configuration), method: :patch, class: "space-y-6" do |form| %>
+  <% if @managed_available && !self_hosted? %>
+    <% if @mode_error.present? %>
+      <%= render(Campbooks::Alert.new(variant: :danger)) { @mode_error } %>
+    <% end %>
+
+    <%# ── Choose: Campbooks AI (managed) vs bring your own keys ── %>
+    <div data-controller="ai-mode-selector" class="space-y-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <%= render(Campbooks::CheckableCard.new(
+              name: "ai_mode", value: "managed", type: :radio,
+              checked: @ai_mode == "managed",
+              title: t(".managed_title"), description: t(".managed_description"),
+              variant: :horizontal,
+              data: { action: "change->ai-mode-selector#select" })) %>
+        <%= render(Campbooks::CheckableCard.new(
+              name: "ai_mode", value: "byo", type: :radio,
+              checked: @ai_mode == "byo",
+              title: t(".byo_title"), description: t(".byo_description"),
+              variant: :horizontal,
+              data: { action: "change->ai-mode-selector#select" })) %>
+      </div>
+
+      <div data-ai-mode-selector-target="managedPanel" class="<%= "hidden" unless @ai_mode == "managed" %>">
+        <%= render(Campbooks::ManagedAiCard.new) %>
+      </div>
+
+      <div data-ai-mode-selector-target="byoPanel" class="space-y-6 <%= "hidden" unless @ai_mode == "byo" %>">
+        <%= render "onboarding/steps/ai_byo_fields", text_provider: @text_provider, document_provider: @document_provider %>
+      </div>
+    </div>
+  <% else %>
+    <%# Self-hosted (or cloud without a platform key): bring-your-own only. %>
+    <%= render "onboarding/steps/ai_byo_fields", text_provider: @text_provider, document_provider: @document_provider %>
+  <% end %>
+
+  <%# Skip lives in the wizard header now (works on every step). A skip button
+      can't go here — this is inside the form_with, and nesting a form is invalid. %>
+  <div class="pt-2">
+    <%= form.submit t(".save_and_continue"),
+        class: "w-full py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-accent-600 hover:bg-accent-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-500 cursor-pointer transition-colors" %>
+  </div>
+<% end %>

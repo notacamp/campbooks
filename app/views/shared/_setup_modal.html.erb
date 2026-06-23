@@ -1,0 +1,12 @@
+<div data-controller="setup-modal">
+  <dialog data-setup-modal-target="dialog"
+          class="fixed inset-0 m-auto rounded-2xl shadow-2xl border border-gray-200/80 p-0 w-full max-w-lg max-h-[90dvh] overflow-hidden backdrop:bg-black/40">
+    <%# Content — turbo frame loads the full form including its own header %>
+    <turbo-frame id="setup_modal_frame" data-setup-modal-target="frame"
+                 class="block overflow-y-auto min-h-0">
+      <div class="flex items-center justify-center py-8">
+        <%= render(Campbooks::Spinner.new(size: :md)) %>
+      </div>
+    </turbo-frame>
+  </dialog>
+</div>

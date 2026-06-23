@@ -1,0 +1,41 @@
+---
+pt:
+  events:
+    bulk_count:
+      one: 1 email
+      other: "%{count} emails"
+    groups:
+      account: Conta
+      calendar: Calendário
+      contacts: Contactos
+      documents: Documentos
+      email: Email
+      reminders: Lembretes
+    names:
+      calendar_event_created: Evento de calendário criado
+      calendar_event_deleted: Evento de calendário eliminado
+      calendar_event_updated: Evento de calendário atualizado
+      contact_blocked: Contacto bloqueado
+      contact_starred: Contacto destacado
+      contact_unblocked: Contacto desbloqueado
+      contact_unstarred: Contacto sem destaque
+      document_approved: Documento aprovado
+      document_processed: Documento processado
+      document_rejected: Documento rejeitado
+      document_restored: Documento restaurado
+      email_account_connected: Conta ligada
+      email_account_disconnected: Conta desligada
+      email_archived: Email arquivado
+      email_bulk_archived: Emails arquivados em massa
+      email_forwarded: Email reencaminhado
+      email_received: Email recebido
+      email_sent: Email enviado
+      email_skim_decision: Decisão de triagem
+      email_snoozed: Email adiado
+      email_tagged: Email etiquetado
+      email_trashed: Email movido para o lixo
+      reminder_confirmed: Lembrete confirmado
+      reminder_created: Lembrete criado
+      reminder_dismissed: Lembrete dispensado
+    system_actor: Sistema
+    time_ago: há %{time}

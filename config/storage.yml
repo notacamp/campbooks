@@ -1,0 +1,36 @@
+test:
+  service: Disk
+  root: <%= Rails.root.join("tmp/storage") %>
+
+local:
+  service: Disk
+  root: <%= Rails.root.join("storage") %>
+
+amazon:
+  service: S3
+  access_key_id: <%= Rails.application.credentials.dig(:aws, :access_key_id) %>
+  secret_access_key: <%= Rails.application.credentials.dig(:aws, :secret_access_key) %>
+  region: <%= Rails.application.credentials.dig(:aws, :region) || "eu-west-1" %>
+  bucket: <%= Rails.application.credentials.dig(:aws, :bucket) || "campbooks-storage" %>
+  upload:
+    server_side_encryption: "AES256"
+
+# S3 object storage for production uploads (see config/environments/production.rb).
+# Provider-neutral: works against AWS S3 (set S3_REGION, no endpoint) or any
+# S3-compatible service like Hetzner Object Storage (also set S3_ENDPOINT +
+# S3_FORCE_PATH_STYLE). Credentials live in the host compose .env (never
+# committed), mirroring the SMTP setup. This exists because the previous
+# DiskService wrote into the container's ephemeral layer and lost every upload on
+# each deploy.
+s3:
+  service: S3
+  access_key_id: <%= ENV["S3_ACCESS_KEY_ID"] %>
+  secret_access_key: <%= ENV["S3_SECRET_ACCESS_KEY"] %>
+  region: <%= ENV.fetch("S3_REGION", "eu-central-1") %>
+  bucket: <%= ENV.fetch("S3_BUCKET", "campbooks-storage") %>
+  upload:
+    server_side_encryption: "AES256"
+<% if ENV["S3_ENDPOINT"].present? %>
+  endpoint: <%= ENV["S3_ENDPOINT"] %>
+  force_path_style: <%= ENV.fetch("S3_FORCE_PATH_STYLE", "true") %>
+<% end %>

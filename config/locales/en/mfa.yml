@@ -1,0 +1,151 @@
+---
+en:
+  components:
+    recovery_code_grid:
+      copy_all: Copy all
+    security_method_card:
+      disabled: 'Off'
+      enabled: 'On'
+  session_challenges:
+    create:
+      invalid_code: That didn't match. Please try again.
+      try_later: Too many attempts. Please try again later.
+    expired: Your session expired. Please sign in again.
+    send_email_code:
+      code_sent: We've emailed you a one-time code.
+      try_later: Too many requests. Please try again later.
+    show:
+      back_to_login: Back to sign in
+      email_intro: We'll email a one-time code to your address.
+      email_label: 6-digit code
+      email_send: Email me a code
+      email_submit: Verify
+      method_email_otp: Email code
+      method_passkey: Passkey
+      method_recovery: Recovery code
+      method_totp: Authenticator app
+      passkey_button: Use a passkey
+      passkey_intro: Use your passkey or security key to continue.
+      passkey_unsupported: This browser doesn't support passkeys.
+      recovery_hint: Enter one of your one-time backup codes.
+      recovery_label: Recovery code
+      recovery_submit: Verify
+      subtitle: Enter your second factor to finish signing in.
+      title: Two-step verification
+      totp_label: 6-digit code from your authenticator app
+      totp_submit: Verify
+      use_recovery: Use a recovery code instead
+  settings:
+    security:
+      disable:
+        disabled: Two-factor authentication is now off.
+        not_enabled: Two-factor authentication isn't set up.
+        wrong_password: That password is incorrect.
+      email_otp:
+        create:
+          enabled: Email codes turned on.
+        destroy:
+          disabled: Email codes turned off.
+      passkeys:
+        create:
+          error: Couldn't add that passkey. Please try again.
+          success: Passkey added.
+        destroy:
+          success: Passkey removed.
+        new:
+          cancel: Cancel
+          intro: Follow your device's prompt to register a passkey or security key.
+          name_label: Name (optional)
+          name_placeholder: e.g. YubiKey, MacBook Touch ID
+          submit: Add passkey
+          title: Add a passkey
+          unsupported: This browser doesn't support passkeys.
+      recovery_codes:
+        create:
+          generated: New recovery codes generated. Your old codes no longer work.
+        show:
+          done: Done
+          empty: You don't have any recovery codes yet.
+          fresh_warning: Save these now — each code works once and they won't be shown
+            again.
+          regenerate: Generate new codes
+          regenerate_confirm: Generating new codes invalidates your current ones.
+            Continue?
+          remaining: "%{count} unused codes remaining."
+          title: Recovery codes
+      show:
+        danger_button: Turn off 2FA
+        danger_confirm: This removes all of your second factors. Continue?
+        danger_description: Removes every second factor (authenticator, passkeys,
+          email codes and recovery codes) from your account.
+        danger_password_label: Confirm your password
+        danger_title: Turn off two-factor authentication
+        email_description: Receive a one-time code by email at sign-in. The weakest
+          option — best kept as a backup.
+        email_disable: Turn off
+        email_enable: Turn on
+        email_title: Email code
+        passkeys_add: Add passkey
+        passkeys_added_on: Added %{date}
+        passkeys_default_name: Passkey
+        passkeys_description: Use Touch ID, Face ID, Windows Hello, or a hardware
+          key as your second step.
+        passkeys_empty: No passkeys registered yet.
+        passkeys_last_used: last used %{date}
+        passkeys_never_used: not used yet
+        passkeys_remove: Remove
+        passkeys_remove_confirm: Remove this passkey?
+        passkeys_title: Passkeys & security keys
+        recovery_description: One-time backup codes to sign in if you lose your other
+          methods.
+        recovery_remaining: "%{count} unused codes remaining"
+        recovery_title: Recovery codes
+        recovery_view: View codes
+        sign_in_add: Add %{provider}
+        sign_in_methods_description: Sign in with your Google, Microsoft, or Zoho
+          account — in addition to your password or passkey.
+        sign_in_methods_empty: No social sign-in connected yet.
+        sign_in_methods_title: Social sign-in
+        sign_in_only_method: Your only sign-in method
+        sign_in_remove: Remove
+        sign_in_remove_confirm: Remove %{provider} sign-in from your account?
+        status_off: Two-factor authentication is off. Add a method below to turn it
+          on.
+        status_on: Two-factor authentication is on.
+        subtitle: Add a second step at sign-in so a stolen password isn't enough.
+        title: Security
+        totp_description: Generate a 6-digit code with an app like 1Password, Authy,
+          or Google Authenticator.
+        totp_disable: Turn off
+        totp_disable_confirm: Turn off the authenticator app?
+        totp_enable: Set up
+        totp_reconfigure: Reconfigure
+        totp_title: Authenticator app
+      sign_in_methods:
+        create:
+          already_linked: "%{provider} sign-in is already connected."
+          unknown_provider: That sign-in provider isn't supported.
+        destroy:
+          last_method: That's your only way to sign in — add another method before
+            removing it.
+          removed: "%{provider} sign-in removed."
+        link_error:
+          invalid: We couldn't complete sign-in with %{provider}. Please try again.
+          linked_to_other_user: That %{provider} account is already linked to a different
+            Campbooks account.
+        linked: "%{provider} sign-in added."
+      totp:
+        create:
+          enabled: Authenticator app is on.
+          invalid_code: That code didn't match. Check your app's clock and try again.
+        destroy:
+          disabled: Authenticator app turned off.
+        new:
+          cancel: Cancel
+          copy_key: Copy
+          step1_hint: Open your authenticator app and scan this code.
+          step1_title: 1. Scan the QR code
+          step2_title: 2. Or enter this key manually
+          step3_title: 3. Enter the 6-digit code to confirm
+          submit: Turn on
+          title: Set up authenticator app

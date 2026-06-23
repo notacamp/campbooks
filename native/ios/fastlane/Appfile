@@ -1,0 +1,3 @@
+app_identifier("com.notacamp.campbooks")
+# Fill in after enrolling (App Store Connect → Membership):
+# team_id("XXXXXXXXXX")

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none" role="img" aria-label="Campbooks">
+  <defs>
+    <linearGradient id="ember" x1="3" y1="2" x2="29" y2="30" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E52C8F"/>
+      <stop offset="0.55" stop-color="#FC4E57"/>
+      <stop offset="1" stop-color="#FD9320"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="9" fill="url(#ember)"/>
+  <g transform="translate(2 2)" stroke="#fff" stroke-linecap="round" fill="none">
+    <path d="M20.65 17.46 A7.5 7.5 0 1 1 20.65 10.54" stroke-width="2.7"/>
+    <path d="M18.1 16.1 A4.6 4.6 0 1 1 18.1 11.9" stroke-width="2.4" opacity="0.55"/>
+  </g>
+</svg>

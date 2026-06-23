@@ -1,0 +1,157 @@
+---
+fr:
+  components:
+    recovery_code_grid:
+      copy_all: Tout copier
+    security_method_card:
+      disabled: Désactivé
+      enabled: Activé
+  session_challenges:
+    create:
+      invalid_code: Cela ne correspond pas. Veuillez réessayer.
+      try_later: Trop de tentatives. Veuillez réessayer plus tard.
+    expired: Votre session a expiré. Veuillez vous reconnecter.
+    send_email_code:
+      code_sent: Nous vous avons envoyé un code à usage unique par e-mail.
+      try_later: Trop de requêtes. Veuillez réessayer plus tard.
+    show:
+      back_to_login: Retour à la connexion
+      email_intro: Nous vous enverrons un code à usage unique par e-mail.
+      email_label: Code à 6 chiffres
+      email_send: Envoyer un code par e-mail
+      email_submit: Vérifier
+      method_email_otp: Code par e-mail
+      method_passkey: Clé d'accès
+      method_recovery: Code de récupération
+      method_totp: Application d'authentification
+      passkey_button: Utiliser une clé d'accès
+      passkey_intro: Utilisez votre clé d'accès ou clé de sécurité pour continuer.
+      passkey_unsupported: Ce navigateur ne prend pas en charge les clés d'accès.
+      recovery_hint: Saisissez l'un de vos codes de secours à usage unique.
+      recovery_label: Code de récupération
+      recovery_submit: Vérifier
+      subtitle: Saisissez votre deuxième facteur pour terminer la connexion.
+      title: Vérification en deux étapes
+      totp_label: Code à 6 chiffres de votre application d'authentification
+      totp_submit: Vérifier
+      use_recovery: Utiliser un code de récupération à la place
+  settings:
+    security:
+      disable:
+        disabled: L'authentification à deux facteurs est maintenant désactivée.
+        not_enabled: L'authentification à deux facteurs n'est pas configurée.
+        wrong_password: Ce mot de passe est incorrect.
+      email_otp:
+        create:
+          enabled: Codes par e-mail activés.
+        destroy:
+          disabled: Codes par e-mail désactivés.
+      passkeys:
+        create:
+          error: Impossible d'ajouter cette clé d'accès. Veuillez réessayer.
+          success: Clé d'accès ajoutée.
+        destroy:
+          success: Clé d'accès supprimée.
+        new:
+          cancel: Annuler
+          intro: Suivez l'invite de votre appareil pour enregistrer une clé d'accès
+            ou une clé de sécurité.
+          name_label: Nom (facultatif)
+          name_placeholder: ex. YubiKey, MacBook Touch ID
+          submit: Ajouter la clé d'accès
+          title: Ajouter une clé d'accès
+          unsupported: Ce navigateur ne prend pas en charge les clés d'accès.
+      recovery_codes:
+        create:
+          generated: Nouveaux codes de récupération générés. Vos anciens codes ne
+            fonctionnent plus.
+        show:
+          done: Terminer
+          empty: Vous n'avez pas encore de codes de récupération.
+          fresh_warning: Sauvegardez-les maintenant — chaque code ne fonctionne qu'une
+            seule fois et ils ne seront plus affichés.
+          regenerate: Générer de nouveaux codes
+          regenerate_confirm: La génération de nouveaux codes invalide les codes actuels.
+            Continuer ?
+          remaining: "%{count} codes non utilisés restants."
+          title: Codes de récupération
+      show:
+        danger_button: Désactiver la 2FA
+        danger_confirm: Cela supprime tous vos deuxièmes facteurs. Continuer ?
+        danger_description: Supprime tous les deuxièmes facteurs (application d'authentification,
+          clés d'accès, codes e-mail et codes de récupération) de votre compte.
+        danger_password_label: Confirmez votre mot de passe
+        danger_title: Désactiver l'authentification à deux facteurs
+        email_description: Recevez un code à usage unique par e-mail lors de la connexion.
+          L'option la moins sécurisée — à conserver de préférence comme solution de
+          secours.
+        email_disable: Désactiver
+        email_enable: Activer
+        email_title: Code par e-mail
+        passkeys_add: Ajouter une clé d'accès
+        passkeys_added_on: Ajoutée le %{date}
+        passkeys_default_name: Clé d'accès
+        passkeys_description: Utilisez Touch ID, Face ID, Windows Hello ou une clé
+          matérielle comme deuxième étape.
+        passkeys_empty: Aucune clé d'accès enregistrée pour l'instant.
+        passkeys_last_used: dernière utilisation le %{date}
+        passkeys_never_used: pas encore utilisée
+        passkeys_remove: Supprimer
+        passkeys_remove_confirm: Supprimer cette clé d'accès ?
+        passkeys_title: Clés d'accès et clés de sécurité
+        recovery_description: Codes de secours à usage unique pour vous connecter
+          si vous perdez vos autres méthodes.
+        recovery_remaining: "%{count} codes non utilisés restants"
+        recovery_title: Codes de récupération
+        recovery_view: Voir les codes
+        sign_in_add: Ajouter %{provider}
+        sign_in_methods_description: Connectez-vous avec votre compte Google, Microsoft
+          ou Zoho — en plus de votre mot de passe ou clé d'accès.
+        sign_in_methods_empty: Aucune connexion sociale associée pour l'instant.
+        sign_in_methods_title: Connexion sociale
+        sign_in_only_method: Votre seule méthode de connexion
+        sign_in_remove: Retirer
+        sign_in_remove_confirm: Retirer la connexion %{provider} de votre compte ?
+        status_off: L'authentification à deux facteurs est désactivée. Ajoutez une
+          méthode ci-dessous pour l'activer.
+        status_on: L'authentification à deux facteurs est activée.
+        subtitle: Ajoutez une deuxième étape à la connexion pour qu'un mot de passe
+          volé ne suffise pas.
+        title: Sécurité
+        totp_description: Générez un code à 6 chiffres avec une application comme
+          1Password, Authy ou Google Authenticator.
+        totp_disable: Désactiver
+        totp_disable_confirm: Désactiver l'application d'authentification ?
+        totp_enable: Configurer
+        totp_reconfigure: Reconfigurer
+        totp_title: Application d'authentification
+      sign_in_methods:
+        create:
+          already_linked: La connexion %{provider} est déjà associée.
+          unknown_provider: Ce fournisseur de connexion n'est pas pris en charge.
+        destroy:
+          last_method: C'est votre seul moyen de vous connecter — ajoutez une autre
+            méthode avant de la retirer.
+          removed: Connexion %{provider} retirée.
+        link_error:
+          invalid: Nous n'avons pas pu finaliser la connexion avec %{provider}. Veuillez
+            réessayer.
+          linked_to_other_user: Ce compte %{provider} est déjà associé à un autre
+            compte Campbooks.
+        linked: Connexion %{provider} ajoutée.
+      totp:
+        create:
+          enabled: L'application d'authentification est activée.
+          invalid_code: Ce code ne correspond pas. Vérifiez l'horloge de votre application
+            et réessayez.
+        destroy:
+          disabled: Application d'authentification désactivée.
+        new:
+          cancel: Annuler
+          copy_key: Copier
+          step1_hint: Ouvrez votre application d'authentification et scannez ce code.
+          step1_title: 1. Scannez le QR code
+          step2_title: 2. Ou saisissez cette clé manuellement
+          step3_title: 3. Saisissez le code à 6 chiffres pour confirmer
+          submit: Activer
+          title: Configurer l'application d'authentification

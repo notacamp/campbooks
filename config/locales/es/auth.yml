@@ -1,0 +1,97 @@
+---
+es:
+  auth:
+    oauth_sign_in:
+      blocked:
+        deletion_requested: Esta cuenta está programada para eliminarse y no puede
+          usarse para iniciar sesión.
+        existing_account: Ya existe una cuenta con este correo. Inicia sesión con
+          tu contraseña y luego añade el inicio de sesión con %{provider} en Ajustes
+          → Seguridad.
+        invalid: No pudimos completar el inicio de sesión con %{provider}. Inténtalo
+          de nuevo.
+        mailbox_has_owner: Este correo está conectado como buzón. Inicia sesión en
+          la cuenta propietaria y activa el inicio de sesión con %{provider} en Ajustes
+          → Seguridad.
+        mailbox_no_owner: Este correo está conectado como buzón, pero no está configurado
+          para iniciar sesión. Contacta con el administrador de tu espacio de trabajo.
+      rate_limited: Demasiados intentos de inicio de sesión. Espera unos minutos e
+        inténtalo de nuevo.
+  invitations:
+    show:
+      accept: Aceptar invitación
+      heading: "¡Tiene una invitación!"
+      invitation_prose_html: "%{inviter} le ha invitado a unirse a %{workspace} en
+        Campbooks."
+      workspace_label: Espacio de trabajo
+  passwords:
+    edit:
+      heading: Actualice su contraseña
+      password_confirmation_label: Confirmar nueva contraseña
+      password_confirmation_placeholder: Vuelva a introducir su contraseña
+      password_label: Nueva contraseña
+      password_placeholder: Al menos 8 caracteres
+      submit: Actualizar contraseña
+      tagline: Elija una nueva contraseña para su cuenta.
+    new:
+      back_to_sign_in: Volver a iniciar sesión
+      email_label: Dirección de correo electrónico
+      email_placeholder: usted@ejemplo.com
+      heading: "¿Olvidó su contraseña?"
+      submit: Enviar enlace de restablecimiento
+      tagline: Introduzca su dirección de correo y le enviaremos un enlace para restablecerla.
+  registrations:
+    check_code:
+      try_later: Demasiados intentos. Por favor, intenelo de nuevo mas tarde.
+    create:
+      try_later: Demasiados intentos. Por favor, intenelo de nuevo mas tarde.
+    new:
+      beta_badge: Beta cerrada
+      beta_code_hint: Campbooks está en beta cerrada. Introduzca el código de invitación
+        que recibió para crear su cuenta.
+      beta_code_label: Código de invitación
+      beta_code_placeholder: p. ej. ABCD-2345
+      email_label: Dirección de correo electrónico
+      email_placeholder: usted@ejemplo.com
+      have_account: "¿Ya tiene una cuenta?"
+      name_label: Nombre completo
+      name_placeholder: Su nombre
+      privacy: Política de Privacidad
+      sign_in: Iniciar sesión
+      submit: Enviar código de verificación
+      tagline: Cree su cuenta
+      terms: Términos del Servicio
+      terms_consent_html: Acepto los %{terms} y la %{privacy}.
+    password:
+      password_label: Contraseña
+      password_placeholder: Al menos 8 caracteres
+      submit: Crear cuenta
+      tagline: Establezca su contraseña
+      verified_prose: verificado. Elija una contraseña para terminar de crear su cuenta.
+    pending_approval:
+      body: Su solicitud de cuenta ha sido enviada para su revisión. Recibirá un correo
+        cuando sea aprobada.
+      heading: Solicitud enviada
+    resend_code:
+      try_later: Demasiadas solicitudes. Por favor, intenelo de nuevo mas tarde.
+    verify:
+      code_label: Código de verificación
+      code_sent_html: Enviamos un código de 6 dígitos a %{email}. Introdúzcalo a continuación
+        para continuar.
+      resend: Reenviar código
+      start_over: Empezar de nuevo
+      submit: Verificar
+      tagline: Compruebe su correo
+  sessions:
+    new:
+      beta_badge: Beta cerrada
+      email_label: Dirección de correo electrónico
+      email_placeholder: usted@ejemplo.com
+      forgot_password: "¿Olvidó su contraseña?"
+      no_account: "¿Es nuevo en Campbooks?"
+      or: o
+      password_label: Contraseña
+      password_placeholder: Introduzca su contraseña
+      sign_up: Crear una cuenta
+      submit: Iniciar sesión
+      tagline: La bandeja de entrada que se ordena sola.

@@ -1,0 +1,150 @@
+---
+fr:
+  components:
+    action_toast:
+      undo: Annuler
+    ai_setup_prompt:
+      documents:
+        body: Lire les PDF, les scans et les images jointes nécessite un fournisseur
+          avec vision, comme OpenAI. Vos fichiers sont enregistrés dans tous les cas.
+        cta: Ajouter l'IA pour les documents
+        title: L'IA pour les documents n'est pas configurée
+      embeddings:
+        body: La recherche sémantique fonctionne avec OpenAI ou Gemini. Ajoutez l'un
+          d'eux pour l'activer.
+        cta: Ouvrir les paramètres d'IA
+        title: La recherche nécessite un fournisseur d'embeddings
+      inline:
+        documents: L'IA pour les documents a besoin d'un fournisseur avec vision.
+        embeddings: La recherche a besoin d'un fournisseur OpenAI ou Gemini.
+        text: Scout a besoin d'un fournisseur d'IA.
+      text:
+        body: Scout, les réponses intelligentes et le tri de la boîte de réception
+          fonctionnent avec un fournisseur d'IA. Ajoutez-en un pour les activer.
+        cta: Configurer l'IA
+        title: L'IA n'est pas encore configurée
+    beta_banner:
+      dismiss: Ignorer
+      message: Campbooks est en version bêta — certaines choses peuvent encore casser
+        ou changer pendant que nous le peaufinons.
+    bug_report_button:
+      label: Signaler un bug
+    bug_report_modal:
+      cancel: Annuler
+      close: Fermer
+      context_note: Nous inclurons aussi la page sur laquelle vous êtes, votre navigateur
+        et les erreurs récentes pour nous aider à le reproduire.
+      description_label: Que s'est-il passé ?
+      description_placeholder: Décrivez le bug — ce que vous avez fait, ce que vous
+        attendiez et ce qui s'est réellement passé.
+      done: Terminé
+      error_empty: Veuillez décrire le bug avant l'envoi.
+      error_generic: Un problème est survenu lors de l'envoi de votre rapport. Veuillez
+        réessayer.
+      screenshot_label: Joindre une capture d'écran de cette page
+      submit: Envoyer le rapport
+      submitting: Envoi…
+      subtitle: Dites-nous ce qui n'a pas fonctionné
+      success_body: Nous l'avons enregistré et l'équipe va l'examiner. Merci de contribuer
+        à améliorer Campbooks.
+      success_title: Merci — rapport envoyé
+      title: Signaler un bug
+    clamp_text:
+      less: Afficher moins
+      more: Lire plus
+    code_block:
+      empty: "(vide)"
+    email_html_preview:
+      frame_title: Aperçu de l'e-mail
+    inbox_settings_modal:
+      close_label: Fermer les paramètres de la boîte de réception
+      nav:
+        accounts: Comptes
+        contacts: Contacts
+        display: Affichage
+        document_types: Types de documents
+        filtering: Filtrage
+        labels: Labels
+        signatures: Signatures
+        tags: Étiquettes
+      settings_sections_label: Sections des paramètres
+      title: Paramètres de la boîte de réception
+    keyboard_shortcuts_modal:
+      contexts:
+        calendar: Calendrier
+        email: Email
+        feed: Fil
+        general: Général
+        navigation: Navigation
+        selection: Sélection
+      footer_hint: Appuyez sur ? pour ouvrir cette fenêtre à tout moment.
+      shortcuts:
+        archive: Archiver
+        cal_new: Nouvel événement
+        cal_next: Période suivante
+        cal_prev: Période précédente
+        cal_today: Aller à aujourd'hui
+        cal_views: Changer de vue
+        clear_selection: Effacer la sélection
+        command_palette: Palette de commandes
+        compose: Composer
+        delete: Supprimer
+        feed_actions: Actions de la carte
+        feed_dismiss: Ignorer / archiver
+        feed_navigate: Se déplacer entre les cartes
+        feed_primary: Action principale
+        forward: Transférer
+        mark_read: Marquer comme lu
+        mark_unread: Marquer comme non lu
+        navigate_threads: Naviguer dans les conversations
+        reply: Répondre
+        reply_all: Répondre à tous
+        show_shortcuts: Afficher les raccourcis
+        toggle_selection: Basculer la sélection
+      title: Raccourcis clavier
+    logo:
+      beta: Beta
+    managed_ai_card:
+      badge: Géré
+      body: Campbooks gère l'IA pour vous, avec ses propres modèles — aucune clé API
+        à gérer.
+      document_role: Documents
+      documents_unavailable: L'analyse de documents n'est pas disponible pour le moment.
+      switch_link: Utiliser mes propres clés
+      text_role: E-mail et chat
+      title: Campbooks AI
+    markdown_editor:
+      preview_tab: Aperçu
+      write_tab: Écrire
+    notion:
+      database_form:
+        attach_file: Joindre %{file}
+        no_fields: Cette base de données n'a aucun champ que Campbooks peut remplir.
+        no_file: Aucun fichier à joindre.
+        select_blank: "— aucun —"
+    resize_handle:
+      hint: Glissez pour redimensionner
+    section_nav:
+      default_label: Navigation par section
+    star_toggle:
+      star: Marquer d'une étoile
+      unstar: Retirer l'étoile
+    swipeable:
+      approve: Approuver
+      archive: Archiver
+      confirm_archive_message: Elle quitte votre boîte. Vous pouvez annuler.
+      confirm_archive_title: Archiver cette conversation ?
+      confirm_delete_message: Cette action est irréversible.
+      confirm_delete_title: Supprimer définitivement ?
+      confirm_trash_message: Vous pouvez la restaurer depuis la corbeille.
+      confirm_trash_title: Mettre à la corbeille ?
+      delete: Supprimer
+      dismiss: Ignorer
+      error: Une erreur s'est produite
+      reject: Rejeter
+      snooze: Reporter
+      trash: Corbeille
+    table:
+      no_data: Aucune donnée trouvée.
+    toast:
+      unread_label: Notification non lue

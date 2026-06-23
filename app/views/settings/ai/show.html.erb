@@ -1,0 +1,185 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2 space-y-8">
+
+    <%# ── AI Mode (cloud only) ────────────────────────────────── %>
+    <% if @managed_available %>
+      <div>
+        <h2 class="text-base font-semibold text-gray-900 mb-3"><%= t(".ai_mode_heading") %></h2>
+        <% if @using_managed %>
+          <%= render(Campbooks::ManagedAiCard.new) %>
+          <%= button_to switch_mode_settings_ai_path, params: { mode: "byo" }, method: :post,
+                class: "mt-3 inline-flex items-center px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-800 transition-colors cursor-pointer",
+                form: { data: { turbo_confirm: t(".switch_to_byo_confirm") } } do %>
+            <%= t(".switch_to_byo") %>
+          <% end %>
+        <% else %>
+          <%= render(Campbooks::Alert.new(variant: :info)) do %>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <span><%= t(".managed_offer") %></span>
+              <%= button_to switch_mode_settings_ai_path, params: { mode: "managed" }, method: :post,
+                    class: "inline-flex items-center px-3 py-1.5 text-sm font-medium bg-accent-600 hover:bg-accent-700 text-white rounded-lg transition-colors cursor-pointer whitespace-nowrap" do %>
+                <%= t(".switch_to_managed") %>
+              <% end %>
+            </div>
+          <% end %>
+        <% end %>
+      </div>
+    <% end %>
+
+    <%# ── AI Providers ───────────────────────────────────────── %>
+    <div>
+      <h2 class="text-base font-semibold text-gray-900 mb-4"><%= t(".providers_heading") %></h2>
+
+      <% vision = @adapters.select { |a| AiAdapter::VISION_PROVIDERS.include?(a.provider) } %>
+      <% text = @adapters.select { |a| !AiAdapter::VISION_PROVIDERS.include?(a.provider) } %>
+
+      <%# ── Vision Providers ── %>
+      <div class="mb-6">
+        <h3 class="text-sm font-semibold text-gray-700 mb-2"><%= t(".vision_subheading") %> <span class="text-xs text-gray-400 font-normal"><%= t(".vision_subheading_note") %></span></h3>
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-3">
+          <% vision.each do |adapter| %>
+            <%= render "adapter_card", adapter: adapter %>
+          <% end %>
+        </div>
+        <div class="mt-3">
+          <%= render "adapter_modal", adapter: current_user.workspace.ai_adapters.new, modal_id: "new-vision", label: t(".add_vision_provider"), provider_type: :vision %>
+          <button onclick="document.getElementById('new-vision-modal').classList.remove('hidden')"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <%= t(".add_vision_provider") %>
+          </button>
+        </div>
+      </div>
+
+      <%# ── Text Providers ── %>
+      <div>
+        <h3 class="text-sm font-semibold text-gray-700 mb-2"><%= t(".text_subheading") %> <span class="text-xs text-gray-400 font-normal"><%= t(".text_subheading_note") %></span></h3>
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-3">
+          <% text.each do |adapter| %>
+            <%= render "adapter_card", adapter: adapter %>
+          <% end %>
+        </div>
+        <div class="mt-3">
+          <%= render "adapter_modal", adapter: current_user.workspace.ai_adapters.new, modal_id: "new-text", label: t(".add_text_provider"), provider_type: :text %>
+          <button onclick="document.getElementById('new-text-modal').classList.remove('hidden')"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <%= t(".add_text_provider") %>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <%# ── Service Configuration ───────────────────────────────── %>
+    <div>
+      <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".services_heading") %></h2>
+      <p class="text-sm text-gray-500 mb-4"><%= t(".services_desc") %></p>
+
+      <% if @adapters.empty? %>
+        <%= render(Campbooks::EmptyState.new(variant: :card, title: t(".create_provider_first"), description: t(".create_provider_first_desc"))) %>
+      <% else %>
+        <div class="space-y-3">
+          <% AiConfiguration::PURPOSES.each do |purpose| %>
+            <% config = @configs[purpose] || current_user.workspace.ai_configurations.new(purpose: purpose) %>
+            <details class="bg-card rounded-xl shadow-sm border border-gray-200 group">
+              <summary class="px-4 py-3 cursor-pointer select-none list-none flex items-center justify-between hover:bg-gray-50 rounded-xl group-open:rounded-b-none transition-colors">
+                <div class="flex items-center gap-2">
+                  <svg class="w-3.5 h-3.5 text-gray-400 group-open:rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                  <h3 class="text-sm font-semibold text-gray-900"><%= human_enum(AiConfiguration, :purpose, purpose) %></h3>
+                </div>
+                <% if config.persisted? %>
+                  <%= render(Campbooks::Badge.new(variant: :accent)) { "#{config.provider} / #{config.model}" } %>
+                <% else %>
+                  <%= render(Campbooks::Badge.new(variant: :neutral)) { t(".not_configured") } %>
+                <% end %>
+              </summary>
+
+              <div class="border-t border-gray-100 px-4 py-3 space-y-3">
+              <%= form_with model: config, url: ai_configuration_path(purpose), method: :patch do |f| %>
+                <div>
+                  <%= f.label :ai_adapter_id, t(".provider_label"), class: "block text-xs font-medium text-gray-600 mb-1" %>
+                  <%= f.collection_select :ai_adapter_id, @adapters, :id, :name,
+                      { include_blank: t(".select_provider") },
+                      class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+                </div>
+                <div>
+                  <%= f.label :model, class: "block text-xs font-medium text-gray-600 mb-1" %>
+                  <%= f.text_field :model, class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <%= f.label :max_tokens, t(".max_tokens_label"), class: "block text-xs font-medium text-gray-600 mb-1" %>
+                    <%= f.number_field :max_tokens, class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+                  </div>
+                  <div>
+                    <%= f.label :temperature, t(".creativity_label"), class: "block text-xs font-medium text-gray-600 mb-1" %>
+                    <%= f.number_field :temperature, step: 0.1, min: 0.0, max: 2.0, class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+                  </div>
+                </div>
+                <div>
+                  <label class="flex items-center gap-1.5 text-sm">
+                    <%= f.check_box :enabled, class: "rounded border-gray-300 text-accent-600 focus:ring-accent-500" %>
+                    <span class="text-xs text-gray-600"><%= t(".enabled_label") %></span>
+                  </label>
+                </div>
+                <div>
+                  <%= f.label :system_prompt, t(".instructions_label"), class: "block text-xs font-medium text-gray-600 mb-1" %>
+                  <p class="text-xs text-gray-400 mb-1"><%= t(".instructions_hint") %></p>
+                  <div data-controller="tiptap-editor"
+                       data-tiptap-editor-content-value="<%= config.system_prompt.presence || '' %>"
+                       data-tiptap-editor-placeholder-value="<%= t(".instructions_placeholder") %>"
+                       data-tiptap-editor-toolbar-value="true"
+                       data-tiptap-editor-heading-value="false"
+                       data-tiptap-editor-code-block-value="false"
+                       class="border border-gray-300 rounded-lg bg-card overflow-hidden focus-within:border-accent-500 focus-within:ring-1 focus-within:ring-accent-500">
+                    <%= f.hidden_field :system_prompt, data: { tiptap_editor_target: "input" } %>
+                    <div data-tiptap-editor-target="toolbar" class="tiptap-toolbar">
+                      <button type="button" data-action="click->tiptap-editor#toggleBold" title="<%= t(".toolbar_bold") %>"><b>B</b></button>
+                      <button type="button" data-action="click->tiptap-editor#toggleItalic" title="<%= t(".toolbar_italic") %>"><i>I</i></button>
+                      <span class="tiptap-divider"></span>
+                      <button type="button" data-action="click->tiptap-editor#toggleBulletList" title="<%= t(".toolbar_bullet") %>">&bull; List</button>
+                      <button type="button" data-action="click->tiptap-editor#toggleOrderedList" title="<%= t(".toolbar_numbered") %>">1. List</button>
+                      <span class="tiptap-divider"></span>
+                      <button type="button" data-action="click->tiptap-editor#undo" title="<%= t(".toolbar_undo") %>">&#8634;</button>
+                      <button type="button" data-action="click->tiptap-editor#redo" title="<%= t(".toolbar_redo") %>">&#8635;</button>
+                    </div>
+                    <div data-tiptap-editor-target="editor" class="tiptap-editor"></div>
+                  </div>
+                </div>
+                <%= render(Campbooks::Button.new(variant: :primary, size: :sm, type: :submit, class: "w-full")) { t(".save_service", name: human_enum(AiConfiguration, :purpose, purpose)) } %>
+              <% end %>
+            </div></details>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# ── Help ────────────────────────────────────────────────── %>
+  <div class="lg:col-span-1">
+    <%= render(Campbooks::Card.new(padding: :md, class: "bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/25")) do %>
+      <div class="flex items-center gap-1.5 mb-2">
+        <svg class="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h2v2h-2v-2zm0-12h2v8h-2V5z"/>
+        </svg>
+        <span class="text-[11px] text-amber-700 font-semibold dark:text-amber-300"><%= t(".how_it_works_label") %></span>
+      </div>
+      <p class="text-sm text-gray-700 leading-relaxed">
+        <%= t(".how_it_works_body") %>
+      </p>
+    <% end %>
+
+    <%= render(Campbooks::Card.new(padding: :md, class: "mt-4")) do %>
+      <h3 class="text-sm font-semibold text-gray-900 mb-2"><%= t(".vision_providers_heading") %></h3>
+      <ul class="text-xs text-gray-600 space-y-1.5">
+        <li><strong class="text-gray-800">OpenAI</strong> — GPT-4o, GPT-4o-mini</li>
+        <li><strong class="text-gray-800">Anthropic</strong> — Claude models</li>
+        <li><strong class="text-gray-800">Gemini</strong> — Google AI models</li>
+      </ul>
+      <p class="text-xs text-gray-500 mt-2"><strong>DeepSeek</strong> <%= t(".vision_providers_deepseek_note") %></p>
+    <% end %>
+  </div>
+</div>

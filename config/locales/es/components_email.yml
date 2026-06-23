@@ -1,0 +1,191 @@
+---
+es:
+  components:
+    board_card:
+      no_subject: "(sin asunto)"
+      snoozed_prefix: Hasta
+    board_column:
+      awaiting: Esperando respuesta
+      awaiting_hint: 'Curado automáticamente: arrastra tarjetas hacia fuera, no hacia
+        dentro'
+      done: Hecho
+      empty: Nada aquí
+      inbox: Recibidos
+      more: "+ más"
+      snoozed: Pospuestos
+    category_chip:
+      labels:
+        important: Importante
+        notifications: Notificaciones
+        personal: Personal
+        promotions: Promociones
+        social: Social
+        updates: Actualizaciones
+    compose_actions:
+      section_labels:
+        select_account: De
+        send_email: Enviar
+        set_body: Cuerpo
+        set_recipients: Para
+        set_signature: Firma
+        set_subject: Asunto
+      use_this_draft: Usar este borrador
+    compose_area:
+      bcc_button: Cco
+      discard: Descartar
+      discard_aria: Descartar redacción
+      header_forward: Reenviando mensaje
+      header_new_message: Nuevo mensaje
+      header_reply: Respondiendo a %{address}
+      header_reply_all: Respondiendo a todos
+      label_bcc: 'Cco:'
+      label_cc: 'Cc:'
+      label_signature: 'Firma:'
+      label_subject: 'Asunto:'
+      label_to: 'Para:'
+      no_signature: Sin firma
+      placeholder_bcc: Añadir CCO...
+      placeholder_body: Escriba su mensaje...
+      placeholder_cc: Añadir CC...
+      placeholder_to: Buscar contactos o escribir correo...
+      send: Enviar
+      signature_default: "%{name} (predeterminada)"
+      signature_preview_label: Firma
+      toolbar_bold: Negrita
+      toolbar_bullet_list: Lista con viñetas
+      toolbar_italic: Cursiva
+      toolbar_link: Insertar enlace
+      toolbar_ordered_list: Lista numerada
+      toolbar_redo: Rehacer
+      toolbar_undo: Deshacer
+    compose_attachments:
+      attach: Adjuntar archivos
+      upload_failed: Error al subir
+    contact_avatar:
+      received_indicator: "↓"
+      sent_indicator: "↑"
+    contact_popover:
+      email_count_label: correos
+      last_email_label: 'último:'
+      view_profile: Ver perfil →
+    document_chip:
+      unclassified: Sin clasificar
+    email_account_popover:
+      connected: Conectada
+      disconnected: Desconectada
+      emails_label: correos
+      manage: Gestionar cuenta →
+      never_synced: Aún no sincronizada
+      synced_ago: Sincronizada hace %{time}
+      syncing: Sincronizando…
+    email_account_sharing:
+      add_button: Añadir
+      add_section_title: Añadir persona
+      all_have_access: Todos los miembros de su espacio de trabajo ya tienen acceso
+        a esta cuenta.
+      back_to_accounts: Cuentas
+      owner_badge: Propietario
+      panel_description: 'Elija quién en su espacio de trabajo puede ver o enviar
+        desde '
+      panel_title: Gestionar acceso
+      remove_access_title: Eliminar acceso
+      remove_confirm: "¿Eliminar el acceso de %{name} a %{email}?"
+      role_aria_label: Rol
+      role_for_aria: Rol para %{name}
+      select_person_placeholder: Seleccione una persona…
+      you_badge: "(usted)"
+    email_detail:
+      attachments:
+        count:
+          one: "%{count} archivo adjunto"
+          other: "%{count} archivos adjuntos"
+        from_message_title: 'Del mensaje: %{time}'
+        from_thread:
+          one: " de %{count} mensaje en la conversación"
+          other: " de %{count} mensajes en la conversación"
+      discussion: Conversación
+      forward: Reenviar
+      labels_label: Etiquetas
+      no_content: Sin contenido.
+      no_subject: "(sin asunto)"
+      open_full_view: Abrir en vista completa
+      reply: Responder
+      reply_all: Responder a todos
+      selected_badge: Seleccionado
+      send_to_notion: Guardar en Notion
+      tags_label: Etiquetas
+    email_filter_panel:
+      accounts: Cuentas
+      all_folders: Todas las carpetas
+      any_category: Cualquier categoría
+      any_priority: Cualquier prioridad
+      category: Categoría
+      date_from: Desde
+      date_to: Hasta
+      domain: Dominio
+      domain_placeholder: ejemplo.com
+      folder: Carpeta
+      has_attachment: Con adjunto
+      priority: Prioridad
+      priority_high: Alta
+      priority_low: Baja
+      priority_medium: Media
+      sender: Remitente
+      sender_placeholder: nombre o correo
+      tag_filter_placeholder: Filtrar etiquetas…
+      tag_match_all: Todas las etiquetas
+      tag_match_any: Cualquier etiqueta
+      tags: Etiquetas
+      unread: Solo no leídos
+    email_list_item:
+      no_subject: "(sin asunto)"
+      sent_to: Para %{address}
+    email_search_bar:
+      clear: Borrar búsqueda
+      filters: Filtros
+      placeholder: Buscar correo…
+    email_search_result:
+      no_subject: "(sin asunto)"
+      sent_to: Para %{address}
+    inbox_view_switcher:
+      aria_label: Disposición de la bandeja
+      board: Vista de tablero
+      default: Vista predeterminada
+      list: Vista de lista
+    new_folder_modal:
+      name_label: Nombre de la carpeta
+      name_placeholder: p. ej. Recibos
+      submit: Crear carpeta
+      subtitle: Se añade a todas tus bandejas conectadas.
+      title: Nueva carpeta
+    rich_text_editor:
+      align_center: Centrar
+      align_left: Alinear a la izquierda
+      align_right: Alinear a la derecha
+      block_type: Estilo de texto
+      blockquote: Cita
+      bold: Negrita
+      bullet_list: Lista con viñetas
+      clear_formatting: Borrar formato
+      code_block: Bloque de código
+      heading_1: Título 1
+      heading_2: Título 2
+      heading_3: Título 3
+      horizontal_rule: Separador
+      image: Insertar imagen
+      image_insert: Insertar
+      image_upload: Subir
+      image_url_placeholder: Pega la URL de la imagen…
+      inline_code: Código en línea
+      italic: Cursiva
+      link: Enlace
+      link_apply: Aplicar
+      link_remove: Quitar
+      link_url_placeholder: Pega o escribe una URL…
+      numbered_list: Lista numerada
+      paragraph: Texto normal
+      redo: Rehacer
+      strikethrough: Tachado
+      text_color: Color del texto
+      underline: Subrayado
+      undo: Deshacer

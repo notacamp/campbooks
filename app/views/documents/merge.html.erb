@@ -1,0 +1,46 @@
+<% content_for :main_class, "px-4 sm:px-6 lg:px-8 py-6" %>
+
+<%= render Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"), spacing: :lg) %>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  <% @docs.each do |doc| %>
+    <div class="bg-card rounded-xl shadow-sm border-2 border-gray-200 hover:border-accent-400 transition-colors p-4">
+      <div class="flex items-start justify-between mb-3">
+        <div>
+          <span class="text-xs text-gray-400">#<%= doc.id %></span>
+          <h3 class="text-sm font-semibold text-gray-900 mt-1"><%= doc.display_title %></h3>
+        </div>
+        <% if doc.classification %>
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium" style="<%= document_type_badge_style(doc.classification) %>">
+            <%= document_type_label(doc.classification) %>
+          </span>
+        <% end %>
+      </div>
+      <dl class="space-y-1 text-xs text-gray-500">
+        <dt class="inline font-medium text-gray-600"><%= t(".label_status") %> </dt>
+        <dd class="inline"><%= human_enum(Document, :review_status, doc.review_status) %></dd>
+        <% if doc.document_date %>
+          <br><dt class="inline font-medium text-gray-600"><%= t(".label_date") %> </dt>
+          <dd class="inline"><%= l(doc.document_date, format: :numeric) %></dd>
+        <% end %>
+        <% if doc.reference_display %>
+          <br><dt class="inline font-medium text-gray-600"><%= t(".label_ref") %> </dt>
+          <dd class="inline"><%= doc.reference_display %></dd>
+        <% end %>
+        <br><dt class="inline font-medium text-gray-600"><%= t(".label_linked_emails") %> </dt>
+        <dd class="inline"><%= doc.email_messages.size %></dd>
+        <br><dt class="inline font-medium text-gray-600"><%= t(".label_file") %> </dt>
+        <dd class="inline"><%= doc.original_file.filename %></dd>
+      </dl>
+
+      <%= button_to perform_merge_documents_path,
+            params: { keep_id: doc.id, merge_ids: @docs.map(&:id) },
+            method: :post,
+            form: { data: { turbo_confirm: t(".merge_confirm", count: @docs.size - 1) } } do %>
+        <%= render(Campbooks::Button.new(variant: :primary, type: :submit, class: "w-full")) { t(".keep_this_one") } %>
+      <% end %>
+    </div>
+  <% end %>
+</div>
+
+<%= render Campbooks::Button.new(variant: :ghost, href: documents_path, class: "mt-4") { t("shared.actions.cancel") } %>

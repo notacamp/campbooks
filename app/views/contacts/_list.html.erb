@@ -1,0 +1,18 @@
+<%# locals: people, pagy %>
+<div id="isc_rows" class="divide-y divide-border rounded-xl border border-border bg-card overflow-hidden">
+  <% if people.any? %>
+    <% people.each do |person| %>
+      <%= render "contacts/person", person: person %>
+    <% end %>
+  <% else %>
+    <p class="text-sm text-muted-foreground py-12 text-center"><%= t(".no_people") %></p>
+  <% end %>
+</div>
+
+<% if pagy && pagy.next %>
+  <%= turbo_frame_tag "isc_pagination",
+        src: contacts_path(page: pagy.next, q: params[:q].presence, format: :turbo_stream),
+        loading: :lazy do %>
+    <div class="flex justify-center py-4"><%= render(Campbooks::Spinner.new(size: :sm)) %></div>
+  <% end %>
+<% end %>

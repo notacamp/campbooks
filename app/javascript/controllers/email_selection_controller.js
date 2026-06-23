@@ -1,0 +1,154 @@
+import { Controller } from "@hotwired/stimulus"
+
+export default class extends Controller {
+  static targets = ["toolbar", "header", "count", "checkbox", "tagMenu", "folderMenu", "snoozeMenu"]
+
+  connect() {
+    this.selected = new Set()
+  }
+
+  // --- Selection ---
+
+  toggle(event) {
+    const cb = event.target
+    if (cb.checked) {
+      this.selected.add(cb.value)
+    } else {
+      this.selected.delete(cb.value)
+    }
+    this.updateUI()
+  }
+
+  toggleAll(event) {
+    const checked = event.target.checked
+    this.checkboxTargets.forEach(cb => {
+      cb.checked = checked
+      if (checked) {
+        this.selected.add(cb.value)
+      } else {
+        this.selected.delete(cb.value)
+      }
+    })
+    this.updateUI()
+  }
+
+  clear() {
+    this.selected.clear()
+    this.checkboxTargets.forEach(cb => cb.checked = false)
+    const selectAll = this.element.querySelector("[data-email-selection-select-all]")
+    if (selectAll) selectAll.checked = false
+    this.updateUI()
+    this.closeDropdowns()
+  }
+
+  // --- Actions ---
+
+  bulkAction(event) {
+    const button = event.currentTarget
+    const tool = button.dataset.tool
+    if (!tool) return
+
+    if (tool === "delete") {
+      if (!confirm(`Delete ${this.selected.size} email thread(s)? This cannot be undone.`)) return
+    }
+
+    const body = new FormData()
+    body.append("tool", tool)
+    this.selected.forEach(id => body.append("email_ids[]", id))
+
+    const csrfToken = document.querySelector("meta[name='csrf-token']")?.content
+    fetch("/email_messages/bulk", {
+      method: "POST",
+      headers: {
+        "X-CSRF-Token": csrfToken,
+        "Accept": "text/vnd.turbo-stream.html"
+      },
+      body: body
+    }).then(response => response.text()).then(html => {
+      if (html) {
+        Turbo.renderStreamMessage(html)
+      }
+    }).catch(() => {
+      // Turbo Stream handles errors via the server response
+    })
+
+    this.clear()
+  }
+
+  bulkActionWithArgs(event) {
+    const button = event.currentTarget
+    const tool = button.dataset.tool
+    const tagName = button.dataset.tagName
+    const tagAction = button.dataset.tagAction
+    const folderId = button.dataset.folderId
+    const snoozedUntil = button.dataset.snoozedUntil
+
+    if (!tool) return
+
+    const body = new FormData()
+    body.append("tool", tool)
+    this.selected.forEach(id => body.append("email_ids[]", id))
+    if (tagName) body.append("tag_name", tagName)
+    if (tagAction) body.append("tag_action", tagAction)
+    if (folderId) body.append("folder_id", folderId)
+    if (snoozedUntil) body.append("snoozed_until", snoozedUntil)
+
+    const csrfToken = document.querySelector("meta[name='csrf-token']")?.content
+    fetch("/email_messages/bulk", {
+      method: "POST",
+      headers: {
+        "X-CSRF-Token": csrfToken,
+        "Accept": "text/vnd.turbo-stream.html"
+      },
+      body: body
+    }).then(response => response.text()).then(html => {
+      if (html) {
+        Turbo.renderStreamMessage(html)
+      }
+    }).catch(() => {})
+
+    this.clear()
+    this.closeDropdowns()
+  }
+
+  // --- Dropdowns ---
+
+  toggleDropdown(event) {
+    const menu = event.currentTarget.dataset.menu
+    this.closeDropdowns()
+    if (menu === "tag") {
+      this.tagMenuTarget.classList.toggle("hidden")
+    } else if (menu === "folder") {
+      this.folderMenuTarget.classList.toggle("hidden")
+    } else if (menu === "snooze") {
+      this.snoozeMenuTarget.classList.toggle("hidden")
+    }
+  }
+
+  closeDropdowns() {
+    if (this.hasTagMenuTarget) this.tagMenuTarget.classList.add("hidden")
+    if (this.hasFolderMenuTarget) this.folderMenuTarget.classList.add("hidden")
+    if (this.hasSnoozeMenuTarget) this.snoozeMenuTarget.classList.add("hidden")
+  }
+
+  // --- Keyboard ---
+
+  keydown(event) {
+    if (event.key === "Escape") {
+      this.clear()
+    }
+  }
+
+  // --- UI ---
+
+  updateUI() {
+    if (this.selected.size > 0) {
+      this.toolbarTarget.classList.remove("hidden")
+      this.headerTarget.classList.add("hidden")
+      this.countTarget.textContent = this.selected.size
+    } else {
+      this.toolbarTarget.classList.add("hidden")
+      this.headerTarget.classList.remove("hidden")
+    }
+  }
+}

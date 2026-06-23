@@ -1,0 +1,221 @@
+---
+pt:
+  email_messages:
+    notion_exports:
+      new:
+        title: Guardar no Notion
+        subtitle: "Adicionar este email (%{subject}) ao Notion."
+        no_subject: "(sem assunto)"
+        heading: Para onde deve ir?
+        workspace: Espaço de trabalho
+        workspace_one: "Espaço de trabalho: %{name}"
+        to_database: Adicionar a uma base de dados
+        to_database_desc: Criar um item na base de dados e preencher os seus campos.
+        to_page: Criar uma página
+        to_page_desc: Adicionar uma subpágina sob uma página à sua escolha.
+      databases:
+        search: Pesquisar bases de dados…
+        none: Nenhuma base de dados encontrada. Partilhe uma base de dados com esta
+          integração no Notion.
+        error: "Não foi possível carregar as bases de dados: %{message}"
+      database_form:
+        untitled: Base de dados sem título
+        back: "← Bases de dados"
+        create_item: Criar item no Notion
+        error: "Não foi possível carregar a base de dados: %{message}"
+        attachments_count:
+          one: "%{count} anexo"
+          other: "%{count} anexos"
+      pages:
+        search: Pesquisar páginas…
+        parent_page: Página principal
+        none: Nenhuma página encontrada. Partilhe uma página com esta integração no
+          Notion.
+        page_title: Título da página
+        note: Nota (opcional)
+        attach_files:
+          one: Anexar o anexo do email
+          other: Anexar os %{count} anexos do email
+        create_page: Criar página no Notion
+        error: "Não foi possível carregar as páginas: %{message}"
+      create:
+        pick_destination: Escolha um destino no Notion.
+        created: Guardado no Notion.
+        failed: Não foi possível criar o item no Notion.
+        failed_with: "Exportação para o Notion falhou: %{message}"
+      errors:
+        not_connected: Ligue o Notion primeiro.
+    board:
+      index:
+        heading: Quadro
+    empty:
+      add_account_button: Adicionar conta de email
+      connect_email_description: Ligue uma conta de email para começar a receber e
+        processar emails automaticamente.
+      connect_email_title: Ligar o seu email
+      manage_accounts_button: Gerir contas de email
+      no_mail_yet_description: As suas contas de email estão ligadas. O correio aparecerá
+        aqui após a próxima sincronização.
+      no_mail_yet_title: Ainda sem correio
+    empty_detail:
+      no_email_selected: Nenhum email selecionado
+      select_prompt: Selecione um email na barra lateral para o ver aqui.
+    index:
+      all_folder_label: Todos
+      collapse_sidebar_aria: Recolher barra lateral
+      expand_sidebar_aria: Expandir barra lateral
+      folders_heading: Pastas
+      inbox_heading: Caixa de entrada
+      inbox_settings_aria: Definições da caixa de entrada
+      new_message_title: Nova mensagem
+      no_email_selected: Nenhum email selecionado
+      no_emails_in_folder: Nenhum email nesta pasta.
+      select_all_label: Todos
+      toolbar_clear_selection_title: Limpar seleção
+      toolbar_delete_title: Eliminar
+      toolbar_mark_read_title: Marcar como lido
+      toolbar_mark_unread_title: Marcar como não lido
+      toolbar_move_folder_title: Mover para pasta
+      toolbar_scout_chat_title: Enviar para o Scout
+      toolbar_send_to_scout_title: Enviar para o Scout
+      toolbar_snooze_title: Adiar
+      toolbar_tag_title: Etiqueta
+    mobile_folder_bar:
+      all: Todos
+      new_folder: Nova pasta
+    new:
+      all_folder_label: Todos
+      bcc_label: 'Bcc:'
+      bcc_placeholder: Adicionar BCC...
+      bcc_toggle_label: Bcc
+      cc_label: 'Cc:'
+      cc_placeholder: Adicionar CC...
+      close_scout_aria: Fechar Scout
+      collapse_sidebar_aria: Recolher barra lateral
+      expand_sidebar_aria: Expandir barra lateral
+      folders_heading: Pastas
+      from_label: 'De:'
+      inbox_heading: Caixa de entrada
+      inbox_settings_aria: Definições da caixa de entrada
+      new_message_heading: Nova Mensagem
+      no_emails_yet: Ainda não há emails.
+      no_sendable_accounts_description: É necessária uma conta de email com permissão
+        de envio para redigir novas mensagens.
+      no_sendable_accounts_title: Sem contas para envio
+      no_signature_option: Sem assinatura
+      scout_keyboard_hint: Cmd+Shift+E para manual
+      scout_label: Scout
+      signature_default_suffix: "(predefinição)"
+      signature_label: 'Assin.:'
+      signature_preview_heading: Assinatura
+      subject_label: 'Assunto:'
+      subject_placeholder: Assunto
+      to_label: 'Para:'
+      to_placeholder: Pesquisar contactos ou escrever email...
+      toggle_chat_aria: Alternar chat
+      write_message_placeholder: Escreva a sua mensagem...
+    reply_actions:
+      forward_title: Reencaminhar
+      reply_all_title: Responder a todos
+      reply_title: Responder
+    search:
+      chips:
+        account: 'Conta: %{value}'
+        category: 'Categoria: %{value}'
+        date_from: Depois de %{value}
+        date_to: Antes de %{value}
+        domain: 'Domínio: %{value}'
+        folder: 'Pasta: %{value}'
+        has_attachment: Com anexo
+        priority: 'Prioridade: %{value}'
+        sender: 'De: %{value}'
+        tag: 'Etiqueta: %{value}'
+        unread: Não lidas
+      no_results: Nenhum email correspondente
+      no_results_hint: Tente menos filtros ou uma pesquisa mais ampla.
+      results_heading: Resultados da pesquisa
+    show:
+      ai_processed_badge: Processado por IA
+      all_folder_label: Todos
+      back_to_inbox_label: Caixa de entrada
+      close_discussion_aria: Fechar discussão
+      close_scout_aria: Fechar Scout
+      collapse_discussion_aria: Recolher discussão
+      collapse_sidebar_aria: Recolher barra lateral
+      compose_label: Compor
+      discussion_button_label: Discussão
+      discussion_empty_body: Deixe uma nota para a sua equipa, ou mencione %{scout_mention}
+        para perguntar à IA sobre este email.
+      discussion_empty_heading: Iniciar a discussão
+      discussion_label: Discussão
+      expand_sidebar_aria: Expandir barra lateral
+      folders_heading: Pastas
+      inbox_heading: Caixa de entrada
+      inbox_settings_aria: Definições da caixa de entrada
+      new_message_title: Nova mensagem
+      no_emails_yet: Ainda não há emails.
+      scout_keyboard_hint: Cmd+Shift+E para manual
+      scout_label: Scout
+      show_discussion_aria: Mostrar discussão
+      show_discussion_title: Mostrar discussão
+      snoozed_until_badge: Adiado até %{time}
+      toggle_chat_aria: Alternar chat
+      toolbar_clear_selection_title: Limpar seleção
+      toolbar_delete_title: Eliminar
+      toolbar_mark_read_title: Marcar como lido
+      toolbar_mark_unread_title: Marcar como não lido
+      toolbar_move_folder_title: Mover para pasta
+      toolbar_scout_chat_title: Enviar para o Scout
+      toolbar_send_to_scout_title: Enviar para o Scout
+      toolbar_snooze_title: Adiar
+      toolbar_tag_title: Etiqueta
+      unsnooze_label: Cancelar adiamento
+      unsnooze_title: Cancelar adiamento
+    snooze_button:
+      ok: OK
+      snooze_title: Adiar
+    tags:
+      add_tag_aria: Adicionar etiqueta
+      remove_tag_title: Remover etiqueta
+      search_tags_placeholder: Pesquisar etiquetas...
+    thread_list:
+      back_to_inbox: "— voltar à caixa de entrada"
+      drag_to_folder: Arrastar para uma pasta
+      no_subject: "(sem assunto)"
+      pin_title: Tornar prioritário
+      priority_section: Prioritário
+      senders_more: "%{first}, %{second}, e mais"
+      sent_to_prefix: 'Para:'
+      unpin_title: Remover prioridade
+    zoho_labels:
+      add_label_aria: Adicionar rótulo
+      remove_label_title: Remover rótulo
+      search_labels_placeholder: Pesquisar rótulos...
+  email_scans:
+    show:
+      account_label: Conta
+      breadcrumb_scans: Sincronizações
+      completed_label: Concluído
+      documents_created_label: Documentos criados
+      emails_found_label: Emails encontrados
+      emails_in_scan_heading: Emails nesta sincronização
+      emails_processed_label: Emails processados
+      error_details_heading: Detalhes do erro
+      errors_label: Erros
+      no_subject: "(sem assunto)"
+      page_heading: 'Sincronização #%{id}'
+      started_label: Iniciado
+      status_label: Estado
+      table_from: De
+      table_received: Recebido
+      table_status: Estado
+      table_subject: Assunto
+  email_threads:
+    show:
+      added_to_discussion: Foi adicionado a esta discussão. Pode ver a conversa abaixo
+        e responder.
+      back_to_inbox: Voltar à caixa de entrada
+      discussion_empty_body: Deixe uma nota, ou mencione %{scout_mention} para perguntar
+        à IA sobre este email.
+      discussion_empty_heading: Iniciar a discussão
+      discussion_heading: Discussão

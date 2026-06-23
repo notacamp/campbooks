@@ -1,0 +1,76 @@
+#!/usr/bin/env sh
+
+if ! gem list foreman -i --silent; then
+  echo "Installing foreman..."
+  gem install foreman
+fi
+
+# Default to port 3000 if not specified
+export PORT="${PORT:-3000}"
+
+# ── Stop any running servers ────────────────────────────────────────────────
+# DO NOT REMOVE any of these kill steps. Each targets a different scenario.
+#
+# SIGKILL on foreman orphans its children — they keep running. After that,
+# bin/dev fails because:
+#   a) The stale tmp/pids/server.pid makes Rails think a server is running.
+#   b) The orphaned puma holds the port.
+#   c) Orphaned solid-queue / tailwindcss waste resources.
+#
+# The kill patterns below match the ACTUAL process command lines, not the
+# Procfile.dev commands (foreman expands "bin/rails server" → "puma ...",
+# "tailwindcss:watch" → "tailwindcss ... -w", etc.).
+
+echo "==> Starting Docker services..."
+docker compose -f docker-compose.dev.yml up -d --wait 2>/dev/null || echo "   (Docker not available — skipping)"
+
+echo "==> Checking for running project processes..."
+
+STALE_PID="tmp/pids/server.pid"
+if [ -f "$STALE_PID" ]; then
+  STALE=$(cat "$STALE_PID" 2>/dev/null)
+  echo "==> Removing stale server PID file (pid: $STALE)..."
+  rm -f "$STALE_PID"
+fi
+
+COUNT=0
+
+# 1. puma — the actual Rails server process (not "bin/rails server")
+KILLED=$(pkill -9 -f "puma.*campbooks" 2>/dev/null && echo "1" || echo "0")
+if [ "$KILLED" = "1" ]; then COUNT=$((COUNT + 1)); echo "   Killed puma"; fi
+
+# 2. solid-queue — the actual job worker process (not "solid_queue:start")
+KILLED=$(pkill -9 -f "solid-queue" 2>/dev/null && echo "1" || echo "0")
+if [ "$KILLED" = "1" ]; then COUNT=$((COUNT + 1)); echo "   Killed solid-queue"; fi
+
+# 3. tailwindcss — the actual watcher binary (not "tailwindcss:watch")
+KILLED=$(pkill -9 -f "tailwindcss.*campbooks" 2>/dev/null && echo "1" || echo "0")
+if [ "$KILLED" = "1" ]; then COUNT=$((COUNT + 1)); echo "   Killed tailwindcss"; fi
+
+# 4. foreman itself (process group leader, if still alive)
+KILLED=$(pkill -9 -f "foreman start" 2>/dev/null && echo "1" || echo "0")
+if [ "$KILLED" = "1" ]; then COUNT=$((COUNT + 1)); echo "   Killed foreman"; fi
+
+# 5. Anything still holding the port (belt-and-suspenders)
+pids=$(lsof -ti :"$PORT" 2>/dev/null)
+if [ -n "$pids" ]; then
+  echo "   Killing port $PORT holders: $pids"
+  kill -9 $pids 2>/dev/null || true
+  COUNT=$((COUNT + 1))
+fi
+
+if [ "$COUNT" -eq 0 ]; then
+  echo "   (none found)"
+else
+  echo "==> Stopped $COUNT running process(es)."
+  sleep 0.5
+fi
+
+# ── Start ───────────────────────────────────────────────────────────────────
+
+# Let the debug gem allow remote connections,
+# but avoid loading until `debugger` is called
+export RUBY_DEBUG_OPEN="true"
+export RUBY_DEBUG_LAZY="true"
+
+exec foreman start -f Procfile.dev "$@"

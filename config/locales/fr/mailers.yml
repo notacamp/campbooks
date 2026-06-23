@@ -1,0 +1,66 @@
+---
+fr:
+  invitation_mailer:
+    invitation:
+      accept_button: Accepter l'invitation
+      accept_text: 'Acceptez l''invitation ici :'
+      body_html: "%{inviter} vous invite à rejoindre %{workspace} sur Campbooks."
+      body_text: "%{inviter} vous invite à rejoindre %{workspace} sur Campbooks."
+      expires: Cette invitation expire dans 7 jours.
+      greeting: Bonjour,
+      ignore: Vous ne l'attendiez pas ? Pas de souci — ignorez simplement cet e-mail.
+      subject: "%{inviter} vous invite à rejoindre %{workspace} sur Campbooks"
+  notification_mailer:
+    mention:
+      body_html: "%{actor} vous a mentionné dans la discussion sur %{subject}."
+      body_text: '%{actor} vous a mentionné dans la discussion sur "%{subject}".'
+      footer: Vous recevez cet e-mail car vous avez été mentionné. Désactivez les
+        e-mails de mention dans vos paramètres de notifications.
+      greeting: Bonjour %{name},
+      subject: "%{actor} vous a mentionné dans une discussion"
+      view_button: Voir la discussion
+      view_text: 'Voir la discussion :'
+    thread_activity:
+      body_html: "%{actor} a ajouté un commentaire à une discussion que vous suivez,
+        %{subject}."
+      body_text: '%{actor} a ajouté un commentaire à une discussion que vous suivez,
+        "%{subject}".'
+      footer: Vous recevez cet e-mail car vous suivez cette conversation. Vous pouvez
+        vous désabonner depuis le panneau de discussion.
+      greeting: Bonjour %{name},
+      subject: Nouveau commentaire sur "%{subject}"
+      view_button: Voir la discussion
+      view_text: 'Voir la discussion :'
+  passwords_mailer:
+    reset:
+      body: 'Vous avez demandé à réinitialiser votre mot de passe Campbooks. Voici
+        le lien pour le faire :'
+      body_text: Vous pouvez réinitialiser votre mot de passe sur
+      expires: Ce lien expire dans %{duration}.
+      expires_text: Ce lien expirera dans %{duration}.
+      greeting: Bonjour,
+      ignore: Vous n'avez pas fait cette demande ? Ignorez simplement cet e-mail.
+      reset_button: Réinitialiser le mot de passe
+      subject: Réinitialisez votre mot de passe
+  signup_request_mailer:
+    approved:
+      body: Votre demande de compte Campbooks a été approuvée. Cliquez sur le bouton
+        ci-dessous pour finaliser la création de votre compte.
+      body_text: 'Votre demande de compte Campbooks a été approuvée. Visitez le lien
+        ci-dessous pour finaliser la création de votre compte :'
+      complete_button: Finaliser l'inscription
+      greeting: Bonjour %{name},
+      ignore: Si vous n'avez pas demandé d'accès, ignorez cet e-mail.
+      subject: Votre compte Campbooks a été approuvé
+      unique: Ce lien vous est réservé et ne doit pas être partagé.
+  verification_mailer:
+    verify:
+      body: 'Voici votre code de vérification Campbooks :'
+      body_text: 'Votre code de vérification Campbooks est : %{code}'
+      expires: Il est valable 10 minutes.
+      expires_text: Ce code expire dans 10 minutes.
+      greeting: Bonjour %{name},
+      ignore: Vous n'avez pas demandé de code ? Aucune action requise — ignorez simplement
+        cet e-mail.
+      ignore_text: Si vous n'avez pas demandé ce code, ignorez simplement cet e-mail.
+      subject: "%{code} est votre code de vérification Campbooks"

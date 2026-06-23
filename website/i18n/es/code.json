@@ -1,0 +1,1313 @@
+{
+  "theme.ErrorPageContent.title": {
+    "message": "Esta página ha fallado.",
+    "description": "The title of the fallback page when the page crashed"
+  },
+  "theme.BackToTopButton.buttonAriaLabel": {
+    "message": "Volver al principio",
+    "description": "The ARIA label for the back to top button"
+  },
+  "theme.blog.archive.title": {
+    "message": "Archivo",
+    "description": "The page & hero title of the blog archive page"
+  },
+  "theme.blog.archive.description": {
+    "message": "Archivo",
+    "description": "The page & hero description of the blog archive page"
+  },
+  "theme.blog.paginator.navAriaLabel": {
+    "message": "Navegación por la página de la lista de blogs ",
+    "description": "The ARIA label for the blog pagination"
+  },
+  "theme.blog.paginator.newerEntries": {
+    "message": "Entradas más recientes",
+    "description": "The label used to navigate to the newer blog posts page (previous page)"
+  },
+  "theme.blog.paginator.olderEntries": {
+    "message": "Entradas más antiguas",
+    "description": "The label used to navigate to the older blog posts page (next page)"
+  },
+  "theme.blog.post.paginator.navAriaLabel": {
+    "message": "Barra de paginación de publicaciones del blog",
+    "description": "The ARIA label for the blog posts pagination"
+  },
+  "theme.blog.post.paginator.newerPost": {
+    "message": "Publicación más reciente",
+    "description": "The blog post button label to navigate to the newer/previous post"
+  },
+  "theme.blog.post.paginator.olderPost": {
+    "message": "Publicación más antigua",
+    "description": "The blog post button label to navigate to the older/next post"
+  },
+  "theme.tags.tagsPageLink": {
+    "message": "Ver Todas las Etiquetas",
+    "description": "The label of the link targeting the tag list page"
+  },
+  "theme.colorToggle.ariaLabel.mode.system": {
+    "message": "modo sistema",
+    "description": "The name for the system color mode"
+  },
+  "theme.colorToggle.ariaLabel.mode.light": {
+    "message": "modo claro",
+    "description": "The name for the light color mode"
+  },
+  "theme.colorToggle.ariaLabel.mode.dark": {
+    "message": "modo oscuro",
+    "description": "The name for the dark color mode"
+  },
+  "theme.colorToggle.ariaLabel": {
+    "message": "Cambiar entre modo oscuro y claro (actualmente {mode})",
+    "description": "The ARIA label for the color mode toggle"
+  },
+  "theme.docs.breadcrumbs.navAriaLabel": {
+    "message": "Rastro de navegación",
+    "description": "The ARIA label for the breadcrumbs"
+  },
+  "theme.docs.paginator.navAriaLabel": {
+    "message": "Página del documento",
+    "description": "The ARIA label for the docs pagination"
+  },
+  "theme.docs.paginator.previous": {
+    "message": "Anterior",
+    "description": "The label used to navigate to the previous doc"
+  },
+  "theme.docs.paginator.next": {
+    "message": "Siguiente",
+    "description": "The label used to navigate to the next doc"
+  },
+  "theme.docs.tagDocListPageTitle.nDocsTagged": {
+    "message": "Un documento etiquetado|{count} documentos etiquetados",
+    "description": "Pluralized label for \"{count} docs tagged\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.docs.tagDocListPageTitle": {
+    "message": "{nDocsTagged} con \"{tagName}\"",
+    "description": "The title of the page for a docs tag"
+  },
+  "theme.docs.versionBadge.label": {
+    "message": "Version: {versionLabel}"
+  },
+  "theme.docs.versions.unreleasedVersionLabel": {
+    "message": "Esta es la documentación sin publicar para {siteTitle}, versión {versionLabel}.",
+    "description": "The label used to tell the user that he's browsing an unreleased doc version"
+  },
+  "theme.docs.versions.unmaintainedVersionLabel": {
+    "message": "Esta es la documentación para {siteTitle} {versionLabel}, que ya no se mantiene activamente.",
+    "description": "The label used to tell the user that he's browsing an unmaintained doc version"
+  },
+  "theme.docs.versions.latestVersionSuggestionLabel": {
+    "message": "Para la documentación actualizada, vea {latestVersionLink} ({versionLabel}).",
+    "description": "The label used to tell the user to check the latest version"
+  },
+  "theme.docs.versions.latestVersionLinkLabel": {
+    "message": "última versión",
+    "description": "The label used for the latest version suggestion link label"
+  },
+  "theme.common.editThisPage": {
+    "message": "Editar esta página",
+    "description": "The link label to edit the current page"
+  },
+  "theme.common.headingLinkTitle": {
+    "message": "Enlace directo al {heading}",
+    "description": "Title for link to heading"
+  },
+  "theme.lastUpdated.atDate": {
+    "message": " en {date}",
+    "description": "The words used to describe on which date a page has been last updated"
+  },
+  "theme.lastUpdated.byUser": {
+    "message": " por {user}",
+    "description": "The words used to describe by who the page has been last updated"
+  },
+  "theme.lastUpdated.lastUpdatedAtBy": {
+    "message": "Última actualización{atDate}{byUser}",
+    "description": "The sentence used to display when a page has been last updated, and by who"
+  },
+  "theme.navbar.mobileVersionsDropdown.label": {
+    "message": "Versiones",
+    "description": "The label for the navbar versions dropdown on mobile view"
+  },
+  "theme.NotFound.title": {
+    "message": "Página No Encontrada",
+    "description": "The title of the 404 page"
+  },
+  "theme.tags.tagsListLabel": {
+    "message": "Etiquetas:",
+    "description": "The label alongside a tag list"
+  },
+  "theme.admonition.caution": {
+    "message": "precaución",
+    "description": "The default label used for the Caution admonition (:::caution)"
+  },
+  "theme.admonition.danger": {
+    "message": "peligro",
+    "description": "The default label used for the Danger admonition (:::danger)"
+  },
+  "theme.admonition.info": {
+    "message": "info",
+    "description": "The default label used for the Info admonition (:::info)"
+  },
+  "theme.admonition.note": {
+    "message": "nota",
+    "description": "The default label used for the Note admonition (:::note)"
+  },
+  "theme.admonition.tip": {
+    "message": "tip",
+    "description": "The default label used for the Tip admonition (:::tip)"
+  },
+  "theme.admonition.warning": {
+    "message": "aviso",
+    "description": "The default label used for the Warning admonition (:::warning)"
+  },
+  "theme.AnnouncementBar.closeButtonAriaLabel": {
+    "message": "Cerrar",
+    "description": "The ARIA label for close button of announcement bar"
+  },
+  "theme.blog.sidebar.navAriaLabel": {
+    "message": "Navegación de publicaciones recientes",
+    "description": "The ARIA label for recent posts in the blog sidebar"
+  },
+  "theme.DocSidebarItem.expandCategoryAriaLabel": {
+    "message": "Ampliar la categoría '{label}' de la barra lateral",
+    "description": "The ARIA label to expand the sidebar category"
+  },
+  "theme.DocSidebarItem.collapseCategoryAriaLabel": {
+    "message": "Colapsar categoría '{label}' de la barra lateral",
+    "description": "The ARIA label to collapse the sidebar category"
+  },
+  "theme.IconExternalLink.ariaLabel": {
+    "message": "(se abre en una nueva pestaña)",
+    "description": "The ARIA label for the external link icon"
+  },
+  "theme.NavBar.navAriaLabel": {
+    "message": "Principal",
+    "description": "The ARIA label for the main navigation"
+  },
+  "theme.navbar.mobileLanguageDropdown.label": {
+    "message": "Idiomas",
+    "description": "The label for the mobile language switcher dropdown"
+  },
+  "theme.NotFound.p1": {
+    "message": "No pudimos encontrar lo que buscaba.",
+    "description": "The first paragraph of the 404 page"
+  },
+  "theme.NotFound.p2": {
+    "message": "Comuníquese con el dueño del sitio que le proporcionó la URL original y hágale saber que su vínculo está roto.",
+    "description": "The 2nd paragraph of the 404 page"
+  },
+  "theme.TOCCollapsible.toggleButtonLabel": {
+    "message": "En esta página",
+    "description": "The label used by the button on the collapsible TOC component"
+  },
+  "theme.blog.post.readMore": {
+    "message": "Leer Más",
+    "description": "The label used in blog post item excerpts to link to full blog posts"
+  },
+  "theme.blog.post.readMoreLabel": {
+    "message": "Leer más acerca de {title}",
+    "description": "The ARIA label for the link to full blog posts from excerpts"
+  },
+  "theme.blog.post.readingTime.plurals": {
+    "message": "Lectura de un minuto|{readingTime} min de lectura",
+    "description": "Pluralized label for \"{readingTime} min read\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.CodeBlock.copy": {
+    "message": "Copiar",
+    "description": "The copy button label on code blocks"
+  },
+  "theme.CodeBlock.copied": {
+    "message": "Copiado",
+    "description": "The copied button label on code blocks"
+  },
+  "theme.CodeBlock.copyButtonAriaLabel": {
+    "message": "Copiar código",
+    "description": "The ARIA label for copy code blocks button"
+  },
+  "theme.CodeBlock.wordWrapToggle": {
+    "message": "Alternar ajuste de palabras",
+    "description": "The title attribute for toggle word wrapping button of code block lines"
+  },
+  "theme.docs.breadcrumbs.home": {
+    "message": "Página de Inicio",
+    "description": "The ARIA label for the home page in the breadcrumbs"
+  },
+  "theme.docs.sidebar.collapseButtonTitle": {
+    "message": "Colapsar barra lateral",
+    "description": "The title attribute for collapse button of doc sidebar"
+  },
+  "theme.docs.sidebar.collapseButtonAriaLabel": {
+    "message": "Colapsar barra lateral",
+    "description": "The title attribute for collapse button of doc sidebar"
+  },
+  "theme.docs.sidebar.navAriaLabel": {
+    "message": "Barra lateral de Documentos",
+    "description": "The ARIA label for the sidebar navigation"
+  },
+  "theme.docs.sidebar.closeSidebarButtonAriaLabel": {
+    "message": "Cerrar barra de lateral",
+    "description": "The ARIA label for close button of mobile sidebar"
+  },
+  "theme.navbar.mobileSidebarSecondaryMenu.backButtonLabel": {
+    "message": "← Volver al menú principal",
+    "description": "The label of the back button to return to main menu, inside the mobile navbar sidebar secondary menu (notably used to display the docs sidebar)"
+  },
+  "theme.docs.sidebar.toggleSidebarButtonAriaLabel": {
+    "message": "Alternar barra lateral",
+    "description": "The ARIA label for hamburger menu button of mobile navigation"
+  },
+  "theme.navbar.mobileDropdown.collapseButton.expandAriaLabel": {
+    "message": "Expandir el menú desplegable",
+    "description": "The ARIA label of the button to expand the mobile dropdown navbar item"
+  },
+  "theme.navbar.mobileDropdown.collapseButton.collapseAriaLabel": {
+    "message": "Contraer el menú desplegable",
+    "description": "The ARIA label of the button to collapse the mobile dropdown navbar item"
+  },
+  "theme.docs.sidebar.expandButtonTitle": {
+    "message": "Expandir barra lateral",
+    "description": "The ARIA label and title attribute for expand button of doc sidebar"
+  },
+  "theme.docs.sidebar.expandButtonAriaLabel": {
+    "message": "Expandir barra lateral",
+    "description": "The ARIA label and title attribute for expand button of doc sidebar"
+  },
+  "theme.blog.post.plurals": {
+    "message": "Una publicación|{count} publicaciones",
+    "description": "Pluralized label for \"{count} posts\". Use as much plural forms (separated by \"|\") as your language support (see https://www.unicode.org/cldr/cldr-aux/charts/34/supplemental/language_plural_rules.html)"
+  },
+  "theme.blog.tagTitle": {
+    "message": "{nPosts} etiquetados con \"{tagName}\"",
+    "description": "The title of the page for a blog tag"
+  },
+  "theme.blog.author.pageTitle": {
+    "message": "{authorName} - {nPosts}",
+    "description": "The title of the page for a blog author"
+  },
+  "theme.blog.authorsList.pageTitle": {
+    "message": "Autores",
+    "description": "The title of the authors page"
+  },
+  "theme.blog.authorsList.viewAll": {
+    "message": "Ver todos los autores",
+    "description": "The label of the link targeting the blog authors page"
+  },
+  "theme.blog.author.noPosts": {
+    "message": "Este autor aún no ha escrito ninguna publicación.",
+    "description": "The text for authors with 0 blog post"
+  },
+  "theme.contentVisibility.unlistedBanner.title": {
+    "message": "Página sin clasificar",
+    "description": "The unlisted content banner title"
+  },
+  "theme.contentVisibility.unlistedBanner.message": {
+    "message": "Esta página está sin clasificar. Los motores de búsqueda no la indexaran, y solo los usuarios con el enlace directo podrán acceder a esta.",
+    "description": "The unlisted content banner message"
+  },
+  "theme.contentVisibility.draftBanner.title": {
+    "message": "Página en borrador",
+    "description": "The draft content banner title"
+  },
+  "theme.contentVisibility.draftBanner.message": {
+    "message": "Esta página es un borrador. Solo será visible en desarrollo y quedará excluida de la compilación de producción.",
+    "description": "The draft content banner message"
+  },
+  "theme.docs.DocCard.categoryDescription.plurals": {
+    "message": "1 artículo|{count} artículos",
+    "description": "The default description for a category card in the generated index about how many items this category includes"
+  },
+  "theme.ErrorPageContent.tryAgain": {
+    "message": "Intente de nuevo",
+    "description": "The label of the button to try again rendering when the React error boundary captures an error"
+  },
+  "theme.common.skipToMainContent": {
+    "message": "Saltar al contenido principal",
+    "description": "The skip to content label used for accessibility, allowing to rapidly navigate to main content with keyboard tab/enter navigation"
+  },
+  "theme.tags.tagsPageTitle": {
+    "message": "Etiquetas",
+    "description": "The title of the tag list page"
+  },
+  "about.page.title": {
+    "message": "Sobre Campbooks"
+  },
+  "about.page.description": {
+    "message": "Campbooks es un cliente de correo electrónico nativo de IA, con disponibilidad de codigo fuente, para profesionales y pequeñas empresas."
+  },
+  "about.hero.title": {
+    "message": "Sobre Campbooks"
+  },
+  "about.hero.p1": {
+    "message": "Campbooks es un cliente de correo electrónico nativo de IA con codigo fuente disponible, para profesionales y pequeñas empresas que viven entre correos y papeleo. Lee tu bandeja de entrada y los adjuntos, usa IA para archivar y destacar lo que importa, y te ofrece un flujo claro de revisión y aprobación, reinventado para que no se parezca en nada al correo al que estás acostumbrado."
+  },
+  "about.hero.p2": {
+    "message": "La interfaz es cálida, clara y humana, como un asistente amable que resulta ser muy competente. Sin sobrecarga de barras de herramientas, sin jerga empresarial, sin estética fintech estéril. Solo un lugar rápido y enfocado para gestionar tu papeleo y volver a tu trabajo de verdad."
+  },
+  "about.hero.p3.prefix": {
+    "message": "Campbooks está desarrollado y mantenido por"
+  },
+  "about.hero.p3.suffix": {
+    "message": "un estudio que crea herramientas para pequeñas empresas."
+  },
+  "about.technology.title": {
+    "message": "Tecnología"
+  },
+  "about.opensource.title": {
+    "message": "Codigo fuente disponible"
+  },
+  "about.opensource.p1": {
+    "message": "Campbooks se publica bajo la Sustainable Use License, una licencia de tipo fair-code con codigo fuente disponible. Puedes ver el codigo fuente, reportar problemas y contribuir en GitHub."
+  },
+  "home.hero.eyebrow": {
+    "message": "Tu papeleo, ordenado"
+  },
+  "home.hero.title": {
+    "message": "La bandeja de entrada que se organiza sola."
+  },
+  "home.hero.lede": {
+    "message": "Campbooks lee tus correos y adjuntos, archiva las facturas, recibos y contratos por su cuenta, y te entrega una lista breve de lo que realmente te necesita. Para que puedas volver a dirigir tu negocio."
+  },
+  "home.hero.cta.start": {
+    "message": "Únete a la beta"
+  },
+  "home.hero.cta.selfhost": {
+    "message": "Alójalo tú mismo"
+  },
+  "home.hero.trust.free": {
+    "message": "Autoalojamiento gratuito"
+  },
+  "home.hero.trust.mit": {
+    "message": "Codigo fuente disponible"
+  },
+  "home.hero.trust.data": {
+    "message": "Tus datos, tu servidor"
+  },
+  "home.hero.float.sorted": {
+    "message": "Ordenado en 4 grupos"
+  },
+  "home.hero.float.promos": {
+    "message": "1.381 promociones, archivadas sin ruido"
+  },
+  "home.feature.documents.eyebrow": {
+    "message": "Documentos"
+  },
+  "home.feature.documents.title": {
+    "message": "Cada recibo y contrato, archivado en el momento en que llega."
+  },
+  "home.feature.documents.prose": {
+    "message": "Los adjuntos se convierten automáticamente en documentos buscables, clasificados por tipo y etiquetados, listos para revisar, aprobar o exportar. Sin carpetas que mantener, sin arrastrar archivos."
+  },
+  "home.feature.documents.list.1": {
+    "message": "Clasificación automática: facturas, recibos, contratos, extractos"
+  },
+  "home.feature.documents.list.2": {
+    "message": "Búsqueda de texto completo en todo lo que has recibido"
+  },
+  "home.feature.documents.list.3": {
+    "message": "Aprueba con un clic y exporta cuando lo necesites"
+  },
+  "home.feature.scout.eyebrow": {
+    "message": "Scout"
+  },
+  "home.feature.scout.title": {
+    "message": "Un asistente que ya lo ha leído todo."
+  },
+  "home.feature.scout.prose": {
+    "message": "Scout te informa cada mañana, responde preguntas sobre tu papeleo en lenguaje sencillo y convierte «¿qué debo, y a quién?» en una respuesta de una línea."
+  },
+  "home.feature.scout.list.1": {
+    "message": "Un resumen matutino de lo que te necesita, nada más"
+  },
+  "home.feature.scout.list.2": {
+    "message": "Pregunta cualquier cosa sobre tu bandeja de entrada y documentos"
+  },
+  "home.feature.scout.list.3": {
+    "message": "Redacta respuestas que puedes leer, ajustar y aprobar"
+  },
+  "home.caps.eyebrow": {
+    "message": "Más bajo el capó"
+  },
+  "home.caps.title": {
+    "message": "Discretamente capaz bajo la calma."
+  },
+  "home.workspace.eyebrow": {
+    "message": "Todo el espacio de trabajo"
+  },
+  "home.workspace.title": {
+    "message": "Mucho más que una bandeja de entrada."
+  },
+  "home.workspace.prose": {
+    "message": "Lo que empezó como una bandeja de entrada ya es un espacio de trabajo completo: un calendario bidireccional, triaje en un gesto, un tablero Kanban y recordatorios que Scout saca directamente de tu correo."
+  },
+  "home.workspace.pill.board": {
+    "message": "Tablero Kanban"
+  },
+  "home.workspace.pill.palette": {
+    "message": "Barra de comandos"
+  },
+  "home.workspace.pill.reminders": {
+    "message": "Recordatorios inteligentes"
+  },
+  "home.workspace.pill.integrations": {
+    "message": "Notion, Drive, Slack"
+  },
+  "home.workspace.soon": {
+    "message": "Apps para iOS y Android, muy pronto"
+  },
+  "home.workspace.cta": {
+    "message": "Probar en la nube"
+  },
+  "home.workspace.caption": {
+    "message": "En modo oscuro. También hay uno claro."
+  },
+  "home.os.eyebrow": {
+    "message": "Codigo fuente disponible"
+  },
+  "home.os.title": {
+    "message": "Tuyo para siempre."
+  },
+  "home.os.prose": {
+    "message": "Campbooks tiene codigo fuente disponible bajo la Sustainable Use License. Empieza en segundos en nuestra nube, o alójalo tú mismo y conserva cada byte en tu propio servidor."
+  },
+  "home.os.cta.selfhosting": {
+    "message": "Guía de autoalojamiento"
+  },
+  "home.os.cta.github": {
+    "message": "Dale una estrella en GitHub"
+  },
+  "home.os.note": {
+    "message": "La nube alojada se reinicia periódicamente, por lo que es perfecta para probarlo antes de desplegar el tuyo propio."
+  },
+  "home.os.terminal.arialabel": {
+    "message": "Terminal que muestra cómo instalar y ejecutar Campbooks"
+  },
+  "home.os.terminal.output": {
+    "message": "→ Campbooks ejecutándose en http://localhost:3000"
+  },
+  "home.cta.title": {
+    "message": "Despeja la pila hoy."
+  },
+  "home.cta.prose": {
+    "message": "Abre la aplicación alojada y conecta tu primera bandeja de entrada en menos de dos minutos."
+  },
+  "home.cta.start": {
+    "message": "Únete a la beta"
+  },
+  "home.cta.docs": {
+    "message": "Leer la documentación"
+  },
+  "home.meta.title": {
+    "message": "La bandeja de entrada que se organiza sola"
+  },
+  "home.meta.description": {
+    "message": "Campbooks lee tus correos y adjuntos, archiva las facturas, recibos y contratos por su cuenta, y te entrega una lista breve de lo que te necesita. Con codigo fuente disponible y autoalojamiento gratuito, para profesionales y pequeñas empresas."
+  },
+  "pricing.tier.selfhosted.name": {
+    "message": "Autoalojado"
+  },
+  "pricing.tier.selfhosted.price": {
+    "message": "Gratis"
+  },
+  "pricing.tier.selfhosted.description": {
+    "message": "Despliégalo en tu propio servidor. Control total, coste cero."
+  },
+  "pricing.tier.selfhosted.feature1": {
+    "message": "Cuentas de correo ilimitadas"
+  },
+  "pricing.tier.selfhosted.feature2": {
+    "message": "Clasificación de documentos con IA"
+  },
+  "pricing.tier.selfhosted.feature3": {
+    "message": "Flujo de revisión y aprobación"
+  },
+  "pricing.tier.selfhosted.feature4": {
+    "message": "Búsqueda de texto completo"
+  },
+  "pricing.tier.selfhosted.feature5": {
+    "message": "Etiquetas de correo electrónico"
+  },
+  "pricing.tier.selfhosted.feature6": {
+    "message": "Colaboración en equipo"
+  },
+  "pricing.tier.selfhosted.feature7": {
+    "message": "Sustainable Use License"
+  },
+  "pricing.tier.selfhosted.cta": {
+    "message": "Guía de instalación"
+  },
+  "pricing.tier.cloud.name": {
+    "message": "Nube"
+  },
+  "pricing.tier.cloud.price": {
+    "message": "Gratis durante la beta"
+  },
+  "pricing.tier.cloud.badge": {
+    "message": "Beta cerrada"
+  },
+  "pricing.tier.cloud.description": {
+    "message": "Usa nuestra instancia alojada. Sin servidor que gestionar: crea una cuenta y empieza en segundos."
+  },
+  "pricing.tier.cloud.feature1": {
+    "message": "Tu propio espacio de trabajo privado"
+  },
+  "pricing.tier.cloud.feature2": {
+    "message": "Todas las funciones disponibles"
+  },
+  "pricing.tier.cloud.feature3": {
+    "message": "Sin configuración previa"
+  },
+  "pricing.tier.cloud.feature4": {
+    "message": "Siempre actualizado"
+  },
+  "pricing.tier.cloud.feature5": {
+    "message": "Se requiere código de acceso"
+  },
+  "pricing.tier.cloud.cta": {
+    "message": "Crear tu cuenta"
+  },
+  "pricing.tier.enterprise.name": {
+    "message": "Enterprise"
+  },
+  "pricing.tier.enterprise.price": {
+    "message": "Próximamente"
+  },
+  "pricing.tier.enterprise.description": {
+    "message": "Alojamiento gestionado con soporte prioritario para equipos."
+  },
+  "pricing.tier.enterprise.feature1": {
+    "message": "Alojamiento gestionado"
+  },
+  "pricing.tier.enterprise.feature2": {
+    "message": "Soporte prioritario"
+  },
+  "pricing.tier.enterprise.feature3": {
+    "message": "Integraciones personalizadas"
+  },
+  "pricing.tier.enterprise.feature4": {
+    "message": "Garantía de SLA"
+  },
+  "pricing.tier.enterprise.feature5": {
+    "message": "Copias de seguridad automatizadas"
+  },
+  "pricing.tier.enterprise.feature6": {
+    "message": "Instancia dedicada"
+  },
+  "pricing.tier.enterprise.cta": {
+    "message": "Contáctanos"
+  },
+  "pricing.faq1.q": {
+    "message": "¿Campbooks es realmente gratuito?"
+  },
+  "pricing.faq1.a": {
+    "message": "Sí. Campbooks es de codigo fuente disponible bajo la Sustainable Use License. Puedes descargarlo, modificarlo y desplegarlo de forma gratuita en tu propia infraestructura."
+  },
+  "pricing.faq2.q": {
+    "message": "¿Qué incluye el nivel de nube?"
+  },
+  "pricing.faq2.a": {
+    "message": "Tu propio espacio de trabajo privado y persistente en nuestra instancia alojada: el producto completo, sin configuración. Está en beta cerrada, por lo que el registro requiere un código de acceso: envía un correo a inbox@not-a-camp.com para solicitarlo."
+  },
+  "pricing.faq3.q": {
+    "message": "¿Puedo conectar cualquier proveedor de correo?"
+  },
+  "pricing.faq3.a": {
+    "message": "Campbooks admite Zoho Mail, Google Workspace y Microsoft 365 mediante OAuth. La compatibilidad con IMAP está prevista para una versión futura."
+  },
+  "pricing.faq4.q": {
+    "message": "¿Qué servicios de IA utiliza?"
+  },
+  "pricing.faq4.a": {
+    "message": "Campbooks utiliza Claude (Anthropic) para el análisis de documentos, la clasificación de correos y el chat. También puedes configurar proveedores compatibles con OpenAI, como DeepSeek."
+  },
+  "pricing.page.title": {
+    "message": "Precios"
+  },
+  "pricing.page.description": {
+    "message": "Campbooks tiene codigo fuente disponible y es gratuito para autoalojamiento."
+  },
+  "pricing.hero.title": {
+    "message": "Precios sencillos"
+  },
+  "pricing.hero.subtitle": {
+    "message": "Alójalo gratis, usa nuestra instancia en la nube o deja que lo gestionemos nosotros."
+  },
+  "pricing.faq.title": {
+    "message": "Preguntas frecuentes"
+  },
+  "privacy.page.title": {
+    "message": "Política de privacidad"
+  },
+  "privacy.page.description": {
+    "message": "Cómo Campbooks recopila, usa y protege tus datos. Alojado en la UE, nunca vendido."
+  },
+  "privacy.hero.title": {
+    "message": "Política de privacidad"
+  },
+  "privacy.hero.last_updated": {
+    "message": "Última actualización:"
+  },
+  "privacy.intro.body": {
+    "message": "Campbooks es un espacio de trabajo de correo electrónico y documentos operado por Not A Camp («nosotros»). Esta política explica qué datos personales recopilamos, por qué los recopilamos, dónde se almacenan y los derechos que tienes sobre ellos. Hemos intentado que sea breve y legible."
+  },
+  "privacy.intro.summary": {
+    "message": "En una línea: tus datos están alojados en la Unión Europea, nunca los vendemos y nunca los compartimos con terceros para sus propios fines."
+  },
+  "privacy.section.controller.title": {
+    "message": "Quién es responsable de tus datos"
+  },
+  "privacy.section.controller.body_before": {
+    "message": "El responsable del tratamiento de tus datos personales es"
+  },
+  "privacy.section.controller.body_after": {
+    "message": "con domicilio social en Rua de S. Pedro 24, Branca CCH, 2100-607 Santarém, Portugal. Si tienes alguna pregunta sobre esta política o sobre tus datos, contáctanos en"
+  },
+  "privacy.section.collect.title": {
+    "message": "Qué datos recopilamos"
+  },
+  "privacy.section.collect.item1.label": {
+    "message": "Información de la cuenta"
+  },
+  "privacy.section.collect.item1.body": {
+    "message": "— tu nombre, dirección de correo electrónico y contraseña (almacenada únicamente como hash salado), además de la configuración del espacio de trabajo que establezcas."
+  },
+  "privacy.section.collect.item2.label": {
+    "message": "Correos y documentos que conectas"
+  },
+  "privacy.section.collect.item2.body": {
+    "message": "— cuando vinculas un buzón de correo, ingerimos los mensajes y adjuntos que decides traer a Campbooks para organizarlos, clasificarlos y mostrártelos. Este contenido te pertenece."
+  },
+  "privacy.section.collect.item3.label": {
+    "message": "Credenciales de integración"
+  },
+  "privacy.section.collect.item3.body": {
+    "message": "— tokens de actualización OAuth para los proveedores de correo conectados (Zoho, Google, Microsoft) y la clave API de cualquier proveedor de IA que conectes, todos almacenados cifrados en reposo. Nunca vemos ni almacenamos tu contraseña del proveedor."
+  },
+  "privacy.section.collect.item4.label": {
+    "message": "Datos de uso y técnicos"
+  },
+  "privacy.section.collect.item4.body": {
+    "message": "— registros básicos (dirección IP, tipo de navegador, marcas de tiempo) necesarios para operar el servicio, mantenerlo seguro y depurar problemas."
+  },
+  "privacy.section.use.title": {
+    "message": "Cómo usamos tus datos"
+  },
+  "privacy.section.use.intro": {
+    "message": "Usamos tus datos únicamente para proporcionar y mejorar Campbooks, en concreto para:"
+  },
+  "privacy.section.use.item1": {
+    "message": "operar tu cuenta y espacio de trabajo;"
+  },
+  "privacy.section.use.item2": {
+    "message": "ingerir, clasificar y destacar tus correos y documentos;"
+  },
+  "privacy.section.use.item3": {
+    "message": "ejecutar los análisis de IA y flujos de trabajo que solicites;"
+  },
+  "privacy.section.use.item4": {
+    "message": "mantener el servicio seguro y fiable; y"
+  },
+  "privacy.section.use.item5": {
+    "message": "comunicarnos contigo sobre tu cuenta y las actualizaciones del servicio."
+  },
+  "privacy.section.use.no_train_before": {
+    "message": "No"
+  },
+  "privacy.section.use.no_train_after": {
+    "message": "usamos el contenido de tus correos o documentos para entrenar modelos de IA, y tampoco lo"
+  },
+  "privacy.section.use.no_ads": {
+    "message": "usamos con fines publicitarios."
+  },
+  "privacy.section.gdpr.title": {
+    "message": "Base jurídica (GDPR)"
+  },
+  "privacy.section.gdpr.intro": {
+    "message": "Si te encuentras en el Espacio Económico Europeo o en el Reino Unido, tratamos tus datos sobre la base de"
+  },
+  "privacy.section.gdpr.contract": {
+    "message": "contrato"
+  },
+  "privacy.section.gdpr.middle": {
+    "message": "(para prestar el servicio al que te suscribiste),"
+  },
+  "privacy.section.gdpr.legitimate_interests": {
+    "message": "intereses legítimos"
+  },
+  "privacy.section.gdpr.middle2": {
+    "message": "(para mantener el servicio seguro y operativo) y tu"
+  },
+  "privacy.section.gdpr.consent": {
+    "message": "consentimiento"
+  },
+  "privacy.section.gdpr.outro": {
+    "message": "cuando sea necesario (por ejemplo, al conectar un buzón de correo). Puedes retirar tu consentimiento en cualquier momento desconectando una integración o cerrando tu cuenta."
+  },
+  "privacy.section.storage.title": {
+    "message": "Dónde se almacenan tus datos"
+  },
+  "privacy.section.storage.intro": {
+    "message": "Todos los datos de los clientes están alojados en la"
+  },
+  "privacy.section.storage.eu": {
+    "message": "Unión Europea"
+  },
+  "privacy.section.storage.provider_before": {
+    "message": "en la infraestructura proporcionada por"
+  },
+  "privacy.section.storage.provider_after": {
+    "message": "(Alemania). No transferimos tus datos fuera de la UE por nuestra parte. Los datos solo salen de la UE si"
+  },
+  "privacy.section.storage.you": {
+    "message": "tú"
+  },
+  "privacy.section.storage.connect_before": {
+    "message": "decides conectar un servicio ubicado en otro lugar (por ejemplo, un proveedor de IA con sede en EE. UU.) — véase"
+  },
+  "privacy.section.storage.connect_link": {
+    "message": "Servicios que conectas"
+  },
+  "privacy.section.storage.connect_after": {
+    "message": "a continuación."
+  },
+  "privacy.section.sharing.title": {
+    "message": "Con quién compartimos los datos"
+  },
+  "privacy.section.sharing.no_sell": {
+    "message": "No vendemos tus datos ni los compartimos con nadie para sus propios fines."
+  },
+  "privacy.section.sharing.sub_processor": {
+    "message": "Para operar el servicio, nos apoyamos en un único subencargado de infraestructura, que actúa solo según nuestras instrucciones:"
+  },
+  "privacy.section.sharing.hetzner": {
+    "message": "(Alemania, UE) — alojamiento e infraestructura. Tus datos permanecen dentro de la UE."
+  },
+  "privacy.section.sharing.disclosure": {
+    "message": "También podemos divulgar datos si lo exige la ley, para proteger nuestros derechos legales o como parte de una transmisión empresarial (en cuyo caso esta política seguirá siendo aplicable)."
+  },
+  "privacy.section.connected.title": {
+    "message": "Servicios que conectas (IA y buzones de correo)"
+  },
+  "privacy.section.connected.intro_before": {
+    "message": "Campbooks te permite conectar servicios externos que"
+  },
+  "privacy.section.connected.you": {
+    "message": "tú"
+  },
+  "privacy.section.connected.intro_after": {
+    "message": "eliges y controlas. Solo enviamos tus datos a estos servicios cuando los has conectado y únicamente para hacer lo que solicitaste:"
+  },
+  "privacy.section.connected.ai.label": {
+    "message": "Tu proveedor de IA"
+  },
+  "privacy.section.connected.ai.body_before": {
+    "message": "— las funciones de IA son opcionales y las configuras tú. Eliges el proveedor (como OpenAI, Anthropic, DeepSeek o Gemini) y proporcionas tu propia clave API. Cuando usas una función de IA, el contenido relevante del correo o documento se envía al proveedor que"
+  },
+  "privacy.section.connected.ai.you": {
+    "message": "tú"
+  },
+  "privacy.section.connected.ai.body_after": {
+    "message": "has seleccionado, bajo tu propia cuenta y los términos de ese proveedor. No elegimos el proveedor por ti y nunca enviamos tu contenido a un servicio de IA que no hayas configurado."
+  },
+  "privacy.section.connected.mailbox.label": {
+    "message": "Tu buzón de correo"
+  },
+  "privacy.section.connected.mailbox.body": {
+    "message": "— cuando conectas Zoho, Google o Microsoft mediante OAuth, accedemos únicamente al buzón que vinculaste, a tu indicación, para traer sus mensajes a Campbooks."
+  },
+  "privacy.section.connected.disclaimer": {
+    "message": "Respecto a los datos que les envías, estos proveedores actúan como responsables independientes según sus propios términos: te recomendamos que revises sus políticas de privacidad."
+  },
+  "privacy.section.retention.title": {
+    "message": "Durante cuánto tiempo conservamos los datos"
+  },
+  "privacy.section.retention.body": {
+    "message": "Conservamos tus datos mientras tu cuenta esté activa. Cuando eliminas contenido o cierras tu cuenta, suprimimos los datos personales asociados en un plazo razonable, salvo que debamos conservar registros limitados para cumplir obligaciones legales."
+  },
+  "privacy.section.rights.title": {
+    "message": "Tus derechos"
+  },
+  "privacy.section.rights.intro": {
+    "message": "Tienes derecho a:"
+  },
+  "privacy.section.rights.item1": {
+    "message": "acceder a los datos personales que conservamos sobre ti;"
+  },
+  "privacy.section.rights.item2": {
+    "message": "rectificar datos inexactos;"
+  },
+  "privacy.section.rights.item3": {
+    "message": "eliminar tus datos («derecho al olvido»);"
+  },
+  "privacy.section.rights.item4": {
+    "message": "exportar tus datos en un formato portable;"
+  },
+  "privacy.section.rights.item5": {
+    "message": "oponerte a o restringir determinados tratamientos; y"
+  },
+  "privacy.section.rights.item6": {
+    "message": "retirar tu consentimiento en cualquier momento."
+  },
+  "privacy.section.rights.contact_before": {
+    "message": "Para ejercer cualquiera de estos derechos, escríbenos a"
+  },
+  "privacy.section.rights.contact_after": {
+    "message": "Si te encuentras en el EEE o en el Reino Unido, también tienes derecho a presentar una reclamación ante la autoridad de control de protección de datos de tu país."
+  },
+  "privacy.section.security.title": {
+    "message": "Seguridad"
+  },
+  "privacy.section.security.body": {
+    "message": "Protegemos tus datos con cifrado en tránsito (HTTPS) y cifrado en reposo para campos sensibles como los tokens de integración. El acceso a los sistemas de producción está restringido y registrado. Ningún sistema es completamente seguro, pero trabajamos para mantener tus datos a salvo y notificarte de inmediato si una brecha te afecta."
+  },
+  "privacy.section.cookies.title": {
+    "message": "Cookies"
+  },
+  "privacy.section.cookies.body": {
+    "message": "La aplicación Campbooks utiliza una única cookie esencial para mantenerte con la sesión iniciada. No usamos cookies publicitarias ni de rastreo de terceros. Este sitio de marketing no establece cookies de seguimiento."
+  },
+  "privacy.section.children.title": {
+    "message": "Menores"
+  },
+  "privacy.section.children.body": {
+    "message": "Campbooks es una herramienta empresarial y no está dirigida a menores de 16 años. No recopilamos datos de menores de forma consciente."
+  },
+  "privacy.section.changes.title": {
+    "message": "Cambios en esta política"
+  },
+  "privacy.section.changes.body": {
+    "message": "Podemos actualizar esta política de vez en cuando. Cuando realicemos cambios sustanciales, actualizaremos la fecha en la parte superior de esta página y, cuando corresponda, te notificaremos en la aplicación o por correo electrónico."
+  },
+  "privacy.section.contact.title": {
+    "message": "Contacto"
+  },
+  "privacy.section.contact.body_before": {
+    "message": "¿Preguntas sobre tu privacidad? Escríbenos a"
+  },
+  "privacy.section.contact.body_after": {
+    "message": "y te responderemos."
+  },
+  "selfhost.terminal.ariaLabel": {
+    "message": "Terminal: clonar, configurar y ejecutar Campbooks"
+  },
+  "selfhost.page.title": {
+    "message": "Autoalojamiento de Campbooks"
+  },
+  "selfhost.page.description": {
+    "message": "Ejecuta Campbooks en tu propio servidor. Una app Rails, una base de datos PostgreSQL, tus propias claves de IA. Codigo fuente disponible bajo la Sustainable Use License."
+  },
+  "selfhost.hero.eyebrow": {
+    "message": "Autoalojamiento"
+  },
+  "selfhost.hero.title": {
+    "message": "Ejecuta Campbooks en tu propio servidor."
+  },
+  "selfhost.hero.prose": {
+    "message": "Una app Rails, una base de datos PostgreSQL, tus propias claves de IA. Clónalo, establece unas pocas variables de entorno y gestiona tu papeleo de principio a fin."
+  },
+  "selfhost.hero.cta.install": {
+    "message": "Guía de instalación"
+  },
+  "selfhost.hero.cta.github": {
+    "message": "Ver en GitHub"
+  },
+  "selfhost.hero.trust.mit": {
+    "message": "Codigo fuente disponible"
+  },
+  "selfhost.hero.trust.seats": {
+    "message": "Sin usuarios ni límites"
+  },
+  "selfhost.hero.trust.schedule": {
+    "message": "Actualiza cuando quieras"
+  },
+  "selfhost.why.eyebrow": {
+    "message": "Por qué autoalojarlo"
+  },
+  "selfhost.why.title": {
+    "message": "Mantén todo bajo tu propio tejado."
+  },
+  "selfhost.get.eyebrow": {
+    "message": "Incluido"
+  },
+  "selfhost.get.title": {
+    "message": "Todas las funciones, sin restricciones."
+  },
+  "selfhost.get.prose": {
+    "message": "La edición autoalojada es el producto completo. No hay un nivel «pro» oculto tras un muro de pago; la nube simplemente te ahorra el despliegue."
+  },
+  "selfhost.stack.eyebrow": {
+    "message": "Construido con"
+  },
+  "selfhost.cta.title": {
+    "message": "¿Prefieres que lo gestionemos nosotros?"
+  },
+  "selfhost.cta.prose": {
+    "message": "Olvídate del servidor. Abre la nube alojada y empieza a ordenar en segundos, y alójalo tú mismo cuando estés listo."
+  },
+  "selfhost.cta.cloud": {
+    "message": "Usar la nube"
+  },
+  "selfhost.cta.install": {
+    "message": "Leer la guía de instalación"
+  },
+  "terms.page.title": {
+    "message": "Condiciones del servicio"
+  },
+  "terms.page.description": {
+    "message": "Las condiciones que rigen el uso del servicio alojado de Campbooks."
+  },
+  "terms.hero.title": {
+    "message": "Condiciones del servicio"
+  },
+  "terms.hero.last_updated": {
+    "message": "Última actualización:"
+  },
+  "terms.intro.p1_before_company": {
+    "message": "Estas Condiciones del servicio («Condiciones») constituyen un acuerdo entre tú y"
+  },
+  "terms.intro.p1_after_company": {
+    "message": "(«Not A Camp», «nosotros»), la empresa que opera Campbooks. Rigen el uso del servicio alojado de Campbooks en"
+  },
+  "terms.intro.p1_after_link": {
+    "message": "(el «Servicio»). Al crear una cuenta o usar el Servicio, aceptas estas Condiciones. Si no estás de acuerdo, por favor no uses el Servicio."
+  },
+  "terms.section.the_service.title": {
+    "message": "El Servicio"
+  },
+  "terms.section.the_service.p1": {
+    "message": "Campbooks es un espacio de trabajo de correo electrónico y documentos que ingesta tus correos y adjuntos, usa IA para ayudar a clasificarlos y destacarlos, y proporciona herramientas de revisión y flujo de trabajo. Podemos añadir, cambiar o eliminar funciones con el tiempo."
+  },
+  "terms.section.the_service.p2_before_license": {
+    "message": "El código fuente de Campbooks es de código abierto bajo la"
+  },
+  "terms.section.the_service.p2_after_license": {
+    "message": ". Si ejecutas tu propia copia autoalojada, ese uso se rige por la licencia MIT, no por estas Condiciones — estas Condiciones se aplican únicamente al Servicio alojado que operamos."
+  },
+  "terms.section.closed_beta.title": {
+    "message": "Beta cerrada"
+  },
+  "terms.section.closed_beta.p1_before_strong1": {
+    "message": "El Servicio alojado se encuentra actualmente en"
+  },
+  "terms.section.closed_beta.strong1": {
+    "message": "beta cerrada, solo por invitación"
+  },
+  "terms.section.closed_beta.p1_after_strong1": {
+    "message": ". El acceso requiere una invitación, y podemos aprobar, rechazar o revocar el acceso beta a nuestra discreción. Durante la beta, el Servicio se ofrece"
+  },
+  "terms.section.closed_beta.strong2": {
+    "message": "de forma gratuita"
+  },
+  "terms.section.closed_beta.p1_after_strong2": {
+    "message": ", puede cambiar o no estar disponible temporalmente, y puede contener errores. No podemos garantizar que los datos se conserven durante la beta, por lo que te recomendamos guardar copias propias de todo lo importante y evitar almacenar información altamente confidencial."
+  },
+  "terms.section.your_account.title": {
+    "message": "Tu cuenta"
+  },
+  "terms.section.your_account.p1_before_link": {
+    "message": "Debes proporcionar información exacta al registrarte y mantener tus credenciales de acceso seguras. Eres responsable de toda la actividad que se realice bajo tu cuenta. Debes tener al menos 16 años, o la edad de consentimiento digital en tu país, para usar el Servicio. Notifícanos sin demora en"
+  },
+  "terms.section.your_account.p1_after_link": {
+    "message": "si sospechas un uso no autorizado de tu cuenta."
+  },
+  "terms.section.acceptable_use.title": {
+    "message": "Uso aceptable"
+  },
+  "terms.section.acceptable_use.intro": {
+    "message": "Al usar el Servicio, aceptas no:"
+  },
+  "terms.section.acceptable_use.li1": {
+    "message": "infringir la ley ni los derechos de nadie, incluidos los derechos de privacidad y propiedad intelectual;"
+  },
+  "terms.section.acceptable_use.li2": {
+    "message": "subir malware ni enviar spam ni contenido ilegal, dañino o abusivo;"
+  },
+  "terms.section.acceptable_use.li3": {
+    "message": "intentar interrumpir, sobrecargar, acceder sin autorización o sondear el Servicio o su infraestructura;"
+  },
+  "terms.section.acceptable_use.li4": {
+    "message": "realizar ingeniería inversa, revender o explotar comercialmente el Servicio alojado (el código de código abierto está disponible por separado bajo la licencia MIT); ni"
+  },
+  "terms.section.acceptable_use.li5": {
+    "message": "usar el Servicio para tratar datos que no tienes derecho a tratar."
+  },
+  "terms.section.your_content.title": {
+    "message": "Tu contenido"
+  },
+  "terms.section.your_content.p1_before_link": {
+    "message": "Conservas todos los derechos sobre los correos, documentos y demás contenido que incorporas a Campbooks. Solo nos concedes la licencia limitada necesaria para alojar, procesar y mostrar ese contenido a fin de prestarte el Servicio. Eres responsable de tener el derecho a usar el contenido que conectas. El modo en que gestionamos los datos personales se describe en nuestra"
+  },
+  "terms.section.your_content.privacy_link": {
+    "message": "Política de privacidad"
+  },
+  "terms.section.your_content.p1_after_link": {
+    "message": "."
+  },
+  "terms.section.third_party.title": {
+    "message": "Servicios de terceros que conectas"
+  },
+  "terms.section.third_party.p1_before_ai": {
+    "message": "Campbooks te permite conectar servicios externos que tú eliges y controlas — tu"
+  },
+  "terms.section.third_party.strong_ai": {
+    "message": "proveedor de IA"
+  },
+  "terms.section.third_party.p1_after_ai_before_mailbox": {
+    "message": "(proporcionas tu propia clave API) y tu"
+  },
+  "terms.section.third_party.strong_mailbox": {
+    "message": "buzón de correo"
+  },
+  "terms.section.third_party.p1_after_mailbox": {
+    "message": "(Zoho, Google o Microsoft, mediante OAuth). El uso de esos servicios se rige por sus propios términos, y eres responsable de tus cuentas con ellos. No somos responsables de los servicios de terceros, y conectarlos queda a tu propia discreción."
+  },
+  "terms.section.fees.title": {
+    "message": "Tarifas y suscripciones futuras"
+  },
+  "terms.section.fees.p1_before_subscription": {
+    "message": "El Servicio alojado es gratuito durante la beta. Tenemos previsto pasar a un"
+  },
+  "terms.section.fees.strong_subscription": {
+    "message": "modelo de suscripción"
+  },
+  "terms.section.fees.p1_after_subscription_before_free_tier": {
+    "message": ", en el que esperamos mantener un"
+  },
+  "terms.section.fees.strong_free_tier": {
+    "message": "nivel gratuito"
+  },
+  "terms.section.fees.p1_after_free_tier": {
+    "message": "limitado a una única cuenta de correo conectada y un conjunto reducido de funciones, con planes de pago que desbloquean cuentas de correo adicionales y más capacidades. Si y cuando introduzcamos planes de pago, te mostraremos los precios y cualquier condición adicional antes de cobrarte: nunca se te facturará retroactivamente por tu uso gratuito durante la beta, y podrás rechazarlo. La versión de código abierto siempre seguirá siendo gratuita para autoalojamiento bajo la licencia MIT, sin tales límites."
+  },
+  "terms.section.ip.title": {
+    "message": "Propiedad intelectual"
+  },
+  "terms.section.ip.p1": {
+    "message": "El software Campbooks es de código abierto bajo la licencia MIT. Los nombres, logotipos y marca de Campbooks y Not A Camp son propiedad de Not A Camp LDA, y estas Condiciones no te otorgan ningún derecho a usar nuestras marcas comerciales sin permiso."
+  },
+  "terms.section.disclaimer.title": {
+    "message": "Exclusión de garantías"
+  },
+  "terms.section.disclaimer.p1_before_as_is": {
+    "message": "El Servicio se proporciona"
+  },
+  "terms.section.disclaimer.strong_as_is": {
+    "message": "«tal cual»"
+  },
+  "terms.section.disclaimer.p1_and": {
+    "message": "y"
+  },
+  "terms.section.disclaimer.strong_as_available": {
+    "message": "«según disponibilidad»"
+  },
+  "terms.section.disclaimer.p1_after_strong": {
+    "message": ", sin garantías de ningún tipo, ya sean expresas o implícitas, incluida la idoneidad para un propósito particular y el funcionamiento ininterrumpido o sin errores. Dado que el Servicio es gratuito y se reinicia periódicamente, no garantizamos que tus datos se conserven o estén disponibles."
+  },
+  "terms.section.liability.title": {
+    "message": "Limitación de responsabilidad"
+  },
+  "terms.section.liability.p1": {
+    "message": "En la máxima medida permitida por la ley, Not A Camp no será responsable de ningún daño indirecto, incidental o consecuente, ni de ninguna pérdida de datos, beneficios o negocio, derivada del uso que hagas del Servicio. Nada en estas Condiciones limita una responsabilidad que no pueda ser limitada en virtud del derecho aplicable."
+  },
+  "terms.section.indemnification.title": {
+    "message": "Indemnización"
+  },
+  "terms.section.indemnification.p1": {
+    "message": "Aceptas indemnizar y eximir de responsabilidad a Not A Camp frente a reclamaciones y costes derivados del uso indebido del Servicio, de tu contenido o del incumplimiento de estas Condiciones o del derecho aplicable."
+  },
+  "terms.section.termination.title": {
+    "message": "Rescisión"
+  },
+  "terms.section.termination.p1": {
+    "message": "Puedes dejar de usar el Servicio en cualquier momento. Podemos suspender o cancelar tu acceso si incumples estas Condiciones o utilizas el Servicio de un modo que pueda perjudicarnos a nosotros, a otros usuarios o a terceros. Las disposiciones que por su naturaleza deban sobrevivir a la rescisión (como las de propiedad intelectual, exclusión de garantías y limitación de responsabilidad) seguirán siendo aplicables."
+  },
+  "terms.section.changes.title": {
+    "message": "Cambios en estas Condiciones"
+  },
+  "terms.section.changes.p1": {
+    "message": "Podemos actualizar estas Condiciones de vez en cuando. Cuando realicemos cambios sustanciales, actualizaremos la fecha en la parte superior de esta página y, cuando corresponda, te notificaremos. Continuar usando el Servicio tras la entrada en vigor de los cambios implica que aceptas las Condiciones actualizadas."
+  },
+  "terms.section.governing_law.title": {
+    "message": "Ley aplicable"
+  },
+  "terms.section.governing_law.p1_before_country": {
+    "message": "Estas Condiciones se rigen por las leyes de"
+  },
+  "terms.section.governing_law.strong_country": {
+    "message": "Portugal"
+  },
+  "terms.section.governing_law.p1_after_country": {
+    "message": ", y los tribunales de Portugal tienen jurisdicción sobre cualquier controversia, sin perjuicio de los derechos obligatorios de protección al consumidor que tengas en tu país de residencia en la UE."
+  },
+  "terms.section.contact.title": {
+    "message": "Contacto"
+  },
+  "terms.section.contact.p1_before_link": {
+    "message": "¿Preguntas sobre estas Condiciones? Escríbenos a"
+  },
+  "terms.section.contact.p1_after_link": {
+    "message": "y te responderemos."
+  },
+  "dataDeletion.page.title": {
+    "message": "Eliminar su cuenta y datos"
+  },
+  "dataDeletion.page.description": {
+    "message": "Cómo eliminar su cuenta de Campbooks y todos los datos asociados, de forma inmediata y permanente."
+  },
+  "dataDeletion.hero.title": {
+    "message": "Eliminar su cuenta y datos"
+  },
+  "dataDeletion.hero.intro": {
+    "message": "Puede eliminar su cuenta de Campbooks y todos sus datos en cualquier momento. La eliminación es autónoma y tiene efecto inmediato. Esta página explica qué se elimina, qué podemos estar obligados a conservar y cómo solicitar la eliminación si no puede acceder a la aplicación."
+  },
+  "dataDeletion.section.in_app.title": {
+    "message": "Eliminar desde la aplicación"
+  },
+  "dataDeletion.section.in_app.intro": {
+    "message": "Para eliminar su cuenta y datos desde dentro de Campbooks:"
+  },
+  "dataDeletion.section.in_app.step1": {
+    "message": "Abra Campbooks e inicie sesión."
+  },
+  "dataDeletion.section.in_app.step2": {
+    "message": "Vaya a Ajustes -> Cuenta."
+  },
+  "dataDeletion.section.in_app.step3": {
+    "message": "Desplácese hasta el final y haga clic en Eliminar cuenta."
+  },
+  "dataDeletion.section.in_app.step4": {
+    "message": "Confirme la eliminación cuando se le solicite."
+  },
+  "dataDeletion.section.in_app.effect": {
+    "message": "La eliminación es autónoma y tiene efecto inmediato."
+  },
+  "dataDeletion.section.what_deleted.title": {
+    "message": "Qué se elimina"
+  },
+  "dataDeletion.section.what_deleted.intro": {
+    "message": "Cuando elimina su cuenta, eliminamos permanentemente:"
+  },
+  "dataDeletion.section.what_deleted.item1": {
+    "message": "su cuenta y perfil;"
+  },
+  "dataDeletion.section.what_deleted.item2": {
+    "message": "los datos del espacio de trabajo que le pertenecen;"
+  },
+  "dataDeletion.section.what_deleted.item3": {
+    "message": "correos electrónicos y documentos importados en Campbooks;"
+  },
+  "dataDeletion.section.what_deleted.item4": {
+    "message": "tokens OAuth de los buzones conectados;"
+  },
+  "dataDeletion.section.what_deleted.item5": {
+    "message": "las claves de API de proveedores de IA que haya añadido; y"
+  },
+  "dataDeletion.section.what_deleted.item6": {
+    "message": "sus flujos de trabajo y ajustes."
+  },
+  "dataDeletion.section.what_retained.title": {
+    "message": "Qué podemos conservar"
+  },
+  "dataDeletion.section.what_retained.body": {
+    "message": "Conservamos únicamente los registros que estamos legalmente obligados a mantener — por ejemplo, para fines fiscales o contables — y solo durante el período mínimo exigido por la ley. Las copias residuales que puedan existir en copias de seguridad cifradas se eliminan en un plazo de 30 días tras la eliminación de la cuenta."
+  },
+  "dataDeletion.section.by_email.title": {
+    "message": "Solicitar la eliminación por correo electrónico"
+  },
+  "dataDeletion.section.by_email.intro": {
+    "message": "Si no puede acceder a la aplicación, puede solicitar la eliminación por correo electrónico. Envíe un mensaje a"
+  },
+  "dataDeletion.section.by_email.instructions": {
+    "message": "desde la dirección de correo electrónico asociada a su cuenta de Campbooks. Procesaremos la eliminación y confirmaremos una vez completada."
+  },
+  "dataDeletion.section.timeline.title": {
+    "message": "Plazos"
+  },
+  "dataDeletion.section.timeline.body": {
+    "message": "Los datos se eliminan de los sistemas activos inmediatamente tras la eliminación. Las copias residuales en copias de seguridad cifradas se eliminan en un plazo de 30 días."
+  },
+  "support.page.title": {
+    "message": "Soporte"
+  },
+  "support.page.description": {
+    "message": "Obtenga ayuda con Campbooks. Contáctenos por correo electrónico, consulte las preguntas frecuentes o reporte un problema."
+  },
+  "support.hero.title": {
+    "message": "Soporte"
+  },
+  "support.hero.intro": {
+    "message": "¿Necesita ayuda con Campbooks? Está en el lugar correcto. Consulte las preguntas frecuentes a continuación o contáctenos directamente — somos un equipo pequeño y leemos todos los mensajes."
+  },
+  "support.section.contact.title": {
+    "message": "Contáctenos"
+  },
+  "support.section.contact.intro": {
+    "message": "La mejor forma de contactarnos es por correo electrónico:"
+  },
+  "support.section.contact.response_time": {
+    "message": "Intentamos responder en 2 días laborables."
+  },
+  "support.section.faq.title": {
+    "message": "Preguntas frecuentes"
+  },
+  "support.section.faq.q1.question": {
+    "message": "¿Cómo obtengo acceso?"
+  },
+  "support.section.faq.q1.answer": {
+    "message": "Campbooks cloud se encuentra actualmente en beta cerrada. Envíe un correo electrónico a"
+  },
+  "support.section.faq.q1.answer_after": {
+    "message": "para solicitar un código de acceso."
+  },
+  "support.section.faq.q2.question": {
+    "message": "¿Cómo conecto mi buzón de correo?"
+  },
+  "support.section.faq.q2.answer": {
+    "message": "En la aplicación, vaya a la configuración de la cuenta y conecte Zoho, Google o Microsoft vía OAuth. La conexión otorga a Campbooks acceso de lectura a su bandeja de entrada para importar y organizar sus correos electrónicos y archivos adjuntos."
+  },
+  "support.section.faq.q3.question": {
+    "message": "¿Dónde se almacenan mis datos?"
+  },
+  "support.section.faq.q3.answer_before": {
+    "message": "Todos los datos de los clientes se alojan en la Unión Europea (Hetzner, Alemania). Consulte nuestra"
+  },
+  "support.section.faq.q3.privacy_link": {
+    "message": "Política de privacidad"
+  },
+  "support.section.faq.q3.answer_after": {
+    "message": "para obtener información completa."
+  },
+  "support.section.faq.q4.question": {
+    "message": "¿Puedo autoalojar Campbooks?"
+  },
+  "support.section.faq.q4.answer_before": {
+    "message": "Sí — Campbooks es de código abierto. Puede encontrar instrucciones de instalación en la"
+  },
+  "support.section.faq.q4.selfhosting_link": {
+    "message": "página de autoalojamiento"
+  },
+  "support.section.faq.q4.answer_middle": {
+    "message": "y el código fuente en"
+  },
+  "support.section.faq.q5.question": {
+    "message": "¿Cómo elimino mi cuenta?"
+  },
+  "support.section.faq.q5.answer_before": {
+    "message": "Puede eliminar su cuenta y todos los datos asociados desde dentro de la aplicación. Consulte nuestra"
+  },
+  "support.section.faq.q5.data_deletion_link": {
+    "message": "página de eliminación de datos"
+  },
+  "support.section.faq.q5.answer_after": {
+    "message": "para obtener instrucciones paso a paso."
+  },
+  "support.section.bug.title": {
+    "message": "Reportar un problema"
+  },
+  "support.section.bug.intro": {
+    "message": "¿Ha encontrado algo que no funciona? La forma más rápida de reportarlo es a través del sistema de informes de errores integrado en la aplicación (el ícono de carpeta en la esquina inferior derecha de la pantalla). También puede abrir un problema directamente en GitHub:"
+  },
+  "support.section.company.title": {
+    "message": "Empresa"
+  },
+  "support.section.company.body": {
+    "message": "Campbooks es operado por Not A Camp LDA, Rua de S. Pedro 24, Branca CCH, 2100-607 Santarém, Portugal."
+  }
+}

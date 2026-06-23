@@ -1,0 +1,191 @@
+---
+fr:
+  components:
+    board_card:
+      no_subject: "(sans objet)"
+      snoozed_prefix: Jusqu'au
+    board_column:
+      awaiting: En attente de réponse
+      awaiting_hint: Organisé automatiquement — faites glisser les cartes vers l'extérieur,
+        pas l'inverse
+      done: Terminé
+      empty: Rien ici
+      inbox: Boîte de réception
+      more: "+ plus"
+      snoozed: Reportés
+    category_chip:
+      labels:
+        important: Important
+        notifications: Notifications
+        personal: Personnel
+        promotions: Promotions
+        social: Réseaux sociaux
+        updates: Mises à jour
+    compose_actions:
+      section_labels:
+        select_account: De
+        send_email: Envoyer
+        set_body: Corps
+        set_recipients: À
+        set_signature: Signature
+        set_subject: Objet
+      use_this_draft: Utiliser ce brouillon
+    compose_area:
+      bcc_button: Cci
+      discard: Abandonner
+      discard_aria: Abandonner la rédaction
+      header_forward: Transfert du message
+      header_new_message: Nouveau message
+      header_reply: Réponse à %{address}
+      header_reply_all: Répondre à tous
+      label_bcc: 'Cci :'
+      label_cc: 'Cc :'
+      label_signature: 'Sig. :'
+      label_subject: 'Objet :'
+      label_to: 'À :'
+      no_signature: Sans signature
+      placeholder_bcc: Ajouter en Cci...
+      placeholder_body: Rédigez votre message...
+      placeholder_cc: Ajouter en Cc...
+      placeholder_to: Rechercher des contacts ou saisir un e-mail...
+      send: Envoyer
+      signature_default: "%{name} (par défaut)"
+      signature_preview_label: Signature
+      toolbar_bold: Gras
+      toolbar_bullet_list: Liste à puces
+      toolbar_italic: Italique
+      toolbar_link: Insérer un lien
+      toolbar_ordered_list: Liste numérotée
+      toolbar_redo: Rétablir
+      toolbar_undo: Annuler
+    compose_attachments:
+      attach: Joindre des fichiers
+      upload_failed: Échec du téléversement
+    contact_avatar:
+      received_indicator: "↓"
+      sent_indicator: "↑"
+    contact_popover:
+      email_count_label: e-mails
+      last_email_label: 'dernier :'
+      view_profile: Voir le profil →
+    document_chip:
+      unclassified: Non classifié
+    email_account_popover:
+      connected: Connecté
+      disconnected: Déconnecté
+      emails_label: e-mails
+      manage: Gérer le compte →
+      never_synced: Pas encore synchronisé
+      synced_ago: Synchronisé il y a %{time}
+      syncing: Synchronisation…
+    email_account_sharing:
+      add_button: Ajouter
+      add_section_title: Ajouter une personne
+      all_have_access: Tous les membres de votre espace de travail ont déjà accès
+        à ce compte.
+      back_to_accounts: Comptes
+      owner_badge: Propriétaire
+      panel_description: 'Choisissez qui dans votre espace de travail peut consulter
+        ou envoyer depuis '
+      panel_title: Gérer l'accès
+      remove_access_title: Retirer l'accès
+      remove_confirm: Retirer l'accès de %{name} à %{email} ?
+      role_aria_label: Rôle
+      role_for_aria: Rôle pour %{name}
+      select_person_placeholder: Sélectionnez une personne…
+      you_badge: "(vous)"
+    email_detail:
+      attachments:
+        count:
+          one: "%{count} pièce jointe"
+          other: "%{count} pièces jointes"
+        from_message_title: 'Du message : %{time}'
+        from_thread:
+          one: " de %{count} message dans la conversation"
+          other: " de %{count} messages dans la conversation"
+      discussion: Discussion
+      forward: Transférer
+      labels_label: Libellés
+      no_content: Aucun contenu.
+      no_subject: "(sans objet)"
+      open_full_view: Ouvrir en plein écran
+      reply: Répondre
+      reply_all: Répondre à tous
+      selected_badge: Sélectionné
+      send_to_notion: Enregistrer dans Notion
+      tags_label: Étiquettes
+    email_filter_panel:
+      accounts: Comptes
+      all_folders: Tous les dossiers
+      any_category: Toute catégorie
+      any_priority: Toute priorité
+      category: Catégorie
+      date_from: Du
+      date_to: Au
+      domain: Domaine
+      domain_placeholder: exemple.com
+      folder: Dossier
+      has_attachment: Avec pièce jointe
+      priority: Priorité
+      priority_high: Haute
+      priority_low: Basse
+      priority_medium: Moyenne
+      sender: Expéditeur
+      sender_placeholder: nom ou e-mail
+      tag_filter_placeholder: Filtrer les étiquettes…
+      tag_match_all: Toutes les étiquettes
+      tag_match_any: N'importe quelle étiquette
+      tags: Étiquettes
+      unread: Non lus uniquement
+    email_list_item:
+      no_subject: "(sans objet)"
+      sent_to: À %{address}
+    email_search_bar:
+      clear: Effacer la recherche
+      filters: Filtres
+      placeholder: Rechercher le courrier…
+    email_search_result:
+      no_subject: "(sans objet)"
+      sent_to: À %{address}
+    inbox_view_switcher:
+      aria_label: Disposition de la boîte
+      board: Vue tableau
+      default: Vue par défaut
+      list: Vue liste
+    new_folder_modal:
+      name_label: Nom du dossier
+      name_placeholder: 'ex. : Reçus'
+      submit: Créer le dossier
+      subtitle: Ajouté à toutes vos boîtes de réception connectées.
+      title: Nouveau dossier
+    rich_text_editor:
+      align_center: Centrer
+      align_left: Aligner à gauche
+      align_right: Aligner à droite
+      block_type: Style de texte
+      blockquote: Citation
+      bold: Gras
+      bullet_list: Liste à puces
+      clear_formatting: Effacer la mise en forme
+      code_block: Bloc de code
+      heading_1: Titre 1
+      heading_2: Titre 2
+      heading_3: Titre 3
+      horizontal_rule: Séparateur
+      image: Insérer une image
+      image_insert: Insérer
+      image_upload: Téléverser
+      image_url_placeholder: Collez l’URL de l’image…
+      inline_code: Code en ligne
+      italic: Italique
+      link: Lien
+      link_apply: Appliquer
+      link_remove: Supprimer
+      link_url_placeholder: Collez ou saisissez une URL…
+      numbered_list: Liste numérotée
+      paragraph: Texte normal
+      redo: Rétablir
+      strikethrough: Barré
+      text_color: Couleur du texte
+      underline: Souligné
+      undo: Annuler

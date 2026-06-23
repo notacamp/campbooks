@@ -1,0 +1,15 @@
+<p style="<%= email_text_greeting %>"><%= t(".greeting", name: @recipient.name) %></p>
+
+<p style="<%= email_text_body %>">
+  <%= t(".body_html",
+        actor: content_tag(:strong, @actor_name, style: "font-weight:600;"),
+        subject: content_tag(:strong, "“#{@subject_label}”", style: "font-weight:600;")) %>
+</p>
+
+<% if @snippet.present? %>
+  <p style="<%= email_text_body %>"><em><%= @snippet %></em></p>
+<% end %>
+
+<%= email_button(@url, t(".view_button")) %>
+
+<p style="<%= email_text_muted %>"><%= t(".footer") %></p>

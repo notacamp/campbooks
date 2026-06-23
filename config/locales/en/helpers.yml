@@ -1,0 +1,32 @@
+---
+en:
+  helpers:
+    date:
+      last_month: Last Month
+      this_month: This Month
+      this_week: This Week
+      today: Today
+    document_type:
+      unclassified: Unclassified
+    payment_methods:
+      card: Card
+      cash: Cash
+      check: Check
+      mbway: MB Way
+      multibanco: Multibanco
+      other: Other
+      transfer: Bank Transfer
+    relationship:
+      client: Client
+      colleague: Colleague
+      partner: Partner
+      personal: Personal
+      service_provider: Service Provider
+      unknown: Unknown
+      vendor: Vendor
+    snooze:
+      later_today: Later today (%{time})
+      next_week: Next week (%{datetime})
+      this_evening: This evening (%{time})
+      this_weekend: This weekend (%{datetime})
+      tomorrow: Tomorrow (%{datetime})

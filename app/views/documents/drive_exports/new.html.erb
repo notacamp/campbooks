@@ -1,0 +1,59 @@
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle", document: @document.display_title))) %>
+
+<%= render(Campbooks::Card.new(padding: :lg, class: "max-w-2xl")) do %>
+  <div class="flex items-center gap-2 mb-4">
+    <%= render(Campbooks::BrandLogo.new(brand: :google_drive, size: :sm)) %>
+    <h2 class="text-sm font-semibold text-gray-900"><%= t(".choose_folder") %></h2>
+  </div>
+
+  <!-- Breadcrumb -->
+  <div class="flex items-center gap-1.5 text-sm mb-3 flex-wrap">
+    <%= link_to t(".my_drive"), new_document_drive_export_path(@document), class: "text-accent-600 hover:text-accent-700" %>
+    <% if @current %>
+      <span class="text-gray-400">/</span>
+      <% if @up_id != "root" %>
+        <%= link_to "…", new_document_drive_export_path(@document, parent_id: @up_id), class: "text-accent-600 hover:text-accent-700" %>
+        <span class="text-gray-400">/</span>
+      <% end %>
+      <span class="font-medium text-gray-900"><%= @current.name %></span>
+    <% end %>
+  </div>
+
+  <!-- Folder list -->
+  <div class="border border-gray-200 rounded-lg divide-y divide-gray-100 mb-4 max-h-72 overflow-y-auto dark:border-white/10 dark:divide-white/5">
+    <% if @folders.any? %>
+      <% @folders.each do |folder| %>
+        <%= link_to new_document_drive_export_path(@document, parent_id: folder.id),
+              class: "flex items-center justify-between gap-2 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-white/5 no-underline text-gray-700" do %>
+          <span class="flex items-center gap-2 min-w-0">
+            <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+            <span class="truncate text-sm"><%= folder.name %></span>
+          </span>
+          <svg class="w-4 h-4 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        <% end %>
+      <% end %>
+    <% else %>
+      <p class="px-3 py-4 text-sm text-gray-500"><%= t(".no_subfolders") %></p>
+    <% end %>
+  </div>
+
+  <!-- Create a folder here -->
+  <%= form_with url: create_folder_document_drive_export_path(@document), method: :post, class: "flex gap-2 mb-6" do %>
+    <%= hidden_field_tag :parent_id, @parent_id %>
+    <%= text_field_tag :name, nil, placeholder: t(".new_folder_placeholder"),
+          class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+    <%= render Campbooks::Button.new(variant: :outline, size: :sm, type: :submit) { t(".create_folder") } %>
+  <% end %>
+
+  <!-- Upload here -->
+  <%= form_with url: document_drive_export_path(@document), method: :post, data: { turbo: false } do %>
+    <%= hidden_field_tag :folder_id, @parent_id || "root" %>
+    <div class="flex items-center justify-between gap-3">
+      <%= link_to t("shared.actions.cancel"), document_path(@document), class: "text-sm text-gray-500 hover:text-gray-700" %>
+      <%= render Campbooks::Button.new(variant: :primary, type: :submit) do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0-12l-4 4m4-4l4 4"/></svg>
+        <%= t(".upload_here", folder: @current&.name || t(".my_drive")) %>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

@@ -1,0 +1,9 @@
+<%= t(".greeting", name: @recipient.name) %>
+
+<%= t(".body_text", actor: @actor_name, subject: @subject_label) %>
+
+<% if @snippet.present? %>"<%= @snippet %>"
+
+<% end %><%= t(".view_text") %> <%= @url %>
+
+<%= t(".footer") %>

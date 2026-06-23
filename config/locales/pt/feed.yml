@@ -1,0 +1,129 @@
+---
+pt:
+  components:
+    feed:
+      calendar_event_card:
+        at_time: Às %{time}
+        dismiss: Dispensar
+        in_minutes:
+          one: Em %{count} min
+          other: Em %{count} min
+        join: Entrar
+        now: A começar agora
+        untitled: "(Sem título)"
+        view: Ver
+      email_action_card:
+        archive: Arquivar
+        archive_hint: Arquiva toda a conversa. Pode anular.
+        attachment: Anexo
+        file_as: 'Etiquetar: %{tag}'
+        messages:
+          one: "%{count} mensagem"
+          other: "%{count} mensagens"
+        open: Abrir
+      follow_up_card:
+        aged:
+          one: Respondeu há %{count} dia · sem resposta ainda
+          other: Respondeu há %{count} dias · sem resposta ainda
+        dismiss: Dispensar
+        draft_follow_up: Rascunho de acompanhamento
+        waiting: A aguardar resposta
+      highlight_card:
+        reason:
+          attachment: Anexo
+          busy_thread: Conversa ativa
+          high_priority: Prioridade alta
+          important: Importante
+          starred: Remetente com estrela
+      reminder_card:
+        confirm: Adicionar ao calendário
+        dismiss: Dispensar
+        in_days:
+          one: Em %{count} dia
+          other: Em %{count} dias
+        overdue: Em atraso
+        today: Hoje
+        tomorrow: Amanhã
+      reply_reminder_card:
+        aged:
+          one: "%{count} dia, sem resposta"
+          other: "%{count} dias, sem resposta"
+        dismiss: Dispensar
+        reply: Responder
+        snoozed_back: De volta da soneca
+      shared:
+        kbd_navigate: Navegar
+        many_participants: "%{names} e mais %{count}"
+        two_participants: "%{first} e %{second}"
+        no_subject: "(sem assunto)"
+        priority: Prioridade
+        scout_read: li agora mesmo
+        unknown_sender: Remetente desconhecido
+        working: A processar…
+        yesterday: Ontem
+      starred_email_card:
+        archive: Arquivar
+        archive_hint: Arquiva toda a conversa. Pode anular.
+        open: Abrir
+        starred: Destacado
+        unstar: Remover destaque
+      tag_suggestion_card:
+        file_it: Etiquetar
+        not_now: Agora não
+        prefix: Etiquetar
+        under: como
+    time_of_day_greeting:
+      greeting:
+        afternoon: Boa tarde, %{name}.
+        evening: Boa noite, %{name}.
+        morning: Bom dia, %{name}.
+        night: Tarde da noite, %{name}.
+  feed:
+    items:
+      dismissed: Dispensado.
+      follow_up_dismissed: Acompanhamento dispensado.
+      gone: Isto já não está disponível.
+      reminder_confirmed: "%{title} adicionado ao seu calendário."
+      reminder_confirmed_no_calendar: Lembrete confirmado. Ligue um calendário para
+        sincronizar automaticamente.
+      reminder_dismissed: Lembrete dispensado.
+      restored: Reposto.
+      unsupported: Essa ação não é suportada aqui.
+  home:
+    index:
+      ask_scout: Pergunte qualquer coisa ao Scout…
+      connect_body: O Scout lê e organiza o seu email antes de chegar. Ligue uma caixa
+        de entrada e o seu feed ganha vida.
+      connect_cta: Ligar caixa de entrada
+      connect_title: Ligue a sua caixa de entrada para começar
+      disconnected_body: O Scout não consegue aceder à sua caixa de entrada neste
+        momento — volte a ligá-la para o seu feed ganhar vida outra vez.
+      disconnected_cta: Voltar a ligar
+      disconnected_title: Volte a ligar a sua caixa de entrada
+      documents_ring: Documentos
+      empty_body: O Scout leu tudo e nada precisa de si neste momento. Toque numa
+        pilha acima para folhear, ou volte mais tarde.
+      empty_title: Tudo em dia ✨
+      feed_end: É tudo. O Scout vigia a caixa de entrada para que não precise de o
+        fazer.
+      needs_attention: Precisa de atenção
+      rewind_count:
+        one: "%{count} destaque"
+        other: "%{count} destaques"
+      rewind_this_month: Este mês
+      rings_coach_body: Cada anel agrupa emails relacionados. Toque num para os tratar
+        numa passagem rápida e deslizável.
+      rings_coach_cta: Percebi
+      rings_coach_title: Skim da sua caixa de entrada
+      scout_coach_body: O seu assistente de IA lê e organiza a caixa de entrada e
+        destaca o que precisa de si. Peça-lhe para encontrar ou resumir o que quiser.
+      scout_coach_cta: Percebi
+      scout_coach_title: Conheça o Scout
+      subtitle:
+        clear: Tudo em dia — o Scout está de vigia para que assim continue.
+        lots: "%{n} coisas precisam de si. O Scout empilhou-as para folhear sem sofrer."
+        single: Só uma coisa precisa de si — o Scout arquivou o resto.
+        some: "%{n} coisas precisam de si — o Scout empilhou-as. Uma folheada rápida
+          e está despachado."
+      take_tour: Fazer a visita guiada
+      your_feed: O seu feed

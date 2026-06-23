@@ -1,0 +1,17 @@
+<%# Lazily loaded into a single-email Skim card's turbo-frame (skim_body_<id>):
+    the whole email body, image URLs rewritten and <style>/<script> stripped so
+    no CSS leaks as text (see EmailMessageHelpers#safe_email_body). When the body
+    is empty and the caller asked for it (single-email cards pass fallback=summary),
+    show the email's summary so the card reads as content, not "No preview". %>
+<%= turbo_frame_tag "skim_body_#{@email.id}" do %>
+  <% body = safe_email_body(rewrite_email_urls(@email.body, @email.email_account_id)) %>
+  <% if body.to_s.strip.empty? %>
+    <% if @summary_fallback && @email.summary.present? %>
+      <div class="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground"><%= @email.summary %></div>
+    <% else %>
+      <p class="text-xs italic text-muted-foreground"><%= t(".no_preview_html") %></p>
+    <% end %>
+  <% else %>
+    <%= body %>
+  <% end %>
+<% end %>

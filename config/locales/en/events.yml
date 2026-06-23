@@ -1,0 +1,41 @@
+---
+en:
+  events:
+    bulk_count:
+      one: 1 email
+      other: "%{count} emails"
+    groups:
+      account: Account
+      calendar: Calendar
+      contacts: Contacts
+      documents: Documents
+      email: Email
+      reminders: Reminders
+    names:
+      calendar_event_created: Calendar event created
+      calendar_event_deleted: Calendar event deleted
+      calendar_event_updated: Calendar event updated
+      contact_blocked: Contact blocked
+      contact_starred: Contact starred
+      contact_unblocked: Contact unblocked
+      contact_unstarred: Contact unstarred
+      document_approved: Document approved
+      document_processed: Document processed
+      document_rejected: Document rejected
+      document_restored: Document restored
+      email_account_connected: Account connected
+      email_account_disconnected: Account disconnected
+      email_archived: Email archived
+      email_bulk_archived: Emails bulk-archived
+      email_forwarded: Email forwarded
+      email_received: Email received
+      email_sent: Email sent
+      email_skim_decision: Skim decision
+      email_snoozed: Email snoozed
+      email_tagged: Email tagged
+      email_trashed: Email trashed
+      reminder_confirmed: Reminder confirmed
+      reminder_created: Reminder created
+      reminder_dismissed: Reminder dismissed
+    system_actor: System
+    time_ago: "%{time} ago"

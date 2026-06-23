@@ -1,0 +1,62 @@
+---
+es:
+  admin:
+    beta_codes:
+      create:
+        success: Se han generado %{count} códigos de invitación.
+      destroy:
+        success: Código de invitación eliminado.
+      index:
+        count_label: Cantidad
+        delete: Eliminar
+        delete_confirm: "¿Eliminar este código sin usar?"
+        empty_title: Aún no hay códigos de invitación — genere algunos arriba.
+        generate: Generar códigos
+        label_label: Etiqueta (opcional)
+        label_placeholder: p. ej. Lista de lanzamiento, amigos y familia
+        no_label: Sin etiqueta
+        redeemed_note: canjeado por %{email} · hace %{time_ago}
+        status:
+          available: Disponible
+          expired: Caducado
+          redeemed: Canjeado
+        subtitle: Genere códigos de un solo uso para registros en beta cerrada.
+        title: Códigos de invitación
+    dashboard:
+      show:
+        available_beta_codes: Códigos disponibles
+        pending_invitations: Invitaciones pendientes
+        pending_signups: Registros pendientes
+        subtitle: Gestione el acceso a la plataforma y los usuarios.
+        title: Admin
+        total_users: Usuarios totales
+        workspaces: Espacios de trabajo
+    invitations:
+      index:
+        approve: Aprobar
+        empty_title: Sin invitaciones pendientes.
+        invited_by: Invitado por %{name} de %{workspace} · hace %{time_ago}
+        reject: Rechazar
+        subtitle: Revise y apruebe las invitaciones pendientes de miembros sin rol
+          de administrador.
+        title: Invitaciones
+    sidebar:
+      beta_codes: Códigos de invitación
+      dashboard: Panel
+      invitations: Invitaciones
+      signup_requests: Solicitudes de registro
+      users: Usuarios
+    signup_requests:
+      index:
+        approve: Aprobar
+        empty_title: Sin solicitudes de registro %{status}.
+        reject: Rechazar
+        subtitle: Apruebe o rechace solicitudes de cuenta.
+        title: Solicitudes de registro
+    users:
+      index:
+        demote_to_member: Degradar a miembro
+        empty_title: Sin usuarios.
+        promote_to_admin: Ascender a administrador
+        subtitle: Gestione los usuarios y roles de la plataforma.
+        title: Usuarios

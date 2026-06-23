@@ -1,0 +1,37 @@
+<% all_labels = message.email_account.external_tags.by_name.map { |t| { id: t.id, name: t.name, color: t.color } } %>
+
+<div id="<%= dom_id(message, :labels) %>"
+     class="relative inline-flex items-center gap-1 flex-wrap"
+     data-controller="email-labels"
+     data-email-labels-message-id-value="<%= message.id %>"
+     data-email-labels-all-labels-value="<%= all_labels.to_json %>"
+     data-email-labels-assigned-ids-value="<%= message.tags.loaded? ? message.tags.select(&:external?).map(&:id) : message.tags.external.pluck(:id) %>">
+
+  <% external_tags = message.tags.loaded? ? message.tags.select(&:external?) : message.tags.external %>
+  <% external_tags.each do |tag| %>
+    <span class="text-[11px] rounded px-2 py-0.5 font-medium inline-flex items-center gap-1 select-none"
+          style="background-color:<%= tag.color %>20;color:<%= tag.color %>">
+      <%= tag.name %>
+      <button type="button"
+              data-action="email-labels#remove"
+              data-email-labels-tag-id-param="<%= tag.id %>"
+              class="hover:opacity-60 leading-none text-[12px] ml-0.5"
+              title="<%= t(".remove_label_title") %>">&times;</button>
+    </span>
+  <% end %>
+
+  <%= render(Campbooks::IconButton.new(aria_label: t(".add_label_aria"), size: :md, class: "hover:text-accent-600")) do %>
+    <span class="text-sm font-medium leading-none">+</span>
+  <% end %>
+
+  <div data-email-labels-target="dropdown"
+       class="hidden absolute top-full left-0 z-50 mt-1 bg-card border border-gray-200 rounded-lg shadow-lg"
+       style="min-width:180px;max-height:200px;overflow-y:auto">
+    <input type="text"
+           data-email-labels-target="search"
+           data-action="input->email-labels#search keydown->email-labels#navigate"
+           placeholder="<%= t(".search_labels_placeholder") %>"
+           class="w-full border-0 border-b border-gray-200 px-3 py-2 text-xs focus:ring-0 focus:outline-none sticky top-0 bg-card rounded-t-lg">
+    <div data-email-labels-target="results" class="py-1"></div>
+  </div>
+</div>

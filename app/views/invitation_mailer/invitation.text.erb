@@ -1,0 +1,5 @@
+<%= t(".body_text", inviter: @invited_by.name, workspace: @workspace.name) %>
+
+<%= t(".accept_text") %> <%= invitation_url(@invitation.token) %>
+
+<%= t(".expires") %>

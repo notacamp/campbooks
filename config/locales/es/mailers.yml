@@ -1,0 +1,67 @@
+---
+es:
+  invitation_mailer:
+    invitation:
+      accept_button: Aceptar invitación
+      accept_text: 'Acepte la invitación aquí:'
+      body_html: "%{inviter} le ha invitado a unirse a %{workspace} en Campbooks."
+      body_text: "%{inviter} le ha invitado a unirse a %{workspace} en Campbooks."
+      expires: Esta invitación caduca en 7 días.
+      greeting: Hola,
+      ignore: "¿No esperaba esto? No se preocupe — simplemente ignórelo."
+      subject: "%{inviter} le ha invitado a unirse a %{workspace} en Campbooks"
+  notification_mailer:
+    mention:
+      body_html: "%{actor} le ha mencionado en la conversación sobre %{subject}."
+      body_text: '%{actor} le ha mencionado en la conversación sobre "%{subject}".'
+      footer: Recibe este correo porque le mencionaron. Desactive los correos de menciones
+        en su configuración de notificaciones.
+      greeting: Hola %{name},
+      subject: "%{actor} le ha mencionado en una conversación"
+      view_button: Ver conversación
+      view_text: 'Ver la conversación:'
+    thread_activity:
+      body_html: "%{actor} ha añadido un comentario a una conversación que sigue,
+        %{subject}."
+      body_text: '%{actor} ha añadido un comentario a una conversación que sigue,
+        "%{subject}".'
+      footer: Recibe este correo porque sigue esta conversación. Puede dejar de seguirla
+        desde el panel de conversación.
+      greeting: Hola %{name},
+      subject: Nuevo comentario en "%{subject}"
+      view_button: Ver conversación
+      view_text: 'Ver la conversación:'
+  passwords_mailer:
+    reset:
+      body: 'Ha solicitado restablecer su contraseña de Campbooks. Aquí tiene el enlace
+        para hacerlo:'
+      body_text: Puede restablecer su contraseña en
+      expires: Este enlace caduca en %{duration}.
+      expires_text: Este enlace caducará en %{duration}.
+      greeting: Hola,
+      ignore: "¿No ha solicitado esto? Puede ignorarlo sin problema."
+      reset_button: Restablecer contraseña
+      subject: Restablezca su contraseña
+  signup_request_mailer:
+    approved:
+      body: Su solicitud de cuenta de Campbooks ha sido aprobada. Haga clic en el
+        botón de abajo para terminar de crear su cuenta.
+      body_text: 'Su solicitud de cuenta de Campbooks ha sido aprobada. Visite el
+        enlace a continuación para terminar de crear su cuenta:'
+      complete_button: Completar registro
+      greeting: Hola %{name},
+      ignore: Si no solicitó acceso, puede ignorar este correo.
+      subject: Su cuenta de Campbooks ha sido aprobada
+      unique: Este enlace es único para usted y no debe compartirse.
+  verification_mailer:
+    verify:
+      body: 'Aquí tiene su código de verificación de Campbooks:'
+      body_text: 'Su código de verificación de Campbooks es: %{code}'
+      expires: Es válido durante 10 minutos.
+      expires_text: Este código caduca en 10 minutos.
+      greeting: Hola %{name},
+      ignore: "¿No ha solicitado un código? No es necesario hacer nada — simplemente
+        ignórelo."
+      ignore_text: Si no ha solicitado este código, puede ignorar este correo sin
+        problema.
+      subject: "%{code} es su código de verificación de Campbooks"

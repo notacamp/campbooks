@@ -1,0 +1,222 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-22T00:00:00Z",
+  "title": "Design System: Campbooks",
+  "extensions": {
+    "colorMeta": {
+      "calm-blue": {
+        "role": "primary",
+        "displayName": "Calm Blue",
+        "canonical": "oklch(48% 0.21 265)",
+        "tonalRamp": [
+          "oklch(15% 0.08 265)",
+          "oklch(25% 0.12 265)",
+          "oklch(35% 0.16 265)",
+          "oklch(48% 0.21 265)",
+          "oklch(56% 0.19 265)",
+          "oklch(72% 0.14 265)",
+          "oklch(84% 0.065 265)",
+          "oklch(96.5% 0.012 265)"
+        ]
+      },
+      "amber-attention-600": {
+        "role": "secondary",
+        "displayName": "Amber Attention",
+        "canonical": "oklch(62% 0.18 48)",
+        "tonalRamp": [
+          "oklch(15% 0.06 48)",
+          "oklch(25% 0.09 48)",
+          "oklch(35% 0.12 48)",
+          "oklch(52% 0.16 42)",
+          "oklch(62% 0.18 48)",
+          "oklch(78% 0.12 50)",
+          "oklch(88% 0.06 52)",
+          "oklch(97% 0.02 60)"
+        ]
+      },
+      "warm-ash-bg": {
+        "role": "neutral",
+        "displayName": "Warm Ash Background",
+        "canonical": "oklch(98% 0.002 265)",
+        "tonalRamp": [
+          "oklch(98% 0.002 265)",
+          "oklch(95% 0.003 265)",
+          "oklch(89% 0.005 265)",
+          "oklch(87% 0.01 265)",
+          "oklch(75% 0.01 265)",
+          "oklch(55% 0.01 265)",
+          "oklch(45% 0.01 265)",
+          "oklch(25% 0.01 265)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page-level headings. Used once per screen." },
+      "title": { "displayName": "Title", "purpose": "Section headers within a page." },
+      "headline": { "displayName": "Headline", "purpose": "Card headers and list section titles." },
+      "body": { "displayName": "Body", "purpose": "Main content at 14px. Compact but readable." },
+      "label": { "displayName": "Label", "purpose": "Metadata, timestamps, help text, badge content." },
+      "mono": { "displayName": "Mono", "purpose": "Code blocks and agent chat message content." }
+    },
+    "shadows": [
+      { "name": "rest", "value": "0 1px 2px 0 rgba(0,0,0,0.05)", "purpose": "Cards, table wrappers, inputs. Default surface state." },
+      { "name": "hover", "value": "0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05)", "purpose": "Clickable cards and stats on hover." },
+      { "name": "overlay", "value": "0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)", "purpose": "Modals and toasts floating above the page." }
+    ],
+    "motion": [
+      { "name": "ease-colors", "value": "150ms ease", "purpose": "Color transitions on buttons, links, badges." },
+      { "name": "ease-transform", "value": "200ms ease", "purpose": "Transform transitions on toggle knob." },
+      { "name": "ease-shadow", "value": "200ms ease", "purpose": "Shadow transitions on hover states." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" },
+      { "name": "2xl", "value": "1536px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Main call-to-action. Calm Blue background, white text, rounded-lg.",
+      "html": "<button class=\"ds-btn-primary\">Save changes</button>",
+      "css": ".ds-btn-primary { background: var(--color-accent-600); color: white; padding: 8px 16px; font-size: 14px; font-weight: 500; font-family: ui-sans-serif, system-ui, sans-serif; border: none; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; transition: background-color 150ms; } .ds-btn-primary:hover { background: var(--color-accent-700); } .ds-btn-primary:focus-visible { outline: 2px solid var(--color-accent-500); outline-offset: 2px; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary action. Gray border, transparent background, darkens on hover.",
+      "html": "<button class=\"ds-btn-outline\">Cancel</button>",
+      "css": ".ds-btn-outline { background: transparent; color: oklch(45% 0.01 265); padding: 8px 16px; font-size: 14px; font-weight: 500; font-family: ui-sans-serif, system-ui, sans-serif; border: 1px solid var(--color-gray-300); border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; transition: background-color 150ms, color 150ms; } .ds-btn-outline:hover { background: var(--color-gray-50); color: oklch(38% 0.01 265); } .ds-btn-outline:focus-visible { outline: 2px solid var(--color-accent-500); outline-offset: 2px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Tertiary action. No border, transparent background, subtle hover.",
+      "html": "<button class=\"ds-btn-ghost\">Learn more</button>",
+      "css": ".ds-btn-ghost { background: transparent; color: oklch(55% 0.01 265); padding: 8px 16px; font-size: 14px; font-weight: 500; font-family: ui-sans-serif, system-ui, sans-serif; border: none; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; transition: background-color 150ms, color 150ms; } .ds-btn-ghost:hover { background: var(--color-gray-100); color: oklch(45% 0.01 265); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--color-accent-500); outline-offset: 2px; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Standard surface container with thin border and rest shadow.",
+      "html": "<article class=\"ds-card\"><h3 class=\"ds-card-heading\">Documents to review</h3><ul class=\"ds-card-list\"><li class=\"ds-card-list-item\"><a href=\"#\">Invoice #1042</a><span class=\"ds-card-meta\">12/05/2026</span></li></ul></article>",
+      "css": ".ds-card { background: white; border: 1px solid var(--color-gray-200); border-radius: 12px; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); padding: 24px; font-family: ui-sans-serif, system-ui, sans-serif; } .ds-card-heading { font-size: 14px; font-weight: 600; color: oklch(25% 0.01 265); margin: 0 0 16px 0; } .ds-card-list { list-style: none; margin: 0; padding: 0; } .ds-card-list-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-top: 1px solid var(--color-gray-100); } .ds-card-list-item:first-child { border-top: none; padding-top: 0; } .ds-card-list-item a { color: var(--color-accent-600); font-size: 14px; font-weight: 500; text-decoration: none; } .ds-card-list-item a:hover { color: var(--color-accent-700); } .ds-card-meta { font-size: 12px; color: oklch(55% 0.01 265); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Standard text input with crisp focus ring.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-label\" for=\"ds-email\">Email address</label><input class=\"ds-input\" id=\"ds-email\" type=\"email\" placeholder=\"you@example.com\" /></div>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 6px; } .ds-label { font-size: 14px; font-weight: 500; color: oklch(45% 0.01 265); font-family: ui-sans-serif, system-ui, sans-serif; } .ds-input { padding: 8px 12px; font-size: 14px; font-family: ui-sans-serif, system-ui, sans-serif; border: 1px solid var(--color-gray-300); border-radius: 8px; background: white; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); outline: none; transition: border-color 150ms, box-shadow 150ms; } .ds-input:focus { border-color: var(--color-accent-500); box-shadow: 0 0 0 1px var(--color-accent-500); } .ds-input::placeholder { color: var(--color-gray-400); }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "badge-accent",
+      "description": "Pill-shaped status indicator. Shown in accent variant.",
+      "html": "<span class=\"ds-badge ds-badge-accent\">Approved</span> <span class=\"ds-badge ds-badge-danger\">High priority</span> <span class=\"ds-badge ds-badge-neutral\">Draft</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; font-size: 12px; font-weight: 500; padding: 2px 10px; border-radius: 9999px; font-family: ui-sans-serif, system-ui, sans-serif; } .ds-badge-accent { background: var(--color-accent-100); color: var(--color-accent-700); } .ds-badge-danger { background: var(--color-red-100); color: var(--color-red-700); } .ds-badge-neutral { background: var(--color-gray-100); color: oklch(55% 0.01 265); } .ds-badge-success { background: var(--color-green-100); color: var(--color-green-700); } .ds-badge-warning { background: var(--color-yellow-100); color: var(--color-yellow-700); }"
+    },
+    {
+      "name": "Stat Card",
+      "kind": "card",
+      "refersTo": "stat",
+      "description": "Compact metric display with colored left accent and value/label pair.",
+      "html": "<a class=\"ds-stat ds-stat-info\" href=\"#\"><span class=\"ds-stat-value\">12</span><span class=\"ds-stat-label\">Connected</span></a>",
+      "css": ".ds-stat { display: block; background: white; border: 1px solid var(--color-gray-200); border-left: 4px solid var(--color-gray-300); border-radius: 8px; padding: 12px 16px; box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05); text-decoration: none; font-family: ui-sans-serif, system-ui, sans-serif; transition: box-shadow 200ms; } a.ds-stat:hover { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05); } .ds-stat-info { border-left-color: var(--color-blue-500); } .ds-stat-danger { border-left-color: var(--color-red-500); } .ds-stat-success { border-left-color: var(--color-green-500); } .ds-stat-attention { border-left-color: oklch(62% 0.18 48); } .ds-stat-value { display: block; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; color: oklch(25% 0.01 265); } .ds-stat-info .ds-stat-value { color: var(--color-blue-700); } .ds-stat-danger .ds-stat-value { color: var(--color-red-700); } .ds-stat-success .ds-stat-value { color: var(--color-green-700); } .ds-stat-attention .ds-stat-value { color: oklch(52% 0.16 42); } .ds-stat-label { display: block; font-size: 12px; color: oklch(55% 0.01 265); margin-top: 2px; }"
+    },
+    {
+      "name": "Toggle",
+      "kind": "input",
+      "refersTo": "toggle",
+      "description": "Checkbox-based toggle switch with smooth knob transition.",
+      "html": "<label class=\"ds-toggle\"><input type=\"checkbox\" class=\"ds-toggle-input\" /><span class=\"ds-toggle-track\"><span class=\"ds-toggle-knob\"></span></span><span class=\"ds-toggle-label\">Enable notifications</span></label>",
+      "css": ".ds-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; font-family: ui-sans-serif, system-ui, sans-serif; } .ds-toggle-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); } .ds-toggle-track { position: relative; display: inline-block; width: 36px; height: 20px; background: var(--color-gray-200); border-radius: 9999px; transition: background-color 150ms; } .ds-toggle-input:checked + .ds-toggle-track { background: var(--color-accent-600); } .ds-toggle-input:focus-visible + .ds-toggle-track { outline: 2px solid var(--color-accent-300); outline-offset: 2px; } .ds-toggle-input:disabled + .ds-toggle-track { opacity: 0.5; } .ds-toggle-knob { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: white; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.15); transition: transform 200ms; } .ds-toggle-input:checked + .ds-toggle-track .ds-toggle-knob { transform: translateX(16px); } .ds-toggle-label { font-size: 14px; color: oklch(25% 0.01 265); user-select: none; }"
+    },
+    {
+      "name": "Avatar",
+      "kind": "custom",
+      "refersTo": "avatar",
+      "description": "Initials-based avatar in Calm Blue tint, circular.",
+      "html": "<span class=\"ds-avatar\" aria-label=\"Alex Demo\">AD</span>",
+      "css": ".ds-avatar { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: var(--color-accent-100); color: var(--color-accent-700); font-size: 12px; font-weight: 600; font-family: ui-sans-serif, system-ui, sans-serif; border-radius: 50%; flex-shrink: 0; }"
+    },
+    {
+      "name": "Toast Notification",
+      "kind": "custom",
+      "refersTo": "toast",
+      "description": "Floating notification with overlay shadow and ring border.",
+      "html": "<div class=\"ds-toast\" role=\"status\">Document approved successfully.</div>",
+      "css": ".ds-toast { max-width: 384px; padding: 12px 16px; background: white; border-radius: 8px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); font-size: 14px; font-family: ui-sans-serif, system-ui, sans-serif; color: oklch(25% 0.01 265); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.05); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Thoughtful Desk",
+    "overview": "Campbooks feels like a well-organized desk belonging to someone competent and unhurried. Everything has its place, but nothing is fussy. The owner knows where things are and can reach for them without looking. It's clean but lived-in — not a showroom, not a mess. The system uses a restrained palette anchored by a single calm blue accent (hue 265 in OKLCH) and warm-tinted neutrals. It's flat at rest with paper-thin elevation where layering is needed. Corners are softly rounded (8px standard). Typography relies on the system font stack — nothing decorative, nothing that draws attention to itself. This system explicitly rejects Outlook's toolbar density, enterprise SaaS jargon, and fintech sterility.",
+    "keyCharacteristics": [
+      "Single calm blue accent carrying ≤10% of any screen — its restraint is the point",
+      "Paper-like cards with thin gray borders and the faintest shadow",
+      "14px base size — compact but readable, respecting the owner's time",
+      "Clean, precise interactions: fast transitions, crisp focus rings, deliberate hover states",
+      "Progressive density: calm at the dashboard, richer in email and document detail views"
+    ],
+    "rules": [
+      {
+        "name": "The One Voice Rule",
+        "body": "The Calm Blue accent appears on ≤10% of any given screen. Its rarity is the point. If a screen feels colorful, something is wrong.",
+        "section": "colors"
+      },
+      {
+        "name": "The Semantic Restraint Rule",
+        "body": "Red, green, amber, and blue are reserved for status communication (priority, approval state, errors). Never use them decoratively.",
+        "section": "colors"
+      },
+      {
+        "name": "The System Stack Rule",
+        "body": "Never load custom web fonts. The system font stack is faster and feels native to the user's device.",
+        "section": "typography"
+      },
+      {
+        "name": "The 14px Baseline Rule",
+        "body": "Body text is 0.875rem (14px). This is deliberate: compact enough for data-dense screens while remaining readable. Bump to 16px only in long-form reading contexts.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "Surfaces are flat at rest. Shadows appear only as a response to state (hover, focus, modal overlay). An element with a permanent prominent shadow is a bug.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Border-First Rule",
+        "body": "Depth is conveyed primarily through thin gray borders (border border-gray-200), not shadows. The shadow is the second signal, not the first.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use the Calm Blue accent on ≤10% of any screen. Buttons, links, focus rings. Not backgrounds, not dividers, not decoration.",
+      "Do use semantic colors only for status. A red badge means danger or high priority. A green badge means done.",
+      "Do start with the system font stack. No custom web fonts unless there's a specific reason.",
+      "Do keep cards flat at rest. Shadows are for hover and overlay states.",
+      "Do use the border-first approach to depth: thin gray-200 borders define surfaces; the shadow is secondary.",
+      "Do write interface copy that sounds like a person: 'No emails need follow-up' not 'Zero actionable items detected.'",
+      "Do keep the dashboard calm. Urgency (red badges, warnings) is reserved for genuinely urgent things."
+    ],
+    "donts": [
+      "Don't use Outlook-level density. If a screen has more than 4 distinct action areas, split it.",
+      "Don't use enterprise SaaS jargon in labels, buttons, or empty states. 'Processed' not 'Ingestion pipeline complete.'",
+      "Don't use navy-and-gold, pure black, or sterile white as neutrals. The grays are tinted toward the accent hue.",
+      "Don't use border-left or border-right greater than 1px as a colored accent stripe on cards. The Stat component's 4px left border is the sole exception; do not replicate the pattern elsewhere.",
+      "Don't animate layout properties (width, height, top, left). Use transform and opacity only.",
+      "Don't use glassmorphism, gradient text, or decorative blur effects.",
+      "Don't wrap everything in a card. Items that don't need elevation should live directly on the page."
+    ]
+  }
+}

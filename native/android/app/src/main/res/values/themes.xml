@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- HotwireActivity extends AppCompatActivity and the built-in Custom Tab
+         handler reads Material attrs, so use a Material 3 theme. -->
+    <style name="Theme.Campbooks" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:statusBarColor" tools:targetApi="l">@android:color/transparent</item>
+    </style>
+</resources>

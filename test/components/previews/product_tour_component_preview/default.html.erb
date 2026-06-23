@@ -1,0 +1,5 @@
+<%# The controller normally lives on <body>; wrap it here and autostart so the
+    overlay opens and every scene can be walked through in Lookbook. %>
+<div data-controller="product-tour" class="relative min-h-[640px]">
+  <%= render Campbooks::ProductTour.new(autostart: true) %>
+</div>

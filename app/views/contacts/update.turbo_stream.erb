@@ -1,0 +1,9 @@
+<%= turbo_stream.replace dom_id(@contact, :name_display) do %>
+  <%= render "contacts/name_field", contact: @contact, person: @person %>
+<% end %>
+<%= turbo_stream.replace dom_id(@contact, :relationship_display) do %>
+  <%= render "contacts/relationship_field", contact: @contact, person: @person %>
+<% end %>
+<%= turbo_stream.append "action_toasts" do %>
+  <%= render "shared/action_toast", message: t(".updated_toast"), variant: :success %>
+<% end %>

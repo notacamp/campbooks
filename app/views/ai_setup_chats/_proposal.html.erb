@@ -1,0 +1,7 @@
+<%# locals: thread (AgentThread), kind (String), items (Array|nil) %>
+<%# Stable id so AiSetupChatReplyJob can replace this region with the proposal. %>
+<div id="setup_chat_proposal_<%= thread.id %>">
+  <% if local_assigns[:items].present? %>
+    <%= render(Campbooks::AiSetupProposal.new(items: items, kind: kind, form_action: ai_setup_chat_apply_path(kind: kind))) %>
+  <% end %>
+</div>

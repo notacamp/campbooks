@@ -1,0 +1,12 @@
+<%= render(Campbooks::ComposeArea.new(
+  email_message: email_message,
+  mode: mode,
+  to_address: to_address,
+  cc_address: cc_address,
+  subject: subject,
+  quoted_body: quoted_body,
+  prefill_body: local_assigns.fetch(:prefill_body, nil),
+  signature_content: signature_content,
+  current_signature_id: local_assigns.fetch(:current_signature_id, nil),
+  signatures: local_assigns.fetch(:signatures, [])
+)) %>

@@ -1,0 +1,81 @@
+<% field_classes = "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" %>
+<%= form_with model: @event, class: "space-y-4" do |f| %>
+  <% if @event.errors.any? %>
+    <div class="rounded-lg bg-red-50 text-red-700 text-sm px-3 py-2 dark:bg-red-500/10 dark:text-red-300">
+      <%= @event.errors.full_messages.to_sentence %>
+    </div>
+  <% end %>
+
+  <%= hidden_field_tag :view, params[:view] %>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".title_label") %></label>
+    <%= f.text_field :title, class: field_classes, placeholder: t(".title_placeholder"), autofocus: true %>
+  </div>
+
+  <% if @event.new_record? && @calendars.present? %>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".calendar_label") %></label>
+      <%= f.select :calendar_id,
+            @calendars.map { |c| [ "#{c.name} (#{c.calendar_account.display_name})", c.id ] },
+            { selected: @event.calendar_id }, class: field_classes %>
+    </div>
+  <% elsif @event.persisted? && @event.calendar %>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".calendar_label") %></label>
+      <div class="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
+        <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background-color: <%= @event.calendar.display_color %>"></span>
+        <span class="text-sm font-medium text-foreground"><%= @event.calendar.name %></span>
+        <span class="truncate text-xs text-muted-foreground"><%= @event.calendar.calendar_account.display_name %></span>
+      </div>
+    </div>
+  <% end %>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".color_label") %></label>
+    <%= render Campbooks::ColorSwatchPicker.new(name: "calendar_event[color]", selected: @event.color, none_label: t(".color_default")) %>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".starts_label") %></label>
+      <%= f.datetime_field :start_at, class: field_classes %>
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".ends_label") %></label>
+      <%= f.datetime_field :end_at, class: field_classes %>
+    </div>
+  </div>
+
+  <label class="flex items-center gap-2 text-sm text-gray-700">
+    <%= f.check_box :all_day, class: "rounded border-border text-primary focus:ring-ring" %>
+    <%= t(".all_day_label") %>
+  </label>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".location_label") %></label>
+    <%= f.text_field :location, class: field_classes %>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".description_label") %></label>
+    <%= f.text_area :description, rows: 3, class: field_classes %>
+  </div>
+
+  <% if @event.persisted? && @event.recurring? %>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".recurrence_label") %></label>
+      <select name="recurrence_scope" class="<%= field_classes %>">
+        <option value="this"><%= t(".recurrence_this") %></option>
+        <option value="all"><%= t(".recurrence_all") %></option>
+      </select>
+    </div>
+  <% end %>
+
+  <div class="flex items-center justify-between pt-2">
+    <%= render(Campbooks::Button.new(variant: :primary, size: :md, type: "submit")) { @event.new_record? ? t(".create") : t(".save") } %>
+    <button type="button" data-action="click->calendar-event-modal#close" class="cursor-pointer border-0 bg-transparent text-sm text-gray-500 hover:text-gray-700">
+      <%= t(".cancel") %>
+    </button>
+  </div>
+<% end %>

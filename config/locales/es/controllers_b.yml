@@ -1,0 +1,68 @@
+---
+es:
+  ai_configurations:
+    update:
+      assignment_updated: Asignación de %{purpose} actualizada.
+      failed_to_save: 'Error al guardar %{purpose}: %{errors}'
+      is_unassigned: "%{purpose} no está asignado."
+      reset_to_unassigned: "%{purpose} restablecido a sin asignar."
+  inbox_settings:
+    accounts:
+      scan_now:
+        started: Análisis iniciado. Los nuevos mensajes aparecerán en breve.
+    tags:
+      destroy:
+        cannot_delete: La etiqueta security_flagged no se puede eliminar.
+  settings:
+    ai_adapters:
+      create:
+        created: Adaptador de IA "%{name}" creado.
+        failed: 'Error al crear el adaptador: %{errors}'
+      destroy:
+        deleted: Adaptador de IA "%{name}" eliminado.
+        in_use: No se puede eliminar "%{name}" — todavía está asignado a servicios.
+      managed_not_editable: 'Campbooks AI lo gestionamos nosotros: cambia de modo
+        en Ajustes en lugar de editarlo.'
+      update:
+        failed: 'Error al actualizar el adaptador: %{errors}'
+        updated: Adaptador de IA "%{name}" actualizado.
+        updated_env_key: Adaptador de IA "%{name}" actualizado (usando la clave de
+          entorno si está disponible).
+    general:
+      update:
+        saved: Configuración actualizada.
+    integrations:
+      connections:
+        create:
+          created: Conexión "%{name}" creada.
+        destroy:
+          deleted: Conexión "%{name}" eliminada.
+        update:
+          updated: Conexión "%{name}" actualizada.
+      google_drive:
+        destroy:
+          disconnected: Google Drive desconectado.
+      google_drive_configs:
+        update:
+          saved: Configuración de Google Drive actualizada.
+      notion:
+        destroy:
+          disconnected: Integración de Notion desconectada.
+        update:
+          saved: Integración de Notion actualizada.
+          workspace_warning: 'Conectado, pero no se pudo obtener la información del
+            espacio de trabajo: %{error}'
+      zoho_drive:
+        destroy:
+          mapping_not_found: Asignación no encontrada.
+          mapping_removed: Asignación eliminada.
+        update:
+          mapping_saved: Asignación de carpeta guardada.
+    invitations:
+      create:
+        pending_review: Invitación para %{email} enviada para revisión del administrador.
+        sent: Invitación enviada a %{email}.
+      destroy:
+        cancelled: Invitación cancelada.
+      resend:
+        resent: Invitación reenviada a %{email}.

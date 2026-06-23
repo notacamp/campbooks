@@ -1,0 +1,68 @@
+---
+en:
+  activerecord:
+    errors:
+      models:
+        ai_adapter:
+          attributes:
+            managed:
+              plan_upgrade_required: requires a plan that includes Campbooks AI
+        ai_configuration:
+          attributes:
+            model:
+              not_permitted_on_plan: isn't available on your plan
+  components:
+    entitlements:
+      plan_badge:
+        names:
+          business: Business
+          free: Free
+          pro: Pro
+          unlimited: Unlimited
+      plan_summary:
+        current_plan: Current plan
+        included: Included
+        not_included: Not included
+        over_cap: Using %{usage} of %{limit} — over your plan limit.
+        self_hosted_body: This is a self-hosted Campbooks install. Every feature is
+          available with no plan limits.
+        self_hosted_title: Self-hosted — everything included
+        tiers:
+          basic: Basic
+          premium: Premium
+          standard: Standard
+        unlimited: Unlimited
+        usage_of_limit: "%{usage} of %{limit}"
+      upgrade_prompt:
+        cta: View plans
+        reason:
+          not_allowed: "%{feature} isn't part of your current plan."
+          not_enabled: "%{feature} is switched off for your workspace."
+          over_limit: You've used all the %{feature} your plan includes.
+        title: Upgrade your plan
+  entitlements:
+    blocked:
+      email_accounts_cap: You've reached the email account limit (%{limit}) on your
+        %{plan} plan. Upgrade to connect more.
+      not_allowed: "%{feature} isn't included in your %{plan} plan. Upgrade to switch
+        it on."
+      not_enabled: "%{feature} is turned off for your workspace."
+      over_limit: You've reached your plan's limit for %{feature}. Upgrade for more.
+    features:
+      ai_model_access: AI models
+      email_accounts: Email accounts
+      emails_synced: Emails synced
+      managed_ai: Campbooks AI
+      notifications: Notifications
+      scout: Scout
+      workflow_executions: Workflow runs
+      workflows: Workflows
+  navigation:
+    settings:
+      items:
+        plan: Plan & limits
+  settings:
+    plan:
+      show:
+        subtitle: See what your workspace includes and how much you've used.
+        title: Plan & limits

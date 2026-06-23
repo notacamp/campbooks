@@ -1,0 +1,40 @@
+<%= render(Campbooks::PageHeader.new(
+  title: t(".heading"),
+  subtitle: t(".subheading"),
+  spacing: :lg
+)) do |header| %>
+  <% header.with_actions do %>
+    <span class="text-sm text-muted-foreground whitespace-nowrap"><%= t(".count", count: @pagy.count) %></span>
+  <% end %>
+<% end %>
+
+<div class="space-y-5">
+  <%# Group filter chips. "All" clears the filter; each group narrows by its event types. %>
+  <div class="flex flex-wrap gap-2">
+    <% chips = [ [ t(".all"), nil ] ] + Events::Registry.groups.map { |g| [ t("events.groups.#{g}"), g.to_s ] } %>
+    <% chips.each do |chip_label, chip_group| %>
+      <% active = @group.to_s == chip_group.to_s %>
+      <% chip_styles = active ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:bg-muted" %>
+      <%= link_to chip_label, activity_path(group: chip_group),
+            class: "rounded-full border px-3 py-1 text-xs font-medium transition-colors #{chip_styles}" %>
+    <% end %>
+  </div>
+
+  <div id="isc_rows" class="divide-y divide-border rounded-xl border border-border bg-card overflow-hidden">
+    <% if @events.any? %>
+      <% @events.each do |event| %>
+        <%= render(Campbooks::Activity::EventRow.new(event: event)) %>
+      <% end %>
+    <% else %>
+      <p class="text-sm text-muted-foreground py-12 text-center"><%= t(".empty") %></p>
+    <% end %>
+  </div>
+
+  <% if @pagy.next %>
+    <%= turbo_frame_tag "isc_pagination",
+          src: activity_path(page: @pagy.next, group: @group.presence, format: :turbo_stream),
+          loading: :lazy do %>
+      <div class="flex justify-center py-4"><%= render(Campbooks::Spinner.new(size: :sm)) %></div>
+    <% end %>
+  <% end %>
+</div>

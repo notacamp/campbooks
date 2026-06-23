@@ -1,0 +1,114 @@
+---
+en:
+  dashboard:
+    show:
+      all_set_description: New emails and documents will appear here when they need
+        your attention.
+      all_set_title: All set up — waiting for data.
+      attention_empty_idle: New emails and documents will appear here when they need
+        action.
+      attention_empty_recent: Here's what came in since your last visit.
+      attention_empty_title: Nothing needs your attention.
+      attention_heading: Needs your attention
+      high_priority: High priority
+      no_subject: "(no subject)"
+      recent_activity_heading: Recent activity
+      recent_syncs_heading: Recent syncs
+      scan_documents:
+        one: 1 document
+        other: "%{count} documents"
+      scan_emails:
+        one: 1 email
+        other: "%{count} emails"
+      scan_errors:
+        one: 1 error
+        other: "%{count} errors"
+      setup_description: Complete these steps to start processing documents and emails.
+      setup_title: Finish setting up your workspace.
+      stuck_documents:
+        one: 1 document stuck in processing.
+        other: "%{count} documents stuck in processing."
+      time_ago: "%{time} ago"
+      title: Home
+      unnamed_document: Unnamed document
+      view: View
+  email_message_tags:
+    create:
+      tagged_as: Tagged as '%{name}'
+    destroy:
+      tag_removed: Tag '%{name}' removed
+  email_message_zoho_labels:
+    create:
+      label_applied: Label '%{name}' applied
+    destroy:
+      label_removed: Label '%{name}' removed
+  workflow_executions:
+    index:
+      back_to_workflow: Back to workflow
+      empty_description: This workflow will appear here each time its trigger fires.
+      empty_title: No runs yet
+      steps:
+        one: 1 step
+        other: "%{count} steps"
+      subtitle: Every time this workflow fired, and what happened
+      title: "%{name} — Runs"
+      triggered: Triggered
+    show:
+      all_runs: All runs
+      result: Result
+      step_fallback: Step
+      steps_heading: Steps
+      title: Run detail
+      took: took %{duration}
+      trigger_data: Trigger data
+  workflows:
+    notion_fields:
+      error: "Couldn't load fields: %{message}"
+      prompt: Enter a database ID and load its fields.
+      no_fields: This database has no fields Campbooks can fill in.
+    edit:
+      back_to_workflows: Back to workflows
+      description_label: Description (optional)
+      description_placeholder: What does this workflow do?
+      name_label: Workflow Name
+      name_placeholder: My Automation
+      new_workflow: New Workflow
+      no_runs_yet: No runs yet. This workflow runs automatically when its trigger
+        fires.
+      recent_runs_heading: Recent runs
+      regenerate_url: Regenerate URL
+      regenerate_url_confirm: Generate a new URL? The current one will stop working.
+      subtitle: Configure your automation
+      template_variables_heading: Template Variables
+      then_label: Then
+      time_ago: "%{time} ago"
+      trigger_email_received: Email Received
+      trigger_event: Domain Event
+      trigger_webhook: Incoming Webhook
+      view_all: View all
+      webhook_url_description: Point an external service here to trigger this workflow.
+      webhook_url_heading: Webhook URL
+      when_label: When
+    index:
+      create_workflow: Create Workflow
+      delete_confirm: Delete this workflow?
+      empty_description: Create your first workflow to automate email processing.
+      empty_title: No workflows yet
+      enable: Enable
+      new_workflow: New Workflow
+      pause: Pause
+      status_active: Active
+      status_paused: Paused
+      steps:
+        one: 1 step
+        other: "%{count} steps"
+      subtitle: Automate your email processing with triggers and actions
+      trigger_meta: "%{trigger} trigger · %{steps}"
+  zoho_drive_accounts:
+    new:
+      connect_button: Connect Zoho Drive Account
+      description: Connect your Zoho Drive account to push documents from Campbooks.
+        You will be redirected to Zoho to authorize access.
+      permissions_note: This will request access to create and read files in your
+        Zoho WorkDrive.
+      title: Connect Zoho Drive

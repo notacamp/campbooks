@@ -1,0 +1,163 @@
+---
+pt:
+  components:
+    follow_button:
+      follow: Seguir
+      follow_aria: Seguir esta discussão
+      following: A seguir
+      unfollow_aria: Deixar de seguir esta discussão
+    liquid_field:
+      available_variables: Variáveis disponíveis
+      variables_toggle: "{ } Variáveis"
+    onboarding_progress:
+      skip_hint: Cada passo é opcional — ignore o que quiser e termine a configuração
+        mais tarde nas Definições.
+      steps:
+        ai_configuration: Configuração de IA
+        classification: Classificação
+        email_accounts: Contas de Email
+        review: Revisão
+        workspace: Espaço de trabalho
+    setup_hub:
+      add_manually: Adicionar manualmente
+      connect_google: Ligar Google
+      connect_microsoft: Ligar Microsoft
+      connect_zoho: Ligar Zoho
+      dismiss_title: Dispensar esta tarefa
+      heading: Concluir a configuração do Campbooks
+      leave_for_now: Deixar para mais tarde
+      let_ai_help: "✨ Deixe a IA ajudar"
+      progress: "%{completed} de %{total} concluídos"
+    step_picker:
+      condition_description: Continuar apenas se uma regra corresponder
+      condition_title: Condição
+      dialog_label: Adicionar um passo
+      group_labels:
+        action: Ações
+        logic: Lógica
+      no_matching_steps: Nenhum passo encontrado.
+      search_placeholder: Pesquisar passos…
+    sync_indicator:
+      syncing: A sincronizar a sua caixa de entrada
+    webhook_url_field:
+      copy: Copiar
+      default_label: URL do Webhook
+      pending_hint: Guarde este fluxo de trabalho para gerar o URL do webhook.
+    workflow_builder:
+      step_label:
+        condition: Se %{field} %{operator} '%{value}'
+        send_email: Enviar Email
+      step_summary:
+        from: 'De: %{name}'
+        no_account: Nenhuma conta de email selecionada
+        unknown: Desconhecido
+      trigger_label: Email Recebido
+      trigger_summary:
+        all: Todos os emails recebidos
+        with_documents: Apenas emails com documentos
+        without_documents: Apenas emails sem documentos
+    workflow_step_card:
+      delete_confirm: Remover este passo?
+      delete_title: Eliminar passo
+      step_types:
+        action: Ação
+        condition: Condição
+        trigger: Gatilho
+    workflow_step_connector:
+      add_step: Adicionar passo
+      add_step_label: Adicionar um passo
+    workflow_step_form:
+      action_label: Ação
+      attach_attachments: Anexar ficheiros do email
+      attach_no: Não
+      attach_yes: Sim
+      bcc: BCC
+      body: Corpo
+      body_hint: Use Liquid para construir o corpo do email
+      cc: CC
+      custom_headers_hint: 'Opcional, um por linha como Chave: Valor. O cabeçalho
+        de autenticação da integração é adicionado automaticamente.'
+      discord_hint: 'No seu servidor Discord: Definições → Integrações → Webhooks
+        → Novo Webhook, depois copie o URL.'
+      discord_webhook_url: URL do webhook Discord
+      document_type: Tipo de documento
+      drive_upload_hint: Carrega os anexos do email que desencadeou o fluxo de trabalho.
+      email_action_hint: Executa sobre o email que desencadeou o fluxo de trabalho,
+        agindo como proprietário do fluxo. Apenas para fluxos desencadeados por email.
+      email_tool: Ação
+      emit_event_hint: Regista um novo evento neste espaço de trabalho. Pode acionar
+        outros fluxos de trabalho que o escutem.
+      event_name_hint: Escolha um evento ou escreva o seu. Use um caráter universal
+        como document.* para corresponder a um grupo inteiro. Os campos estão disponíveis
+        como {{ event.payload.* }}.
+      event_name_label: Evento
+      event_payload_label: Conteúdo (JSON)
+      field_hint: Um caminho nos dados do gatilho, p. ex. payload.status ou headers.X-Event.
+      field_label: Campo
+      filter_by_attachments: Filtrar por anexos
+      folder_name: Nome da pasta
+      forward_to: Reencaminhar para
+      forward_to_hint: 'Para Reencaminhar — ex.: {{ email.from }}'
+      has_documents:
+        any: Qualquer (com ou sem documentos)
+        'no': Sem documentos
+        'yes': Tem documentos
+      headers: Cabeçalhos
+      headers_hint: 'Um por linha como Chave: Valor. Os valores suportam Liquid.'
+      integration: Integração
+      load_error: "Não foi possível carregar os campos."
+      load_fields: Carregar campos
+      load_loading: A carregar campos…
+      load_prompt: Escolha um espaço de trabalho e uma base de dados e carregue os
+        seus campos.
+      message: Mensagem
+      method: Método
+      no_integrations_link: adicione uma
+      no_integrations_prefix: 'Ainda não há integrações — '
+      no_integrations_suffix: " para chamar uma API guardada."
+      no_notion_link: ligue um
+      no_notion_prefix: Nenhum espaço de trabalho Notion ligado —
+      notion_database_hint: A base de dados Notion à qual adicionar uma linha.
+      notion_database_id: ID da base de dados
+      notion_file_property: Propriedade de ficheiros
+      notion_file_property_hint: Opcional. Nome da propriedade para carregar os anexos
+        do email.
+      notion_workspace: Espaço de trabalho Notion
+      operator_label: Operador
+      operator_options:
+        contains: Contém
+        equals: É igual a
+        exists: Está presente
+        not_contains: Não contém
+        not_equals: É diferente de
+        not_exists: Está vazio
+      optional: Opcional
+      override_username: Substituir nome de utilizador (opcional)
+      page_content: Corpo
+      page_title: Título
+      parent_folder_hint: Opcional. Deixe em branco para usar a raiz do My Drive.
+      parent_folder_id: ID da pasta principal
+      parent_page_hint: A página Notion sob a qual criar a nova página.
+      parent_page_id: ID da página principal
+      path: Caminho
+      select_email_account: "-- Selecionar conta de email --"
+      select_email_tool: "-- Selecionar ação --"
+      select_integration: "-- Selecionar integração --"
+      select_placeholder: "-- Selecionar --"
+      send_from: Enviar de
+      slack_hint: Crie um webhook de entrada no seu espaço Slack e cole o URL acima.
+      slack_webhook_url: URL do webhook Slack
+      subject: Assunto
+      tag_name: Nome da etiqueta
+      tag_name_hint: 'Para Adicionar/Remover etiqueta — ex.: fatura'
+      to: Para
+      trigger_label: Gatilho
+      trigger_options:
+        email_received: Email recebido
+        event: Evento de domínio
+        webhook: Webhook de entrada
+      url: URL
+      value_label: Valor
+      webhook_hint: Envie um pedido POST com um corpo JSON para este URL para executar
+        o fluxo de trabalho. O corpo está disponível nos passos como {{ payload.*
+        }}.

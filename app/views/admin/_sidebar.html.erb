@@ -1,0 +1,16 @@
+<% content_for(:sidebar) do %>
+  <div class="w-48 flex-shrink-0">
+    <nav class="space-y-0.5">
+      <%= link_to t(".dashboard"), admin_root_path,
+            class: "block px-3 py-1.5 text-sm rounded-lg #{'bg-accent-50 text-accent-700 font-medium' if controller_name == 'dashboard'} hover:bg-gray-50 text-gray-600" %>
+      <%= link_to t(".signup_requests"), admin_signup_requests_path,
+            class: "block px-3 py-1.5 text-sm rounded-lg #{'bg-accent-50 text-accent-700 font-medium' if controller_name == 'signup_requests'} hover:bg-gray-50 text-gray-600" %>
+      <%= link_to t(".beta_codes"), admin_beta_codes_path,
+            class: "block px-3 py-1.5 text-sm rounded-lg #{'bg-accent-50 text-accent-700 font-medium' if controller_name == 'beta_codes'} hover:bg-gray-50 text-gray-600" %>
+      <%= link_to t(".invitations"), admin_invitations_path,
+            class: "block px-3 py-1.5 text-sm rounded-lg #{'bg-accent-50 text-accent-700 font-medium' if controller_name == 'invitations'} hover:bg-gray-50 text-gray-600" %>
+      <%= link_to t(".users"), admin_users_path,
+            class: "block px-3 py-1.5 text-sm rounded-lg #{'bg-accent-50 text-accent-700 font-medium' if controller_name == 'users'} hover:bg-gray-50 text-gray-600" %>
+    </nav>
+  </div>
+<% end %>

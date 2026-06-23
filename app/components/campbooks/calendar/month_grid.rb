@@ -1,0 +1,93 @@
+module Campbooks
+  module Calendar
+    # Traditional month grid (Mon-first), one cell per day with up to three event
+    # chips and a "+N" overflow. Tapping a day number opens the new-event form
+    # prefilled with that date; tapping a chip opens the event. Stays at 7 columns
+    # down to 375px (chips truncate) — no horizontal overflow.
+    class MonthGrid < Campbooks::Base
+      MAX_CHIPS = 3
+
+      def initialize(date:, events:, reminders: [])
+        @date = date
+        @events = events.to_a
+        @reminders = reminders.to_a
+      end
+
+      def view_template
+        div(class: "rounded-xl border border-border overflow-hidden bg-card",
+            data: { controller: "calendar-create", "calendar-create-mode-value": "month" }) do
+          div(class: "grid grid-cols-7 border-b border-border") do
+            weekday_names.each do |name|
+              div(class: "px-1 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400 text-center truncate") { name }
+            end
+          end
+          div(class: "grid grid-cols-7") do
+            days.each { |day| render_day(day) }
+          end
+        end
+      end
+
+      private
+
+      def days
+        (@date.beginning_of_month.beginning_of_week..@date.end_of_month.end_of_week).to_a
+      end
+
+      def by_day
+        @by_day ||= @events.group_by { |e| e.start_at.to_date }
+      end
+
+      def reminders_by_day
+        @reminders_by_day ||= @reminders.group_by { |r| r.due_at.to_date }
+      end
+
+      # Localized abbreviated weekday names, rotated to start on Monday.
+      def weekday_names
+        names = t("date.abbr_day_names")
+        (1..7).map { |i| names[i % 7] }
+      end
+
+      def render_day(day)
+        in_month = day.month == @date.month
+        today = day == Date.current
+        events = by_day[day] || []
+        reminders = reminders_by_day[day] || []
+
+        div(
+          data: { "new-url": helpers.new_calendar_event_path(date: day.iso8601, view: "month") },
+          class: class_names(
+            "min-h-[84px] sm:min-h-[104px] cursor-pointer border-b border-r border-border p-1 transition-colors hover:bg-muted/20 [&:nth-child(7n)]:border-r-0",
+            in_month ? "bg-card" : "bg-muted/30"
+          )
+        ) do
+          a(href: helpers.new_calendar_event_path(date: day.iso8601, view: "month"),
+            data: { "calendar-event-modal-open": helpers.new_calendar_event_path(date: day.iso8601, view: "month") },
+            class: class_names(
+              "flex items-center justify-center w-6 h-6 mb-0.5 text-xs rounded-full transition-colors hover:bg-muted",
+              today ? "bg-primary text-primary-foreground font-semibold" : (in_month ? "text-gray-700" : "text-gray-400")
+            )) { day.day.to_s }
+
+          div(class: "space-y-0.5") do
+            shown = events.first(MAX_CHIPS)
+            shown.each { |event| render_chip(event) }
+            slots = MAX_CHIPS - shown.size
+            reminders.first(slots).each { |reminder| render Campbooks::Calendar::ReminderChip.new(reminder: reminder) } if slots.positive?
+            overflow = events.size + reminders.size - MAX_CHIPS
+            div(class: "px-1 text-[10px] text-gray-400") { "+#{overflow}" } if overflow.positive?
+          end
+        end
+      end
+
+      def render_chip(event)
+        color = event.display_color
+        a(href: helpers.edit_calendar_event_path(event),
+          data: { "calendar-event-modal-open": helpers.edit_calendar_event_path(event) },
+          class: "block truncate rounded px-1 py-0.5 text-[10px] sm:text-[11px] leading-tight",
+          style: "background-color: #{color}; color: #{contrast_on(color)}",
+          title: event.title) do
+          event.all_day ? event.title.to_s : "#{l(event.start_at, format: :clock)} #{event.title}"
+        end
+      end
+    end
+  end
+end

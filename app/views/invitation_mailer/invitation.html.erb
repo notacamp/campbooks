@@ -1,0 +1,13 @@
+<p style="<%= email_text_greeting %>"><%= t(".greeting") %></p>
+
+<p style="<%= email_text_body %>">
+  <%= t(".body_html",
+        inviter: content_tag(:strong, @invited_by.name, style: "font-weight:600;"),
+        workspace: content_tag(:strong, @workspace.name, style: "font-weight:600;")) %>
+</p>
+
+<%= email_button(invitation_url(@invitation.token), t(".accept_button")) %>
+
+<p style="<%= email_text_meta %>"><%= t(".expires") %></p>
+
+<p style="<%= email_text_muted %>"><%= t(".ignore") %></p>

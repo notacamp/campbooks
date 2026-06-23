@@ -1,0 +1,253 @@
+<% content_for :main_class, "px-4 sm:px-6 lg:px-8 py-6" %>
+
+<div class="mb-4">
+  <%= link_to documents_path, class: "inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors" do %>
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    <%= t(".back") %>
+  <% end %>
+</div>
+
+<%# ── Header: identity + status on the left, sign-off actions on the right ── %>
+<div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6">
+  <div class="min-w-0">
+    <div class="flex items-center flex-wrap gap-2.5">
+      <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-foreground min-w-0 break-words">
+        <%= @document.entity_display_name || t(".document_fallback_title", id: @document.id) %>
+      </h1>
+      <%= status_badge(@document.display_status) %>
+      <% if @document.classification %>
+        <span class="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium"
+              style="<%= document_type_badge_style(@document.classification) %>">
+          <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" style="background-color:<%= document_type_dot_color(@document.classification) %>"></span>
+          <%= document_type_label(@document.classification) %>
+        </span>
+      <% end %>
+    </div>
+    <p class="mt-2 text-sm text-muted-foreground flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+      <span><%= t(".created_at", time: time_ago_in_words(@document.created_at)) %></span>
+      <% if @document.reviewed_by %>
+        <span class="text-border" aria-hidden="true">&middot;</span>
+        <span><%= t(".reviewed_by", name: @document.reviewed_by.name) %></span>
+      <% end %>
+      <% if @document.email_message %>
+        <span class="text-border" aria-hidden="true">&middot;</span>
+        <span class="inline-flex items-center gap-1">
+          <%= t(".from") %>
+          <% if @document.email_message.contact %>
+            <%= link_to @document.email_message.contact.name.presence || clean_email_address(@document.email_message.from_address),
+                  email_messages_path(inbox_settings: "contacts"),
+                  class: "font-medium text-foreground hover:underline underline-offset-2" %>
+          <% else %>
+            <span class="font-medium text-foreground"><%= clean_email_address(@document.email_message.from_address) %></span>
+          <% end %>
+        </span>
+        <span class="text-border" aria-hidden="true">&middot;</span>
+        <%= link_to @document.email_message.email_thread&.subject&.truncate(40) || @document.email_message.subject&.truncate(40) || t(".email_link_fallback"),
+              email_message_path(@document.email_message),
+              class: "font-medium text-foreground hover:underline underline-offset-2 truncate max-w-[16rem]" %>
+      <% end %>
+    </p>
+  </div>
+
+  <div class="flex flex-wrap items-center gap-2 sm:flex-shrink-0">
+    <% if @document.ai_completed? && !@document.review_approved? %>
+      <%# turbo:false → follow the controller's HTML redirect for a full refresh.
+          The default Turbo submit hits approve's turbo_stream branch, which swaps a
+          documents-index row that isn't on this page, so nothing would update here. %>
+      <%= form_with url: approve_document_path(@document), method: :post, data: { turbo: false } do %>
+        <%= render Campbooks::Button.new(variant: :primary, type: :submit) do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          <%= t(".approve") %>
+        <% end %>
+      <% end %>
+    <% end %>
+    <% unless @document.ai_processing? %>
+      <%= form_with url: reprocess_document_path(@document), method: :post do %>
+        <%= render Campbooks::Button.new(variant: :outline, type: :submit) do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <%= t(".reanalyze") %>
+        <% end %>
+      <% end %>
+    <% end %>
+
+    <% if @document.original_file.attached? %>
+      <% if @drive_account %>
+        <%= render Campbooks::Button.new(variant: :outline, href: new_document_drive_export_path(@document)) do %>
+          <%= render(Campbooks::BrandLogo.new(brand: :google_drive, size: :xs)) %>
+          <%= t(".send_to_drive") %>
+        <% end %>
+      <% end %>
+      <% if @notion_connected %>
+        <%= render Campbooks::Button.new(variant: :outline, href: new_document_notion_export_path(@document)) do %>
+          <%= render(Campbooks::BrandLogo.new(brand: :notion, size: :xs)) %>
+          <%= t(".send_to_notion") %>
+        <% end %>
+      <% end %>
+    <% end %>
+  </div>
+</div>
+
+<% if @document.ai_failed? %>
+  <%= render(Campbooks::Alert.new(variant: :error)) do %>
+    <span class="font-medium"><%= t(".ai_failed_title") %></span>
+    <% if @document.ai_error.present? %>
+      <span class="block mt-1 text-sm opacity-90"><%= @document.ai_error %></span>
+    <% end %>
+    <span class="block mt-1 text-sm"><%= t(".ai_failed_hint") %></span>
+  <% end %>
+<% end %>
+
+<%# ── Side-by-side: wide document preview + narrow extracted-data panel ── %>
+<div class="flex flex-col lg:flex-row gap-6 items-start w-full">
+  <!-- Document preview -->
+  <div class="flex-1 min-w-0 w-full">
+    <% if @document.original_file.attached? %>
+      <% if @document.image? %>
+        <div class="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+          <div class="flex justify-center bg-muted p-4">
+            <%= image_tag url_for(@document.original_file), class: "max-w-full max-h-[80vh] object-contain rounded" %>
+          </div>
+        </div>
+      <% elsif @document.pdf? %>
+        <div data-controller="pdf-preview" class="bg-card rounded-xl shadow-sm border border-border overflow-hidden flex flex-col" style="min-height: 80vh">
+          <div class="flex items-center justify-between px-4 py-2 border-b border-border bg-muted shrink-0">
+            <span class="text-sm font-medium text-foreground"><%= t(".original_pdf_label") %></span>
+            <div class="flex items-center gap-2">
+              <button data-action="pdf-preview#open"
+                      class="p-1.5 hover:bg-background rounded-md border border-transparent hover:border-border transition-colors"
+                      title="<%= t('.maximize') %>">
+                <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+                </svg>
+              </button>
+              <%= link_to rails_blob_path(@document.original_file, disposition: :attachment),
+                    class: "p-1.5 hover:bg-background rounded-md border border-transparent hover:border-border transition-colors",
+                    title: t(".download") do %>
+                <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+              <% end %>
+            </div>
+          </div>
+          <iframe src="<%= file_document_path(@document) %>"
+                  class="flex-1 w-full border-0"
+                  title="<%= t('.original_pdf_iframe_title') %>"
+                  data-pdf-preview-target="iframe"></iframe>
+          <%= render "documents/pdf_overlay" %>
+        </div>
+      <% else %>
+        <div class="bg-card rounded-xl shadow-sm border border-border p-6 text-center">
+          <p class="text-sm text-muted-foreground"><%= @document.original_file.filename %></p>
+          <%= link_to t(".download"), url_for(@document.original_file),
+              class: "mt-2 inline-block text-sm font-medium text-foreground hover:underline underline-offset-2", target: "_blank" %>
+        </div>
+      <% end %>
+    <% end %>
+
+    <% if @document.processed_pdf.attached? %>
+      <div data-controller="pdf-preview" class="bg-card rounded-xl shadow-sm border border-border overflow-hidden flex flex-col mt-6" style="min-height: 50vh">
+        <div class="flex items-center justify-between px-4 py-2 border-b border-border bg-muted shrink-0">
+          <div class="min-w-0">
+            <span class="text-sm font-medium text-foreground"><%= t(".processed_pdf_label") %></span>
+            <span class="text-xs text-muted-foreground ml-2"><%= @document.canonical_filename %></span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button data-action="pdf-preview#open"
+                    class="p-1.5 hover:bg-background rounded-md border border-transparent hover:border-border transition-colors"
+                    title="<%= t('.maximize') %>">
+              <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+              </svg>
+            </button>
+            <%= link_to rails_blob_path(@document.processed_pdf, disposition: :attachment),
+                  class: "p-1.5 hover:bg-background rounded-md border border-transparent hover:border-border transition-colors",
+                  title: t(".download") do %>
+              <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+            <% end %>
+          </div>
+        </div>
+        <iframe src="<%= file_document_path(@document, type: :processed) %>"
+                class="flex-1 w-full border-0"
+                title="<%= t('.processed_pdf_iframe_title') %>"
+                data-pdf-preview-target="iframe"></iframe>
+        <%= render "documents/pdf_overlay" %>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Extracted-data panel -->
+  <% field_classes = "block w-full rounded-lg border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+  <% label_classes = "block text-sm font-medium text-gray-700 mb-1.5" %>
+  <div class="w-full lg:w-[26rem] flex-shrink-0">
+    <div class="bg-card rounded-xl shadow-sm border border-border">
+      <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-border">
+        <h2 class="text-sm font-semibold text-foreground"><%= t(".extracted_data") %></h2>
+        <% if @document.ai_confidence_score %>
+          <% pct = (@document.ai_confidence_score * 100).round %>
+          <% high = @document.ai_confidence_score >= 0.7 %>
+          <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground" title="<%= t('.ai_confidence') %>">
+            <span class="block w-14 h-1.5 rounded-full bg-muted overflow-hidden">
+              <span class="block h-full rounded-full <%= high ? 'bg-success' : 'bg-warning' %>" style="width: <%= pct %>%"></span>
+            </span>
+            <span class="tabular-nums font-medium"><%= pct %>%</span>
+          </span>
+        <% end %>
+      </div>
+
+      <% if (mem = @document.ai_extraction_data&.dig("classification_memory")).present? %>
+        <div class="px-4 py-2 border-b border-border bg-muted/40">
+          <p class="text-xs text-muted-foreground flex items-start gap-1.5">
+            <svg class="w-3.5 h-3.5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+            <span><%= t(".learned_hint", type: mem["type"], count: mem["count"], total: mem["total"]) %></span>
+          </p>
+        </div>
+      <% end %>
+
+      <%= form_with model: @document do |f| %>
+        <div class="p-4 space-y-4">
+          <div>
+            <%= f.label :document_type_id, t(".label_document_type"), class: label_classes %>
+            <%= f.select :document_type_id,
+                  @document_types.map { |dt| [ document_type_label(dt), dt.id ] },
+                  { include_blank: t("helpers.document_type.unclassified") },
+                  class: field_classes %>
+            <% if @document.review_pending? %>
+              <p class="mt-1.5 text-xs text-muted-foreground"><%= t(".reclassify_hint") %></p>
+            <% end %>
+          </div>
+
+          <% schema = @document.classification&.extraction_schema %>
+          <% if schema.is_a?(Hash) && schema.any? %>
+            <% schema.each do |field_name, field_def| %>
+              <% value = @document.metadata&.dig(field_name) %>
+              <div>
+                <label class="<%= label_classes %>"><%= field_def["description"] || field_name.humanize %></label>
+                <% if field_def["type"] == "integer" %>
+                  <%= f.number_field "metadata[#{field_name}]", value: value, class: field_classes %>
+                <% else %>
+                  <%= f.text_field "metadata[#{field_name}]", value: value, class: field_classes %>
+                <% end %>
+              </div>
+            <% end %>
+          <% else %>
+            <% partial_name = lookup_context.exists?("documents/forms/#{@document.document_type}", nil, true) ? @document.document_type : "other" %>
+            <%= render "documents/forms/#{partial_name}", f: f %>
+          <% end %>
+
+          <div>
+            <%= f.label :description, t(".label_description"), class: label_classes %>
+            <%= f.text_area :description, rows: 3, class: field_classes %>
+          </div>
+
+          <%= render Campbooks::Button.new(variant: :primary, type: :submit, class: "w-full") { t(".save_changes") } %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

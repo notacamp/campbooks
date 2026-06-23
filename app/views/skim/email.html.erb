@@ -1,0 +1,80 @@
+<%# The stacked email card: loaded into the skim_email_card turbo-frame when a
+    row is tapped, shown layered over the stack. Read the email, reply inline,
+    archive it, or open it in full. The skim-mode controller owns Back / archive /
+    reply wiring (the layer + this frame both sit inside it). %>
+<%= turbo_frame_tag "skim_email_card", class: "block w-full" do %>
+  <div class="flex max-h-[82vh] w-full flex-col rounded-xl border border-border bg-card p-5 shadow-2xl sm:p-6">
+    <div class="flex items-start justify-between gap-3">
+      <div class="flex min-w-0 items-start gap-2.5">
+        <%= render Campbooks::ContactAvatar.new(email: @email.from_address, contact_id: @email.contact_id, size: :md, variant: :neutral) %>
+        <div class="min-w-0">
+          <p class="truncate text-xs text-muted-foreground"><%= @email.from_address %></p>
+          <h3 class="mt-0.5 text-balance text-base font-semibold leading-snug text-foreground"><%= @email.subject.presence || t(".no_subject") %></h3>
+        </div>
+      </div>
+      <button type="button" data-action="click->skim-mode#closeEmail"
+              class="inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-foreground/10 text-foreground transition-colors hover:bg-foreground/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400"
+              aria-label="<%= t(".back_to_stack") %>">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="mt-3 flex-1 overflow-auto text-sm leading-relaxed text-foreground [&_a]:text-accent-600 [&_a]:underline [&_img]:max-w-full">
+      <% body = safe_email_body(rewrite_email_urls(@email.body, @email.email_account_id)) %>
+      <% if body.to_s.strip.empty? %>
+        <p class="italic text-muted-foreground"><%= t(".no_preview") %></p>
+      <% else %>
+        <%= body %>
+      <% end %>
+    </div>
+
+    <% if @can_send %>
+      <div data-skim-reply class="mt-3 hidden">
+        <textarea data-skim-reply-body rows="4"
+                  placeholder="<%= t(".reply_placeholder", address: @email.from_address) %>"
+                  class="block w-full resize-y rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-accent-500 focus:ring-accent-500"></textarea>
+        <div class="mt-2 flex items-center gap-2">
+          <button type="button" data-action="click->skim-mode#sendReply" data-skim-id="<%= @email.id %>"
+                  class="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"><%= t(".send_reply") %></button>
+          <button type="button" data-action="click->skim-mode#toggleReply"
+                  class="text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"><%= t("shared.actions.cancel") %></button>
+        </div>
+      </div>
+    <% end %>
+
+    <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
+      <% if @can_send %>
+        <button type="button" data-action="click->skim-mode#toggleReply"
+                class="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400">
+          <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+          </svg>
+          <%= t(".reply") %>
+        </button>
+      <% end %>
+      <button type="button" data-action="click->skim-mode#archiveEmail" data-skim-id="<%= @email.id %>"
+              class="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400">
+        <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+        </svg>
+        <%= t(".archive") %>
+        <kbd class="ml-0.5 text-[10px] font-mono opacity-60">E</kbd>
+      </button>
+      <button type="button" data-action="click->skim-mode#promoteOpenEmail" data-skim-id="<%= @email.id %>"
+              class="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400">
+        <svg class="h-4 w-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+        </svg>
+        <%= t(".make_priority") %>
+        <kbd class="ml-0.5 text-[10px] font-mono opacity-60">P</kbd>
+      </button>
+      <%= link_to email_message_path(@email.id), data: { turbo_frame: "_top" },
+            class: "inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400" do %>
+        <%= t(".open_in_full") %>
+        <span aria-hidden="true">↗</span>
+      <% end %>
+    </div>
+  </div>
+<% end %>

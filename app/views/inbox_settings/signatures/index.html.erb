@@ -1,0 +1,18 @@
+<%= turbo_frame_tag "inbox_settings_panel" do %>
+  <div data-section="signatures">
+    <header class="sticky top-0 z-10 bg-background/95 backdrop-blur px-6 py-4 border-b border-border flex items-center justify-between gap-4">
+      <div class="min-w-0">
+        <h3 class="text-sm font-semibold text-foreground"><%= t(".heading") %></h3>
+        <p class="text-xs text-muted-foreground mt-0.5"><%= t(".subtitle") %></p>
+      </div>
+      <%= render(Campbooks::Button.new(variant: :primary, size: :sm,
+            href: new_inbox_settings_signature_path,
+            data: { turbo_frame: "inbox_settings_signature_form" })) { t(".add_signature") } %>
+    </header>
+
+    <div class="px-6 py-5">
+      <%= turbo_frame_tag "inbox_settings_signature_form" %>
+      <%= render "inbox_settings/signatures/list", signatures: @signatures %>
+    </div>
+  </div>
+<% end %>

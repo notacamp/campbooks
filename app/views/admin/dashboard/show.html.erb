@@ -1,0 +1,11 @@
+<% render "admin/sidebar" %>
+
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+  <%= render(Campbooks::Stat.new(value: @pending_signup_requests_count, label: t(".pending_signups"), variant: :attention)) %>
+  <%= render(Campbooks::Stat.new(value: @pending_invitations_count, label: t(".pending_invitations"), variant: :attention)) %>
+  <%= render(Campbooks::Stat.new(value: @total_users_count, label: t(".total_users"))) %>
+  <%= render(Campbooks::Stat.new(value: @total_organizations_count, label: t(".workspaces"))) %>
+  <%= render(Campbooks::Stat.new(value: @available_beta_codes_count, label: t(".available_beta_codes"))) %>
+</div>

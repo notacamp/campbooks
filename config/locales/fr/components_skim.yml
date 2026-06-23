@@ -1,0 +1,121 @@
+---
+fr:
+  components:
+    doc_skim_card:
+      ai_confidence: Confiance de l'IA
+      apply: Appliquer
+      approve: Approuver
+      document_fallback: Document
+      download: Télécharger
+      edit: Modifier
+      edit_date: Date
+      edit_name: Nom
+      edit_vendor: Fournisseur
+      expand: Agrandir l'aperçu
+      extracted_data: Données extraites
+      junk: Indésirable
+      new_type: "+ Nouveau type"
+      no_types: Aucun type de document pour l'instant
+      open: Ouvrir
+      reclassify: Reclasser
+      refile_as: Reclasser en
+      reprocess: Retraiter
+      skip: Passer
+      unclassified: Non classifié
+    doc_skim_ring:
+      ring_title: Examiner %{label}
+    doc_skim_stack:
+      all_reviewed: Tout examiné
+      all_reviewed_body: Vous avez examiné toute la file d'attente.
+      back_to_documents: Retour aux documents
+      close_aria: Fermer l'examen
+      close_preview: Fermer l'aperçu
+      go_back: Retour
+      intro_cta: Commencer l'examen
+      intro_help: Comment fonctionne l'examen
+      intro_lead: Videz votre file d'examen un document à la fois — confirmez ce que
+        l'IA a classé, corrigez ce qu'elle a manqué.
+      intro_step_act: Approuvez le classement de l'IA ou corrigez-le — reclassez,
+        modifiez ou retraitez.
+      intro_step_move: Touchez les côtés ou glissez pour parcourir les documents à
+        examiner.
+      intro_step_undo: Les approbations sont annulables — rien n'est définitif.
+      intro_title: Skim de vos documents
+      kbd_approve: approuver
+      kbd_back: retour
+      kbd_close: fermer
+      kbd_edit: modifier
+      kbd_junk: indésirable
+      kbd_open: ouvrir
+      kbd_preview: aperçu
+      kbd_reclassify: reclasser
+      kbd_reprocess: retraiter
+      kbd_skip: passer
+      preview_download: Télécharger
+      preview_open: Ouvrir dans un nouvel onglet
+      progress_aria: Progression de l'examen
+      skip_and_continue: Passer et continuer
+      touch_hint: Glisser pour déplacer · utiliser les boutons pour agir
+      undo: Annuler
+    doc_skim_tray:
+      review_all: Tout examiner
+    skim_card:
+      allow: Autoriser
+      archive: Archiver
+      archive_all: Tout archiver
+      block_sender: Bloquer l'expéditeur
+      decide_later: Décider plus tard
+      deny: Refuser
+      dismiss_follow_up: Ignorer
+      draft_follow_up: Rédiger un suivi
+      emails:
+        one: "%{count} e-mail"
+        other: "%{count} e-mails"
+      keep: Conserver
+      make_priority: Rendre prioritaire
+      more: "+%{count} de plus"
+      open_in_full: Ouvrir en entier
+      priority: Prioritaire
+      progress_label: Pile %{position} sur %{total}
+      reply: Répondre
+      scout:
+        archive: Vous archivez généralement ceux-ci
+        keep: Vous conservez généralement ceux-ci
+        lead: Scout
+        promote: Vous épinglez généralement ceux-ci en Prioritaire
+        ratio: "%{count} sur vos %{total} derniers"
+      select_all: Tout sélectionner
+      select_all_aria: Tout sélectionner dans cette pile
+      select_email_aria: Sélectionner %{subject}
+      star_sender: Mettre en avant l'expéditeur
+      starred: Mis en avant
+      suggested: Suggéré
+      unpin: Désépingler
+      unstar: Retirer la mise en avant
+      waiting: En attente de réponse
+    skim_stack:
+      all_caught_up: Tout est à jour
+      all_caught_up_body: Vous avez parcouru toute la pile.
+      back_to_inbox: Retour à la boîte de réception
+      back_to_stack: Retour à la pile
+      close_aria: Fermer le Skim
+      go_back: Retour
+      intro_cta: Commencer le Skim
+      intro_help: Comment fonctionne le Skim
+      intro_lead: Le moyen le plus rapide de vider votre boîte de réception — une
+        pile à la fois, comme des Stories pour vos e-mails.
+      intro_step_act: Conservez, archivez ou épinglez chaque pile avec les boutons
+        — aucune pile n'est oubliée.
+      intro_step_move: Touchez les côtés ou glissez pour parcourir votre boîte de
+        réception, du plus récent au plus ancien.
+      intro_step_undo: 'Rien n''est supprimé : les e-mails archivés restent consultables
+        et chaque action peut être annulée.'
+      intro_title: Skim de votre boîte de réception
+      kbd_archive: " archiver   "
+      kbd_back_keep: "← retour   → conserver   "
+      kbd_close: " fermer"
+      kbd_priority: " prioritaire   "
+      keep_and_continue: Conserver et continuer
+      progress_aria: Progression du Skim
+      touch_hint: Glisser pour déplacer · utiliser les boutons pour conserver ou archiver
+      undo: Annuler

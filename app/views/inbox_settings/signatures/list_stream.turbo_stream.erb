@@ -1,0 +1,8 @@
+<%# locals: message %>
+<%= turbo_stream.replace "inbox_settings_signatures_rows" do %>
+  <%= render "inbox_settings/signatures/list", signatures: @signatures %>
+<% end %>
+<%= turbo_stream.update "inbox_settings_signature_form", "" %>
+<%= turbo_stream.append "action_toasts" do %>
+  <%= render "shared/action_toast", message: message, variant: :success %>
+<% end %>

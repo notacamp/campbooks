@@ -1,0 +1,92 @@
+---
+fr:
+  inbox_settings:
+    accounts:
+      show:
+        active: Actif
+        connect_label: 'Connecter :'
+        disconnect_confirm: Déconnecter %{name} ?
+        heading: Comptes et synchronisation
+        inactive: Inactif
+        last_scan: 'Dernière analyse : %{time}'
+        last_scan_never: jamais
+        manage_access: Gérer l'accès
+        no_accounts: Aucun compte e-mail connecté. Connectez-en un ci-dessus pour
+          commencer.
+        no_scans: Aucune analyse pour l'instant.
+        re_auth: Ré-authentifier
+        recent_scans_heading: Analyses récentes
+        scan_found: "%{found} trouvés · %{docs} docs"
+        scan_now: Analyser maintenant
+        scanning: Analyse en cours…
+        subheading: Boîtes aux lettres connectées et analyses récentes.
+    display:
+      show:
+        attachments_option: Indicateur de pièces jointes
+        chat_option: Panneau de discussion Scout
+        density_breathable: Aéré
+        density_compact: Compact
+        density_default: Par défaut
+        density_heading: Densité
+        email_accounts_heading: Comptes e-mail
+        heading: Affichage
+        hide_account_hint: Masquer un compte pour retirer ses conversations de la
+          liste.
+        labels_option: Étiquettes
+        no_accounts: Aucun compte e-mail connecté pour l'instant.
+        show_heading: Afficher
+        subheading: L'apparence de votre boîte de réception sur cet appareil. Enregistré
+          dans ce navigateur.
+    filtering:
+      show:
+        allowed_heading: Expéditeurs autorisés
+        blocked_heading: Expéditeurs bloqués
+        blocked_hint: Leurs e-mails sont archivés automatiquement. Débloquez pour
+          les recevoir à nouveau.
+        heading: Filtrage de la boîte
+        no_allowed: Aucun expéditeur autorisé pour l'instant.
+        no_blocked: Aucun expéditeur bloqué.
+        no_starred: Aucun expéditeur mis en avant pour l'instant.
+        remove: Retirer
+        save: Enregistrer
+        starred_heading: Expéditeurs mis en avant
+        strategy:
+          blacklist:
+            desc: Tout le monde atteint votre boîte. Bloquez les expéditeurs un par
+              un — leurs e-mails sont archivés automatiquement.
+            label: Liste noire (par défaut)
+          whitelist:
+            desc: Seuls les expéditeurs autorisés et mis en avant atteignent votre
+              boîte. Les nouveaux attendent dans le groupe En attente de Skim pour
+              être autorisés ou refusés.
+            label: Liste blanche
+        strategy_heading: Stratégie
+        subheading: Décidez quels expéditeurs atteignent votre boîte de réception.
+        unblock: Débloquer
+        unstar: Retirer la mise en avant
+    tags:
+      create:
+        created_toast: Étiquette créée.
+      destroy:
+        deleted_toast: Étiquette supprimée.
+      form:
+        ai_prompt_hint: Ce que l'IA utilise pour décider d'appliquer cette étiquette.
+          Prend en charge le markdown.
+        ai_prompt_label: Consigne IA
+        cancel: Annuler
+        color_label: Couleur (hex)
+        create_tag: Créer une étiquette
+        group_label: Groupe
+        group_placeholder: ex. Finance
+      index:
+        add_tag: Ajouter une étiquette
+        heading: Étiquettes
+        no_tags: Aucune étiquette pour l'instant. Ajoutez-en une pour commencer à
+          trier votre boîte de réception.
+        subheading: Les étiquettes aident Scout à trier votre boîte de réception automatiquement.
+      tag:
+        delete_confirm: Supprimer %{name} ?
+        edit: Modifier
+        tagged_messages_title: Messages étiquetés
+      update:
+        updated_toast: Étiquette mise à jour.

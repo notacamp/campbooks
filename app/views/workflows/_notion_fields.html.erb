@@ -1,0 +1,24 @@
+<% if error.present? %>
+  <p class="text-sm text-red-600 dark:text-red-400"><%= t(".error", message: error) %></p>
+<% elsif schema.nil? %>
+  <p class="text-sm text-muted-foreground"><%= t(".prompt") %></p>
+<% else %>
+  <% props = notion_writable_properties(schema) %>
+  <% if props.empty? %>
+    <p class="text-sm text-muted-foreground"><%= t(".no_fields") %></p>
+  <% else %>
+    <div class="space-y-3">
+      <% props.each do |name, prop| %>
+        <div>
+          <label class="block text-sm font-medium text-foreground mb-1">
+            <%= name %>
+            <span class="text-xs font-normal text-muted-foreground">(<%= prop["type"].tr("_", " ") %>)</span>
+          </label>
+          <input type="text" name="<%= prefix %>[<%= name %>]" value="<%= values[name] %>"
+                 class="block w-full rounded-lg shadow-sm text-sm font-mono"
+                 placeholder="{{ ... }}" autocomplete="off">
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

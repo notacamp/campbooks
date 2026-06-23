@@ -1,0 +1,6 @@
+<%= render(Campbooks::ChatForm.new(
+  url: thread ? scout_thread_messages_path(thread) : scout_path,
+  form_id: "agent_chat_form",
+  input_id: "agent_chat_input",
+  placeholder: t(".placeholder")
+)) %>

@@ -1,0 +1,19 @@
+<%# Inner, replaceable tray content. Lives inside the turbo #doc_skim_tray frame and
+    is what Documents::SkimTrayBroadcaster replaces, so the stable frame is preserved
+    while the rings refresh live (counts drop as documents are reviewed). The visual
+    container lives inside the conditional, so an empty review queue renders nothing
+    rather than a bare bordered box. %>
+<div id="doc_skim_tray_content">
+  <% if rings.any? %>
+    <div class="mb-6">
+      <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-1 pt-1">
+        <span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".needs_review") %></span>
+        <span class="text-muted-foreground/40" aria-hidden="true">·</span>
+        <span class="text-xs text-muted-foreground/70">
+          <%= t(".ai_unsure", count: rings.sum { |r| r[:count].to_i }) %>
+        </span>
+      </div>
+      <%= render Campbooks::DocSkimTray.new(rings: rings) %>
+    </div>
+  <% end %>
+</div>

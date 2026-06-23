@@ -1,0 +1,40 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) do %>
+  <%= render(Campbooks::Button.new(variant: :primary, size: :md, href: new_settings_integrations_connection_path)) { t(".add_connection") } %>
+<% end %>
+
+<%= render(Campbooks::Card.new(padding: :lg)) do %>
+  <% if @connections.any? %>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b text-left text-xs font-medium text-gray-500">
+            <th class="py-2 pr-4"><%= t(".col_name") %></th>
+            <th class="py-2 pr-4"><%= t(".col_base_url") %></th>
+            <th class="py-2 pr-4"><%= t(".col_auth") %></th>
+            <th class="py-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @connections.each do |connection| %>
+            <tr class="border-b last:border-0">
+              <td class="py-2 pr-4 font-medium text-gray-900 whitespace-nowrap"><%= connection.name %></td>
+              <td class="py-2 pr-4 text-gray-600 font-mono text-xs"><%= connection.base_url %></td>
+              <td class="py-2 pr-4">
+                <%= render(Campbooks::Badge.new(variant: connection.auth_type == "none" ? :neutral : :info, size: :sm)) { human_enum(Connection, :auth_type, connection.auth_type) } %>
+              </td>
+              <td class="py-2 text-right whitespace-nowrap">
+                <%= render(Campbooks::Button.new(variant: :ghost, size: :xs, href: edit_settings_integrations_connection_path(connection))) { t(".edit") } %>
+                <%= button_to t(".delete"), settings_integrations_connection_path(connection), method: :delete,
+                      class: "inline px-2 py-1 text-xs text-red-600 hover:text-red-700 cursor-pointer",
+                      form: { class: "inline", data: { turbo_confirm: t(".delete_confirm", name: connection.name) } } %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <%= render(Campbooks::EmptyState.new(variant: :card, title: t(".no_connections_title"), description: t(".no_connections_desc"))) %>
+  <% end %>
+<% end %>

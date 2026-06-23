@@ -1,0 +1,63 @@
+<%# Focused discussion view: shown to teammates pulled into a thread by an
+    @mention who don't have access to the underlying mailbox. Mailbox users are
+    redirected to the full email reader by the controller. %>
+<div class="mx-auto max-w-3xl px-4 py-6 sm:py-10">
+  <a href="<%= email_messages_path %>" class="inline-flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground mb-4">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    <%= t(".back_to_inbox") %>
+  </a>
+
+  <div class="flex items-start justify-between gap-3 mb-1">
+    <h1 class="text-xl font-bold text-foreground"><%= @thread.display_subject %></h1>
+    <%= render "email_messages/follow_toggle",
+          email_message: @latest_message,
+          following: (@agent_thread.present? && @agent_thread.thread_follows.exists?(user_id: Current.user.id)) %>
+  </div>
+  <p class="text-[12px] text-muted-foreground mb-5"><%= t(".added_to_discussion") %></p>
+
+  <%# Email context — read-only %>
+  <% if @messages.any? %>
+    <div class="rounded-xl border border-border bg-card divide-y divide-border mb-7">
+      <% @messages.each do |msg| %>
+        <article class="p-4">
+          <header class="flex items-center justify-between gap-2 mb-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <%= render Campbooks::ContactAvatar.new(email: msg.from_address, contact_id: msg.contact_id, size: :sm, variant: :neutral) %>
+              <span class="text-[13px] font-medium text-foreground truncate"><%= clean_email_address(msg.from_address) || msg.from_address %></span>
+            </div>
+            <span class="text-[11px] text-muted-foreground flex-shrink-0"><%= msg.received_at ? l(msg.received_at, format: :at) : "" %></span>
+          </header>
+          <div class="text-[13px] leading-relaxed text-muted-foreground max-h-96 overflow-y-auto break-words">
+            <%= safe_email_body_full(msg) %>
+          </div>
+        </article>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%# Discussion %>
+  <% if @thread %><%= turbo_stream_from @thread %><% end %>
+  <h2 class="flex items-center gap-1.5 text-[13px] font-semibold text-foreground mb-2">
+    <svg class="w-4 h-4 text-accent-600 dark:text-accent-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/></svg>
+    <%= t(".discussion_heading") %>
+  </h2>
+
+  <div id="comments_list" data-chat-input-target="list" class="rounded-xl border border-border bg-card divide-y divide-border">
+    <% if @comments.any? %>
+      <% @comments.each do |comment| %>
+        <%= render "email_comments/comment", comment: comment, email_message: @latest_message %>
+      <% end %>
+    <% else %>
+      <div id="discussion_empty" class="px-4 py-10 text-center">
+        <p class="text-[13px] font-medium text-foreground"><%= t(".discussion_empty_heading") %></p>
+        <p class="mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+          <%= t(".discussion_empty_body", scout_mention: content_tag(:span, "@scout", class: "font-semibold text-accent-600 dark:text-accent-300")).html_safe %>
+        </p>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="mt-3">
+    <%= render "email_comments/form", email_message: @latest_message %>
+  </div>
+</div>

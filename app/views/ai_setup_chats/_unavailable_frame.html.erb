@@ -1,0 +1,15 @@
+<%# Shown when no AI provider is configured — point the user at AI setup. %>
+<%= turbo_frame_tag "setup_modal_frame" do %>
+  <div class="p-6 text-center flex flex-col items-center gap-3">
+    <%= render(Campbooks::ScoutAvatar.new(size: :lg)) %>
+    <p class="text-sm font-medium text-foreground"><%= t(".heading") %></p>
+    <p class="text-sm text-muted-foreground max-w-xs">
+      <%= t(".body") %>
+    </p>
+    <button type="button"
+            data-setup-modal-open="<%= setup_path(:ai_configuration, return_to: request.path) %>"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 cursor-pointer">
+      <%= t(".setup_link") %>
+    </button>
+  </div>
+<% end %>

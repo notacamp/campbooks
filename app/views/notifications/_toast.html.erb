@@ -1,0 +1,14 @@
+<%= render(Campbooks::Toast.new(
+      title: notification.title,
+      body: notification.body.present? ? truncate(notification.body, length: 120) : nil,
+      time: t(".time_ago", time: time_ago_in_words(notification.created_at)),
+      unread: !notification.read?,
+      id: "toast_#{dom_id(notification)}")) do |toast| %>
+  <% toast.with_actions do %>
+    <%= button_to mark_read_notification_path(notification), method: :post,
+        class: "flex-shrink-0 rounded-md bg-accent-50 px-2 py-1 text-xs font-medium text-accent-600 hover:bg-accent-100 border-0 cursor-pointer",
+        form_class: "inline-flex" do %>
+      <%= t(".mark_read") %>
+    <% end %>
+  <% end %>
+<% end %>

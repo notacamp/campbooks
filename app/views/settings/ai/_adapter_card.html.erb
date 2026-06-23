@@ -1,0 +1,47 @@
+<%# adapter: AiAdapter %>
+<div class="bg-card rounded-xl shadow-sm border border-gray-200 p-3">
+  <div class="flex items-center justify-between">
+    <div class="min-w-0">
+      <p class="text-sm font-semibold text-gray-900 truncate"><%= adapter.name %></p>
+      <p class="text-xs text-gray-500">
+        <%= human_enum(AiAdapter, :provider, adapter.provider) %>
+        <% if (region = AiConfiguration::PROVIDER_REGIONS[adapter.provider]) %>
+          <span class="ml-0.5 inline-flex items-center rounded px-1 text-[10px] font-medium <%= region == "EU" ? "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400" : "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" %>"><%= region %></span>
+        <% end %>
+        <% if adapter.endpoint_url.present? %>
+          · <%= URI.parse(adapter.endpoint_url).host rescue adapter.endpoint_url.truncate(30) %>
+        <% end %>
+      </p>
+      <% case adapter.api_key_source %>
+      <% when "stored" %>
+        <p class="text-[10px] mt-0.5 text-green-600 dark:text-green-400"><%= t(".api_key_stored") %></p>
+      <% when "managed" %>
+        <p class="text-[10px] mt-0.5 text-blue-600 dark:text-blue-400"><%= t(".platform_managed") %></p>
+      <% when "env" %>
+        <p class="text-[10px] mt-0.5 text-amber-600 dark:text-amber-400"><%= t(".using_env_key", key: AiConfiguration::PROVIDER_ENV_KEYS[adapter.provider]) %></p>
+      <% else %>
+        <p class="text-[10px] mt-0.5 text-red-500 dark:text-red-400"><%= t(".no_key") %></p>
+      <% end %>
+    </div>
+
+    <% unless adapter.managed? %>
+      <div class="flex items-center gap-1 flex-shrink-0 ml-2">
+        <button onclick="document.getElementById('edit-adapter-<%= adapter.id %>-modal').classList.remove('hidden')"
+                class="px-2 py-1 text-xs font-medium rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-800 transition-colors">
+          <%= t(".edit") %>
+        </button>
+        <% unless adapter.in_use? %>
+          <%= button_to settings_ai_adapter_path(adapter), method: :delete,
+                form: { data: { turbo_confirm: t(".delete_confirm", name: adapter.name) } },
+                class: "px-2 py-1 text-xs font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-500/10" do %>
+            <%= t(".delete") %>
+          <% end %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<% unless adapter.managed? %>
+  <%= render "adapter_modal", adapter: adapter, modal_id: "edit-adapter-#{adapter.id}", label: "Edit Provider", provider_type: nil %>
+<% end %>

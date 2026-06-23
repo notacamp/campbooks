@@ -1,0 +1,69 @@
+---
+es:
+  activerecord:
+    errors:
+      models:
+        ai_adapter:
+          attributes:
+            managed:
+              plan_upgrade_required: requiere un plan que incluya Campbooks AI
+        ai_configuration:
+          attributes:
+            model:
+              not_permitted_on_plan: no está disponible en tu plan
+  components:
+    entitlements:
+      plan_badge:
+        names:
+          business: Empresarial
+          free: Gratis
+          pro: Pro
+          unlimited: Ilimitado
+      plan_summary:
+        current_plan: Plan actual
+        included: Incluido
+        not_included: No incluido
+        over_cap: 'Usando %{usage} de %{limit}: por encima del límite de tu plan.'
+        self_hosted_body: Esta es una instalación autoalojada de Campbooks. Todas
+          las funciones están disponibles sin límites de plan.
+        self_hosted_title: 'Autoalojado: todo incluido'
+        tiers:
+          basic: Básico
+          premium: Premium
+          standard: Estándar
+        unlimited: Ilimitado
+        usage_of_limit: "%{usage} de %{limit}"
+      upgrade_prompt:
+        cta: Ver planes
+        reason:
+          not_allowed: "%{feature} no forma parte de tu plan actual."
+          not_enabled: "%{feature} está desactivado en tu espacio de trabajo."
+          over_limit: Has usado todo el %{feature} que incluye tu plan.
+        title: Mejora tu plan
+  entitlements:
+    blocked:
+      email_accounts_cap: Has alcanzado el límite de cuentas de correo (%{limit})
+        de tu plan %{plan}. Mejora tu plan para conectar más.
+      not_allowed: "%{feature} no está incluido en tu plan %{plan}. Mejora tu plan
+        para activarlo."
+      not_enabled: "%{feature} está desactivado en tu espacio de trabajo."
+      over_limit: Has alcanzado el límite de tu plan para %{feature}. Mejora tu plan
+        para obtener más.
+    features:
+      ai_model_access: Modelos de IA
+      email_accounts: Cuentas de correo
+      emails_synced: Correos sincronizados
+      managed_ai: Campbooks AI
+      notifications: Notificaciones
+      scout: Scout
+      workflow_executions: Ejecuciones de flujo
+      workflows: Flujos de trabajo
+  navigation:
+    settings:
+      items:
+        plan: Plan y límites
+  settings:
+    plan:
+      show:
+        subtitle: Consulta qué incluye tu espacio de trabajo y cuánto has usado.
+        title: Plan y límites

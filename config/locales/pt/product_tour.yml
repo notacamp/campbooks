@@ -1,0 +1,68 @@
+---
+pt:
+  components:
+    product_tour:
+      aria_label: Visita guiada
+      back: Voltar
+      next: Seguinte
+      s1_body: O Campbooks é uma caixa de entrada que se organiza sozinha. Em cerca
+        de um minuto, mostro-lhe as quatro coisas que o tornam diferente — experimente
+        cada uma à medida que avançamos.
+      s1_point_ask: Pergunte qualquer coisa à sua caixa de entrada
+      s1_point_remind: Os prazos nunca lhe escapam
+      s1_point_skim: Trate de uma pilha inteira em segundos
+      s1_point_surface: O Scout destaca apenas o que precisa de si
+      s1_title: Bem-vindo ao Campbooks
+      s2_badge: Precisa de si
+      s2_eyebrow: A sua página inicial
+      s2_feedback: É a ideia principal, sem abrir o email. A notificação do LinkedIn
+        em baixo era ruído, por isso o Scout deixou-a ficar.
+      s2_summary: Um código único para confirmar a sua transferência bancária — expira
+        em 10 minutos, por isso vale a pena ver agora.
+      s2_task: Toque na mensagem que o Scout assinalou para ver o que ele extraiu.
+      s2_title: O Scout destaca o que precisa de si
+      s2_why: O Scout lê cada email à medida que chega e traz para a frente apenas
+        o que importa. Tudo o resto fica discretamente fora do caminho.
+      s3_eyebrow: Skim
+      s3_feedback: É a pilha toda, tratada. O correio arquivado continua pesquisável
+        e todas as ações podem ser anuladas.
+      s3_progress: "%{done} de %{total} pilhas tratadas"
+      s3_task: 'Percorra as três: arquive o ruído, mantenha o que importa.'
+      s3_title: Trate de uma pilha em segundos
+      s3_why: O Skim agrupa a sua caixa de entrada em pilhas e reproduz-nas como Stories.
+        Toma uma decisão por pilha — manter o que importa, arquivar o ruído — em vez
+        de abrir dezenas de emails.
+      s4_dismiss: ou dispensar
+      s4_extracted: 'O Scout encontrou uma data-limite: sexta-feira'
+      s4_eyebrow: Lembretes
+      s4_feedback: Definido. Volta a aparecer na sexta-feira, e pode transformar qualquer
+        lembrete num evento de calendário com um toque.
+      s4_remind_cta: Lembrar-me
+      s4_reminder_title: Pagar fatura da Acme — $248.00
+      s4_reminder_when: Lembrete definido · sexta-feira, 9:00
+      s4_task: Esta fatura vence na sexta-feira. Toque em “Lembrar-me” para a definir.
+      s4_title: Os prazos nunca escapam
+      s4_why: Quando um email traz uma data-limite ou uma promessa que fez, o Scout
+        extrai-a para que não fique soterrada.
+      s5_eyebrow: Scout
+      s5_feedback: O Scout faz isto na sua caixa de entrada real assim que estiver
+        ligada — e também pode redigir as respostas.
+      s5_greeting: Olá! Sou o Scout. Pergunte-me sobre a sua caixa de entrada — ou
+        toque numa sugestão para começar.
+      s5_prompt: O que precisa de resposta hoje?
+      s5_reply_intro: 'Dois emails estão à sua espera:'
+      s5_reply_item_1: Sarah — perguntou sobre o almoço de quinta-feira
+      s5_reply_item_2: Acme Supply Co. — a fatura que vence na sexta-feira
+      s5_task: Toque na pergunta para perguntar ao Scout.
+      s5_title: Pergunte qualquer coisa à sua caixa de entrada
+      s5_why: O Scout consegue procurar, resumir e agir no seu correio e documentos.
+        Basta perguntar por palavras simples.
+      s6_body: 'É este o ciclo: o Scout destaca o que importa, você trata do resto
+        em segundos com o Skim, os prazos não escapam e pode perguntar qualquer coisa.
+        Ligue a sua caixa de entrada para o tornar real.'
+      s6_cta_connect: Ligar a sua caixa de entrada
+      s6_cta_explore: Explorar por minha conta
+      s6_title: Está tudo pronto
+      scout_says: Scout
+      skip: Ignorar visita
+      step: "%{current} de %{total}"

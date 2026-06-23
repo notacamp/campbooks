@@ -1,0 +1,50 @@
+name: Deploy website
+
+# Builds the Docusaurus marketing site (website/) and publishes it to Netlify
+# on every push to main that touches website/. Builds in CI and uploads the
+# prebuilt output (--no-build) so it doesn't depend on Netlify's build step.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - '.github/workflows/deploy-website.yml'
+  workflow_dispatch: {}
+
+concurrency:
+  group: website-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy-website:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build site
+        run: npm run build
+
+      - name: Deploy to Netlify (production)
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        run: |
+          npx --yes netlify-cli@latest deploy --prod --no-build \
+            --dir=build \
+            --site="${{ secrets.NETLIFY_SITE_ID }}" \
+            --message "CI deploy ${GITHUB_SHA::7}"

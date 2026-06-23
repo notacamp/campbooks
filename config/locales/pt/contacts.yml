@@ -1,0 +1,112 @@
+---
+pt:
+  contacts:
+    analyze:
+      analyzing_context: " com o seu contexto"
+      analyzing_html: O Scout está a analisar este contacto%{context}. O perfil aparecerá
+        aqui em breve.
+      queued_toast: Análise em fila.
+    consolidate_all:
+      complete:
+        one: Consolidação concluída. %{count} pessoa fundida.
+        other: Consolidação concluída. %{count} pessoas fundidas.
+    dedup:
+      confidence: "(%{pct}%)"
+      dismiss: Ignorar
+      merge: Fundir
+      possible_duplicates:
+        one: "%{count} possível duplicado"
+        other: "%{count} possíveis duplicados"
+    index:
+      all_heading: Todos os contactos
+      blocked_heading: Bloqueados
+      find_duplicates: Encontrar duplicados
+      heading: Contactos
+      people_count:
+        one: "%{count} pessoa"
+        other: "%{count} pessoas"
+      search_placeholder: Pesquisar pessoas…
+      skim_cta_subtitle:
+        one: "%{count} novo contacto para aprovar ou bloquear"
+        other: "%{count} novos contactos para aprovar ou bloquear"
+      skim_cta_title: Rever novos remetentes
+      starred_heading: Favoritos
+      subheading: Pessoas que o Scout identificou na sua caixa de entrada.
+    list:
+      no_people: Nenhuma pessoa encontrada.
+    name_field:
+      cancel: Cancelar
+      edit_name_aria: Editar nome
+      save: Guardar
+    person:
+      emails_exchanged_title: Emails trocados
+    relationship_field:
+      cancel: Cancelar
+      edit_relationship_aria: Editar relação
+      none_option: Nenhuma
+      save: Guardar
+    resolve_duplicate:
+      dismissed: Duplicado ignorado.
+      merged: Fundido em %{name}.
+    scan_dedup:
+      complete:
+        one: Verificação concluída. %{count} grupo de possíveis duplicados.
+        other: Verificação concluída. %{count} grupos de possíveis duplicados.
+    show:
+      analyze: Analisar
+      analyze_prompt_placeholder: Diga ao Scout quem é esta pessoa…
+      back_aria: Voltar aos contactos
+      documents_heading: Documentos
+      email_history_heading: Histórico de email
+      emails_exchanged_label: Emails trocados
+      go: Ir
+      last_contact_ago: há %{time}
+      last_contact_label: Último contacto
+      name_label: Nome
+      no_email_history: Sem histórico de email disponível.
+      no_subject: "(sem assunto)"
+      re_analyze: Reanalisar
+      relationship_label: Relação
+      run_analysis_prompt: Execute a análise para criar um perfil deste contacto.
+      scouts_analysis: Análise do Scout
+    skim:
+      approve: Aprovar
+      back: Voltar aos contactos
+      block: Bloquear
+      close: Fechar
+      close_aria: Voltar aos contactos
+      done_subtitle: Não há novos remetentes para rever de momento.
+      done_title: Tudo em dia
+      emails:
+        one: "%{count} email"
+        other: "%{count} emails"
+      empty_subtitle: Os novos remetentes aparecerão aqui à medida que chegarem.
+      empty_title: Nada para rever
+      go_back: Remetente anterior
+      guide_approve: deixa o email deles entrar na caixa de entrada
+      guide_block: arquiva automaticamente tudo o que enviam
+      guide_skip: deixa-os para decidir mais tarde
+      new_sender: Novo remetente
+      no_summary: O Scout ainda não analisou este remetente.
+      progress: "%{done} de %{total}"
+      progress_aria: Progresso da revisão de novos remetentes
+      skip: Ignorar
+      subtitle: Decida que novos remetentes chegam à sua caixa de entrada — aprove
+        os que quer, bloqueie os restantes.
+      title: Novos remetentes
+      touch_hint: Deslize para alternar entre remetentes
+    state:
+      allowed_toast: "%{name} permitido."
+      block: Bloquear
+      block_confirm: Bloquear este remetente? O email existente será arquivado e sairá
+        da caixa de entrada.
+      blocked_toast: "%{name} bloqueado — a arquivar o email."
+      star: Destacar
+      starred: Destacado
+      starred_toast: "%{name} destacado."
+      unblock: Desbloquear
+      unblocked_toast: "%{name} desbloqueado — a restaurar o email."
+      unstar: Remover destaque
+      unstarred_toast: Destaque removido de %{name}.
+    update:
+      updated_toast: Contacto actualizado.

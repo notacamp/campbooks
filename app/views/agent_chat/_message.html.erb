@@ -1,0 +1,8 @@
+<%= render(Campbooks::ChatMessage.new(
+  message: agent_message,
+  context: :global,
+  latest: local_assigns.fetch(:latest, false),
+  tool_url_builder: ->(tool, args) {
+    { url: scout_tool_path(tool: tool, args: args, thread_id: agent_message.agent_thread&.id), method: :post }
+  }
+)) %>

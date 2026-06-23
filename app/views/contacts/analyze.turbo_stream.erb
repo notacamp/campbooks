@@ -1,0 +1,8 @@
+<%= turbo_stream.replace "contact_analysis_section" do %>
+  <%= render(Campbooks::Alert.new(variant: :info, id: "contact_analysis_section")) do %>
+    <p class="text-sm"><%= t(".analyzing_html", context: params[:prompt].present? ? t(".analyzing_context") : "") %></p>
+  <% end %>
+<% end %>
+<%= turbo_stream.append "action_toasts" do %>
+  <%= render "shared/action_toast", message: t(".queued_toast"), variant: :info %>
+<% end %>

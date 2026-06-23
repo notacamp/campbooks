@@ -1,0 +1,20 @@
+<%# Anti-flash dark-mode class (must run before first paint) + Inter webfont.
+    Shared by every layout so the theme toggle and dark mode work everywhere.
+    Render this first inside <head>. %>
+<script>
+  (function () {
+    try {
+      var stored = localStorage.getItem("theme");
+      var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      if (stored === "dark" || (stored !== "light" && prefersDark)) {
+        document.documentElement.classList.add("dark");
+      }
+    } catch (e) {}
+  })();
+</script>
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="icon" href="/icon.png" type="image/png">
+<link rel="apple-touch-icon" href="/icon.png">
+<%# Inter is self-hosted via @font-face in app/assets/tailwind/application.css —
+    no request to Google Fonts, so no visitor IP leaves the app (GDPR). %>

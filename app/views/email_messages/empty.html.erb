@@ -1,0 +1,37 @@
+<div class="flex flex-col h-full">
+  <div class="flex-1 min-h-0 overflow-y-auto">
+<% if @accounts.any? %>
+  <%= render(Campbooks::EmptyState.new(variant: :standalone, title: t(".no_mail_yet_title"),
+        description: t(".no_mail_yet_description"))) do |state| %>
+    <% state.with_icon do %>
+      <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+      </svg>
+    <% end %>
+    <% state.with_actions do %>
+      <%= render(Campbooks::Button.new(variant: :outline, href: email_messages_path(inbox_settings: "accounts"))) do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <%= t(".manage_accounts_button") %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% else %>
+  <%= render(Campbooks::EmptyState.new(variant: :standalone, title: t(".connect_email_title"),
+        description: t(".connect_email_description"))) do |state| %>
+    <% state.with_icon do %>
+      <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+      </svg>
+    <% end %>
+    <% state.with_actions do %>
+      <%= button_to email_accounts_path, method: :post,
+            data: { turbo: false },
+            class: "inline-flex items-center font-medium transition-colors bg-accent-600 text-white hover:bg-accent-700 focus-visible:outline-accent-600 px-3 py-2 text-sm rounded-md cursor-pointer border-0" do %>
+        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+        <%= t(".add_account_button") %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
+  </div>
+</div>

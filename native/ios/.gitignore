@@ -1,0 +1,16 @@
+# Xcode / build output
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.ipa
+*.dSYM.zip
+
+# App Store Connect API key — NEVER commit
+*.p8
+AuthKey_*.p8
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/test_output/

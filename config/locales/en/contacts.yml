@@ -1,0 +1,112 @@
+---
+en:
+  contacts:
+    analyze:
+      analyzing_context: " with your context"
+      analyzing_html: Scout is analyzing this contact%{context}. The profile will
+        appear here shortly.
+      queued_toast: Analysis queued.
+    consolidate_all:
+      complete:
+        one: Consolidation complete. %{count} person merged.
+        other: Consolidation complete. %{count} person(s) merged.
+    dedup:
+      confidence: "(%{pct}%)"
+      dismiss: Dismiss
+      merge: Merge
+      possible_duplicates:
+        one: "%{count} possible duplicate"
+        other: "%{count} possible duplicates"
+    index:
+      all_heading: All contacts
+      blocked_heading: Blocked
+      find_duplicates: Find duplicates
+      heading: Contacts
+      people_count:
+        one: "%{count} person"
+        other: "%{count} people"
+      search_placeholder: Search people…
+      skim_cta_subtitle:
+        one: "%{count} new contact to approve or block"
+        other: "%{count} new contacts to approve or block"
+      skim_cta_title: Review new senders
+      starred_heading: Starred
+      subheading: People Scout has seen in your inbox.
+    list:
+      no_people: No people found.
+    name_field:
+      cancel: Cancel
+      edit_name_aria: Edit name
+      save: Save
+    person:
+      emails_exchanged_title: Emails exchanged
+    relationship_field:
+      cancel: Cancel
+      edit_relationship_aria: Edit relationship
+      none_option: None
+      save: Save
+    resolve_duplicate:
+      dismissed: Duplicate dismissed.
+      merged: Merged into %{name}.
+    scan_dedup:
+      complete:
+        one: Scan complete. %{count} possible duplicate group.
+        other: Scan complete. %{count} possible duplicate group(s).
+    show:
+      analyze: Analyze
+      analyze_prompt_placeholder: Tell Scout who this is…
+      back_aria: Back to contacts
+      documents_heading: Documents
+      email_history_heading: Email history
+      emails_exchanged_label: Emails exchanged
+      go: Go
+      last_contact_ago: "%{time} ago"
+      last_contact_label: Last contact
+      name_label: Name
+      no_email_history: No email history available.
+      no_subject: "(no subject)"
+      re_analyze: Re-analyze
+      relationship_label: Relationship
+      run_analysis_prompt: Run analysis to build a profile for this contact.
+      scouts_analysis: Scout's analysis
+    skim:
+      approve: Approve
+      back: Back to contacts
+      block: Block
+      close: Close
+      close_aria: Back to contacts
+      done_subtitle: No new senders to review right now.
+      done_title: All caught up
+      emails:
+        one: "%{count} email"
+        other: "%{count} emails"
+      empty_subtitle: New senders will appear here as they arrive.
+      empty_title: Nothing to review
+      go_back: Previous sender
+      guide_approve: lets their mail into your inbox
+      guide_block: auto-archives everything they send
+      guide_skip: leaves them for you to decide later
+      new_sender: New sender
+      no_summary: Scout hasn't profiled this sender yet.
+      progress: "%{done} of %{total}"
+      progress_aria: New sender review progress
+      skip: Skip
+      subtitle: Decide which new senders reach your inbox — approve the ones you want,
+        block the rest.
+      title: New senders
+      touch_hint: Swipe to move between senders
+    state:
+      allowed_toast: Allowed %{name}.
+      block: Block
+      block_confirm: Block this sender? Their existing mail will be archived out of
+        your inbox.
+      blocked_toast: Blocked %{name} — archiving their mail.
+      star: Star
+      starred: Starred
+      starred_toast: Starred %{name}.
+      unblock: Unblock
+      unblocked_toast: Unblocked %{name} — restoring their mail.
+      unstar: Unstar
+      unstarred_toast: Unstarred %{name}.
+    update:
+      updated_toast: Contact updated.

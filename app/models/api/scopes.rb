@@ -1,0 +1,45 @@
+# frozen_string_literal: true
+
+module Api
+  # App-facing catalog of public-API OAuth scopes: names + human descriptions,
+  # used by the Settings → API access scope picker and the API docs. The
+  # canonical *list* of enabled scopes lives in config/initializers/doorkeeper.rb
+  # (Doorkeeper `optional_scopes`); the spec spec/models/api/scopes_spec.rb
+  # asserts this catalog matches it, so the two never drift.
+  module Scopes
+    # scope name (String) => short, human-readable description
+    CATALOG = {
+      "emails:read"     => "Read email messages, threads, and folders",
+      "emails:write"    => "Mark emails read/unread, archive, snooze, and tag them",
+      "emails:send"     => "Compose, send, and reply to email",
+      "documents:read"  => "List and download documents",
+      "documents:write" => "Upload, update, approve, reject, and reclassify documents",
+      "contacts:read"   => "Read contacts",
+      "contacts:write"  => "Update contacts and change their state (star, block, allow)",
+      "tags:read"       => "List tags",
+      "tags:write"      => "Add and remove tags on emails",
+      "document_types:read" => "List document types",
+      "workflows:read"     => "List workflows and their run history",
+      "workflows:trigger"  => "Trigger a workflow",
+      "scout:read"         => "Read Scout chat threads and messages",
+      "scout:write"        => "Create Scout threads and send messages"
+    }.freeze
+
+    module_function
+
+    # All enabled scope names, as strings.
+    def all
+      CATALOG.keys
+    end
+
+    def description(scope)
+      CATALOG[scope.to_s]
+    end
+
+    # Reduce a user-supplied scope selection (an array of names, and/or a
+    # space-delimited string) to the recognized scopes only. Returns an array.
+    def sanitize(requested)
+      Array(requested).flat_map { |value| value.to_s.split }.uniq & all
+    end
+  end
+end

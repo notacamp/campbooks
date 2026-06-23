@@ -1,0 +1,458 @@
+---
+en:
+  settings:
+    api_clients:
+      index:
+        title: API access
+        subtitle: Create OAuth clients to reach your Campbooks data from your own apps and scripts.
+        new_client: New client
+        col_name: Name
+        col_client_id: Client ID
+        col_scopes: Scopes
+        col_created: Created
+        regenerate: Regenerate secret
+        regenerate_confirm: Regenerate this client's secret? The current secret stops working immediately.
+        revoke: Revoke tokens
+        revoke_confirm: Revoke all active tokens for this client? Apps using it will need a new token.
+        delete: Delete
+        delete_confirm: Delete the client "%{name}"? This can't be undone.
+        no_clients_title: No API clients yet
+        no_clients_desc: Create a client to get a client ID and secret for the Campbooks API.
+      new:
+        title: New API client
+        subtitle: Give your client a name and choose what it can access.
+        name_label: Name
+        name_placeholder: e.g. Billing sync
+        name_hint: A label to help you recognize this client later.
+        scopes_label: Scopes
+        scopes_hint: Grant only the access this client needs.
+        create: Create client
+        cancel: Cancel
+      reveal:
+        title: Client created
+        subtitle: Copy the secret for "%{name}" now.
+        warning: This is the only time the client secret is shown. Store it somewhere safe — you can regenerate it later if you lose it.
+        client_id_label: Client ID
+        client_secret_label: Client secret
+        copy: Copy
+        next_steps_title: Exchange these for an access token
+        done: Done
+      create:
+        scopes_required: Select at least one scope.
+      revoke:
+        revoked: All tokens for "%{name}" were revoked.
+      destroy:
+        deleted: Client "%{name}" was deleted.
+    account:
+      analyze_writing_style:
+        queued: Scout is analyzing your sent email — your style profile will appear
+          here shortly.
+      delete:
+        cancel: Cancel
+        confirm_email_label: Type your email address to confirm
+        confirm_email_placeholder: your@email.com
+        confirm_password_label: Current password
+        delete_button: Permanently delete my account
+        member_items: Your account, your personal sessions, notifications, and preferences.
+          Shared workspace data (emails, documents, calendars) will not be deleted.
+        member_warning: You are one of several members of this workspace. Deleting
+          your account will remove you from the workspace. All shared emails, documents,
+          and calendars will remain accessible to the other members.
+        sole_owner_items: Your account, the entire workspace, all email accounts and
+          their messages, all documents and attachments, all calendars and events,
+          and all other workspace data.
+        sole_owner_warning: You are the only member of this workspace. Deleting your
+          account will permanently erase the entire workspace, including all email
+          accounts, documents, calendars, and associated data.
+        subtitle: This action is permanent and cannot be undone.
+        title: Delete account
+        what_will_be_deleted: What will be deleted
+      destroy:
+        deletion_scheduled: Your account is being deleted. You have been signed out.
+        wrong_email: Email address does not match.
+        wrong_password: Current password is incorrect.
+      language:
+        failed: Could not update your language. Please try again.
+        updated: Language updated.
+      show:
+        change_password: Change Password
+        confirm_password: Confirm New Password
+        current_password: Current Password
+        danger_zone_desc: Deleting your account is permanent and cannot be undone.
+        danger_zone_title: Danger zone
+        data_export_button: Download my data
+        data_export_desc: Download a copy of your personal data (profile, sessions,
+          AI conversations, and more) as a JSON file.
+        data_export_title: Your data
+        delete_account_button: Delete account
+        language_subtitle: Choose the language for your Campbooks interface.
+        language_title: Language
+        new_password: New Password
+        privacy_policy: Privacy Policy
+        save_language: Save
+        subtitle: Manage your password and account preferences.
+        terms_of_service: Terms of Service
+        title: Account Settings
+        update_password: Update Password
+        writing_style_analyze: Analyze my writing style
+        writing_style_label: Your writing style
+        writing_style_learned_empty: Scout hasn't analyzed your sent email yet.
+        writing_style_learned_label: Learned from your sent email
+        writing_style_placeholder: e.g. I keep replies warm but brief, greet people
+          by first name, and sign off as Sam.
+        writing_style_save: Save writing style
+        writing_style_subtitle: Describe how you write — greetings, sign-off, tone,
+          length — and Scout will match your voice when it drafts replies.
+        writing_style_title: Writing style
+      update:
+        password_updated: Password updated.
+        wrong_password: Current password is incorrect.
+      writing_style:
+        failed: Could not save your writing style. Please try again.
+        updated: Writing style saved.
+    ai:
+      adapter_card:
+        api_key_stored: API key stored
+        delete: Delete
+        delete_confirm: Delete "%{name}"?
+        edit: Edit
+        no_key: No API key configured
+        platform_managed: Managed by Campbooks AI
+        using_env_key: Using %{key}
+      adapter_modal:
+        api_key_placeholder_hosted: Enter your API key
+        api_key_placeholder_self_hosted: Leave blank to use env var
+        create_provider: Create Provider
+        endpoint_url_label: Endpoint URL (optional)
+        endpoint_url_placeholder: Custom endpoint or blank for default
+        provider_label: Provider
+        save_changes: Save Changes
+      show:
+        add_text_provider: Add Text Provider
+        add_vision_provider: Add Vision Provider
+        ai_mode_heading: How AI runs
+        create_provider_first: Create an AI provider first
+        create_provider_first_desc: You need at least one AI provider before configuring
+          services.
+        creativity_label: Creativity
+        enabled_label: Enabled
+        how_it_works_body: Create AI Providers (named API connections), then assign
+          them to each service. Use different providers for different tasks — vision-capable
+          providers (OpenAI, Anthropic, Gemini) for document analysis, and any provider
+          for text tasks.
+        how_it_works_label: How this works
+        instructions_hint: Optional. Max 2,000 characters. Appended as preferences
+          — won't override core rules or JSON format.
+        instructions_label: Instructions for Scout
+        instructions_placeholder: Optional instructions for Scout...
+        managed_offer: Don't want to manage API keys? Let Campbooks run the AI for
+          you.
+        max_tokens_label: Max response length
+        not_configured: not configured
+        provider_label: Provider
+        providers_heading: AI Providers
+        save_service: Save %{name}
+        select_provider: Select a provider…
+        services_desc: Each task Scout performs. Expand one to choose its provider
+          and tune how it behaves.
+        services_heading: AI Services
+        subtitle: Connect AI providers, then assign one to each task Scout performs.
+        switch_to_byo: Use my own keys instead
+        switch_to_byo_confirm: Switch to your own API keys? Campbooks will stop running
+          AI for this workspace until you add a provider.
+        switch_to_managed: Use Campbooks AI
+        text_subheading: Chat & classification
+        text_subheading_note: "— any provider works for text tasks"
+        title: AI providers & services
+        toolbar_bold: Bold
+        toolbar_bullet: Bullet List
+        toolbar_italic: Italic
+        toolbar_numbered: Numbered List
+        toolbar_redo: Redo
+        toolbar_undo: Undo
+        vision_providers_deepseek_note: cannot process images/PDFs — use for text-only
+          services.
+        vision_providers_heading: Vision-capable providers
+        vision_subheading: Document analysis
+        vision_subheading_note: "— OpenAI, Anthropic, Gemini (vision-capable)"
+      switch_mode:
+        invalid_mode: Unknown AI mode.
+        managed_unavailable: Campbooks AI isn't available on this installation.
+        switched_to_byo: Switched to your own keys. Add a provider below to enable
+          AI.
+        switched_to_managed: Now using Campbooks AI.
+    general:
+      show:
+        ai_providers_hint: Looking for AI providers and model settings? They now live
+          under %{link}.
+        ai_providers_link_text: AI providers & services
+        profile_configured: Profile configured — Scout has context about your workspace
+        save_profile: Save Profile
+        subtitle: Your workspace profile and how Scout understands your business.
+        title: General
+        workspace_context_label: Describe your workspace, role, and purpose
+        workspace_context_placeholder: 'Example: I run Not A Camp, a consulting firm
+          that helps businesses with financial management…'
+        workspace_profile_desc: This description is included in AI prompts to help
+          Scout understand who you are, what your workspace does, and what matters
+          to you.
+        workspace_profile_heading: Workspace Profile
+    integrations:
+      calendars:
+        show:
+          active: Active
+          calendars_heading: Calendars
+          calendars_pending: Calendars will appear here after the first sync.
+          connect_desc: Calendars come with your connected mail accounts. Connect
+            Google or Zoho and its calendar appears here automatically, syncing both
+            ways. Already connected an account? Reconnect it to grant calendar access.
+          connect_google: Connect Google
+          connect_heading: Add a calendar
+          connect_zoho: Connect Zoho
+          disconnect_confirm: Disconnect %{name}? Its calendar will stop syncing.
+          empty_desc: Connect a Google or Zoho calendar to get started.
+          empty_title: No calendars connected
+          inactive: Needs reconnect
+          manage_access: Manage access
+          'off': 'Off'
+          primary: primary
+          reconnect: Reconnect
+          subtitle: Connect Google or Zoho calendars and manage events with two-way
+            sync.
+          synced: Synced
+          title: Calendars
+      connections:
+        edit:
+          title: Edit connection
+        form:
+          auth_hint: How requests authenticate. The fields below apply to the matching
+            type; others can be left blank.
+          auth_label: Authentication
+          base_url_hint: A workflow's Custom Action appends its path to this. Loopback
+            and private hosts are blocked.
+          base_url_label: Base URL
+          base_url_placeholder: https://api.stripe.com
+          create_connection: Create connection
+          header_name_hint: For "Header" auth.
+          header_name_label: Header name
+          header_name_placeholder: X-Api-Key
+          name_label: Name
+          name_placeholder: Stripe (prod)
+          save_connection: Save connection
+          secret_hint: Stored encrypted. Used as the bearer token, header value, or
+            basic password.
+          secret_label: Secret
+          secret_placeholder_existing: Leave blank to keep current
+          secret_placeholder_new: Token / password / header value
+          username_hint: For "Basic" auth.
+          username_label: Username
+          username_placeholder: user
+        index:
+          add_connection: Add connection
+          col_auth: Auth
+          col_base_url: Base URL
+          col_name: Name
+          delete: Delete
+          delete_confirm: Delete "%{name}"? Workflow steps using it will stop working.
+          edit: Edit
+          no_connections_desc: Add a saved API integration so workflows can call it
+            with a Custom Action step.
+          no_connections_title: No connections yet
+          subtitle: Saved API integrations your workflows can call with a Custom Action
+            step.
+          title: Connections
+        new:
+          subtitle: Save an API integration your workflows can call with a Custom
+            Action.
+          title: Add connection
+      google_drive:
+        show:
+          col_auto_push: Auto-Push
+          col_document_type: Document Type
+          col_drive_folder: Drive Folder
+          col_subfolders: Subfolders
+          configure: Configure
+          connect_button: Connect Google Drive
+          connect_desc_html: Connect your Google account to create folders and upload
+            files to Google Drive (%{scope} scope, so you can browse and pick any
+            folder).
+          connected_account_heading: Connected Account
+          connected_as: Connected as
+          connected_label: Connected
+          disconnect: Disconnect
+          disconnect_confirm: Disconnect Google Drive? Document uploads will stop.
+          drive_org_desc: Each document type can have its own folder, naming pattern,
+            and subfolder structure.
+          drive_org_heading: How Drive Organizes Your Files
+          edit_config: Edit
+          folder_set: Folder set
+          off_badge: 'Off'
+          on_badge: 'On'
+          reconnect_button: Reconnect Google Drive
+          reconnect_prompt: Reconnect to grant full Drive access — required to browse
+            and pick existing folders when sending files.
+          subtitle: Push documents to Google Drive with per-type folder and naming
+            rules.
+          title: Google Drive
+      google_drive_configs:
+        edit:
+          auto_push_hint: When enabled, approved documents of this type are automatically
+            uploaded to Google Drive.
+          auto_push_label: Auto-push when document is approved
+          folder_id_hint_html: 'Find this in the Google Drive folder URL: %{url}'
+          folder_id_label: Drive Folder ID
+          folder_id_placeholder: e.g. 1a2b3c4d5e...
+          folder_path_hint: A human-readable label shown in the UI. Not used for the
+            actual upload.
+          folder_path_label: Folder Label
+          folder_path_placeholder: e.g. Campbooks / Invoices
+          naming_pattern_hint: 'Available placeholders: {date}, {entity}, {reference},
+            {type}, {vendor}, {id}'
+          naming_pattern_label: File Naming Pattern
+          subfolder_pattern_hint_html: "<strong>Flat</strong>: All files go directly
+            in the target folder.<br><strong>Year</strong>: Organized by year (e.g.
+            /Folder/2026/).<br><strong>Year/Month</strong>: Organized by year and
+            month (e.g. /Folder/2026/05_May/).<br><strong>Entity</strong>: Organized
+            by entity name (vendor or client)."
+          subfolder_pattern_label: Subfolder Workspace
+          subtitle: Control how documents of this type are pushed to Google Drive.
+      index:
+        show:
+          api_connections_desc: Save outbound API integrations (base URL + auth) once,
+            then call them from any workflow with a Custom Action step — without pasting
+            secrets into each step.
+          api_connections_heading: API Connections
+          api_connections_manage: Manage connections
+          calendars_configure: Configure
+          calendars_desc: Connect Google or Zoho calendars to view and manage events
+            in Campbooks, with two-way sync.
+          calendars_heading: Calendars
+          connected: Connected
+          connection: connection
+          connections:
+            one: "%{count} connection"
+            other: "%{count} connections"
+          google_drive_configure: Configure
+          google_drive_desc: Push approved documents to Google Drive folders automatically.
+            Each document type gets its own folder with customizable naming rules.
+          google_drive_heading: Google Drive
+          none_yet: None yet
+          not_connected: Not connected
+          notion_configure: Configure
+          notion_desc: Keep Notion databases in sync with Campbooks. Changes flow
+            both ways — update a document here and it updates in Notion, and vice
+            versa.
+          notion_heading: Notion
+          subtitle: Connect external services for document sync and export.
+          title: Integrations
+          zoho_drive_configure: Configure
+          zoho_drive_desc: Send documents to Zoho WorkDrive, organized by document
+            type into dedicated folders. Map each type to its own Drive location.
+          zoho_drive_heading: Zoho Drive
+      notion:
+        show:
+          col_database: Notion Database
+          col_document_type: Document Type
+          col_pull: Pull
+          col_push: Push
+          connect_another: Connect another workspace
+          connect_button: Connect Notion
+          connected_label: Connected
+          connected_to: Connected to
+          destinations_heading: Document Destinations in Notion
+          disconnect: Disconnect
+          disconnect_confirm: Disconnect this Notion workspace?
+          edit: Edit
+          edit_doc_type_link: Edit a document type
+          manual_toggle: 'Advanced: connect with an integration token instead'
+          mappings_desc: Configure which Notion database each document type maps to
+            and how fields are translated. Edit a document type to set up its Notion
+            mapping.
+          no_mappings: No mappings configured.
+          no_mappings_hint: to add a Notion database mapping.
+          oauth_desc: Connect a Notion workspace. You'll choose which pages and databases
+            Campbooks can access in Notion.
+          off_badge: 'Off'
+          on_badge: 'On'
+          per_doc_type: Per document type
+          subtitle: Connect Notion to create pages, add database items, and upload
+            files — from documents, workflows, and Scout.
+          title: Notion
+          unknown_type: Unknown
+          workspace_heading: Your Notion Workspaces
+        token_form:
+          token_desc_html: Create an integration at %{link}. The token must have %{read}
+            and %{insert} capabilities.
+          token_label: Notion API Token
+          token_placeholder: secret_...
+      zoho_drive:
+        show:
+          active: Active
+          add_mapping_button: Add Mapping
+          add_mapping_heading: Add Folder Mapping
+          all_other_docs: All other documents
+          all_other_docs_option: All other documents
+          auto_badge: Auto
+          auto_sync_label: Auto sync new documents
+          col_account: Account
+          col_auto_sync: Auto Sync
+          col_document_type: Document Type
+          col_drive_folder: Drive Folder
+          connect_account: Connect Account
+          connected_accounts_heading: Connected Accounts
+          disconnect: Disconnect
+          disconnect_confirm: Disconnect %{name}?
+          display_path_label: Display Path
+          display_path_optional: "(optional)"
+          display_path_placeholder: "/Invoices/2025"
+          document_type_label: Document Type
+          drive_account_label: Drive Account
+          drive_folder_id_hint: "— copy from the folder URL in Zoho Drive"
+          drive_folder_id_label: Drive Folder ID
+          drive_folder_id_placeholder: Folder ID from Drive URL
+          folder_mappings_desc: Where each document type is stored in Zoho Drive.
+          folder_mappings_heading: Folder Mappings
+          inactive: Inactive
+          last_synced: 'Last synced: %{time}'
+          manual_badge: Manual
+          never: Never
+          no_accounts: No Drive accounts connected.
+          reauth: Re-auth
+          remove: Remove
+          remove_confirm: Remove this mapping?
+          subtitle: Push documents to Zoho WorkDrive, organized by document type.
+          title: Zoho Drive
+    members:
+      index:
+        cancel_confirm: Cancel this invitation?
+        cancel_invitation: Cancel
+        current_members_heading: Current Members (%{count})
+        email_label: Email address
+        email_placeholder: colleague@example.com
+        expires_in: expires %{time} from now
+        invite_button: Invite member
+        invite_modal_heading: Invite a member
+        invited_by: Invited by %{name}
+        no_members: No members yet.
+        past_heading: Past invitations (%{count})
+        pending_heading: Pending Invitations
+        resend: Resend
+        send_invitation: Send invitation
+        subtitle: Manage who has access to this workspace.
+        title: Members
+        you_badge: you
+    notifications:
+      index:
+        doc_types_title: Document Types
+        no_doc_types: No document types configured yet.
+        no_tags: No tags configured yet.
+        subtitle: Choose how you want to be notified about new activity.
+        tags_title: Tags
+        title: Notification Preferences
+      section:
+        email_label: Email
+        in_app_label: In-app
+        show_all: Show all %{count} items
+        toggle_all: Toggle all
+    sidebar:
+      aria_label: Settings navigation

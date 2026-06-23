@@ -1,0 +1,27 @@
+<%= turbo_frame_tag "notion_export_step" do %>
+  <% if @error %>
+    <p class="text-sm text-red-600 dark:text-red-400"><%= t(".error", message: @error) %></p>
+  <% else %>
+    <%= form_with url: databases_email_message_notion_export_path(@email_message, integration_id: @integration.id),
+          method: :get, data: { turbo_frame: "notion_export_step" }, class: "mb-3" do %>
+      <%= text_field_tag :q, params[:q], placeholder: t(".search"),
+            class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+    <% end %>
+
+    <% if @databases.any? %>
+      <ul class="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-72 overflow-y-auto dark:border-white/10 dark:divide-white/5">
+        <% @databases.each do |db| %>
+          <li>
+            <%= link_to database_form_email_message_notion_export_path(@email_message, integration_id: @integration.id, database_id: db["id"]),
+                  data: { turbo_frame: "notion_export_step" },
+                  class: "block px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-50 no-underline dark:hover:bg-white/5" do %>
+              <%= notion_database_title(db) %>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% else %>
+      <p class="text-sm text-gray-500"><%= t(".none") %></p>
+    <% end %>
+  <% end %>
+<% end %>

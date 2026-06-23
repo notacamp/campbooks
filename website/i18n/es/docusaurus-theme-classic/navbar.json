@@ -1,0 +1,34 @@
+{
+  "title": {
+    "message": "Campbooks",
+    "description": "The title in the navbar"
+  },
+  "logo.alt": {
+    "message": "Campbooks",
+    "description": "The alt text of navbar logo"
+  },
+  "item.label.Docs": {
+    "message": "Documentación",
+    "description": "Navbar item with label Docs"
+  },
+  "item.label.Blog": {
+    "message": "Blog",
+    "description": "Navbar item with label Blog"
+  },
+  "item.label.Pricing": {
+    "message": "Precios",
+    "description": "Navbar item with label Pricing"
+  },
+  "item.label.About": {
+    "message": "Acerca de",
+    "description": "Navbar item with label About"
+  },
+  "item.label.Try the cloud version": {
+    "message": "Probar en la nube",
+    "description": "Navbar item with label Try the cloud version"
+  },
+  "item.label.GitHub": {
+    "message": "GitHub",
+    "description": "Navbar item with label GitHub"
+  }
+}

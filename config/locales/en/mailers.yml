@@ -1,0 +1,62 @@
+---
+en:
+  invitation_mailer:
+    invitation:
+      accept_button: Accept invitation
+      accept_text: 'Accept the invitation here:'
+      body_html: "%{inviter} invited you to join %{workspace} on Campbooks."
+      body_text: "%{inviter} has invited you to join %{workspace} on Campbooks."
+      expires: This invitation expires in 7 days.
+      greeting: Hello,
+      ignore: Not expecting this? No worries — just ignore it.
+      subject: "%{inviter} invited you to join %{workspace} on Campbooks"
+  notification_mailer:
+    mention:
+      body_html: "%{actor} mentioned you in the discussion on %{subject}."
+      body_text: '%{actor} mentioned you in the discussion on "%{subject}".'
+      footer: You're getting this because you were mentioned. Turn off mention emails
+        in your notification settings.
+      greeting: Hi %{name},
+      subject: "%{actor} mentioned you in a discussion"
+      view_button: View discussion
+      view_text: 'View the discussion:'
+    thread_activity:
+      body_html: "%{actor} added a comment to a discussion you follow, %{subject}."
+      body_text: '%{actor} added a comment to a discussion you follow, "%{subject}".'
+      footer: You're getting this because you follow this thread. You can unfollow
+        it from the discussion panel.
+      greeting: Hi %{name},
+      subject: New comment on "%{subject}"
+      view_button: View discussion
+      view_text: 'View the discussion:'
+  passwords_mailer:
+    reset:
+      body: 'You asked to reset your Campbooks password. Here''s a link to do that:'
+      body_text: You can reset your password on
+      expires: This link expires in %{duration}.
+      expires_text: This link will expire in %{duration}.
+      greeting: Hello,
+      ignore: Didn't request this? You can safely ignore it.
+      reset_button: Reset password
+      subject: Reset your password
+  signup_request_mailer:
+    approved:
+      body: Your Campbooks account request has been approved. Click the button below
+        to finish creating your account.
+      body_text: 'Your Campbooks account request has been approved. Visit the link
+        below to finish creating your account:'
+      complete_button: Complete signup
+      greeting: Hi %{name},
+      ignore: If you didn't request access, you can ignore this email.
+      subject: Your Campbooks account has been approved
+      unique: This link is unique to you and should not be shared.
+  verification_mailer:
+    verify:
+      body: 'Here''s your Campbooks verification code:'
+      body_text: 'Your Campbooks verification code is: %{code}'
+      expires: It's good for 10 minutes.
+      expires_text: This code expires in 10 minutes.
+      greeting: Hello %{name},
+      ignore: Didn't request a code? No action needed — just ignore this.
+      ignore_text: If you didn't request this code, you can safely ignore this email.
+      subject: "%{code} is your Campbooks verification code"

@@ -1,0 +1,50 @@
+---
+pt:
+  notifications:
+    bell:
+      heading: Notificações
+      mark_all_read: Marcar todas como lidas
+      view_all: Ver todas
+    dropdown_list:
+      all_caught_up: Está tudo em dia.
+      earlier: Anteriores
+      needs_you: Requer atenção
+    gone: Essa notificação já não está disponível.
+    index:
+      all_caught_up: Está tudo em dia.
+      archive_read: Arquivar lidas
+      empty_archived: Sem notificações arquivadas.
+      filters:
+        all: Todas
+        archived: Arquivadas
+        needs_action: Requer ação
+        unread: Não lidas
+      manage_preferences_html: Gira as notificações que recebe em %{link}.
+      mark_all_read: Marcar todas como lidas
+      preferences_link: Preferências de Notificação
+      subtitle:
+        one: "%{count} não lida"
+        other: "%{count} não lidas"
+      title: Notificações
+    toast:
+      mark_read: Marcar como lida
+      time_ago: há %{time}
+  skim:
+    email:
+      archive: Arquivar
+      back_to_stack: Voltar à pilha
+      make_priority: Marcar como prioritário
+      no_preview: Sem pré-visualização — utilize "Abrir completo" para ler.
+      no_subject: "(sem assunto)"
+      open_in_full: Abrir completo
+      reply: Responder
+      reply_placeholder: Escrever uma resposta para %{address}…
+      send_reply: Enviar resposta
+    email_content:
+      no_preview_html: Sem pré-visualização &mdash; utilize &ldquo;Responder / abrir
+        completo&rdquo;.
+    show:
+      back_to_inbox: Voltar à caixa de entrada
+      close: Fechar
+      inbox_calm: A sua caixa de entrada já está calma
+      nothing_to_skim: Nada para Skim agora.

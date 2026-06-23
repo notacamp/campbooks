@@ -1,0 +1,50 @@
+---
+fr:
+  notifications:
+    bell:
+      heading: Notifications
+      mark_all_read: Tout marquer comme lu
+      view_all: Voir tout
+    dropdown_list:
+      all_caught_up: Vous êtes à jour.
+      earlier: Antérieur
+      needs_you: Nécessite votre attention
+    gone: Cette notification n'est plus disponible.
+    index:
+      all_caught_up: Vous êtes à jour.
+      archive_read: Archiver les lus
+      empty_archived: Aucune notification archivée.
+      filters:
+        all: Tout
+        archived: Archivés
+        needs_action: Action requise
+        unread: Non lus
+      manage_preferences_html: Gérez les notifications que vous recevez dans %{link}.
+      mark_all_read: Tout marquer comme lu
+      preferences_link: Préférences de notification
+      subtitle:
+        one: "%{count} non lu"
+        other: "%{count} non lus"
+      title: Notifications
+    toast:
+      mark_read: Marquer comme lu
+      time_ago: il y a %{time}
+  skim:
+    email:
+      archive: Archiver
+      back_to_stack: Retour à la pile
+      make_priority: Mettre en priorité
+      no_preview: Aucun aperçu disponible — utilisez « Ouvrir en entier » pour le
+        lire.
+      no_subject: "(sans objet)"
+      open_in_full: Ouvrir en entier
+      reply: Répondre
+      reply_placeholder: Rédiger une réponse à %{address}…
+      send_reply: Envoyer la réponse
+    email_content:
+      no_preview_html: Aucun aperçu &mdash; utilisez &ldquo;Répondre / ouvrir en entier&rdquo;.
+    show:
+      back_to_inbox: Retour à la boîte de réception
+      close: Fermer
+      inbox_calm: Votre boîte de réception est déjà calme
+      nothing_to_skim: Rien à parcourir pour l'instant.

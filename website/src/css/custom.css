@@ -1,0 +1,280 @@
+/* Campbooks design tokens — keep in sync with the Rails app @theme.
+   2026-06-20: ported off electric-violet (hue 276) to the shipped system —
+   white/warm-neutral canvas (hue 60), near-black ink, and ONE warm "Ember"
+   gradient (magenta→coral→orange) used surgically as the signature. */
+
+/* Self-hosted webfonts — replaces the Google Fonts + Fontshare stylesheets that
+   used to load in docusaurus.config.ts, so visiting the site sends no visitor IP
+   to Google/Fontshare (GDPR). Files live in static/fonts/ (served at /fonts/
+   since baseUrl is "/"). */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/InterVariable.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/JetBrainsMono-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/JetBrainsMono-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/JetBrainsMono-700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Clash Display";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/ClashDisplay-400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Clash Display";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/ClashDisplay-500.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Clash Display";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/ClashDisplay-600.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Clash Display";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/ClashDisplay-700.woff2") format("woff2");
+}
+
+:root {
+  /* ── The ONE warm signature: "Ember" (magenta→orange). Surgical use only. ── */
+  --ember: linear-gradient(135deg, oklch(62% 0.23 354) 0%, oklch(67% 0.21 22) 55%, oklch(76% 0.17 60) 100%);
+  --ember-solid: oklch(64% 0.21 20);
+  --ember-deep: oklch(55% 0.19 25); /* readable on white — links, active */
+  --ember-glow: 0 6px 18px -6px oklch(64% 0.22 20 / 0.45);
+
+  /* Legacy "accent" ramp → the warm Ember family (names kept so rules below
+     re-skin in place). Used for docs links, active nav, primary touches. */
+  --camps-accent-50: oklch(97% 0.02 30);
+  --camps-accent-100: oklch(94% 0.05 28);
+  --camps-accent-200: oklch(88% 0.09 26);
+  --camps-accent-500: var(--ember-solid);
+  --camps-accent-600: var(--ember-deep);
+  --camps-accent-700: oklch(48% 0.17 27);
+
+  /* Warm-neutral structure (hue 60, very low chroma) — matches the app. */
+  --camps-warm-ash-bg: oklch(99.4% 0.0015 60);
+  --camps-warm-ash-border: oklch(91.5% 0.003 60);
+  --camps-gray-50: oklch(97.5% 0.002 60);
+  --camps-gray-100: oklch(95.5% 0.003 60);
+
+  --ifm-color-primary: var(--camps-accent-600);
+  --ifm-color-primary-dark: var(--camps-accent-700);
+  --ifm-color-primary-darker: var(--camps-accent-700);
+  --ifm-color-primary-darkest: var(--camps-accent-700);
+  --ifm-color-primary-light: var(--camps-accent-500);
+  --ifm-color-primary-lighter: var(--camps-accent-500);
+  --ifm-color-primary-lightest: var(--camps-accent-200);
+  --ifm-code-font-size: 0.8125rem;
+  --ifm-font-family-base: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --ifm-font-family-monospace: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --ifm-heading-font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Display face — used only on marketing surfaces via scoped classes. The
+     brand/marketing layer is allowed a display face; the app UI is Inter-only. */
+  --camps-display: "Clash Display", "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Motion tokens (exponential ease-outs; no bounce) */
+  --camps-ease-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --camps-ease-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --camps-ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ifm-font-size-base: 0.875rem;
+  --ifm-line-height-base: 1.5;
+  --ifm-navbar-height: 4rem;
+  --ifm-navbar-background-color: white;
+  --ifm-navbar-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  --ifm-footer-background-color: white;
+  --ifm-background-color: var(--camps-warm-ash-bg);
+  --ifm-background-surface-color: white;
+  --ifm-global-radius: 0.5rem;
+  --ifm-global-shadow-lw: 0 1px 2px 0 rgba(0,0,0,0.05);
+  --ifm-global-shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07);
+  --ifm-card-border-radius: 0.75rem;
+  --ifm-breadcrumb-border-radius: 0.375rem;
+  --ifm-pagination-nav-border-radius: 0.5rem;
+  --ifm-toc-border-color: var(--camps-warm-ash-border);
+}
+
+/* Navbar */
+.navbar {
+  border-bottom: 1px solid var(--camps-warm-ash-border);
+}
+.navbar__title {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: oklch(24% 0.006 60);
+}
+.navbar__link--active {
+  color: var(--camps-accent-600);
+}
+
+/* App link in navbar — the brand CTA, carries the Ember signature */
+.navbar-app-link {
+  background-image: var(--ember);
+  color: white !important;
+  border-radius: 0.5rem;
+  padding: 0.375rem 0.875rem !important;
+  font-weight: 600;
+  box-shadow: var(--ember-glow);
+  transition: filter 0.15s, transform 0.15s;
+}
+.navbar-app-link:hover {
+  filter: brightness(1.04);
+  transform: translateY(-1px);
+}
+
+/* Sidebar */
+.menu__link {
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+}
+.menu__link--active {
+  font-weight: 600;
+}
+.menu__link:hover {
+  background-color: var(--camps-gray-50);
+}
+.theme-doc-sidebar-container {
+  border-right: 1px solid var(--camps-warm-ash-border) !important;
+}
+
+/* Docs content */
+.theme-doc-markdown {
+  font-size: 1rem;
+}
+.theme-doc-markdown h2 {
+  border-bottom: 1px solid var(--camps-gray-100);
+  padding-bottom: 0.5rem;
+  margin-top: 2.5rem;
+}
+.theme-doc-markdown h3 {
+  margin-top: 2rem;
+}
+
+/* Cards */
+.card {
+  background: white;
+  border-radius: 0.75rem;
+  border: 1px solid var(--camps-warm-ash-border);
+  box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
+  transition: box-shadow 0.15s;
+}
+.card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.07);
+}
+
+/* Code blocks */
+code {
+  background-color: var(--camps-gray-100) !important;
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.3rem;
+  border: none;
+}
+pre {
+  border: 1px solid var(--camps-warm-ash-border);
+  border-radius: 0.5rem !important;
+  background-color: var(--camps-gray-50) !important;
+}
+.theme-code-block {
+  box-shadow: none !important;
+}
+
+/* Footer */
+.footer {
+  border-top: 1px solid var(--camps-warm-ash-border);
+}
+.footer__title {
+  font-size: 0.875rem;
+}
+.footer__item {
+  font-size: 0.875rem;
+}
+.footer__copyright {
+  font-size: 0.75rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--camps-gray-100);
+}
+
+/* Callout blocks */
+.callout {
+  border-radius: 0.5rem;
+  padding: 0.875rem 1rem;
+  margin: 1.25rem 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+.callout-note {
+  background-color: oklch(96.5% 0.012 265);
+  border: 1px solid oklch(92% 0.035 265);
+  color: oklch(35% 0.04 265);
+}
+.callout-info {
+  background-color: oklch(97% 0.008 240);
+  border: 1px solid oklch(90% 0.03 240);
+  color: oklch(35% 0.04 240);
+}
+.callout-warning {
+  background-color: oklch(97% 0.02 60);
+  border: 1px solid oklch(94% 0.05 55);
+  color: oklch(52% 0.16 42);
+}
+
+/* Hero */
+.hero-section {
+  padding: 5rem 0;
+}
+.hero-title {
+  font-size: 2.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.hero-subtitle {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--ifm-color-emphasis-700);
+  max-width: 36rem;
+  margin-top: 1rem;
+}
+
+/* Pricing */
+.pricing-card {
+  background: white;
+  border-radius: 0.75rem;
+  border: 1px solid var(--camps-warm-ash-border);
+  padding: 2rem;
+  box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
+}
+.pricing-card-highlighted {
+  border-color: var(--ember-solid);
+  box-shadow: 0 0 0 1px var(--ember-solid);
+}

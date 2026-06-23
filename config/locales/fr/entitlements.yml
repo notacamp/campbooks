@@ -1,0 +1,71 @@
+---
+fr:
+  activerecord:
+    errors:
+      models:
+        ai_adapter:
+          attributes:
+            managed:
+              plan_upgrade_required: nécessite un forfait incluant Campbooks AI
+        ai_configuration:
+          attributes:
+            model:
+              not_permitted_on_plan: n'est pas disponible dans votre forfait
+  components:
+    entitlements:
+      plan_badge:
+        names:
+          business: Entreprise
+          free: Gratuit
+          pro: Pro
+          unlimited: Illimité
+      plan_summary:
+        current_plan: Forfait actuel
+        included: Inclus
+        not_included: Non inclus
+        over_cap: Utilisation de %{usage} sur %{limit} — au-delà de la limite de votre
+          forfait.
+        self_hosted_body: Ceci est une installation auto-hébergée de Campbooks. Toutes
+          les fonctionnalités sont disponibles sans limite de forfait.
+        self_hosted_title: Auto-hébergé — tout est inclus
+        tiers:
+          basic: Basique
+          premium: Premium
+          standard: Standard
+        unlimited: Illimité
+        usage_of_limit: "%{usage} sur %{limit}"
+      upgrade_prompt:
+        cta: Voir les forfaits
+        reason:
+          not_allowed: "%{feature} ne fait pas partie de votre forfait actuel."
+          not_enabled: "%{feature} est désactivé pour votre espace de travail."
+          over_limit: Vous avez utilisé tout le %{feature} inclus dans votre forfait.
+        title: Améliorez votre forfait
+  entitlements:
+    blocked:
+      email_accounts_cap: Vous avez atteint la limite de comptes e-mail (%{limit})
+        de votre forfait %{plan}. Améliorez votre forfait pour en connecter davantage.
+      not_allowed: "%{feature} n'est pas inclus dans votre forfait %{plan}. Améliorez
+        votre forfait pour l'activer."
+      not_enabled: "%{feature} est désactivé pour votre espace de travail."
+      over_limit: Vous avez atteint la limite de votre forfait pour %{feature}. Améliorez
+        votre forfait pour en obtenir plus.
+    features:
+      ai_model_access: Modèles d'IA
+      email_accounts: Comptes e-mail
+      emails_synced: E-mails synchronisés
+      managed_ai: Campbooks AI
+      notifications: Notifications
+      scout: Scout
+      workflow_executions: Exécutions de workflow
+      workflows: Workflows
+  navigation:
+    settings:
+      items:
+        plan: Forfait et limites
+  settings:
+    plan:
+      show:
+        subtitle: Découvrez ce que votre espace de travail inclut et ce que vous avez
+          utilisé.
+        title: Forfait et limites

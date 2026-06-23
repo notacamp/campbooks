@@ -1,0 +1,23 @@
+<%# Infinite scroll for the flat search results. Append the next page into
+    #email_search_list, then refresh or remove the pagination sentinel. Mirrors
+    index.turbo_stream.erb. Only the keyword path paginates (meaning mode returns
+    a single bounded page, so @pagy is nil there). %>
+<%= turbo_stream.append "email_search_list" do %>
+  <% @messages.each do |message| %>
+    <%= render(Campbooks::EmailSearchResult.new(message: message, link_params: @search_params.to_h, active: @message&.id == message.id)) %>
+  <% end %>
+<% end %>
+
+<% if @pagy&.next %>
+  <%= turbo_stream.replace "threads_pagination" do %>
+    <%= turbo_frame_tag "threads_pagination",
+          src: search_email_messages_path(@search_params.to_h.merge(page: @pagy.next, format: :turbo_stream)),
+          loading: :lazy do %>
+      <div class="flex items-center justify-center py-4">
+        <%= render(Campbooks::Spinner.new(size: :sm)) %>
+      </div>
+    <% end %>
+  <% end %>
+<% else %>
+  <%= turbo_stream.remove "threads_pagination" %>
+<% end %>

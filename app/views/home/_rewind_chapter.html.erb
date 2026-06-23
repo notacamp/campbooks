@@ -1,0 +1,7 @@
+<%# A time chapter in Rewind — "This month", "March", "2024" — and how many
+    highlights it holds. The "time frame highlight" that marks each leg of the
+    journey back, set off by the timeline's hairline. `label` and `count` locals. %>
+<div class="flex items-baseline gap-2.5 pt-9 pb-1">
+  <h3 class="text-[15px] font-semibold tracking-tight text-foreground"><%= label %></h3>
+  <span class="text-[12px] font-medium text-muted-foreground"><%= t("home.index.rewind_count", count: count) %></span>
+</div>

@@ -1,0 +1,113 @@
+<%= render(Campbooks::OnboardingProgress.new(current_step: @step, previous_step: @previous_step)) %>
+
+<% sub_step = @sub_step || 0 %>
+
+<%= render(Campbooks::Card.new(padding: :lg)) do %>
+  <%= form_with url: onboarding_path(step: :workspace), method: :patch, data: { turbo: false } do |f| %>
+    <%= hidden_field_tag :sub_step, sub_step %>
+
+    <%# Header %>
+    <div class="flex items-center gap-3 mb-6">
+      <div class="w-10 h-10 rounded-lg bg-accent-100 flex items-center justify-center">
+        <svg class="w-5 h-5 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+      </div>
+      <div>
+        <h1 class="text-lg font-semibold text-gray-900">
+          <%= case sub_step
+              when 0 then t(".sub_step_0_title")
+              when 1 then t(".sub_step_1_title")
+              when 2 then t(".sub_step_2_title")
+              when 3 then t(".sub_step_3_title")
+              when 4 then t(".sub_step_4_title")
+              end %>
+        </h1>
+        <p class="text-sm text-gray-500">
+          <%= t(".step_of", current: sub_step + 1, total: 5) %>
+          <span class="text-gray-300 mx-1.5">·</span>
+          <%= t(".step_context") %>
+        </p>
+      </div>
+    </div>
+
+    <%# Sub-step content %>
+    <% case sub_step %>
+    <% when 0 %>
+      <p class="text-sm text-gray-600 mb-4"><%= t(".sub_step_0_intro") %></p>
+      <%= render(Campbooks::Input.new("workspace[name]", type: :text, label: t(".workspace_name_label"), placeholder: t(".workspace_name_placeholder"), value: Current.workspace.name, autofocus: true)) %>
+      <p class="text-xs text-gray-400 mt-1"><%= t(".workspace_name_hint") %></p>
+
+    <% when 1 %>
+      <p class="text-sm text-gray-600 mb-4"><%= t(".sub_step_1_intro") %></p>
+      <fieldset class="space-y-3">
+        <% is_company = Current.workspace.setting("workspace_type") == "company" %>
+        <% is_individual = Current.workspace.setting("workspace_type") == "individual" %>
+        <label class="workspace-type-label flex items-start gap-3 p-4 rounded-xl border border-gray-200 hover:border-gray-300 cursor-pointer transition-colors has-[:checked]:border-accent-500 has-[:checked]:bg-accent-50">
+          <%= radio_button_tag "workspace[workspace_type]", "company", is_company, class: "mt-0.5 text-accent-600 focus:ring-accent-500" %>
+          <div>
+            <span class="text-sm font-semibold text-gray-900"><%= t(".type_company_label") %></span>
+            <p class="text-xs text-gray-500 mt-0.5"><%= t(".type_company_description") %></p>
+          </div>
+        </label>
+        <label class="workspace-type-label flex items-start gap-3 p-4 rounded-xl border border-gray-200 hover:border-gray-300 cursor-pointer transition-colors has-[:checked]:border-accent-500 has-[:checked]:bg-accent-50">
+          <%= radio_button_tag "workspace[workspace_type]", "individual", is_individual, class: "mt-0.5 text-accent-600 focus:ring-accent-500" %>
+          <div>
+            <span class="text-sm font-semibold text-gray-900"><%= t(".type_personal_label") %></span>
+            <p class="text-xs text-gray-500 mt-0.5"><%= t(".type_personal_description") %></p>
+          </div>
+        </label>
+      </fieldset>
+
+    <% when 2 %>
+      <p class="text-sm text-gray-600 mb-4"><%= t(".sub_step_2_intro") %></p>
+      <%= f.text_area :workspace_context, name: "workspace[workspace_context]",
+            rows: 6, value: Current.workspace.workspace_context,
+            class: "block w-full rounded-lg border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500",
+            placeholder: t(".workspace_context_placeholder") %>
+
+    <% when 3 %>
+      <p class="text-sm text-gray-600 mb-4"><%= t(".sub_step_3_intro") %></p>
+      <%= render(Campbooks::Select.new("workspace[country]", label: t(".country_label"),
+            options: ISO3166::Country.all.sort_by(&:iso_short_name).map { |c| [c.iso_short_name, c.alpha2] },
+            selected: Current.workspace.setting("country"),
+            include_blank: t(".country_blank"))) %>
+      <div class="mt-4">
+        <%= render(Campbooks::Input.new("workspace[address_line1]", type: :text, label: t(".address_line1_label"), placeholder: t(".address_line1_placeholder"), value: Current.workspace.setting("address_line1"))) %>
+      </div>
+      <div class="mt-4">
+        <%= render(Campbooks::Input.new("workspace[address_line2]", type: :text, label: t(".address_line2_label"), placeholder: t(".address_line2_placeholder"), value: Current.workspace.setting("address_line2"))) %>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+        <%= render(Campbooks::Input.new("workspace[city]", type: :text, label: t(".city_label"), placeholder: t(".city_placeholder"), value: Current.workspace.setting("city"))) %>
+        <%= render(Campbooks::Input.new("workspace[postal_code]", type: :text, label: t(".postal_code_label"), placeholder: t(".postal_code_placeholder"), value: Current.workspace.setting("postal_code"))) %>
+      </div>
+
+    <% when 4 %>
+      <p class="text-sm text-gray-600 mb-4"><%= t(".sub_step_4_intro") %></p>
+      <%= render(Campbooks::Input.new("workspace[company_tax_id]", type: :text, label: nil, placeholder: t(".tax_id_placeholder"), value: Current.workspace.setting("company_tax_id"))) %>
+      <%= render(Campbooks::Alert.new(variant: :warning)) do %>
+        <%= t(".alert_why_matters_html") %>
+      <% end %>
+    <% end %>
+
+    <%# Navigation %>
+    <div class="flex justify-between items-center pt-4 mt-4 border-t border-gray-200">
+      <% if sub_step > 0 %>
+        <%= link_to onboarding_path(step: :workspace, sub_step: sub_step - 1),
+              class: "inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 bg-card hover:bg-gray-50 transition-colors" do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          <%= t("shared.actions.back") %>
+        <% end %>
+      <% else %>
+        <div></div>
+      <% end %>
+
+      <% if sub_step < 4 %>
+        <%= f.submit t(".next_button"),
+              class: "px-4 py-2 bg-accent-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-accent-700 transition-colors cursor-pointer border-0" %>
+      <% else %>
+        <%= f.submit t(".save_and_continue"),
+              class: "px-4 py-2 bg-accent-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-accent-700 transition-colors cursor-pointer border-0" %>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

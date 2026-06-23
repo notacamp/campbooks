@@ -1,0 +1,25 @@
+<%# Unified settings navigation: one grouped list, always fully visible, so
+    every section stays reachable. The groups come from `settings_nav_groups`
+    (NavigationHelper) so this sidebar and the topbar user menu stay in sync.
+    Each item is [path, active_keys, label, icon_path]; a link is active when
+    current_section is in its key list.
+    Note: Tags, Contacts, Signatures, and Sync now live in the inbox settings
+    modal (the gear icon on the email page), so they are not listed here. %>
+<nav class="w-full lg:w-56 lg:flex-shrink-0" aria-label="<%= t(".aria_label") %>">
+  <% settings_nav_groups.each_with_index do |(heading, items), group_index| %>
+    <div class="<%= "mt-6" unless group_index.zero? %>">
+      <p class="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400"><%= heading %></p>
+      <div class="space-y-0.5">
+        <% items.each do |path, active_keys, label, icon_path| %>
+          <% active = active_keys.include?(current_section) %>
+          <%= link_to path,
+                "aria-current": (active ? "page" : nil),
+                class: "flex items-center gap-2.5 px-3 py-2 text-sm rounded-md #{active ? 'bg-accent-50 text-accent-700 font-medium' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}" do %>
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="<%= icon_path %>"/></svg>
+            <span><%= label %></span>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</nav>

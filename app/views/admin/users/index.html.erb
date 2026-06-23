@@ -1,0 +1,37 @@
+<% render "admin/sidebar" %>
+
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+
+<div class="bg-card rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+  <% if @users.any? %>
+    <div class="divide-y divide-gray-100">
+      <% @users.each do |user| %>
+        <div class="flex items-center justify-between px-5 py-3">
+          <div class="flex items-center gap-3">
+            <%= render(Campbooks::Avatar.new(name: user.name, size: :sm)) %>
+            <div>
+              <div class="flex items-center gap-2">
+                <p class="text-sm font-medium text-gray-900"><%= user.name %></p>
+                <%= render(Campbooks::Badge.new(variant: user.admin? ? :accent : :neutral, size: :sm)) { human_enum(User, :role, user.role) } %>
+              </div>
+              <p class="text-xs text-gray-500"><%= user.email_address %> &middot; <%= user.workspace&.name %></p>
+            </div>
+          </div>
+          <% if user != Current.user %>
+            <div>
+              <% if user.admin? %>
+                <%= button_to t(".demote_to_member"), admin_user_path(user, role: "member"), method: :patch,
+                      class: "text-xs text-amber-600 hover:text-amber-700 font-medium cursor-pointer dark:text-amber-400 dark:hover:text-amber-300" %>
+              <% else %>
+                <%= button_to t(".promote_to_admin"), admin_user_path(user, role: "admin"), method: :patch,
+                      class: "text-xs text-accent-600 hover:text-accent-700 font-medium cursor-pointer" %>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  <% else %>
+    <%= render(Campbooks::EmptyState.new(variant: :inline, title: t(".empty_title"))) %>
+  <% end %>
+</div>

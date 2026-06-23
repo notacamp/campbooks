@@ -1,0 +1,32 @@
+# Backfill utility: re-runs the triage tagging ladder for a single already-processed
+# email that has no tags. Mirrors the tagging block in EmailProcessJob (#44-56) so a
+# backlog of mail that was marked `processed` before tagging existed (or whose tagging
+# silently failed) can be tagged without re-fetching bodies/attachments.
+#
+# Idempotent: no-ops once the email has any tag, so it is safe to re-run.
+class EmailRetagJob < ApplicationJob
+  queue_as :default
+  retry_on StandardError, wait: :polynomially_longer, attempts: 3
+
+  def perform(email_message_id)
+    email = EmailMessage.find(email_message_id)
+    return if email.ignored?
+    return unless email.tags.empty?
+
+    # AI model resolution reads Current.workspace (see EmailProcessJob). Without it
+    # the classifier falls back to a keyless Anthropic client and no tag is assigned.
+    Current.workspace = email.email_account.workspace
+
+    begin
+      decision = Emails::Triage.new(email).call
+      email.update!(category: decision.category, category_confidence: decision.confidence)
+      email.email_message_tags.find_or_create_by!(tag: decision.tag) if decision.tag
+      Ai::EmailClassifier.new(email).classify! if decision.needs_llm?
+    rescue => e
+      Rails.logger.error("[EmailRetagJob] Triage failed for email #{email.id}, falling back to classifier: #{e.message}")
+      Ai::EmailClassifier.new(email).classify!
+    end
+  ensure
+    Current.workspace = nil
+  end
+end

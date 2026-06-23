@@ -1,0 +1,41 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle", name: @application.name))) %>
+
+<%= render(Campbooks::Card.new(padding: :lg)) do %>
+  <div class="space-y-5">
+    <div class="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+      <%= t(".warning") %>
+    </div>
+
+    <div data-controller="clipboard">
+      <label class="block text-sm font-medium text-gray-700 mb-1.5"><%= t(".client_id_label") %></label>
+      <div class="flex gap-2">
+        <input type="text" readonly value="<%= @application.uid %>" data-clipboard-target="source"
+               class="flex-1 min-w-0 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 font-mono text-xs text-gray-900">
+        <button type="button" data-clipboard-target="button" data-action="clipboard#copy"
+                class="shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"><%= t(".copy") %></button>
+      </div>
+    </div>
+
+    <div data-controller="clipboard">
+      <label class="block text-sm font-medium text-gray-700 mb-1.5"><%= t(".client_secret_label") %></label>
+      <div class="flex gap-2">
+        <input type="text" readonly value="<%= @plaintext_secret %>" data-clipboard-target="source"
+               class="flex-1 min-w-0 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 font-mono text-xs text-gray-900">
+        <button type="button" data-clipboard-target="button" data-action="clipboard#copy"
+                class="shrink-0 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"><%= t(".copy") %></button>
+      </div>
+    </div>
+
+    <div class="rounded-lg bg-gray-50 border border-gray-200 p-3">
+      <p class="text-xs font-medium text-gray-700 mb-1.5"><%= t(".next_steps_title") %></p>
+      <pre class="overflow-x-auto text-xs text-gray-600 whitespace-pre-wrap break-all">curl -X POST <%= request.base_url %>/api/oauth/token \
+  -d grant_type=client_credentials \
+  -d client_id=<%= @application.uid %> \
+  -d client_secret=YOUR_SECRET \
+  -d "scope=<%= @application.scopes.to_a.join(" ") %>"</pre>
+    </div>
+
+    <%= render(Campbooks::Button.new(variant: :primary, size: :md, href: settings_api_clients_path)) { t(".done") } %>
+  </div>
+<% end %>

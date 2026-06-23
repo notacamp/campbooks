@@ -1,0 +1,26 @@
+{
+  "version.label": {
+    "message": "Next",
+    "description": "The label for version current"
+  },
+  "sidebar.docsSidebar.category.Getting Started": {
+    "message": "Démarrage rapide",
+    "description": "The label for category 'Getting Started' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Deployment": {
+    "message": "Déploiement",
+    "description": "The label for category 'Deployment' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Email": {
+    "message": "E-mail",
+    "description": "The label for category 'Email' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.Documents": {
+    "message": "Documents",
+    "description": "The label for category 'Documents' in sidebar 'docsSidebar'"
+  },
+  "sidebar.docsSidebar.category.AI": {
+    "message": "IA",
+    "description": "The label for category 'AI' in sidebar 'docsSidebar'"
+  }
+}

@@ -1,0 +1,118 @@
+---
+es:
+  dashboard:
+    show:
+      all_set_description: Los nuevos correos y documentos aparecerán aquí cuando
+        requieran su atención.
+      all_set_title: Todo configurado — esperando datos.
+      attention_empty_idle: Los nuevos correos y documentos aparecerán aquí cuando
+        necesiten acción.
+      attention_empty_recent: Esto es lo que llegó desde su última visita.
+      attention_empty_title: No hay nada que requiera su atención.
+      attention_heading: Requiere su atención
+      high_priority: Alta prioridad
+      no_subject: "(sin asunto)"
+      recent_activity_heading: Actividad reciente
+      recent_syncs_heading: Sincronizaciones recientes
+      scan_documents:
+        one: 1 documento
+        other: "%{count} documentos"
+      scan_emails:
+        one: 1 correo
+        other: "%{count} correos"
+      scan_errors:
+        one: 1 error
+        other: "%{count} errores"
+      setup_description: Complete estos pasos para empezar a procesar documentos y
+        correos.
+      setup_title: Complete la configuración de su espacio de trabajo.
+      stuck_documents:
+        one: 1 documento bloqueado en el procesamiento.
+        other: "%{count} documentos bloqueados en el procesamiento."
+      time_ago: hace %{time}
+      title: Inicio
+      unnamed_document: Documento sin nombre
+      view: Ver
+  email_message_tags:
+    create:
+      tagged_as: Etiquetado como '%{name}'
+    destroy:
+      tag_removed: Etiqueta '%{name}' eliminada
+  email_message_zoho_labels:
+    create:
+      label_applied: Etiqueta '%{name}' aplicada
+    destroy:
+      label_removed: Etiqueta '%{name}' eliminada
+  workflow_executions:
+    index:
+      back_to_workflow: Volver al flujo de trabajo
+      empty_description: Este flujo de trabajo aparecerá aquí cada vez que se active
+        su disparador.
+      empty_title: Sin ejecuciones aún
+      steps:
+        one: 1 paso
+        other: "%{count} pasos"
+      subtitle: Cada vez que se activó este flujo de trabajo y lo que ocurrió
+      title: "%{name} — Ejecuciones"
+      triggered: Activado
+    show:
+      all_runs: Todas las ejecuciones
+      result: Resultado
+      step_fallback: Paso
+      steps_heading: Pasos
+      title: Detalle de ejecución
+      took: tardó %{duration}
+      trigger_data: Datos del disparador
+  workflows:
+    notion_fields:
+      error: "No se pudieron cargar los campos: %{message}"
+      prompt: Ingrese un ID de base de datos y cargue sus campos.
+      no_fields: Esta base de datos no tiene campos que Campbooks pueda rellenar.
+    edit:
+      back_to_workflows: Volver a flujos de trabajo
+      description_label: Descripción (opcional)
+      description_placeholder: "¿Qué hace este flujo de trabajo?"
+      name_label: Nombre del flujo de trabajo
+      name_placeholder: Mi automatización
+      new_workflow: Nuevo flujo de trabajo
+      no_runs_yet: Sin ejecuciones aún. Este flujo de trabajo se ejecuta automáticamente
+        cuando se activa su disparador.
+      recent_runs_heading: Ejecuciones recientes
+      regenerate_url: Regenerar URL
+      regenerate_url_confirm: "¿Generar una nueva URL? La actual dejará de funcionar."
+      subtitle: Configure su automatización
+      template_variables_heading: Variables de plantilla
+      then_label: Entonces
+      time_ago: hace %{time}
+      trigger_email_received: Correo recibido
+      trigger_event: Evento de dominio
+      trigger_webhook: Webhook entrante
+      view_all: Ver todas
+      webhook_url_description: Apunte un servicio externo aquí para activar este flujo
+        de trabajo.
+      webhook_url_heading: URL del webhook
+      when_label: Cuando
+    index:
+      create_workflow: Crear flujo de trabajo
+      delete_confirm: "¿Eliminar este flujo de trabajo?"
+      empty_description: Cree su primer flujo de trabajo para automatizar el procesamiento
+        de correos.
+      empty_title: Sin flujos de trabajo aún
+      enable: Activar
+      new_workflow: Nuevo flujo de trabajo
+      pause: Pausar
+      status_active: Activo
+      status_paused: En pausa
+      steps:
+        one: 1 paso
+        other: "%{count} pasos"
+      subtitle: Automatice el procesamiento de correos con disparadores y acciones
+      trigger_meta: Disparador %{trigger} · %{steps}
+  zoho_drive_accounts:
+    new:
+      connect_button: Conectar cuenta de Zoho Drive
+      description: Conecte su cuenta de Zoho Drive para enviar documentos desde Campbooks.
+        Será redirigido a Zoho para autorizar el acceso.
+      permissions_note: Esto solicitará acceso para crear y leer archivos en su Zoho
+        WorkDrive.
+      title: Conectar Zoho Drive

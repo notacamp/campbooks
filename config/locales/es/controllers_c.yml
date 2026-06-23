@@ -1,0 +1,165 @@
+---
+es:
+  admin:
+    base:
+      no_permission: No tiene permiso para acceder a eso.
+    invitations:
+      approve:
+        success: Invitación a %{email} aprobada y enviada.
+      reject:
+        success: Invitación a %{email} rechazada.
+    signup_requests:
+      approve:
+        success: "%{email} aprobado."
+      reject:
+        success: "%{email} rechazado."
+    users:
+      update:
+        invalid_role: Rol no válido.
+        own_role: No puede cambiar su propio rol.
+        success: "%{name} ahora es %{role}."
+  ai_setup_chats:
+    apply:
+      added_document_types:
+        one: Añadido %{count} tipo de documento.
+        other: Añadidos %{count} tipos de documento.
+      added_tags:
+        one: Añadida %{count} etiqueta.
+        other: Añadidas %{count} etiquetas.
+      nothing_added: Nada añadido — su configuración no ha cambiado.
+    message:
+      thinking: Pensando…
+  compose_attachments:
+    create:
+      failed: No se pudo subir ese archivo. Inténtalo de nuevo.
+      invalid: Esto no parece un archivo.
+      too_large: Ese archivo es demasiado grande (máx. 25 MB).
+  compose_images:
+    create:
+      failed: No se pudo subir esa imagen. Inténtalo de nuevo.
+      invalid: Esto no parece una imagen.
+      too_large: Esa imagen es demasiado grande (máx. 10 MB).
+      unsupported_type: Usa una imagen PNG, JPG, GIF o WebP.
+  invitations:
+    accept:
+      already_member: Ya es miembro.
+      create_account: Cree una cuenta para aceptar esta invitación.
+      joined: "¡Se ha unido a %{workspace}!"
+    check_validity:
+      already_accepted: Esta invitación ya ha sido aceptada.
+      cancelled: Esta invitación ha sido cancelada.
+      expired: Esta invitación ha caducado.
+      pending_approval: Esta invitación está pendiente de aprobación por el administrador.
+    set_invitation:
+      not_found: Invitación no encontrada.
+    show:
+      already_member: Ya es miembro de este espacio de trabajo.
+      create_account: Cree una cuenta para aceptar esta invitación.
+  oauth:
+    calendar:
+      auth_failed: Error al conectar el calendario. Inténtelo de nuevo.
+      discovery_failed: No se pudo recuperar su cuenta de calendario.
+      invalid_request: Solicitud OAuth no válida.
+      linked: Calendario %{email} conectado correctamente.
+    google:
+      callback:
+        error: 'Error al conectar Google Drive: %{message}'
+        success: Google Drive conectado como %{email}.
+    google_mail:
+      callback:
+        auth_failed: Error de autenticación. Inténtelo de nuevo.
+        discovery_failed: No se pudo detectar su cuenta de Google.
+        invalid_request: Solicitud OAuth no válida.
+        linked: "%{email} conectado correctamente."
+        sign_in_failed: No se pudo recuperar su cuenta de Google.
+    microsoft:
+      callback:
+        auth_failed: Error de autenticación. Inténtelo de nuevo.
+        discovery_failed: No se pudo recuperar la información de su cuenta de Microsoft.
+        invalid_request: Solicitud OAuth no válida.
+        linked: "%{email} (Microsoft 365) conectado correctamente."
+        sign_in_failed: No se pudo recuperar su cuenta de Microsoft.
+    notion:
+      callback:
+        error: 'Error al conectar Notion: %{message}'
+        invalid_state: La solicitud de conexión a Notion ha caducado o no es válida.
+          Por favor, inténtelo de nuevo.
+        success: Conectado a %{workspace}.
+      connect:
+        not_configured: El inicio de sesión en Notion no está configurado en esta
+          instancia. Conéctese con un token de integración.
+    zoho:
+      callback:
+        account_discovery_failed: No se pudo detectar su cuenta de Zoho.
+        auth_failed: Error de autenticación. Inténtelo de nuevo.
+        drive_discovery_failed: No se pudo detectar su cuenta de Zoho.
+        drive_linked: "%{email} conectado correctamente."
+        invalid_request: Solicitud OAuth no válida.
+        linked: "%{email} conectado correctamente."
+        sign_in_failed: No se pudo recuperar su cuenta de Zoho.
+  onboarding:
+    suggest_document_types:
+      suggestion_error: No se pudieron generar sugerencias. Asegúrese de que hay un
+        proveedor de IA configurado o inténtelo de nuevo.
+    suggest_tags:
+      suggestion_error: No se pudieron generar sugerencias. Asegúrese de que hay un
+        proveedor de IA configurado o inténtelo de nuevo.
+    update:
+      setup_complete: "¡Configuración completada! Bienvenido a Campbooks."
+  passwords:
+    create:
+      sent: Instrucciones de restablecimiento de contraseña enviadas (si existe un
+        usuario con esa dirección de correo).
+      try_later: Inténtelo de nuevo más tarde.
+    set_user_by_token:
+      invalid_link: El enlace de restablecimiento de contraseña no es válido o ha
+        caducado.
+    update:
+      mismatch: Las contraseñas no coinciden.
+      reset: La contraseña ha sido restablecida.
+  registrations:
+    approved:
+      invalid_link: El enlace de aprobación no es válido o ya ha sido utilizado.
+    check_code:
+      expired: El código ha caducado. Solicite uno nuevo.
+      incorrect: Código incorrecto. Le quedan %{remaining} intentos.
+      too_many_attempts: Demasiados intentos. Empiece de nuevo.
+    complete:
+      account_exists: Esa cuenta ya existe. Inicie sesión con su contraseña.
+      beta_code_unavailable: Ese código de invitación ya no está disponible — empiece
+        de nuevo con uno nuevo.
+      password_too_short: La contraseña debe tener al menos 8 caracteres.
+      welcome_workspace: "¡Bienvenido a %{workspace}!"
+    create:
+      code_sent: Hemos enviado un código de verificación a %{email}.
+      invalid_beta_code: Ese código de invitación no es válido o ya ha sido utilizado.
+      invalid_email: Introduzca una dirección de correo válida.
+      invite_only: Campbooks es solo por invitación por ahora — necesita una invitación
+        para registrarse.
+      request_submitted: Su solicitud ha sido enviada para revisión. Recibirá un correo
+        cuando sea aprobada.
+      terms_required: Acepte los Términos del Servicio y la Política de Privacidad
+        para continuar.
+    ensure_step_order:
+      verify_email_first: Verifique su correo primero.
+    resend_code:
+      sent: Se ha enviado un nuevo código a %{email}.
+  sessions:
+    create:
+      invalid: Pruebe con otra dirección de correo o contraseña.
+      try_later: Inténtelo de nuevo más tarde.
+    native:
+      expired: Ese enlace de inicio de sesión ha caducado. Inténtelo de nuevo.
+  setup:
+    update:
+      ai_saved: Configuración de IA guardada.
+      document_types_added:
+        one: Tipo de documento añadido.
+        other: "%{count} tipos de documento añadidos."
+      pick_at_least_one_tag: Seleccione al menos una etiqueta o añada la suya a continuación.
+      pick_at_least_one_type: Seleccione al menos un tipo o añada el suyo a continuación.
+      tags_added:
+        one: Etiqueta añadida.
+        other: "%{count} etiquetas añadidas."
+      workspace_error: Algo ha fallado. Inténtelo de nuevo.
+      workspace_saved: Perfil del espacio de trabajo actualizado.

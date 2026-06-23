@@ -1,0 +1,166 @@
+---
+pt:
+  admin:
+    base:
+      no_permission: Não tem permissão para aceder a isso.
+    invitations:
+      approve:
+        success: Convite para %{email} aprovado e enviado.
+      reject:
+        success: Convite para %{email} rejeitado.
+    signup_requests:
+      approve:
+        success: "%{email} aprovado."
+      reject:
+        success: "%{email} rejeitado."
+    users:
+      update:
+        invalid_role: Função inválida.
+        own_role: Não pode alterar a sua própria função.
+        success: "%{name} é agora %{role}."
+  ai_setup_chats:
+    apply:
+      added_document_types:
+        one: Adicionado %{count} tipo de documento.
+        other: Adicionados %{count} tipos de documento.
+      added_tags:
+        one: Adicionada %{count} etiqueta.
+        other: Adicionadas %{count} etiquetas.
+      nothing_added: Nada adicionado — a sua configuração não foi alterada.
+    message:
+      thinking: A pensar…
+  compose_attachments:
+    create:
+      failed: Não foi possível carregar esse ficheiro. Tente novamente.
+      invalid: Isto não parece ser um ficheiro.
+      too_large: Esse ficheiro é demasiado grande (máx. 25 MB).
+  compose_images:
+    create:
+      failed: Não foi possível carregar essa imagem. Tente novamente.
+      invalid: Isto não parece ser uma imagem.
+      too_large: Essa imagem é demasiado grande (máx. 10 MB).
+      unsupported_type: Use uma imagem PNG, JPG, GIF ou WebP.
+  invitations:
+    accept:
+      already_member: Já é membro.
+      create_account: Crie uma conta para aceitar este convite.
+      joined: Entrou em %{workspace}!
+    check_validity:
+      already_accepted: Este convite já foi aceite.
+      cancelled: Este convite foi cancelado.
+      expired: Este convite expirou.
+      pending_approval: Este convite está pendente de aprovação pelo administrador.
+    set_invitation:
+      not_found: Convite não encontrado.
+    show:
+      already_member: Já é membro deste espaço de trabalho.
+      create_account: Crie uma conta para aceitar este convite.
+  oauth:
+    calendar:
+      auth_failed: Falha na ligação ao calendário. Tente novamente.
+      discovery_failed: Não foi possível obter a sua conta de calendário.
+      invalid_request: Pedido OAuth inválido.
+      linked: Calendário %{email} ligado com sucesso.
+    google:
+      callback:
+        error: 'Falha na ligação ao Google Drive: %{message}'
+        success: Google Drive ligado como %{email}.
+    google_mail:
+      callback:
+        auth_failed: Autenticação falhou. Tente novamente.
+        discovery_failed: Não foi possível descobrir a sua conta Google.
+        invalid_request: Pedido OAuth inválido.
+        linked: "%{email} ligado com sucesso."
+        sign_in_failed: Não foi possível obter a sua conta Google.
+    microsoft:
+      callback:
+        auth_failed: Autenticação falhou. Tente novamente.
+        discovery_failed: Não foi possível obter as informações da sua conta Microsoft.
+        invalid_request: Pedido OAuth inválido.
+        linked: "%{email} (Microsoft 365) ligado com sucesso."
+        sign_in_failed: Não foi possível obter a sua conta Microsoft.
+    notion:
+      callback:
+        error: 'Falha na ligação ao Notion: %{message}'
+        invalid_state: O pedido de ligação ao Notion expirou ou é inválido. Tente
+          novamente.
+        success: Ligado a %{workspace}.
+      connect:
+        not_configured: O início de sessão no Notion não está configurado nesta instância.
+          Ligue com um token de integração.
+    zoho:
+      callback:
+        account_discovery_failed: Não foi possível descobrir a sua conta Zoho.
+        auth_failed: Autenticação falhou. Tente novamente.
+        drive_discovery_failed: Não foi possível descobrir a sua conta Zoho.
+        drive_linked: "%{email} ligado com sucesso."
+        invalid_request: Pedido OAuth inválido.
+        linked: "%{email} ligado com sucesso."
+        sign_in_failed: Não foi possível obter a sua conta Zoho.
+  onboarding:
+    suggest_document_types:
+      suggestion_error: Não foi possível gerar sugestões. Certifique-se de que um
+        fornecedor de IA está configurado ou tente novamente.
+    suggest_tags:
+      suggestion_error: Não foi possível gerar sugestões. Certifique-se de que um
+        fornecedor de IA está configurado ou tente novamente.
+    update:
+      setup_complete: Configuração concluída! Bem-vindo ao Campbooks.
+  passwords:
+    create:
+      sent: Instruções de redefinição de palavra-passe enviadas (caso exista um utilizador
+        com esse endereço de e-mail).
+      try_later: Tente novamente mais tarde.
+    set_user_by_token:
+      invalid_link: O link de redefinição de palavra-passe é inválido ou expirou.
+    update:
+      mismatch: As palavras-passe não coincidem.
+      reset: Palavra-passe redefinida.
+  registrations:
+    approved:
+      invalid_link: O link de aprovação é inválido ou já foi utilizado.
+    check_code:
+      expired: Código expirado. Solicite um novo.
+      incorrect: Código incorreto. %{remaining} tentativas restantes.
+      too_many_attempts: Demasiadas tentativas. Comece novamente.
+    complete:
+      account_exists: Essa conta já existe. Inicie sessão com a sua palavra-passe.
+      beta_code_unavailable: Esse código de convite já não está disponível — recomece
+        com um novo.
+      password_too_short: A palavra-passe deve ter pelo menos 8 caracteres.
+      welcome_workspace: Bem-vindo a %{workspace}!
+    create:
+      code_sent: Enviámos um código de verificação para %{email}.
+      invalid_beta_code: Esse código de convite não é válido ou já foi utilizado.
+      invalid_email: Introduza um endereço de e-mail válido.
+      invite_only: O Campbooks é apenas por convite neste momento — precisa de um
+        convite para se registar.
+      request_submitted: O seu pedido foi submetido para revisão. Receberá um e-mail
+        quando for aprovado.
+      terms_required: Aceite os Termos de Serviço e a Política de Privacidade para
+        continuar.
+    ensure_step_order:
+      verify_email_first: Por favor, verifique primeiro o seu e-mail.
+    resend_code:
+      sent: Um novo código foi enviado para %{email}.
+  sessions:
+    create:
+      invalid: Tente outro endereço de e-mail ou palavra-passe.
+      try_later: Tente novamente mais tarde.
+    native:
+      expired: Essa ligação de início de sessão expirou. Tente novamente.
+  setup:
+    update:
+      ai_saved: Configuração de IA guardada.
+      document_types_added:
+        one: Tipo de documento adicionado.
+        other: "%{count} tipos de documento adicionados."
+      pick_at_least_one_tag: Selecione pelo menos uma etiqueta, ou adicione a sua
+        própria abaixo.
+      pick_at_least_one_type: Selecione pelo menos um tipo, ou adicione o seu próprio
+        abaixo.
+      tags_added:
+        one: Etiqueta adicionada.
+        other: "%{count} etiquetas adicionadas."
+      workspace_error: Ocorreu um erro. Tente novamente.
+      workspace_saved: Perfil do espaço de trabalho atualizado.

@@ -1,0 +1,68 @@
+---
+pt:
+  ai_configurations:
+    update:
+      assignment_updated: Atribuição de %{purpose} atualizada.
+      failed_to_save: 'Falha ao guardar %{purpose}: %{errors}'
+      is_unassigned: "%{purpose} não está atribuído."
+      reset_to_unassigned: "%{purpose} reposto para não atribuído."
+  inbox_settings:
+    accounts:
+      scan_now:
+        started: Verificação iniciada. As novas mensagens aparecerão em breve.
+    tags:
+      destroy:
+        cannot_delete: A etiqueta security_flagged não pode ser eliminada.
+  settings:
+    ai_adapters:
+      create:
+        created: Adaptador de IA "%{name}" criado.
+        failed: 'Falha ao criar o adaptador: %{errors}'
+      destroy:
+        deleted: Adaptador de IA "%{name}" eliminado.
+        in_use: Não é possível eliminar "%{name}" — ainda está atribuído a serviços.
+      managed_not_editable: O Campbooks AI é gerido por nós — mude de modo nas Definições
+        em vez de o editar.
+      update:
+        failed: 'Falha ao atualizar o adaptador: %{errors}'
+        updated: Adaptador de IA "%{name}" atualizado.
+        updated_env_key: Adaptador de IA "%{name}" atualizado (a utilizar chave de
+          ambiente se disponível).
+    general:
+      update:
+        saved: Definições atualizadas.
+    integrations:
+      connections:
+        create:
+          created: Ligação "%{name}" criada.
+        destroy:
+          deleted: Ligação "%{name}" eliminada.
+        update:
+          updated: Ligação "%{name}" atualizada.
+      google_drive:
+        destroy:
+          disconnected: Google Drive desligado.
+      google_drive_configs:
+        update:
+          saved: Configuração do Google Drive atualizada.
+      notion:
+        destroy:
+          disconnected: Integração com Notion desligada.
+        update:
+          saved: Integração com Notion atualizada.
+          workspace_warning: 'Ligado, mas não foi possível obter informações do espaço
+            de trabalho: %{error}'
+      zoho_drive:
+        destroy:
+          mapping_not_found: Mapeamento não encontrado.
+          mapping_removed: Mapeamento removido.
+        update:
+          mapping_saved: Mapeamento de pasta guardado.
+    invitations:
+      create:
+        pending_review: Convite para %{email} submetido para revisão pelo administrador.
+        sent: Convite enviado para %{email}.
+      destroy:
+        cancelled: Convite cancelado.
+      resend:
+        resent: Convite reenviado para %{email}.

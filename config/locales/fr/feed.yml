@@ -1,0 +1,129 @@
+---
+fr:
+  components:
+    feed:
+      calendar_event_card:
+        at_time: À %{time}
+        dismiss: Ignorer
+        in_minutes:
+          one: Dans %{count} min
+          other: Dans %{count} min
+        join: Rejoindre
+        now: Commence maintenant
+        untitled: "(Sans titre)"
+        view: Voir
+      email_action_card:
+        archive: Archiver
+        archive_hint: Archive toute la conversation. Vous pouvez annuler.
+        attachment: Pièce jointe
+        file_as: 'Classer : %{tag}'
+        messages:
+          one: "%{count} message"
+          other: "%{count} messages"
+        open: Ouvrir
+      follow_up_card:
+        aged:
+          one: Vous avez répondu il y a %{count} jour · toujours sans réponse
+          other: Vous avez répondu il y a %{count} jours · toujours sans réponse
+        dismiss: Ignorer
+        draft_follow_up: Rédiger un suivi
+        waiting: En attente de leur réponse
+      highlight_card:
+        reason:
+          attachment: Pièce jointe
+          busy_thread: Conversation active
+          high_priority: Priorité haute
+          important: Important
+          starred: Expéditeur favori
+      reminder_card:
+        confirm: Ajouter au calendrier
+        dismiss: Ignorer
+        in_days:
+          one: Dans %{count} jour
+          other: Dans %{count} jours
+        overdue: En retard
+        today: Aujourd'hui
+        tomorrow: Demain
+      reply_reminder_card:
+        aged:
+          one: "%{count} jour, sans réponse"
+          other: "%{count} jours, sans réponse"
+        dismiss: Ignorer
+        reply: Répondre
+        snoozed_back: De retour après la pause
+      shared:
+        kbd_navigate: Naviguer
+        many_participants: "%{names} et %{count} autres"
+        two_participants: "%{first} et %{second}"
+        no_subject: "(sans objet)"
+        priority: Priorité
+        scout_read: je viens de le lire
+        unknown_sender: Expéditeur inconnu
+        working: En cours…
+        yesterday: Hier
+      starred_email_card:
+        archive: Archiver
+        archive_hint: Archive toute la conversation. Vous pouvez annuler.
+        open: Ouvrir
+        starred: Mis en avant
+        unstar: Retirer la mise en avant
+      tag_suggestion_card:
+        file_it: Classer
+        not_now: Pas maintenant
+        prefix: Classer
+        under: sous
+    time_of_day_greeting:
+      greeting:
+        afternoon: Bon après-midi, %{name}.
+        evening: Bonsoir, %{name}.
+        morning: Bonjour, %{name}.
+        night: Tard dans la nuit, %{name}.
+  feed:
+    items:
+      dismissed: Ignoré.
+      follow_up_dismissed: Suivi ignoré.
+      gone: Ce n'est plus disponible.
+      reminder_confirmed: "%{title} ajouté à votre calendrier."
+      reminder_confirmed_no_calendar: Rappel confirmé. Connectez un calendrier pour
+        le synchroniser automatiquement.
+      reminder_dismissed: Rappel ignoré.
+      restored: Rétabli.
+      unsupported: Cette action n'est pas prise en charge ici.
+  home:
+    index:
+      ask_scout: Demandez ce que vous voulez à Scout…
+      connect_body: Scout lit et trie vos e-mails avant votre arrivée. Connectez une
+        boîte et votre fil prend vie.
+      connect_cta: Connecter une boîte
+      connect_title: Connectez votre boîte de réception pour commencer
+      disconnected_body: Scout ne peut pas accéder à votre boîte pour le moment —
+        reconnectez-la pour que votre fil reprenne vie.
+      disconnected_cta: Reconnecter la boîte
+      disconnected_title: Reconnectez votre boîte de réception
+      documents_ring: Documents
+      empty_body: Scout a tout lu et rien ne requiert votre attention pour l'instant.
+        Touchez une pile ci-dessus pour parcourir, ou revenez plus tard.
+      empty_title: Tout est à jour ✨
+      feed_end: C'est tout. Scout veille sur la boîte de réception pour vous.
+      needs_attention: À traiter
+      rewind_count:
+        one: "%{count} temps fort"
+        other: "%{count} temps forts"
+      rewind_this_month: Ce mois-ci
+      rings_coach_body: Chaque anneau regroupe des e-mails liés. Touchez-en un pour
+        les traiter en un passage rapide et glissable.
+      rings_coach_cta: Compris
+      rings_coach_title: Skim de votre boîte de réception
+      scout_coach_body: Votre assistant IA lit et trie votre boîte, puis met en avant
+        ce qui vous attend. Demandez-lui de trouver ou de résumer ce que vous voulez.
+      scout_coach_cta: Compris
+      scout_coach_title: Découvrez Scout
+      subtitle:
+        clear: Tout est à jour — Scout veille pour que ça dure.
+        lots: "%{n} éléments requièrent votre attention. Scout les a empilés pour
+          parcourir sans corvée."
+        single: Un seul élément requiert votre attention — Scout a classé le reste.
+        some: "%{n} éléments requièrent votre attention — Scout les a empilés. Un
+          coup d'œil et c'est plié."
+      take_tour: Faire la visite
+      your_feed: Votre fil

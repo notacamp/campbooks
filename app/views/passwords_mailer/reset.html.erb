@@ -1,0 +1,11 @@
+<p style="<%= email_text_greeting %>"><%= t(".greeting") %></p>
+
+<p style="<%= email_text_body %>"><%= t(".body") %></p>
+
+<%= email_button(edit_password_url(@user.password_reset_token), t(".reset_button")) %>
+
+<p style="<%= email_text_meta %>">
+  <%= t(".expires", duration: distance_of_time_in_words(0, @user.password_reset_token_expires_in)) %>
+</p>
+
+<p style="<%= email_text_muted %>"><%= t(".ignore") %></p>

@@ -1,0 +1,199 @@
+# Plan / entitlement catalog
+# ---------------------------
+# The source of truth for what each subscription tier grants. Loaded + frozen
+# once at boot by Entitlements::Catalog (config/initializers/entitlements.rb).
+#
+# Each workspace stores a `plan` name (a key under `plans:` below) plus a small
+# `entitlement_overrides` jsonb for per-workspace deviations. The effective
+# entitlements a workspace sees are: catalog[plan] deep-merged with overrides
+# (Entitlements::Resolver). Self-hosted installs bypass this entirely and get an
+# Entitlements::NullResolver (everything unlimited) — the `unlimited` plan below
+# exists so the catalog is complete and can be assigned to a cloud workspace as a
+# manual "give them everything" escape hatch.
+#
+# Feature entry shape:
+#   type:    limit | flag | config
+#   allowed: billing gate — false means the tier does not include the feature at
+#            all (the seam billing flips). Changing it is a plan change.
+#   enabled: admin on/off toggle. A feature is "active" only when allowed && enabled.
+#   limit:   (type: limit) integer cap, or null for unlimited.
+#   config:  (type: config) arbitrary knobs (e.g. ai model tier).
+#
+# A feature is enforced only when active AND its usage is countable. Deferred
+# volume limits (emails_synced, workflow_executions, notifications) ship with
+# enabled: false so the schema/resolver are complete but nothing is enforced
+# until the metering layer lands; flip enabled: true + register a counter then.
+#
+# These numbers are starting defaults — edit freely; a bad edit fails boot (CI).
+
+version: 1
+
+plans:
+  # ── Free ──────────────────────────────────────────────────────────────────
+  free:
+    email_accounts:
+      type: limit
+      allowed: true
+      enabled: true
+      limit: 1
+    workflows:
+      type: limit
+      allowed: false        # workflows are a paid feature
+      enabled: true
+      limit: 0
+    managed_ai:
+      type: flag
+      allowed: true         # keep out-of-box "Campbooks AI"; billing via the deferred quota
+      enabled: true
+    scout:
+      type: flag
+      allowed: true
+      enabled: true
+    ai_model_access:
+      type: config
+      allowed: true
+      enabled: true
+      config:
+        tier: basic
+    # ── deferred volume limits (enforced once metering exists) ──
+    emails_synced:
+      type: limit
+      allowed: true
+      enabled: false
+      limit: 10000
+    workflow_executions:
+      type: limit
+      allowed: true
+      enabled: false
+      limit: 0
+    notifications:
+      type: limit
+      allowed: true
+      enabled: false
+      limit: 500
+
+  # ── Pro ───────────────────────────────────────────────────────────────────
+  pro:
+    email_accounts:
+      type: limit
+      allowed: true
+      enabled: true
+      limit: 5
+    workflows:
+      type: limit
+      allowed: true
+      enabled: true
+      limit: 10
+    managed_ai:
+      type: flag
+      allowed: true
+      enabled: true
+    scout:
+      type: flag
+      allowed: true
+      enabled: true
+    ai_model_access:
+      type: config
+      allowed: true
+      enabled: true
+      config:
+        tier: standard
+    emails_synced:
+      type: limit
+      allowed: true
+      enabled: false
+      limit: 50000
+    workflow_executions:
+      type: limit
+      allowed: true
+      enabled: false
+      limit: 1000
+    notifications:
+      type: limit
+      allowed: true
+      enabled: false
+      limit: 5000
+
+  # ── Business ──────────────────────────────────────────────────────────────
+  business:
+    email_accounts:
+      type: limit
+      allowed: true
+      enabled: true
+      limit: null           # unlimited
+    workflows:
+      type: limit
+      allowed: true
+      enabled: true
+      limit: null
+    managed_ai:
+      type: flag
+      allowed: true
+      enabled: true
+    scout:
+      type: flag
+      allowed: true
+      enabled: true
+    ai_model_access:
+      type: config
+      allowed: true
+      enabled: true
+      config:
+        tier: premium
+    emails_synced:
+      type: limit
+      allowed: true
+      enabled: false
+      limit: null
+    workflow_executions:
+      type: limit
+      allowed: true
+      enabled: false
+      limit: null
+    notifications:
+      type: limit
+      allowed: true
+      enabled: false
+      limit: null
+
+  # ── Unlimited (self-hosted canonical / cloud escape hatch) ──────────────────
+  unlimited:
+    email_accounts:
+      type: limit
+      allowed: true
+      enabled: true
+      limit: null
+    workflows:
+      type: limit
+      allowed: true
+      enabled: true
+      limit: null
+    managed_ai:
+      type: flag
+      allowed: true
+      enabled: true
+    scout:
+      type: flag
+      allowed: true
+      enabled: true
+    ai_model_access:
+      type: config
+      allowed: true
+      enabled: true
+      config:
+        tier: premium
+    emails_synced:
+      type: limit
+      allowed: true
+      enabled: false
+      limit: null
+    workflow_executions:
+      type: limit
+      allowed: true
+      enabled: false
+      limit: null
+    notifications:
+      type: limit
+      allowed: true
+      enabled: false
+      limit: null

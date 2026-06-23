@@ -1,0 +1,21 @@
+---
+pt:
+  ai_setup_chats:
+    panel:
+      empty_body: Responda a algumas perguntas rápidas e o Scout sugerirá %{kind_label}
+        adaptados ao seu negócio — aceite, edite ou ignore qualquer um deles.
+      empty_heading: O Scout pode configurar isto por si
+      heading: Deixe o Scout configurar os seus %{kind_label}
+      input_placeholder: Escreva a sua resposta…
+      kind_document_types: tipos de documento
+      kind_tags: etiquetas
+      start: Começar
+      subtitle: Algumas perguntas rápidas e depois sugestões que pode editar.
+      thinking: A pensar…
+    typing:
+      thinking: A pensar…
+    unavailable_frame:
+      body: Ligue um fornecedor de IA de texto e o Scout poderá sugerir tipos de documento
+        e etiquetas para si. Demora apenas um minuto.
+      heading: Configure primeiro o seu fornecedor de IA
+      setup_link: Configurar IA →

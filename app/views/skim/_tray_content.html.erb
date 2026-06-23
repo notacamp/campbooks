@@ -1,0 +1,11 @@
+<%# Inner, replaceable tray content. Lives inside the turbo-permanent #skim_tray
+    frame and is what the real-time broadcaster (Emails::SkimTrayBroadcaster)
+    replaces, so the stable frame is preserved while the rings refresh live.
+    doc_count (home only) folds the document-review queue into the "Skim all"
+    badge + chain; it defaults to 0 (inbox + the live broadcaster: mail-only). %>
+<% doc_count = local_assigns.fetch(:doc_count, 0).to_i %>
+<div id="skim_tray_content">
+  <% if rings.any? || doc_count.positive? %>
+    <%= render Campbooks::SkimTray.new(rings: rings, doc_count: doc_count) %>
+  <% end %>
+</div>

@@ -1,0 +1,24 @@
+<%#
+  The "getting started" surface. Kept named/ID'd `setup_banner` so the setup
+  modals' completion stream (turbo_stream.replace "setup_banner") keeps
+  refreshing it — but its contents are now the Campbooks::SetupHub checklist.
+  locals: collapsed (Boolean, default false)
+%>
+<%
+  # Visibility (incl. the "every remaining task dismissed" case) lives in
+  # SetupHelper#setup_checklist_visible? so the home page gates on the same rule.
+  return unless setup_checklist_visible?
+
+  status = setup_status
+  org = Current.workspace || current_user&.workspace
+  dismissed = Array(org&.setting("dismissed_setup_keys"))
+  incomplete = status.incomplete_items.map { |item| item[:key] }
+%>
+<div id="setup_banner" class="mb-6">
+  <%= render(Campbooks::SetupHub.new(
+        items: SetupStatus::ITEMS,
+        incomplete_keys: incomplete,
+        dismissed_keys: dismissed,
+        return_to: request.path,
+        collapsed: local_assigns.fetch(:collapsed, false))) %>
+</div>

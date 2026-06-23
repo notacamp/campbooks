@@ -1,0 +1,90 @@
+{
+  "link.title.Product": {
+    "message": "Produit",
+    "description": "The title of the footer links column with title=Product in the footer"
+  },
+  "link.title.Project": {
+    "message": "Projet",
+    "description": "The title of the footer links column with title=Project in the footer"
+  },
+  "link.title.Docs": {
+    "message": "Documentation",
+    "description": "The title of the footer links column with title=Docs in the footer"
+  },
+  "link.title.App": {
+    "message": "Application",
+    "description": "The title of the footer links column with title=App in the footer"
+  },
+  "link.title.Legal": {
+    "message": "Mentions légales",
+    "description": "The title of the footer links column with title=Legal in the footer"
+  },
+  "link.item.label.Documentation": {
+    "message": "Documentation",
+    "description": "The label of footer link with label=Documentation linking to /docs/getting-started/overview"
+  },
+  "link.item.label.Pricing": {
+    "message": "Tarifs",
+    "description": "The label of footer link with label=Pricing linking to /pricing"
+  },
+  "link.item.label.Blog": {
+    "message": "Blog",
+    "description": "The label of footer link with label=Blog linking to /blog"
+  },
+  "link.item.label.About": {
+    "message": "À propos",
+    "description": "The label of footer link with label=About linking to /about"
+  },
+  "link.item.label.GitHub": {
+    "message": "GitHub",
+    "description": "The label of footer link with label=GitHub linking to https://github.com/notacamp/campbooks"
+  },
+  "link.item.label.Self-hosting": {
+    "message": "Auto-hébergement",
+    "description": "The label of footer link with label=Self-hosting linking to /self-hosting"
+  },
+  "link.item.label.Installation": {
+    "message": "Installation",
+    "description": "The label of footer link with label=Installation linking to /docs/getting-started/installation"
+  },
+  "link.item.label.Getting started": {
+    "message": "Démarrage rapide",
+    "description": "The label of footer link with label=Getting started linking to /docs/getting-started/overview"
+  },
+  "link.item.label.Deployment": {
+    "message": "Déploiement",
+    "description": "The label of footer link with label=Deployment linking to /docs/deployment/overview"
+  },
+  "link.item.label.Log in": {
+    "message": "Se connecter",
+    "description": "The label of footer link with label=Log in linking to https://app.campbooks.not-a-camp.com"
+  },
+  "link.item.label.Made by Not A Camp": {
+    "message": "Créé par Not A Camp",
+    "description": "The label of footer link with label=Made by Not A Camp linking to https://not-a-camp.com"
+  },
+  "link.item.label.Privacy Policy": {
+    "message": "Politique de confidentialité",
+    "description": "The label of footer link with label=Privacy Policy linking to /privacy"
+  },
+  "link.item.label.Terms of Service": {
+    "message": "Conditions d'utilisation",
+    "description": "The label of footer link with label=Terms of Service linking to /terms"
+  },
+  "copyright": {
+    "message": "Campbooks — vos documents administratifs, enfin organises. Code source disponible sous la Sustainable Use License.",
+    "description": "The footer copyright"
+  },
+  "link.title.Help": {
+    "message": "Aide",
+    "description": "The title of the footer links column with title=Help in the footer"
+  },
+  "link.item.label.Support": {
+    "message": "Assistance",
+    "description": "The label of footer link with label=Support linking to /support"
+  },
+  "link.item.label.Delete your data": {
+    "message": "Supprimer vos donnees",
+    "description": "The label of footer link with label=Delete your data linking to /data-deletion"
+  }
+}

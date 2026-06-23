@@ -1,0 +1,26 @@
+<%# Next page of the infinite feed: append the cards into the timeline, then
+    advance (or retire) the lazy sentinel. Mirrors email_messages/index. %>
+<%= turbo_stream.append "feed_timeline" do %>
+  <% @timeline_groups.each do |group| %>
+    <%= render "timeline_group", group: group %>
+  <% end %>
+<% end %>
+
+<% if @pagy&.next %>
+  <%= turbo_stream.replace "feed_pagination" do %>
+    <%= render "feed_pagination", pagy: @pagy %>
+  <% end %>
+<% elsif @show_rewind %>
+  <%# Curated spine exhausted — hand the sentinel straight to Rewind (past
+      highlights), which keeps the same scroll going back in time. No "Looking
+      back" heading: it's one continuous feed, not a separate section. %>
+  <%= turbo_stream.replace "feed_pagination" do %>
+    <%= render "rewind_pagination", cursor: nil %>
+  <% end %>
+<% else %>
+  <%= turbo_stream.remove "feed_pagination" %>
+  <%# Last page reached, no past highlights to surface — sign off. %>
+  <%= turbo_stream.append "feed_timeline" do %>
+    <%= render "feed_end" %>
+  <% end %>
+<% end %>

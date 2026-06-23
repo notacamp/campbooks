@@ -1,0 +1,8 @@
+<%= turbo_stream.prepend "inbox_settings_doc_types_rows" do %>
+  <%= render "inbox_settings/document_types/document_type", type: @type %>
+<% end %>
+<%= turbo_stream.remove "inbox_settings_doc_types_empty" %>
+<%= turbo_stream.update "inbox_settings_doc_type_form", "" %>
+<%= turbo_stream.append "action_toasts" do %>
+  <%= render "shared/action_toast", message: t(".success"), variant: :success %>
+<% end %>

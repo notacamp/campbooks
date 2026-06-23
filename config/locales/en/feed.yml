@@ -1,0 +1,128 @@
+---
+en:
+  components:
+    feed:
+      calendar_event_card:
+        at_time: At %{time}
+        dismiss: Dismiss
+        in_minutes:
+          one: In %{count} min
+          other: In %{count} min
+        join: Join
+        now: Starting now
+        untitled: "(No title)"
+        view: View
+      email_action_card:
+        archive: Archive
+        archive_hint: Archives the whole thread. You can undo it.
+        attachment: Attachment
+        file_as: 'File: %{tag}'
+        messages:
+          one: "%{count} message"
+          other: "%{count} messages"
+        open: Open
+      follow_up_card:
+        aged:
+          one: You replied %{count} day ago · no reply yet
+          other: You replied %{count} days ago · no reply yet
+        dismiss: Dismiss
+        draft_follow_up: Draft follow-up
+        waiting: Waiting on their reply
+      highlight_card:
+        reason:
+          attachment: Attachment
+          busy_thread: Active thread
+          high_priority: High priority
+          important: Important
+          starred: Starred sender
+      reminder_card:
+        confirm: Add to calendar
+        dismiss: Dismiss
+        in_days:
+          one: In %{count} day
+          other: In %{count} days
+        overdue: Overdue
+        today: Today
+        tomorrow: Tomorrow
+      reply_reminder_card:
+        aged:
+          one: "%{count} day, no reply"
+          other: "%{count} days, no reply"
+        dismiss: Dismiss
+        reply: Reply
+        snoozed_back: Back from snooze
+      shared:
+        kbd_navigate: Move
+        many_participants: "%{names} & %{count} others"
+        two_participants: "%{first} & %{second}"
+        no_subject: "(no subject)"
+        priority: Priority
+        scout_read: read it just now
+        unknown_sender: Unknown sender
+        working: Working…
+        yesterday: Yesterday
+      starred_email_card:
+        archive: Archive
+        archive_hint: Archives the whole thread. You can undo it.
+        open: Open
+        starred: Starred
+        unstar: Unstar
+      tag_suggestion_card:
+        file_it: File it
+        not_now: Not now
+        prefix: File
+        under: under
+    time_of_day_greeting:
+      greeting:
+        afternoon: Afternoon, %{name}.
+        evening: Evening, %{name}.
+        morning: Morning, %{name}.
+        night: Late night, %{name}.
+  feed:
+    items:
+      dismissed: Dismissed.
+      follow_up_dismissed: Follow-up dismissed.
+      gone: That is no longer available.
+      reminder_confirmed: "%{title} added to your calendar."
+      reminder_confirmed_no_calendar: Reminder confirmed. Connect a calendar to sync
+        it automatically.
+      reminder_dismissed: Reminder dismissed.
+      restored: Restored.
+      unsupported: That action is not supported here.
+  home:
+    index:
+      ask_scout: Ask Scout anything…
+      connect_body: Scout reads and sorts your email before you arrive. Connect an
+        inbox and your feed comes alive.
+      connect_cta: Connect an inbox
+      connect_title: Connect your inbox to begin
+      disconnected_body: Scout can't reach your inbox right now — reconnect to bring
+        your feed back to life.
+      disconnected_cta: Reconnect inbox
+      disconnected_title: Reconnect your inbox
+      documents_ring: Documents
+      empty_body: Scout has read everything and nothing needs you right now. Tap a
+        stack above to skim, or check back later.
+      empty_title: All caught up ✨
+      feed_end: That's the lot. Scout's watching the inbox so you don't have to.
+      needs_attention: Needs attention
+      rewind_count:
+        one: "%{count} highlight"
+        other: "%{count} highlights"
+      rewind_this_month: This month
+      rings_coach_body: Each ring groups related emails. Tap one to clear them in
+        a quick, swipeable pass.
+      rings_coach_cta: Got it
+      rings_coach_title: Skim through your inbox
+      scout_coach_body: Your AI sidekick reads and sorts your inbox, then surfaces
+        what needs you. Ask it to find or summarise anything.
+      scout_coach_cta: Got it
+      scout_coach_title: Meet Scout
+      subtitle:
+        clear: All clear — Scout's on watch so it stays that way.
+        lots: "%{n} things need you. Scout stacked them so you can skim, not slog."
+        single: Just one thing needs you — Scout filed the rest.
+        some: "%{n} things need you — Scout stacked them. A quick skim and you're
+          done."
+      take_tour: Take the tour
+      your_feed: Your feed
