@@ -1,0 +1,140 @@
+# Campbooks — self-hosting stack.
+#
+# Quick start:
+#   1. cp .env.example .env
+#   2. bin/generate-secrets          # fills in the required secrets
+#   3. edit .env                     # add at least one AI key + any integrations you want
+#   4. docker compose up -d --build
+#   5. open http://localhost:3000    # register the first account (signup is open)
+#
+# This runs the whole app: Postgres (with pgvector), the Rails web server, and a
+# background job worker. OpenSearch is optional (see the `search` profile below).
+#
+# For contributor/dev dependencies (host-based `bin/dev`), see docker-compose.dev.yml.
+name: campbooks
+
+# Shared environment for the web and worker containers. Values come from .env
+# (Compose loads it automatically); the `:?` entries fail fast with a helpful
+# message if a required secret is missing.
+x-campbooks-env: &campbooks-env
+  RAILS_ENV: production
+  RAILS_LOG_TO_STDOUT: "1"
+  # --- Database (points at the postgres service below) ---
+  DATABASE_HOST: postgres
+  CAMPBOOKS_DATABASE_PASSWORD: ${CAMPBOOKS_DATABASE_PASSWORD:?missing — run bin/generate-secrets, then set it in .env}
+  # --- Required secrets (run bin/generate-secrets to create these) ---
+  SECRET_KEY_BASE: ${SECRET_KEY_BASE:?missing — run bin/generate-secrets, then set it in .env}
+  ACTIVE_RECORD_PRIMARY_KEY: ${ACTIVE_RECORD_PRIMARY_KEY:?missing — run bin/generate-secrets, then set it in .env}
+  ACTIVE_RECORD_DETERMINISTIC_KEY: ${ACTIVE_RECORD_DETERMINISTIC_KEY:?missing — run bin/generate-secrets, then set it in .env}
+  ACTIVE_RECORD_KEY_DERIVATION_SALT: ${ACTIVE_RECORD_KEY_DERIVATION_SALT:?missing — run bin/generate-secrets, then set it in .env}
+  # --- Host / TLS ---
+  # APP_HOST must match how you reach the app (host-header protection + link
+  # generation). FORCE_SSL=false lets the app serve over plain HTTP; set it to
+  # true once you put a TLS-terminating reverse proxy in front (see docs).
+  APP_HOST: ${APP_HOST:-localhost}
+  FORCE_SSL: ${FORCE_SSL:-false}
+
+services:
+  # --------------------------------------------------------------- PostgreSQL
+  # pgvector is REQUIRED: a migration runs `CREATE EXTENSION vector` on first
+  # boot, so a vanilla `postgres` image would fail. This image bundles it.
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: campbooks_app
+      POSTGRES_PASSWORD: ${CAMPBOOKS_DATABASE_PASSWORD:?set CAMPBOOKS_DATABASE_PASSWORD in .env}
+      # A throwaway default DB; the app creates its own (cb_primary/cache/queue/cable).
+      POSTGRES_DB: campbooks
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campbooks_app -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    # Not published to the host by default (the app reaches it over the Compose
+    # network). Uncomment to connect a local SQL client for debugging.
+    # ports:
+    #   - "5432:5432"
+
+  # ---------------------------------------------------------------- Web (Rails)
+  # On first boot the entrypoint runs `db:prepare` (creates + migrates all four
+  # databases, enabling pgvector). It becomes healthy once /up returns 200.
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: campbooks:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      <<: *campbooks-env
+    ports:
+      - "${WEB_PORT:-3000}:80"
+    volumes:
+      # Active Storage uses local disk when no S3 is configured — persist it so
+      # uploads survive container recreation. The worker shares the same volume.
+      - storage:/rails/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:80/up || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+
+  # ------------------------------------------------------- Background job worker
+  # Reuses the web image (no second build). Runs Solid Queue out of the web
+  # process so email/AI/indexing work can't starve web requests. Waits for web
+  # so migrations have already run (the worker never migrates).
+  worker:
+    image: campbooks:latest
+    restart: unless-stopped
+    command: ["./bin/rails", "solid_queue:start"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      <<: *campbooks-env
+      JOB_CONCURRENCY: ${JOB_CONCURRENCY:-1}
+    volumes:
+      - storage:/rails/storage
+
+  # ----------------------------------------------------- OpenSearch (optional)
+  # Only powers Contact full-text autocomplete (everything else uses pgvector;
+  # Contact search falls back to SQL when this is absent). Enable it with:
+  #   set OPENSEARCH_URL=http://opensearch:9200 in .env
+  #   docker compose --profile search up -d
+  opensearch:
+    image: opensearchproject/opensearch:2.11.1
+    profiles: ["search"]
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - opensearch:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+
+volumes:
+  pgdata:
+  storage:
+  opensearch:

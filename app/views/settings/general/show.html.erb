@@ -1,0 +1,25 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+
+<div class="max-w-2xl">
+  <%= form_with model: current_user, url: settings_general_path, method: :patch, class: "bg-card rounded-xl shadow-sm border border-gray-200 p-6" do |f| %>
+    <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".workspace_profile_heading") %></h2>
+    <p class="text-sm text-gray-500 mb-4"><%= t(".workspace_profile_desc") %></p>
+    <div class="mb-4">
+      <%= f.label :workspace_context, t(".workspace_context_label"), class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= f.text_area :workspace_context, rows: 6,
+            class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-accent-500 focus:ring-accent-500 sm:text-sm",
+            placeholder: t(".workspace_context_placeholder") %>
+    </div>
+    <div class="flex items-center justify-between">
+      <%= render(Campbooks::Button.new(variant: :primary, type: :submit)) { t(".save_profile") } %>
+      <% if current_user.workspace_context.present? %>
+        <span class="text-xs text-green-600 dark:text-green-400"><%= t(".profile_configured") %></span>
+      <% end %>
+    </div>
+  <% end %>
+
+  <p class="text-sm text-gray-500 mt-4">
+    <%= t(".ai_providers_hint", link: link_to(t(".ai_providers_link_text"), settings_ai_path, class: "font-medium text-accent-600 hover:text-accent-700")) %>
+  </p>
+</div>

@@ -1,0 +1,56 @@
+<turbo-frame id="setup_modal_frame">
+  <%= form_with url: setup_path(:document_types), method: :patch do |f| %>
+
+    <%# Header %>
+    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <h2 class="text-base font-semibold text-gray-900"><%= t(".title") %></h2>
+      <button type="button" data-setup-modal-close=""
+              class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+              aria-label="<%= t('.close_dialog') %>">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <%# Body %>
+    <div class="p-6 space-y-5">
+      <%= render "shared/modals/form_error", error: local_assigns[:error] %>
+
+      <p class="text-sm text-gray-600"><%= t(".description") %></p>
+
+      <fieldset class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <legend class="sr-only"><%= t(".legend") %></legend>
+        <% SetupPresets::DOCUMENT_TYPES.each do |preset| %>
+          <label class="flex items-start gap-3 p-3 rounded-xl border border-gray-200 hover:border-gray-300 cursor-pointer transition-colors has-[:checked]:border-accent-500 has-[:checked]:bg-accent-50">
+            <%= check_box_tag "document_type[presets][]", preset[:name], false,
+                  id: "doc_preset_#{preset[:name].parameterize}",
+                  class: "mt-0.5 rounded border-gray-300 text-accent-600 focus:ring-accent-500" %>
+            <span class="min-w-0">
+              <span class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background-color: <%= preset[:color] %>"></span>
+                <span class="text-sm font-semibold text-gray-900 capitalize"><%= preset[:name] %></span>
+              </span>
+              <span class="block text-xs text-gray-500 mt-0.5"><%= preset[:description] %></span>
+            </span>
+          </label>
+        <% end %>
+      </fieldset>
+
+      <div>
+        <label for="document_type_custom" class="block text-sm font-medium text-gray-700 mb-1.5"><%= t(".add_your_own") %></label>
+        <%= text_field_tag "document_type[custom]", nil, id: "document_type_custom",
+              placeholder: t(".custom_placeholder"),
+              class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-accent-500 focus:ring-accent-500 sm:text-sm" %>
+      </div>
+
+      <%# Footer %>
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+        <button type="button" data-setup-modal-close=""
+                class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer">
+          <%= t("shared.actions.cancel") %>
+        </button>
+        <%= f.submit t(".submit"),
+              class: "px-4 py-2 bg-accent-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-accent-700 cursor-pointer border-0 transition-colors" %>
+      </div>
+    </div>
+  <% end %>
+</turbo-frame>

@@ -1,0 +1,84 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+
+<!-- Connect a calendar -->
+<%= render(Campbooks::Card.new(padding: :lg, class: "mb-6")) do %>
+  <h2 class="text-sm font-semibold text-gray-900 mb-1"><%= t(".connect_heading") %></h2>
+  <p class="text-sm text-gray-500 mb-4"><%= t(".connect_desc") %></p>
+  <div class="flex flex-wrap gap-3">
+    <% { "google" => t(".connect_google"), "zoho" => t(".connect_zoho") }.each do |provider, label| %>
+      <%= button_to email_accounts_path(provider: provider), method: :post, data: { turbo: false },
+            class: "inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-card px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer transition-colors" do %>
+        <%= raw(Campbooks::OauthButton::PROVIDER_CONFIG[provider.to_sym][:icon]) %>
+        <span><%= label %></span>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>
+
+<!-- Connected calendars -->
+<% if @calendar_accounts.any? %>
+  <div class="space-y-4">
+    <% @calendar_accounts.each do |account| %>
+      <%= render(Campbooks::Card.new(padding: :lg)) do %>
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3 mb-4">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <%= render(Campbooks::ColorDot.new(color: account.color, size: :sm)) %>
+              <span class="text-sm font-medium text-gray-900 truncate"><%= account.display_name %></span>
+              <%= render(Campbooks::Badge.new(variant: account.active? ? :success : :danger, size: :md)) { account.active? ? t(".active") : t(".inactive") } %>
+              <% if (perm = account.permission_for(Current.user)) %>
+                <%= render(Campbooks::Badge.new(variant: perm.owner? ? :accent : :neutral, size: :md)) { human_enum(CalendarAccountUser, :role, perm.role) } %>
+              <% end %>
+            </div>
+            <p class="text-xs text-gray-500 mt-0.5 truncate">
+              <%= account.email_address %> &middot; <%= human_enum(CalendarAccount, :provider, account.provider) %>
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-1 sm:flex-shrink-0">
+            <% if account.owned_by?(Current.user) %>
+              <%= link_to t(".manage_access"), sharing_calendar_account_path(account),
+                    class: "px-2 py-1 text-xs font-medium text-accent-700 hover:bg-accent-50 dark:text-accent-300 dark:hover:bg-accent-500/10 rounded transition-colors" %>
+            <% end %>
+            <%= button_to t(".reconnect"), email_accounts_path(provider: account.provider), method: :post, data: { turbo: false },
+                  class: "px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:hover:bg-white/5 rounded cursor-pointer transition-colors" %>
+            <% if account.owned_by?(Current.user) %>
+              <%= button_to t("shared.actions.disconnect"), calendar_account_path(account), method: :delete,
+                    data: { turbo_confirm: t(".disconnect_confirm", name: account.display_name) },
+                    class: "px-2 py-1 text-xs font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 rounded cursor-pointer transition-colors" %>
+            <% end %>
+          </div>
+        </div>
+
+        <% if account.calendars.any? %>
+          <div class="border-t border-border pt-3">
+            <p class="text-xs font-medium text-gray-500 mb-2"><%= t(".calendars_heading") %></p>
+            <div class="space-y-1.5">
+              <% account.calendars.order(is_primary: :desc, name: :asc).each do |cal| %>
+                <div class="flex items-center justify-between gap-2">
+                  <span class="inline-flex items-center gap-2 min-w-0">
+                    <%= render(Campbooks::ColorDot.new(color: cal.display_color, size: :xs)) %>
+                    <span class="text-[13px] text-gray-700 truncate"><%= cal.name %></span>
+                    <% if cal.is_primary %><span class="text-[11px] text-gray-400"><%= t(".primary") %></span><% end %>
+                  </span>
+                  <% if account.managed_by?(Current.user) %>
+                    <%= button_to calendar_account_calendar_path(account, cal), method: :patch,
+                          params: { calendar: { syncing: cal.syncing ? "0" : "1" } }, class: "cursor-pointer" do %>
+                      <%= render(Campbooks::Badge.new(variant: cal.syncing ? :success : :neutral, size: :sm)) { cal.syncing ? t(".synced") : t(".off") } %>
+                    <% end %>
+                  <% else %>
+                    <%= render(Campbooks::Badge.new(variant: cal.syncing ? :success : :neutral, size: :sm)) { cal.syncing ? t(".synced") : t(".off") } %>
+                  <% end %>
+                </div>
+              <% end %>
+            </div>
+          </div>
+        <% else %>
+          <p class="text-xs text-gray-400 border-t border-border pt-3"><%= t(".calendars_pending") %></p>
+        <% end %>
+      <% end %>
+    <% end %>
+  </div>
+<% else %>
+  <%= render(Campbooks::EmptyState.new(variant: :card, title: t(".empty_title"), description: t(".empty_desc"))) %>
+<% end %>

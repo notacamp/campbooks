@@ -1,0 +1,68 @@
+---
+fr:
+  inbox_settings:
+    document_types:
+      create:
+        success: Type de document créé.
+      destroy:
+        success: Type de document supprimé.
+      document_type:
+        delete_confirm: Supprimer %{name} ?
+        documents_title: Documents
+      form:
+        ai_prompt_hint: Ce que l'IA utilise pour classifier ce type de document. Supporte
+          le markdown.
+        ai_prompt_label: Invite IA
+        auto_star_hint: Les documents marqués d'une étoile apparaissent en haut de
+          la liste.
+        auto_star_label: Marquer automatiquement les documents de ce type d'une étoile
+        color_label: Couleur (hex)
+        create_type: Créer le type
+        extraction_schema_hint: Facultatif. Champs à extraire, chacun avec un type
+          (string/integer/number) et une description.
+        extraction_schema_label: Schéma d'extraction (JSON)
+        extraction_schema_placeholder: '{"field_name":{"type":"string","description":"Ce
+          que ce champ représente"}}'
+        none_option: Aucun
+      index:
+        add_type: Ajouter un type
+        empty: Aucun type de document pour l'instant. Ajoutez-en un pour indiquer
+          à Scout ce qu'il doit classifier.
+        heading: Types de documents
+        subtitle: Les documents que Scout recherche et les données qu'il extrait.
+      update:
+        success: Type de document mis à jour.
+    external_labels:
+      index:
+        account_label: Compte
+        color_label: Couleur
+        heading: Étiquettes
+        new_label_label: Nouvelle étiquette
+        new_label_placeholder: Nom de l'étiquette
+        no_accounts: Aucun compte e-mail connecté pour l'instant.
+        subtitle: Étiquettes du fournisseur synchronisées avec votre boîte aux lettres.
+        sync: Synchroniser
+      labels:
+        delete_confirm: Supprimer cette étiquette de votre boîte aux lettres ?
+        empty: Aucune étiquette pour l'instant. Synchronisez depuis votre fournisseur
+          ou ajoutez-en une ci-dessus.
+    signatures:
+      form:
+        assign_accounts_heading: Assigner aux comptes
+        content_label: Contenu
+        create_signature: Créer la signature
+        editor_placeholder: Rédigez votre signature e-mail...
+        name_label: Nom
+        name_placeholder: ex. Professionnelle, Décontractée
+        set_default_label: Définir comme signature par défaut
+      index:
+        add_signature: Ajouter une signature
+        heading: Signatures
+        subtitle: Signatures réutilisables pour la rédaction d'e-mails.
+      list:
+        empty: Aucune signature pour l'instant. Ajoutez-en une pour l'inclure lors
+          de la rédaction.
+      signature:
+        default_badge: par défaut
+        delete_confirm: Supprimer cette signature ?
+        set_default: Définir par défaut

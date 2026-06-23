@@ -1,0 +1,58 @@
+---
+fr:
+  activerecord:
+    attributes:
+      reminder:
+        reminder_types:
+          appointment: Rendez-vous
+          deadline: Échéance
+          delivery: Livraison
+          event: Événement
+          other: Rappel
+          payment_due: Paiement dû
+          renewal: Renouvellement
+          travel: Voyage
+        statuses:
+          confirmed: Confirmé
+          dismissed: Ignoré
+          pending: En attente
+          snoozed: Reporté
+  components:
+    calendar:
+      reminder_chip:
+        suggested: Suggéré
+    reminder_row:
+      adjust_date: Ajuster la date et l'heure
+      confirm: Ajouter au calendrier
+      confirmed: Ajouté au calendrier
+      dismiss: Ignorer
+      in_days:
+        one: Dans %{count} jour
+        other: Dans %{count} jours
+      overdue: En retard
+      snooze: Reporter
+      today: Aujourd'hui
+      tomorrow: Demain
+      view_event: Voir l'événement
+  reminders:
+    confirm:
+      confirmed: Ajouté à votre calendrier.
+      confirmed_no_calendar: Rappel confirmé. Connectez un calendrier pour le synchroniser
+        automatiquement.
+    dismiss:
+      dismissed: Rappel ignoré.
+    index:
+      confirmed: Confirmés récemment
+      empty_body: Quand Scout repère une échéance, une livraison ou un délai dans
+        vos e-mails ou documents, il apparaît ici à confirmer.
+      empty_title: Aucun rappel pour le moment
+      snoozed: Reportés
+      subtitle: Engagements datés que Scout a trouvés dans vos e-mails et documents.
+        Confirmez ceux que vous voulez dans votre calendrier.
+      title: Rappels
+      upcoming: À venir
+    snooze:
+      snoozed: Reporté d'une semaine.
+    source:
+      document: Document
+      email: E-mail

@@ -1,0 +1,6 @@
+<%= turbo_stream.replace "isc_dedup" do %>
+  <%= render "contacts/dedup", flagged: @flagged %>
+<% end %>
+<%= turbo_stream.append "action_toasts" do %>
+  <%= render "shared/action_toast", message: @message, variant: :success %>
+<% end %>

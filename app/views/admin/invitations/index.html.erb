@@ -1,0 +1,28 @@
+<% render "admin/sidebar" %>
+
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+
+<div class="bg-card rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+  <% if @invitations.any? %>
+    <div class="divide-y divide-gray-100">
+      <% @invitations.each do |invitation| %>
+        <div class="flex items-center justify-between px-5 py-3">
+          <div>
+            <p class="text-sm font-medium text-gray-900"><%= invitation.email %></p>
+            <p class="text-xs text-gray-500">
+              <%= t(".invited_by", name: invitation.invited_by.name, workspace: invitation.workspace.name, time_ago: time_ago_in_words(invitation.created_at)) %>
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <%= button_to t(".approve"), approve_admin_invitation_path(invitation), method: :post,
+                  class: "text-xs text-accent-600 hover:text-accent-700 font-medium cursor-pointer" %>
+            <%= button_to t(".reject"), reject_admin_invitation_path(invitation), method: :post,
+                  class: "text-xs text-red-600 hover:text-red-700 font-medium cursor-pointer dark:text-red-400 dark:hover:text-red-300" %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% else %>
+    <%= render(Campbooks::EmptyState.new(variant: :inline, title: t(".empty_title"))) %>
+  <% end %>
+</div>

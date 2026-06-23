@@ -1,0 +1,1037 @@
+@import "tailwindcss";
+@import "../../../vendor/javascript/tw-animate-css.css";
+
+/* Self-hosted Inter (variable font) — replaces the Google Fonts <link> that used
+   to live in shared/_theme_head.html.erb, so no visitor IP is sent to Google
+   (GDPR). The variable file carries every weight 100–900 plus the optical-size
+   axis (applied automatically). Files live in app/assets/fonts/; Propshaft
+   digests the url() at serve time. */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("InterVariable.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("InterVariable-Italic.woff2") format("woff2");
+}
+
+/* Dark mode is driven by a `.dark` class on <html> (toggled by the theme
+   Stimulus controller + an anti-flash inline script in the layout head). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Design tokens — semantic source variables (shadcn-style), LIGHT theme.
+   Neutrals are tinted toward the accent hue (276) at very low chroma so the
+   whole surface reads as one cohesive, modern family — never sterile gray.
+   ────────────────────────────────────────────────────────────────────────── */
+:root {
+  --background: oklch(100% 0 0);
+  --foreground: oklch(18% 0.005 60);
+
+  --card: oklch(100% 0 0);
+  --card-foreground: oklch(18% 0.005 60);
+  --popover: oklch(100% 0 0);
+  --popover-foreground: oklch(18% 0.005 60);
+
+  /* Primary = the functional near-black "ink". The electric-violet is retired. */
+  --primary: oklch(20% 0.006 60);
+  --primary-foreground: oklch(99% 0 0);
+
+  --secondary: oklch(96.6% 0.002 60);
+  --secondary-foreground: oklch(28% 0.006 60);
+
+  --muted: oklch(96.6% 0.002 60);
+  --muted-foreground: oklch(50% 0.008 60);
+
+  /* shadcn "accent" role = subtle neutral hover tint */
+  --accent: oklch(96.6% 0.002 60);
+  --accent-foreground: oklch(24% 0.006 60);
+
+  --destructive: oklch(55% 0.218 25);
+  --destructive-foreground: oklch(98.5% 0.012 25);
+
+  --border: oklch(91.5% 0.003 60);
+  --input: oklch(89% 0.004 60);
+  --ring: oklch(20% 0.006 60);
+
+  --radius: 0.625rem;
+
+  /* ── The ONE warm signature: "Ember" (magenta→orange). Surgical use only —
+        Scout, live story-rings, the logo, the one delight CTA, celebrations. ── */
+  --ember: linear-gradient(135deg, oklch(62% 0.23 354), oklch(67% 0.21 22) 55%, oklch(76% 0.17 60));
+  --ember-solid: oklch(64% 0.21 20);
+  --ember-glow: 0 6px 18px -6px oklch(64% 0.22 20 / 0.45);
+  --scout-bg: linear-gradient(135deg, oklch(97.6% 0.032 26), oklch(99% 0.012 55) 75%);
+  --scout-border: color-mix(in oklch, oklch(64% 0.21 20) 16%, transparent);
+
+  /* Chrome layer — a hair off white so topbar / side panels separate from content */
+  --sidebar: oklch(99.2% 0.001 60);
+  --sidebar-foreground: oklch(18% 0.005 60);
+  --sidebar-primary: oklch(20% 0.006 60);
+  --sidebar-primary-foreground: oklch(99% 0 0);
+  --sidebar-accent: oklch(96.6% 0.002 60);
+  --sidebar-accent-foreground: oklch(24% 0.006 60);
+  --sidebar-border: oklch(91.5% 0.003 60);
+  --sidebar-ring: oklch(20% 0.006 60);
+
+  /* Status roles used by RubyUI components */
+  --success: oklch(58% 0.14 150);
+  --success-foreground: oklch(99% 0.01 150);
+  --warning: oklch(68% 0.15 70);
+  --warning-foreground: oklch(28% 0.05 70);
+
+  --chart-1: oklch(64% 0.21 20);
+  --chart-2: oklch(62% 0.17 200);
+  --chart-3: oklch(70% 0.17 70);
+  --chart-4: oklch(62% 0.17 150);
+  --chart-5: oklch(58% 0.2 350);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Design tokens — DARK theme. A deep violet-charcoal (never pure black),
+   with a lifted, more vivid accent. Also re-maps the legacy --color-* ramps
+   so existing components that use bg-gray-*, bg-accent-*, etc. flip to dark
+   automatically with no Ruby changes.
+   ────────────────────────────────────────────────────────────────────────── */
+.dark {
+  --background: oklch(14% 0.004 60);
+  --foreground: oklch(97% 0.003 60);
+
+  --card: oklch(17.5% 0.006 60);
+  --card-foreground: oklch(97% 0.003 60);
+  --popover: oklch(18% 0.006 60);
+  --popover-foreground: oklch(97% 0.003 60);
+
+  /* Primary in dark = near-white ink (the functional color inverts) */
+  --primary: oklch(97% 0.003 60);
+  --primary-foreground: oklch(17% 0.005 60);
+
+  --secondary: oklch(24% 0.007 60);
+  --secondary-foreground: oklch(94% 0.004 60);
+
+  --muted: oklch(22% 0.007 60);
+  --muted-foreground: oklch(68% 0.009 60);
+
+  --accent: oklch(25% 0.008 60);
+  --accent-foreground: oklch(94% 0.005 60);
+
+  --destructive: oklch(64% 0.2 25);
+  --destructive-foreground: oklch(98% 0.01 25);
+
+  --border: oklch(26% 0.009 60);
+  --input: oklch(30% 0.01 60);
+  --ring: oklch(85% 0.005 60);
+
+  --ember: linear-gradient(135deg, oklch(64% 0.235 354), oklch(69% 0.215 22) 55%, oklch(78% 0.17 60));
+  --ember-solid: oklch(68% 0.21 22);
+  --ember-glow: 0 8px 22px -6px oklch(64% 0.22 20 / 0.6);
+  --scout-bg: linear-gradient(135deg, oklch(26% 0.055 26), oklch(19% 0.02 50) 80%);
+  --scout-border: color-mix(in oklch, oklch(64% 0.21 20) 30%, transparent);
+
+  --sidebar: oklch(16% 0.005 60);
+  --sidebar-foreground: oklch(97% 0.003 60);
+  --sidebar-primary: oklch(97% 0.003 60);
+  --sidebar-primary-foreground: oklch(17% 0.005 60);
+  --sidebar-accent: oklch(25% 0.008 60);
+  --sidebar-accent-foreground: oklch(94% 0.005 60);
+  --sidebar-border: oklch(26% 0.009 60);
+  --sidebar-ring: oklch(85% 0.005 60);
+
+  --success: oklch(70% 0.15 150);
+  --success-foreground: oklch(16% 0.03 150);
+  --warning: oklch(76% 0.15 70);
+  --warning-foreground: oklch(20% 0.05 70);
+
+  /* ── legacy "accent" ramp → a QUIET INK scale, dark (electric-violet retired) ── */
+  --color-accent-50: oklch(26% 0.008 60);
+  --color-accent-100: oklch(30% 0.009 60);
+  --color-accent-200: oklch(36% 0.009 60);
+  --color-accent-300: oklch(46% 0.009 60);
+  --color-accent-400: oklch(60% 0.008 60);
+  --color-accent-500: oklch(72% 0.007 60);
+  --color-accent-600: oklch(85% 0.005 60);
+  --color-accent-700: oklch(90% 0.004 60);
+  --color-accent-800: oklch(94% 0.004 60);
+  --color-accent-900: oklch(97% 0.003 60);
+
+  /* ── legacy neutral ramp, INVERTED for dark (warm) ── */
+  --color-gray-50: oklch(18% 0.006 60);
+  --color-gray-100: oklch(22% 0.007 60);
+  --color-gray-200: oklch(27% 0.008 60);
+  --color-gray-300: oklch(33% 0.009 60);
+  --color-gray-400: oklch(50% 0.009 60);
+  --color-gray-500: oklch(64% 0.008 60);
+  --color-gray-600: oklch(72% 0.007 60);
+  --color-gray-700: oklch(82% 0.005 60);
+  --color-gray-800: oklch(89% 0.004 60);
+  --color-gray-900: oklch(96% 0.003 60);
+  --color-gray-950: oklch(98% 0.002 60);
+
+  --color-warm-ash-bg: oklch(14% 0.004 60);
+  --color-warm-ash-border: oklch(26% 0.009 60);
+
+  --color-attention-50: oklch(29% 0.05 70);
+  --color-attention-100: oklch(33% 0.07 68);
+  --color-attention-600: oklch(76% 0.16 70);
+  --color-attention-700: oklch(82% 0.13 66);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Bridge semantic source vars → Tailwind color utilities (bg-background,
+   text-muted-foreground, border-border, bg-primary, ring-ring, …) plus
+   radius, fonts, and motion easings. `inline` keeps utilities pointed at the
+   live var() so the .dark overrides above propagate everywhere.
+   ────────────────────────────────────────────────────────────────────────── */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-ember: var(--ember-solid);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+    Monaco, Consolas, monospace;
+
+  /* Exponential ease-outs for the motion language — confident, no bounce */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-skeleton: skeleton-pulse 1.8s ease-in-out infinite;
+  --animate-fade-in: fade-in 0.25s var(--ease-out-quint);
+
+  /* Product-tour "now you try" invites — draw the eye to the thing to tap. The
+     global reduced-motion guard below stops the loop. */
+  --animate-tour-breathe: tour-breathe 2.2s var(--ease-out-quint) infinite;
+  --animate-tour-invite: tour-invite-wash 2.2s var(--ease-out-quint) infinite;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Legacy brand + neutral ramps (LIGHT values). Existing components reference
+   these directly (bg-accent-600, text-gray-700, border-warm-ash-border, …).
+   Redefining them here re-skins the whole app to the new system in one shot;
+   the .dark block above supplies their dark-mode values.
+   ────────────────────────────────────────────────────────────────────────── */
+@theme {
+  /* "accent" ramp → a quiet INK scale (warm-neutral). The electric-violet brand
+     is retired; the warm signature lives in --ember, applied surgically. */
+  --color-accent-50: oklch(97% 0.003 60);
+  --color-accent-100: oklch(95% 0.004 60);
+  --color-accent-200: oklch(90% 0.005 60);
+  --color-accent-300: oklch(80% 0.006 60);
+  --color-accent-400: oklch(62% 0.008 60);
+  --color-accent-500: oklch(45% 0.008 60);
+  --color-accent-600: oklch(30% 0.007 60);
+  --color-accent-700: oklch(24% 0.006 60);
+  --color-accent-800: oklch(20% 0.005 60);
+  --color-accent-900: oklch(17% 0.005 60);
+
+  /* Neutral ramp — warm-tinted (hue 60) at very low chroma */
+  --color-gray-50: oklch(97.5% 0.002 60);
+  --color-gray-100: oklch(95.5% 0.003 60);
+  --color-gray-200: oklch(91.5% 0.003 60);
+  --color-gray-300: oklch(87% 0.004 60);
+  --color-gray-400: oklch(70% 0.007 60);
+  --color-gray-500: oklch(56% 0.008 60);
+  --color-gray-600: oklch(48% 0.008 60);
+  --color-gray-700: oklch(40% 0.007 60);
+  --color-gray-800: oklch(31% 0.006 60);
+  --color-gray-900: oklch(20% 0.005 60);
+  --color-gray-950: oklch(14% 0.004 60);
+
+  --color-warm-ash-bg: oklch(99.4% 0.0015 60);
+  --color-warm-ash-border: oklch(91.5% 0.003 60);
+
+  /* Attention amber (kept — warm status) */
+  --color-attention-50: oklch(97% 0.02 70);
+  --color-attention-100: oklch(94% 0.05 66);
+  --color-attention-600: oklch(70% 0.17 70);
+  --color-attention-700: oklch(58% 0.16 64);
+}
+
+/* ── Ember helpers — the warm signature, applied surgically ────────────────── */
+.bg-ember-gradient { background-image: var(--ember); }
+.scout-glass { background-image: var(--scout-bg); border: 1px solid var(--scout-border); }
+.shadow-ember { box-shadow: var(--ember-glow); }
+
+/* ── Compact Skim tray — smaller story-rings in the dense inbox view. Scoped to
+   a `.skim-compact` wrapper (the inbox's skim_tray frame) so the same tray
+   content renders full-size on home and compact in the inbox, even though both
+   share one live broadcast. ───────────────────────────────────────────────── */
+.skim-compact .skim-ring { width: 3.25rem; }
+.skim-compact .skim-ring__inner { height: 2.5rem; width: 2.5rem; }
+.skim-compact .skim-ring__icon { height: 1.125rem; width: 1.125rem; }
+.skim-compact .skim-ring__label { font-size: 10px; }
+
+/* The inbox tray draws its frame (separator + padding + horizontal scroll) ONLY
+   when it actually holds rings. `:has(> *)` is false for the empty
+   #skim_tray_content (its whitespace text node is not an element child), so a
+   tray with nothing to skim collapses to nothing instead of leaving a stray
+   bordered strip. Scoped to .skim-compact (the inbox mount) so home — which
+   frames its rings with its own wrapper — is unaffected. */
+.skim-compact #skim_tray_content:has(> *) {
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-gray-100);
+  padding: 0.625rem 0.75rem;
+  scrollbar-width: none;
+}
+.skim-compact #skim_tray_content::-webkit-scrollbar { display: none; }
+
+/* ── Feed scroll-focus — dim every entry except the one nearest the viewport
+   centre, so the eye settles on one card at a time. Opt-in: the rules only bite
+   once feed_focus_controller flags the list with [data-feed-focus] (so with no
+   JS every card stays full strength). The dimming is motion-only; the
+   [data-focused] flag itself is always set — it's the feed-keyboard cursor and
+   the anchor the on-card shortcut chips hang off, so it must survive reduced
+   motion even when the visible dim does not. ──────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  [data-feed-focus] [data-feed-focus-unit] {
+    opacity: 0.38;
+    transform: scale(0.984);
+    transition: opacity 0.4s var(--ease-out-quint), transform 0.4s var(--ease-out-quint);
+  }
+  [data-feed-focus] [data-feed-focus-unit][data-focused] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── Feed shortcut hints — the key chips on a card's buttons (→ ← e r …) surface
+   only on the focused card, and only where a physical keyboard is likely (fine
+   pointer). Touch devices can't press them, so there they stay hidden and a
+   swipe hint (data-feed-swipe-hint) takes their place — the two are mutually
+   exclusive by pointer type. ─────────────────────────────────────────────── */
+[data-feed-keyhint], [data-feed-swipe-hint] { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  [data-feed-focus-unit][data-focused] [data-feed-keyhint] { display: inline-flex; }
+}
+@media (pointer: coarse) {
+  [data-feed-focus-unit][data-focused] [data-feed-swipe-hint] { display: flex; }
+}
+
+@keyframes new-message-glow {
+  0% { background-color: color-mix(in oklch, var(--ember-solid) 16%, transparent); }
+  100% { background-color: transparent; }
+}
+
+.new-message-glow {
+  animation: new-message-glow 2s var(--ease-out-quint) forwards;
+}
+
+html {
+  font-size: 0.875rem; /* 14px, down from browser default 16px */
+}
+
+/* Respect a reduced-motion preference: keep state changes instant and stop the
+   chat's looping motion (typing dots, avatar pulse, message fade-ins). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* Product-tour invites: a gentle scale "breathe" for buttons/chips and a soft
+   ember background wash for a tappable row that doesn't otherwise read as a
+   button. Both loop until the user acts (the controller strips the class). */
+@keyframes tour-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
+}
+@keyframes tour-invite-wash {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: color-mix(in oklch, var(--ember-solid) 8%, transparent); }
+}
+
+/* Markdown-rendered content in agent chat messages */
+.agent-message-content p {
+  margin-bottom: 0.5rem;
+}
+.agent-message-content p:last-child {
+  margin-bottom: 0;
+}
+.agent-message-content ul,
+.agent-message-content ol {
+  margin: 0.25rem 0 0.5rem 0;
+  padding-left: 1.25rem;
+}
+.agent-message-content ul {
+  list-style-type: disc;
+}
+.agent-message-content ol {
+  list-style-type: decimal;
+}
+.agent-message-content li {
+  margin-bottom: 0.125rem;
+}
+.agent-message-content strong {
+  font-weight: 600;
+}
+.agent-message-content a {
+  color: var(--color-accent-600);
+  text-decoration: underline;
+}
+.agent-message-content code {
+  font-size: 0.8125rem;
+  background-color: var(--color-muted);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-family: var(--font-mono);
+}
+.agent-message-content pre {
+  font-size: 0.8125rem;
+  background-color: var(--color-muted);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+}
+.agent-message-content pre code {
+  background: none;
+  padding: 0;
+}
+.agent-message-content table {
+  border-collapse: collapse;
+  /* Size to content but never exceed the bubble; scroll wide tables (e.g. on
+     mobile) instead of clipping columns. */
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+  font-size: 0.8125rem;
+}
+.agent-message-content th {
+  background-color: var(--color-muted);
+  padding: 0.375rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 1px solid var(--color-border);
+}
+.agent-message-content td {
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.agent-message-content tr:hover td {
+  background-color: var(--color-accent);
+}
+
+/* Fix dialog centering when showModal() opens it — UA sets display:block,
+   but we need flex for internal layout. Override while keeping native centering. */
+dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Command palette */
+.command-palette-dialog {
+  margin: auto !important;
+}
+
+.command-palette-dialog[open] {
+  animation: palette-in 0.15s var(--ease-out-quint);
+}
+
+.command-palette-dialog::backdrop {
+  background: color-mix(in oklch, var(--color-gray-950) 40%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.command-palette-dialog[open]::backdrop {
+  animation: palette-fade 0.15s ease-out;
+}
+
+@keyframes palette-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes palette-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── TipTap / ProseMirror editor ──────────────────────────── */
+.tiptap-editor .ProseMirror {
+  min-height: 120px;
+  outline: none;
+  padding: 0.5rem 0.75rem;
+  line-height: 1.6;
+  font-size: 0.875rem;
+  color: var(--color-gray-800);
+}
+
+.tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
+  color: var(--color-gray-400);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.tiptap-editor .ProseMirror blockquote {
+  border-left: 3px solid var(--color-gray-300);
+  padding-left: 0.75rem;
+  margin: 0.5rem 0;
+  color: var(--color-gray-500);
+}
+
+.tiptap-editor .ProseMirror ul,
+.tiptap-editor .ProseMirror ol {
+  padding-left: 1.25rem;
+}
+
+.tiptap-editor .ProseMirror ul { list-style-type: disc; }
+.tiptap-editor .ProseMirror ol { list-style-type: decimal; }
+
+.tiptap-editor .ProseMirror p { margin-bottom: 0.25rem; }
+.tiptap-editor .ProseMirror p:last-child { margin-bottom: 0; }
+
+.tiptap-editor .ProseMirror a {
+  color: var(--color-accent-600);
+  text-decoration: underline;
+}
+
+.tiptap-editor .ProseMirror h1 { font-size: 1.5rem; font-weight: 700; line-height: 1.3; margin: 0.6rem 0 0.35rem; }
+.tiptap-editor .ProseMirror h2 { font-size: 1.25rem; font-weight: 700; line-height: 1.3; margin: 0.55rem 0 0.3rem; }
+.tiptap-editor .ProseMirror h3 { font-size: 1.05rem; font-weight: 600; line-height: 1.3; margin: 0.5rem 0 0.25rem; }
+
+.tiptap-editor .ProseMirror img,
+.tiptap-editor .ProseMirror img.rte-img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.375rem;
+  margin: 0.25rem 0;
+}
+.tiptap-editor .ProseMirror img.ProseMirror-selectednode {
+  outline: 2px solid var(--color-accent-500);
+}
+
+.tiptap-editor .ProseMirror code {
+  background: var(--color-gray-100);
+  border-radius: 0.25rem;
+  padding: 0.05rem 0.3rem;
+  font-size: 0.85em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.tiptap-editor .ProseMirror pre {
+  background: var(--color-gray-900);
+  color: var(--color-gray-100);
+  border-radius: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  margin: 0.5rem 0;
+  overflow-x: auto;
+  font-size: 0.8125rem;
+}
+.tiptap-editor .ProseMirror pre code { background: none; padding: 0; color: inherit; }
+
+.tiptap-editor .ProseMirror hr {
+  border: none;
+  border-top: 1px solid var(--color-gray-300);
+  margin: 0.85rem 0;
+}
+
+/* TipTap toolbar */
+.tiptap-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.125rem;
+  padding: 0.25rem;
+  border-bottom: 1px solid var(--color-gray-200);
+  background: var(--color-gray-50);
+  border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.tiptap-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 0.25rem;
+  color: var(--color-gray-600);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  transition: background-color 0.15s;
+}
+
+.tiptap-toolbar button:hover {
+  background: var(--color-gray-200);
+  color: var(--color-gray-900);
+}
+
+.tiptap-toolbar button.is-active {
+  background: var(--color-accent-100);
+  color: var(--color-accent-700);
+}
+
+.tiptap-toolbar .tiptap-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--color-gray-300);
+  margin: 0 0.125rem;
+}
+
+/* Block-type <select> */
+.tiptap-toolbar .tiptap-select {
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 0.25rem;
+  color: var(--color-gray-700);
+  font-size: 0.75rem;
+  padding: 0 0.35rem;
+  cursor: pointer;
+  max-width: 7.5rem;
+}
+.tiptap-toolbar .tiptap-select:hover { background: var(--color-gray-200); }
+
+/* Text-colour control: an "A" glyph that opens the native picker */
+.tiptap-toolbar .tiptap-color {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  color: var(--color-gray-600);
+  overflow: hidden;
+}
+.tiptap-toolbar .tiptap-color:hover { background: var(--color-gray-200); }
+.tiptap-toolbar .tiptap-color-glyph {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1;
+  border-bottom: 3px solid currentColor;
+  padding-bottom: 1px;
+}
+.tiptap-toolbar .tiptap-color input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* Link / image popover */
+.rte { position: relative; }
+.tiptap-popover {
+  position: absolute;
+  top: 2.6rem;
+  left: 0.5rem;
+  right: 0.5rem;
+  z-index: 30;
+  max-width: 22rem;
+  display: none;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem;
+  background: var(--color-card, #fff);
+  border: 1px solid var(--color-gray-200);
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 30px -10px rgb(0 0 0 / 0.25);
+}
+.tiptap-popover.is-open { display: flex; }
+.tiptap-popover-input {
+  width: 100%;
+  font-size: 0.8125rem;
+  border: 1px solid var(--color-gray-300);
+  border-radius: 0.375rem;
+  padding: 0.3rem 0.5rem;
+  background: var(--color-card, #fff);
+  color: var(--color-gray-800);
+}
+.tiptap-popover-input:focus {
+  outline: none;
+  border-color: var(--color-accent-500);
+  box-shadow: 0 0 0 1px var(--color-accent-500);
+}
+.tiptap-popover-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+.tiptap-popover-btn {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.tiptap-popover-btn--ghost {
+  color: var(--color-gray-600);
+  border-color: var(--color-gray-200);
+  background: transparent;
+}
+.tiptap-popover-btn--ghost:hover { background: var(--color-gray-100); }
+.tiptap-popover-btn--primary {
+  color: #fff;
+  background: var(--color-accent-600);
+}
+.tiptap-popover-btn--primary:hover { background: var(--color-accent-700); }
+.tiptap-popover-error {
+  font-size: 0.75rem;
+  color: var(--color-red-600, #dc2626);
+}
+
+/* ── Compose attachment tray ──────────────────────────── */
+.compose-attachments-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.compose-attach-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-gray-600);
+  background: transparent;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 9999px;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.compose-attach-btn:hover { background: var(--color-gray-100); color: var(--color-gray-900); }
+.compose-attachments-tray {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 16rem;
+  font-size: 0.75rem;
+  color: var(--color-gray-700);
+  background: var(--color-gray-100);
+  border: 1px solid var(--color-gray-200);
+  border-radius: 0.375rem;
+  padding: 0.2rem 0.5rem;
+}
+.attachment-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachment-chip button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-gray-400);
+  font-size: 0.7rem;
+  line-height: 1;
+  padding: 0;
+}
+.attachment-chip button:hover { color: var(--color-red-600, #dc2626); }
+.attachment-chip.is-uploading { opacity: 0.6; }
+.attachment-chip.is-error {
+  color: var(--color-red-700, #b91c1c);
+  background: var(--color-red-50, #fef2f2);
+  border-color: var(--color-red-200, #fecaca);
+}
+
+/* ── Thread list view modes ──────────────────────────── */
+#email_threads {
+  --thread-py: 0.625rem;
+  --thread-gap: 0.75rem;
+  --thread-avatar-size: 2rem;
+  --thread-avatar-font: 12px;
+  --thread-subject-size: 11px;
+  --thread-meta-size: 10px;
+  --thread-label-size: 9px;
+}
+
+#email_threads[data-inbox-view-mode="compact"] {
+  --thread-py: 0.375rem;
+  --thread-gap: 0.5rem;
+  --thread-subject-size: 10px;
+  --thread-meta-size: 9px;
+  --thread-label-size: 8px;
+}
+
+#email_threads[data-inbox-view-mode="compact"] .js-inbox-labels {
+  display: none !important;
+}
+
+/* Compact avatar: override ContactAvatar w-8 h-8 (size :lg) */
+#email_threads[data-inbox-view-mode="compact"] .relative.flex-shrink-0 > .w-8.h-8 {
+  width: 1.25rem;
+  height: 1.25rem;
+  font-size: 9px;
+}
+
+/* Compact direction indicator: override w-3.5 h-3.5 */
+#email_threads[data-inbox-view-mode="compact"] .relative.flex-shrink-0 > .w-3\.5.h-3\.5 {
+  width: 0.75rem;
+  height: 0.75rem;
+  font-size: 6px;
+  line-height: 1;
+}
+
+#email_threads[data-inbox-view-mode="breathable"] {
+  --thread-py: 1rem;
+  --thread-gap: 1rem;
+  --thread-subject-size: 13px;
+  --thread-meta-size: 11px;
+  --thread-label-size: 10px;
+}
+
+/* Breathable avatar */
+#email_threads[data-inbox-view-mode="breathable"] .relative.flex-shrink-0 > .w-8.h-8 {
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 14px;
+}
+
+/* ── Inbox layout modes ──────────────────────────────────────────────────────
+   data-inbox-layout lives on the email shell root and is orthogonal to the
+   density view-mode above. "default" keeps the multi-pane shell as-is. The
+   !important rules override the inline width the panel-resize controller writes
+   onto the list pane. Panes are tagged with data-inbox-pane. */
+
+/* List: a single full-width, full-height column spanning up to the left nav
+   rail; the reading + discussion panes collapse and rows open the bottom-right
+   drawer (wired in JS). */
+[data-inbox-layout="list"] [data-inbox-pane="detail"] {
+  display: none !important;
+}
+[data-inbox-layout="list"] [data-inbox-pane="list"] {
+  flex: 1 1 auto !important;
+  max-width: none !important;
+  width: auto !important;
+  border-right-width: 0 !important;
+}
+/* No drag-to-resize affordance once the list owns the whole column. */
+[data-inbox-layout="list"] [data-inbox-pane="list"] [data-panel-resize-target="handle"] {
+  display: none !important;
+}
+/* In List mode the header's right edge spans to the window edge, where the
+   bottom-right reading drawer floats. On SHORT desktop viewports the drawer's
+   top rises into this strip and buries the view switcher — trapping the user in
+   List mode with no way back (issue #14). ONLY there, float the switcher to the
+   left of the header, clear of the drawer; on taller viewports it stays in its
+   natural spot beside the gear (this guard stops it jumping on every switch).
+
+   Guard rationale: ≥640px is the `sm` breakpoint where the drawer becomes a
+   floating bottom-right card (below it, it's a full-width, dismissible modal
+   sheet that never traps the switcher). max-height:720px is where the default
+   lg drawer (560px tall, 1rem off the bottom → top ≈ 100dvh−576) reaches the
+   ~150px-tall header band; on taller viewports the drawer sits well below it. */
+@media (min-width: 640px) and (max-height: 720px) {
+  [data-inbox-layout="list"] [data-inbox-pane="list"] .inbox-view-switcher {
+    order: -1;
+  }
+}
+
+/* Board: hide the list + reading panes, reveal the board frame. */
+[data-inbox-layout="board"] [data-inbox-pane="list"],
+[data-inbox-layout="board"] [data-inbox-pane="detail"] {
+  display: none !important;
+}
+[data-inbox-layout="board"] [data-inbox-pane="board"] {
+  display: flex !important;
+}
+
+/* ── Documents filters disclosure ────────────────────────────────────────────
+   The /documents filters live in a <details> that's collapsed on mobile but meant
+   to be always-open on desktop (its content is force-shown with `md:block`).
+   Current Chrome hides a closed <details>'s content via
+   `::details-content { content-visibility: hidden }`, which a child's display can't
+   override — so on desktop the card collapsed to a bare ~2px sliver (its border +
+   shadow), reading as a stray shadowed divider under the Skim tray. Re-reveal the
+   content at md+ (where the summary toggle is hidden and the filters always show).
+   Other browsers lack ::details-content and already honor `md:block`. */
+@media (min-width: 768px) {
+  details.filters-disclosure::details-content {
+    content-visibility: visible;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Harmonized semantic "soft" tones. One OKLCH family — steady lightness/chroma,
+   evenly-spaced hues — so status pills and Badge variants read as a cohesive
+   set instead of a raw-Tailwind rainbow. Each has a paired dark value.
+   ────────────────────────────────────────────────────────────────────────── */
+.tone-green   { background-color: oklch(93% 0.06 152);  color: oklch(45% 0.13 152); }
+.tone-blue    { background-color: oklch(93.5% 0.05 248); color: oklch(48% 0.14 248); }
+.tone-amber   { background-color: oklch(94% 0.07 85);   color: oklch(52% 0.12 78); }
+.tone-orange  { background-color: oklch(93% 0.075 52);  color: oklch(53% 0.16 48); }
+.tone-red     { background-color: oklch(93% 0.06 25);   color: oklch(53% 0.18 25); }
+.tone-violet  { background-color: oklch(94% 0.05 276);  color: oklch(48% 0.19 276); }
+.tone-neutral { background-color: var(--muted);         color: var(--muted-foreground); }
+.dark .tone-green   { background-color: oklch(33% 0.07 152); color: oklch(84% 0.13 152); }
+.dark .tone-blue    { background-color: oklch(33% 0.07 248); color: oklch(85% 0.11 248); }
+.dark .tone-amber   { background-color: oklch(35% 0.07 80);  color: oklch(87% 0.12 85); }
+.dark .tone-orange  { background-color: oklch(36% 0.08 52);  color: oklch(86% 0.13 55); }
+.dark .tone-red     { background-color: oklch(34% 0.08 25);  color: oklch(86% 0.15 25); }
+.dark .tone-violet  { background-color: oklch(34% 0.09 276); color: oklch(86% 0.12 276); }
+
+@layer base {
+  /* Default border + outline colors track the theme (shadcn reset) */
+  *,
+  ::after,
+  ::before {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Unified, visible focus ring for keyboard users */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  /* Form controls: flat, border-only, theme-aware focus ring */
+  [type="text"],
+  [type="email"],
+  [type="url"],
+  [type="password"],
+  [type="number"],
+  [type="date"],
+  [type="datetime-local"],
+  [type="month"],
+  [type="search"],
+  [type="tel"],
+  [type="time"],
+  [type="week"],
+  select,
+  textarea {
+    appearance: none;
+    padding: 0.5rem 0.75rem;
+    border-width: 1px;
+    border-color: var(--color-input);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    &::placeholder {
+      color: var(--color-muted-foreground);
+    }
+    &:focus {
+      border-color: var(--color-ring);
+      box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-ring) 30%, transparent);
+    }
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Swipe-to-act (Campbooks::Swipeable + swipe-actions controller).
+   The action panel sits behind the row; the controller sets data-color as the
+   drag crosses each threshold (the color/icon "morph"). While dragging, the
+   content is painted with an opaque --swipe-surface so it cleanly covers the
+   panel — at rest it's transparent, so the row looks exactly as before.
+   ────────────────────────────────────────────────────────────────────────── */
+/* Deep, refined oklch status tones (per DESIGN.md) — set as --swipe-accent on the
+   panel and read by the rounded action "tab" inside it. Not flat Tailwind-500 blocks.
+   These are state colors (the Ember signature is reserved for Scout / wins). */
+/* One deep oklch per action, named once so the swipe badge AND the confirm-dialog
+   button use the exact same color. */
+:root {
+  --swipe-blue: oklch(48% 0.14 248);
+  --swipe-amber: oklch(56% 0.135 65);
+  --swipe-orange: oklch(53% 0.16 48);
+  --swipe-red: oklch(53% 0.18 25);
+  --swipe-green: oklch(45% 0.13 152);
+  --swipe-neutral: oklch(40% 0.012 60);
+}
+[data-swipe-actions-target$="Panel"][data-color="blue"]    { --swipe-accent: var(--swipe-blue); }
+[data-swipe-actions-target$="Panel"][data-color="amber"]   { --swipe-accent: var(--swipe-amber); }
+[data-swipe-actions-target$="Panel"][data-color="orange"]  { --swipe-accent: var(--swipe-orange); }
+[data-swipe-actions-target$="Panel"][data-color="red"]     { --swipe-accent: var(--swipe-red); }
+[data-swipe-actions-target$="Panel"][data-color="green"]   { --swipe-accent: var(--swipe-green); }
+[data-swipe-actions-target$="Panel"][data-color="neutral"] { --swipe-accent: var(--swipe-neutral); }
+
+/* While dragging, the row peels up off the action tab: opaque surface, soft
+   rounding + a warm-tinted lift shadow. Flat again at rest (canvas default). */
+[data-controller~="swipe-actions"][data-swiping="true"] [data-swipe-actions-target="content"] {
+  background-color: var(--swipe-surface, var(--color-card));
+  user-select: none;
+  border-radius: 0.875rem;
+  box-shadow: 0 2px 6px oklch(20% 0.03 40 / 0.10), 0 14px 30px oklch(20% 0.03 40 / 0.16);
+}

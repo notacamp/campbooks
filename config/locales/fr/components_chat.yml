@@ -1,0 +1,71 @@
+---
+fr:
+  components:
+    ai_setup_message:
+      example_hint: ex. %{hint}
+    ai_setup_proposal:
+      add_selected: Ajouter la sélection
+      document_types_label: types de documents
+      edit_label: Modifier
+      field_colour: Couleur
+      field_name: Nom
+      field_prompt: Ce que ça couvre
+      no_suggestions: Aucune suggestion pour l'instant.
+      suggested_heading: "%{kind} suggérés"
+      tags_label: étiquettes
+    chat_actions:
+      allow_sender: Autoriser l'expéditeur
+      archive: Archiver
+      block_sender: Bloquer l'expéditeur
+      create_event: Créer un événement de calendrier
+      draft_reply: Rédiger une réponse
+      forward_to: Transférer à %{address}
+      reclassify: Reclassifier
+      remove_tag_prefix: 'Supprimer l''étiquette : %{name}'
+      remove_with_name: Supprimer %{name}
+      snooze: Reporter
+      star_sender: Mettre l'expéditeur en avant
+      tag_prefix: 'Étiquette : %{name}'
+      tag_with_name: Étiqueter %{name}
+      unblock_sender: Débloquer l'expéditeur
+      unsnooze: Annuler le report
+      unstar_sender: Retirer la mise en avant
+    chat_error:
+      error_message: Je n'ai pas pu accéder à cela pour l'instant. Voulez-vous réessayer
+        ?
+      retry: Réessayer
+    chat_form:
+      keyboard_hint: Entrée pour envoyer · Maj+Entrée pour une nouvelle ligne
+      send_aria_label: Envoyer le message
+      textarea_aria_label: Message à Scout
+    chat_message:
+      ai_badge: IA
+      draft_badge: Brouillon
+      time_ago: il y a %{time}
+    command_palette:
+      capture_placeholder: Déplacer vers quel dossier…
+      dialog_aria_label: Recherche et commandes
+      group_actions: Actions
+      group_contacts: Contacts
+      group_emails: E-mails
+      group_folder: Dossier
+      group_navigate: Naviguer
+      hint_escape_back: esc retour
+      hint_escape_close: esc fermer
+      hint_navigate: "↑↓ naviguer"
+      hint_select: "↵ sélectionner"
+      move_email_to_folder: Déplacer l'e-mail vers un dossier
+      results_aria_label: Résultats de recherche
+      search_aria_label: Rechercher des e-mails, conversations, contacts et paramètres
+      search_placeholder: Rechercher des e-mails, conversations, contacts, paramètres…
+    email_scout_actions:
+      draft_follow_up: Rédiger un suivi
+      suggest_reply: Suggérer une réponse
+    notification_item:
+      archive_aria_label: Archiver la notification
+      archive_title: Archiver
+      restore_aria_label: Restaurer la notification
+      restore_title: Restaurer
+      time_ago: il y a %{time}
+    scout_briefing:
+      try_asking: Essayez de demander

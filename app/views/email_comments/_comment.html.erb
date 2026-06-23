@@ -1,0 +1,14 @@
+<%# Padding lives here (not in the parent loop) so a freshly-sent comment that is
+    appended straight into #comments_list matches the reloaded layout exactly. %>
+<div class="px-4 py-3">
+  <%= render(Campbooks::ChatMessage.new(
+    message: comment,
+    context: :email_chat,
+    layout: :comments,
+    tool_url_builder: ->(tool, args) {
+      if local_assigns[:email_message]
+        { url: tool_email_message_path(local_assigns[:email_message], tool: tool, args: args), method: :post }
+      end
+    }
+  )) %>
+</div>

@@ -1,0 +1,70 @@
+---
+pt:
+  components:
+    ai_setup_message:
+      example_hint: 'ex.: %{hint}'
+    ai_setup_proposal:
+      add_selected: Adicionar selecionados
+      document_types_label: tipos de documentos
+      edit_label: Editar
+      field_colour: Cor
+      field_name: Nome
+      field_prompt: O que abrange
+      no_suggestions: Sem sugestões ainda.
+      suggested_heading: Sugestões de %{kind}
+      tags_label: etiquetas
+    chat_actions:
+      allow_sender: Permitir remetente
+      archive: Arquivar
+      block_sender: Bloquear remetente
+      create_event: Criar evento de calendário
+      draft_reply: Rascunho de resposta
+      forward_to: Reencaminhar para %{address}
+      reclassify: Reclassificar
+      remove_tag_prefix: 'Remover etiqueta: %{name}'
+      remove_with_name: Remover %{name}
+      snooze: Adiar
+      star_sender: Destacar remetente
+      tag_prefix: 'Etiqueta: %{name}'
+      tag_with_name: Etiquetar %{name}
+      unblock_sender: Desbloquear remetente
+      unsnooze: Cancelar adiamento
+      unstar_sender: Remover destaque
+    chat_error:
+      error_message: Não consegui responder agora. Quer tentar novamente?
+      retry: Tentar novamente
+    chat_form:
+      keyboard_hint: Enter para enviar · Shift+Enter para nova linha
+      send_aria_label: Enviar mensagem
+      textarea_aria_label: Mensagem ao Scout
+    chat_message:
+      ai_badge: IA
+      draft_badge: Rascunho
+      time_ago: há %{time}
+    command_palette:
+      capture_placeholder: Mover para qual pasta…
+      dialog_aria_label: Pesquisa e comandos
+      group_actions: Ações
+      group_contacts: Contactos
+      group_emails: E-mails
+      group_folder: Pasta
+      group_navigate: Navegar
+      hint_escape_back: esc voltar
+      hint_escape_close: esc fechar
+      hint_navigate: "↑↓ navegar"
+      hint_select: "↵ selecionar"
+      move_email_to_folder: Mover e-mail para pasta
+      results_aria_label: Resultados da pesquisa
+      search_aria_label: Pesquisar e-mails, conversas, contactos e definições
+      search_placeholder: Pesquisar e-mails, conversas, contactos, definições…
+    email_scout_actions:
+      draft_follow_up: Rascunho de acompanhamento
+      suggest_reply: Sugerir resposta
+    notification_item:
+      archive_aria_label: Arquivar notificação
+      archive_title: Arquivar
+      restore_aria_label: Restaurar notificação
+      restore_title: Restaurar
+      time_ago: há %{time}
+    scout_briefing:
+      try_asking: Experimente perguntar

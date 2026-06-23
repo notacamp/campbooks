@@ -1,0 +1,112 @@
+---
+fr:
+  contacts:
+    analyze:
+      analyzing_context: " avec votre contexte"
+      analyzing_html: Scout analyse ce contact%{context}. Le profil apparaîtra ici
+        dans un instant.
+      queued_toast: Analyse mise en file d'attente.
+    consolidate_all:
+      complete:
+        one: Consolidation terminée. %{count} personne fusionnée.
+        other: Consolidation terminée. %{count} personnes fusionnées.
+    dedup:
+      confidence: "(%{pct}%)"
+      dismiss: Ignorer
+      merge: Fusionner
+      possible_duplicates:
+        one: "%{count} doublon possible"
+        other: "%{count} doublons possibles"
+    index:
+      all_heading: Tous les contacts
+      blocked_heading: Bloqués
+      find_duplicates: Trouver les doublons
+      heading: Contacts
+      people_count:
+        one: "%{count} personne"
+        other: "%{count} personnes"
+      search_placeholder: Rechercher des personnes…
+      skim_cta_subtitle:
+        one: "%{count} nouveau contact à approuver ou bloquer"
+        other: "%{count} nouveaux contacts à approuver ou bloquer"
+      skim_cta_title: Passer en revue les nouveaux expéditeurs
+      starred_heading: Favoris
+      subheading: Les personnes que Scout a vues dans votre boîte de réception.
+    list:
+      no_people: Aucune personne trouvée.
+    name_field:
+      cancel: Annuler
+      edit_name_aria: Modifier le nom
+      save: Enregistrer
+    person:
+      emails_exchanged_title: E-mails échangés
+    relationship_field:
+      cancel: Annuler
+      edit_relationship_aria: Modifier la relation
+      none_option: Aucune
+      save: Enregistrer
+    resolve_duplicate:
+      dismissed: Doublon ignoré.
+      merged: Fusionné avec %{name}.
+    scan_dedup:
+      complete:
+        one: Analyse terminée. %{count} groupe de doublons potentiels.
+        other: Analyse terminée. %{count} groupes de doublons potentiels.
+    show:
+      analyze: Analyser
+      analyze_prompt_placeholder: Dites à Scout qui c'est…
+      back_aria: Retour aux contacts
+      documents_heading: Documents
+      email_history_heading: Historique des e-mails
+      emails_exchanged_label: E-mails échangés
+      go: OK
+      last_contact_ago: il y a %{time}
+      last_contact_label: Dernier contact
+      name_label: Nom
+      no_email_history: Aucun historique d'e-mails disponible.
+      no_subject: "(sans objet)"
+      re_analyze: Ré-analyser
+      relationship_label: Relation
+      run_analysis_prompt: Lancez l'analyse pour créer un profil pour ce contact.
+      scouts_analysis: Analyse de Scout
+    skim:
+      approve: Approuver
+      back: Retour aux contacts
+      block: Bloquer
+      close: Fermer
+      close_aria: Retour aux contacts
+      done_subtitle: Aucun nouvel expéditeur à examiner pour le moment.
+      done_title: Tout est à jour
+      emails:
+        one: "%{count} e-mail"
+        other: "%{count} e-mails"
+      empty_subtitle: Les nouveaux expéditeurs apparaîtront ici au fur et à mesure.
+      empty_title: Rien à examiner
+      go_back: Expéditeur précédent
+      guide_approve: laisse leurs e-mails arriver dans votre boîte de réception
+      guide_block: archive automatiquement tout ce qu'ils envoient
+      guide_skip: les laisse de côté pour plus tard
+      new_sender: Nouvel expéditeur
+      no_summary: Scout n'a pas encore analysé cet expéditeur.
+      progress: "%{done} sur %{total}"
+      progress_aria: Progression de la revue des nouveaux expéditeurs
+      skip: Ignorer
+      subtitle: 'Choisissez quels nouveaux expéditeurs atteignent votre boîte de réception
+        : approuvez ceux que vous voulez, bloquez les autres.'
+      title: Nouveaux expéditeurs
+      touch_hint: Balayez pour passer d'un expéditeur à l'autre
+    state:
+      allowed_toast: "%{name} autorisé."
+      block: Bloquer
+      block_confirm: Bloquer cet expéditeur ? Ses e-mails existants seront archivés
+        et quitteront la boîte de réception.
+      blocked_toast: "%{name} bloqué — archivage de ses e-mails."
+      star: Favori
+      starred: En favori
+      starred_toast: "%{name} ajouté aux favoris."
+      unblock: Débloquer
+      unblocked_toast: "%{name} débloqué — restauration de ses e-mails."
+      unstar: Retirer des favoris
+      unstarred_toast: "%{name} retiré des favoris."
+    update:
+      updated_toast: Contact mis à jour.

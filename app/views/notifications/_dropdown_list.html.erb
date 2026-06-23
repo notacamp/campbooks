@@ -1,0 +1,21 @@
+<% if notifications.any? %>
+  <% needs, rest = notifications.partition(&:priority_action_required?) %>
+  <% if needs.any? %>
+    <div class="px-3 pt-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"><%= t(".needs_you") %></div>
+    <div class="divide-y divide-border/60">
+      <% needs.each do |n| %>
+        <%= render(Campbooks::NotificationItem.new(notification: n, compact: true)) %>
+      <% end %>
+    </div>
+  <% end %>
+  <% if rest.any? %>
+    <div class="px-3 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground <%= 'border-t border-border/60 mt-1' if needs.any? %>"><%= t(".earlier") %></div>
+    <div class="divide-y divide-border/60">
+      <% rest.each do |n| %>
+        <%= render(Campbooks::NotificationItem.new(notification: n, compact: true)) %>
+      <% end %>
+    </div>
+  <% end %>
+<% else %>
+  <%= render(Campbooks::EmptyState.new(variant: :inline, title: t(".all_caught_up"))) %>
+<% end %>

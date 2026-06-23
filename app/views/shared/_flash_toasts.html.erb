@@ -1,0 +1,4 @@
+<%# Ephemeral toast flashes (success, info). Rendered inside the #action_toasts region. %>
+<% flash_toasts.each do |notification| %>
+  <%= render(Campbooks::ActionToast.new(message: notification[:message], variant: notification[:severity])) %>
+<% end %>

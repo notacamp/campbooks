@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -e
+
+# Install gems if Gemfile changed or first run
+bundle check >/dev/null 2>&1 || bundle install --jobs 4 --retry 2
+
+# Run pending migrations (campbooks uses solid_queue/cache/cable schemas too)
+bin/rails db:prepare 2>/dev/null || true
+
+# Bootsnap cache outside the volume mount (avoids permission issues)
+export BOOTSNAP_CACHE_DIR=/tmp/bootsnap
+
+# Remove stale server PID
+rm -f tmp/pids/server.pid
+
+exec "$@"

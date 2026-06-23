@@ -1,0 +1,11 @@
+---
+pt:
+  activity:
+    index:
+      all: Tudo
+      count:
+        one: 1 evento
+        other: "%{count} eventos"
+      empty: Ainda não há atividade.
+      heading: Atividade
+      subheading: Tudo o que aconteceu no seu espaço de trabalho.

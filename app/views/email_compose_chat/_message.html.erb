@@ -1,0 +1,8 @@
+<%= render(Campbooks::ChatMessage.new(
+  message: agent_message,
+  context: :compose_chat,
+  show_actions: false
+)) %>
+<% if agent_message.from_ai? && agent_message.ai_suggested_actions.any? %>
+  <%= render "email_compose_chat/actions", actions: agent_message.ai_suggested_actions %>
+<% end %>

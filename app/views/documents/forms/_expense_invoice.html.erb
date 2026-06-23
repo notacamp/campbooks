@@ -1,0 +1,31 @@
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  <%= render Campbooks::Input.new("document[vendor_name]", label: t(".vendor_name"), value: f.object.vendor_name) %>
+
+  <%= render Campbooks::Input.new("document[vendor_nif]", label: t(".vendor_nif"), value: f.object.vendor_nif, placeholder: "123456789") %>
+
+  <%= render Campbooks::Input.new("document[buyer_nif]", label: t(".buyer_nif"), value: f.object.buyer_nif, placeholder: "518692663") %>
+
+  <%= render Campbooks::Input.new("document[document_date]", type: :date, label: t(".document_date"), value: f.object.document_date) %>
+
+  <%= render Campbooks::Input.new("document[due_date]", type: :date, label: t(".due_date"), value: f.object.due_date) %>
+
+  <%= render Campbooks::Input.new("document[invoice_number]", label: t(".invoice_number"), value: f.object.invoice_number) %>
+
+  <%= render Campbooks::Input.new("document[amount_cents]", type: :number, label: t(".amount_cents"), value: f.object.amount_cents) %>
+
+  <%= render Campbooks::Input.new("document[currency]", label: t(".currency"), value: f.object.currency) %>
+
+  <%= render Campbooks::Input.new("document[tax_amount_cents]", type: :number, label: t(".tax_amount_cents"), value: f.object.tax_amount_cents) %>
+
+  <%= render Campbooks::Input.new("document[tax_rate]", type: :number, label: t(".tax_rate"), value: f.object.tax_rate, step: 0.01) %>
+
+  <%= render Campbooks::Select.new("document[expense_category]", label: t(".expense_category"),
+        options: Document.expense_categories.keys.map { |k| [ human_enum(Document, :expense_category, k), k ] },
+        selected: f.object.expense_category, include_blank: t(".select_category")) %>
+
+  <%# Hidden field so unchecking persists false (Campbooks::Checkbox has no companion). %>
+  <div class="flex items-end">
+    <input type="hidden" name="document[company_vat_present]" value="0">
+    <%= render Campbooks::Checkbox.new("document[company_vat_present]", label: t(".company_vat_present"), checked: f.object.company_vat_present) %>
+  </div>
+</div>

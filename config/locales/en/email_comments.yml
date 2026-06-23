@@ -1,0 +1,19 @@
+---
+en:
+  email_comments:
+    draft:
+      discard: Discard
+      drafted_reply: drafted a reply
+      drafted_reply_outdated: drafted a reply (outdated)
+      edit_in_composer: Edit in composer
+      save_draft_label: Save draft
+      send_reply_confirm: Send this reply now?
+    draft_questions:
+      answer_placeholder: Type your answer…
+      needs_details: needs a few details before drafting
+    draft_saved:
+      discard: Discard
+      saved_to_zoho: Saved to Zoho
+      send_confirm: Send this draft now?
+    form:
+      placeholder: Comment, or tag a teammate or @scout…

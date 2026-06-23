@@ -1,0 +1,11 @@
+<p style="<%= email_text_greeting %>"><%= t(".greeting", name: @signup_request.name) %></p>
+
+<p style="<%= email_text_body %>">
+  <%= t(".body") %>
+</p>
+
+<%= email_button(@url, t(".complete_button")) %>
+
+<p style="<%= email_text_meta %>"><%= t(".unique") %></p>
+
+<p style="<%= email_text_muted %>"><%= t(".ignore") %></p>

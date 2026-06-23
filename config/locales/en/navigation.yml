@@ -1,0 +1,32 @@
+---
+en:
+  navigation:
+    settings:
+      groups:
+        ai_and_automation: AI & automation
+        workspace: Workspace
+        your_account: Your account
+      items:
+        account: Account
+        ai_providers_and_services: AI providers & services
+        api_access: API access
+        general: General
+        integrations: Integrations
+        members: Members
+        notifications: Notifications
+        security: Security
+  statuses:
+    approved: Approved
+    completed: Completed
+    failed: Failed
+    fetched: Fetched
+    generated: Generated
+    generating: Generating
+    ignored: Ignored
+    pending: Pending
+    processed: Processed
+    processing: Processing
+    rejected: Rejected
+    review: Review
+    running: Running
+    sent: Sent

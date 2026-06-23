@@ -1,0 +1,24 @@
+<%# Bottom-right email reader (a full-width bottom sheet on mobile). Mounted in
+    both the application and email layouts; the email-drawer controller
+    intercepts /email_messages/:id clicks — in the List/Board inbox layouts, or
+    anywhere off the inbox — and lazy-loads the message into the inner frame. %>
+<%= render(Campbooks::EmailDrawer.new(size: :lg)) do |drawer| %>
+  <% drawer.with_header do %>
+    <svg class="w-4 h-4 text-muted-foreground" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 8l7.89 4.26a2 2 0 001.92 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+    </svg>
+    <%= render(Campbooks::IconButton.new(aria_label: t("shared.actions.close"), size: :sm,
+          data: { action: "click->email-drawer#close" })) do %>
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
+    <% end %>
+  <% end %>
+  <% drawer.with_body do %>
+    <%= turbo_frame_tag "email_drawer_content", src: nil, loading: :lazy do %>
+      <div class="flex items-center justify-center py-12">
+        <%= render(Campbooks::Spinner.new(size: :md)) %>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>

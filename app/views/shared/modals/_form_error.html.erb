@@ -1,0 +1,3 @@
+<% if local_assigns[:error].present? %>
+  <%= render(Campbooks::Alert.new(variant: :error, message: error)) %>
+<% end %>

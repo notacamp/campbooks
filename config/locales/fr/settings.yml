@@ -1,0 +1,481 @@
+---
+fr:
+  settings:
+    api_clients:
+      index:
+        title: Accès API
+        subtitle: Créez des clients OAuth pour accéder à vos données Campbooks depuis vos propres applications et scripts.
+        new_client: Nouveau client
+        col_name: Nom
+        col_client_id: ID client
+        col_scopes: Autorisations
+        col_created: Créé le
+        regenerate: Régénérer le secret
+        regenerate_confirm: Régénérer le secret de ce client ? Le secret actuel cesse de fonctionner immédiatement.
+        revoke: Révoquer les jetons
+        revoke_confirm: Révoquer tous les jetons actifs de ce client ? Les applications qui l'utilisent devront obtenir un nouveau jeton.
+        delete: Supprimer
+        delete_confirm: Supprimer le client « %{name} » ? Cette action est irréversible.
+        no_clients_title: Aucun client API pour le moment
+        no_clients_desc: Créez un client pour obtenir un ID et un secret pour l'API Campbooks.
+      new:
+        title: Nouveau client API
+        subtitle: Donnez un nom au client et choisissez ce à quoi il peut accéder.
+        name_label: Nom
+        name_placeholder: ex. Synchronisation de facturation
+        name_hint: Une étiquette pour reconnaître ce client plus tard.
+        scopes_label: Autorisations
+        scopes_hint: N'accordez que l'accès dont ce client a besoin.
+        create: Créer le client
+        cancel: Annuler
+      reveal:
+        title: Client créé
+        subtitle: Copiez maintenant le secret de « %{name} ».
+        warning: C'est la seule fois que le secret du client est affiché. Conservez-le en lieu sûr — vous pourrez le régénérer plus tard si vous le perdez.
+        client_id_label: ID client
+        client_secret_label: Secret client
+        copy: Copier
+        next_steps_title: Échangez-les contre un jeton d'accès
+        done: Terminé
+      create:
+        scopes_required: Sélectionnez au moins une autorisation.
+      revoke:
+        revoked: Tous les jetons de « %{name} » ont été révoqués.
+      destroy:
+        deleted: Le client « %{name} » a été supprimé.
+    account:
+      analyze_writing_style:
+        queued: Scout analyse vos e-mails envoyés — votre profil de style apparaîtra
+          ici sous peu.
+      delete:
+        cancel: Annuler
+        confirm_email_label: Saisissez votre adresse e-mail pour confirmer
+        confirm_email_placeholder: votre@email.com
+        confirm_password_label: Mot de passe actuel
+        delete_button: Supprimer définitivement mon compte
+        member_items: Votre compte, vos sessions personnelles, notifications et préférences.
+          Les données partagées de l'espace de travail (e-mails, documents, calendriers)
+          ne seront pas supprimées.
+        member_warning: Vous êtes l'un des membres de cet espace de travail. La suppression
+          de votre compte vous retirera de l'espace de travail. Tous les e-mails,
+          documents et calendriers partagés resteront accessibles aux autres membres.
+        sole_owner_items: Votre compte, l'intégralité de l'espace de travail, tous
+          les comptes e-mail et leurs messages, tous les documents et pièces jointes,
+          tous les calendriers et événements, ainsi que toutes les autres données
+          de l'espace de travail.
+        sole_owner_warning: Vous êtes le seul membre de cet espace de travail. La
+          suppression de votre compte effacera définitivement l'intégralité de l'espace
+          de travail, y compris tous les comptes e-mail, documents, calendriers et
+          données associées.
+        subtitle: Cette action est permanente et ne peut pas être annulée.
+        title: Supprimer le compte
+        what_will_be_deleted: Ce qui sera supprimé
+      destroy:
+        deletion_scheduled: Votre compte est en cours de suppression. Vous avez été
+          déconnecté.
+        wrong_email: L'adresse e-mail ne correspond pas.
+        wrong_password: Le mot de passe actuel est incorrect.
+      language:
+        failed: Impossible de mettre à jour votre langue. Veuillez réessayer.
+        updated: Langue mise à jour.
+      show:
+        change_password: Changer le mot de passe
+        confirm_password: Confirmer le nouveau mot de passe
+        current_password: Mot de passe actuel
+        danger_zone_desc: Supprimer votre compte est permanent et irréversible.
+        danger_zone_title: Zone de danger
+        data_export_button: Télécharger mes données
+        data_export_desc: Téléchargez une copie de vos données personnelles (profil,
+          sessions, conversations IA, etc.) dans un fichier JSON.
+        data_export_title: Vos données
+        delete_account_button: Supprimer le compte
+        language_subtitle: Choisissez la langue de votre interface Campbooks.
+        language_title: Langue
+        new_password: Nouveau mot de passe
+        privacy_policy: Politique de confidentialité
+        save_language: Enregistrer
+        subtitle: Gérez votre mot de passe et vos préférences de compte.
+        terms_of_service: Conditions d'utilisation
+        title: Paramètres du compte
+        update_password: Mettre à jour le mot de passe
+        writing_style_analyze: Analyser mon style d'écriture
+        writing_style_label: Votre style d'écriture
+        writing_style_learned_empty: Scout n'a pas encore analysé vos e-mails envoyés.
+        writing_style_learned_label: Appris de vos e-mails envoyés
+        writing_style_placeholder: 'ex. : je garde des réponses chaleureuses mais
+          brèves, j''appelle les gens par leur prénom et je signe Sam.'
+        writing_style_save: Enregistrer le style d'écriture
+        writing_style_subtitle: Décrivez votre façon d'écrire — salutations, signature,
+          ton, longueur — et Scout adoptera votre voix lorsqu'il rédige des réponses.
+        writing_style_title: Style d'écriture
+      update:
+        password_updated: Mot de passe mis à jour.
+        wrong_password: Le mot de passe actuel est incorrect.
+      writing_style:
+        failed: Impossible d'enregistrer votre style d'écriture. Veuillez réessayer.
+        updated: Style d'écriture enregistré.
+    ai:
+      adapter_card:
+        api_key_stored: Clé API enregistrée
+        delete: Supprimer
+        delete_confirm: Supprimer « %{name} » ?
+        edit: Modifier
+        no_key: Aucune clé API configurée
+        platform_managed: Géré par Campbooks AI
+        using_env_key: Utilise %{key}
+      adapter_modal:
+        api_key_placeholder_hosted: Saisissez votre clé API
+        api_key_placeholder_self_hosted: Laisser vide pour utiliser la variable d'environnement
+        create_provider: Créer un fournisseur
+        endpoint_url_label: URL du point d'accès (facultatif)
+        endpoint_url_placeholder: Point d'accès personnalisé ou vide pour la valeur
+          par défaut
+        provider_label: Fournisseur
+        save_changes: Enregistrer les modifications
+      show:
+        add_text_provider: Ajouter un fournisseur texte
+        add_vision_provider: Ajouter un fournisseur vision
+        ai_mode_heading: Fonctionnement de l'IA
+        create_provider_first: Créez d'abord un fournisseur IA
+        create_provider_first_desc: Vous devez disposer d'au moins un fournisseur
+          IA avant de configurer les services.
+        creativity_label: Créativité
+        enabled_label: Activé
+        how_it_works_body: Créez des fournisseurs IA (connexions API nommées), puis
+          assignez-les à chaque service. Utilisez des fournisseurs différents pour
+          différentes tâches — les fournisseurs avec vision (OpenAI, Anthropic, Gemini)
+          pour l'analyse de documents, et n'importe quel fournisseur pour les tâches
+          texte.
+        how_it_works_label: Comment ça fonctionne
+        instructions_hint: Facultatif. 2 000 caractères max. Ajoutées en tant que
+          préférences — ne remplacent pas les règles fondamentales ni le format JSON.
+        instructions_label: Instructions pour Scout
+        instructions_placeholder: Instructions facultatives pour Scout...
+        managed_offer: Vous ne voulez pas gérer de clés API ? Laissez Campbooks gérer
+          l'IA pour vous.
+        max_tokens_label: Longueur maximale de la réponse
+        not_configured: non configuré
+        provider_label: Fournisseur
+        providers_heading: Fournisseurs IA
+        save_service: Enregistrer %{name}
+        select_provider: Sélectionnez un fournisseur…
+        services_desc: Chaque tâche effectuée par Scout. Développez-en une pour choisir
+          son fournisseur et ajuster son comportement.
+        services_heading: Services IA
+        subtitle: Connectez des fournisseurs IA, puis assignez-en un à chaque tâche
+          effectuée par Scout.
+        switch_to_byo: Utiliser mes propres clés
+        switch_to_byo_confirm: Passer à vos propres clés API ? Campbooks cessera d'exécuter
+          l'IA pour cet espace de travail jusqu'à ce que vous ajoutiez un fournisseur.
+        switch_to_managed: Utiliser Campbooks AI
+        text_subheading: Chat & classification
+        text_subheading_note: "— tous les fournisseurs conviennent pour les tâches
+          texte"
+        title: Fournisseurs et services IA
+        toolbar_bold: Gras
+        toolbar_bullet: Liste à puces
+        toolbar_italic: Italique
+        toolbar_numbered: Liste numérotée
+        toolbar_redo: Rétablir
+        toolbar_undo: Annuler
+        vision_providers_deepseek_note: ne peut pas traiter les images/PDF — à utiliser
+          pour les services texte uniquement.
+        vision_providers_heading: Fournisseurs avec vision
+        vision_subheading: Analyse de documents
+        vision_subheading_note: "— OpenAI, Anthropic, Gemini (avec vision)"
+      switch_mode:
+        invalid_mode: Mode d'IA inconnu.
+        managed_unavailable: Campbooks AI n'est pas disponible sur cette installation.
+        switched_to_byo: Vous êtes passé à vos propres clés. Ajoutez un fournisseur
+          ci-dessous pour activer l'IA.
+        switched_to_managed: Campbooks AI est maintenant activé.
+    general:
+      show:
+        ai_providers_hint: Vous cherchez les fournisseurs IA et les paramètres de
+          modèle ? Ils se trouvent désormais sous %{link}.
+        ai_providers_link_text: Fournisseurs et services IA
+        profile_configured: Profil configuré — Scout a le contexte de votre espace
+          de travail
+        save_profile: Enregistrer le profil
+        subtitle: Votre profil d'espace de travail et la façon dont Scout comprend
+          votre activité.
+        title: Général
+        workspace_context_label: Décrivez votre espace de travail, votre rôle et votre
+          activité
+        workspace_context_placeholder: 'Exemple : Je dirige Not A Camp, un cabinet
+          de conseil qui aide les entreprises dans leur gestion financière…'
+        workspace_profile_desc: Cette description est incluse dans les invites IA
+          pour aider Scout à comprendre qui vous êtes, ce que fait votre espace de
+          travail et ce qui vous importe.
+        workspace_profile_heading: Profil de l'espace de travail
+    integrations:
+      calendars:
+        show:
+          active: Actif
+          calendars_heading: Calendriers
+          calendars_pending: Les calendriers apparaîtront ici après la première synchronisation.
+          connect_desc: Les calendriers accompagnent vos comptes e-mail connectés.
+            Connectez Google ou Zoho et son calendrier apparaît ici automatiquement,
+            avec synchronisation dans les deux sens. Vous avez déjà connecté un compte
+            ? Reconnectez-le pour accorder l'accès au calendrier.
+          connect_google: Connecter Google
+          connect_heading: Ajouter un calendrier
+          connect_zoho: Connecter Zoho
+          disconnect_confirm: Déconnecter %{name} ? La synchronisation du calendrier
+            s'arrêtera.
+          empty_desc: Connectez un calendrier Google ou Zoho pour commencer.
+          empty_title: Aucun calendrier connecté
+          inactive: Reconnexion requise
+          manage_access: Gérer l'accès
+          'off': Désactivé
+          primary: principal
+          reconnect: Reconnecter
+          subtitle: Connectez des calendriers Google ou Zoho et gérez des événements
+            avec la synchronisation bidirectionnelle.
+          synced: Synchronisé
+          title: Calendriers
+      connections:
+        edit:
+          title: Modifier la connexion
+        form:
+          auth_hint: Comment les requêtes s'authentifient. Les champs ci-dessous s'appliquent
+            au type correspondant ; les autres peuvent être laissés vides.
+          auth_label: Authentification
+          base_url_hint: L'Action personnalisée d'un flux de travail ajoute son chemin
+            à cette URL. Les hôtes en boucle locale et privés sont bloqués.
+          base_url_label: URL de base
+          base_url_placeholder: https://api.stripe.com
+          create_connection: Créer la connexion
+          header_name_hint: Pour l'authentification « En-tête ».
+          header_name_label: Nom de l'en-tête
+          header_name_placeholder: X-Api-Key
+          name_label: Nom
+          name_placeholder: Stripe (prod)
+          save_connection: Enregistrer la connexion
+          secret_hint: Stocké de façon chiffrée. Utilisé comme jeton bearer, valeur
+            d'en-tête ou mot de passe basique.
+          secret_label: Secret
+          secret_placeholder_existing: Laisser vide pour conserver l'actuel
+          secret_placeholder_new: Jeton / mot de passe / valeur d'en-tête
+          username_hint: Pour l'authentification « Basique ».
+          username_label: Nom d'utilisateur
+          username_placeholder: utilisateur
+        index:
+          add_connection: Ajouter une connexion
+          col_auth: Authentification
+          col_base_url: URL de base
+          col_name: Nom
+          delete: Supprimer
+          delete_confirm: Supprimer « %{name} » ? Les étapes de flux de travail qui
+            l'utilisent cesseront de fonctionner.
+          edit: Modifier
+          no_connections_desc: Ajoutez une intégration API enregistrée pour que les
+            flux de travail puissent l'appeler avec une étape Action personnalisée.
+          no_connections_title: Aucune connexion pour l'instant
+          subtitle: Intégrations API enregistrées que vos flux de travail peuvent
+            appeler avec une étape Action personnalisée.
+          title: Connexions
+        new:
+          subtitle: Enregistrez une intégration API que vos flux de travail peuvent
+            appeler avec une Action personnalisée.
+          title: Ajouter une connexion
+      google_drive:
+        show:
+          col_auto_push: Envoi automatique
+          col_document_type: Type de document
+          col_drive_folder: Dossier Drive
+          col_subfolders: Sous-dossiers
+          configure: Configurer
+          connect_button: Connecter Google Drive
+          connect_desc_html: Connectez votre compte Google pour envoyer des documents
+            vers Google Drive. Campbooks n'accède qu'aux fichiers qu'il crée (portée
+            %{scope}).
+          connected_account_heading: Compte connecté
+          connected_as: Connecté en tant que
+          connected_label: Connecté
+          disconnect: Déconnecter
+          disconnect_confirm: Déconnecter Google Drive ? Les uploads de documents
+            s'arrêteront.
+          drive_org_desc: Chaque type de document peut avoir son propre dossier, son
+            modèle de nommage et sa structure de sous-dossiers.
+          drive_org_heading: Comment Drive organise vos fichiers
+          edit_config: Modifier
+          folder_set: Dossier défini
+          off_badge: Désactivé
+          on_badge: Activé
+          reconnect_button: Reconnecter Google Drive
+          reconnect_prompt: Reconnectez pour accorder un accès complet à Drive — nécessaire
+            pour parcourir et sélectionner des dossiers existants lors de l'envoi
+            de fichiers.
+          subtitle: Envoyez des documents vers Google Drive avec des règles de dossier
+            et de nommage par type.
+          title: Google Drive
+      google_drive_configs:
+        edit:
+          auto_push_hint: Lorsque cette option est activée, les documents approuvés
+            de ce type sont automatiquement uploadés vers Google Drive.
+          auto_push_label: Envoi automatique à l'approbation du document
+          folder_id_hint_html: 'Trouvez-le dans l''URL du dossier Google Drive : %{url}'
+          folder_id_label: ID du dossier Drive
+          folder_id_placeholder: ex. 1a2b3c4d5e...
+          folder_path_hint: Un libellé lisible affiché dans l'interface. Non utilisé
+            pour l'upload réel.
+          folder_path_label: Libellé du dossier
+          folder_path_placeholder: ex. Campbooks / Factures
+          naming_pattern_hint: 'Espaces réservés disponibles : {date}, {entity}, {reference},
+            {type}, {vendor}, {id}'
+          naming_pattern_label: Modèle de nommage des fichiers
+          subfolder_pattern_hint_html: "<strong>Plat</strong> : Tous les fichiers
+            sont placés directement dans le dossier cible.<br><strong>Année</strong>
+            : Organisé par année (ex. /Dossier/2026/).<br><strong>Année/Mois</strong>
+            : Organisé par année et mois (ex. /Dossier/2026/05_Mai/).<br><strong>Entité</strong>
+            : Organisé par nom d'entité (fournisseur ou client)."
+          subfolder_pattern_label: Structure de sous-dossiers
+          subtitle: Contrôlez la façon dont les documents de ce type sont envoyés
+            vers Google Drive.
+      index:
+        show:
+          api_connections_desc: Enregistrez des intégrations API sortantes (URL de
+            base + authentification) une seule fois, puis appelez-les depuis n'importe
+            quel flux de travail avec une étape Action personnalisée — sans coller
+            vos secrets dans chaque étape.
+          api_connections_heading: Connexions API
+          api_connections_manage: Gérer les connexions
+          calendars_configure: Configurer
+          calendars_desc: Connectez des calendriers Google ou Zoho pour voir et gérer
+            des événements dans Campbooks, avec synchronisation bidirectionnelle.
+          calendars_heading: Calendriers
+          connected: Connecté
+          connection: connexion
+          connections:
+            one: "%{count} connexion"
+            other: "%{count} connexions"
+          google_drive_configure: Configurer
+          google_drive_desc: Envoyez automatiquement les documents approuvés vers
+            des dossiers Google Drive. Chaque type de document dispose de son propre
+            dossier avec des règles de nommage personnalisables.
+          google_drive_heading: Google Drive
+          none_yet: Aucune pour l'instant
+          not_connected: Non connecté
+          notion_configure: Configurer
+          notion_desc: Gardez les bases de données Notion synchronisées avec Campbooks.
+            Les modifications se propagent dans les deux sens — mettez à jour un document
+            ici et il se met à jour dans Notion, et vice versa.
+          notion_heading: Notion
+          subtitle: Connectez des services externes pour la synchronisation et l'export
+            de documents.
+          title: Intégrations
+          zoho_drive_configure: Configurer
+          zoho_drive_desc: Envoyez des documents vers Zoho WorkDrive, organisés par
+            type de document dans des dossiers dédiés. Associez chaque type à son
+            propre emplacement Drive.
+          zoho_drive_heading: Zoho Drive
+      notion:
+        show:
+          col_database: Base de données Notion
+          col_document_type: Type de document
+          col_pull: Récupération
+          col_push: Envoi
+          connect_another: Connecter un autre espace de travail
+          connect_button: Connecter Notion
+          connected_label: Connecté
+          connected_to: Connecté à
+          destinations_heading: Destinations des documents dans Notion
+          disconnect: Déconnecter
+          disconnect_confirm: Déconnecter l'intégration Notion ?
+          edit: Modifier
+          edit_doc_type_link: Modifiez un type de document
+          manual_toggle: 'Avancé : connecter avec un jeton d''intégration'
+          mappings_desc: Configurez à quelle base de données Notion chaque type de
+            document est associé et comment les champs sont traduits. Modifiez un
+            type de document pour configurer son association Notion.
+          no_mappings: Aucune association configurée.
+          no_mappings_hint: pour ajouter une association à une base de données Notion.
+          oauth_desc: Connectez un espace de travail Notion. Vous choisirez quelles
+            pages et bases de données Campbooks peut accéder dans Notion.
+          off_badge: Désactivé
+          on_badge: Activé
+          per_doc_type: Par type de document
+          subtitle: Synchronisez les documents de façon bidirectionnelle avec les
+            bases de données Notion.
+          title: Notion
+          unknown_type: Inconnu
+          workspace_heading: Votre espace de travail Notion
+        token_form:
+          token_desc_html: Créez une intégration sur %{link}. Le jeton doit avoir
+            les capacités %{read} et %{insert}.
+          token_label: Jeton API Notion
+          token_placeholder: secret_...
+      zoho_drive:
+        show:
+          active: Actif
+          add_mapping_button: Ajouter l'association
+          add_mapping_heading: Ajouter une association de dossier
+          all_other_docs: Tous les autres documents
+          all_other_docs_option: Tous les autres documents
+          auto_badge: Auto
+          auto_sync_label: Synchronisation automatique des nouveaux documents
+          col_account: Compte
+          col_auto_sync: Synchronisation auto
+          col_document_type: Type de document
+          col_drive_folder: Dossier Drive
+          connect_account: Connecter un compte
+          connected_accounts_heading: Comptes connectés
+          disconnect: Déconnecter
+          disconnect_confirm: Déconnecter %{name} ?
+          display_path_label: Chemin d'affichage
+          display_path_optional: "(facultatif)"
+          display_path_placeholder: "/Factures/2025"
+          document_type_label: Type de document
+          drive_account_label: Compte Drive
+          drive_folder_id_hint: "— copiez depuis l'URL du dossier dans Zoho Drive"
+          drive_folder_id_label: ID du dossier Drive
+          drive_folder_id_placeholder: ID du dossier depuis l'URL Drive
+          folder_mappings_desc: L'emplacement de chaque type de document dans Zoho
+            Drive.
+          folder_mappings_heading: Associations de dossiers
+          inactive: Inactif
+          last_synced: 'Dernière synchronisation : %{time}'
+          manual_badge: Manuelle
+          never: Jamais
+          no_accounts: Aucun compte Drive connecté.
+          reauth: Ré-authentifier
+          remove: Supprimer
+          remove_confirm: Supprimer cette association ?
+          subtitle: Envoyez des documents vers Zoho WorkDrive, organisés par type
+            de document.
+          title: Zoho Drive
+    members:
+      index:
+        cancel_confirm: Annuler cette invitation ?
+        cancel_invitation: Annuler
+        current_members_heading: Membres actuels (%{count})
+        email_label: Adresse e-mail
+        email_placeholder: collegue@exemple.com
+        expires_in: expire dans %{time}
+        invite_button: Inviter un membre
+        invite_modal_heading: Inviter un membre
+        invited_by: Invité par %{name}
+        no_members: Aucun membre pour l'instant.
+        past_heading: Invitations passées (%{count})
+        pending_heading: Invitations en attente
+        resend: Renvoyer
+        send_invitation: Envoyer l'invitation
+        subtitle: Gérez les personnes ayant accès à cet espace de travail.
+        title: Membres
+        you_badge: vous
+    notifications:
+      index:
+        doc_types_title: Types de documents
+        no_doc_types: Aucun type de document configuré pour l'instant.
+        no_tags: Aucune étiquette configurée pour l'instant.
+        subtitle: Choisissez comment vous souhaitez être notifié des nouvelles activités.
+        tags_title: Étiquettes
+        title: Préférences de notification
+      section:
+        email_label: E-mail
+        in_app_label: Dans l'application
+        show_all: Afficher tous les %{count} éléments
+        toggle_all: Tout activer/désactiver
+    sidebar:
+      aria_label: Navigation des paramètres

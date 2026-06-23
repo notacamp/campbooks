@@ -1,0 +1,6 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+
+<div class="max-w-2xl">
+  <%= render Campbooks::Entitlements::PlanSummary.new(entitlements: @entitlements) %>
+</div>

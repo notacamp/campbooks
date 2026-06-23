@@ -1,0 +1,23 @@
+<%# A page of Rewind: append this leg's time chapters + highlight cards into the
+    timeline, then advance the lazy sentinel to the next keyset cursor — or retire
+    it and sign off at the end of the highlights. Mirrors the curated pagination. %>
+<%= turbo_stream.append "feed_timeline" do %>
+  <% @rewind_entries.each do |entry| %>
+    <% if entry[:type] == :chapter %>
+      <%= render "rewind_chapter", label: entry[:label], count: entry[:count] %>
+    <% else %>
+      <%= render Campbooks::Feed::HighlightCard.new(email: entry[:email], reason: entry[:reason]) %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<% if @rewind_next %>
+  <%= turbo_stream.replace "feed_pagination" do %>
+    <%= render "rewind_pagination", cursor: @rewind_next %>
+  <% end %>
+<% else %>
+  <%= turbo_stream.remove "feed_pagination" %>
+  <%= turbo_stream.append "feed_timeline" do %>
+    <%= render "feed_end" %>
+  <% end %>
+<% end %>

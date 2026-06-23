@@ -1,0 +1,75 @@
+---
+en:
+  calendar:
+    index:
+      connect_cta: Connect a calendar
+      empty_desc: Connect a Google or Zoho calendar to see and manage your events
+        here.
+      empty_title: No calendar connected
+      new_event: New event
+      next: Next
+      previous: Previous
+      reminders: Reminders
+      title: Calendar
+      today: Today
+      upcoming: Upcoming
+      view_agenda: Agenda
+      view_day: Day
+      view_month: Month
+      view_week: Week
+  calendar_events:
+    create:
+      created: Event created.
+      no_calendar: Pick a calendar to add the event to.
+    destroy:
+      deleted: Event deleted.
+    edit:
+      rsvp_prompt: Will you attend?
+      title: Edit event
+    errors:
+      not_writable: You don't have permission to change this event.
+    form:
+      all_day_label: All day
+      calendar_label: Calendar
+      cancel: Cancel
+      color_default: Calendar color
+      color_label: Color
+      create: Create event
+      delete: Delete event
+      delete_confirm: Delete this event?
+      description_label: Description
+      ends_label: Ends
+      location_label: Location
+      recurrence_all: All events in the series
+      recurrence_label: Apply to
+      recurrence_this: This event
+      rsvp_accepted: 'Yes'
+      rsvp_declined: 'No'
+      rsvp_tentative: Maybe
+      save: Save
+      starts_label: Starts
+      title_label: Title
+      title_placeholder: Add a title
+    new:
+      title: New event
+    rsvp:
+      invalid_rsvp: Invalid response.
+      rsvp_saved: Your response was saved.
+    update:
+      updated: Event updated.
+  components:
+    calendar:
+      agenda_list:
+        empty_desc: No events in this range.
+        empty_title: Nothing coming up
+        today: Today
+        tomorrow: Tomorrow
+      event_modal:
+        aria_label: Event
+      event_row:
+        all_day: All day
+        untitled: "(No title)"
+        video_call: Video call
+      week_grid:
+        add: "+ Add"
+        untitled: "(No title)"

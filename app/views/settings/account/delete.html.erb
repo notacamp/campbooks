@@ -1,0 +1,54 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+
+<div class="max-w-xl space-y-6">
+  <div class="bg-card rounded-xl shadow-sm border border-red-200 p-6 space-y-4">
+    <div class="flex items-start gap-3">
+      <div class="shrink-0 mt-0.5">
+        <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+        </svg>
+      </div>
+      <div>
+        <% if @sole_owner %>
+          <p class="text-sm font-medium text-red-700"><%= t(".sole_owner_warning") %></p>
+        <% else %>
+          <p class="text-sm font-medium text-gray-700"><%= t(".member_warning") %></p>
+        <% end %>
+      </div>
+    </div>
+
+    <div>
+      <h3 class="text-sm font-semibold text-gray-900 mb-2"><%= t(".what_will_be_deleted") %></h3>
+      <p class="text-sm text-gray-600">
+        <% if @sole_owner %>
+          <%= t(".sole_owner_items") %>
+        <% else %>
+          <%= t(".member_items") %>
+        <% end %>
+      </p>
+    </div>
+  </div>
+
+  <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-6">
+    <%= form_with url: settings_account_path, method: :delete, class: "space-y-4" do |f| %>
+      <div>
+        <%= f.label :current_password, t(".confirm_password_label"), class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.password_field :current_password, required: true, autocomplete: "current-password",
+              class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm" %>
+      </div>
+
+      <div>
+        <%= f.label :confirm_email, t(".confirm_email_label"), class: "block text-sm font-medium text-gray-700 mb-1" %>
+        <%= f.email_field :confirm_email, required: true, placeholder: t(".confirm_email_placeholder"),
+              autocomplete: "off",
+              class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm" %>
+      </div>
+
+      <div class="flex flex-col sm:flex-row gap-3 pt-2">
+        <%= render(Campbooks::Button.new(variant: :danger, type: :submit)) { t(".delete_button") } %>
+        <%= render(Campbooks::Button.new(variant: :outline, href: settings_account_path)) { t(".cancel") } %>
+      </div>
+    <% end %>
+  </div>
+</div>

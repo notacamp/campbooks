@@ -1,0 +1,48 @@
+# Campbooks — iOS fastlane.
+#
+# Setup (after enrolling in the Apple Developer Program):
+#   1. brew install xcodegen          # the .xcodeproj is generated from project.yml
+#   2. bundle install                 # installs fastlane (see ../Gemfile)
+#   3. set DEVELOPMENT_TEAM in project.yml, then run `xcodegen`
+#   4. create an App Store Connect API key, then export:
+#        export ASC_KEY_ID=XXXXXXXXXX
+#        export ASC_ISSUER_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+#        export ASC_KEY_PATH=/abs/path/AuthKey_XXXXXXXXXX.p8
+#   5. bundle exec fastlane beta
+default_platform(:ios)
+
+def asc_api_key
+  app_store_connect_api_key(
+    key_id: ENV.fetch("ASC_KEY_ID"),
+    issuer_id: ENV.fetch("ASC_ISSUER_ID"),
+    key_filepath: ENV.fetch("ASC_KEY_PATH"),
+  )
+end
+
+platform :ios do
+  desc "Regenerate the Xcode project from project.yml"
+  lane :gen do
+    sh("cd .. && xcodegen")
+  end
+
+  desc "Build a signed App Store release archive"
+  lane :build do
+    gen
+    build_app(
+      project: "Campbooks.xcodeproj",
+      scheme: "Campbooks",
+      configuration: "Release",
+      export_method: "app-store",
+    )
+  end
+
+  desc "Build and upload to TestFlight"
+  lane :beta do
+    api_key = asc_api_key
+    build
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: true,
+    )
+  end
+end

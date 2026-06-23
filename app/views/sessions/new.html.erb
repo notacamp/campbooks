@@ -1,0 +1,51 @@
+<div class="min-h-[60vh] flex items-center justify-center">
+  <div class="w-full max-w-md">
+    <div class="text-center mb-8">
+      <%= render(Campbooks::Logo.new(size: :lg)) %>
+      <% unless self_hosted? %>
+        <div class="mt-3 flex justify-center">
+          <%= render(Campbooks::Badge.new(variant: :accent, size: :md, class: "uppercase tracking-wide")) { t(".beta_badge") } %>
+        </div>
+      <% end %>
+      <p class="text-sm text-gray-600 mt-4"><%= t(".tagline") %></p>
+    </div>
+
+    <%= render(Campbooks::Card.new) do %>
+      <%# Native submit (turbo: false): sign-in redirects to the app (often
+          root → onboarding, a different layout), which a Turbo form submission
+          can silently fail to render — leaving the user stuck on the login page.
+          Errors are shown via a flash redirect, so disabling Turbo here is safe. %>
+      <%= form_with url: session_url, class: "space-y-5", data: { turbo: false } do |form| %>
+        <%= render(Campbooks::Input.new("email_address", type: :email, label: t(".email_label"), placeholder: t(".email_placeholder"), required: true, value: params[:email_address], autofocus: true, autocomplete: "email")) %>
+
+        <%= render(Campbooks::Input.new("password", type: :password, label: t(".password_label"), placeholder: t(".password_placeholder"), required: true, autocomplete: "current-password")) %>
+
+        <div class="pt-1">
+          <%= render(Campbooks::Button.new(variant: :primary, type: "submit", class: "w-full justify-center")) { t(".submit") } %>
+        </div>
+
+        <p class="text-center text-sm">
+          <%= link_to t(".forgot_password"), new_password_path, class: "text-accent-600 hover:text-accent-700 font-medium" %>
+        </p>
+      <% end %>
+
+      <%= render(Campbooks::Divider.new(label: t(".or"))) %>
+
+      <%# In the native app, link straight to the provider authorize URL (built
+          in the controller) so the system browser opens exactly once; on the
+          web, use the normal /session/:provider redirect. %>
+      <div class="space-y-3">
+        <%= render(Campbooks::OauthButton.new(provider: :google, href: @oauth_urls&.dig(:google) || google_session_path, size: :lg)) %>
+        <%= render(Campbooks::OauthButton.new(provider: :microsoft, href: @oauth_urls&.dig(:microsoft) || microsoft_session_path, size: :lg)) %>
+        <%= render(Campbooks::OauthButton.new(provider: :zoho, href: @oauth_urls&.dig(:zoho) || zoho_session_path, size: :lg)) %>
+      </div>
+
+      <% if public_signup_allowed? %>
+        <p class="text-center text-sm mt-6">
+          <%= t(".no_account") %>
+          <%= link_to t(".sign_up"), new_registration_path, class: "text-accent-600 hover:text-accent-700 font-medium" %>
+        </p>
+      <% end %>
+    <% end %>
+  </div>
+</div>

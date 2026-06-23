@@ -1,0 +1,120 @@
+---
+en:
+  email_actions:
+    access_denied: You don't have access to that email account.
+    add_tag:
+      not_found: No tag named '%{tag_name}' — create it in Settings → Tags first.
+      success: Tagged as '%{tag_name}'
+    allow_sender:
+      success: Allowed %{name} into the inbox.
+    archive:
+      failure: Could not archive thread
+      success: Thread archived
+    block_sender:
+      success: Blocked %{name} — their mail will be archived.
+    bulk_archive:
+      success:
+        one: Archived %{count} email
+        other: Archived %{count} emails
+    bulk_tag:
+      added:
+        one: Added tag '%{tag_name}' on %{count} email
+        other: Added tag '%{tag_name}' on %{count} emails
+      removed:
+        one: Removed tag '%{tag_name}' on %{count} email
+        other: Removed tag '%{tag_name}' on %{count} emails
+    create_calendar_event:
+      no_calendar: Connect a calendar first to add events.
+      success: Event '%{title}' added to your calendar
+    forward_email:
+      failure: Could not forward to %{to_address}
+      success: Forwarded to %{to_address}
+    pin:
+      success: Pinned to the top of your inbox.
+    reclassify:
+      success:
+        one: Re-classified %{count} email
+        other: Re-classified %{count} emails
+    remove_tag:
+      not_found: No tag named '%{tag_name}' on this email.
+      success: Tag '%{tag_name}' removed
+    send_permission_denied: You don't have permission to send from that account.
+    sender_not_found: Couldn't find the sender for this email.
+    snooze:
+      failure: Could not snooze thread
+      success: Thread snoozed until %{snoozed_until}
+    star_sender:
+      success: Starred %{name} — their emails are now promoted.
+    trash:
+      failure: Could not trash thread
+      success: Thread trashed
+    unarchive:
+      failure: Could not move thread to Inbox
+      success: Moved to Inbox
+    unblock_sender:
+      success: Unblocked %{name}.
+    unpin:
+      success: Removed from the top of your inbox.
+    unsnooze:
+      failure: Could not unsnooze thread
+      success: Thread unsnoozed
+    unstar_sender:
+      success: Removed star from %{name}.
+    upload_attachments_to_drive:
+      failure: Couldn't upload to Drive — connect Google Drive and make sure the email
+        has attachments.
+      success:
+        one: Uploaded 1 attachment to Google Drive
+        other: Uploaded %{count} attachments to Google Drive
+  jobs:
+    ai_setup_chat_reply:
+      error_generic: Scout couldn't generate suggestions just now. Please try again.
+      error_no_ai_config: Scout needs a text AI provider before it can help here.
+        Set one up, then try again.
+      error_retry: Something went wrong reaching Scout. Please try again.
+      no_suggestions_yet: Scout couldn't come up with suggestions yet — tell it a
+        bit more about your business and try again.
+      proposal_intro: Here's what I'd suggest for your %{kind}. Pick the ones you
+        want and apply them — you can tweak any of them first.
+    compose_chat_reply:
+      error: I'm sorry, I ran into an issue processing your request. Could you try
+        again?
+    email_chat_reply:
+      auto_action_failures_prefix: 'However, I couldn''t complete these actions:'
+      conversation_archived: This conversation has been archived.
+    email_process:
+      auto_replied_notice: I see you replied to this thread yourself. I've marked
+        previous drafts as outdated. Let me know if you need anything else.
+    email_reply_daemon:
+      auto_action_failures_prefix: 'However, I couldn''t complete these actions:'
+      conversation_archived: This conversation has been archived.
+  notifier:
+    account_disconnected:
+      body: Re-authenticate to resume email sync.
+      title: "%{email_address} disconnected"
+    document_failed:
+      title: Document processing failed
+    documents_need_review:
+      body: Scout wasn't confident — review and classify them.
+      title:
+        one: "%{count} document needs review"
+        other: "%{count} documents need review"
+    export_failed:
+      body: Something went wrong generating your export. Try again.
+      title: Export failed
+    export_ready:
+      body:
+        one: "%{count} document ready to download."
+        other: "%{count} documents ready to download."
+      title: Export ready
+    invitation_pending_approval:
+      body: "%{invitee_email} was invited by %{inviter_name}."
+      title: Invitation needs approval
+    scout_reply:
+      title: Scout replied
+    subject_label:
+      fallback: your inbox
+    thread_activity:
+      title: New comment from %{actor_name}
+    thread_mention:
+      title: "%{actor_name} mentioned you"

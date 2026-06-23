@@ -1,0 +1,31 @@
+# Development dependencies for host-based development (`bin/dev`).
+#
+# This is NOT the self-hosting stack — see docker-compose.yml for that. `bin/dev`
+# brings these up, then runs Rails/Tailwind/Solid Queue on the host via foreman.
+#
+# Currently just OpenSearch, which powers Contact full-text autocomplete. The app
+# runs fine without it (Contact search falls back to SQL ILIKE), but contributors
+# who want parity with production can keep it running.
+name: campbooks-dev
+
+services:
+  opensearch:
+    image: opensearchproject/opensearch:2.11.1
+    container_name: campbooks-opensearch
+    environment:
+      - discovery.type=single-node
+      - "DISABLE_SECURITY_PLUGIN=true"
+      - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=Admin123!"
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"' || curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"yellow\"'"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+volumes:
+  opensearch-data:

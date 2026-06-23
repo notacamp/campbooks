@@ -1,0 +1,6 @@
+<%# Lazily loaded into the inbox's #skim_tray turbo-frame. Renders the ring tray,
+    or nothing when there is nothing to skim. The inner #skim_tray_content is
+    refreshed live by Emails::SkimTrayBroadcaster. %>
+<%= turbo_frame_tag "skim_tray" do %>
+  <%= render "skim/tray_content", rings: @rings, doc_count: @doc_count %>
+<% end %>

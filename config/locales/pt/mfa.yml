@@ -1,0 +1,156 @@
+---
+pt:
+  components:
+    recovery_code_grid:
+      copy_all: Copiar tudo
+    security_method_card:
+      disabled: Desativado
+      enabled: Ativado
+  session_challenges:
+    create:
+      invalid_code: Não corresponde. Tente novamente.
+      try_later: Demasiadas tentativas. Tente novamente mais tarde.
+    expired: A sua sessão expirou. Inicie sessão novamente.
+    send_email_code:
+      code_sent: Enviámos um código de utilização única por e-mail.
+      try_later: Demasiados pedidos. Tente novamente mais tarde.
+    show:
+      back_to_login: Voltar ao início de sessão
+      email_intro: Enviaremos um código de utilização única para o seu endereço de
+        e-mail.
+      email_label: Código de 6 dígitos
+      email_send: Enviar-me um código
+      email_submit: Verificar
+      method_email_otp: Código por e-mail
+      method_passkey: Chave de acesso
+      method_recovery: Código de recuperação
+      method_totp: Aplicação de autenticação
+      passkey_button: Usar uma chave de acesso
+      passkey_intro: Use a sua chave de acesso ou chave de segurança para continuar.
+      passkey_unsupported: Este navegador não suporta chaves de acesso.
+      recovery_hint: Introduza um dos seus códigos de reserva de utilização única.
+      recovery_label: Código de recuperação
+      recovery_submit: Verificar
+      subtitle: Introduza o seu segundo fator para concluir o início de sessão.
+      title: Verificação em dois passos
+      totp_label: Código de 6 dígitos da sua aplicação de autenticação
+      totp_submit: Verificar
+      use_recovery: Usar um código de recuperação em alternativa
+  settings:
+    security:
+      disable:
+        disabled: A autenticação de dois fatores está agora desativada.
+        not_enabled: A autenticação de dois fatores não está configurada.
+        wrong_password: A palavra-passe está incorreta.
+      email_otp:
+        create:
+          enabled: Códigos por e-mail ativados.
+        destroy:
+          disabled: Códigos por e-mail desativados.
+      passkeys:
+        create:
+          error: Não foi possível adicionar a chave de acesso. Tente novamente.
+          success: Chave de acesso adicionada.
+        destroy:
+          success: Chave de acesso removida.
+        new:
+          cancel: Cancelar
+          intro: Siga as instruções do seu dispositivo para registar uma chave de
+            acesso ou chave de segurança.
+          name_label: Nome (opcional)
+          name_placeholder: 'ex.: YubiKey, MacBook Touch ID'
+          submit: Adicionar chave de acesso
+          title: Adicionar uma chave de acesso
+          unsupported: Este navegador não suporta chaves de acesso.
+      recovery_codes:
+        create:
+          generated: Novos códigos de recuperação gerados. Os códigos anteriores já
+            não funcionam.
+        show:
+          done: Concluído
+          empty: Ainda não tem códigos de recuperação.
+          fresh_warning: Guarde-os agora — cada código funciona uma vez e não voltarão
+            a ser mostrados.
+          regenerate: Gerar novos códigos
+          regenerate_confirm: Gerar novos códigos invalida os atuais. Continuar?
+          remaining: "%{count} códigos não utilizados restantes."
+          title: Códigos de recuperação
+      show:
+        danger_button: Desativar a 2FA
+        danger_confirm: Esta ação remove todos os seus segundos fatores. Continuar?
+        danger_description: Remove todos os segundos fatores (aplicação de autenticação,
+          chaves de acesso, códigos por e-mail e códigos de recuperação) da sua conta.
+        danger_password_label: Confirme a sua palavra-passe
+        danger_title: Desativar a autenticação de dois fatores
+        email_description: Receba um código de utilização única por e-mail ao iniciar
+          sessão. A opção menos segura — melhor usada como alternativa de reserva.
+        email_disable: Desativar
+        email_enable: Ativar
+        email_title: Código por e-mail
+        passkeys_add: Adicionar chave de acesso
+        passkeys_added_on: Adicionada em %{date}
+        passkeys_default_name: Chave de acesso
+        passkeys_description: Use Touch ID, Face ID, Windows Hello ou uma chave de
+          hardware como segundo passo.
+        passkeys_empty: Ainda não há chaves de acesso registadas.
+        passkeys_last_used: última utilização em %{date}
+        passkeys_never_used: ainda não utilizada
+        passkeys_remove: Remover
+        passkeys_remove_confirm: Remover esta chave de acesso?
+        passkeys_title: Chaves de acesso e chaves de segurança
+        recovery_description: Códigos de reserva de utilização única para iniciar
+          sessão caso perca os outros métodos.
+        recovery_remaining: "%{count} códigos não utilizados restantes"
+        recovery_title: Códigos de recuperação
+        recovery_view: Ver códigos
+        sign_in_add: Adicionar %{provider}
+        sign_in_methods_description: Inicie sessão com a sua conta Google, Microsoft
+          ou Zoho — além da sua palavra-passe ou chave de acesso.
+        sign_in_methods_empty: Ainda não há início de sessão social associado.
+        sign_in_methods_title: Início de sessão social
+        sign_in_only_method: O seu único método de início de sessão
+        sign_in_remove: Remover
+        sign_in_remove_confirm: Remover o início de sessão %{provider} da sua conta?
+        status_off: A autenticação de dois fatores está desativada. Adicione um método
+          abaixo para a ativar.
+        status_on: A autenticação de dois fatores está ativada.
+        subtitle: Adicione um segundo passo ao iniciar sessão para que uma palavra-passe
+          roubada não seja suficiente.
+        title: Segurança
+        totp_description: Gere um código de 6 dígitos com uma aplicação como 1Password,
+          Authy ou Google Authenticator.
+        totp_disable: Desativar
+        totp_disable_confirm: Desativar a aplicação de autenticação?
+        totp_enable: Configurar
+        totp_reconfigure: Reconfigurar
+        totp_title: Aplicação de autenticação
+      sign_in_methods:
+        create:
+          already_linked: O início de sessão %{provider} já está associado.
+          unknown_provider: Esse fornecedor de início de sessão não é suportado.
+        destroy:
+          last_method: É a sua única forma de iniciar sessão — adicione outro método
+            antes de a remover.
+          removed: Início de sessão %{provider} removido.
+        link_error:
+          invalid: Não foi possível concluir o início de sessão com %{provider}. Tente
+            novamente.
+          linked_to_other_user: Essa conta %{provider} já está associada a outra conta
+            Campbooks.
+        linked: Início de sessão %{provider} adicionado.
+      totp:
+        create:
+          enabled: A aplicação de autenticação está ativada.
+          invalid_code: O código não corresponde. Verifique o relógio da sua aplicação
+            e tente novamente.
+        destroy:
+          disabled: Aplicação de autenticação desativada.
+        new:
+          cancel: Cancelar
+          copy_key: Copiar
+          step1_hint: Abra a sua aplicação de autenticação e leia este código.
+          step1_title: 1. Leia o código QR
+          step2_title: 2. Ou introduza esta chave manualmente
+          step3_title: 3. Introduza o código de 6 dígitos para confirmar
+          submit: Ativar
+          title: Configurar aplicação de autenticação

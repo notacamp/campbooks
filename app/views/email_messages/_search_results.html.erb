@@ -1,0 +1,50 @@
+<%# Flat inbox search results, rendered inside the email_search_results frame.
+    Locals: messages, search_params, pagy.
+    Chips live here (not in the bar) so they refresh together with the results;
+    each chip removes its criterion via a full-page nav (keeps the bar in sync). %>
+<% chips = search_active_filters(search_params, accounts: @accounts || [], tags: @all_tags || []) %>
+
+<div class="border-b border-gray-100">
+  <% if chips.any? %>
+    <div class="flex flex-wrap items-center gap-1 px-2.5 py-1.5">
+      <% chips.each do |chip| %>
+        <%= link_to chip[:remove_path],
+              class: "group inline-flex items-center gap-1 rounded-md bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 text-[10px] px-1.5 py-0.5 transition-colors",
+              data: { turbo_frame: "_top" } do %>
+          <span class="truncate max-w-[150px]"><%= chip[:label] %></span>
+          <svg class="w-2.5 h-2.5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        <% end %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <div class="px-2.5 py-1.5">
+    <span class="text-[10px] font-medium text-gray-500"><%= t("email_messages.search.results_heading") %></span>
+  </div>
+</div>
+
+<% if messages.any? %>
+  <div id="email_search_list">
+    <% messages.each do |message| %>
+      <%= render(Campbooks::EmailSearchResult.new(message: message, link_params: search_params.to_h, active: @message&.id == message.id)) %>
+    <% end %>
+  </div>
+
+  <% if pagy&.next %>
+    <%= turbo_frame_tag "threads_pagination",
+          src: search_email_messages_path(search_params.to_h.merge(page: pagy.next, format: :turbo_stream)),
+          loading: :lazy do %>
+      <div class="flex items-center justify-center py-4">
+        <%= render(Campbooks::Spinner.new(size: :sm)) %>
+      </div>
+    <% end %>
+  <% end %>
+<% else %>
+  <div class="px-6 py-12 text-center">
+    <div class="w-10 h-10 rounded-full bg-card shadow-sm border border-gray-200 mx-auto flex items-center justify-center mb-2">
+      <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+    </div>
+    <p class="text-[11px] font-medium text-gray-500"><%= t("email_messages.search.no_results") %></p>
+    <p class="mt-1 text-[10px] text-gray-400"><%= t("email_messages.search.no_results_hint") %></p>
+  </div>
+<% end %>

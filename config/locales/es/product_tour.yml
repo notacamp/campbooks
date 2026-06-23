@@ -1,0 +1,68 @@
+---
+es:
+  components:
+    product_tour:
+      aria_label: Visita guiada
+      back: Atrás
+      next: Siguiente
+      s1_body: 'Campbooks es una bandeja de entrada que se ordena sola. En aproximadamente
+        un minuto, te mostraré las cuatro cosas que la hacen diferente: prueba cada
+        una a medida que avanzamos.'
+      s1_point_ask: Pregúntale lo que quieras a tu bandeja
+      s1_point_remind: Los plazos nunca se escapan
+      s1_point_skim: Despeja un montón entero en segundos
+      s1_point_surface: Scout destaca solo lo que te necesita
+      s1_title: Te damos la bienvenida a Campbooks
+      s2_badge: Te necesita
+      s2_eyebrow: Tu inicio
+      s2_feedback: Esa es la idea, sin abrir el correo. La notificación de LinkedIn
+        de abajo era ruido, así que Scout la dejó estar.
+      s2_summary: Un código de un solo uso para confirmar tu transferencia bancaria;
+        caduca en 10 minutos, así que conviene mirarlo ahora.
+      s2_task: Toca el mensaje que Scout marcó para ver lo que extrajo.
+      s2_title: Scout destaca lo que te necesita
+      s2_why: Scout lee cada correo en cuanto llega y trae al frente solo lo que importa.
+        Todo lo demás se queda discretamente a un lado.
+      s3_eyebrow: Skim
+      s3_feedback: Ese es todo el montón, resuelto. El correo archivado sigue siendo
+        buscable y cada acción se puede deshacer.
+      s3_progress: "%{done} de %{total} pilas despejadas"
+      s3_task: 'Recorre las tres: archiva el ruido, conserva lo que importa.'
+      s3_title: Despeja un montón en segundos
+      s3_why: Skim agrupa tu bandeja en pilas y las reproduce como Stories. Tomas
+        una decisión por pila —quedarte con lo que importa, archivar el ruido— en
+        vez de abrir decenas de correos.
+      s4_dismiss: o descartar
+      s4_extracted: 'Scout detectó una fecha límite: viernes'
+      s4_eyebrow: Recordatorios
+      s4_feedback: Listo. Reaparecerá el viernes, y puedes convertir cualquier recordatorio
+        en un evento de calendario con un toque.
+      s4_remind_cta: Recordármelo
+      s4_reminder_title: 'Pagar factura de Acme: $248.00'
+      s4_reminder_when: Recordatorio programado · viernes, 9:00
+      s4_task: Esta factura vence el viernes. Toca “Recordármelo” para programarlo.
+      s4_title: Los plazos nunca se escapan
+      s4_why: Cuando un correo trae una fecha límite o una promesa que hiciste, Scout
+        la extrae para que no quede enterrada.
+      s5_eyebrow: Scout
+      s5_feedback: Scout hace esto en tu bandeja real en cuanto la conectes, y también
+        puede redactar las respuestas.
+      s5_greeting: "¡Hola! Soy Scout. Pregúntame sobre tu bandeja de entrada, o toca
+        una sugerencia para empezar."
+      s5_prompt: "¿Qué necesita respuesta hoy?"
+      s5_reply_intro: 'Dos correos te están esperando:'
+      s5_reply_item_1: 'Sarah: preguntó por la comida del jueves'
+      s5_reply_item_2: 'Acme Supply Co.: la factura que vence el viernes'
+      s5_task: Toca la pregunta para preguntarle a Scout.
+      s5_title: Pregúntale lo que quieras a tu bandeja
+      s5_why: Scout puede buscar, resumir y actuar en tu correo y tus documentos.
+        Solo tienes que pedírselo con palabras normales.
+      s6_body: 'Ese es el ciclo: Scout destaca lo que importa, tú despejas el resto
+        en segundos con Skim, los plazos no se escapan y puedes preguntar lo que quieras.
+        Conecta tu bandeja para hacerlo realidad.'
+      s6_cta_connect: Conecta tu bandeja de entrada
+      s6_cta_explore: Explorar por mi cuenta
+      s6_title: Todo listo
+      scout_says: Scout
+      skip: Omitir visita
+      step: "%{current} de %{total}"

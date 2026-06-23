@@ -1,0 +1,21 @@
+---
+en:
+  ai_setup_chats:
+    panel:
+      empty_body: Answer a couple of quick questions and Scout will suggest %{kind_label}
+        tailored to your business — accept, edit, or skip any of them.
+      empty_heading: Scout can set this up for you
+      heading: Let Scout set up your %{kind_label}
+      input_placeholder: Type your answer…
+      kind_document_types: document types
+      kind_tags: tags
+      start: Start
+      subtitle: A couple of quick questions, then suggestions you can edit.
+      thinking: Thinking…
+    typing:
+      thinking: Thinking…
+    unavailable_frame:
+      body: Connect a text AI provider and Scout can suggest document types and tags
+        for you. It only takes a minute.
+      heading: Set up your AI provider first
+      setup_link: Set up AI →

@@ -1,0 +1,43 @@
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle", document: @document.display_title))) %>
+
+<%= render(Campbooks::Card.new(padding: :lg, class: "max-w-2xl")) do %>
+  <div class="flex items-center gap-2 mb-4">
+    <%= render(Campbooks::BrandLogo.new(brand: :notion, size: :sm)) %>
+    <h2 class="text-sm font-semibold text-gray-900"><%= t(".heading") %></h2>
+  </div>
+
+  <!-- Workspace -->
+  <% if @integrations.size > 1 %>
+    <%= form_with url: new_document_notion_export_path(@document), method: :get, data: { turbo: false }, class: "mb-5" do %>
+      <label for="integration_id" class="block text-sm font-medium text-gray-700 mb-1"><%= t(".workspace") %></label>
+      <%= select_tag :integration_id,
+            options_for_select(@integrations.map { |i| [ i.display_name, i.id ] }, @integration.id),
+            onchange: "this.form.requestSubmit()",
+            class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+    <% end %>
+  <% else %>
+    <p class="text-sm text-gray-500 mb-5"><%= t(".workspace_one", name: @integration.display_name) %></p>
+  <% end %>
+
+  <!-- Destination chooser -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
+    <%= link_to databases_document_notion_export_path(@document, integration_id: @integration.id),
+          data: { turbo_frame: "notion_export_step" },
+          class: "flex-1 border border-gray-200 rounded-lg p-4 hover:border-accent-400 hover:bg-accent-50/30 no-underline dark:border-white/10" do %>
+      <h3 class="text-sm font-semibold text-gray-900 mb-1"><%= t(".to_database") %></h3>
+      <p class="text-xs text-gray-500"><%= t(".to_database_desc") %></p>
+    <% end %>
+    <%= link_to pages_document_notion_export_path(@document, integration_id: @integration.id),
+          data: { turbo_frame: "notion_export_step" },
+          class: "flex-1 border border-gray-200 rounded-lg p-4 hover:border-accent-400 hover:bg-accent-50/30 no-underline dark:border-white/10" do %>
+      <h3 class="text-sm font-semibold text-gray-900 mb-1"><%= t(".to_page") %></h3>
+      <p class="text-xs text-gray-500"><%= t(".to_page_desc") %></p>
+    <% end %>
+  </div>
+
+  <%= turbo_frame_tag "notion_export_step" %>
+
+  <div class="mt-4">
+    <%= link_to t("shared.actions.cancel"), document_path(@document), class: "text-sm text-gray-500 hover:text-gray-700" %>
+  </div>
+<% end %>

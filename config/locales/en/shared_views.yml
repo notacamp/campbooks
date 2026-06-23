@@ -1,0 +1,94 @@
+---
+en:
+  shared:
+    doc_skim_overlay:
+      gathering_documents: Gathering documents to review…
+      review_documents_label: Review your documents
+    markdown_editor:
+      preview: Preview
+      write: Write
+    modals:
+      ai_configuration_form:
+        api_key_hint: Stored encrypted. You can get a free DeepSeek key at platform.deepseek.com.
+        api_key_label: API key
+        api_key_placeholder: Enter your API key
+        byo_description: Bring your own provider keys.
+        byo_title: Use my own keys
+        choose_mode: Please choose how you'd like to set up AI.
+        close_dialog: Close dialog
+        document_api_key_placeholder: Add a key to enable document analysis
+        documents_api_key_hint: Leave blank to skip — you can add document analysis
+          anytime.
+        documents_intro_html: 'Optional: add a vision-capable model — <strong>OpenAI</strong>,
+          Anthropic, or Gemini — to read PDFs and images. Leave the key blank to skip.'
+        documents_title: Add document & image AI
+        managed_description: No API keys — Campbooks runs the AI for you.
+        managed_title: Campbooks AI
+        provider_label: Provider
+        save: Save providers
+        step_of: Step %{step} of %{total}
+        text_intro_html: Pick the model that powers email triage, replies, and Scout
+          chat. <strong>DeepSeek</strong> is free and fast for text.
+        title: Set up your text AI
+      document_types_form:
+        add_your_own: Add your own
+        close_dialog: Close dialog
+        custom_placeholder: e.g. delivery note
+        description: Pick the ones you deal with. Scout uses these to recognize and
+          organize documents, with a smart starting prompt for each. You can fine-tune
+          them later.
+        legend: Common document types
+        submit: Add document types
+        title: What documents do you handle?
+      tags_form:
+        add_your_own: Add your own
+        close_dialog: Close dialog
+        custom_placeholder: e.g. project-alpha
+        description: Tags help Scout sort incoming email by topic and priority. Pick
+          a few to start, each comes with a smart rule you can refine later.
+        legend: Common tags
+        submit: Add tags
+        title: How do you want to organize email?
+      workspace_form:
+        city_label: City
+        city_placeholder: Lisbon
+        close_dialog: Close dialog
+        country_label: Country
+        country_placeholder: Portugal
+        postal_code_label: Postal code
+        postal_code_placeholder: 1000-001
+        save_workspace: Save workspace profile
+        step0_title: Tell us about your workspace
+        step1_description: Describe your work, the clients you serve, and what matters
+          day to day. Scout reads this on every AI request.
+        step1_title: What does your workspace do?
+        step2_description: All optional, but it helps Scout understand local regulations
+          and your tax context.
+        step2_title: Where are you based?
+        step_of: Step %{step} of %{total}
+        tax_id_label: Tax ID
+        tax_id_placeholder: '123456789'
+        type_company_description: Documents for a business, organization, or legal
+          entity.
+        type_company_label: A company
+        type_individual_description: 'My own documents: receipts, warranties, personal
+          contracts.'
+        type_individual_label: Just me
+        workspace_context_placeholder: 'Example: I run a consulting firm that helps
+          small businesses with financial management and tax compliance...'
+        workspace_name_label: Workspace name
+        workspace_name_placeholder: Your company or workspace name
+        workspace_type_legend: Who is this for?
+    skim_overlay:
+      gathering_inbox: Gathering your inbox…
+      skim_inbox_label: Skim your inbox
+    topbar:
+      keyboard_shortcuts: Keyboard shortcuts
+      main_navigation: Main navigation
+      open_main_menu: Open main menu
+      search: Search…
+      search_and_commands: Search and commands (⌘K)
+      toggle_dark_mode: Toggle dark mode
+      toggle_theme: Toggle theme
+    user_menu:
+      sign_out: Sign out

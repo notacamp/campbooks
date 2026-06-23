@@ -1,0 +1,196 @@
+<% if setup_checklist_visible? %>
+  <%# Until setup is finished, onboarding owns the whole screen: the getting-started
+      checklist is vertically centered (nudged a little above the optical middle) with
+      nothing else competing for it. The setup hub lives on home ONLY; every other page
+      shows its own empty state with the relevant CTA instead. `min-h` accounts for the
+      mobile topbar + bottom nav; full height on desktop. %>
+  <% content_for :main_class, "mx-auto flex w-full max-w-[600px] flex-col justify-center px-4 min-h-[calc(100svh_-_7.5rem)] lg:min-h-screen pb-[8vh]" %>
+  <%= render "shared/setup_banner" %>
+<% else %>
+<% content_for :main_class, "mx-auto w-full max-w-[600px] px-4 pb-32 pt-10 sm:pt-12" %>
+<%
+  name = (current_user.try(:name).presence ||
+          current_user.try(:email_address).to_s.split("@").first).to_s.split(/\s+/).first.presence || "there"
+%>
+
+<%= turbo_stream_from "skim_#{current_user.id}" %>
+
+<%# Greeting + time-of-day glyph. Server renders a best-effort default; the
+    local-greeting controller corrects it to the visitor's device-local time. %>
+<%# Pile-size tiers so the greeting's tone scales with the load — a quip that
+    suits a handful reads wrong at 249. zero / one / few (<10) / many. %>
+<%
+  pending = @pending_count.to_i
+  greeting_subtitle =
+    if pending.zero?
+      t(".subtitle.clear")
+    elsif pending == 1
+      t(".subtitle.single")
+    elsif pending < 10
+      t(".subtitle.some", n: pending)
+    else
+      t(".subtitle.lots", n: pending)
+    end
+%>
+<%= render Campbooks::TimeOfDayGreeting.new(name: name, subtitle: greeting_subtitle) %>
+
+<%# Replayable entry to the guided product walkthrough (also auto-opens once for
+    new users, and via ?tour=1). Opens the overlay rendered in the layout. %>
+<button type="button" data-action="product-tour#open"
+        class="mt-3 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+  <svg viewBox="0 0 24 24" fill="currentColor" class="h-3.5 w-3.5" style="color: var(--ember-solid)" aria-hidden="true"><path d="M12 2l1.7 5.6L19.5 9l-5.8 1.4L12 16l-1.7-5.6L4.5 9l5.8-1.4z"/></svg>
+  <%= t(".take_tour") %>
+</button>
+
+<%# Mixed Skim rings — inbox theme rings (lazy + live) plus a single "Documents"
+    rollup ring, scrolling together as one strip. The inbox rings use the global
+    skim-overlay; the Documents ring opens the page-scoped doc-skim-overlay (mounted
+    here just like /documents), launching the document review-all walk.
+    "Skim all" (the lazy tray's lead ring) walks the inbox rings then hands off
+    seamlessly into document review: the skim-all controller chains the two
+    overlays, and its doc-count value (= the Documents ring's count) both folds
+    into the badge and gates whether there's a document leg to continue into. %>
+<div data-controller="doc-skim-overlay" class="mt-5">
+  <div id="home_skim_rings"
+       data-controller="skim-all"
+       data-skim-all-doc-count-value="<%= @doc_review_count.to_i %>"
+       data-skim-all-skim-overlay-outlet="[data-controller~='skim-overlay']"
+       data-skim-all-doc-skim-overlay-outlet="[data-controller~='doc-skim-overlay']"
+       class="flex items-start gap-2.5 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <%= turbo_frame_tag "skim_tray", src: skim_tray_path(doc_count: @doc_review_count), loading: "lazy", class: "block shrink-0" do %>
+      <div class="flex items-start gap-2.5" aria-hidden="true">
+        <% 5.times do %><div class="h-[72px] w-[60px] flex-shrink-0 animate-pulse rounded-full bg-muted/70"></div><% end %>
+      </div>
+    <% end %>
+    <% if @doc_review_count.to_i > 0 %>
+      <%# A single rollup ring → opens the document review-all walk. category: "other"
+          only selects the folder glyph (distinct from the lightning "Skim all"); #open
+          ignores it and walks every document. %>
+      <%= render Campbooks::DocSkimRing.new(category: "other", label: t(".documents_ring"), count: @doc_review_count, class: "shrink-0", data: { action: "click->doc-skim-overlay#open" }) %>
+    <% end %>
+  </div>
+  <%= render "shared/doc_skim_overlay" %>
+</div>
+
+<%# First-run nudge pointing at the skim rings — shown once (the coachmark controller
+    waits for the lazy rings, and only appears when there's something to skim).
+    Held back until the full product tour has been seen, so the walkthrough owns
+    the first run and these stay a lightweight follow-up reminder. %>
+<% if current_user.tour_dismissed?("product_tour") && !current_user.tour_dismissed?("home_rings") %>
+  <%= render Campbooks::Coachmark.new(
+        tour_key: "home_rings",
+        anchor: "#home_skim_rings",
+        union_children: true,
+        title: t(".rings_coach_title"),
+        body: t(".rings_coach_body"),
+        cta: t(".rings_coach_cta")
+      ) %>
+<% end %>
+
+<%# Once the rings nudge is done, a second one-time nudge introduces Scout. Anchors
+    to whichever Scout entry is visible — the composer pill (desktop) or the bottom
+    nav tab (mobile); placement: top so the bubble sits above either. %>
+<% if current_user.tour_dismissed?("product_tour") && current_user.tour_dismissed?("home_rings") && !current_user.tour_dismissed?("scout_intro") %>
+  <%= render Campbooks::Coachmark.new(
+        tour_key: "scout_intro",
+        anchor: "[data-scout-coach-anchor]",
+        placement: :top,
+        title: t(".scout_coach_title"),
+        body: t(".scout_coach_body"),
+        cta: t(".scout_coach_cta")
+      ) %>
+<% end %>
+
+<%# One continuous feed: the curated "needs attention" + "your feed" spine flows
+    straight into past highlights (Rewind) — no separate "Looking back" section.
+    feed-focus highlights the card nearest the viewport centre (scroll-focus);
+    feed-keyboard acts on THAT card — ↑↓ / j / k move it, → fires its primary,
+    ← its escape, letters the rest, with shortcut chips surfacing on it. Touch
+    drives the same actions by swiping each card (Swipeable, right=primary). %>
+<% if @attention.any? || @timeline.any? || @show_rewind %>
+  <div data-controller="feed-keyboard feed-focus">
+  <% if @attention.any? %>
+    <%# Urgent: high-contrast ink label + an Ember dot. Generous space sets it
+        clearly apart as a section heading, not a chip on the card below. %>
+    <div class="mt-12 flex items-center gap-2">
+      <span class="h-1.5 w-1.5 rounded-full" style="background-color: var(--ember-solid)"></span>
+      <h2 class="text-xs font-semibold uppercase tracking-[0.12em] text-foreground"><%= t(".needs_attention") %></h2>
+    </div>
+    <div class="mt-2 divide-y divide-border">
+      <% @attention.each do |pair| %>
+        <%= render Campbooks::Feed::Card.new(item: pair[:item], subject: pair[:subject]) %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if @timeline.any? %>
+    <%# Ambient section heading, set well apart from the attention cluster above. %>
+    <h2 class="mt-16 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"><%= t(".your_feed") %></h2>
+  <% end %>
+  <%# Timeline container — turbo streams append the next curated page here AND,
+      once the spine is exhausted, the past-highlight cards, so the whole thing
+      reads as one feed. A hairline (divide-y) marks each item; py-6 keeps it
+      breathing, low-density on purpose. %>
+  <div id="feed_timeline" class="mt-2 divide-y divide-border">
+    <% @timeline_groups.each do |group| %>
+      <%= render "timeline_group", group: group %>
+    <% end %>
+  </div>
+
+  <% if @pagy&.next %>
+    <%= render "feed_pagination", pagy: @pagy %>
+  <% elsif @show_rewind %>
+    <%# Curated spine done → keep the same scroll going back through past
+        highlights. No heading — it's one feed, not a separate section. %>
+    <%= render "rewind_pagination", cursor: nil %>
+  <% elsif @attention.any? || @timeline.any? %>
+    <%= render "feed_end" %>
+  <% end %>
+  </div>
+<% else %>
+  <%# Genuinely nothing — no actionable items AND no past highlights. (The greeting
+      subtitle already says "all clear"; this is guidance, not a second banner.) %>
+  <div class="mt-16 flex flex-col items-center text-center">
+    <%= render Campbooks::ScoutAvatar.new(size: :xl) %>
+    <% case @inbox_state %>
+    <% when :caught_up %>
+      <h2 class="mt-4 text-lg font-semibold text-foreground"><%= t(".empty_title") %></h2>
+      <p class="mt-1 max-w-xs text-sm text-muted-foreground"><%= t(".empty_body") %></p>
+    <% when :disconnected %>
+      <%# Has inboxes, but every one is currently disconnected — say "reconnect",
+          never "connect", so it doesn't read as a brand-new account. %>
+      <h2 class="mt-4 text-lg font-semibold text-foreground"><%= t(".disconnected_title") %></h2>
+      <p class="mt-1 max-w-xs text-sm text-muted-foreground"><%= t(".disconnected_body") %></p>
+      <%= render(Campbooks::Button.new(variant: :primary, href: email_messages_path(inbox_settings: "accounts"), class: "mt-5")) { t(".disconnected_cta") } %>
+    <% else %>
+      <%# New user, no inbox yet: an honest start state, not a false "all caught up". %>
+      <h2 class="mt-4 text-lg font-semibold text-foreground"><%= t(".connect_title") %></h2>
+      <p class="mt-1 max-w-xs text-sm text-muted-foreground"><%= t(".connect_body") %></p>
+      <%= render(Campbooks::Button.new(variant: :primary, href: email_messages_path(inbox_settings: "accounts"), class: "mt-5")) { t(".connect_cta") } %>
+    <% end %>
+  </div>
+<% end %>
+
+<%# Scout composer — glass-docked; opens the full Scout chat (inline compose is a
+    follow-up). Desktop only: on mobile, Scout is reached via the bottom-nav
+    center tab, so the docked bar would collide with it. %>
+<%# Centered on the feed column, not the whole window: the wrapper spans the
+    content area (lg:left-20 clears the nav rail, mirroring the shell's lg:pl-20)
+    and centers the bar, so it lines up under the 600px feed container instead of
+    drifting half the rail-width to the left. px-4 keeps it off the edges. %>
+<div class="pointer-events-none fixed inset-x-0 bottom-4 z-30 hidden px-4 lg:left-20 lg:flex lg:justify-center">
+  <%# pointer-events-none on the wrapper + auto on the pill: the empty space
+      beside the bar stays click-through to the feed cards behind it. %>
+  <%= link_to scout_path,
+        data: { scout_coach_anchor: "" },
+        class: "pointer-events-auto flex w-full max-w-[600px] items-center gap-2.5 rounded-2xl border border-border bg-card/80 p-2 pl-3.5 shadow-lg backdrop-blur-xl transition hover:bg-card" do %>
+    <span class="flex-shrink-0" style="color: var(--ember-solid)">
+      <svg viewBox="0 0 24 24" fill="currentColor" class="h-[22px] w-[22px]" aria-hidden="true"><path d="M12 2l1.7 5.6L19.5 9l-5.8 1.4L12 16l-1.7-5.6L4.5 9l5.8-1.4z"/></svg>
+    </span>
+    <span class="flex-1 text-sm text-muted-foreground"><%= t(".ask_scout") %></span>
+    <span class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="h-[15px] w-[15px]" aria-hidden="true"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/></svg>
+    </span>
+  <% end %>
+</div>
+<% end %>

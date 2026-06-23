@@ -1,0 +1,58 @@
+---
+pt:
+  activerecord:
+    attributes:
+      reminder:
+        reminder_types:
+          appointment: Compromisso
+          deadline: Prazo
+          delivery: Entrega
+          event: Evento
+          other: Lembrete
+          payment_due: Pagamento devido
+          renewal: Renovação
+          travel: Viagem
+        statuses:
+          confirmed: Confirmado
+          dismissed: Dispensado
+          pending: Pendente
+          snoozed: Adiado
+  components:
+    calendar:
+      reminder_chip:
+        suggested: Sugerido
+    reminder_row:
+      adjust_date: Ajustar data e hora
+      confirm: Adicionar ao calendário
+      confirmed: Adicionado ao calendário
+      dismiss: Dispensar
+      in_days:
+        one: Em %{count} dia
+        other: Em %{count} dias
+      overdue: Em atraso
+      snooze: Adiar
+      today: Hoje
+      tomorrow: Amanhã
+      view_event: Ver evento
+  reminders:
+    confirm:
+      confirmed: Adicionado ao seu calendário.
+      confirmed_no_calendar: Lembrete confirmado. Ligue um calendário para sincronizar
+        automaticamente.
+    dismiss:
+      dismissed: Lembrete dispensado.
+    index:
+      confirmed: Confirmados recentemente
+      empty_body: Quando o Scout detetar uma data de vencimento, entrega ou prazo
+        no seu email ou documentos, aparece aqui para confirmar.
+      empty_title: Sem lembretes de momento
+      snoozed: Adiados
+      subtitle: Compromissos com data que o Scout encontrou no seu email e documentos.
+        Confirme os que quer no seu calendário.
+      title: Lembretes
+      upcoming: Próximos
+    snooze:
+      snoozed: Adiado por uma semana.
+    source:
+      document: Documento
+      email: E-mail

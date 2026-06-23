@@ -1,0 +1,11 @@
+<% if ai_provider_available?(:text) %>
+  <%= render(Campbooks::ChatForm.new(
+    url: email_messages_compose_chat_path,
+    form_id: "agent_chat_form",
+    input_id: "compose_chat_input",
+    placeholder: t(".placeholder"),
+    hidden_fields: { thread_id: local_assigns[:thread]&.id }
+  )) %>
+<% else %>
+  <%= render(Campbooks::AiSetupPrompt.new(capability: :text, variant: :banner)) %>
+<% end %>

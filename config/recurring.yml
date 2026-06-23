@@ -1,0 +1,89 @@
+production:
+  email_scan:
+    class: EmailScanJob
+    schedule: every minute
+  email_scan_full:
+    # Periodic read/flag reconcile for change-feed-less vendors (Zoho): enqueues a
+    # "full" re-baseline per such account. Delta vendors (Gmail/Microsoft) skip it —
+    # their change feed already carries read/flag changes. See EmailScanJob#perform.
+    command: "EmailScanJob.perform_later(nil, 'resync_sweep')"
+    schedule: every 15 minutes
+  calendar_scan:
+    # Incremental calendar pull via per-calendar sync tokens — fast, like email_scan.
+    class: CalendarScanJob
+    schedule: every minute
+  calendar_scan_full:
+    # Refreshes the calendar list + full event window; also the 410 token-recovery
+    # path. See CalendarScanJob#perform.
+    command: "CalendarScanJob.perform_later(nil, 'full')"
+    schedule: every 15 minutes
+  calendar_watch_renew:
+    # Register/renew Google events.watch push channels (no-op without a public
+    # callback host or with DISABLE_CALENDAR_PUSH). See Calendars::WebhookRenewalJob.
+    class: Calendars::WebhookRenewalJob
+    schedule: every 6 hours
+  provider_token_refresh:
+    class: ProviderTokenRefreshJob
+    schedule: every 45 minutes
+  zoho_label_sync:
+    class: ZohoLabelSyncJob
+    schedule: every 10 minutes
+  email_reply_daemon:
+    class: EmailReplyDaemonJob
+    schedule: every 30 seconds
+  notion_sync:
+    class: NotionSyncJob
+    schedule: every 15 minutes
+  unsnooze:
+    class: UnsnoozeJob
+    schedule: every minute
+  clear_solid_queue_finished_jobs:
+    command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
+    schedule: every hour at minute 12
+  feed_refresh:
+    # Sweep so time-based feed items surface/expire (reminders aging in, snoozes
+    # coming due) and stale rows reconcile, without an explicit event trigger.
+    class: Feed::RefreshAllJob
+    schedule: every 15 minutes
+  sessions_prune:
+    # Delete sessions idle past Session::INACTIVITY_LIMIT (GDPR storage limitation;
+    # keeps ip_address/user_agent rows from accumulating forever).
+    class: SessionsPruneJob
+    schedule: every day at 4am
+  retention_sweep:
+    # Operational-data retention (GDPR storage limitation): prune old scan/sync
+    # logs, workflow run-history, and dismissed feed cards. Never user content.
+    class: RetentionSweepJob
+    schedule: every day at 4am
+
+development:
+  email_scan:
+    class: EmailScanJob
+    schedule: every minute
+  email_scan_full:
+    command: "EmailScanJob.perform_later(nil, 'resync_sweep')"
+    schedule: every 15 minutes
+  calendar_scan:
+    class: CalendarScanJob
+    schedule: every minute
+  calendar_scan_full:
+    command: "CalendarScanJob.perform_later(nil, 'full')"
+    schedule: every 15 minutes
+  provider_token_refresh:
+    class: ProviderTokenRefreshJob
+    schedule: every 45 minutes
+  zoho_label_sync:
+    class: ZohoLabelSyncJob
+    schedule: every 10 minutes
+  email_reply_daemon:
+    class: EmailReplyDaemonJob
+    schedule: every 30 seconds
+  notion_sync:
+    class: NotionSyncJob
+    schedule: every 15 minutes
+  unsnooze:
+    class: UnsnoozeJob
+    schedule: every minute
+  feed_refresh:
+    class: Feed::RefreshAllJob
+    schedule: every 15 minutes

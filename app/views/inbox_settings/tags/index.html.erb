@@ -1,0 +1,29 @@
+<%= turbo_frame_tag "inbox_settings_panel" do %>
+  <div data-section="tags">
+    <header class="sticky top-0 z-10 bg-background/95 backdrop-blur px-6 py-4 border-b border-border flex items-center justify-between gap-4">
+      <div class="min-w-0">
+        <h3 class="text-sm font-semibold text-foreground"><%= t(".heading") %></h3>
+        <p class="text-xs text-muted-foreground mt-0.5"><%= t(".subheading") %></p>
+      </div>
+      <%= render(Campbooks::Button.new(variant: :primary, size: :sm,
+            href: new_inbox_settings_tag_path,
+            data: { turbo_frame: "inbox_settings_tag_form" })) { t(".add_tag") } %>
+    </header>
+
+    <div class="px-6 py-5">
+      <%= turbo_frame_tag "inbox_settings_tag_form" %>
+
+      <div id="inbox_settings_tags_rows">
+        <% if @tags.any? %>
+          <% @tags.each do |tag| %>
+            <%= render "inbox_settings/tags/tag", tag: tag, count: @tag_message_counts[tag.id] || 0 %>
+          <% end %>
+        <% else %>
+          <p id="inbox_settings_tags_empty" class="text-[13px] text-muted-foreground py-8 text-center">
+            <%= t(".no_tags") %>
+          </p>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>

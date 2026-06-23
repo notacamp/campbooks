@@ -1,0 +1,18 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+  <%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+
+  <% if @tags.any? %>
+    <%= render "section", title: t("settings.notifications.index.tags_title"), rows: @tags, kind: :tag, id_method: :id, current_user: current_user %>
+  <% else %>
+    <div class="bg-card shadow-sm rounded-lg border border-gray-200 mb-6">
+      <%= render(Campbooks::EmptyState.new(variant: :inline, title: t(".no_tags"))) %>
+    </div>
+  <% end %>
+
+  <% if @doc_types.any? %>
+    <%= render "section", title: t("settings.notifications.index.doc_types_title"), rows: @doc_types, kind: :document_type, id_method: :id, current_user: current_user %>
+  <% else %>
+    <div class="bg-card shadow-sm rounded-lg border border-gray-200 mb-6">
+      <%= render(Campbooks::EmptyState.new(variant: :inline, title: t(".no_doc_types"))) %>
+    </div>
+  <% end %>

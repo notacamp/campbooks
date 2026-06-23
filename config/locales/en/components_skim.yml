@@ -1,0 +1,118 @@
+---
+en:
+  components:
+    doc_skim_card:
+      ai_confidence: AI confidence
+      apply: Apply
+      approve: Approve
+      document_fallback: Document
+      download: Download
+      edit: Edit
+      edit_date: Date
+      edit_name: Name
+      edit_vendor: Vendor
+      expand: Expand preview
+      extracted_data: Extracted data
+      junk: Junk
+      new_type: "+ New type"
+      no_types: No document types yet
+      open: Open
+      reclassify: Reclassify
+      refile_as: Re-file as
+      reprocess: Reprocess
+      skip: Skip
+      unclassified: Unclassified
+    doc_skim_ring:
+      ring_title: Review %{label}
+    doc_skim_stack:
+      all_reviewed: All reviewed
+      all_reviewed_body: You reviewed the whole queue.
+      back_to_documents: Back to documents
+      close_aria: Close review
+      close_preview: Close preview
+      go_back: Go back
+      intro_cta: Start reviewing
+      intro_help: How review works
+      intro_lead: Clear your review queue one document at a time — confirm what the
+        AI filed, fix what it missed.
+      intro_step_act: Approve the AI's filing, or fix it — reclassify, edit, or reprocess.
+      intro_step_move: Tap the sides or swipe to step through the documents to review.
+      intro_step_undo: Approvals are undoable — nothing is locked in.
+      intro_title: Skim your documents
+      kbd_approve: approve
+      kbd_back: back
+      kbd_close: close
+      kbd_edit: edit
+      kbd_junk: junk
+      kbd_open: open
+      kbd_preview: preview
+      kbd_reclassify: reclassify
+      kbd_reprocess: reprocess
+      kbd_skip: skip
+      preview_download: Download
+      preview_open: Open in new tab
+      progress_aria: Review progress
+      skip_and_continue: Skip and continue
+      touch_hint: Swipe to move · use the buttons to act
+      undo: Undo
+    doc_skim_tray:
+      review_all: Review all
+    skim_card:
+      allow: Allow
+      archive: Archive
+      archive_all: Archive all
+      block_sender: Block sender
+      decide_later: Decide later
+      deny: Deny
+      dismiss_follow_up: Dismiss
+      draft_follow_up: Draft follow-up
+      emails:
+        one: "%{count} email"
+        other: "%{count} emails"
+      keep: Keep
+      make_priority: Make priority
+      more: "+%{count} more"
+      open_in_full: Open in full
+      priority: Priority
+      progress_label: Stack %{position} of %{total}
+      reply: Reply
+      scout:
+        archive: You usually archive these
+        keep: You usually keep these
+        lead: Scout
+        promote: You usually pin these to Priority
+        ratio: "%{count} of your last %{total}"
+      select_all: Select all
+      select_all_aria: Select all in this stack
+      select_email_aria: Select %{subject}
+      star_sender: Star sender
+      starred: Starred
+      suggested: Suggested
+      unpin: Unpin
+      unstar: Unstar
+      waiting: Waiting on reply
+    skim_stack:
+      all_caught_up: All caught up
+      all_caught_up_body: You skimmed the whole stack.
+      back_to_inbox: Back to inbox
+      back_to_stack: Back to stack
+      close_aria: Close skim
+      go_back: Go back
+      intro_cta: Start skimming
+      intro_help: How Skim works
+      intro_lead: The fastest way to clear your inbox — one stack at a time, like
+        Stories for your email.
+      intro_step_act: Keep, archive, or pin each stack with the buttons — no stack
+        left behind.
+      intro_step_move: Tap the sides or swipe to step through your inbox, newest first.
+      intro_step_undo: 'Nothing is deleted: archived mail stays searchable, and every
+        action can be undone.'
+      intro_title: Skim your inbox
+      kbd_archive: " archive   "
+      kbd_back_keep: "← back   → keep   "
+      kbd_close: " close"
+      kbd_priority: " priority   "
+      keep_and_continue: Keep and continue
+      progress_aria: Skim progress
+      touch_hint: Swipe to move · use the buttons to keep or archive
+      undo: Undo

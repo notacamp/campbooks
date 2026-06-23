@@ -1,0 +1,37 @@
+<% render "admin/sidebar" %>
+
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+
+<div class="flex gap-2 mb-4">
+  <% %w[pending approved rejected accepted].each do |status| %>
+    <%= link_to human_enum(SignupRequest, :status, status), admin_signup_requests_path(status: status),
+          class: "px-3 py-1 text-xs font-medium rounded-full border #{@status == status ? 'bg-accent-600 text-white border-accent-600' : 'bg-card text-gray-600 border-gray-200 hover:bg-gray-50'}" %>
+  <% end %>
+</div>
+
+<div class="bg-card rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+  <% if @signup_requests.any? %>
+    <div class="divide-y divide-gray-100">
+      <% @signup_requests.each do |request| %>
+        <div class="flex items-center justify-between px-5 py-3">
+          <div>
+            <p class="text-sm font-medium text-gray-900"><%= request.name %></p>
+            <p class="text-xs text-gray-500"><%= request.email %></p>
+          </div>
+          <div class="flex items-center gap-2">
+            <% variant = { "pending" => :warning, "approved" => :success, "rejected" => :danger, "accepted" => :accent }[request.status] %>
+            <%= render(Campbooks::Badge.new(variant: variant, size: :sm)) { human_enum(SignupRequest, :status, request.status) } %>
+            <% if request.pending? %>
+              <%= button_to t(".approve"), approve_admin_signup_request_path(request), method: :post,
+                    class: "text-xs text-accent-600 hover:text-accent-700 font-medium cursor-pointer" %>
+              <%= button_to t(".reject"), reject_admin_signup_request_path(request), method: :post,
+                    class: "text-xs text-red-600 hover:text-red-700 font-medium cursor-pointer dark:text-red-400 dark:hover:text-red-300" %>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% else %>
+    <%= render(Campbooks::EmptyState.new(variant: :inline, title: t(".empty_title", status: @status))) %>
+  <% end %>
+</div>

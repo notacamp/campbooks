@@ -1,0 +1,17 @@
+<%# locals: contact — a single contact row for the Starred / Blocked sections %>
+<div id="<%= dom_id(contact, :contact_row) %>" class="flex items-center gap-3 py-3 px-4 hover:bg-muted/40 transition-colors">
+  <%= link_to contact_path(contact), class: "flex items-center gap-3 min-w-0 flex-1" do %>
+    <span class="w-9 h-9 rounded-full bg-accent-100 text-accent-700 dark:bg-accent-500/15 dark:text-accent-300 text-sm font-semibold flex items-center justify-center flex-shrink-0">
+      <%= contact.display_name.to_s.first(1).upcase.presence || "?" %>
+    </span>
+    <div class="min-w-0 flex-1">
+      <div class="flex items-center gap-2">
+        <span class="text-sm font-medium text-foreground truncate"><%= contact.display_name %></span>
+        <% if contact.relationship_type.present? %><%= relationship_badge(contact.relationship_type) %><% end %>
+      </div>
+      <p class="text-xs text-muted-foreground truncate"><%= contact.email %></p>
+    </div>
+  <% end %>
+  <span class="text-xs text-muted-foreground tabular-nums flex-shrink-0"><%= contact.email_count %></span>
+  <%= render "contacts/row_actions", contact: contact %>
+</div>

@@ -1,0 +1,162 @@
+<%= render(Campbooks::OnboardingProgress.new(current_step: @step, previous_step: @previous_step)) %>
+
+<div class="mb-6">
+  <h1 class="text-lg font-semibold text-gray-900"><%= t(".heading") %></h1>
+  <p class="text-sm text-gray-500 mt-1"><%= t(".subheading") %></p>
+</div>
+
+<div class="space-y-6">
+  <!-- Workspace -->
+  <%= render(Campbooks::Card.new(padding: :lg)) do %>
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-sm font-semibold text-gray-900"><%= t(".workspace_title") %></h3>
+      <%= link_to t("shared.actions.edit"), onboarding_path(step: :workspace), class: "text-xs text-accent-600 hover:text-accent-700 font-medium" %>
+    </div>
+    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+      <div>
+        <dt class="text-xs text-gray-400"><%= t(".label_name") %></dt>
+        <dd class="text-gray-900 font-medium"><%= @org.name %></dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-400"><%= t(".label_type") %></dt>
+        <dd class="text-gray-900 font-medium"><%= @org.setting("workspace_type") == "individual" ? t(".type_personal") : t(".type_company") %></dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-400"><%= t(".label_country") %></dt>
+        <dd class="text-gray-900 font-medium"><%= @org.setting("country").presence || "—" %></dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-400"><%= t(".label_tax_id") %></dt>
+        <dd class="text-gray-900 font-medium"><%= @org.setting("company_tax_id").presence || "—" %></dd>
+      </div>
+      <div>
+        <dt class="text-xs text-gray-400"><%= t(".label_address") %></dt>
+        <dd class="text-gray-900 text-sm">
+          <% if @org.setting("address_line1").present? %>
+            <%= @org.setting("address_line1") %><br>
+            <%= @org.setting("address_line2") %><br>
+            <%= [@org.setting("city"), @org.setting("postal_code")].compact.join(" ") %>
+          <% else %>
+            —
+          <% end %>
+        </dd>
+      </div>
+      <div class="sm:col-span-2">
+        <dt class="text-xs text-gray-400"><%= t(".label_context") %></dt>
+        <dd class="text-gray-700 mt-1 whitespace-pre-wrap"><%= @org.workspace_context.presence || t(".context_not_configured") %></dd>
+      </div>
+    </dl>
+  <% end %>
+
+  <!-- Email Accounts -->
+  <%= render(Campbooks::Card.new(padding: :lg)) do %>
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-sm font-semibold text-gray-900">
+        <%= t(".email_accounts_title") %>
+        <span class="text-xs text-gray-400 font-normal"><%= t(".email_accounts_count", count: @accounts.size) %></span>
+      </h3>
+      <%= link_to t("shared.actions.edit"), onboarding_path(step: :email_accounts), class: "text-xs text-accent-600 hover:text-accent-700 font-medium" %>
+    </div>
+    <% if @accounts.any? %>
+      <% @accounts.each do |account| %>
+        <div class="flex items-center gap-3 p-3 rounded-lg bg-green-50 mb-2 dark:bg-green-500/10">
+          <svg class="w-5 h-5 text-green-600 flex-shrink-0 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+          <div>
+            <p class="text-sm font-medium text-gray-900"><%= account.display_name %></p>
+            <p class="text-xs text-gray-500"><%= human_enum(EmailAccount, :provider, account.provider) %></p>
+          </div>
+        </div>
+      <% end %>
+    <% else %>
+      <p class="text-sm text-gray-500"><%= t(".no_email_accounts") %></p>
+    <% end %>
+  <% end %>
+
+  <!-- AI Configuration -->
+  <%= render(Campbooks::Card.new(padding: :lg)) do %>
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-sm font-semibold text-gray-900"><%= t(".ai_configuration_title") %></h3>
+      <%= link_to t("shared.actions.edit"), onboarding_path(step: :ai_configuration), class: "text-xs text-accent-600 hover:text-accent-700 font-medium" %>
+    </div>
+    <% if @configs.any? %>
+      <% adapters = @configs.map(&:ai_adapter).compact.uniq %>
+      <div class="space-y-4">
+        <% adapters.each do |adapter| %>
+          <div class="p-3 rounded-lg bg-gray-50">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-sm font-semibold text-gray-900"><%= adapter.name %></span>
+              <%= render(Campbooks::Badge.new(variant: :info)) { adapter.provider } %>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              <% @configs.select { |c| c.ai_adapter_id == adapter.id }.each do |config| %>
+                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-card text-gray-600 border border-gray-200">
+                  <%= config.purpose_label %> (<%= config.model %>)
+                </span>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <p class="text-sm text-gray-500"><%= t(".no_ai_configuration") %></p>
+    <% end %>
+  <% end %>
+
+  <!-- Classification -->
+  <%= render(Campbooks::Card.new(padding: :lg)) do %>
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-sm font-semibold text-gray-900">
+        <%= t(".classification_title") %>
+        <span class="text-xs text-gray-400 font-normal"><%= t(".classification_count", types_count: @document_types.size, tags_count: @tags.size) %></span>
+      </h3>
+      <%= link_to t("shared.actions.edit"), onboarding_path(step: :classification), class: "text-xs text-accent-600 hover:text-accent-700 font-medium" %>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <h4 class="text-xs font-medium text-gray-400 mb-2"><%= t(".document_types_subtitle") %></h4>
+        <% if @document_types.any? %>
+          <div class="space-y-1">
+            <% @document_types.each do |type| %>
+              <div class="flex items-center gap-2 p-1.5 rounded">
+                <%= render(Campbooks::ColorDot.new(color: type.color, size: :sm)) %>
+                <span class="text-sm text-gray-900"><%= type.name.humanize %></span>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-sm text-gray-500"><%= t(".none_yet") %></p>
+        <% end %>
+      </div>
+      <div>
+        <h4 class="text-xs font-medium text-gray-400 mb-2"><%= t(".email_tags_subtitle") %></h4>
+        <% if @tags.any? %>
+          <div class="space-y-1">
+            <% @tags.each do |tag| %>
+              <div class="flex items-center gap-2 p-1.5 rounded">
+                <%= render(Campbooks::ColorDot.new(color: tag.color, size: :sm)) %>
+                <span class="text-sm text-gray-900"><%= tag.name.humanize %></span>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-sm text-gray-500"><%= t(".none_yet") %></p>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <!-- Finish -->
+  <%# Native submit (turbo: false): completing the wizard redirects to root (a
+      different layout), which a Turbo form submission fails to render. %>
+  <%= form_with url: onboarding_path(step: :review), method: :patch, class: "space-y-4", data: { turbo: false } do |form| %>
+    <%= render(Campbooks::Alert.new(variant: :notice)) do %>
+      <div>
+        <p class="text-sm font-medium text-green-800 dark:text-green-300"><%= t(".all_set") %></p>
+        <p class="text-xs text-green-700 mt-0.5 dark:text-green-400"><%= t(".all_set_detail") %></p>
+      </div>
+    <% end %>
+
+    <%= form.submit t(".finish_button"),
+        class: "w-full py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-accent-600 hover:bg-accent-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-500 cursor-pointer transition-colors" %>
+  <% end %>
+</div>

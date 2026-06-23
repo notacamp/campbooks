@@ -1,0 +1,75 @@
+---
+pt:
+  calendar:
+    index:
+      connect_cta: Ligar um calendário
+      empty_desc: Ligue um calendário Google ou Zoho para ver e gerir os seus eventos
+        aqui.
+      empty_title: Nenhum calendário ligado
+      new_event: Novo evento
+      next: Próximo
+      previous: Anterior
+      reminders: Lembretes
+      title: Calendário
+      today: Hoje
+      upcoming: Próximos
+      view_agenda: Agenda
+      view_day: Dia
+      view_month: Mês
+      view_week: Semana
+  calendar_events:
+    create:
+      created: Evento criado.
+      no_calendar: Selecione um calendário para adicionar o evento.
+    destroy:
+      deleted: Evento eliminado.
+    edit:
+      rsvp_prompt: Vai participar?
+      title: Editar evento
+    errors:
+      not_writable: Não tem permissão para alterar este evento.
+    form:
+      all_day_label: Dia inteiro
+      calendar_label: Calendário
+      cancel: Cancelar
+      color_default: Cor do calendário
+      color_label: Cor
+      create: Criar evento
+      delete: Eliminar evento
+      delete_confirm: Eliminar este evento?
+      description_label: Descrição
+      ends_label: Fim
+      location_label: Local
+      recurrence_all: Todos os eventos da série
+      recurrence_label: Aplicar a
+      recurrence_this: Este evento
+      rsvp_accepted: Sim
+      rsvp_declined: Não
+      rsvp_tentative: Talvez
+      save: Guardar
+      starts_label: Início
+      title_label: Título
+      title_placeholder: Adicionar um título
+    new:
+      title: Novo evento
+    rsvp:
+      invalid_rsvp: Resposta inválida.
+      rsvp_saved: A sua resposta foi guardada.
+    update:
+      updated: Evento atualizado.
+  components:
+    calendar:
+      agenda_list:
+        empty_desc: Nenhum evento neste intervalo.
+        empty_title: Nada em vista
+        today: Hoje
+        tomorrow: Amanhã
+      event_modal:
+        aria_label: Evento
+      event_row:
+        all_day: Dia inteiro
+        untitled: "(Sem título)"
+        video_call: Videochamada
+      week_grid:
+        add: "+ Adicionar"
+        untitled: "(Sem título)"

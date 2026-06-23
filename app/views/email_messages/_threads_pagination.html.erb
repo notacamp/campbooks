@@ -1,0 +1,17 @@
+<%# Infinite-scroll sentinel for the thread sidebar. A lazy turbo frame that fetches
+    the next page as a turbo stream when it scrolls into view. Render only when
+    `pagy.next` is present; `pagy` and `threads` are required locals. %>
+<%= turbo_frame_tag "threads_pagination",
+      src: email_messages_path(
+        page: pagy.next,
+        folder_id: params[:folder_id].presence,
+        folder_name: params[:folder_name].presence,
+        group: params[:group].presence,
+        continue_section: thread_continue_section(threads),
+        format: :turbo_stream
+      ),
+      loading: :lazy do %>
+  <div class="flex items-center justify-center py-4">
+    <%= render(Campbooks::Spinner.new(size: :sm)) %>
+  </div>
+<% end %>

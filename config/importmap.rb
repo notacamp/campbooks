@@ -1,0 +1,20 @@
+# Pin npm packages by running ./bin/importmap
+
+pin "application"
+pin "@hotwired/turbo-rails", to: "turbo.min.js"
+pin "@hotwired/stimulus", to: "stimulus.min.js"
+pin "@hotwired/stimulus-loading", to: "stimulus-loading.js"
+pin "@rails/actioncable", to: "@rails--actioncable.js" # @8.1.300
+pin_all_from "app/javascript/controllers", under: "controllers"
+pin "@tiptap/core", to: "https://esm.sh/@tiptap/core@2.11.2"
+pin "@tiptap/starter-kit", to: "https://esm.sh/@tiptap/starter-kit@2.11.2"
+pin "@tiptap/extension-placeholder", to: "https://esm.sh/@tiptap/extension-placeholder@2.11.2"
+pin "@tiptap/extension-underline", to: "https://esm.sh/@tiptap/extension-underline@2.11.2?deps=@tiptap/core@2.11.2"
+pin "@tiptap/extension-link", to: "https://esm.sh/@tiptap/extension-link@2.11.2?deps=@tiptap/core@2.11.2"
+pin "@tiptap/extension-image", to: "https://esm.sh/@tiptap/extension-image@2.11.2?deps=@tiptap/core@2.11.2"
+pin "@tiptap/extension-text-align", to: "https://esm.sh/@tiptap/extension-text-align@2.11.2?deps=@tiptap/core@2.11.2"
+pin "@tiptap/extension-text-style", to: "https://esm.sh/@tiptap/extension-text-style@2.11.2?deps=@tiptap/core@2.11.2"
+pin "@tiptap/extension-color", to: "https://esm.sh/@tiptap/extension-color@2.11.2?deps=@tiptap/core@2.11.2,@tiptap/extension-text-style@2.11.2"
+pin "@tiptap/extension-highlight", to: "https://esm.sh/@tiptap/extension-highlight@2.11.2?deps=@tiptap/core@2.11.2"
+pin "marked", to: "https://cdn.jsdelivr.net/npm/marked@15.0.9/lib/marked.esm.js"
+pin "html2canvas-pro", to: "https://esm.sh/html2canvas-pro@1.5.11" # lazy-loaded by the bug-report widget for screenshots (maintained fork; supports Tailwind v4 oklch colors)

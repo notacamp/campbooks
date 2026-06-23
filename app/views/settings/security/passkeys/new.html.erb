@@ -1,0 +1,32 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"))) %>
+
+<div class="max-w-md">
+  <div class="bg-card rounded-xl shadow-sm border border-border p-5 sm:p-6">
+    <p class="text-sm text-muted-foreground mb-4"><%= t(".intro") %></p>
+
+    <%= form_with url: settings_security_passkeys_path, method: :post, class: "space-y-4",
+          data: {
+            controller: "webauthn",
+            webauthn_options_url_value: options_settings_security_passkeys_path(format: :json),
+            webauthn_mode_value: "create",
+            webauthn_unsupported_message_value: t(".unsupported"),
+            turbo: false
+          } do %>
+      <input type="hidden" name="credential" data-webauthn-target="credential" />
+
+      <div>
+        <label for="nickname" class="block text-sm font-medium text-gray-700 mb-1.5"><%= t(".name_label") %></label>
+        <input type="text" name="nickname" id="nickname" maxlength="60" placeholder="<%= t(".name_placeholder") %>"
+               class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-accent-500 focus:ring-accent-500 sm:text-sm" />
+      </div>
+
+      <p data-webauthn-target="error" class="text-sm text-red-600" hidden></p>
+
+      <div class="flex gap-2">
+        <%= render(Campbooks::Button.new(variant: :primary, type: :button, data: { action: "webauthn#start", webauthn_target: "submit" })) { t(".submit") } %>
+        <%= render(Campbooks::Button.new(variant: :ghost, href: settings_security_path)) { t(".cancel") } %>
+      </div>
+    <% end %>
+  </div>
+</div>

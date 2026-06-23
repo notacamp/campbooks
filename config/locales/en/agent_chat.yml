@@ -1,0 +1,27 @@
+---
+en:
+  agent_chat:
+    form:
+      placeholder: Ask Scout anything…
+    show:
+      delete_chat: Delete chat
+      delete_chat_aria: Delete chat
+      delete_confirm: Delete this chat?
+      earlier: Earlier
+      new_chat: New chat
+      no_chats: No chats yet
+      open_email: Open email
+      show_chats_aria: Show chats
+      this_week: This week
+      today: Today
+    thread_item:
+      click_to_rename: Click to rename
+      delete_chat: Delete chat
+      delete_chat_aria: 'Delete chat: %{title}'
+      delete_confirm: Delete this chat?
+      open_chat_aria: 'Open chat: %{title}'
+      time_ago: "%{time} ago"
+    thread_title:
+      click_to_rename: Click to rename
+    typing:
+      thinking: Thinking…

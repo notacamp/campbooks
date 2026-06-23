@@ -1,0 +1,78 @@
+<%# Contact Skim — new-sender triage in the Skim "stories" idiom (mirrors the email
+    and document skims): segmented progress on top, one card at a time that
+    cross-fades, tap-zones / arrows / swipe to navigate, Allow · Block · Skip to act. %>
+<div class="relative mx-auto flex min-h-[70vh] w-full max-w-2xl flex-col outline-none"
+     tabindex="-1"
+     data-controller="contact-skim"
+     data-action="keydown->contact-skim#onKeydown click->contact-skim#onClick touchstart->contact-skim#onTouchStart touchend->contact-skim#onTouchEnd">
+
+  <%# Top chrome: segmented stories bar + people icon · title · counter · close. %>
+  <div class="relative z-20 flex-shrink-0">
+    <div class="flex items-center gap-1" data-contact-skim-target="segments" role="progressbar" aria-label="<%= t('.progress_aria') %>"></div>
+
+    <div class="mt-3 flex items-center justify-between gap-3">
+      <div class="flex min-w-0 flex-1 items-center gap-2">
+        <svg class="h-4 w-4 flex-shrink-0 text-foreground/70" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a3 3 0 10-2.83-4"/>
+        </svg>
+        <h1 class="truncate text-sm font-semibold text-foreground"><%= t(".title") %></h1>
+      </div>
+      <div class="flex flex-shrink-0 items-center gap-2">
+        <span data-contact-skim-target="progress" data-template="<%= t(".progress", done: "__D__", total: "__T__") %>" class="text-xs text-muted-foreground tabular-nums"></span>
+        <%= link_to contacts_path,
+              class: "inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-foreground/10 text-foreground transition-colors hover:bg-foreground/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-400",
+              aria: { label: t(".close_aria") },
+              data: { contact_skim_target: "close", controller: "history-back", action: "click->history-back#back" } do %>
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        <% end %>
+      </div>
+    </div>
+    <p class="mt-1 text-xs text-muted-foreground"><%= t(".subtitle") %></p>
+  </div>
+
+  <% if @contacts.any? %>
+    <%# Stage: edge tap-zones behind (z-0); the absolutely-stacked frames at z-10. %>
+    <div class="relative flex flex-1 items-center justify-center overflow-hidden py-4 sm:py-6">
+      <button type="button" tabindex="-1" aria-label="<%= t('.go_back') %>" class="absolute inset-y-0 left-0 z-0 w-1/4 cursor-default sm:w-32" data-action="click->contact-skim#prev"></button>
+      <button type="button" tabindex="-1" aria-label="<%= t('.skip') %>" class="absolute inset-y-0 right-0 z-0 w-1/4 cursor-default sm:w-32" data-action="click->contact-skim#next"></button>
+
+      <div class="relative z-10 h-full w-full">
+        <% @contacts.each_with_index do |contact, i| %>
+          <div class="absolute inset-0 flex items-center justify-center px-2 sm:px-4 <%= "hidden" unless i.zero? %>"
+               style="<%= "opacity:0" unless i.zero? %>"
+               data-contact-skim-target="frame"
+               data-approve-url="<%= set_state_contact_path(contact, state: "allow") %>"
+               data-block-url="<%= set_state_contact_path(contact, state: "block") %>">
+            <div class="mx-auto w-full max-w-lg">
+              <%= render Campbooks::ContactSkimCard.new(contact: contact, fill: true, class: "shadow-2xl") %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+
+      <div class="absolute inset-0 z-10 hidden flex-col items-center justify-center px-6 text-center" data-contact-skim-target="done">
+        <div class="text-3xl">✨</div>
+        <p class="mt-3 text-lg font-semibold text-foreground"><%= t(".done_title") %></p>
+        <p class="mt-1 max-w-xs text-sm text-muted-foreground"><%= t(".done_subtitle") %></p>
+        <%= link_to t(".back"), contacts_path, class: "mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90" %>
+      </div>
+    </div>
+
+    <%# Footer: touch hint on coarse pointers, keyboard legend on desktop. %>
+    <div class="relative z-20 flex-shrink-0 pt-2 text-center">
+      <p class="text-[11px] text-muted-foreground/70 sm:hidden"><%= t(".touch_hint") %></p>
+      <p class="hidden text-[11px] text-muted-foreground/70 sm:block">
+        <kbd class="rounded bg-foreground/10 px-1 py-0.5 font-mono text-[10px]">A</kbd> <%= t(".approve") %>
+        <kbd class="ml-2 rounded bg-foreground/10 px-1 py-0.5 font-mono text-[10px]">B</kbd> <%= t(".block") %>
+        <kbd class="ml-2 rounded bg-foreground/10 px-1 py-0.5 font-mono text-[10px]">→</kbd> <%= t(".skip") %>
+        <kbd class="ml-2 rounded bg-foreground/10 px-1 py-0.5 font-mono text-[10px]">Esc</kbd> <%= t(".close") %>
+      </p>
+    </div>
+  <% else %>
+    <div class="flex flex-1 flex-col items-center justify-center text-center">
+      <p class="text-lg font-semibold text-foreground"><%= t(".empty_title") %></p>
+      <p class="mt-1 text-sm text-muted-foreground"><%= t(".empty_subtitle") %></p>
+      <%= link_to t(".back"), contacts_path, class: "mt-5 inline-flex items-center rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted" %>
+    </div>
+  <% end %>
+</div>

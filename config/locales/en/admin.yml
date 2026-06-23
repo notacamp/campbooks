@@ -1,0 +1,61 @@
+---
+en:
+  admin:
+    beta_codes:
+      create:
+        success: Generated %{count} invite codes.
+      destroy:
+        success: Invite code deleted.
+      index:
+        count_label: How many
+        delete: Delete
+        delete_confirm: Delete this unused code?
+        empty_title: No invite codes yet — generate some above.
+        generate: Generate codes
+        label_label: Label (optional)
+        label_placeholder: e.g. Launch list, friends & family
+        no_label: No label
+        redeemed_note: redeemed by %{email} · %{time_ago} ago
+        status:
+          available: Available
+          expired: Expired
+          redeemed: Redeemed
+        subtitle: Generate single-use codes for closed-beta signups.
+        title: Invite Codes
+    dashboard:
+      show:
+        available_beta_codes: Available codes
+        pending_invitations: Pending Invitations
+        pending_signups: Pending Signups
+        subtitle: Manage platform access and users.
+        title: Admin
+        total_users: Total Users
+        workspaces: Workspaces
+    invitations:
+      index:
+        approve: Approve
+        empty_title: No pending invitations.
+        invited_by: Invited by %{name} from %{workspace} · %{time_ago} ago
+        reject: Reject
+        subtitle: Review and approve pending invitations from non-admin members.
+        title: Invitations
+    sidebar:
+      beta_codes: Invite Codes
+      dashboard: Dashboard
+      invitations: Invitations
+      signup_requests: Signup Requests
+      users: Users
+    signup_requests:
+      index:
+        approve: Approve
+        empty_title: No %{status} signup requests.
+        reject: Reject
+        subtitle: Approve or reject account requests.
+        title: Signup Requests
+    users:
+      index:
+        demote_to_member: Demote to member
+        empty_title: No users.
+        promote_to_admin: Promote to admin
+        subtitle: Manage platform users and roles.
+        title: Users

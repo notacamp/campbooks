@@ -1,0 +1,120 @@
+---
+es:
+  components:
+    doc_skim_card:
+      ai_confidence: Confianza de la IA
+      apply: Aplicar
+      approve: Aprobar
+      document_fallback: Documento
+      download: Descargar
+      edit: Editar
+      edit_date: Fecha
+      edit_name: Nombre
+      edit_vendor: Proveedor
+      expand: Ampliar vista previa
+      extracted_data: Datos extraídos
+      junk: Basura
+      new_type: "+ Nuevo tipo"
+      no_types: Aún no hay tipos de documento
+      open: Abrir
+      reclassify: Reclasificar
+      refile_as: Reclasificar como
+      reprocess: Reprocesar
+      skip: Omitir
+      unclassified: Sin clasificar
+    doc_skim_ring:
+      ring_title: Revisar %{label}
+    doc_skim_stack:
+      all_reviewed: Todo revisado
+      all_reviewed_body: Ha revisado toda la cola.
+      back_to_documents: Volver a documentos
+      close_aria: Cerrar revisión
+      close_preview: Cerrar vista previa
+      go_back: Volver
+      intro_cta: Empezar a revisar
+      intro_help: Cómo funciona la revisión
+      intro_lead: Vacía tu cola de revisión un documento a la vez — confirma lo que
+        la IA archivó y corrige lo que se le escapó.
+      intro_step_act: Aprueba la clasificación de la IA o corrígela — reclasifica,
+        edita o reprocesa.
+      intro_step_move: Toca los lados o desliza para recorrer los documentos por revisar.
+      intro_step_undo: Las aprobaciones se pueden deshacer — nada queda fijado.
+      intro_title: Skim de tus documentos
+      kbd_approve: aprobar
+      kbd_back: atrás
+      kbd_close: cerrar
+      kbd_edit: editar
+      kbd_junk: basura
+      kbd_open: abrir
+      kbd_preview: vista previa
+      kbd_reclassify: reclasificar
+      kbd_reprocess: reprocesar
+      kbd_skip: omitir
+      preview_download: Descargar
+      preview_open: Abrir en una pestaña nueva
+      progress_aria: Progreso de revisión
+      skip_and_continue: Omitir y continuar
+      touch_hint: Deslice para mover · use los botones para actuar
+      undo: Deshacer
+    doc_skim_tray:
+      review_all: Revisar todo
+    skim_card:
+      allow: Permitir
+      archive: Archivar
+      archive_all: Archivar todo
+      block_sender: Bloquear remitente
+      decide_later: Decidir luego
+      deny: Denegar
+      dismiss_follow_up: Descartar
+      draft_follow_up: Redactar seguimiento
+      emails:
+        one: "%{count} correo"
+        other: "%{count} correos"
+      keep: Conservar
+      make_priority: Marcar como prioritario
+      more: "+%{count} más"
+      open_in_full: Abrir completo
+      priority: Prioritario
+      progress_label: Pila %{position} de %{total}
+      reply: Responder
+      scout:
+        archive: Sueles archivar estos
+        keep: Sueles conservar estos
+        lead: Scout
+        promote: Sueles fijar estos en Prioritario
+        ratio: "%{count} de tus últimos %{total}"
+      select_all: Seleccionar todo
+      select_all_aria: Seleccionar todo en esta pila
+      select_email_aria: Seleccionar %{subject}
+      star_sender: Destacar remitente
+      starred: Destacado
+      suggested: Sugerido
+      unpin: Desanclar
+      unstar: Quitar destacado
+      waiting: Esperando respuesta
+    skim_stack:
+      all_caught_up: Todo al día
+      all_caught_up_body: Ha revisado toda la pila.
+      back_to_inbox: Volver a la bandeja de entrada
+      back_to_stack: Volver a la pila
+      close_aria: Cerrar Skim
+      go_back: Volver
+      intro_cta: Empezar el Skim
+      intro_help: Cómo funciona Skim
+      intro_lead: La forma más rápida de despejar tu bandeja de entrada — una pila
+        a la vez, como Stories para tu correo.
+      intro_step_act: Conserva, archiva o fija cada pila con los botones — ninguna
+        pila se queda atrás.
+      intro_step_move: Toca los lados o desliza para recorrer tu bandeja de entrada,
+        de lo más reciente a lo más antiguo.
+      intro_step_undo: 'Nada se elimina: el correo archivado sigue siendo localizable
+        y cualquier acción se puede deshacer.'
+      intro_title: Skim de tu bandeja de entrada
+      kbd_archive: " archivar   "
+      kbd_back_keep: "← atrás   → conservar   "
+      kbd_close: " cerrar"
+      kbd_priority: " prioritario   "
+      keep_and_continue: Conservar y continuar
+      progress_aria: Progreso de Skim
+      touch_hint: Deslice para mover · use los botones para conservar o archivar
+      undo: Deshacer

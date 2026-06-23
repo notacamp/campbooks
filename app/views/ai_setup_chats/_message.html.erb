@@ -1,0 +1,2 @@
+<%# locals: agent_message (AgentMessage), hint (String|nil) %>
+<%= render(Campbooks::AiSetupMessage.new(message: agent_message, hint: local_assigns[:hint])) %>

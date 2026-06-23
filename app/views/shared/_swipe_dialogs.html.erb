@@ -1,0 +1,61 @@
+<%# Shared dialogs driven by the swipe-actions controller (Campbooks::Swipeable):
+    a confirm gate for destructive swipes and a snooze-time picker. Rendered once
+    per page (see layouts/application.html.erb), inert until a swipe requests them. %>
+
+<dialog id="swipe-confirm-dialog"
+        data-controller="swipe-confirm"
+        data-action="click->swipe-confirm#backdrop"
+        class="m-auto w-[min(22rem,calc(100vw-2rem))] rounded-xl bg-card p-5 text-foreground shadow-2xl backdrop:bg-black/50">
+  <h2 data-swipe-confirm-target="title" class="text-base font-semibold"><%= t(".confirm_title") %></h2>
+  <p data-swipe-confirm-target="message" class="mt-1.5 text-sm text-muted-foreground"><%= t(".confirm_message") %></p>
+  <label data-swipe-confirm-target="rememberRow" style="display:none"
+         class="mt-3 cursor-pointer select-none items-center gap-2 text-sm text-muted-foreground">
+    <input type="checkbox" data-swipe-confirm-target="remember" class="h-4 w-4 rounded border-border text-primary focus:ring-ring">
+    <%= t(".dont_ask_again") %>
+  </label>
+  <div class="mt-5 flex justify-end gap-2">
+    <button type="button" data-action="swipe-confirm#cancel"
+            class="cursor-pointer rounded-lg bg-secondary px-4 py-2 text-sm font-medium text-secondary-foreground hover:bg-muted">
+      <%= t("shared.actions.cancel") %>
+    </button>
+    <%# Background is the swiped action's own accent (swipe-confirm sets --swipe-accent
+        from the action color); falls back to the destructive red. %>
+    <button type="button" data-action="swipe-confirm#confirm" data-swipe-confirm-target="confirm"
+            style="background-color: var(--swipe-accent, var(--swipe-red))"
+            class="cursor-pointer rounded-lg px-4 py-2 text-sm font-medium text-white transition hover:brightness-95">
+      <%= t(".confirm_action") %>
+    </button>
+  </div>
+</dialog>
+
+<dialog id="swipe-snooze-dialog"
+        data-controller="swipe-snooze"
+        data-action="click->swipe-snooze#backdrop"
+        class="m-auto w-[min(20rem,calc(100vw-2rem))] rounded-xl bg-card p-4 text-foreground shadow-2xl backdrop:bg-black/50">
+  <h2 class="mb-2.5 text-sm font-semibold"><%= t(".snooze_title") %></h2>
+  <div class="flex flex-col">
+    <% snooze_presets.each do |_key, label, time| %>
+      <button type="button"
+              data-action="swipe-snooze#pick"
+              data-snooze-until="<%= time.iso8601 %>"
+              class="cursor-pointer rounded-lg px-3 py-2 text-left text-sm hover:bg-muted">
+        <%= label %>
+      </button>
+    <% end %>
+  </div>
+  <div class="mt-2 border-t border-border pt-2">
+    <div class="flex gap-2">
+      <input type="datetime-local" data-swipe-snooze-target="custom"
+             min="<%= Time.current.strftime('%Y-%m-%dT%H:%M') %>"
+             class="min-w-0 flex-1 rounded-md border border-input px-2 py-1.5 text-xs focus:border-accent-400 focus:outline-none">
+      <button type="button" data-action="swipe-snooze#pickCustom"
+              class="flex-shrink-0 cursor-pointer rounded-lg bg-accent-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-600">
+        <%= t(".snooze_action") %>
+      </button>
+    </div>
+    <button type="button" data-action="swipe-snooze#cancel"
+            class="mt-2 w-full cursor-pointer rounded-lg px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted">
+      <%= t("shared.actions.cancel") %>
+    </button>
+  </div>
+</dialog>

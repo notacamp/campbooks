@@ -1,0 +1,13 @@
+---
+es:
+  email_compose:
+    draft_saved:
+      draft_saved: Borrador guardado
+  email_compose_chat:
+    form:
+      placeholder: Describa el correo que desea enviar...
+    messages_panel:
+      empty_body_html: Indique a quién desea escribir y qué quiere decir.<br>Le ayudaré
+        a redactar y enviar el mensaje.
+      example_contract: Enviar un correo a John sobre el contrato
+      example_followup: Hacer seguimiento de la reunión de la semana pasada

@@ -1,0 +1,14 @@
+<%# Infinite scroll for the sidebar thread list. Append the next page into the
+    #email_threads list wrapper (the sentinel lives just outside it, so appended
+    rows land above it), then refresh or remove the sentinel for the page after. %>
+<%= turbo_stream.append "email_threads" do %>
+  <%= render partial: "thread_list", locals: { threads: @threads, current_group: nil, tag_groups: {}, continue_section: params[:continue_section] } %>
+<% end %>
+
+<% if @pagy.next %>
+  <%= turbo_stream.replace "threads_pagination" do %>
+    <%= render partial: "threads_pagination", locals: { pagy: @pagy, threads: @threads } %>
+  <% end %>
+<% else %>
+  <%= turbo_stream.remove "threads_pagination" %>
+<% end %>

@@ -1,0 +1,66 @@
+---
+en:
+  ai_configurations:
+    update:
+      assignment_updated: "%{purpose} assignment updated."
+      failed_to_save: 'Failed to save %{purpose}: %{errors}'
+      is_unassigned: "%{purpose} is unassigned."
+      reset_to_unassigned: "%{purpose} reset to unassigned."
+  inbox_settings:
+    accounts:
+      scan_now:
+        started: Scan started. New messages will appear shortly.
+    tags:
+      destroy:
+        cannot_delete: The security_flagged tag can't be deleted.
+  settings:
+    ai_adapters:
+      create:
+        created: AI adapter "%{name}" created.
+        failed: 'Failed to create adapter: %{errors}'
+      destroy:
+        deleted: AI adapter "%{name}" deleted.
+        in_use: Cannot delete "%{name}" — it is still assigned to services.
+      managed_not_editable: Campbooks AI is managed for you — switch modes in Settings
+        instead of editing it.
+      update:
+        failed: 'Failed to update adapter: %{errors}'
+        updated: AI adapter "%{name}" updated.
+        updated_env_key: AI adapter "%{name}" updated (using env key if available).
+    general:
+      update:
+        saved: Settings updated.
+    integrations:
+      connections:
+        create:
+          created: Connection “%{name}” created.
+        destroy:
+          deleted: Connection “%{name}” deleted.
+        update:
+          updated: Connection “%{name}” updated.
+      google_drive:
+        destroy:
+          disconnected: Google Drive disconnected.
+      google_drive_configs:
+        update:
+          saved: Google Drive config updated.
+      notion:
+        destroy:
+          disconnected: Notion integration disconnected.
+        update:
+          saved: Notion integration updated.
+          workspace_warning: 'Connected but couldn''t fetch workspace info: %{error}'
+      zoho_drive:
+        destroy:
+          mapping_not_found: Mapping not found.
+          mapping_removed: Mapping removed.
+        update:
+          mapping_saved: Folder mapping saved.
+    invitations:
+      create:
+        pending_review: Invitation for %{email} submitted for admin review.
+        sent: Invitation sent to %{email}.
+      destroy:
+        cancelled: Invitation cancelled.
+      resend:
+        resent: Invitation resent to %{email}.

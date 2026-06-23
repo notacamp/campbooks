@@ -1,0 +1,18 @@
+<%# Lazy pagination: append the next page of people, then advance the cursor. %>
+<%= turbo_stream.append "isc_rows" do %>
+  <% @people_with_contacts.each do |person| %>
+    <%= render "contacts/person", person: person %>
+  <% end %>
+<% end %>
+
+<% if @pagy.next %>
+  <%= turbo_stream.replace "isc_pagination" do %>
+    <%= turbo_frame_tag "isc_pagination",
+          src: contacts_path(page: @pagy.next, q: params[:q].presence, format: :turbo_stream),
+          loading: :lazy do %>
+      <div class="flex justify-center py-4"><%= render(Campbooks::Spinner.new(size: :sm)) %></div>
+    <% end %>
+  <% end %>
+<% else %>
+  <%= turbo_stream.remove "isc_pagination" %>
+<% end %>

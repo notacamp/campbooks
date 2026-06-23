@@ -1,0 +1,23 @@
+<%# Full-screen document Skim overlay (Instagram-stories style). Rendered inside the
+    /documents page's data-controller="doc-skim-overlay" wrapper (page-scoped, so it
+    never collides with the global email Skim overlay). The viewer
+    (Campbooks::DocSkimStack, loaded into the frame) fills the panel and carries its
+    own chrome and close button. Escape or the close button dismisses it. %>
+<div data-doc-skim-overlay-target="panel"
+     data-action="keydown->doc-skim-overlay#onKeydown"
+     class="hidden fixed inset-0 z-[60]"
+     role="dialog" aria-modal="true" aria-label="<%= t('.review_documents_label') %>">
+  <%= turbo_frame_tag "doc_skim_content",
+        class: "block h-full w-full",
+        data: { doc_skim_overlay_target: "frame", doc_skim_src: document_skim_path, action: "turbo:frame-load->doc-skim-overlay#frameLoaded" } do %>
+    <div class="flex h-full w-full items-center justify-center bg-background">
+      <div class="flex flex-col items-center gap-3 text-sm text-muted-foreground">
+        <svg class="h-6 w-6 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        <%= t(".gathering_documents") %>
+      </div>
+    </div>
+  <% end %>
+</div>

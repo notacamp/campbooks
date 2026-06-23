@@ -1,0 +1,111 @@
+<%# Mobile-only documents card — the same data + inline review actions as
+    documents/_row, but laid out vertically so phones never need the horizontal
+    table scroll. Shown below md (md:hidden container); the table takes over at md+.
+    Distinct dom_id ("card_document_…") so it can coexist with the desktop row;
+    DocumentsController#review_row_stream swaps both together after approve/reject.
+    Reuses documents.row.* / documents.index.* keys (no card-only namespace).
+
+    When the doc is pending review, the card is wrapped in Campbooks::Swipeable:
+    swipe RIGHT = Approve, swipe LEFT = Reject (the same endpoints as the inline
+    buttons, which stay as an explicit fallback). removes:false — approve/reject
+    replace the card in place via review_row_stream, so the Swipeable WRAPPER holds
+    the dom_id and the replace swaps the whole wrapper for the updated (plain) card. %>
+<% card_inner = capture do %>
+  <div class="flex items-start justify-between gap-3"
+       data-controller="document-rename" data-document-rename-url-value="<%= rename_document_path(doc) %>">
+    <div class="min-w-0 flex-1">
+      <div class="flex items-center gap-1.5 min-w-0">
+        <%= render Campbooks::StarToggle.new(url: toggle_star_document_path(doc), starred: doc.starred?) %>
+        <%= link_to(doc.display_title, document_path(doc),
+              class: "text-sm font-semibold text-accent-600 hover:text-accent-700 truncate min-w-0",
+              data: { document_rename_target: "display" }) %>
+        <button type="button" data-action="document-rename#edit" data-document-rename-target="editButton"
+            aria-label="<%= t("documents.row.rename") %>" title="<%= t("documents.row.rename") %>"
+            class="flex-shrink-0 p-1 -m-1 text-gray-400 hover:text-accent-600 cursor-pointer">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/>
+          </svg>
+        </button>
+      </div>
+      <%= text_field_tag "title", doc.metadata&.dig("title"), placeholder: doc.display_title,
+            class: "hidden mt-1 w-full rounded-md border border-gray-300 px-2 py-1 text-sm shadow-sm focus:border-accent-400 focus:outline-none focus:ring-1 focus:ring-accent-400",
+            data: { document_rename_target: "input",
+                    action: "keydown.enter->document-rename#save keydown.esc->document-rename#cancel blur->document-rename#save" } %>
+      <% if doc.email_message %>
+        <div class="mt-0.5 text-xs text-gray-400 truncate">
+          <%= link_to clean_email_address(doc.email_message.from_address), email_message_path(doc.email_message), class: "hover:text-accent-600" %>
+          <% if doc.email_message.email_thread %>
+            &middot;
+            <%= link_to doc.email_message.email_thread.subject&.truncate(30), email_message_path(doc.email_message), class: "hover:text-accent-600" %>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+    <%= status_badge(doc.display_status) %>
+  </div>
+
+  <%# Type (color dot + label) leads the meta line, then date · reference · source —
+      each part dropped when blank so thin-data docs don't show stray separators. %>
+  <% doc_type = doc.classification || doc.document_type %>
+  <% meta_parts = [] %>
+  <% meta_parts << l(doc.document_date, format: :numeric) if doc.document_date %>
+  <% meta_parts << doc.reference_display if doc.reference_display.present? %>
+  <% meta_parts << human_enum(Document, :source, doc.source) %>
+  <div class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+    <span class="inline-flex items-center gap-1.5 min-w-0">
+      <% if doc_type %>
+        <%= render Campbooks::ColorDot.new(color: document_type_dot_color(doc_type), size: :sm) %>
+        <span class="truncate text-gray-600"><%= document_type_label(doc_type) %></span>
+      <% else %>
+        <span class="text-gray-400"><%= t("documents.row.unclassified") %></span>
+      <% end %>
+    </span>
+    <% meta_parts.each do |part| %>
+      <span aria-hidden="true" class="text-gray-300">&middot;</span>
+      <span><%= part %></span>
+    <% end %>
+  </div>
+
+  <%# Inline review actions — always visible on touch (no hover affordance), with full
+      tap targets. Each posts a Turbo form; review_row_stream swaps row + card in place. %>
+  <% if doc.review_pending? && doc.ai_completed? %>
+    <div class="mt-3 flex items-center justify-end gap-2">
+      <%= button_to approve_document_path(doc), form_class: "inline-flex",
+            class: "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 cursor-pointer",
+            title: t("documents.row.approve") do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        <%= t("documents.row.approve") %>
+      <% end %>
+      <%= button_to reject_document_path(doc), form_class: "inline-flex",
+            class: "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 hover:text-red-600 cursor-pointer",
+            title: t("documents.row.reject") do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        <%= t("documents.row.reject") %>
+      <% end %>
+    </div>
+  <% elsif doc.ai_failed? %>
+    <div class="mt-3 flex justify-end">
+      <%= button_to reprocess_document_path(doc), form_class: "inline-flex",
+            class: "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 cursor-pointer",
+            title: doc.ai_error.presence || t("documents.row.reanalyze") do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <%= t("documents.row.reanalyze") %>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>
+
+<% if doc.review_pending? && doc.ai_completed? %>
+  <%= render(Campbooks::Swipeable.new(
+        id: dom_id(doc, :card),
+        class: "rounded-xl",
+        right: [ { key: "approve", label: t("documents.row.approve"), icon: :approve, color: "green",
+                   endpoint: approve_document_path(doc), params: {}, removes: false } ],
+        left: [ { key: "reject", label: t("documents.row.reject"), icon: :reject, color: "orange",
+                  endpoint: reject_document_path(doc), params: {}, removes: false } ]
+      )) do %>
+    <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-4"><%= card_inner %></div>
+  <% end %>
+<% else %>
+  <div id="<%= dom_id(doc, :card) %>" class="bg-card rounded-xl shadow-sm border border-gray-200 p-4"><%= card_inner %></div>
+<% end %>

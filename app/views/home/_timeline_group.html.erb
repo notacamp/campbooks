@@ -1,0 +1,10 @@
+<%# One timeline entry from Feed::Reader.group_timeline: a single card (rendered
+    via the dispatcher, keeping its feed_item_<id> for inline removal), or a run of
+    filing suggestions stacked as one tight tag queue. %>
+<% case group[:type]
+   when :tag_queue %>
+  <%= render Campbooks::Feed::TagQueueCard.new(items: group[:items]) %>
+<% else %>
+  <% pair = group[:pair] %>
+  <%= render Campbooks::Feed::Card.new(item: pair[:item], subject: pair[:subject]) %>
+<% end %>

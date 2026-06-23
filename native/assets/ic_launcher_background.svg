@@ -1,0 +1,12 @@
+<svg viewBox="0 0 32 32" width="432" height="432" xmlns="http://www.w3.org/2000/svg">
+  <!-- Android adaptive-icon BACKGROUND: the Ember gradient, full bleed, no mark.
+       Same gradient geometry as the iOS tile so both platforms match exactly. -->
+  <defs>
+    <linearGradient id="ember" x1="3" y1="2" x2="29" y2="30" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E52C8F"/>
+      <stop offset="0.55" stop-color="#FC4E57"/>
+      <stop offset="1" stop-color="#FD9320"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" fill="url(#ember)"/>
+</svg>

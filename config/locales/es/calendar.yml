@@ -1,0 +1,75 @@
+---
+es:
+  calendar:
+    index:
+      connect_cta: Conectar un calendario
+      empty_desc: Conecta un calendario de Google o Zoho para ver y gestionar tus
+        eventos aquí.
+      empty_title: Ningún calendario conectado
+      new_event: Nuevo evento
+      next: Siguiente
+      previous: Anterior
+      reminders: Recordatorios
+      title: Calendario
+      today: Hoy
+      upcoming: Próximos
+      view_agenda: Agenda
+      view_day: Día
+      view_month: Mes
+      view_week: Semana
+  calendar_events:
+    create:
+      created: Evento creado.
+      no_calendar: Elige un calendario para añadir el evento.
+    destroy:
+      deleted: Evento eliminado.
+    edit:
+      rsvp_prompt: "¿Asistirás?"
+      title: Editar evento
+    errors:
+      not_writable: No tienes permiso para modificar este evento.
+    form:
+      all_day_label: Todo el día
+      calendar_label: Calendario
+      cancel: Cancelar
+      color_default: Color del calendario
+      color_label: Color
+      create: Crear evento
+      delete: Eliminar evento
+      delete_confirm: "¿Eliminar este evento?"
+      description_label: Descripción
+      ends_label: Fin
+      location_label: Ubicación
+      recurrence_all: Todos los eventos de la serie
+      recurrence_label: Aplicar a
+      recurrence_this: Este evento
+      rsvp_accepted: Sí
+      rsvp_declined: 'No'
+      rsvp_tentative: Quizás
+      save: Guardar
+      starts_label: Inicio
+      title_label: Título
+      title_placeholder: Añadir un título
+    new:
+      title: Nuevo evento
+    rsvp:
+      invalid_rsvp: Respuesta no válida.
+      rsvp_saved: Tu respuesta ha sido guardada.
+    update:
+      updated: Evento actualizado.
+  components:
+    calendar:
+      agenda_list:
+        empty_desc: No hay eventos en este rango.
+        empty_title: Sin eventos próximos
+        today: Hoy
+        tomorrow: Mañana
+      event_modal:
+        aria_label: Evento
+      event_row:
+        all_day: Todo el día
+        untitled: "(Sin título)"
+        video_call: Videollamada
+      week_grid:
+        add: "+ Añadir"
+        untitled: "(Sin título)"

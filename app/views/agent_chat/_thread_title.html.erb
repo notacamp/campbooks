@@ -1,0 +1,28 @@
+<%# locals: thread %>
+<div data-controller="inline-edit" class="min-w-0">
+  <h1 data-inline-edit-target="display"
+      data-action="click->inline-edit#edit"
+      class="flex items-center gap-1.5 min-w-0 cursor-pointer group/title"
+      title="<%= t(".click_to_rename") %>">
+    <span class="text-base font-semibold text-gray-900 truncate hover:bg-gray-100 rounded px-1 -ml-1 transition-colors"><%= thread.title %></span>
+    <svg class="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 group-hover/title:opacity-100 flex-shrink-0 transition-opacity"
+         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+    </svg>
+  </h1>
+
+  <%= form_with model: thread, url: scout_thread_path(thread), method: :patch,
+        html: {
+          class: "hidden",
+          data: { inline_edit_target: "form", action: "turbo:submit-start->inline-edit#markSubmitting turbo:submit-end->inline-edit#saved" }
+        } do |f| %>
+    <%= f.text_field :title,
+          value: thread.title,
+          required: true,
+          class: "text-base font-semibold text-gray-900 bg-card border border-blue-400 dark:border-blue-500/40 rounded px-1 py-0 w-full focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-500/40",
+          data: {
+            inline_edit_target: "input",
+            action: "blur->inline-edit#cancel keydown.esc->inline-edit#cancel keydown->inline-edit#submitOnEnter"
+          } %>
+  <% end %>
+</div>

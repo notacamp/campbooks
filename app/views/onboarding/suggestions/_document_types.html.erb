@@ -1,0 +1,14 @@
+<% if suggestions.present? %>
+  <div class="space-y-2">
+    <% suggestions.each_with_index do |s, i| %>
+      <%= render(Campbooks::CheckableCard.new(
+            name: "ai_document_type_#{i}", value: s["name"], checked: true,
+            title: s["name"].humanize, description: s["prompt"], color: s["color"],
+            variant: :horizontal,
+            class: "border-accent-200 bg-accent-50 hover:border-accent-300")) %>
+    <% end %>
+    <p class="text-xs text-gray-400 mt-2"><%= t(".save_hint") %></p>
+  </div>
+<% else %>
+  <p class="text-xs text-gray-400 italic"><%= t(".no_suggestions") %></p>
+<% end %>

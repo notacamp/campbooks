@@ -1,0 +1,219 @@
+---
+en:
+  email_messages:
+    notion_exports:
+      new:
+        title: Save to Notion
+        subtitle: "Add this email (%{subject}) to Notion."
+        no_subject: "(no subject)"
+        heading: Where should this go?
+        workspace: Workspace
+        workspace_one: "Workspace: %{name}"
+        to_database: Add to a database
+        to_database_desc: Create a database item and fill in its fields.
+        to_page: Create a page
+        to_page_desc: Add a subpage under a page you choose.
+      databases:
+        search: Search databases…
+        none: No databases found. Share a database with this integration in Notion.
+        error: "Couldn't load databases: %{message}"
+      database_form:
+        untitled: Untitled database
+        back: ← Databases
+        create_item: Create item in Notion
+        error: "Couldn't load the database: %{message}"
+        attachments_count:
+          one: "%{count} attachment"
+          other: "%{count} attachments"
+      pages:
+        search: Search pages…
+        parent_page: Parent page
+        none: No pages found. Share a page with this integration in Notion.
+        page_title: Page title
+        note: Note (optional)
+        attach_files:
+          one: Attach the email's attachment
+          other: Attach the email's %{count} attachments
+        create_page: Create page in Notion
+        error: "Couldn't load pages: %{message}"
+      create:
+        pick_destination: Choose a destination in Notion.
+        created: Saved to Notion.
+        failed: Couldn't create the item in Notion.
+        failed_with: "Notion export failed: %{message}"
+      errors:
+        not_connected: Connect Notion first.
+    board:
+      index:
+        heading: Board
+    empty:
+      add_account_button: Add email account
+      connect_email_description: Link an email account to start receiving and processing
+        emails automatically.
+      connect_email_title: Connect your email
+      manage_accounts_button: Manage email accounts
+      no_mail_yet_description: Your email accounts are connected. Mail will appear
+        here after the next scan.
+      no_mail_yet_title: No mail yet
+    empty_detail:
+      no_email_selected: No email selected
+      select_prompt: Select an email from the sidebar to view it here.
+    index:
+      all_folder_label: All
+      collapse_sidebar_aria: Collapse sidebar
+      expand_sidebar_aria: Expand sidebar
+      folders_heading: Folders
+      inbox_heading: Inbox
+      inbox_settings_aria: Inbox settings
+      new_message_title: New message
+      no_email_selected: No email selected
+      no_emails_in_folder: No emails in this folder.
+      select_all_label: All
+      toolbar_clear_selection_title: Clear selection
+      toolbar_delete_title: Delete
+      toolbar_mark_read_title: Mark read
+      toolbar_mark_unread_title: Mark unread
+      toolbar_move_folder_title: Move to folder
+      toolbar_scout_chat_title: Send to Scout
+      toolbar_send_to_scout_title: Send to Scout
+      toolbar_snooze_title: Snooze
+      toolbar_tag_title: Tag
+    mobile_folder_bar:
+      all: All
+      new_folder: New folder
+    new:
+      all_folder_label: All
+      bcc_label: 'Bcc:'
+      bcc_placeholder: Add BCC...
+      bcc_toggle_label: Bcc
+      cc_label: 'Cc:'
+      cc_placeholder: Add CC...
+      close_scout_aria: Close Scout
+      collapse_sidebar_aria: Collapse sidebar
+      expand_sidebar_aria: Expand sidebar
+      folders_heading: Folders
+      from_label: 'From:'
+      inbox_heading: Inbox
+      inbox_settings_aria: Inbox settings
+      new_message_heading: New Message
+      no_emails_yet: No emails yet.
+      no_sendable_accounts_description: You need an email account with send permission
+        to compose new messages.
+      no_sendable_accounts_title: No sendable accounts
+      no_signature_option: No signature
+      scout_keyboard_hint: Cmd+Shift+E for manual
+      scout_label: Scout
+      signature_default_suffix: "(default)"
+      signature_label: 'Sig:'
+      signature_preview_heading: Signature
+      subject_label: 'Subj:'
+      subject_placeholder: Subject
+      to_label: 'To:'
+      to_placeholder: Search contacts or type email...
+      toggle_chat_aria: Toggle chat
+      write_message_placeholder: Write your message...
+    reply_actions:
+      forward_title: Forward
+      reply_all_title: Reply All
+      reply_title: Reply
+    search:
+      chips:
+        account: 'Account: %{value}'
+        category: 'Category: %{value}'
+        date_from: After %{value}
+        date_to: Before %{value}
+        domain: 'Domain: %{value}'
+        folder: 'Folder: %{value}'
+        has_attachment: Has attachment
+        priority: 'Priority: %{value}'
+        sender: 'From: %{value}'
+        tag: 'Tag: %{value}'
+        unread: Unread
+      no_results: No matching emails
+      no_results_hint: Try fewer filters or a broader query.
+      results_heading: Search results
+    show:
+      ai_processed_badge: AI processed
+      all_folder_label: All
+      back_to_inbox_label: Inbox
+      close_discussion_aria: Close discussion
+      close_scout_aria: Close Scout
+      collapse_discussion_aria: Collapse discussion
+      collapse_sidebar_aria: Collapse sidebar
+      compose_label: Compose
+      discussion_button_label: Discussion
+      discussion_empty_body: Leave a note for your team, or tag %{scout_mention} to
+        ask the AI about this email.
+      discussion_empty_heading: Start the discussion
+      discussion_label: Discussion
+      expand_sidebar_aria: Expand sidebar
+      folders_heading: Folders
+      inbox_heading: Inbox
+      inbox_settings_aria: Inbox settings
+      new_message_title: New message
+      no_emails_yet: No emails yet.
+      scout_keyboard_hint: Cmd+Shift+E for manual
+      scout_label: Scout
+      show_discussion_aria: Show discussion
+      show_discussion_title: Show discussion
+      snoozed_until_badge: Snoozed until %{time}
+      toggle_chat_aria: Toggle chat
+      toolbar_clear_selection_title: Clear selection
+      toolbar_delete_title: Delete
+      toolbar_mark_read_title: Mark read
+      toolbar_mark_unread_title: Mark unread
+      toolbar_move_folder_title: Move to folder
+      toolbar_scout_chat_title: Send to Scout
+      toolbar_send_to_scout_title: Send to Scout
+      toolbar_snooze_title: Snooze
+      toolbar_tag_title: Tag
+      unsnooze_label: Unsnooze
+      unsnooze_title: Unsnooze
+    snooze_button:
+      ok: OK
+      snooze_title: Snooze
+    tags:
+      add_tag_aria: Add tag
+      remove_tag_title: Remove tag
+      search_tags_placeholder: Search tags...
+    thread_list:
+      back_to_inbox: "— back to inbox"
+      drag_to_folder: Drag to a folder
+      no_subject: "(no subject)"
+      pin_title: Make priority
+      priority_section: Priority
+      senders_more: "%{first}, %{second}, and more"
+      sent_to_prefix: 'To:'
+      unpin_title: Remove priority
+    zoho_labels:
+      add_label_aria: Add label
+      remove_label_title: Remove label
+      search_labels_placeholder: Search labels...
+  email_scans:
+    show:
+      account_label: Account
+      breadcrumb_scans: Scans
+      completed_label: Completed
+      documents_created_label: Documents Created
+      emails_found_label: Emails Found
+      emails_in_scan_heading: Emails in this scan
+      emails_processed_label: Emails Processed
+      error_details_heading: Error Details
+      errors_label: Errors
+      no_subject: "(no subject)"
+      page_heading: 'Scan #%{id}'
+      started_label: Started
+      status_label: Status
+      table_from: From
+      table_received: Received
+      table_status: Status
+      table_subject: Subject
+  email_threads:
+    show:
+      added_to_discussion: You were added to this discussion. You can see the conversation
+        below and reply.
+      back_to_inbox: Back to inbox
+      discussion_empty_body: Leave a note, or tag %{scout_mention} to ask the AI about
+        this email.
+      discussion_empty_heading: Start the discussion
+      discussion_heading: Discussion

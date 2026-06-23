@@ -1,0 +1,7 @@
+<%# Appends an Undo snackbar to the shared toast region from a controller turbo_stream:
+    turbo_stream.append(Campbooks::ActionToast::REGION_ID, partial: "shared/undo_toast",
+      locals: { message:, endpoint:, params: }) %>
+<%= render(Campbooks::ActionToast.new(
+  message: message, variant: :success,
+  undo: { endpoint: endpoint, params: params }
+)) %>

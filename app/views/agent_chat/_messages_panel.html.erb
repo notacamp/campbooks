@@ -1,0 +1,38 @@
+<% thread = local_assigns[:thread] %>
+<% messages = local_assigns[:messages] || [] %>
+<% last_message = messages.last %>
+
+<div class="flex-1 overflow-y-auto min-h-0" id="agent_messages" data-controller="chat-input" data-chat-input-target="list">
+  <div id="agent_messages_list" class="max-w-3xl mx-auto w-full px-3 sm:px-5 py-4 min-h-full flex flex-col">
+    <% if messages.any? %>
+      <% last_index = messages.length - 1 %>
+      <% messages.each_with_index do |msg, i| %>
+        <%= render "agent_chat/message", agent_message: msg, latest: (i == last_index) %>
+      <% end %>
+      <%# A trailing user message means its reply is in flight (show the spinner) %>
+      <%# or it failed (show the persisted error card) — never a phantom spinner. %>
+      <% if last_message&.from_user? %>
+        <% if last_message.failed? %>
+          <%= render "agent_chat/error", retry_content: last_message.content %>
+        <% else %>
+          <%= render "agent_chat/typing" %>
+        <% end %>
+      <% end %>
+    <% else %>
+      <% briefing = local_assigns[:briefing] || Scout::Briefing.for(current_user) %>
+      <div class="flex-1 flex">
+        <%= render(Campbooks::ScoutBriefing.new(**briefing)) %>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<div class="border-t border-border flex-shrink-0">
+  <div class="max-w-3xl mx-auto w-full px-3 sm:px-5 py-3 sm:py-4">
+    <% if ai_provider_available?(:text) %>
+      <%= render "agent_chat/form", thread: thread %>
+    <% else %>
+      <%= render(Campbooks::AiSetupPrompt.new(capability: :text, variant: :banner)) %>
+    <% end %>
+  </div>
+</div>

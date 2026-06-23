@@ -1,0 +1,29 @@
+# Campbooks — Android fastlane.
+#
+# Setup (after creating the Play Console account):
+#   1. bundle install                         # installs fastlane (see ../Gemfile)
+#   2. cp ../keystore.properties.example ../keystore.properties  # then fill it in
+#   3. place the Play service-account JSON at ../play-store-key.json (git-ignored)
+#   4. bundle exec fastlane beta
+default_platform(:android)
+
+platform :android do
+  desc "Build a signed release AAB"
+  lane :build do
+    gradle(task: "clean")
+    gradle(task: "bundle", build_type: "Release")
+  end
+
+  desc "Build and upload to the Play Console internal testing track"
+  lane :beta do
+    build
+    upload_to_play_store(
+      track: "internal",
+      aab: "app/build/outputs/bundle/release/app-release.aab",
+      release_status: "draft",
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+    )
+  end
+end

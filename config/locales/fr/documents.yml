@@ -1,0 +1,214 @@
+---
+fr:
+  documents:
+    drive_exports:
+      create:
+        no_file: Ce document n'a pas de fichier à importer.
+        upload_failed: 'Échec de l''import : %{message}'
+        uploaded: Importé dans Google Drive.
+      create_folder:
+        folder_created: Dossier "%{name}" créé.
+        folder_failed: 'Impossible de créer le dossier : %{message}'
+        folder_name_required: Saisissez un nom pour le dossier.
+      errors:
+        not_connected: Connectez d'abord Google Drive.
+        reconnect_needed: Reconnectez Google Drive pour activer la navigation dans
+          les dossiers.
+      new:
+        browse_failed: 'Impossible de parcourir Drive : %{message}'
+        choose_folder: Choisir un dossier
+        create_folder: Créer un dossier
+        my_drive: My Drive
+        new_folder_placeholder: Nom du nouveau dossier
+        no_subfolders: Aucun dossier ici pour l'instant.
+        subtitle: Choisissez où mettre %{document}.
+        title: Envoyer vers Google Drive
+        upload_here: Importer dans %{folder}
+    forms:
+      bank_statement:
+        account_number: Numéro de compte
+        bank_name: Nom de la banque
+        closing_balance: Solde de clôture (centimes)
+        currency: Devise
+        opening_balance: Solde d'ouverture (centimes)
+        period_end: Fin de période
+        period_start: Début de période
+      expense_invoice:
+        amount_cents: Montant (centimes)
+        buyer_nif: NIF de l'acheteur
+        company_vat_present: Numéro de TVA de l'entreprise présent
+        currency: Devise
+        document_date: Date du document
+        due_date: Date d'échéance
+        expense_category: Catégorie de Dépense
+        invoice_number: Numéro de facture
+        select_category: Sélectionner une catégorie
+        tax_amount_cents: Montant de la taxe (centimes)
+        tax_rate: Taux de taxe (%)
+        vendor_name: Nom du fournisseur
+        vendor_nif: NIF du fournisseur
+      other:
+        document_date: Date du document
+        entity_name: Nom de l'entité
+      receipt:
+        amount_cents: Montant (centimes)
+        document_date: Date du document
+        payment_method: Mode de paiement
+        receipt_number: Numéro de reçu
+        select_method: Sélectionner un mode
+        vendor_name: Nom du fournisseur
+        vendor_nif: NIF du fournisseur
+      revenue_invoice:
+        amount_cents: Montant (centimes)
+        client_name: Nom du client
+        client_nif: NIF du client
+        currency: Devise
+        document_date: Date du document
+        due_date: Date d'échéance
+        invoice_number: Numéro de facture
+        tax_amount_cents: Montant de la taxe (centimes)
+        tax_rate: Taux de taxe (%)
+    index:
+      accepted_formats: PDF, JPG, PNG, WEBP, HEIC
+      click_to_upload: Cliquer pour téléverser
+      col_date: Date
+      col_name: Nom
+      col_reference: Référence
+      col_source: Source
+      col_status: Statut
+      col_type: Type
+      download_zip: Télécharger le ZIP
+      drag_and_drop: ou glisser-déposer
+      empty_connect_email: Connecter un compte e-mail
+      empty_description: Scout classe automatiquement les documents de votre boîte
+        de réception. Connectez un compte e-mail ou importez un fichier pour commencer.
+      empty_description_connected: Scout surveille votre boîte de réception et classe
+        les documents ici dès leur arrivée. Vous pouvez aussi en importer un manuellement.
+      empty_title: Aucun document pour l'instant
+      empty_upload: Importer un document
+      export: Exporter
+      export_confirm: Générer un ZIP de tous les documents correspondant aux filtres
+        actuels ?
+      export_failed: Échec
+      exports_col_date: Date
+      exports_col_documents: Documents
+      exports_col_download: Télécharger
+      exports_col_status: Statut
+      exports_heading: Exports
+      filter_all_categories: Toutes les catégories
+      filter_all_statuses: Tous les statuts
+      filter_all_types: Tous les types
+      filter_category: Catégorie
+      filter_month: Mois
+      filter_status: Statut
+      filter_type: Type
+      filter_types_selected:
+        one: "%{count} sélectionné"
+        other: "%{count} sélectionnés"
+      filters: Filtres
+      no_documents: Aucun document ne correspond à ces filtres.
+      reanalyze_all: Ré-analyser tout (%{count})
+      selected_files: 'Fichiers sélectionnés :'
+      title: Documents
+      upload: Téléverser
+      upload_and_process: Téléverser et traiter
+    merge:
+      keep_this_one: Conserver celui-ci
+      label_date: 'Date :'
+      label_file: 'Fichier :'
+      label_linked_emails: 'E-mails liés :'
+      label_ref: 'Réf. :'
+      label_status: 'Statut :'
+      merge_confirm: Fusionner %{count} document(s) dans celui-ci ? Les autres seront
+        supprimés.
+      subtitle: Choisissez le document à conserver. Les liens e-mail des autres documents
+        seront transférés vers celui-ci.
+      title: Fusionner les documents
+    notion_exports:
+      create:
+        created: Envoyé vers Notion.
+        failed: Impossible de créer l'élément dans Notion.
+        failed_with: 'Échec de l''export Notion : %{message}'
+        pick_destination: Choisissez une destination dans Notion.
+      database_form:
+        back: "← Bases de données"
+        create_item: Créer un élément dans Notion
+        error: 'Impossible de charger la base de données : %{message}'
+        untitled: Base de données sans titre
+      databases:
+        error: 'Impossible de charger les bases de données : %{message}'
+        none: Aucune base de données trouvée. Partagez une base de données avec cette
+          intégration dans Notion.
+        search: Rechercher des bases de données…
+      errors:
+        not_connected: Connectez d'abord Notion.
+      new:
+        heading: Où doit aller ce document ?
+        subtitle: Ajouter %{document} à Notion.
+        title: Envoyer vers Notion
+        to_database: Ajouter à une base de données
+        to_database_desc: Créez un élément dans la base de données et remplissez ses
+          champs.
+        to_page: Créer une page
+        to_page_desc: Ajoutez une sous-page sous une page de votre choix.
+        workspace: Espace de travail
+        workspace_one: 'Espace de travail : %{name}'
+      pages:
+        attach_file: Joindre %{file}
+        create_page: Créer une page dans Notion
+        error: 'Impossible de charger les pages : %{message}'
+        none: Aucune page trouvée. Partagez une page avec cette intégration dans Notion.
+        note: Note (facultatif)
+        page_title: Titre de la page
+        parent_page: Page parente
+        search: Rechercher des pages…
+      shared:
+        untitled: Sans titre
+    pdf_overlay:
+      close_aria_label: Fermer
+      close_title: Fermer
+      fullscreen_iframe_title: Aperçu PDF plein écran
+    row:
+      approve: Approuver
+      reanalyze: Ré-analyser
+      reject: Rejeter
+      rename: Renommer
+      unclassified: Non classifié
+    show:
+      ai_confidence: Confiance de l'IA
+      ai_failed_hint: Ré-analysez pour réessayer, ou définissez le type manuellement
+        et approuvez.
+      ai_failed_title: L'analyse de l'IA a échoué
+      approve: Approuver
+      back: Retour aux documents
+      created_at: Créé il y a %{time}
+      document_fallback_title: 'Document #%{id}'
+      download: Télécharger
+      email_link_fallback: E-mail
+      extracted_data: Données extraites
+      from: De
+      label_description: Description
+      label_document_type: Classification
+      learned_hint: Suggéré à partir de %{count} sur %{total} documents approuvés
+        classés comme %{type}.
+      maximize: Agrandir
+      original_pdf_iframe_title: Aperçu du PDF original
+      original_pdf_label: PDF original
+      processed_pdf_iframe_title: Aperçu du PDF traité
+      processed_pdf_label: PDF traité
+      reanalyze: Ré-analyser
+      reclassify_hint: Changer le type marque ce document comme révisé.
+      reviewed_by: Revu par %{name}
+      save_changes: Enregistrer les modifications
+      send_to_drive: Envoyer vers Drive
+      send_to_notion: Envoyer vers Notion
+    skim:
+      show:
+        back_to_documents: Retour aux documents
+        close: Fermer
+        no_documents_body: Tout ce que l'IA a signalé a été traité.
+        no_documents_title: Aucun document à examiner
+      tray_content:
+        ai_unsure: "%{count} dont l'IA n'était pas sûre — parcourez pour confirmer
+          ou reclasser"
+        needs_review: À examiner

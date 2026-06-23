@@ -1,0 +1,100 @@
+<%= turbo_frame_tag "inbox_settings_panel" do %>
+  <div data-section="accounts">
+    <header class="sticky top-0 z-10 bg-background/95 backdrop-blur px-6 py-4 border-b border-border flex items-center justify-between gap-4">
+      <div class="min-w-0">
+        <h3 class="text-sm font-semibold text-foreground"><%= t(".heading") %></h3>
+        <p class="text-xs text-muted-foreground mt-0.5"><%= t(".subheading") %></p>
+      </div>
+      <%= button_to t(".scan_now"), inbox_settings_accounts_scan_path, method: :post,
+            class: "inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer transition-colors" %>
+    </header>
+
+    <div class="px-6 py-5 space-y-6">
+      <!-- Connect -->
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs font-medium text-foreground mr-1"><%= t(".connect_label") %></span>
+        <% providers = microsoft_mailbox_connect_enabled? ? %w[zoho google microsoft] : %w[zoho google] %>
+        <% providers.each do |provider| %>
+          <%= button_to human_enum(EmailAccount, :provider, provider), email_accounts_path(provider: provider), method: :post,
+                data: { turbo: false },
+                class: "rounded-lg border border-border px-2.5 py-1 text-xs font-medium text-accent-700 hover:bg-accent-50 dark:text-accent-300 dark:hover:bg-accent-500/10 cursor-pointer transition-colors" %>
+        <% end %>
+      </div>
+
+      <!-- Accounts -->
+      <section>
+        <% if @accounts.any? %>
+          <div class="space-y-2">
+            <% @accounts.each do |account| %>
+              <div id="<%= dom_id(account) %>" class="rounded-lg border border-border p-3">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2">
+                      <%= render(Campbooks::ColorDot.new(color: account.color, size: :sm)) if account.color.present? %>
+                      <span class="text-[13px] font-medium text-foreground truncate"><%= account.display_name %></span>
+                      <% if account.active? %>
+                        <%= render(Campbooks::Badge.new(variant: :success, size: :md)) { t(".active") } %>
+                      <% else %>
+                        <%= render(Campbooks::Badge.new(variant: :danger, size: :md)) { t(".inactive") } %>
+                      <% end %>
+                      <% if (perm = account.permission_for(Current.user)) %>
+                        <%= render(Campbooks::Badge.new(variant: perm.owner? ? :accent : :neutral, size: :md)) { human_enum(EmailAccountUser, :role, perm.role) } %>
+                      <% end %>
+                    </div>
+                    <p class="text-xs text-muted-foreground mt-0.5 truncate"><%= account.email_address %></p>
+                    <p class="text-xs text-muted-foreground mt-0.5">
+                      <% if account.scanning? %>
+                        <span class="inline-flex items-center gap-1 text-accent-600"><%= render(Campbooks::Spinner.new(size: :sm)) %> <%= t(".scanning") %></span> &middot;
+                      <% end %>
+                      <%= t(".last_scan", time: account.last_scanned_at ? l(account.last_scanned_at, format: :at_short) : t(".last_scan_never")) %>
+                    </p>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-1 sm:justify-end sm:flex-shrink-0">
+                    <% if account.owned_by?(Current.user) %>
+                      <%= link_to t(".manage_access"), sharing_email_account_path(account),
+                            data: { turbo_frame: "inbox_settings_panel" },
+                            class: "px-2 py-0.5 text-xs font-medium text-accent-700 hover:bg-accent-50 dark:text-accent-300 dark:hover:bg-accent-500/10 rounded cursor-pointer transition-colors" %>
+                    <% end %>
+                    <%= button_to t(".re_auth"), email_accounts_path(provider: account.provider), method: :post,
+                          data: { turbo: false },
+                          class: "px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded cursor-pointer transition-colors" %>
+                    <% if account.owned_by?(Current.user) %>
+                      <%= button_to t("shared.actions.disconnect"), email_account_path(account), method: :delete,
+                            data: { turbo_confirm: t(".disconnect_confirm", name: account.display_name) },
+                            class: "px-2 py-0.5 text-xs font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 rounded cursor-pointer transition-colors" %>
+                    <% end %>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-[13px] text-muted-foreground py-6 text-center"><%= t(".no_accounts") %></p>
+        <% end %>
+      </section>
+
+      <!-- Recent scans -->
+      <section>
+        <h4 class="text-xs font-semibold text-foreground mb-2"><%= t(".recent_scans_heading") %></h4>
+        <% if @recent_scans.any? %>
+          <div class="divide-y divide-border rounded-lg border border-border">
+            <% @recent_scans.each do |scan| %>
+              <%= link_to email_scan_path(scan), data: { turbo_frame: "_top" },
+                    class: "flex items-center gap-3 px-3 py-2 hover:bg-muted/40 transition-colors" do %>
+                <span class="text-xs text-foreground w-32 truncate"><%= scan.email_account&.display_name || "—" %></span>
+                <% variant = { "completed" => :success, "running" => :info, "failed" => :danger }.fetch(scan.status.to_s, :neutral) %>
+                <%= render(Campbooks::Badge.new(variant: variant, size: :md)) { human_enum(EmailScanLog, :status, scan.status) } %>
+                <span class="text-xs text-muted-foreground ml-auto whitespace-nowrap">
+                  <%= t(".scan_found", found: scan.emails_found, docs: scan.documents_created) %>
+                </span>
+                <span class="text-xs text-muted-foreground whitespace-nowrap"><%= l(scan.started_at || scan.created_at, format: :at_short) %></span>
+              <% end %>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-[13px] text-muted-foreground py-4 text-center"><%= t(".no_scans") %></p>
+        <% end %>
+      </section>
+    </div>
+  </div>
+<% end %>

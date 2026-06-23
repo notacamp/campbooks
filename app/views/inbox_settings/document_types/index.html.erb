@@ -1,0 +1,29 @@
+<%= turbo_frame_tag "inbox_settings_panel" do %>
+  <div data-section="document_types">
+    <header class="sticky top-0 z-10 bg-background/95 backdrop-blur px-6 py-4 border-b border-border flex items-center justify-between gap-4">
+      <div class="min-w-0">
+        <h3 class="text-sm font-semibold text-foreground"><%= t(".heading") %></h3>
+        <p class="text-xs text-muted-foreground mt-0.5"><%= t(".subtitle") %></p>
+      </div>
+      <%= render(Campbooks::Button.new(variant: :primary, size: :sm,
+            href: new_inbox_settings_document_type_path,
+            data: { turbo_frame: "inbox_settings_doc_type_form" })) { t(".add_type") } %>
+    </header>
+
+    <div class="px-6 py-5">
+      <%= turbo_frame_tag "inbox_settings_doc_type_form" %>
+
+      <div id="inbox_settings_doc_types_rows">
+        <% if @types.any? %>
+          <% @types.each do |type| %>
+            <%= render "inbox_settings/document_types/document_type", type: type %>
+          <% end %>
+        <% else %>
+          <p id="inbox_settings_doc_types_empty" class="text-[13px] text-muted-foreground py-8 text-center">
+            <%= t(".empty") %>
+          </p>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>

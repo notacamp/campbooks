@@ -1,0 +1,18 @@
+<%# locals: contact, person %>
+<div data-controller="inline-edit" id="<%= dom_id(contact, :name_display) %>">
+  <div data-inline-edit-target="display" class="flex items-center gap-1.5">
+    <span class="text-sm text-foreground"><%= person&.name.presence || "—" %></span>
+    <button type="button" data-action="click->inline-edit#edit" class="text-gray-300 hover:text-gray-500 flex-shrink-0" aria-label="<%= t(".edit_name_aria") %>">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+    </button>
+  </div>
+  <div data-inline-edit-target="form" class="hidden">
+    <%= form_with url: contact_path(contact), method: :patch,
+          data: { action: "turbo:submit-end->inline-edit#saved" }, class: "flex items-center gap-1.5" do %>
+      <%= text_field_tag "person[name]", person&.name, data: { inline_edit_target: "input" },
+            class: "text-sm border border-gray-300 rounded-md px-2 py-1 w-40 focus:ring-accent-500 focus:border-accent-500" %>
+      <button type="submit" class="text-xs px-2 py-1 bg-accent-600 text-white rounded hover:bg-accent-700"><%= t(".save") %></button>
+      <button type="button" data-action="click->inline-edit#cancel" class="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"><%= t(".cancel") %></button>
+    <% end %>
+  </div>
+</div>

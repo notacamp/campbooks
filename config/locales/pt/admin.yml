@@ -1,0 +1,61 @@
+---
+pt:
+  admin:
+    beta_codes:
+      create:
+        success: Foram gerados %{count} códigos de convite.
+      destroy:
+        success: Código de convite eliminado.
+      index:
+        count_label: Quantos
+        delete: Eliminar
+        delete_confirm: Eliminar este código não utilizado?
+        empty_title: Ainda não há códigos de convite — gere alguns acima.
+        generate: Gerar códigos
+        label_label: Etiqueta (opcional)
+        label_placeholder: 'ex.: Lista de lançamento, amigos e família'
+        no_label: Sem etiqueta
+        redeemed_note: resgatado por %{email} · há %{time_ago}
+        status:
+          available: Disponível
+          expired: Expirado
+          redeemed: Resgatado
+        subtitle: Gerar códigos de uso único para registos na beta fechada.
+        title: Códigos de Convite
+    dashboard:
+      show:
+        available_beta_codes: Códigos disponíveis
+        pending_invitations: Convites Pendentes
+        pending_signups: Registos Pendentes
+        subtitle: Gerir o acesso à plataforma e os utilizadores.
+        title: Admin
+        total_users: Total de Utilizadores
+        workspaces: Espaços de Trabalho
+    invitations:
+      index:
+        approve: Aprovar
+        empty_title: Sem convites pendentes.
+        invited_by: Convidado por %{name} de %{workspace} · há %{time_ago}
+        reject: Rejeitar
+        subtitle: Rever e aprovar convites pendentes de membros não administradores.
+        title: Convites
+    sidebar:
+      beta_codes: Códigos de Convite
+      dashboard: Dashboard
+      invitations: Convites
+      signup_requests: Pedidos de Registo
+      users: Utilizadores
+    signup_requests:
+      index:
+        approve: Aprovar
+        empty_title: Sem pedidos de registo %{status}.
+        reject: Rejeitar
+        subtitle: Aprovar ou rejeitar pedidos de conta.
+        title: Pedidos de Registo
+    users:
+      index:
+        demote_to_member: Regredir a membro
+        empty_title: Sem utilizadores.
+        promote_to_admin: Promover a administrador
+        subtitle: Gerir utilizadores e funções da plataforma.
+        title: Utilizadores

@@ -1,0 +1,62 @@
+<%# locals: signature %>
+<% persisted = signature.persisted? %>
+<%= form_with model: signature,
+      url: (persisted ? inbox_settings_signature_path(signature) : inbox_settings_signatures_path),
+      method: (persisted ? :patch : :post),
+      class: "rounded-lg border border-border bg-muted/30 p-4 mb-4 space-y-4" do |f| %>
+  <% if signature.errors.any? %>
+    <div class="rounded-md bg-red-50 dark:bg-red-500/10 text-xs text-red-700 dark:text-red-300 px-3 py-2">
+      <%= signature.errors.full_messages.to_sentence %>
+    </div>
+  <% end %>
+
+  <div>
+    <%= f.label :name, t(".name_label"), class: "block text-xs font-medium text-foreground mb-1" %>
+    <%= f.text_field :name, autofocus: true, placeholder: t(".name_placeholder"),
+          class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+  </div>
+
+  <div>
+    <%= f.label :content, t(".content_label"), class: "block text-xs font-medium text-foreground mb-1" %>
+    <%= render Campbooks::RichTextEditor.new(
+          input_name: "signature[content]",
+          content: signature.content.to_s,
+          placeholder: t(".editor_placeholder"),
+          variant: :compact,
+          upload_url: compose_images_path,
+          wrapper_class: "border-gray-300"
+        ) %>
+  </div>
+
+  <label class="flex items-center gap-2 cursor-pointer">
+    <%= f.check_box :is_default, class: "rounded border-gray-300 text-accent-600 focus:ring-accent-500" %>
+    <span class="text-[13px] text-foreground"><%= t(".set_default_label") %></span>
+  </label>
+
+  <% if Current.user.email_accounts.any? %>
+    <div>
+      <h4 class="text-xs font-medium text-foreground mb-2"><%= t(".assign_accounts_heading") %></h4>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+        <% Current.user.email_accounts.each do |account| %>
+          <label class="flex items-center gap-2 py-0.5 cursor-pointer">
+            <%= check_box_tag "signature[email_account_ids][]", account.id,
+                  signature.email_accounts.include?(account),
+                  id: "signature_email_account_ids_#{account.id}",
+                  class: "rounded border-gray-300 text-accent-600 focus:ring-accent-500" %>
+            <%= render(Campbooks::ColorDot.new(color: account.color, size: :sm)) if account.color.present? %>
+            <span class="text-xs text-muted-foreground truncate"><%= account.display_name %></span>
+          </label>
+        <% end %>
+      </div>
+      <%= hidden_field_tag "signature[email_account_ids][]", "" %>
+    </div>
+  <% end %>
+
+  <div class="flex items-center justify-end gap-2 pt-1">
+    <button type="button" onclick="this.closest('turbo-frame').innerHTML = ''"
+            class="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-gray-600 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer">
+      <%= t("shared.actions.cancel") %>
+    </button>
+    <%= render(Campbooks::Button.new(variant: :primary, size: :sm, type: :submit)) { persisted ? t("shared.actions.save_changes") : t(".create_signature") } %>
+  </div>
+<% end %>

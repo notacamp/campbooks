@@ -1,0 +1,70 @@
+---
+en:
+  components:
+    ai_setup_message:
+      example_hint: e.g. %{hint}
+    ai_setup_proposal:
+      add_selected: Add selected
+      document_types_label: document types
+      edit_label: Edit
+      field_colour: Colour
+      field_name: Name
+      field_prompt: What it covers
+      no_suggestions: No suggestions yet.
+      suggested_heading: Suggested %{kind}
+      tags_label: tags
+    chat_actions:
+      allow_sender: Allow sender
+      archive: Archive
+      block_sender: Block sender
+      create_event: Create calendar event
+      draft_reply: Draft reply
+      forward_to: Forward to %{address}
+      reclassify: Re-classify
+      remove_tag_prefix: 'Remove tag: %{name}'
+      remove_with_name: Remove %{name}
+      snooze: Snooze
+      star_sender: Star sender
+      tag_prefix: 'Tag: %{name}'
+      tag_with_name: Tag %{name}
+      unblock_sender: Unblock sender
+      unsnooze: Unsnooze
+      unstar_sender: Unstar sender
+    chat_error:
+      error_message: I couldn't get to that just now. Mind trying again?
+      retry: Try again
+    chat_form:
+      keyboard_hint: Enter to send · Shift+Enter for a new line
+      send_aria_label: Send message
+      textarea_aria_label: Message Scout
+    chat_message:
+      ai_badge: AI
+      draft_badge: Draft
+      time_ago: "%{time} ago"
+    command_palette:
+      capture_placeholder: Move to which folder…
+      dialog_aria_label: Search and commands
+      group_actions: Actions
+      group_contacts: Contacts
+      group_emails: Emails
+      group_folder: Folder
+      group_navigate: Navigate
+      hint_escape_back: esc back
+      hint_escape_close: esc close
+      hint_navigate: "↑↓ navigate"
+      hint_select: "↵ select"
+      move_email_to_folder: Move email to folder
+      results_aria_label: Search results
+      search_aria_label: Search emails, threads, contacts, and settings
+      search_placeholder: Search emails, threads, contacts, settings…
+    email_scout_actions:
+      draft_follow_up: Draft follow-up
+      suggest_reply: Suggest reply
+    notification_item:
+      archive_aria_label: Archive notification
+      archive_title: Archive
+      restore_aria_label: Restore notification
+      restore_title: Restore
+      time_ago: "%{time} ago"
+    scout_briefing:
+      try_asking: Try asking

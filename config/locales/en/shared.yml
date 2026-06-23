@@ -1,0 +1,45 @@
+---
+en:
+  shared:
+    actions:
+      add: Add
+      back: Back
+      cancel: Cancel
+      close: Close
+      confirm: Confirm
+      connect: Connect
+      continue: Continue
+      create: Create
+      delete: Delete
+      disconnect: Disconnect
+      done: Done
+      edit: Edit
+      learn_more: Learn more
+      loading: Loading…
+      remove: Remove
+      save: Save
+      save_changes: Save changes
+      search: Search
+      send: Send
+      skip_for_now: Skip for now
+      update: Update
+    nav:
+      activity: Activity
+      admin: Admin
+      calendar: Calendar
+      contacts: Contacts
+      documents: Docs
+      home: Home
+      mail: Mail
+      more: More
+      new_items: New
+      scout: Scout
+      settings: Settings
+      workflows: Flows
+    swipe_dialogs:
+      confirm_action: Delete
+      confirm_message: This action can't be undone.
+      confirm_title: Are you sure?
+      dont_ask_again: Don't ask again
+      snooze_action: Snooze
+      snooze_title: Snooze until…

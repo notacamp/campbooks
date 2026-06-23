@@ -1,0 +1,162 @@
+---
+en:
+  components:
+    follow_button:
+      follow: Follow
+      follow_aria: Follow this discussion
+      following: Following
+      unfollow_aria: Unfollow this discussion
+    liquid_field:
+      available_variables: Available variables
+      variables_toggle: "{ } Variables"
+    onboarding_progress:
+      skip_hint: Every step is optional — skip anything and finish setting up later
+        in Settings.
+      steps:
+        ai_configuration: AI Configuration
+        classification: Classification
+        email_accounts: Email Accounts
+        review: Review
+        workspace: Workspace
+    setup_hub:
+      add_manually: Add manually
+      connect_google: Connect Google
+      connect_microsoft: Connect Microsoft
+      connect_zoho: Connect Zoho
+      dismiss_title: Dismiss this task
+      heading: Finish setting up Campbooks
+      leave_for_now: Leave for now
+      let_ai_help: "✨ Let AI help"
+      progress: "%{completed} of %{total} done"
+    step_picker:
+      condition_description: Only continue if a rule matches
+      condition_title: Condition
+      dialog_label: Add a step
+      group_labels:
+        action: Actions
+        logic: Logic
+      no_matching_steps: No matching steps.
+      search_placeholder: Search steps…
+    sync_indicator:
+      syncing: Syncing your inbox
+    webhook_url_field:
+      copy: Copy
+      default_label: Webhook URL
+      pending_hint: Save this workflow to generate its webhook URL.
+    workflow_builder:
+      step_label:
+        condition: If %{field} %{operator} '%{value}'
+        send_email: Send Email
+      step_summary:
+        from: 'From: %{name}'
+        no_account: No email account selected
+        unknown: Unknown
+      trigger_label: Email Received
+      trigger_summary:
+        all: All incoming emails
+        with_documents: Only emails with documents
+        without_documents: Only emails without documents
+    workflow_step_card:
+      delete_confirm: Remove this step?
+      delete_title: Delete step
+      step_types:
+        action: Action
+        condition: Condition
+        trigger: Trigger
+    workflow_step_connector:
+      add_step: Add step
+      add_step_label: Add a step
+    workflow_step_form:
+      action_label: Action
+      attach_attachments: Attach email files
+      attach_no: 'No'
+      attach_yes: 'Yes'
+      bcc: BCC
+      body: Body
+      body_hint: Use Liquid to build the email body
+      cc: CC
+      custom_headers_hint: 'Optional, one per line as Key: Value. The integration''s
+        auth header is added automatically.'
+      discord_hint: 'In your Discord server: Settings → Integrations → Webhooks →
+        New Webhook, then copy the URL.'
+      discord_webhook_url: Discord webhook URL
+      document_type: Document type
+      drive_upload_hint: Uploads the attachments from the email that triggered the
+        workflow.
+      email_action_hint: Runs on the email that triggered the workflow, acting as
+        the workflow's owner. Email-triggered workflows only.
+      email_tool: Action
+      emit_event_hint: Records a new event in this workspace. It can trigger other
+        workflows that listen for it.
+      event_name_hint: Pick an event or type your own. Use a wildcard like document.*
+        to match a whole group. Fields are available as {{ event.payload.* }}.
+      event_name_label: Event
+      event_payload_label: Payload (JSON)
+      field_hint: A path into the trigger data, e.g. payload.status or headers.X-Event.
+      field_label: Field
+      filter_by_attachments: Filter by attachments
+      folder_name: Folder name
+      forward_to: Forward to
+      forward_to_hint: For Forward — e.g. {{ email.from }}
+      has_documents:
+        any: Any (with or without documents)
+        'no': No documents
+        'yes': Has documents
+      headers: Headers
+      headers_hint: 'One per line as Key: Value. Values support Liquid.'
+      integration: Integration
+      load_error: Couldn't load fields.
+      load_fields: Load fields
+      load_loading: Loading fields…
+      load_prompt: Choose a workspace and database, then load its fields.
+      message: Message
+      method: Method
+      no_integrations_link: add one
+      no_integrations_prefix: 'No integrations yet — '
+      no_integrations_suffix: " to call a saved API."
+      no_notion_link: connect one
+      no_notion_prefix: No Notion workspace connected —
+      notion_database_hint: The Notion database to add a row to.
+      notion_database_id: Database ID
+      notion_file_property: Files property
+      notion_file_property_hint: Optional. Property name to upload the email's attachments
+        into.
+      notion_workspace: Notion workspace
+      operator_label: Operator
+      operator_options:
+        contains: Contains
+        equals: Equals
+        exists: Is present
+        not_contains: Does not contain
+        not_equals: Does not equal
+        not_exists: Is empty
+      optional: Optional
+      override_username: Override username (optional)
+      page_content: Body
+      page_title: Title
+      parent_folder_hint: Optional. Leave blank for My Drive root.
+      parent_folder_id: Parent folder ID
+      parent_page_hint: The Notion page to nest the new page under.
+      parent_page_id: Parent page ID
+      path: Path
+      select_email_account: "-- Select email account --"
+      select_email_tool: "-- Select action --"
+      select_integration: "-- Select integration --"
+      select_placeholder: "-- Select --"
+      send_from: Send from
+      slack_hint: Create an incoming webhook in your Slack workspace, then paste its
+        URL above.
+      slack_webhook_url: Slack webhook URL
+      subject: Subject
+      tag_name: Tag name
+      tag_name_hint: For Add/Remove tag — e.g. invoice
+      to: To
+      trigger_label: Trigger
+      trigger_options:
+        email_received: Email received
+        event: Domain event
+        webhook: Incoming webhook
+      url: URL
+      value_label: Value
+      webhook_hint: Send a POST request with a JSON body to this URL to run the workflow.
+        The body is available to steps as {{ payload.* }}.

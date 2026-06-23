@@ -1,0 +1,13 @@
+---
+fr:
+  email_compose:
+    draft_saved:
+      draft_saved: Brouillon enregistré
+  email_compose_chat:
+    form:
+      placeholder: Décrivez l'e-mail que vous souhaitez envoyer...
+    messages_panel:
+      empty_body_html: Décrivez à qui vous souhaitez écrire et ce que vous voulez
+        dire.<br>Je vous aiderai à rédiger et envoyer votre e-mail.
+      example_contract: Envoyer un e-mail à Jean au sujet du contrat
+      example_followup: Relancer suite à la réunion de la semaine dernière

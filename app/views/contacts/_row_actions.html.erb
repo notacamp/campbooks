@@ -1,0 +1,26 @@
+<%# locals: contact — compact star/block quick-actions for a contact/people row %>
+<div class="flex items-center gap-0.5 flex-shrink-0">
+  <% unless contact.blocked? %>
+    <%= button_to set_state_contact_path(contact, state: contact.starred? ? "unstar" : "star"),
+          form: { class: "contents" },
+          aria: { label: contact.starred? ? t("contacts.state.unstar") : t("contacts.state.star") },
+          class: class_names("p-1.5 rounded-md hover:bg-muted cursor-pointer transition-colors",
+            contact.starred? ? "text-amber-500" : "text-muted-foreground hover:text-amber-500") do %>
+      <%= contact_star_icon(filled: contact.starred?) %>
+    <% end %>
+  <% end %>
+  <% if contact.blocked? %>
+    <%= button_to set_state_contact_path(contact, state: "unblock"),
+          form: { class: "contents" }, aria: { label: t("contacts.state.unblock") },
+          class: "p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-colors" do %>
+      <%= contact_unblock_icon %>
+    <% end %>
+  <% else %>
+    <%= button_to set_state_contact_path(contact, state: "block"),
+          form: { class: "contents", data: { turbo_confirm: t("contacts.state.block_confirm") } },
+          aria: { label: t("contacts.state.block") },
+          class: "p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-red-600 cursor-pointer transition-colors" do %>
+      <%= contact_block_icon %>
+    <% end %>
+  <% end %>
+</div>

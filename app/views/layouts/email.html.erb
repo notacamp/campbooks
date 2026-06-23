@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html class="h-full bg-background" lang="<%= I18n.locale %>">
+  <head>
+    <%= render "shared/theme_head" %>
+    <title><%= page_title %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="turbo-prefetch" content="false">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <%= yield :head %>
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body class="h-full <%= "hotwire-native" if hotwire_native_app? %>"
+        data-controller="command-palette email-shortcuts theme inbox-settings-modal skim-overlay"
+        data-command-palette-context-value="<%= content_for?(:cp_context) ? yield(:cp_context) : '' %>"
+        data-command-palette-message-id-value="<%= content_for?(:cp_message_id) ? yield(:cp_message_id) : '' %>"
+        data-command-palette-folders-value="<%= content_for?(:cp_folders) ? yield(:cp_folders) : '[]' %>"
+        data-command-palette-subject-value="<%= content_for?(:cp_subject) ? yield(:cp_subject) : '' %>"
+        data-command-palette-commands-value="<%= command_palette_catalog_json %>"
+        data-email-shortcuts-message-id-value="<%= content_for?(:shortcuts_message_id) ? yield(:shortcuts_message_id) : '' %>"
+        data-email-shortcuts-context-value="<%= content_for?(:shortcuts_context) ? yield(:shortcuts_context) : '' %>">
+    <% if authenticated? %>
+      <%= render(Campbooks::NavRail.new) %>
+    <% end %>
+
+    <%# Native shells provide their own top bar, so the web topbar is suppressed. %>
+    <%= render "shared/topbar" if authenticated? && !hotwire_native_app? %>
+
+    <main class="<%= "lg:pl-20" if authenticated? %>">
+      <%= render "shared/flash_inline" %>
+      <%# Fixed shell region: the full-viewport multi-pane shells (email + Scout)
+          fill this with h-full. Mobile reserves the top bar (3.5rem) + bottom
+          nav (4rem + safe area); desktop is full height beside the rail. In a
+          native shell the topbar is gone, so only the bottom nav (4rem) is
+          subtracted. Both calc() literals are spelled out so Tailwind emits them. %>
+      <div class="<%= authenticated? ? (hotwire_native_app? ? "h-[calc(100dvh_-_4rem_-_env(safe-area-inset-bottom))] lg:h-dvh" : "h-[calc(100dvh_-_7.5rem_-_env(safe-area-inset-bottom))] lg:h-dvh") : "" %>">
+        <%= yield %>
+      </div>
+    </main>
+
+    <% if authenticated? %>
+      <%= render(Campbooks::BottomNav.new) %>
+    <% end %>
+
+    <%= render(Campbooks::CommandPalette.new) %>
+    <%= render(Campbooks::KeyboardShortcutsModal.new) %>
+    <%= render(Campbooks::InboxSettingsModal.new) if authenticated? %>
+    <%= render "shared/setup_modal" if authenticated? %>
+    <%= render "shared/skim_overlay" if authenticated? %>
+    <%= render "shared/email_drawer" if authenticated? %>
+    <%= render(Campbooks::BugReportTab.new) if authenticated? %>
+    <%= render(Campbooks::BugReportModal.new) if authenticated? %>
+    <%= render "shared/flash_toast_region" %>
+    <%= render "shared/swipe_dialogs" if authenticated? %>
+  </body>
+</html>

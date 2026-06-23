@@ -1,0 +1,22 @@
+---
+fr:
+  date:
+    formats:
+      at: "%-d %b %Y à %H:%M"
+      at_short: "%-d %b à %H:%M"
+      clock: "%H:%M"
+      day_month: "%-d %b"
+      full: "%-d %b %Y"
+      numeric: "%d/%m/%Y"
+      section: "%B %Y"
+      thread: "%H:%M"
+  time:
+    formats:
+      at: "%-d %b %Y à %H:%M"
+      at_short: "%-d %b à %H:%M"
+      clock: "%H:%M"
+      day_month: "%-d %b"
+      full: "%-d %b %Y"
+      numeric: "%d/%m/%Y"
+      section: "%B %Y"
+      thread: "%H:%M"

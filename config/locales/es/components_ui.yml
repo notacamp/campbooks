@@ -1,0 +1,150 @@
+---
+es:
+  components:
+    action_toast:
+      undo: Deshacer
+    ai_setup_prompt:
+      documents:
+        body: Leer PDF, escaneos e imágenes adjuntas requiere un proveedor con visión,
+          como OpenAI. Tus archivos se guardan igualmente.
+        cta: Añadir IA para documentos
+        title: La IA para documentos no está configurada
+      embeddings:
+        body: La búsqueda semántica funciona con OpenAI o Gemini. Añade uno de ellos
+          para activarla.
+        cta: Abrir ajustes de IA
+        title: La búsqueda necesita un proveedor de embeddings
+      inline:
+        documents: La IA para documentos necesita un proveedor con visión.
+        embeddings: La búsqueda necesita un proveedor OpenAI o Gemini.
+        text: Scout necesita un proveedor de IA.
+      text:
+        body: Scout, las respuestas inteligentes y la clasificación de la bandeja
+          funcionan con un proveedor de IA. Añade uno para activarlos.
+        cta: Configurar IA
+        title: La IA aún no está configurada
+    beta_banner:
+      dismiss: Descartar
+      message: 'Campbooks está en una beta inicial: es posible que algunas cosas fallen
+        o cambien mientras lo pulimos.'
+    bug_report_button:
+      label: Informar de un error
+    bug_report_modal:
+      cancel: Cancelar
+      close: Cerrar
+      context_note: También incluiremos la página en la que estás, tu navegador y
+        los errores recientes para ayudarnos a reproducirlo.
+      description_label: "¿Qué ha ocurrido?"
+      description_placeholder: 'Describe el error: qué hiciste, qué esperabas y qué
+        ocurrió en realidad.'
+      done: Hecho
+      error_empty: Describe el error antes de enviarlo.
+      error_generic: Se ha producido un problema al enviar tu informe. Inténtalo de
+        nuevo.
+      screenshot_label: Adjuntar una captura de esta página
+      submit: Enviar informe
+      submitting: Enviando…
+      subtitle: Cuéntanos qué ha fallado
+      success_body: Lo hemos registrado y el equipo lo revisará. Gracias por ayudar
+        a mejorar Campbooks.
+      success_title: 'Gracias: informe enviado'
+      title: Informar de un error
+    clamp_text:
+      less: Mostrar menos
+      more: Leer más
+    code_block:
+      empty: "(vacío)"
+    email_html_preview:
+      frame_title: Vista previa del correo
+    inbox_settings_modal:
+      close_label: Cerrar configuración de la bandeja de entrada
+      nav:
+        accounts: Cuentas
+        contacts: Contactos
+        display: Visualización
+        document_types: Tipos de documento
+        filtering: Filtrado
+        labels: Etiquetas
+        signatures: Firmas
+        tags: Etiquetas
+      settings_sections_label: Secciones de configuración
+      title: Configuración de la bandeja de entrada
+    keyboard_shortcuts_modal:
+      contexts:
+        calendar: Calendario
+        email: Correo
+        feed: Feed
+        general: General
+        navigation: Navegación
+        selection: Selección
+      footer_hint: Pulse ? para abrir este diálogo en cualquier momento.
+      shortcuts:
+        archive: Archivar
+        cal_new: Nuevo evento
+        cal_next: Período siguiente
+        cal_prev: Período anterior
+        cal_today: Ir a hoy
+        cal_views: Cambiar de vista
+        clear_selection: Borrar selección
+        command_palette: Paleta de comandos
+        compose: Redactar
+        delete: Eliminar
+        feed_actions: Acciones de la tarjeta
+        feed_dismiss: Descartar / archivar
+        feed_navigate: Moverse entre tarjetas
+        feed_primary: Acción principal
+        forward: Reenviar
+        mark_read: Marcar como leído
+        mark_unread: Marcar como no leído
+        navigate_threads: Navegar conversaciones
+        reply: Responder
+        reply_all: Responder a todos
+        show_shortcuts: Mostrar atajos
+        toggle_selection: Activar selección
+      title: Atajos de teclado
+    logo:
+      beta: Beta
+    managed_ai_card:
+      badge: Gestionado
+      body: 'Campbooks ejecuta la IA por ti, con sus propios modelos: sin claves de
+        API que gestionar.'
+      document_role: Documentos
+      documents_unavailable: El análisis de documentos no está disponible ahora mismo.
+      switch_link: Usar mis propias claves
+      text_role: Correo y chat
+      title: Campbooks AI
+    markdown_editor:
+      preview_tab: Vista previa
+      write_tab: Escribir
+    notion:
+      database_form:
+        attach_file: Adjuntar %{file}
+        no_fields: Esta base de datos no tiene campos que Campbooks pueda rellenar.
+        no_file: No hay ningún archivo para adjuntar.
+        select_blank: "— ninguno —"
+    resize_handle:
+      hint: Arrastra para cambiar el tamaño
+    section_nav:
+      default_label: Navegación de sección
+    star_toggle:
+      star: Destacar
+      unstar: Quitar de destacados
+    swipeable:
+      approve: Aprobar
+      archive: Archivar
+      confirm_archive_message: Sale de tu bandeja. Puedes deshacerlo.
+      confirm_archive_title: "¿Archivar esta conversación?"
+      confirm_delete_message: Esta acción no se puede deshacer.
+      confirm_delete_title: "¿Eliminar permanentemente?"
+      confirm_trash_message: Puedes restaurarla desde la papelera.
+      confirm_trash_title: "¿Mover a la papelera?"
+      delete: Eliminar
+      dismiss: Descartar
+      error: Algo salió mal
+      reject: Rechazar
+      snooze: Posponer
+      trash: Papelera
+    table:
+      no_data: No se encontraron datos.
+    toast:
+      unread_label: Notificación no leída

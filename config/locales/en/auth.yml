@@ -1,0 +1,91 @@
+---
+en:
+  auth:
+    oauth_sign_in:
+      blocked:
+        deletion_requested: This account is scheduled for deletion and can't be used
+          to sign in.
+        existing_account: An account with this email already exists. Sign in with
+          your password, then add %{provider} sign-in under Settings → Security.
+        invalid: We couldn't complete sign-in with %{provider}. Please try again.
+        mailbox_has_owner: This email is connected as a mailbox. Sign in to the account
+          that owns it, then enable %{provider} sign-in under Settings → Security.
+        mailbox_no_owner: This email is connected as a mailbox but isn't set up for
+          sign-in. Contact your workspace admin.
+      rate_limited: Too many sign-in attempts. Please wait a few minutes and try again.
+  invitations:
+    show:
+      accept: Accept Invitation
+      heading: You're invited!
+      invitation_prose_html: "%{inviter} has invited you to join %{workspace} on Campbooks."
+      workspace_label: Workspace
+  passwords:
+    edit:
+      heading: Update your password
+      password_confirmation_label: Confirm new password
+      password_confirmation_placeholder: Re-enter your password
+      password_label: New password
+      password_placeholder: At least 8 characters
+      submit: Update password
+      tagline: Choose a new password for your account.
+    new:
+      back_to_sign_in: Back to sign in
+      email_label: Email address
+      email_placeholder: you@example.com
+      heading: Forgot your password?
+      submit: Send reset link
+      tagline: Enter your email address and we will send you a reset link.
+  registrations:
+    check_code:
+      try_later: Too many attempts. Please try again later.
+    create:
+      try_later: Too many attempts. Please try again later.
+    new:
+      beta_badge: Closed beta
+      beta_code_hint: Campbooks is in closed beta. Enter the invite code you received
+        to create your account.
+      beta_code_label: Invite code
+      beta_code_placeholder: e.g. ABCD-2345
+      email_label: Email address
+      email_placeholder: you@example.com
+      have_account: Already have an account?
+      name_label: Full name
+      name_placeholder: Your name
+      privacy: Privacy Policy
+      sign_in: Sign in
+      submit: Send verification code
+      tagline: Create your account
+      terms: Terms of Service
+      terms_consent_html: I agree to the %{terms} and %{privacy}.
+    password:
+      password_label: Password
+      password_placeholder: At least 8 characters
+      submit: Create account
+      tagline: Set your password
+      verified_prose: verified. Choose a password to finish creating your account.
+    pending_approval:
+      body: Your account request has been submitted for review. You'll receive an
+        email when it's approved.
+      heading: Request submitted
+    resend_code:
+      try_later: Too many requests. Please try again later.
+    verify:
+      code_label: Verification code
+      code_sent_html: We sent a 6-digit code to %{email}. Enter it below to continue.
+      resend: Resend code
+      start_over: Start over
+      submit: Verify
+      tagline: Check your email
+  sessions:
+    new:
+      beta_badge: Closed beta
+      email_label: Email address
+      email_placeholder: you@example.com
+      forgot_password: Forgot your password?
+      no_account: New to Campbooks?
+      or: or
+      password_label: Password
+      password_placeholder: Enter your password
+      sign_up: Create an account
+      submit: Sign in
+      tagline: The inbox that sorts itself.

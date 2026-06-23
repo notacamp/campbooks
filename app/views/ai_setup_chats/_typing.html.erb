@@ -1,0 +1,2 @@
+<%# locals: thread (AgentThread), status (String|nil) %>
+<%= render(Campbooks::ChatTyping.new(id: "setup_chat_typing_#{thread.id}", status: local_assigns.fetch(:status, t(".thinking")))) %>

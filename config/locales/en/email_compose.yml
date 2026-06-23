@@ -1,0 +1,13 @@
+---
+en:
+  email_compose:
+    draft_saved:
+      draft_saved: Draft saved
+  email_compose_chat:
+    form:
+      placeholder: Describe the email you want to send...
+    messages_panel:
+      empty_body_html: Describe who you want to email and what you want to say.<br>I'll
+        help you write and send it.
+      example_contract: Send an email to John about the contract
+      example_followup: Follow up on last week's meeting

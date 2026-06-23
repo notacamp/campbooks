@@ -1,0 +1,53 @@
+<%# Scout's reply draft, shown for human approval. One form, multiple submits via
+    formaction: Save draft / Send (provider-safe save→send) / Edit in composer /
+    Discard — so the body the human edits here is the body that's acted on.
+    `surface` is nil in the Discussion panel (card lives in comments_list) and
+    "drawer"/"detail" when rendered into a compose slot (cleared on send/discard).
+    Locals: draft:, email_message:, surface: (optional), outdated: (optional). %>
+<% subject = draft["subject"] || "Re: #{email_message.subject}" %>
+<% body = draft["body"] || "" %>
+<% surface = local_assigns[:surface].presence %>
+<% outdated = local_assigns[:outdated] || false %>
+<% compose_target = surface == "drawer" ? "drawer_compose_target" : "thread_compose_target" %>
+<div id="<%= dom_id(email_message, :draft) %>" class="px-4 py-3 <%= "opacity-50" if outdated %>">
+  <div class="flex items-start gap-3 ">
+    <div class="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-500/15 text-blue-500 dark:text-blue-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+      <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+        <path fill-rule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5zM18 1.5a.75.75 0 01.728.568l.258 1.036c.236.94.88 1.584 1.82 1.82l1.036.258a.75.75 0 010 1.456l-1.036.258c-.94.236-1.584.88-1.82 1.82l-.258 1.036a.75.75 0 01-1.456 0l-.258-1.036a2.625 2.625 0 00-1.82-1.82l-1.036-.258a.75.75 0 010-1.456l1.036-.258a2.625 2.625 0 001.82-1.82l.258-1.036A.75.75 0 0118 1.5zM16.5 15a.75.75 0 01.712.513l.394 1.183c.15.447.5.799.948.948l1.183.395a.75.75 0 010 1.422l-1.183.395c-.447.15-.799.5-.948.948l-.395 1.183a.75.75 0 01-1.422 0l-.395-1.183a1.5 1.5 0 00-.948-.948l-1.183-.395a.75.75 0 010-1.422l1.183-.395a1.5 1.5 0 00.948-.948l.395-1.183A.75.75 0 0116.5 15z" clip-rule="evenodd"/>
+      </svg>
+    </div>
+    <div class="flex-1 flex flex-col items-end min-w-0">
+      <div class="flex items-center gap-2 mb-1 ">
+        <span class="text-[12px] font-semibold text-gray-900">Scout</span>
+        <span class="text-[10px] text-gray-400"><%= outdated ? t(".drafted_reply_outdated") : t(".drafted_reply") %></span>
+      </div>
+      <p class="text-[11px] text-gray-500 mb-2"><%= subject %></p>
+
+      <%= form_with url: tool_email_message_path(email_message, tool: "save_draft", surface: surface), method: :post,
+            html: { data: { turbo: true } }, class: "w-full" do |f| %>
+        <%= f.hidden_field :subject, value: subject %>
+        <%= f.text_area :body, value: body, rows: [body.lines.count, 5].min,
+              class: "w-full text-[13px] text-gray-700 leading-relaxed bg-card border border-gray-200 rounded-lg p-3 mb-2 focus:ring-1 focus:ring-blue-400 dark:focus:ring-blue-500/40 focus:border-blue-400 dark:focus:border-blue-500/40 focus:outline-none resize-y" %>
+
+        <div class="flex items-center flex-wrap gap-2" id="draft_actions_<%= email_message.id %>">
+          <%= f.submit t("shared.actions.send"),
+                formaction: tool_email_message_path(email_message, tool: "send_reply", surface: surface),
+                data: { turbo_confirm: t(".send_reply_confirm") },
+                class: "inline-flex items-center font-medium transition-colors bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg px-3 py-1 text-[11px] cursor-pointer border-0 #{outdated ? "opacity-50 pointer-events-none" : ""}" %>
+          <%# Drawer composer replaces its own slot, so no separate removal; detail
+              and discussion prepend the composer, so the card must be removed. %>
+          <%= f.submit t(".edit_in_composer"),
+                formaction: compose_email_message_path(email_message, mode: "reply", compose_target: compose_target, remove_draft: (surface == "drawer" ? nil : dom_id(email_message, :draft))),
+                formnovalidate: true,
+                class: "inline-flex items-center font-medium transition-colors bg-card text-gray-700 hover:bg-gray-100 border border-gray-300 rounded-lg px-3 py-1 text-[11px] cursor-pointer #{outdated ? "opacity-50 pointer-events-none" : ""}" %>
+          <%= f.submit t(".save_draft_label"),
+                class: "inline-flex items-center font-medium transition-colors text-gray-600 hover:bg-gray-100 rounded-lg px-3 py-1 text-[11px] cursor-pointer border-0 #{outdated ? "opacity-50 pointer-events-none" : ""}" %>
+          <%= f.submit t(".discard"),
+                formaction: tool_email_message_path(email_message, tool: "discard_draft", surface: surface),
+                formnovalidate: true,
+                class: "inline-flex items-center font-medium transition-colors text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg px-3 py-1 text-[11px] cursor-pointer border-0" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

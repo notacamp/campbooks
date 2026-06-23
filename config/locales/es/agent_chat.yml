@@ -1,0 +1,27 @@
+---
+es:
+  agent_chat:
+    form:
+      placeholder: Pregunte a Scout lo que necesite…
+    show:
+      delete_chat: Eliminar conversación
+      delete_chat_aria: Eliminar conversación
+      delete_confirm: "¿Eliminar esta conversación?"
+      earlier: Anteriores
+      new_chat: Nueva conversación
+      no_chats: Sin conversaciones aún
+      open_email: Abrir correo
+      show_chats_aria: Mostrar conversaciones
+      this_week: Esta semana
+      today: Hoy
+    thread_item:
+      click_to_rename: Haga clic para renombrar
+      delete_chat: Eliminar conversación
+      delete_chat_aria: 'Eliminar conversación: %{title}'
+      delete_confirm: "¿Eliminar esta conversación?"
+      open_chat_aria: 'Abrir conversación: %{title}'
+      time_ago: hace %{time}
+    thread_title:
+      click_to_rename: Haga clic para renombrar
+    typing:
+      thinking: Pensando…

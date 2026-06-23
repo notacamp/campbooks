@@ -1,0 +1,228 @@
+---
+es:
+  agent_tools:
+    create:
+      action_failed: La acción ha fallado. Inténtelo de nuevo.
+  bug_reports:
+    create:
+      failed: No hemos podido enviar tu informe. Inténtalo de nuevo.
+      reported: 'Gracias: tu informe de error se ha enviado.'
+  calendar_accounts:
+    destroy:
+      disconnected: "%{name} desconectado."
+      owner_only: Solo el propietario de la cuenta puede desconectar este calendario.
+    sharing:
+      add_button: Añadir
+      add_heading: Añadir una persona
+      back: Volver a los calendarios
+      members_heading: Personas con acceso
+      owner_only: Solo el propietario de la cuenta puede gestionar el acceso.
+      remove: Quitar
+      subtitle: Elige quién puede ver y editar este calendario.
+      title: Compartir — %{name}
+    update:
+      access_removed: Acceso eliminado para %{name}.
+      invalid_role: Elige un rol válido.
+      not_permitted: No tienes permiso para gestionar este calendario.
+      owner_access_cant_be_removed: No se puede quitar el acceso del propietario.
+      owner_only_access: Solo el propietario de la cuenta puede cambiar quién tiene
+        acceso.
+      owner_role_fixed: No se puede cambiar el acceso del propietario.
+      rename_failed: No se pudo actualizar el calendario.
+      renamed: Nombre del calendario actualizado a %{name}.
+      role_updated: "%{name} ahora es %{role}."
+      user_not_found: Usuario no encontrado.
+  calendars:
+    update:
+      not_permitted: No tienes permiso para gestionar este calendario.
+      updated: Sincronización de %{name} actualizada.
+  documents:
+    approve:
+      approved: Documento aprobado.
+    create:
+      no_files: Seleccione al menos un archivo.
+      upload_failed: 'Error al subir: %{message}'
+      uploaded_many: "%{count} documentos subidos y en cola para procesar."
+      uploaded_one: Documento subido y en cola para procesar.
+    export:
+      generating: Se está generando la exportación. Compruebe el historial cuando
+        termine.
+    file:
+      not_available: Archivo no disponible.
+    merge:
+      too_few: Seleccione al menos dos documentos para combinar.
+    perform_merge:
+      merged: Se han combinado %{count} documento(s) en este.
+    push_to_drive:
+      no_config: No hay configuración de Google Drive para este tipo de documento.
+      not_connected: Google Drive no está conectado.
+      queued: Documento en cola para subir a Google Drive.
+    push_to_notion:
+      no_mapping: No hay ninguna asignación de base de datos de Notion configurada
+        para este tipo de documento.
+      queued: Documento en cola para enviar a Notion.
+    push_to_zoho_drive:
+      inactive_account: La cuenta de Zoho Drive no está activa.
+      no_mapping: No hay ninguna asignación de carpeta de Zoho Drive configurada para
+        este tipo de documento.
+      queued: Documento en cola para subir a Zoho Drive.
+    reject:
+      rejected: Documento rechazado.
+    reprocess:
+      queued: Documento en cola para reprocesar.
+    reprocess_all:
+      queued: "%{count} documentos en cola para reprocesar."
+    update:
+      reclassified_approved: Documento reclasificado y marcado como aprobado.
+      saved: Documento actualizado correctamente.
+  email_accounts:
+    create:
+      microsoft_unavailable: Las conexiones con Microsoft 365 aún no están disponibles.
+    destroy:
+      disconnected: "%{name} desconectado."
+      owner_only: Solo el propietario de la cuenta puede desconectarla.
+    sharing:
+      owner_only: Solo el propietario de la cuenta puede gestionar el acceso.
+    update:
+      access_removed: Acceso eliminado para %{name}.
+      invalid_role: Seleccione un rol válido.
+      not_permitted: No tiene permiso para gestionar esta cuenta.
+      owner_access_cant_be_removed: No se puede eliminar el acceso del propietario.
+      owner_only_access: Solo el propietario de la cuenta puede cambiar quién tiene
+        acceso.
+      owner_role_fixed: No se puede cambiar el acceso del propietario.
+      rename_failed: No se pudo actualizar la cuenta.
+      renamed: Nombre de cuenta actualizado a %{name}.
+      role_updated: "%{name} ahora es %{role}."
+      user_not_found: Usuario no encontrado.
+  email_compose:
+    create:
+      invalid_mode: Modo no válido
+    send_message:
+      no_account: No se pudo determinar la cuenta de correo
+      recipient_required: El destinatario es obligatorio
+      send_failed: Error al enviar el mensaje
+      sent: Mensaje enviado.
+      sent_toast: "¡Mensaje enviado!"
+  email_messages:
+    board:
+      move:
+        invalid_move: Ese movimiento no está permitido.
+        not_found: Esa conversación ya no está disponible.
+    bulk:
+      create:
+        action_failed: La acción ha fallado
+        action_failed_retry: La acción ha fallado. Inténtelo de nuevo.
+        ai_processing_html:
+          one: IA procesando %{count} correo
+          other: IA procesando %{count} correos
+        archived:
+          one: Archivado %{count} correo
+          other: Archivados %{count} correos
+        archived_html:
+          one: Archivado %{count} correo
+          other: Archivados %{count} correos
+        deleted:
+          one: Eliminado %{count} correo
+          other: Eliminados %{count} correos
+        deleted_html:
+          one: Eliminado %{count} correo
+          other: Eliminados %{count} correos
+        done: Hecho
+        forwarded_compose:
+          one: Reenvío abierto para %{count} correo
+          other: Reenvío abierto para %{count} correos
+        marked_read: Marcado(s) %{count} correo(s) como leído(s)
+        marked_read_html: Marcado(s) %{count} como leído(s)
+        marked_unread: Marcado(s) %{count} correo(s) como no leído(s)
+        marked_unread_html: Marcado(s) %{count} como no leído(s)
+        moved_html:
+          one: Movido %{count} correo
+          other: Movidos %{count} correos
+        moved_to_folder: Movido(s) %{count} correo(s) a la carpeta
+        moved_to_folder_named:
+          one: "%{count} correo movido a %{folder}"
+          other: "%{count} correos movidos a %{folder}"
+        no_emails_selected: Ningún correo seleccionado
+        open_scout_chat: Abrir chat de Scout
+        processing_ai:
+          one: Procesando %{count} correo con IA
+          other: Procesando %{count} correos con IA
+        scout_html: Enviado(s) %{count} correo(s) a Scout
+        sent_to_scout: Enviado(s) %{count} correo(s) a Scout
+        snoozed:
+          one: Pospuesta %{count} conversación
+          other: Pospuestas %{count} conversaciones
+        snoozed_html:
+          one: Pospuesta %{count} conversación
+          other: Pospuestas %{count} conversaciones
+        tag_verb_added: Añadida
+        tag_verb_removed: Eliminada
+        tagged: "%{verb} etiqueta '%{tag_name}' en %{count} correo(s)"
+        tagged_html: "%{verb} etiqueta '%{tag_name}'"
+        unarchived:
+          one: Restaurado %{count} correo
+          other: Restaurados %{count} correos
+        unsnoozed:
+          one: Posposición cancelada en %{count} conversación
+          other: Posposición cancelada en %{count} conversaciones
+    dismiss_todo:
+      dismissed: Tarea descartada
+  email_threads:
+    show:
+      no_access: No tiene acceso a esa conversación.
+  email_tools:
+    create:
+      action_failed: La acción ha fallado. Inténtelo de nuevo.
+      conversation_archived: Esta conversación ha sido archivada.
+      conversation_snoozed: Esta conversación ha sido pospuesta.
+      draft_ready: Borrador listo
+      draft_saved: Borrador guardado en Gmail
+      draft_sent: Borrador enviado
+      event_created: Evento '%{title}' añadido a tu calendario
+      forwarded_to: Reenviado a %{address}
+      no_email_selected: Ningún correo seleccionado
+      no_send_permission: No tiene permiso para enviar desde esta cuenta.
+      reply_sent: Respuesta enviada
+      save_draft_html: Borrador guardado
+      tagged: Etiquetado como '%{name}'
+      thread_archived: Conversación archivada
+      thread_snoozed: Conversación pospuesta hasta %{time}
+      thread_snoozed_html: Conversación pospuesta
+      thread_trashed: Conversación enviada a la papelera
+      thread_unarchived: Devuelta a la bandeja de entrada
+      thread_unsnoozed: Posposición cancelada
+      untagged: Etiqueta '%{name}' eliminada
+  mail_folders:
+    create:
+      created: Carpeta '%{name}' creada en tus bandejas
+      created_partial:
+        one: "'%{name}' creada, pero no se pudo añadir a %{count} bandeja"
+        other: "'%{name}' creada, pero no se pudo añadir a %{count} bandejas"
+    destroy:
+      removed: Carpeta '%{name}' eliminada
+  notifications:
+    archive:
+      success: Notificación archivada.
+    archive_all:
+      success: Notificaciones leídas archivadas.
+    bulk_toggle:
+      invalid_type: Tipo de preferencia no válido.
+    destroy:
+      success: Notificación eliminada.
+    mark_all_read:
+      success: Todas las notificaciones marcadas como leídas.
+    notification_gone:
+      gone: Esa notificación ya no está disponible.
+    toggle_preference:
+      invalid_type: Tipo de preferencia no válido.
+    unarchive:
+      success: Notificación restaurada.
+  skim:
+    reply:
+      empty_body: La respuesta está vacía.
+      no_send_permission: No tiene permiso para enviar desde esta cuenta.
+      send_failed: No se pudo enviar la respuesta.
+  zoho_drive_accounts:
+    destroy:
+      disconnected: "%{name} desconectado."
