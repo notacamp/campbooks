@@ -1,0 +1,22 @@
+<%# Loaded into the /documents overlay's turbo-frame (layout:false) and also
+    visitable directly at /documents/skim (full layout, @standalone). Either way the
+    viewer fills its container: the frame in the overlay, the viewport standalone. %>
+<%= turbo_frame_tag "doc_skim_content", class: "block #{@standalone ? 'fixed inset-0 z-50' : 'h-full'} w-full" do %>
+  <% if @rings.any? %>
+    <%= render Campbooks::DocSkimStack.new(rings: @rings, standalone: @standalone,
+          start_category: @start_category, document_types: @document_types,
+          show_intro: !current_user&.tour_dismissed?("doc_skim_intro"),
+          class: @standalone ? "min-h-dvh" : "h-full") %>
+  <% else %>
+    <div class="flex <%= @standalone ? "min-h-dvh" : "h-full" %> w-full flex-col items-center justify-center bg-background px-6 text-center">
+      <div class="text-3xl">✨</div>
+      <p class="mt-3 text-lg font-semibold text-foreground"><%= t(".no_documents_title") %></p>
+      <p class="mt-1 text-sm text-muted-foreground"><%= t(".no_documents_body") %></p>
+      <% if @standalone %>
+        <a href="/documents" data-controller="history-back" data-action="click->history-back#back" class="mt-5 text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"><%= t(".back_to_documents") %></a>
+      <% else %>
+        <button type="button" data-action="click->doc-skim-overlay#close" class="mt-5 text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"><%= t(".close") %></button>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

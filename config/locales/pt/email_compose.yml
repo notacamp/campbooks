@@ -1,0 +1,13 @@
+---
+pt:
+  email_compose:
+    draft_saved:
+      draft_saved: Rascunho guardado
+  email_compose_chat:
+    form:
+      placeholder: Descreva o e-mail que pretende enviar...
+    messages_panel:
+      empty_body_html: Descreva a quem pretende enviar e-mail e o que quer dizer.<br>Ajudarei
+        a escrever e a enviar.
+      example_contract: Enviar um e-mail ao João sobre o contrato
+      example_followup: Fazer seguimento da reunião da semana passada

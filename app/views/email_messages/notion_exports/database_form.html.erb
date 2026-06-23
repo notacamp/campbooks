@@ -1,0 +1,27 @@
+<%= turbo_frame_tag "notion_export_step" do %>
+  <% if @error %>
+    <p class="text-sm text-red-600 dark:text-red-400"><%= t(".error", message: @error) %></p>
+  <% else %>
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-sm font-semibold text-gray-900"><%= @database_title || t(".untitled") %></h3>
+      <%= link_to t(".back"), databases_email_message_notion_export_path(@email_message, integration_id: @integration.id),
+            data: { turbo_frame: "notion_export_step" }, class: "text-xs text-accent-600 hover:text-accent-700" %>
+    </div>
+
+    <% file_label = if @email_message.files.attached?
+         @email_message.files.count == 1 ? @email_message.files.first.filename.to_s : t(".attachments_count", count: @email_message.files.count)
+       end %>
+
+    <%= form_with url: email_message_notion_export_path(@email_message), method: :post, data: { turbo: false }, class: "space-y-4" do %>
+      <%= hidden_field_tag :integration_id, @integration.id %>
+      <%= hidden_field_tag :database_id, @database_id %>
+      <%= hidden_field_tag :kind, "database" %>
+
+      <%= render Campbooks::Notion::DatabaseForm.new(schema: @schema, file_label: file_label) %>
+
+      <div class="flex justify-end">
+        <%= render Campbooks::Button.new(variant: :primary, type: :submit) { t(".create_item") } %>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>

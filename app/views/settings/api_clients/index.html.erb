@@ -1,0 +1,51 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) do %>
+  <%= render(Campbooks::Button.new(variant: :primary, size: :md, href: new_settings_api_client_path)) { t(".new_client") } %>
+<% end %>
+
+<%= render(Campbooks::Card.new(padding: :lg)) do %>
+  <% if @applications.any? %>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b text-left text-xs font-medium text-gray-500">
+            <th class="py-2 pr-4"><%= t(".col_name") %></th>
+            <th class="py-2 pr-4"><%= t(".col_client_id") %></th>
+            <th class="py-2 pr-4"><%= t(".col_scopes") %></th>
+            <th class="py-2 pr-4"><%= t(".col_created") %></th>
+            <th class="py-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @applications.each do |application| %>
+            <tr class="border-b last:border-0 align-top">
+              <td class="py-3 pr-4 font-medium text-gray-900 whitespace-nowrap"><%= application.name %></td>
+              <td class="py-3 pr-4 text-gray-600 font-mono text-xs break-all"><%= application.uid %></td>
+              <td class="py-3 pr-4">
+                <div class="flex flex-wrap gap-1">
+                  <% application.scopes.to_a.each do |scope| %>
+                    <%= render(Campbooks::Badge.new(variant: :neutral, size: :sm)) { scope } %>
+                  <% end %>
+                </div>
+              </td>
+              <td class="py-3 pr-4 text-gray-500 whitespace-nowrap"><%= l(application.created_at.to_date) %></td>
+              <td class="py-3 text-right whitespace-nowrap">
+                <%= button_to t(".regenerate"), regenerate_secret_settings_api_client_path(application),
+                      class: "inline px-2 py-1 text-xs text-gray-600 hover:text-gray-900 cursor-pointer",
+                      form: { class: "inline", data: { turbo_confirm: t(".regenerate_confirm") } } %>
+                <%= button_to t(".revoke"), revoke_settings_api_client_path(application),
+                      class: "inline px-2 py-1 text-xs text-gray-600 hover:text-gray-900 cursor-pointer",
+                      form: { class: "inline", data: { turbo_confirm: t(".revoke_confirm") } } %>
+                <%= button_to t(".delete"), settings_api_client_path(application), method: :delete,
+                      class: "inline px-2 py-1 text-xs text-red-600 hover:text-red-700 cursor-pointer",
+                      form: { class: "inline", data: { turbo_confirm: t(".delete_confirm", name: application.name) } } %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <%= render(Campbooks::EmptyState.new(variant: :card, title: t(".no_clients_title"), description: t(".no_clients_desc"))) %>
+  <% end %>
+<% end %>

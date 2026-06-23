@@ -1,0 +1,4 @@
+# Google Play service-account JSON (git-ignored). Place it at
+# native/android/play-store-key.json or set PLAY_JSON_KEY_FILE.
+json_key_file(ENV["PLAY_JSON_KEY_FILE"] || "play-store-key.json")
+package_name("com.notacamp.campbooks")

@@ -1,0 +1,12 @@
+<%# locals: signatures %>
+<div id="inbox_settings_signatures_rows" class="space-y-2">
+  <% if signatures.any? %>
+    <% signatures.each do |signature| %>
+      <%= render "inbox_settings/signatures/signature", signature: signature %>
+    <% end %>
+  <% else %>
+    <p class="text-[13px] text-muted-foreground py-8 text-center">
+      <%= t(".empty") %>
+    </p>
+  <% end %>
+</div>

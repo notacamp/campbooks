@@ -1,0 +1,6 @@
+<%# Lazily loaded into the /documents #doc_skim_tray turbo-frame. Renders the ring
+    tray, or nothing when there is nothing to review. The inner #doc_skim_tray_content
+    is refreshed live by Documents::SkimTrayBroadcaster. %>
+<%= turbo_frame_tag "doc_skim_tray" do %>
+  <%= render "documents/skim/tray_content", rings: @rings %>
+<% end %>

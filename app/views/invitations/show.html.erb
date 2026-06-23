@@ -1,0 +1,30 @@
+<div class="min-h-[60vh] flex items-center justify-center">
+  <div class="w-full max-w-md">
+    <div class="mb-8 text-center">
+      <%= render(Campbooks::Logo.new(size: :lg)) %>
+      <h1 class="text-2xl font-bold text-gray-900 mt-6"><%= t(".heading") %></h1>
+      <p class="text-gray-600 mt-2">
+        <%= t(".invitation_prose_html",
+              inviter: content_tag(:span, @invitation.invited_by.name, class: "font-medium"),
+              workspace: content_tag(:span, @invitation.workspace.name, class: "font-medium")) %>
+      </p>
+    </div>
+
+    <%= render(Campbooks::Card.new) do %>
+      <div class="space-y-5">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-full bg-accent-100 flex items-center justify-center">
+            <span class="text-lg font-bold text-accent-600"><%= @invitation.workspace.name.first.upcase %></span>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-gray-900"><%= @invitation.workspace.name %></h3>
+            <p class="text-xs text-gray-500"><%= t(".workspace_label") %></p>
+          </div>
+        </div>
+
+        <%= button_to t(".accept"), accept_invitation_path(@invitation.token), method: :post,
+              class: "w-full inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors cursor-pointer" %>
+      </div>
+    <% end %>
+  </div>
+</div>

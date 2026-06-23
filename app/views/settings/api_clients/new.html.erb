@@ -1,0 +1,41 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+
+<%= render(Campbooks::Card.new(padding: :lg)) do %>
+  <%= form_with model: @application, url: settings_api_clients_path, method: :post, class: "space-y-6" do %>
+    <% if @application.errors.any? %>
+      <div class="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+        <ul class="list-disc list-inside">
+          <% @application.errors.full_messages.each do |message| %><li><%= message %></li><% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <%= render(Campbooks::Input.new("application[name]",
+          label: t(".name_label"),
+          placeholder: t(".name_placeholder"),
+          value: @application.name,
+          required: true,
+          hint: t(".name_hint"))) %>
+
+    <fieldset class="space-y-2">
+      <legend class="block text-sm font-medium text-gray-700"><%= t(".scopes_label") %></legend>
+      <p class="text-xs text-gray-500 mb-2"><%= t(".scopes_hint") %></p>
+      <% Api::Scopes::CATALOG.each do |scope, description| %>
+        <label class="flex items-start gap-3 rounded-lg border border-gray-200 p-3 hover:bg-gray-50 cursor-pointer">
+          <input type="checkbox" name="application[scopes][]" value="<%= scope %>"
+                 class="mt-0.5 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900">
+          <span class="min-w-0">
+            <span class="block font-mono text-xs text-gray-900"><%= scope %></span>
+            <span class="block text-xs text-gray-500"><%= description %></span>
+          </span>
+        </label>
+      <% end %>
+    </fieldset>
+
+    <div class="flex items-center gap-3">
+      <%= render(Campbooks::Button.new(variant: :primary, size: :md, type: "submit")) { t(".create") } %>
+      <%= render(Campbooks::Button.new(variant: :ghost, size: :md, href: settings_api_clients_path)) { t(".cancel") } %>
+    </div>
+  <% end %>
+<% end %>

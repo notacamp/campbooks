@@ -1,0 +1,61 @@
+<%= render(Campbooks::OnboardingProgress.new(current_step: @step, previous_step: @previous_step)) %>
+
+<div class="mb-6">
+  <h1 class="text-lg font-semibold text-gray-900"><%= t(".heading") %></h1>
+  <p class="text-sm text-gray-500 mt-1"><%= t(".subheading") %></p>
+</div>
+
+<div class="space-y-6">
+  <% if @accounts.any? %>
+    <%= render(Campbooks::Card.new(padding: :lg)) do %>
+      <h3 class="text-sm font-semibold text-gray-900 mb-3"><%= t(".connected_accounts_title") %></h3>
+      <% @accounts.each do |account| %>
+        <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg dark:bg-green-500/10">
+          <div class="flex items-center gap-3">
+            <svg class="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+            <div>
+              <p class="text-sm font-medium text-gray-900"><%= account.display_name %></p>
+              <p class="text-xs text-gray-500"><%= human_enum(EmailAccount, :provider, account.provider) %></p>
+            </div>
+          </div>
+          <%= render(Campbooks::Badge.new(variant: :success, size: :sm)) { t(".badge_connected") } %>
+        </div>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <%= render(Campbooks::Card.new(padding: :lg)) do %>
+    <h3 class="text-sm font-semibold text-gray-900 mb-3"><%= t(".add_account_title") %></h3>
+    <p class="text-xs text-gray-500 mb-4"><%= t(".add_account_description") %></p>
+
+    <div class="flex gap-3 flex-wrap">
+      <%= button_to "Connect Zoho Mail", email_accounts_path(provider: "zoho"), method: :post,
+          data: { turbo: false },
+          class: "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors cursor-pointer border-0" %>
+      <%= button_to "Connect Google", email_accounts_path(provider: "google"), method: :post,
+          data: { turbo: false },
+          class: "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors cursor-pointer border-0" %>
+      <% if microsoft_mailbox_connect_enabled? %>
+        <%= button_to "Connect Microsoft 365", email_accounts_path(provider: "microsoft"), method: :post,
+            data: { turbo: false },
+            class: "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-accent-600 hover:bg-accent-700 transition-colors cursor-pointer border-0" %>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%= render(Campbooks::Alert.new(variant: :warning)) do %>
+    <%= t(".alert_html") %>
+  <% end %>
+
+  <div class="pt-2 flex gap-3">
+    <%= button_to t(".save_and_continue"), onboarding_path(step: :email_accounts), method: :patch,
+        form: { class: "flex-1" },
+        class: "w-full py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-accent-600 hover:bg-accent-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-500 cursor-pointer transition-colors" %>
+    <%# Native submit (turbo:false): the snooze redirects to root (a different
+        layout), which a Turbo form submission fails to render — leaving the user
+        stuck on this step. A full-page nav follows the redirect reliably. %>
+    <%= button_to t("shared.actions.skip_for_now"), snooze_onboarding_path, method: :post,
+        form: { class: "flex-1", data: { turbo: false } },
+        class: "w-full py-2.5 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-card hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-500 cursor-pointer transition-colors" %>
+  </div>
+</div>

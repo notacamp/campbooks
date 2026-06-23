@@ -1,0 +1,70 @@
+---
+es:
+  components:
+    ai_setup_message:
+      example_hint: p. ej. %{hint}
+    ai_setup_proposal:
+      add_selected: Añadir seleccionados
+      document_types_label: tipos de documento
+      edit_label: Editar
+      field_colour: Color
+      field_name: Nombre
+      field_prompt: Qué incluye
+      no_suggestions: Sin sugerencias aún.
+      suggested_heading: Sugerencias de %{kind}
+      tags_label: etiquetas
+    chat_actions:
+      allow_sender: Permitir remitente
+      archive: Archivar
+      block_sender: Bloquear remitente
+      create_event: Crear evento de calendario
+      draft_reply: Redactar respuesta
+      forward_to: Reenviar a %{address}
+      reclassify: Reclasificar
+      remove_tag_prefix: 'Eliminar etiqueta: %{name}'
+      remove_with_name: Eliminar %{name}
+      snooze: Posponer
+      star_sender: Destacar remitente
+      tag_prefix: 'Etiqueta: %{name}'
+      tag_with_name: Etiquetar como %{name}
+      unblock_sender: Desbloquear remitente
+      unsnooze: Activar
+      unstar_sender: Quitar destacado
+    chat_error:
+      error_message: No he podido hacer eso ahora mismo. ¿Lo intenta de nuevo?
+      retry: Intentar de nuevo
+    chat_form:
+      keyboard_hint: Intro para enviar · Mayús+Intro para nueva línea
+      send_aria_label: Enviar mensaje
+      textarea_aria_label: Mensaje a Scout
+    chat_message:
+      ai_badge: IA
+      draft_badge: Borrador
+      time_ago: hace %{time}
+    command_palette:
+      capture_placeholder: Mover a qué carpeta…
+      dialog_aria_label: Buscar y comandos
+      group_actions: Acciones
+      group_contacts: Contactos
+      group_emails: Correos
+      group_folder: Carpeta
+      group_navigate: Navegar
+      hint_escape_back: esc volver
+      hint_escape_close: esc cerrar
+      hint_navigate: "↑↓ navegar"
+      hint_select: "↵ seleccionar"
+      move_email_to_folder: Mover correo a carpeta
+      results_aria_label: Resultados de búsqueda
+      search_aria_label: Buscar correos, conversaciones, contactos y configuración
+      search_placeholder: Buscar correos, conversaciones, contactos, configuración…
+    email_scout_actions:
+      draft_follow_up: Redactar seguimiento
+      suggest_reply: Sugerir respuesta
+    notification_item:
+      archive_aria_label: Archivar notificación
+      archive_title: Archivar
+      restore_aria_label: Restaurar notificación
+      restore_title: Restaurar
+      time_ago: hace %{time}
+    scout_briefing:
+      try_asking: Pruebe a preguntar

@@ -1,0 +1,13 @@
+<%# Infinite-scroll sentinel for Rewind. Reuses the curated sentinel's frame id
+    (feed_pagination) so the existing replace/remove targeting keeps working;
+    the src is a keyset cursor (?before=&before_id=&period=) carrying the open
+    chapter, or ?rewind=1 for the first page. `cursor` is a Feed::Rewind::Cursor
+    or nil. %>
+<% src = cursor ? { before: cursor.sort_at.iso8601(6), before_id: cursor.id, period: cursor.period } : { rewind: 1 } %>
+<%= turbo_frame_tag "feed_pagination",
+      src: home_path(src.merge(format: :turbo_stream)),
+      loading: :lazy do %>
+  <div class="flex items-center justify-center py-6">
+    <%= render(Campbooks::Spinner.new(size: :sm)) %>
+  </div>
+<% end %>

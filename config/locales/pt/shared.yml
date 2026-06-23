@@ -1,0 +1,45 @@
+---
+pt:
+  shared:
+    actions:
+      add: Adicionar
+      back: Voltar
+      cancel: Cancelar
+      close: Fechar
+      confirm: Confirmar
+      connect: Ligar
+      continue: Continuar
+      create: Criar
+      delete: Eliminar
+      disconnect: Desligar
+      done: Concluído
+      edit: Editar
+      learn_more: Saber mais
+      loading: A carregar…
+      remove: Remover
+      save: Guardar
+      save_changes: Guardar alterações
+      search: Pesquisar
+      send: Enviar
+      skip_for_now: Ignorar por agora
+      update: Atualizar
+    nav:
+      activity: Atividade
+      admin: Admin
+      calendar: Calendário
+      contacts: Contactos
+      documents: Docs
+      home: Início
+      mail: Correio
+      more: Mais
+      new_items: Novo
+      scout: Scout
+      settings: Definições
+      workflows: Fluxos
+    swipe_dialogs:
+      confirm_action: Eliminar
+      confirm_message: Esta ação não pode ser anulada.
+      confirm_title: Tem a certeza?
+      dont_ask_again: Não perguntar novamente
+      snooze_action: Adiar
+      snooze_title: Adiar até…

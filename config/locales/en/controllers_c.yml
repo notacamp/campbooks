@@ -1,0 +1,162 @@
+---
+en:
+  admin:
+    base:
+      no_permission: You don't have permission to access that.
+    invitations:
+      approve:
+        success: Invitation to %{email} approved and sent.
+      reject:
+        success: Invitation to %{email} rejected.
+    signup_requests:
+      approve:
+        success: Approved %{email}.
+      reject:
+        success: Rejected %{email}.
+    users:
+      update:
+        invalid_role: Invalid role.
+        own_role: You can't change your own role.
+        success: "%{name} is now %{role}."
+  ai_setup_chats:
+    apply:
+      added_document_types:
+        one: Added %{count} document type.
+        other: Added %{count} document types.
+      added_tags:
+        one: Added %{count} tag.
+        other: Added %{count} tags.
+      nothing_added: Nothing added — your setup is unchanged.
+    message:
+      thinking: Thinking…
+  compose_attachments:
+    create:
+      failed: Could not upload that file. Please try again.
+      invalid: That doesn't look like a file.
+      too_large: That file is too large (max 25 MB).
+  compose_images:
+    create:
+      failed: Could not upload that image. Please try again.
+      invalid: That doesn't look like an image.
+      too_large: That image is too large (max 10 MB).
+      unsupported_type: Use a PNG, JPG, GIF, or WebP image.
+  invitations:
+    accept:
+      already_member: You are already a member.
+      create_account: Create an account to accept this invitation.
+      joined: You have joined %{workspace}!
+    check_validity:
+      already_accepted: This invitation has already been accepted.
+      cancelled: This invitation has been cancelled.
+      expired: This invitation has expired.
+      pending_approval: This invitation is pending admin approval.
+    set_invitation:
+      not_found: Invitation not found.
+    show:
+      already_member: You are already a member of this workspace.
+      create_account: Create an account to accept this invitation.
+  oauth:
+    calendar:
+      auth_failed: Calendar connection failed. Please try again.
+      discovery_failed: Could not retrieve your calendar account.
+      invalid_request: Invalid OAuth request.
+      linked: "%{email} calendar connected successfully."
+    google:
+      callback:
+        error: 'Google Drive connection failed: %{message}'
+        success: Google Drive connected as %{email}.
+    google_mail:
+      callback:
+        auth_failed: Authentication failed. Please try again.
+        discovery_failed: Could not discover your Google account.
+        invalid_request: Invalid OAuth request.
+        linked: "%{email} connected successfully."
+        sign_in_failed: Could not retrieve your Google account.
+    microsoft:
+      callback:
+        auth_failed: Authentication failed. Please try again.
+        discovery_failed: Could not retrieve your Microsoft account information.
+        invalid_request: Invalid OAuth request.
+        linked: "%{email} (Microsoft 365) connected successfully."
+        sign_in_failed: Could not retrieve your Microsoft account.
+    notion:
+      callback:
+        error: 'Notion connection failed: %{message}'
+        invalid_state: That Notion connection request expired or was invalid. Please
+          try again.
+        success: Connected to %{workspace}.
+      connect:
+        not_configured: Notion sign-in isn't configured on this instance. Connect
+          with an integration token instead.
+    zoho:
+      callback:
+        account_discovery_failed: Could not discover your Zoho account.
+        auth_failed: Authentication failed. Please try again.
+        drive_discovery_failed: Could not discover your Zoho account.
+        drive_linked: "%{email} connected successfully."
+        invalid_request: Invalid OAuth request.
+        linked: "%{email} connected successfully."
+        sign_in_failed: Could not retrieve your Zoho account.
+  onboarding:
+    suggest_document_types:
+      suggestion_error: Couldn't generate suggestions. Make sure an AI provider is
+        configured or try again.
+    suggest_tags:
+      suggestion_error: Couldn't generate suggestions. Make sure an AI provider is
+        configured or try again.
+    update:
+      setup_complete: Setup complete! Welcome to Campbooks.
+  passwords:
+    create:
+      sent: Password reset instructions sent (if user with that email address exists).
+      try_later: Try again later.
+    set_user_by_token:
+      invalid_link: Password reset link is invalid or has expired.
+    update:
+      mismatch: Passwords did not match.
+      reset: Password has been reset.
+  registrations:
+    approved:
+      invalid_link: Approval link is invalid or has already been used.
+    check_code:
+      expired: Code expired. Request a new one.
+      incorrect: Incorrect code. %{remaining} attempts left.
+      too_many_attempts: Too many attempts. Start over.
+    complete:
+      account_exists: That account already exists. Sign in with your password.
+      beta_code_unavailable: That invite code is no longer available — please start
+        over with a new one.
+      password_too_short: Password must be at least 8 characters.
+      welcome_workspace: Welcome to %{workspace}!
+    create:
+      code_sent: We sent a verification code to %{email}.
+      invalid_beta_code: That invite code isn't valid or has already been used.
+      invalid_email: Enter a valid email address.
+      invite_only: Campbooks is invite-only right now — you need an invitation to
+        sign up.
+      request_submitted: Your request has been submitted for review. You'll receive
+        an email when approved.
+      terms_required: Please accept the Terms of Service and Privacy Policy to continue.
+    ensure_step_order:
+      verify_email_first: Please verify your email first.
+    resend_code:
+      sent: A new code was sent to %{email}.
+  sessions:
+    create:
+      invalid: Try another email address or password.
+      try_later: Try again later.
+    native:
+      expired: That sign-in link expired. Please try again.
+  setup:
+    update:
+      ai_saved: AI configuration saved.
+      document_types_added:
+        one: Document type added.
+        other: "%{count} document types added."
+      pick_at_least_one_tag: Pick at least one tag, or add your own below.
+      pick_at_least_one_type: Pick at least one type, or add your own below.
+      tags_added:
+        one: Tag added.
+        other: "%{count} tags added."
+      workspace_error: Something went wrong. Please try again.
+      workspace_saved: Workspace profile updated.

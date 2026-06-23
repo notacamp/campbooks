@@ -1,0 +1,20 @@
+<%= turbo_frame_tag "inbox_board" do %>
+  <div class="flex h-full w-full flex-col overflow-hidden"
+       data-controller="inbox-board"
+       data-inbox-board-move-url-value="<%= board_move_email_messages_path %>">
+    <%# Board owns the full shell (the list pane — and its view switcher — is
+        hidden in board mode), so the switcher has to live here too or there is
+        no way back out to the default/list layouts. %>
+    <div class="flex flex-shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
+      <h2 class="text-[13px] font-semibold text-foreground"><%= t(".heading") %></h2>
+      <%= render(Campbooks::InboxViewSwitcher.new) %>
+    </div>
+    <div class="flex-1 overflow-x-auto overflow-y-hidden p-3">
+      <div class="flex h-full min-w-max gap-3">
+        <% @columns.each do |col| %>
+          <%= render(Campbooks::BoardColumn.new(column: col)) %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>

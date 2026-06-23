@@ -1,0 +1,7 @@
+<%# Loaded into the shared setup <dialog>'s turbo-frame. Subscribes to the
+    per-user stream so AiSetupChatReplyJob can stream turns back in. %>
+<%# locals: thread (AgentThread|nil), kind (String), messages (Array), proposal_items (Array|nil) %>
+<%= turbo_frame_tag "setup_modal_frame" do %>
+  <%= turbo_stream_from "ai_setup_chat_#{current_user.id}" %>
+  <%= render "ai_setup_chats/panel", thread: thread, kind: kind, messages: messages, proposal_items: proposal_items %>
+<% end %>

@@ -1,0 +1,123 @@
+---
+es:
+  email_actions:
+    access_denied: No tiene acceso a esa cuenta de correo.
+    add_tag:
+      not_found: No existe ninguna etiqueta llamada '%{tag_name}' — créela en Configuración
+        → Etiquetas primero.
+      success: Etiquetado como '%{tag_name}'
+    allow_sender:
+      success: "%{name} permitido en la bandeja de entrada."
+    archive:
+      failure: No se pudo archivar la conversación
+      success: Conversación archivada
+    block_sender:
+      success: "%{name} bloqueado — su correo se archivará."
+    bulk_archive:
+      success:
+        one: "%{count} correo archivado"
+        other: "%{count} correos archivados"
+    bulk_tag:
+      added:
+        one: Etiqueta '%{tag_name}' añadida a %{count} correo
+        other: Etiqueta '%{tag_name}' añadida a %{count} correos
+      removed:
+        one: Etiqueta '%{tag_name}' eliminada de %{count} correo
+        other: Etiqueta '%{tag_name}' eliminada de %{count} correos
+    create_calendar_event:
+      no_calendar: Conecta primero un calendario para añadir eventos.
+      success: Evento '%{title}' añadido a tu calendario
+    forward_email:
+      failure: No se pudo reenviar a %{to_address}
+      success: Reenviado a %{to_address}
+    pin:
+      success: Fijado en la parte superior de tu bandeja.
+    reclassify:
+      success:
+        one: "%{count} correo reclasificado"
+        other: "%{count} correos reclasificados"
+    remove_tag:
+      not_found: No hay ninguna etiqueta llamada '%{tag_name}' en este correo.
+      success: Etiqueta '%{tag_name}' eliminada
+    send_permission_denied: No tiene permiso para enviar desde esa cuenta.
+    sender_not_found: No se pudo encontrar el remitente de este correo.
+    snooze:
+      failure: No se pudo posponer la conversación
+      success: Conversación pospuesta hasta %{snoozed_until}
+    star_sender:
+      success: "%{name} destacado — sus correos ahora tienen prioridad."
+    trash:
+      failure: No se pudo eliminar la conversación
+      success: Conversación eliminada
+    unarchive:
+      failure: No se pudo mover la conversación a la bandeja de entrada
+      success: Movido a la bandeja de entrada
+    unblock_sender:
+      success: "%{name} desbloqueado."
+    unpin:
+      success: Quitado de la parte superior de tu bandeja.
+    unsnooze:
+      failure: No se pudo reactivar la conversación
+      success: Conversación reactivada
+    unstar_sender:
+      success: Se quitó el destacado de %{name}.
+    upload_attachments_to_drive:
+      failure: No se pudo subir al Drive — conecta Google Drive y asegúrate de que
+        el correo tiene archivos adjuntos.
+      success:
+        one: 1 archivo adjunto subido a Google Drive
+        other: "%{count} archivos adjuntos subidos a Google Drive"
+  jobs:
+    ai_setup_chat_reply:
+      error_generic: Scout no ha podido generar sugerencias en este momento. Inténtelo
+        de nuevo.
+      error_no_ai_config: Scout necesita un proveedor de IA de texto antes de poder
+        ayudar aquí. Configure uno e inténtelo de nuevo.
+      error_retry: Algo salió mal al contactar con Scout. Inténtelo de nuevo.
+      no_suggestions_yet: Scout no ha podido generar sugerencias todavía — cuéntele
+        un poco más sobre su negocio e inténtelo de nuevo.
+      proposal_intro: Esto es lo que sugeriría para su %{kind}. Elija las que quiera
+        y aplíquelas — puede ajustar cualquiera de ellas primero.
+    compose_chat_reply:
+      error: Lo siento, he tenido un problema al procesar su solicitud. ¿Podría intentarlo
+        de nuevo?
+    email_chat_reply:
+      auto_action_failures_prefix: 'Sin embargo, no he podido completar estas acciones:'
+      conversation_archived: Esta conversación ha sido archivada.
+    email_process:
+      auto_replied_notice: Veo que ha respondido usted mismo a esta conversación.
+        He marcado los borradores anteriores como desactualizados. Avíseme si necesita
+        algo más.
+    email_reply_daemon:
+      auto_action_failures_prefix: 'Sin embargo, no he podido completar estas acciones:'
+      conversation_archived: Esta conversación ha sido archivada.
+  notifier:
+    account_disconnected:
+      body: Vuelva a autenticarse para reanudar la sincronización del correo.
+      title: "%{email_address} desconectada"
+    document_failed:
+      title: Error al procesar el documento
+    documents_need_review:
+      body: Scout no estaba seguro — revíselos y clasifíquelos.
+      title:
+        one: "%{count} documento necesita revisión"
+        other: "%{count} documentos necesitan revisión"
+    export_failed:
+      body: Algo salió mal al generar la exportación. Inténtelo de nuevo.
+      title: Error en la exportación
+    export_ready:
+      body:
+        one: "%{count} documento listo para descargar."
+        other: "%{count} documentos listos para descargar."
+      title: Exportación lista
+    invitation_pending_approval:
+      body: "%{invitee_email} fue invitado por %{inviter_name}."
+      title: La invitación necesita aprobación
+    scout_reply:
+      title: Scout ha respondido
+    subject_label:
+      fallback: su bandeja de entrada
+    thread_activity:
+      title: Nuevo comentario de %{actor_name}
+    thread_mention:
+      title: "%{actor_name} le ha mencionado"

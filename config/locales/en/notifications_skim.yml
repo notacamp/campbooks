@@ -1,0 +1,49 @@
+---
+en:
+  notifications:
+    bell:
+      heading: Notifications
+      mark_all_read: Mark all read
+      view_all: View all
+    dropdown_list:
+      all_caught_up: You're all caught up.
+      earlier: Earlier
+      needs_you: Needs you
+    gone: That notification is no longer available.
+    index:
+      all_caught_up: You're all caught up.
+      archive_read: Archive read
+      empty_archived: No archived notifications.
+      filters:
+        all: All
+        archived: Archived
+        needs_action: Needs action
+        unread: Unread
+      manage_preferences_html: Manage which notifications you receive in %{link}.
+      mark_all_read: Mark all read
+      preferences_link: Notification Preferences
+      subtitle:
+        one: "%{count} unread"
+        other: "%{count} unread"
+      title: Notifications
+    toast:
+      mark_read: Mark read
+      time_ago: "%{time} ago"
+  skim:
+    email:
+      archive: Archive
+      back_to_stack: Back to stack
+      make_priority: Make priority
+      no_preview: No preview available — use "Open in full" to read it.
+      no_subject: "(no subject)"
+      open_in_full: Open in full
+      reply: Reply
+      reply_placeholder: Write a reply to %{address}…
+      send_reply: Send reply
+    email_content:
+      no_preview_html: "“No preview &mdash; use &ldquo;Reply / open full&rdquo;.”"
+    show:
+      back_to_inbox: Back to inbox
+      close: Close
+      inbox_calm: Your inbox is already calm
+      nothing_to_skim: Nothing to skim right now.

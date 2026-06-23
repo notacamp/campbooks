@@ -1,0 +1,50 @@
+<%# Bring-your-own-keys provider fields for the AI onboarding step. Extracted so both
+    the cloud mode-selector and the self-hosted path can reuse them. Uses absolute i18n
+    keys (a partial would otherwise resolve lazy ".keys" against its own virtual path).
+    Locals: text_provider, document_provider. %>
+<%# ── Text provider (required) ──────────────────────────────── %>
+<%= render(Campbooks::Card.new) do |card| %>
+  <% card.with_header(divider: true) do %>
+    <div class="flex flex-wrap items-center gap-2">
+      <h3 class="text-sm font-semibold text-gray-900"><%= t("onboarding.steps.ai_configuration.text_provider_title") %></h3>
+      <%= render(Campbooks::Badge.new(variant: :accent)) { t("onboarding.steps.ai_configuration.badge_required") } %>
+    </div>
+    <p class="text-xs text-gray-500 mt-1"><%= t("onboarding.steps.ai_configuration.text_provider_description") %></p>
+  <% end %>
+  <% card.with_body do %>
+    <div class="space-y-3">
+      <%= render(Campbooks::Select.new("text_provider[provider]",
+            label: t("onboarding.steps.ai_configuration.provider_label"),
+            options: AiConfiguration::PROVIDERS.map { |p| [human_enum(AiConfiguration, :provider, p), p] },
+            selected: text_provider)) %>
+      <%= render(Campbooks::Input.new("text_provider[api_key]", type: :password, label: t("onboarding.steps.ai_configuration.api_key_label"), placeholder: t("onboarding.steps.ai_configuration.api_key_placeholder"))) %>
+      <%= render(Campbooks::Input.new("text_provider[endpoint_url]", type: :url, label: t("onboarding.steps.ai_configuration.endpoint_url_label"), placeholder: t("onboarding.steps.ai_configuration.endpoint_url_placeholder"))) %>
+    </div>
+  <% end %>
+<% end %>
+
+<%# ── Document & image provider (optional) ───────────────────── %>
+<%= render(Campbooks::Card.new) do |card| %>
+  <% card.with_header(divider: true) do %>
+    <div class="flex flex-wrap items-center gap-2">
+      <h3 class="text-sm font-semibold text-gray-900"><%= t("onboarding.steps.ai_configuration.document_provider_title") %></h3>
+      <%= render(Campbooks::Badge.new(variant: :neutral)) { t("onboarding.steps.ai_configuration.badge_optional") } %>
+      <%= render(Campbooks::Badge.new(variant: :info)) { t("onboarding.steps.ai_configuration.badge_vision") } %>
+    </div>
+    <p class="text-xs text-gray-500 mt-1"><%= t("onboarding.steps.ai_configuration.document_provider_description") %></p>
+  <% end %>
+  <% card.with_body do %>
+    <div class="space-y-3">
+      <%= render(Campbooks::Select.new("document_provider[provider]",
+            label: t("onboarding.steps.ai_configuration.provider_label"),
+            options: AiConfiguration::VISION_PROVIDERS.map { |p| [human_enum(AiConfiguration, :provider, p), p] },
+            selected: document_provider)) %>
+      <%= render(Campbooks::Input.new("document_provider[api_key]", type: :password, label: t("onboarding.steps.ai_configuration.api_key_label"), placeholder: t("onboarding.steps.ai_configuration.document_api_key_placeholder"))) %>
+      <%= render(Campbooks::Input.new("document_provider[endpoint_url]", type: :url, label: t("onboarding.steps.ai_configuration.endpoint_url_label"), placeholder: t("onboarding.steps.ai_configuration.endpoint_url_placeholder"))) %>
+    </div>
+  <% end %>
+<% end %>
+
+<%= render(Campbooks::Alert.new(variant: :info)) do %>
+  <%= t("onboarding.steps.ai_configuration.alert_html") %>
+<% end %>

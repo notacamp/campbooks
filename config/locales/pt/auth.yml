@@ -1,0 +1,98 @@
+---
+pt:
+  auth:
+    oauth_sign_in:
+      blocked:
+        deletion_requested: Esta conta está agendada para eliminação e não pode ser
+          usada para iniciar sessão.
+        existing_account: Já existe uma conta com este email. Inicie sessão com a
+          sua palavra-passe e depois adicione o início de sessão %{provider} em Definições
+          → Segurança.
+        invalid: Não foi possível concluir o início de sessão com %{provider}. Tente
+          novamente.
+        mailbox_has_owner: Este email está ligado como caixa de correio. Inicie sessão
+          na conta que o detém e ative o início de sessão %{provider} em Definições
+          → Segurança.
+        mailbox_no_owner: Este email está ligado como caixa de correio, mas não está
+          configurado para início de sessão. Contacte o administrador do seu espaço
+          de trabalho.
+      rate_limited: Demasiadas tentativas de início de sessão. Aguarde alguns minutos
+        e tente novamente.
+  invitations:
+    show:
+      accept: Aceitar Convite
+      heading: Foi convidado!
+      invitation_prose_html: "%{inviter} convidou-o a aderir a %{workspace} no Campbooks."
+      workspace_label: Espaço de trabalho
+  passwords:
+    edit:
+      heading: Atualizar a sua palavra-passe
+      password_confirmation_label: Confirmar nova palavra-passe
+      password_confirmation_placeholder: Reintroduza a sua palavra-passe
+      password_label: Nova palavra-passe
+      password_placeholder: Pelo menos 8 caracteres
+      submit: Atualizar palavra-passe
+      tagline: Escolha uma nova palavra-passe para a sua conta.
+    new:
+      back_to_sign_in: Voltar ao início de sessão
+      email_label: Endereço de e-mail
+      email_placeholder: voce@exemplo.com
+      heading: Esqueceu-se da sua palavra-passe?
+      submit: Enviar link de redefinição
+      tagline: Introduza o seu endereço de e-mail e enviaremos um link de redefinição.
+  registrations:
+    check_code:
+      try_later: Demasiadas tentativas. Por favor tente novamente mais tarde.
+    create:
+      try_later: Demasiadas tentativas. Por favor tente novamente mais tarde.
+    new:
+      beta_badge: Beta fechada
+      beta_code_hint: O Campbooks está em beta fechada. Introduza o código de convite
+        que recebeu para criar a sua conta.
+      beta_code_label: Código de convite
+      beta_code_placeholder: 'ex.: ABCD-2345'
+      email_label: Endereço de e-mail
+      email_placeholder: voce@exemplo.com
+      have_account: Já tem uma conta?
+      name_label: Nome completo
+      name_placeholder: O seu nome
+      privacy: Política de Privacidade
+      sign_in: Iniciar sessão
+      submit: Enviar código de verificação
+      tagline: Crie a sua conta
+      terms: Termos de Serviço
+      terms_consent_html: Concordo com os %{terms} e a %{privacy}.
+    password:
+      password_label: Palavra-passe
+      password_placeholder: Pelo menos 8 caracteres
+      submit: Criar conta
+      tagline: Defina a sua palavra-passe
+      verified_prose: verificado. Escolha uma palavra-passe para concluir a criação
+        da sua conta.
+    pending_approval:
+      body: O seu pedido de conta foi submetido para análise. Receberá um e-mail quando
+        for aprovado.
+      heading: Pedido submetido
+    resend_code:
+      try_later: Demasiados pedidos. Por favor tente novamente mais tarde.
+    verify:
+      code_label: Código de verificação
+      code_sent_html: Enviámos um código de 6 dígitos para %{email}. Introduza-o abaixo
+        para continuar.
+      resend: Reenviar código
+      start_over: Recomeçar
+      submit: Verificar
+      tagline: Verifique o seu e-mail
+  sessions:
+    new:
+      beta_badge: Beta fechada
+      email_label: Endereço de e-mail
+      email_placeholder: voce@exemplo.com
+      forgot_password: Esqueceu-se da sua palavra-passe?
+      no_account: Novo no Campbooks?
+      or: ou
+      password_label: Palavra-passe
+      password_placeholder: Introduza a sua palavra-passe
+      sign_up: Criar uma conta
+      submit: Iniciar sessão
+      tagline: A caixa de entrada que se organiza sozinha.

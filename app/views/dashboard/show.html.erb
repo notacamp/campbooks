@@ -1,0 +1,247 @@
+<%= render(Campbooks::PageHeader.new(title: t(".title"), spacing: :lg)) %>
+
+<%# Stuck processing banner %>
+<% if @stuck_documents > 0 %>
+  <div class="mb-6">
+    <%= render(Campbooks::Alert.new(variant: :warning)) do %>
+      <%= t(".stuck_documents", count: @stuck_documents) %>
+      <%= link_to t(".view"), documents_path(ai_status: :processing), class: "font-medium underline" %>
+    <% end %>
+  </div>
+<% end %>
+
+<%# Section 1: Needs Your Attention %>
+<section class="mb-10">
+  <div class="flex items-baseline gap-2 mb-3">
+    <h2 class="text-base font-semibold text-gray-900"><%= t(".attention_heading") %></h2>
+    <% if @has_action_items %>
+      <span class="text-xs text-gray-400 tabular-nums"><%= @action_items.size %></span>
+    <% end %>
+  </div>
+
+  <% if @has_action_items %>
+    <div class="space-y-2">
+      <% @action_items.each do |item| %>
+        <% case item[:kind] %>
+        <% when :email %>
+          <% email = item[:record] %>
+          <article class="group bg-card rounded-xl border border-gray-200 px-4 py-3 hover:border-gray-300 transition-colors">
+            <div class="flex items-start gap-3">
+              <span class="mt-0.5">
+                <%= render(Campbooks::ContactAvatar.new(
+                      email: email.from_address || "?",
+                      sent: false,
+                      size: :lg,
+                      contact_id: email.contact_id,
+                      variant: :accent
+                    )) %>
+              </span>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <% if email.ai_priority == "high" %>
+                    <span class="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-red-500" title="<%= t(".high_priority") %>"></span>
+                  <% end %>
+                  <%= link_to email.subject.presence || t(".no_subject"), email_message_path(email),
+                        class: "text-sm font-semibold text-gray-900 hover:text-accent-600 transition-colors truncate" %>
+                  <span class="text-xs text-gray-400 flex-shrink-0 ml-auto"><%= t(".time_ago", time: time_ago_in_words(email.received_at)) %></span>
+                </div>
+                <% if email.ai_action_prompt.present? %>
+                  <p class="text-xs text-gray-600 mt-1.5 leading-relaxed line-clamp-2"><%= email.ai_action_prompt %></p>
+                <% end %>
+                <p class="text-xs text-gray-400 mt-1"><%= email.from_address %></p>
+              </div>
+            </div>
+          </article>
+
+        <% when :document %>
+          <% doc = item[:record] %>
+          <article class="group bg-card rounded-xl border border-gray-200 px-4 py-3 hover:border-gray-300 transition-colors">
+            <div class="flex items-start gap-3">
+              <span class="flex-shrink-0 mt-0.5 w-8 h-8 rounded-lg flex items-center justify-center" style="background-color: <%= document_type_dot_color(doc) %>1a; color: <%= document_type_dot_color(doc) %>">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+              </span>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <%= link_to doc.entity_display_name || t(".unnamed_document"), document_path(doc),
+                        class: "text-sm font-semibold text-gray-900 hover:text-accent-600 transition-colors truncate" %>
+                  <span class="text-xs text-gray-400 flex-shrink-0 ml-auto"><%= t(".time_ago", time: time_ago_in_words(doc.created_at)) %></span>
+                </div>
+                <p class="text-xs text-gray-400 mt-1 flex items-center gap-2">
+                  <%= document_type_label(doc.document_type) %>
+                  <% if doc.document_date %> &middot; <%= l(doc.document_date, format: :numeric) %><% end %>
+                  <%= status_badge(doc.display_status) %>
+                </p>
+              </div>
+            </div>
+          </article>
+
+        <% when :reply %>
+          <% comment = item[:record] %>
+          <article class="group bg-card rounded-xl border border-gray-200 px-4 py-3 hover:border-gray-300 transition-colors">
+            <div class="flex items-start gap-3">
+              <span class="flex-shrink-0 mt-0.5 w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center dark:bg-amber-500/10 dark:text-amber-400">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+              </span>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <%= link_to comment.email_thread.subject.presence || t(".no_subject"),
+                        email_thread_path(comment.email_thread),
+                        class: "text-sm font-semibold text-gray-900 hover:text-accent-600 transition-colors truncate" %>
+                  <span class="text-xs text-gray-400 flex-shrink-0 ml-auto"><%= t(".time_ago", time: time_ago_in_words(comment.created_at)) %></span>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">
+                  <%= comment.email_thread.participants.first(2).join(", ") %>
+                </p>
+              </div>
+            </div>
+          </article>
+        <% end %>
+      <% end %>
+    </div>
+  <% else %>
+    <div class="bg-card rounded-xl border border-gray-200 px-6 py-12 text-center" role="status">
+      <div class="w-12 h-12 rounded-full bg-accent-50 text-accent-500 flex items-center justify-center mx-auto mb-3">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      </div>
+      <p class="text-sm font-semibold text-gray-900"><%= t(".attention_empty_title") %></p>
+      <% if @recent_activity.any? %>
+        <p class="mt-1 text-sm text-gray-500"><%= t(".attention_empty_recent") %></p>
+      <% else %>
+        <p class="mt-1 text-sm text-gray-500"><%= t(".attention_empty_idle") %></p>
+      <% end %>
+    </div>
+  <% end %>
+</section>
+
+<%# Section 2: Recent Activity %>
+<% if @recent_activity.any? %>
+  <section class="mb-8">
+    <%= render(Campbooks::Card.new(padding: :none)) do |card| %>
+      <% card.with_header(divider: true) do %>
+        <h2 class="text-base font-semibold text-gray-900"><%= t(".recent_activity_heading") %></h2>
+      <% end %>
+      <% card.with_body do %>
+        <ul class="divide-y divide-gray-100">
+          <% @recent_activity.each do |item| %>
+            <li class="py-2.5 flex items-center gap-3">
+              <% case item[:kind] %>
+              <% when :document %>
+                <% doc = item[:record] %>
+                <%= render(Campbooks::ColorDot.new(color: document_type_dot_color(doc), size: :sm, class: "flex-shrink-0")) %>
+                <span class="text-xs text-gray-400 flex-shrink-0 w-14 tabular-nums"><%= t(".time_ago", time: time_ago_in_words(item[:time])) %></span>
+                <%= link_to doc.entity_display_name || t(".unnamed_document"), document_path(doc),
+                      class: "text-sm text-gray-700 hover:text-accent-600 truncate transition-colors" %>
+                <span class="text-xs text-gray-400 flex-shrink-0 ml-auto hidden sm:inline"><%= document_type_label(doc.document_type) %></span>
+
+              <% when :email %>
+                <% email = item[:record] %>
+                <span class="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-gray-300"></span>
+                <span class="text-xs text-gray-400 flex-shrink-0 w-14 tabular-nums"><%= t(".time_ago", time: time_ago_in_words(item[:time])) %></span>
+                <%= link_to email.subject.presence || t(".no_subject"), email_message_path(email),
+                      class: "text-sm text-gray-700 hover:text-accent-600 truncate transition-colors" %>
+                <span class="text-xs text-gray-400 flex-shrink-0 ml-auto hidden sm:inline truncate max-w-[180px]"><%= email.from_address %></span>
+              <% end %>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    <% end %>
+  </section>
+<% end %>
+
+<%# Section 3: Recent Syncs %>
+<% if @recent_scans.any? %>
+  <section class="mb-8">
+    <%= render(Campbooks::Card.new(padding: :none)) do |card| %>
+      <% card.with_header(divider: true) do %>
+        <h2 class="text-base font-semibold text-gray-900"><%= t(".recent_syncs_heading") %></h2>
+      <% end %>
+      <% card.with_body do %>
+        <ul class="divide-y divide-gray-100">
+          <% @recent_scans.each do |scan| %>
+            <li class="py-2.5 flex items-center gap-3">
+              <span class="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+              <span class="text-xs text-gray-400 flex-shrink-0 w-14 tabular-nums"><%= t(".time_ago", time: time_ago_in_words(scan.completed_at)) %></span>
+              <span class="text-sm text-gray-700">
+                <span class="font-medium"><%= scan.email_account.display_name %></span>
+              </span>
+              <span class="text-xs text-gray-400 flex-shrink-0 ml-auto hidden sm:inline">
+                <%= t(".scan_emails", count: scan.emails_processed) %>
+                <% if scan.documents_created > 0 %>
+                  &middot; <%= t(".scan_documents", count: scan.documents_created) %>
+                <% end %>
+                <% if scan.errors_count > 0 %>
+                  &middot; <span class="text-red-600 dark:text-red-400"><%= t(".scan_errors", count: scan.errors_count) %></span>
+                <% end %>
+              </span>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    <% end %>
+  </section>
+<% end %>
+
+<%# Empty state: new account with no data %>
+<% if !@has_action_items && @recent_activity.empty? %>
+  <div class="flex items-center justify-center py-16">
+    <div class="text-center max-w-lg">
+      <div class="w-16 h-16 rounded-xl bg-accent-50 text-accent-500 flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+      </div>
+
+      <% status = setup_status %>
+      <% items = status&.incomplete_items || [] %>
+
+      <% if items.any? %>
+        <p class="text-lg font-semibold text-gray-900 mb-2"><%= t(".setup_title") %></p>
+        <p class="text-sm text-gray-500 mb-6"><%= t(".setup_description") %></p>
+
+        <div class="space-y-3 text-left">
+          <% items.each do |item| %>
+            <%
+              variant = case item[:severity]
+                        when :critical then :alert
+                        when :warning then :warning
+                        else :info
+                        end
+            %>
+            <%= render(Campbooks::Alert.new(variant: variant)) do %>
+              <p class="font-semibold text-sm"><%= item[:message] %></p>
+              <p class="text-xs mt-0.5 opacity-90"><%= item[:description] %></p>
+              <div class="mt-2">
+                <% if item[:key] == :email_account %>
+                  <div class="flex gap-2 flex-wrap">
+                    <%= button_to "Connect Zoho Mail", email_accounts_path(provider: "zoho"), method: :post,
+                        data: { turbo: false },
+                        class: "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700 transition-colors cursor-pointer border-0" %>
+                    <%= button_to "Connect Google", email_accounts_path(provider: "google"), method: :post,
+                        data: { turbo: false },
+                        class: "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors cursor-pointer border-0" %>
+                    <% if microsoft_mailbox_connect_enabled? %>
+                      <%= button_to "Connect Microsoft 365", email_accounts_path(provider: "microsoft"), method: :post,
+                          data: { turbo: false },
+                          class: "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-accent-600 hover:bg-accent-700 transition-colors cursor-pointer border-0" %>
+                    <% end %>
+                  </div>
+                <% elsif item[:cta_modal] %>
+                  <button type="button"
+                          data-setup-modal-open="<%= setup_path(item[:key], return_to: request.path) %>"
+                          class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-accent-600 hover:bg-accent-700 cursor-pointer border-0 transition-colors">
+                    <%= item[:cta_text] %> →
+                  </button>
+                <% else %>
+                  <%= link_to "#{item[:cta_text]} →", item[:cta_path],
+                        class: "inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-accent-600 hover:bg-accent-700 transition-colors" %>
+                <% end %>
+              </div>
+            <% end %>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="text-lg font-semibold text-gray-900 mb-2"><%= t(".all_set_title") %></p>
+        <p class="text-sm text-gray-500"><%= t(".all_set_description") %></p>
+      <% end %>
+    </div>
+  </div>
+<% end %>

@@ -1,0 +1,16 @@
+<%= turbo_frame_tag "inbox_settings_panel" do %>
+  <% if flash[:error].present? || flash[:success].present? %>
+    <div class="px-6 pt-4">
+      <div class="rounded-md px-3 py-2 text-xs <%= flash[:error] ? "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300" : "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300" %>">
+        <%= flash[:error] || flash[:success] %>
+      </div>
+    </div>
+  <% end %>
+
+  <%= render(Campbooks::EmailAccountSharing.new(
+        account: @email_account,
+        members: @members,
+        addable_users: @addable_users,
+        current_user: Current.user
+      )) %>
+<% end %>

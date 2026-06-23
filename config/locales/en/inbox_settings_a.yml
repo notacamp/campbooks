@@ -1,0 +1,87 @@
+---
+en:
+  inbox_settings:
+    accounts:
+      show:
+        active: Active
+        connect_label: 'Connect:'
+        disconnect_confirm: Disconnect %{name}?
+        heading: Accounts & sync
+        inactive: Inactive
+        last_scan: 'Last scan: %{time}'
+        last_scan_never: never
+        manage_access: Manage access
+        no_accounts: No email accounts connected. Connect one above to start.
+        no_scans: No scans yet.
+        re_auth: Re-auth
+        recent_scans_heading: Recent scans
+        scan_found: "%{found} found · %{docs} docs"
+        scan_now: Scan now
+        scanning: Scanning…
+        subheading: Connected mailboxes and recent scans.
+    display:
+      show:
+        attachments_option: Attachment indicator
+        chat_option: Scout chat panel
+        density_breathable: Breathable
+        density_compact: Compact
+        density_default: Default
+        density_heading: Density
+        email_accounts_heading: Email accounts
+        heading: Display
+        hide_account_hint: Hide an account to remove its threads from the list.
+        labels_option: Labels
+        no_accounts: No email accounts connected yet.
+        show_heading: Show
+        subheading: How your inbox looks on this device. Saved in this browser.
+    filtering:
+      show:
+        allowed_heading: Allowed senders
+        blocked_heading: Blocked senders
+        blocked_hint: Their mail is archived automatically. Unblock to let it back
+          in.
+        heading: Inbox filtering
+        no_allowed: No allowed senders yet.
+        no_blocked: No blocked senders.
+        no_starred: No starred senders yet.
+        remove: Remove
+        save: Save
+        starred_heading: Starred senders
+        strategy:
+          blacklist:
+            desc: Everyone reaches your inbox. Block senders one by one — their mail
+              is archived automatically.
+            label: Blacklist (default)
+          whitelist:
+            desc: Only allowed and starred senders reach your inbox. New senders wait
+              in Skim's Pending bucket to allow or deny.
+            label: Whitelist
+        strategy_heading: Strategy
+        subheading: Decide whose email reaches your inbox.
+        unblock: Unblock
+        unstar: Unstar
+    tags:
+      create:
+        created_toast: Tag created.
+      destroy:
+        deleted_toast: Tag deleted.
+      form:
+        ai_prompt_hint: What the AI uses to decide whether to apply this tag. Supports
+          markdown.
+        ai_prompt_label: AI prompt
+        cancel: Cancel
+        color_label: Color (hex)
+        create_tag: Create tag
+        group_label: Group
+        group_placeholder: e.g. Finance
+      index:
+        add_tag: Add tag
+        heading: Tags
+        no_tags: No tags yet. Add one to start sorting your inbox.
+        subheading: Tags help Scout sort your inbox automatically.
+      tag:
+        delete_confirm: Delete %{name}?
+        edit: Edit
+        tagged_messages_title: Tagged messages
+      update:
+        updated_toast: Tag updated.

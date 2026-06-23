@@ -1,0 +1,4 @@
+<%# Inline validation error inside the New Folder dialog (target: #new_folder_error). %>
+<% if message.present? %>
+  <p class="text-sm font-medium text-red-600 dark:text-red-400" role="alert"><%= message %></p>
+<% end %>

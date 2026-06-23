@@ -1,0 +1,28 @@
+<%# locals: tag, count %>
+<%= turbo_frame_tag dom_id(tag) do %>
+  <div class="flex items-center gap-3 py-2.5 px-1 border-b border-border last:border-0">
+    <%= render(Campbooks::ColorDot.new(color: tag.color)) %>
+    <div class="min-w-0 flex-1">
+      <div class="flex items-center gap-2">
+        <span class="text-[13px] font-medium text-foreground truncate"><%= tag.name %></span>
+        <% if tag.group_name.present? %>
+          <%= render(Campbooks::Badge.new(variant: :neutral, size: :md)) { tag.group_name } %>
+        <% end %>
+      </div>
+      <% if tag.prompt.present? %>
+        <p class="text-xs text-muted-foreground truncate mt-0.5"><%= tag.prompt.truncate(90) %></p>
+      <% end %>
+    </div>
+    <span class="text-xs text-muted-foreground tabular-nums flex-shrink-0" title="<%= t(".tagged_messages_title") %>"><%= count %></span>
+    <div class="flex items-center gap-1 flex-shrink-0">
+      <%= link_to t(".edit"), edit_inbox_settings_tag_path(tag),
+            data: { turbo_frame: "inbox_settings_tag_form" },
+            class: "px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded cursor-pointer transition-colors" %>
+      <% unless tag.name == "security_flagged" %>
+        <%= button_to t("shared.actions.delete"), inbox_settings_tag_path(tag), method: :delete,
+              data: { turbo_confirm: t(".delete_confirm", name: tag.name) },
+              class: "px-2 py-0.5 text-xs font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 rounded cursor-pointer transition-colors" %>
+      <% end %>
+    </div>
+  </div>
+<% end %>

@@ -1,0 +1,30 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"))) %>
+
+<div class="max-w-md">
+  <div class="bg-card rounded-xl shadow-sm border border-border p-5 sm:p-6 space-y-4">
+    <% if @recovery_codes.present? %>
+      <div class="flex items-start gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5">
+        <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"/></svg>
+        <span><%= t(".fresh_warning") %></span>
+      </div>
+
+      <%= render(Campbooks::RecoveryCodeGrid.new(codes: @recovery_codes)) %>
+
+      <div class="pt-1">
+        <%= render(Campbooks::Button.new(variant: :primary, href: settings_security_path)) { t(".done") } %>
+      </div>
+    <% else %>
+      <% if @remaining.to_i.positive? %>
+        <p class="text-sm text-muted-foreground"><%= t(".remaining", count: @remaining) %></p>
+      <% else %>
+        <p class="text-sm text-muted-foreground"><%= t(".empty") %></p>
+      <% end %>
+
+      <%= form_with url: settings_security_recovery_codes_path, method: :post,
+            data: { turbo_confirm: (@remaining.to_i.positive? ? t(".regenerate_confirm") : nil) } do %>
+        <%= render(Campbooks::Button.new(variant: :outline, type: :submit)) { t(".regenerate") } %>
+      <% end %>
+    <% end %>
+  </div>
+</div>

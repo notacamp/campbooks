@@ -1,0 +1,121 @@
+---
+pt:
+  email_actions:
+    access_denied: Não tem acesso a essa conta de email.
+    add_tag:
+      not_found: Nenhuma etiqueta com o nome '%{tag_name}' — crie-a em Definições
+        → Etiquetas primeiro.
+      success: Etiquetado como '%{tag_name}'
+    allow_sender:
+      success: "%{name} permitido na caixa de entrada."
+    archive:
+      failure: Não foi possível arquivar a conversa
+      success: Conversa arquivada
+    block_sender:
+      success: "%{name} bloqueado — o email será arquivado."
+    bulk_archive:
+      success:
+        one: Arquivado %{count} email
+        other: Arquivados %{count} emails
+    bulk_tag:
+      added:
+        one: Etiqueta '%{tag_name}' adicionada em %{count} email
+        other: Etiqueta '%{tag_name}' adicionada em %{count} emails
+      removed:
+        one: Etiqueta '%{tag_name}' removida de %{count} email
+        other: Etiqueta '%{tag_name}' removida de %{count} emails
+    create_calendar_event:
+      no_calendar: Ligue primeiro um calendário para adicionar eventos.
+      success: Evento '%{title}' adicionado ao seu calendário
+    forward_email:
+      failure: Não foi possível reencaminhar para %{to_address}
+      success: Reencaminhado para %{to_address}
+    pin:
+      success: Fixado no topo da caixa de entrada.
+    reclassify:
+      success:
+        one: Reclassificado %{count} email
+        other: Reclassificados %{count} emails
+    remove_tag:
+      not_found: Nenhuma etiqueta com o nome '%{tag_name}' neste email.
+      success: Etiqueta '%{tag_name}' removida
+    send_permission_denied: Não tem permissão para enviar a partir dessa conta.
+    sender_not_found: Não foi possível encontrar o remetente deste email.
+    snooze:
+      failure: Não foi possível adiar a conversa
+      success: Conversa adiada até %{snoozed_until}
+    star_sender:
+      success: "%{name} destacado — os emails passam a ter prioridade."
+    trash:
+      failure: Não foi possível mover a conversa para o lixo
+      success: Conversa movida para o lixo
+    unarchive:
+      failure: Não foi possível mover a conversa para a caixa de entrada
+      success: Movido para a caixa de entrada
+    unblock_sender:
+      success: "%{name} desbloqueado."
+    unpin:
+      success: Removido do topo da caixa de entrada.
+    unsnooze:
+      failure: Não foi possível cancelar o adiamento da conversa
+      success: Adiamento cancelado
+    unstar_sender:
+      success: Destaque de %{name} removido.
+    upload_attachments_to_drive:
+      failure: Não foi possível carregar para o Drive — ligue o Google Drive e certifique-se
+        de que o email tem anexos.
+      success:
+        one: 1 anexo carregado para o Google Drive
+        other: "%{count} anexos carregados para o Google Drive"
+  jobs:
+    ai_setup_chat_reply:
+      error_generic: O Scout não conseguiu gerar sugestões neste momento. Tente novamente.
+      error_no_ai_config: O Scout precisa de um fornecedor de IA de texto antes de
+        poder ajudar aqui. Configure um e tente novamente.
+      error_retry: Ocorreu um erro ao contactar o Scout. Tente novamente.
+      no_suggestions_yet: O Scout ainda não conseguiu apresentar sugestões — diga-lhe
+        um pouco mais sobre o seu negócio e tente novamente.
+      proposal_intro: Aqui está o que sugiro para os seus %{kind}. Escolha os que
+        pretende e aplique-os — pode ajustar qualquer um deles primeiro.
+    compose_chat_reply:
+      error: Lamento, mas ocorreu um problema ao processar o seu pedido. Pode tentar
+        novamente?
+    email_chat_reply:
+      auto_action_failures_prefix: 'No entanto, não consegui concluir estas acções:'
+      conversation_archived: Esta conversa foi arquivada.
+    email_process:
+      auto_replied_notice: Reparei que respondeu a esta conversa. Marquei os rascunhos
+        anteriores como desactualizados. Diga-me se precisar de mais alguma coisa.
+    email_reply_daemon:
+      auto_action_failures_prefix: 'No entanto, não consegui concluir estas acções:'
+      conversation_archived: Esta conversa foi arquivada.
+  notifier:
+    account_disconnected:
+      body: Reautentique para retomar a sincronização de email.
+      title: "%{email_address} desligada"
+    document_failed:
+      title: Falha no processamento do documento
+    documents_need_review:
+      body: O Scout ficou em dúvida — reveja e classifique-os.
+      title:
+        one: "%{count} documento necessita de revisão"
+        other: "%{count} documentos necessitam de revisão"
+    export_failed:
+      body: Ocorreu um erro ao gerar a exportação. Tente novamente.
+      title: Falha na exportação
+    export_ready:
+      body:
+        one: "%{count} documento pronto para transferir."
+        other: "%{count} documentos prontos para transferir."
+      title: Exportação pronta
+    invitation_pending_approval:
+      body: "%{invitee_email} foi convidado por %{inviter_name}."
+      title: Convite aguarda aprovação
+    scout_reply:
+      title: O Scout respondeu
+    subject_label:
+      fallback: a sua caixa de entrada
+    thread_activity:
+      title: Novo comentário de %{actor_name}
+    thread_mention:
+      title: "%{actor_name} mencionou-o"

@@ -1,0 +1,191 @@
+---
+es:
+  onboarding:
+    steps:
+      ai_configuration:
+        alert_html: "<strong>Dos proveedores, dos funciones.</strong> Un modelo de
+          texto (DeepSeek por defecto) gestiona el correo y el chat; un modelo de
+          visión (OpenAI por defecto) lee documentos e imágenes. Ajuste todo más adelante
+          en Configuración → IA."
+        api_key_label: Clave API
+        api_key_placeholder: Introduzca su clave API
+        badge_optional: Opcional
+        badge_required: Obligatorio
+        badge_vision: Visión
+        byo_description: 'Usa tus propias claves de proveedor: DeepSeek, OpenAI, Anthropic
+          o Gemini.'
+        byo_title: Usar mis propias claves
+        choose_mode: Elige cómo quieres configurar la IA.
+        document_api_key_placeholder: Añada una clave para habilitar el análisis de
+          documentos
+        document_provider_description: Lee PDFs, escaneos y archivos adjuntos de imagen.
+          Requiere un proveedor con capacidad de visión — OpenAI, Anthropic o Gemini.
+          Añádalo ahora o en cualquier momento más adelante.
+        document_provider_title: Proveedor de documentos e imágenes
+        endpoint_url_label: URL de endpoint (opcional)
+        endpoint_url_placeholder: Endpoint personalizado o en blanco para usar el
+          predeterminado
+        heading: Conecte sus proveedores de IA
+        managed_description: 'Deja que Campbooks ejecute la IA por ti: sin claves
+          de API que configurar.'
+        managed_title: Campbooks AI
+        provider_label: Proveedor
+        save_and_continue: Guardar y continuar
+        subheading: Campbooks usa IA para leer sus correos y documentos. Configure
+          un proveedor de texto ahora — también puede añadir un proveedor de documentos
+          e imágenes, o hacerlo más adelante en Configuración.
+        text_provider_description: Gestiona el triaje de correos, las respuestas,
+          la clasificación y el chat de Scout. Una clave gratuita de DeepSeek funciona,
+          o cualquier servicio compatible con OpenAI.
+        text_provider_title: Proveedor de texto
+      classification:
+        add_custom_doc_type: Añadir tipo de documento personalizado
+        add_custom_tag: Añadir etiqueta personalizada
+        ai_suggestions_title: Sugerencias de IA
+        alert_html: "<strong>Por qué es importante:</strong> Los tipos de documento
+          y las etiquetas indican a Scout cómo extraer datos de los archivos adjuntos
+          y categorizar su bandeja de entrada. Los valores predeterminados cubren
+          las necesidades empresariales habituales. Puede personalizar todo más adelante
+          en Configuración."
+        custom_tag_color_placeholder: Color (#hex)
+        custom_tag_name_placeholder: Nombre (p. ej. boletines)
+        custom_tag_prompt_placeholder: Indicación de clasificación — describa cuándo
+          debe aplicarse esta etiqueta
+        custom_type_color_placeholder: Color (#hex)
+        custom_type_name_placeholder: Nombre (p. ej. nómina)
+        custom_type_prompt_placeholder: Indicación de clasificación — describa qué
+          cubre este tipo
+        custom_type_schema_placeholder: JSON de esquema (opcional)
+        doc_types_hint: Desmarque los que no necesite. Puede añadir o eliminar tipos
+          en cualquier momento en Configuración.
+        heading: Tipos de documento y etiquetas de correo
+        save_and_continue: Guardar y continuar
+        start_from_scratch: Empezar desde cero
+        subheading: Indique a Scout cómo clasificar sus documentos y categorizar sus
+          correos. La plantilla cubre las necesidades empresariales más comunes.
+        suggest_doc_types_button: Sugerir tipos para mi negocio
+        suggest_doc_types_placeholder: Haga clic en el botón de arriba para generar
+          sugerencias.
+        suggest_tags_button: Sugerir etiquetas para mi negocio
+        suggest_tags_placeholder: Haga clic en el botón de arriba para generar sugerencias.
+        tab_document_types: Tipos de documento
+        tab_document_types_count:
+          one: "(%{count} tipo)"
+          other: "(%{count} tipos)"
+        tab_email_tags: Etiquetas de correo
+        tab_email_tags_count:
+          one: "(%{count} etiqueta)"
+          other: "(%{count} etiquetas)"
+        tags_hint: Desmarque las que no necesite. Las etiquetas se usan para clasificar
+          automáticamente los correos entrantes.
+        template_section_title: Empezar desde una plantilla
+      email_accounts:
+        add_account_description: Campbooks es compatible con Zoho Mail y Google Workspace.
+          Se le redirigirá a su proveedor para autorizar el acceso.
+        add_account_title: Añadir una cuenta de correo
+        alert_html: "<strong>Por qué es importante:</strong> Campbooks analiza su
+          bandeja de entrada en busca de facturas, recibos, contratos y otros documentos.
+          Solo buscamos archivos adjuntos de documentos — los correos personales permanecen
+          privados. Puede desconectar en cualquier momento. Añada más cuentas más
+          adelante en Configuración."
+        badge_connected: Conectada
+        connected_accounts_title: Cuentas conectadas
+        heading: Conecte su correo
+        save_and_continue: Guardar y continuar
+        subheading: Campbooks lee su bandeja de entrada para clasificar correos automáticamente,
+          extraer documentos y destacar lo que importa. Conecte al menos una cuenta
+          de correo para empezar.
+      review:
+        ai_configuration_title: Configuración de IA
+        all_set: "¡Todo listo!"
+        all_set_detail: Puede ajustar todo más adelante en Configuración. Scout está
+          listo para empezar a analizar sus documentos y correos.
+        classification_count: "(%{types_count} tipos, %{tags_count} etiquetas)"
+        classification_title: Clasificación
+        context_not_configured: No configurado
+        document_types_subtitle: Tipos de documento
+        email_accounts_count:
+          one: "(%{count} conectada)"
+          other: "(%{count} conectadas)"
+        email_accounts_title: Cuentas de correo
+        email_tags_subtitle: Etiquetas de correo
+        finish_button: Finalizar e ir al panel
+        heading: Revise su configuración
+        label_address: Dirección
+        label_context: Contexto para Scout
+        label_country: País
+        label_name: Nombre
+        label_tax_id: NIF/CIF
+        label_type: Tipo
+        no_ai_configuration: Aún no hay ningún proveedor de IA configurado. Añada
+          al menos un proveedor de texto en el paso de IA.
+        no_email_accounts: No hay cuentas de correo conectadas. Conecte una para comenzar
+          a analizar su bandeja de entrada.
+        none_yet: Ninguno aún.
+        subheading: Aquí tiene un resumen de todo lo que ha configurado. Puede cambiar
+          cualquier cosa más adelante en Configuración.
+        type_company: Empresa
+        type_personal: Personal
+        workspace_title: Espacio de trabajo
+      workspace:
+        address_line1_label: Dirección línea 1
+        address_line1_placeholder: Dirección postal
+        address_line2_label: Dirección línea 2
+        address_line2_placeholder: Piso, puerta, etc.
+        alert_why_matters_html: "<strong>Por qué es importante:</strong> Un perfil
+          de espacio de trabajo claro permite a Scout hacer recomendaciones más inteligentes.
+          Su país y contexto empresarial ayudan a adaptar las sugerencias, el tratamiento
+          fiscal y las funciones de cumplimiento a su jurisdicción."
+        city_label: Ciudad
+        city_placeholder: Ciudad
+        country_blank: Seleccione un país…
+        country_label: País
+        next_button: Siguiente
+        postal_code_label: Código postal
+        postal_code_placeholder: Código postal
+        save_and_continue: Guardar y continuar
+        step_context: Esto ayuda a Scout a entender su negocio.
+        step_of: Paso %{current} de %{total}
+        sub_step_0_intro: Empecemos por lo básico. Scout usa esto para personalizar
+          cómo habla sobre su trabajo.
+        sub_step_0_title: "¿Cómo se llama su espacio de trabajo?"
+        sub_step_1_intro: Scout adapta su comportamiento según si gestiona los documentos
+          de una empresa o los suyos propios. Esto afecta a cómo se clasifican los
+          documentos, cómo funcionan las funciones fiscales y cómo Scout habla sobre
+          sus datos.
+        sub_step_1_title: "¿Es para una empresa?"
+        sub_step_2_intro: Describa su trabajo, los clientes a los que atiende y lo
+          que importa en el día a día. Scout lee esto en cada solicitud de IA — cuanto
+          más contexto, mejores resultados.
+        sub_step_2_title: "¿A qué se dedica su espacio de trabajo?"
+        sub_step_3_intro: Su ubicación ayuda a Scout a comprender la normativa local
+          y el contexto al revisar documentos.
+        sub_step_3_title: "¿Dónde está ubicado su espacio de trabajo?"
+        sub_step_4_intro: Su número de registro de empresa o identificador fiscal.
+          Scout puede extraer y validar números de identificación fiscal de sus documentos.
+          Opcional — omítalo si prefiere añadirlo más adelante.
+        sub_step_4_title: "¿Cuál es su número de identificación fiscal?"
+        tax_id_placeholder: p. ej. IVA, EIN, NIF, ABN
+        type_company_description: Gestiono documentos para una empresa, organización
+          o entidad jurídica. Campbooks tratará mi espacio de trabajo como una empresa
+          con funciones fiscales, referencias a entidades jurídicas y acceso multiusuario.
+        type_company_label: Empresa
+        type_personal_description: Gestiono mis propios documentos personales — recibos,
+          garantías, contratos personales, extractos bancarios. Campbooks lo mantendrá
+          sencillo y personal.
+        type_personal_label: Personal / Individual
+        workspace_context_placeholder: |-
+          Ejemplo:
+          Dirijo una consultoría que ayuda a empresas con la gestión financiera y el cumplimiento fiscal. Mis clientes son principalmente pequeñas y medianas empresas. Utilizo esta plataforma para recibir facturas, contratos, extractos bancarios y correspondencia.
+        workspace_name_hint: Puede cambiarlo más adelante en la configuración.
+        workspace_name_label: Nombre del espacio de trabajo
+        workspace_name_placeholder: p. ej. Acme Consulting
+    suggestions:
+      document_types:
+        no_suggestions: Sin sugerencias adicionales — sus tipos de plantilla cubren
+          bien los casos comunes.
+        save_hint: Marque las sugerencias que desee añadir y guarde.
+      tags:
+        no_suggestions: Sin sugerencias adicionales — sus etiquetas de plantilla cubren
+          bien los casos comunes.
+        save_hint: Marque las sugerencias que desee añadir y guarde.

@@ -1,0 +1,46 @@
+<% render "admin/sidebar" %>
+
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+
+<div class="bg-card rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
+  <%= form_with url: admin_beta_codes_path, method: :post, class: "flex flex-col sm:flex-row sm:items-end gap-3" do %>
+    <div class="w-full sm:w-28">
+      <%= render(Campbooks::Input.new(:count, type: :number, label: t(".count_label"), value: 10, min: 1, max: 200)) %>
+    </div>
+    <div class="w-full sm:flex-1">
+      <%= render(Campbooks::Input.new(:label, type: :text, label: t(".label_label"), placeholder: t(".label_placeholder"))) %>
+    </div>
+    <%= render(Campbooks::Button.new(variant: :primary, type: "submit", class: "w-full sm:w-auto justify-center")) { t(".generate") } %>
+  <% end %>
+</div>
+
+<div class="bg-card rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+  <% if @beta_codes.any? %>
+    <div class="divide-y divide-gray-100">
+      <% @beta_codes.each do |bc| %>
+        <div class="flex items-center justify-between gap-3 px-5 py-3">
+          <div class="min-w-0">
+            <p class="text-sm font-mono font-semibold text-gray-900"><%= bc.code %></p>
+            <p class="text-xs text-gray-500 truncate">
+              <%= bc.label.presence || t(".no_label") %>
+              <% if bc.redeemed? %>
+                · <%= t(".redeemed_note", email: bc.redeemed_by&.email_address || "—", time_ago: time_ago_in_words(bc.redeemed_at)) %>
+              <% end %>
+            </p>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <% variant = { available: :success, redeemed: :neutral, expired: :warning }[bc.status] %>
+            <%= render(Campbooks::Badge.new(variant: variant, size: :sm)) { t(".status.#{bc.status}") } %>
+            <% unless bc.redeemed? %>
+              <%= button_to t(".delete"), admin_beta_code_path(bc), method: :delete,
+                    class: "text-xs text-red-600 hover:text-red-700 font-medium cursor-pointer dark:text-red-400 dark:hover:text-red-300",
+                    form: { data: { turbo_confirm: t(".delete_confirm") } } %>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% else %>
+    <%= render(Campbooks::EmptyState.new(variant: :inline, title: t(".empty_title"))) %>
+  <% end %>
+</div>

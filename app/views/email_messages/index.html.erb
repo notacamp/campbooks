@@ -1,0 +1,76 @@
+<% content_for :shortcuts_context, "index" %>
+<div class="flex h-full" data-controller="email-selection">
+  <!-- Thread list -->
+  <%# Below lg (mobile/compact), the whole pane scrolls so the folder bar +
+      search bar scroll away with the list. At lg+ (desktop/tablet) the pane is
+      fixed-height and only the inner list scrolls, keeping those tools pinned. %>
+  <div class="w-full lg:w-64 flex-shrink-0 border-r border-gray-200 flex flex-col bg-card relative overflow-y-auto lg:overflow-visible"
+       data-controller="panel-resize"
+       data-panel-resize-edge-value="right"
+       data-panel-resize-storage-key-value="campbooks:email-list-width"
+       data-panel-resize-min-width-value="224"
+       data-panel-resize-default-width-value="<%= inbox_list_width_px(@accounts) %>"
+       data-panel-resize-max-width-value="560"
+       data-panel-resize-min-viewport-value="1024">
+    <%= render(Campbooks::ResizeHandle.new(edge: :right)) %>
+    <%= render "mobile_folder_bar" %>
+    <%= render(Campbooks::EmailSearchBar.new(search_params: @search_params, folders: @folders || [], accounts: @accounts || [], tags: @all_tags || [])) %>
+    <!-- Select-all header -->
+    <div class="px-3 py-1.5 border-b border-gray-100 flex items-center gap-2 opacity-0 hover:opacity-100 transition-opacity">
+      <input type="checkbox"
+             class="w-3.5 h-3.5 rounded border-gray-300 text-accent-600 focus:ring-accent-500 cursor-pointer"
+             data-action="change->email-selection#toggleAll">
+      <span class="text-[10px] text-gray-400 select-none"><%= t(".select_all_label") %></span>
+    </div>
+    <div class="lg:flex-1 lg:overflow-y-auto">
+      <%= turbo_frame_tag "email_search_results" do %>
+        <% if @search_active %>
+          <%= render partial: "search_results", locals: { messages: @messages, search_params: @search_params, pagy: @pagy } %>
+        <% else %>
+          <div id="email_threads" data-controller="email-thread" data-inbox-view-mode="breathable">
+            <% if @threads.any? %>
+              <%= render partial: "thread_list", locals: { threads: @threads, current_group: nil, tag_groups: {} } %>
+
+              <% if @pagy&.next %>
+                <% current_is_custom = @mail_folders&.any? { |f| f.name == @current_folder } %>
+                <%= turbo_frame_tag "threads_pagination", src: email_messages_path(page: @pagy.next, folder_id: current_is_custom ? nil : @current_folder, folder_name: current_is_custom ? @current_folder : nil, format: :turbo_stream), loading: :lazy do %>
+                  <div class="flex items-center justify-center py-4">
+                    <%= render(Campbooks::Spinner.new(size: :sm)) %>
+                  </div>
+                <% end %>
+              <% end %>
+            <% else %>
+              <%= render(Campbooks::EmptyState.new(variant: :inline, class: "p-6")) do %>
+                <p class="text-[11px] text-gray-400"><%= t(".no_emails_in_folder") %></p>
+              <% end %>
+            <% end %>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Selection toolbar -->
+  <div class="hidden absolute top-12 left-1/2 -translate-x-1/2 z-20 bg-card shadow-lg border border-gray-200 rounded-lg px-4 py-2 flex items-center gap-3" data-email-selection-target="toolbar">
+    <span class="text-xs font-medium text-gray-700" data-email-selection-target="count">0 selected</span>
+    <button type="button" class="text-xs text-gray-500 hover:text-gray-700"><%= t(".toolbar_tag_title") %></button>
+    <button type="button" class="text-xs text-gray-500 hover:text-gray-700"><%= t(".toolbar_mark_read_title") %></button>
+    <button type="button" data-action="click->email-selection#clear" class="text-xs text-gray-400 hover:text-gray-600"><%= t("shared.actions.cancel") %></button>
+  </div>
+
+  <!-- Email detail -->
+  <%= turbo_frame_tag "email_detail", src: params[:selected] && email_message_path(params[:selected]), class: "hidden lg:block flex-1 min-w-0 bg-card overflow-y-auto" do %>
+    <%= render(Campbooks::EmptyState.new(
+          variant: :standalone,
+          title: t(".no_email_selected"),
+          description: t("email_messages.empty_detail.select_prompt"),
+          class: "h-full bg-gray-50/30"
+        )) do |state| %>
+      <% state.with_icon do %>
+        <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+        </svg>
+      <% end %>
+    <% end %>
+  <% end %>
+</div>

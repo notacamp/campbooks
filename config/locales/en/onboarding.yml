@@ -1,0 +1,183 @@
+---
+en:
+  onboarding:
+    steps:
+      ai_configuration:
+        alert_html: "<strong>Two providers, two jobs.</strong> A text model (DeepSeek
+          by default) handles email and chat; a vision model (OpenAI by default) reads
+          documents and images. Fine-tune everything later in Settings → AI."
+        api_key_label: API key
+        api_key_placeholder: Enter your API key
+        badge_optional: Optional
+        badge_required: Required
+        badge_vision: Vision
+        byo_description: Bring your own provider keys — DeepSeek, OpenAI, Anthropic,
+          or Gemini.
+        byo_title: Use my own keys
+        choose_mode: Please choose how you'd like to set up AI.
+        document_api_key_placeholder: Add a key to enable document analysis
+        document_provider_description: Reads PDFs, scans, and image attachments. Needs
+          a vision-capable provider — OpenAI, Anthropic, or Gemini. Add it now or
+          anytime later.
+        document_provider_title: Document & image provider
+        endpoint_url_label: Endpoint URL (optional)
+        endpoint_url_placeholder: Custom endpoint, or blank for default
+        heading: Connect your AI providers
+        managed_description: Let Campbooks run the AI for you — no API keys to set
+          up.
+        managed_title: Campbooks AI
+        provider_label: Provider
+        save_and_continue: Save & Continue
+        subheading: Campbooks uses AI to read your emails and documents. Set up a
+          text provider now — you can add a document & image provider too, or later
+          in Settings.
+        text_provider_description: Powers email triage, replies, classification, and
+          Scout chat. A free DeepSeek key works, or any OpenAI-compatible service.
+        text_provider_title: Text provider
+      classification:
+        add_custom_doc_type: Add custom document type
+        add_custom_tag: Add custom tag
+        ai_suggestions_title: AI Suggestions
+        alert_html: "<strong>Why this matters:</strong> Document types and tags tell
+          Scout how to extract data from attachments and categorize your inbox. The
+          defaults cover common business needs. You can customize everything later
+          in Settings."
+        custom_tag_color_placeholder: Color (#hex)
+        custom_tag_name_placeholder: Name (e.g. newsletters)
+        custom_tag_prompt_placeholder: Classification prompt — describe when this
+          tag should be applied
+        custom_type_color_placeholder: Color (#hex)
+        custom_type_name_placeholder: Name (e.g. payslip)
+        custom_type_prompt_placeholder: Classification prompt — describe what this
+          type covers
+        custom_type_schema_placeholder: Schema JSON (optional)
+        doc_types_hint: Uncheck any you don't need. You can always add or remove types
+          later in Settings.
+        heading: Document Types & Email Tags
+        save_and_continue: Save & Continue
+        start_from_scratch: Start from scratch
+        subheading: Tell Scout how to classify your documents and categorize your
+          emails. The template covers common business needs.
+        suggest_doc_types_button: Suggest types for my business
+        suggest_doc_types_placeholder: Click the button above to generate suggestions.
+        suggest_tags_button: Suggest tags for my business
+        suggest_tags_placeholder: Click the button above to generate suggestions.
+        tab_document_types: Document Types
+        tab_document_types_count:
+          one: "(%{count} type)"
+          other: "(%{count} types)"
+        tab_email_tags: Email Tags
+        tab_email_tags_count:
+          one: "(%{count} tag)"
+          other: "(%{count} tags)"
+        tags_hint: Uncheck any you don't need. Tags are used to automatically classify
+          incoming emails.
+        template_section_title: Start from a template
+      email_accounts:
+        add_account_description: Campbooks supports Zoho Mail and Google Workspace.
+          You'll be redirected to your provider to authorize access.
+        add_account_title: Add an email account
+        alert_html: "<strong>Why this matters:</strong> Campbooks scans your inbox
+          for invoices, receipts, contracts, and other documents. We only look for
+          document attachments — personal emails stay private. You can disconnect
+          anytime. Connect more accounts later in Settings."
+        badge_connected: Connected
+        connected_accounts_title: Connected accounts
+        heading: Connect your email
+        save_and_continue: Save & Continue
+        subheading: Campbooks reads your inbox to automatically classify emails, extract
+          documents, and surface what matters. Connect at least one email account
+          to get started.
+      review:
+        ai_configuration_title: AI Configuration
+        all_set: You're all set!
+        all_set_detail: You can fine-tune everything later in Settings. Scout is ready
+          to start analyzing your documents and emails.
+        classification_count: "(%{types_count} types, %{tags_count} tags)"
+        classification_title: Classification
+        context_not_configured: Not configured
+        document_types_subtitle: Document Types
+        email_accounts_count:
+          one: "(%{count} connected)"
+          other: "(%{count} connected)"
+        email_accounts_title: Email Accounts
+        email_tags_subtitle: Email Tags
+        finish_button: Finish & Go to Dashboard
+        heading: Review Your Setup
+        label_address: Address
+        label_context: Context for Scout
+        label_country: Country
+        label_name: Name
+        label_tax_id: Tax ID
+        label_type: Type
+        no_ai_configuration: No AI provider configured yet. Add at least a text provider
+          in the AI step.
+        no_email_accounts: No email accounts connected. Connect one to start scanning
+          your inbox.
+        none_yet: None yet.
+        subheading: Here's a summary of everything you've configured. You can change
+          any of this later in Settings.
+        type_company: Company
+        type_personal: Personal
+        workspace_title: Workspace
+      workspace:
+        address_line1_label: Address line 1
+        address_line1_placeholder: Street address
+        address_line2_label: Address line 2
+        address_line2_placeholder: Suite, floor, etc.
+        alert_why_matters_html: "<strong>Why this matters:</strong> A clear workspace
+          profile lets Scout make smarter recommendations. Your country and business
+          context help tailor suggestions, tax handling, and compliance features to
+          your jurisdiction."
+        city_label: City
+        city_placeholder: City
+        country_blank: Select a country…
+        country_label: Country
+        next_button: Next
+        postal_code_label: Postal code
+        postal_code_placeholder: Postal code
+        save_and_continue: Save & Continue
+        step_context: This helps Scout understand your business.
+        step_of: Step %{current} of %{total}
+        sub_step_0_intro: Let's start with the basics. Scout uses this to personalize
+          how it talks about your work.
+        sub_step_0_title: What's your workspace called?
+        sub_step_1_intro: Scout adapts its behaviour depending on whether you're managing
+          a company's documents or your own. This affects how documents are classified,
+          how tax features work, and how Scout talks about your data.
+        sub_step_1_title: Is this for a company?
+        sub_step_2_intro: Describe your work, the clients you serve, and what matters
+          day to day. Scout reads this on every AI request — the more context, the
+          better the results.
+        sub_step_2_title: What does your workspace do?
+        sub_step_3_intro: Your location helps Scout understand local regulations and
+          context when reviewing documents.
+        sub_step_3_title: Where is your workspace based?
+        sub_step_4_intro: Your company registration or tax identifier. Scout can extract
+          and validate tax IDs from your documents. Optional — skip it if you'd rather
+          add it later.
+        sub_step_4_title: What's your tax identification number?
+        tax_id_placeholder: e.g. VAT, EIN, NIF, ABN
+        type_company_description: I'm managing documents for a business, organization,
+          or legal entity. Campbooks will treat my workspace as a company with tax
+          features, legal entity references, and multi-user access.
+        type_company_label: Company
+        type_personal_description: I'm managing my own personal documents — receipts,
+          warranties, personal contracts, bank statements. Campbooks will keep things
+          simple and personal.
+        type_personal_label: Personal / Individual
+        workspace_context_placeholder: |-
+          Example:
+          I run a consulting firm that helps businesses with financial management and tax compliance. My clients are mostly small to medium businesses. I use this platform to receive invoices, contracts, bank statements, and correspondence.
+        workspace_name_hint: You can change this later in settings.
+        workspace_name_label: Workspace name
+        workspace_name_placeholder: e.g. Acme Consulting
+    suggestions:
+      document_types:
+        no_suggestions: No additional suggestions — your template types cover the
+          common cases well.
+        save_hint: Check the suggestions you want to add, then save.
+      tags:
+        no_suggestions: No additional suggestions — your template tags cover the common
+          cases well.
+        save_hint: Check the suggestions you want to add, then save.

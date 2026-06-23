@@ -1,0 +1,68 @@
+---
+fr:
+  ai_configurations:
+    update:
+      assignment_updated: Affectation de %{purpose} mise à jour.
+      failed_to_save: 'Impossible d''enregistrer %{purpose} : %{errors}'
+      is_unassigned: "%{purpose} n'est pas affecté."
+      reset_to_unassigned: "%{purpose} réinitialisé (non affecté)."
+  inbox_settings:
+    accounts:
+      scan_now:
+        started: Analyse démarrée. Les nouveaux messages apparaîtront sous peu.
+    tags:
+      destroy:
+        cannot_delete: L'étiquette security_flagged ne peut pas être supprimée.
+  settings:
+    ai_adapters:
+      create:
+        created: Adaptateur IA "%{name}" créé.
+        failed: 'Impossible de créer l''adaptateur : %{errors}'
+      destroy:
+        deleted: Adaptateur IA "%{name}" supprimé.
+        in_use: Impossible de supprimer "%{name}" — il est encore affecté à des services.
+      managed_not_editable: Campbooks AI est géré pour vous — changez de mode dans
+        les Réglages au lieu de le modifier.
+      update:
+        failed: 'Impossible de mettre à jour l''adaptateur : %{errors}'
+        updated: Adaptateur IA "%{name}" mis à jour.
+        updated_env_key: Adaptateur IA "%{name}" mis à jour (clé d'environnement utilisée
+          si disponible).
+    general:
+      update:
+        saved: Paramètres mis à jour.
+    integrations:
+      connections:
+        create:
+          created: Connexion « %{name} » créée.
+        destroy:
+          deleted: Connexion « %{name} » supprimée.
+        update:
+          updated: Connexion « %{name} » mise à jour.
+      google_drive:
+        destroy:
+          disconnected: Google Drive déconnecté.
+      google_drive_configs:
+        update:
+          saved: Configuration Google Drive mise à jour.
+      notion:
+        destroy:
+          disconnected: Intégration Notion déconnectée.
+        update:
+          saved: Intégration Notion mise à jour.
+          workspace_warning: 'Connecté, mais impossible de récupérer les informations
+            de l''espace de travail : %{error}'
+      zoho_drive:
+        destroy:
+          mapping_not_found: Correspondance introuvable.
+          mapping_removed: Correspondance supprimée.
+        update:
+          mapping_saved: Correspondance de dossier enregistrée.
+    invitations:
+      create:
+        pending_review: Invitation pour %{email} soumise pour validation par un administrateur.
+        sent: Invitation envoyée à %{email}.
+      destroy:
+        cancelled: Invitation annulée.
+      resend:
+        resent: Invitation renvoyée à %{email}.

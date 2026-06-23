@@ -1,0 +1,11 @@
+<div class="flex items-center gap-2" id="draft_actions_<%= email_message&.id %>">
+  <span class="inline-flex items-center font-medium text-[11px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg px-2.5 py-1"><%= t(".saved_to_zoho") %></span>
+  <%= button_to t("shared.actions.send"), tool_email_message_path(email_message, tool: "send_draft", args: { draft_message_id: zoho_draft_id }),
+        method: :post,
+        class: "inline-flex items-center font-medium transition-colors bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg px-3 py-1 text-[11px]",
+        form: { data: { turbo: true, turbo_confirm: t(".send_confirm") } } %>
+  <%= button_to t(".discard"), tool_email_message_path(email_message, tool: "send_draft", args: { draft_message_id: nil }),
+        method: :post,
+        class: "inline-flex items-center font-medium transition-colors text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg px-3 py-1 text-[11px]",
+        form: { data: { turbo: true } } %>
+</div>

@@ -1,0 +1,5 @@
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  <%= render Campbooks::Input.new("document[vendor_name]", label: t(".entity_name"), value: f.object.vendor_name) %>
+
+  <%= render Campbooks::Input.new("document[document_date]", type: :date, label: t(".document_date"), value: f.object.document_date) %>
+</div>

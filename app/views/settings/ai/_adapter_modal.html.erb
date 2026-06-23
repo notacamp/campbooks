@@ -1,0 +1,62 @@
+<%# locals: adapter (new or existing), modal_id, label, provider_type (:vision, :text, or nil for edit) %>
+<div id="<%= modal_id %>-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/30" onclick="if (event.target === this) this.classList.add('hidden')">
+  <div class="bg-card rounded-xl shadow-xl border border-gray-200 w-full max-w-md mx-4 max-h-[85vh] overflow-y-auto" role="dialog" aria-modal="true">
+    <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+      <h3 class="text-sm font-semibold text-gray-900"><%= label %></h3>
+      <button onclick="document.getElementById('<%= modal_id %>-modal').classList.add('hidden')"
+              class="w-5 h-5 flex items-center justify-center rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <%= form_with model: adapter, url: adapter.persisted? ? settings_ai_adapter_path(adapter) : settings_ai_adapters_path,
+          method: adapter.persisted? ? :patch : :post, class: "px-5 py-4 space-y-4" do |f| %>
+      <div>
+        <%= f.label :name, class: "block text-xs font-medium text-gray-600 mb-1" %>
+        <%= f.text_field :name, required: true, placeholder: "e.g. OpenAI Primary",
+              class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+      </div>
+
+      <% if provider_type == :vision %>
+        <%= f.hidden_field :provider, value: "openai" %>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1"><%= t(".provider_label") %></label>
+          <%= f.select :provider, AiAdapter::VISION_PROVIDERS.map { |p| ["#{human_enum(AiAdapter, :provider, p)} · #{AiConfiguration::PROVIDER_REGIONS[p]}", p] }, {},
+                class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+        </div>
+      <% elsif provider_type == :text %>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1"><%= t(".provider_label") %></label>
+          <%= f.select :provider, AiAdapter::PROVIDERS.map { |p| ["#{human_enum(AiAdapter, :provider, p)} · #{AiConfiguration::PROVIDER_REGIONS[p]}", p] }, {},
+                class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+        </div>
+      <% else %>
+        <div>
+          <%= f.label :provider, class: "block text-xs font-medium text-gray-600 mb-1" %>
+          <%= f.select :provider, AiAdapter::PROVIDERS.map { |p| ["#{human_enum(AiAdapter, :provider, p)} · #{AiConfiguration::PROVIDER_REGIONS[p]}", p] }, {},
+                class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+        </div>
+      <% end %>
+
+      <div>
+        <%= f.label :api_key, class: "block text-xs font-medium text-gray-600 mb-1" %>
+        <%= f.password_field :api_key, placeholder: (self_hosted? ? t(".api_key_placeholder_self_hosted") : t(".api_key_placeholder_hosted")),
+              class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+      </div>
+
+      <div>
+        <%= f.label :endpoint_url, t(".endpoint_url_label"), class: "block text-xs font-medium text-gray-600 mb-1" %>
+        <%= f.url_field :endpoint_url, placeholder: t(".endpoint_url_placeholder"),
+              class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+      </div>
+
+      <div class="flex items-center justify-between pt-2 border-t border-gray-100">
+        <button type="button" onclick="document.getElementById('<%= modal_id %>-modal').classList.add('hidden')"
+                class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+          <%= t("shared.actions.cancel") %>
+        </button>
+        <%= render(Campbooks::Button.new(variant: :primary, size: :xs, type: :submit)) { adapter.persisted? ? t(".save_changes") : t(".create_provider") } %>
+      </div>
+    <% end %>
+  </div>
+</div>

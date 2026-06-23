@@ -1,0 +1,208 @@
+---
+en:
+  documents:
+    drive_exports:
+      create:
+        no_file: This document has no file to upload.
+        upload_failed: 'Upload failed: %{message}'
+        uploaded: Uploaded to Google Drive.
+      create_folder:
+        folder_created: Created folder “%{name}”.
+        folder_failed: 'Couldn''t create the folder: %{message}'
+        folder_name_required: Enter a folder name.
+      errors:
+        not_connected: Connect Google Drive first.
+        reconnect_needed: Reconnect Google Drive to enable folder browsing.
+      new:
+        browse_failed: 'Couldn''t browse Drive: %{message}'
+        choose_folder: Choose a folder
+        create_folder: Create folder
+        my_drive: My Drive
+        new_folder_placeholder: New folder name
+        no_subfolders: No folders here yet.
+        subtitle: Choose where to put %{document}.
+        title: Send to Google Drive
+        upload_here: Upload to %{folder}
+    forms:
+      bank_statement:
+        account_number: Account Number
+        bank_name: Bank Name
+        closing_balance: Closing Balance (cents)
+        currency: Currency
+        opening_balance: Opening Balance (cents)
+        period_end: Period End
+        period_start: Period Start
+      expense_invoice:
+        amount_cents: Amount (cents)
+        buyer_nif: Buyer NIF
+        company_vat_present: Company VAT number present
+        currency: Currency
+        document_date: Document Date
+        due_date: Due Date
+        expense_category: Expense Category
+        invoice_number: Invoice Number
+        select_category: Select category
+        tax_amount_cents: Tax Amount (cents)
+        tax_rate: Tax Rate (%)
+        vendor_name: Vendor Name
+        vendor_nif: Vendor NIF
+      other:
+        document_date: Document Date
+        entity_name: Entity Name
+      receipt:
+        amount_cents: Amount (cents)
+        document_date: Document Date
+        payment_method: Payment Method
+        receipt_number: Receipt Number
+        select_method: Select method
+        vendor_name: Vendor Name
+        vendor_nif: Vendor NIF
+      revenue_invoice:
+        amount_cents: Amount (cents)
+        client_name: Client Name
+        client_nif: Client NIF
+        currency: Currency
+        document_date: Document Date
+        due_date: Due Date
+        invoice_number: Invoice Number
+        tax_amount_cents: Tax Amount (cents)
+        tax_rate: Tax Rate (%)
+    index:
+      accepted_formats: PDF, JPG, PNG, WEBP, HEIC
+      click_to_upload: Click to upload
+      col_date: Date
+      col_name: Name
+      col_reference: Reference
+      col_source: Source
+      col_status: Status
+      col_type: Type
+      download_zip: Download ZIP
+      drag_and_drop: or drag and drop
+      empty_connect_email: Connect an email account
+      empty_description: Scout files documents from your inbox automatically. Connect
+        an email account or upload a file to get started.
+      empty_description_connected: Scout is watching your inbox and files documents
+        here as they arrive. You can also upload one yourself.
+      empty_title: No documents yet
+      empty_upload: Upload a document
+      export: Export
+      export_confirm: Generate a ZIP of all documents matching the current filters?
+      export_failed: Failed
+      exports_col_date: Date
+      exports_col_documents: Documents
+      exports_col_download: Download
+      exports_col_status: Status
+      exports_heading: Exports
+      filter_all_categories: All categories
+      filter_all_statuses: All statuses
+      filter_all_types: All types
+      filter_category: Category
+      filter_month: Month
+      filter_status: Status
+      filter_type: Type
+      filter_types_selected:
+        one: "%{count} selected"
+        other: "%{count} selected"
+      filters: Filters
+      no_documents: No documents match these filters.
+      reanalyze_all: Re-analyze All (%{count})
+      selected_files: 'Selected files:'
+      title: Docs
+      upload: Upload
+      upload_and_process: Upload & Process
+    merge:
+      keep_this_one: Keep This One
+      label_date: 'Date:'
+      label_file: 'File:'
+      label_linked_emails: 'Linked emails:'
+      label_ref: 'Ref:'
+      label_status: 'Status:'
+      merge_confirm: Merge %{count} document(s) into this one? The others will be
+        deleted.
+      subtitle: Choose which document to keep. Email links from the other documents
+        will be moved to the keeper.
+      title: Merge Documents
+    notion_exports:
+      create:
+        created: Sent to Notion.
+        failed: Couldn't create the item in Notion.
+        failed_with: 'Notion export failed: %{message}'
+        pick_destination: Choose a destination in Notion.
+      database_form:
+        back: "← Databases"
+        create_item: Create item in Notion
+        error: 'Couldn''t load the database: %{message}'
+        untitled: Untitled database
+      databases:
+        error: 'Couldn''t load databases: %{message}'
+        none: No databases found. Share a database with this integration in Notion.
+        search: Search databases…
+      errors:
+        not_connected: Connect Notion first.
+      new:
+        heading: Where should this go?
+        subtitle: Add %{document} to Notion.
+        title: Send to Notion
+        to_database: Add to a database
+        to_database_desc: Create a database item and fill in its fields.
+        to_page: Create a page
+        to_page_desc: Add a subpage under a page you choose.
+        workspace: Workspace
+        workspace_one: 'Workspace: %{name}'
+      pages:
+        attach_file: Attach %{file}
+        create_page: Create page in Notion
+        error: 'Couldn''t load pages: %{message}'
+        none: No pages found. Share a page with this integration in Notion.
+        note: Note (optional)
+        page_title: Page title
+        parent_page: Parent page
+        search: Search pages…
+      shared:
+        untitled: Untitled
+    pdf_overlay:
+      close_aria_label: Close
+      close_title: Close
+      fullscreen_iframe_title: Full-screen PDF preview
+    row:
+      approve: Approve
+      reanalyze: Re-analyze
+      reject: Reject
+      rename: Rename
+      unclassified: Unclassified
+    show:
+      ai_confidence: AI confidence
+      ai_failed_hint: Re-analyze to try again, or set the type manually and approve.
+      ai_failed_title: AI analysis failed
+      approve: Approve
+      back: Back to documents
+      created_at: Created %{time} ago
+      document_fallback_title: 'Document #%{id}'
+      download: Download
+      email_link_fallback: Email
+      extracted_data: Extracted data
+      from: From
+      label_description: Description
+      label_document_type: Classification
+      learned_hint: Suggested from %{count} of %{total} approved documents classified
+        as %{type}.
+      maximize: Maximize
+      original_pdf_iframe_title: Original PDF preview
+      original_pdf_label: Original PDF
+      processed_pdf_iframe_title: Processed PDF preview
+      processed_pdf_label: Processed PDF
+      reanalyze: Re-analyze
+      reclassify_hint: Changing the type marks this document as reviewed.
+      reviewed_by: Reviewed by %{name}
+      save_changes: Save changes
+      send_to_drive: Send to Drive
+      send_to_notion: Send to Notion
+    skim:
+      show:
+        back_to_documents: Back to documents
+        close: Close
+        no_documents_body: Everything the AI flagged has been handled.
+        no_documents_title: No documents to review
+      tray_content:
+        ai_unsure: "%{count} the AI wasn't sure about — skim to confirm or re-file"
+        needs_review: Needs review

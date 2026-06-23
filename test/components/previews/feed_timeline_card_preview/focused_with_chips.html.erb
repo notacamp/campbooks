@@ -1,0 +1,11 @@
+<div class="mx-auto max-w-[600px] px-4" data-feed-focus>
+  <%= render Campbooks::Feed::Card.new(item: item, subject: subject) %>
+</div>
+<script>
+  // Lookbook has no scroll-focus controller running, so flag the unit directly —
+  // that's what the focused-state chip CSS hangs off (fine-pointer only; see the
+  // "Feed shortcut hints" block in app/assets/tailwind/application.css).
+  document.querySelectorAll('[data-feed-focus-unit]').forEach(function (u) {
+    u.setAttribute('data-focused', '')
+  })
+</script>

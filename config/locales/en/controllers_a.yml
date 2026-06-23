@@ -1,0 +1,223 @@
+---
+en:
+  agent_tools:
+    create:
+      action_failed: Action failed. Please try again.
+  bug_reports:
+    create:
+      failed: We couldn't send your report. Please try again.
+      reported: Thanks — your bug report was sent.
+  calendar_accounts:
+    destroy:
+      disconnected: "%{name} disconnected."
+      owner_only: Only the account owner can disconnect this calendar.
+    sharing:
+      add_button: Add
+      add_heading: Add a person
+      back: Back to calendars
+      members_heading: People with access
+      owner_only: Only the account owner can manage access.
+      remove: Remove
+      subtitle: Choose who can view and edit this calendar.
+      title: Sharing — %{name}
+    update:
+      access_removed: Access removed for %{name}.
+      invalid_role: Pick a valid role.
+      not_permitted: You don't have permission to manage this calendar.
+      owner_access_cant_be_removed: The owner's access can't be removed.
+      owner_only_access: Only the account owner can change who has access.
+      owner_role_fixed: The owner's access can't be changed.
+      rename_failed: Could not update calendar.
+      renamed: Calendar name updated to %{name}.
+      role_updated: "%{name} is now a %{role}."
+      user_not_found: User not found.
+  calendars:
+    update:
+      not_permitted: You don't have permission to manage this calendar.
+      updated: "%{name} sync updated."
+  documents:
+    approve:
+      approved: Document approved.
+    create:
+      no_files: Please select at least one file.
+      upload_failed: 'Upload failed: %{message}'
+      uploaded_many: "%{count} documents uploaded and queued for processing."
+      uploaded_one: Document uploaded and queued for processing.
+    export:
+      generating: Export is being generated. Check history below when done.
+    file:
+      not_available: File not available.
+    merge:
+      too_few: Select at least two documents to merge.
+    perform_merge:
+      merged: Merged %{count} document(s) into this one.
+    push_to_drive:
+      no_config: No Google Drive config for this document type.
+      not_connected: Google Drive is not connected.
+      queued: Document queued for Google Drive upload.
+    push_to_notion:
+      no_mapping: No Notion database mapping configured for this document type.
+      queued: Document queued for push to Notion.
+    push_to_zoho_drive:
+      inactive_account: Zoho Drive account is not active.
+      no_mapping: No Zoho Drive folder mapping configured for this document type.
+      queued: Document queued for Zoho Drive upload.
+    reject:
+      rejected: Document rejected.
+    reprocess:
+      queued: Document queued for reprocessing.
+    reprocess_all:
+      queued: "%{count} documents queued for reprocessing."
+    update:
+      reclassified_approved: Document re-filed and marked as approved.
+      saved: Document updated successfully.
+  email_accounts:
+    create:
+      microsoft_unavailable: Microsoft 365 connections aren't available yet.
+    destroy:
+      disconnected: "%{name} disconnected."
+      owner_only: Only the account owner can disconnect this account.
+    sharing:
+      owner_only: Only the account owner can manage access.
+    update:
+      access_removed: Access removed for %{name}.
+      invalid_role: Pick a valid role.
+      not_permitted: You don't have permission to manage this account.
+      owner_access_cant_be_removed: The owner's access can't be removed.
+      owner_only_access: Only the account owner can change who has access.
+      owner_role_fixed: The owner's access can't be changed.
+      rename_failed: Could not update account.
+      renamed: Account name updated to %{name}.
+      role_updated: "%{name} is now a %{role}."
+      user_not_found: User not found.
+  email_compose:
+    create:
+      invalid_mode: Invalid mode
+    send_message:
+      no_account: Could not determine email account
+      recipient_required: Recipient is required
+      send_failed: Failed to send message
+      sent: Message sent.
+      sent_toast: Message sent!
+  email_messages:
+    board:
+      move:
+        invalid_move: That move isn't allowed.
+        not_found: That conversation is no longer available.
+    bulk:
+      create:
+        action_failed: Action failed
+        action_failed_retry: Action failed. Please try again.
+        ai_processing_html:
+          one: AI processing %{count} email
+          other: AI processing %{count} email(s)
+        archived:
+          one: Archived %{count} email
+          other: Archived %{count} email(s)
+        archived_html:
+          one: Archived %{count} email
+          other: Archived %{count} email(s)
+        deleted:
+          one: Deleted %{count} email
+          other: Deleted %{count} email(s)
+        deleted_html:
+          one: Deleted %{count} email
+          other: Deleted %{count} email(s)
+        done: Done
+        forwarded_compose:
+          one: Opened forward compose for %{count} email
+          other: Opened forward compose for %{count} email(s)
+        marked_read: Marked %{count} email(s) as read
+        marked_read_html: Marked %{count} as read
+        marked_unread: Marked %{count} email(s) as unread
+        marked_unread_html: Marked %{count} as unread
+        moved_html:
+          one: Moved %{count} email
+          other: Moved %{count} email(s)
+        moved_to_folder: Moved %{count} email(s) to folder
+        moved_to_folder_named:
+          one: Moved %{count} email to %{folder}
+          other: Moved %{count} email(s) to %{folder}
+        no_emails_selected: No emails selected
+        open_scout_chat: Open Scout chat
+        processing_ai:
+          one: Processing %{count} email with AI
+          other: Processing %{count} email(s) with AI
+        scout_html: Sent %{count} email(s) to Scout
+        sent_to_scout: Sent %{count} email(s) to Scout
+        snoozed:
+          one: Snoozed %{count} thread
+          other: Snoozed %{count} thread(s)
+        snoozed_html:
+          one: Snoozed %{count} thread
+          other: Snoozed %{count} thread(s)
+        tag_verb_added: Added
+        tag_verb_removed: Removed
+        tagged: "%{verb} tag '%{tag_name}' on %{count} email(s)"
+        tagged_html: "%{verb} tag '%{tag_name}'"
+        unarchived:
+          one: Restored %{count} email
+          other: Restored %{count} email(s)
+        unsnoozed:
+          one: Unsnoozed %{count} thread
+          other: Unsnoozed %{count} thread(s)
+    dismiss_todo:
+      dismissed: Todo dismissed
+  email_threads:
+    show:
+      no_access: You don't have access to that discussion.
+  email_tools:
+    create:
+      action_failed: Action failed. Please try again.
+      conversation_archived: This conversation has been archived.
+      conversation_snoozed: This conversation has been snoozed.
+      draft_ready: Draft ready
+      draft_saved: Draft saved to Gmail
+      draft_sent: Draft sent
+      event_created: Event '%{title}' added to your calendar
+      forwarded_to: Forwarded to %{address}
+      no_email_selected: No email selected
+      no_send_permission: You don't have permission to send from this account.
+      reply_sent: Reply sent
+      save_draft_html: Draft saved
+      tagged: Tagged as '%{name}'
+      thread_archived: Thread archived
+      thread_snoozed: Thread snoozed until %{time}
+      thread_snoozed_html: Thread snoozed
+      thread_trashed: Thread trashed
+      thread_unarchived: Moved back to inbox
+      thread_unsnoozed: Thread unsnoozed
+      untagged: Tag '%{name}' removed
+  mail_folders:
+    create:
+      created: Created folder '%{name}' in your inboxes
+      created_partial:
+        one: Created '%{name}', but couldn't add it to %{count} inbox
+        other: Created '%{name}', but couldn't add it to %{count} inboxes
+    destroy:
+      removed: Removed folder '%{name}'
+  notifications:
+    archive:
+      success: Notification archived.
+    archive_all:
+      success: Read notifications archived.
+    bulk_toggle:
+      invalid_type: Invalid preference type.
+    destroy:
+      success: Notification removed.
+    mark_all_read:
+      success: All notifications marked as read.
+    notification_gone:
+      gone: That notification is no longer available.
+    toggle_preference:
+      invalid_type: Invalid preference type.
+    unarchive:
+      success: Notification restored.
+  skim:
+    reply:
+      empty_body: Reply is empty.
+      no_send_permission: You don't have permission to send from this account.
+      send_failed: Couldn't send reply.
+  zoho_drive_accounts:
+    destroy:
+      disconnected: "%{name} disconnected."

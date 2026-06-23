@@ -1,0 +1,79 @@
+<%# A single documents-list row. Shared by index.html.erb (first page) and
+    index.turbo_stream.erb (infinite scroll + the quick approve/reject row swap), so
+    the markup lives in one place. The status cell carries the inline review actions:
+    approve/reject while a doc awaits sign-off, reanalyze when the AI failed. %>
+<tr id="<%= dom_id(doc) %>" class="group hover:bg-accent-50">
+  <td class="px-4 py-4" data-controller="document-rename" data-document-rename-url-value="<%= rename_document_path(doc) %>">
+    <div class="flex items-center gap-1.5 min-w-0">
+      <%= render Campbooks::StarToggle.new(url: toggle_star_document_path(doc), starred: doc.starred?) %>
+      <%= link_to(doc.display_title, document_path(doc),
+            class: "text-sm font-medium text-accent-600 hover:text-accent-700 truncate min-w-0",
+            data: { document_rename_target: "display" }) %>
+      <button type="button" data-action="document-rename#edit" data-document-rename-target="editButton"
+          aria-label="<%= t(".rename") %>" title="<%= t(".rename") %>"
+          class="flex-shrink-0 text-gray-400 hover:text-accent-600 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/>
+        </svg>
+      </button>
+    </div>
+    <%= text_field_tag "title", doc.metadata&.dig("title"), placeholder: doc.display_title,
+          class: "hidden w-full rounded-md border border-gray-300 px-2 py-1 text-sm shadow-sm focus:border-accent-400 focus:outline-none focus:ring-1 focus:ring-accent-400",
+          data: { document_rename_target: "input",
+                  action: "keydown.enter->document-rename#save keydown.esc->document-rename#cancel blur->document-rename#save" } %>
+    <% if doc.email_message %>
+      <div class="text-xs text-gray-400 truncate">
+        <%= link_to clean_email_address(doc.email_message.from_address), email_message_path(doc.email_message), class: "hover:text-accent-600" %>
+        <% if doc.email_message.email_thread %>
+          &middot;
+          <%= link_to doc.email_message.email_thread.subject&.truncate(30), email_message_path(doc.email_message), class: "hover:text-accent-600" %>
+        <% end %>
+      </div>
+    <% end %>
+  </td>
+  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+    <% if doc.classification %>
+      <span class="inline-flex items-center gap-1.5">
+        <%= render Campbooks::ColorDot.new(color: document_type_dot_color(doc.classification), size: :sm) %>
+        <%= document_type_label(doc.classification) %>
+      </span>
+    <% elsif doc.document_type %>
+      <span class="inline-flex items-center gap-1.5">
+        <%= render Campbooks::ColorDot.new(color: document_type_dot_color(doc.document_type), size: :sm) %>
+        <%= document_type_label(doc.document_type) %>
+      </span>
+    <% else %>
+      <span class="text-gray-400"><%= t(".unclassified") %></span>
+    <% end %>
+  </td>
+  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><%= doc.document_date ? l(doc.document_date, format: :numeric) : "-" %></td>
+  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><%= doc.reference_display || "-" %></td>
+  <td class="px-6 py-4 whitespace-nowrap">
+    <div class="flex items-center gap-2">
+      <%= status_badge(doc.display_status) %>
+      <% if doc.review_pending? && doc.ai_completed? %>
+        <%# Quick sign-off, hover-revealed (focus-within keeps it open while tabbing).
+            Each posts a Turbo form; the controller swaps this row in place. %>
+        <span class="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+          <%= button_to approve_document_path(doc), form_class: "inline-flex",
+                class: "p-1 rounded-md text-green-600 hover:bg-green-50 cursor-pointer",
+                title: t(".approve"), aria: { label: t(".approve") } do %>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          <% end %>
+          <%= button_to reject_document_path(doc), form_class: "inline-flex",
+                class: "p-1 rounded-md text-gray-400 hover:bg-gray-100 hover:text-red-600 cursor-pointer",
+                title: t(".reject"), aria: { label: t(".reject") } do %>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          <% end %>
+        </span>
+      <% elsif doc.ai_failed? %>
+        <%= button_to reprocess_document_path(doc), form_class: "inline-flex",
+              class: "inline-flex items-center gap-1 p-1 rounded-md text-red-600 hover:bg-red-50 cursor-pointer",
+              title: doc.ai_error.presence || t(".reanalyze"), aria: { label: t(".reanalyze") } do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <% end %>
+      <% end %>
+    </div>
+  </td>
+  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><%= human_enum(Document, :source, doc.source) %></td>
+</tr>

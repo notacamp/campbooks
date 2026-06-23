@@ -1,0 +1,65 @@
+<%# locals: thread, active %>
+<% active = local_assigns[:active] || false %>
+<div id="<%= dom_id(thread, :thread_item) %>"
+     class="group relative rounded-lg transition-colors <%= active ? 'bg-accent-50 dark:bg-accent-500/10' : 'hover:bg-muted' %>"
+     data-controller="inline-edit">
+
+  <%# Active accent indicator %>
+  <% if active %>
+    <span class="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-accent-500"></span>
+  <% end %>
+
+  <%# Editable title area — above the link so clicks here don't navigate %>
+  <div class="relative z-10 px-3 pt-2.5 pb-0.5">
+    <div class="flex items-center gap-1.5 min-w-0">
+      <% if thread.email_chat? %>
+        <svg class="w-3 h-3 text-accent-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+      <% end %>
+
+      <span data-inline-edit-target="display"
+            data-action="click->inline-edit#edit"
+            class="flex items-center gap-1 min-w-0 cursor-pointer group/title"
+            title="<%= t(".click_to_rename") %>">
+        <span class="truncate hover:bg-accent rounded px-1 -ml-1 transition-colors text-sm <%= active ? 'text-accent-800 dark:text-accent-200 font-medium' : 'text-foreground/80' %>"><%= thread.title %></span>
+        <svg class="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover/title:opacity-100 flex-shrink-0 transition-opacity"
+             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+        </svg>
+      </span>
+
+      <%= form_with model: thread, url: scout_thread_path(thread), method: :patch,
+            html: { class: "hidden", data: { inline_edit_target: "form", action: "turbo:submit-start->inline-edit#markSubmitting turbo:submit-end->inline-edit#saved" } } do |f| %>
+        <%= f.text_field :title, value: thread.title, required: true,
+              class: "text-sm font-medium text-foreground bg-card border border-accent-400 dark:border-accent-500/40 rounded px-1 py-0 w-full focus:outline-none focus:ring-2 focus:ring-accent-500/40",
+              data: { inline_edit_target: "input", action: "blur->inline-edit#cancel keydown.esc->inline-edit#cancel keydown->inline-edit#submitOnEnter" } %>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Context and time %>
+  <div class="px-3 pb-2.5">
+    <div class="flex items-center gap-1.5">
+      <% if thread.context_label %>
+        <span class="text-[11px] text-accent-700 dark:text-accent-300 bg-accent-50 dark:bg-accent-500/10 rounded px-1"><%= thread.context_label %></span>
+      <% end %>
+      <span class="text-[11px] text-muted-foreground"><%= t(".time_ago", time: time_ago_in_words(thread.updated_at)) %></span>
+    </div>
+  </div>
+
+  <%# Navigation link — covers entire item, below interactive elements %>
+  <%= link_to scout_thread_path(thread),
+        class: "absolute inset-0 z-0",
+        data: { turbo: false },
+        aria: { label: t(".open_chat_aria", title: thread.title) } do %>
+  <% end %>
+
+  <%# Delete button — above the link %>
+  <%= button_to scout_thread_path(thread, active: active),
+        method: :delete,
+        class: "absolute right-1 top-2 z-10 hidden group-hover:flex group-focus-within:flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer",
+        title: t(".delete_chat"),
+        aria: { label: t(".delete_chat_aria", title: thread.title) },
+        form: { data: { turbo: !active, turbo_confirm: t(".delete_confirm") } } do %>
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+  <% end %>
+</div>

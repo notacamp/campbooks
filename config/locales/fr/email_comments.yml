@@ -1,0 +1,19 @@
+---
+fr:
+  email_comments:
+    draft:
+      discard: Abandonner
+      drafted_reply: a rédigé une réponse
+      drafted_reply_outdated: a rédigé une réponse (obsolète)
+      edit_in_composer: Modifier dans l'éditeur
+      save_draft_label: Enregistrer le brouillon
+      send_reply_confirm: Envoyer cette réponse maintenant ?
+    draft_questions:
+      answer_placeholder: Saisissez votre réponse…
+      needs_details: a besoin de quelques précisions avant de rédiger
+    draft_saved:
+      discard: Abandonner
+      saved_to_zoho: Enregistré dans Zoho
+      send_confirm: Envoyer ce brouillon maintenant ?
+    form:
+      placeholder: Commentaire, ou mentionnez un(e) collègue ou @scout…

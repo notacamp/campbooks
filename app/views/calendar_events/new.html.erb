@@ -1,0 +1,8 @@
+<%# Rendered into the calendar's event modal via the `calendar_event_modal` Turbo
+    Frame (also works as a standalone page fallback when JS is off). %>
+<%= turbo_frame_tag "calendar_event_modal" do %>
+  <%= render "modal_header", title: t(".title") %>
+  <div class="px-5 py-4">
+    <%= render "form" %>
+  </div>
+<% end %>

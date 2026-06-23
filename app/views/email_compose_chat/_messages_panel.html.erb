@@ -1,0 +1,36 @@
+<% thread = local_assigns[:thread] %>
+<% messages = local_assigns[:messages] || [] %>
+<% waiting_for_reply = messages.any? && messages.last.from_user? %>
+
+<div class="flex-1 overflow-y-auto min-h-0" id="compose_messages" data-controller="chat-input" data-chat-input-target="list">
+  <% if messages.any? %>
+    <div class="divide-y divide-gray-50">
+      <% messages.each do |msg| %>
+        <%= render "email_compose_chat/message", agent_message: msg %>
+      <% end %>
+      <% if waiting_for_reply %>
+        <%= render "email_compose_chat/typing" %>
+      <% end %>
+    </div>
+  <% else %>
+    <div id="compose_empty_state" class="flex items-center justify-center h-full">
+      <div class="text-center px-4">
+        <div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-500/15 text-blue-500 dark:text-blue-400 flex items-center justify-center mx-auto mb-3">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <path fill-rule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5z" clip-rule="evenodd"/>
+          </svg>
+        </div>
+        <h3 class="text-sm font-semibold text-gray-900 mb-1">Compose with Scout</h3>
+        <p class="text-[12px] text-gray-500 mb-3"><%= t(".empty_body_html") %></p>
+        <div class="flex flex-wrap justify-center gap-2">
+          <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300"><%= t(".example_contract") %></span>
+          <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-50 text-gray-600"><%= t(".example_followup") %></span>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<div class="px-4 py-3 border-t border-gray-200 flex-shrink-0">
+  <%= render "email_compose_chat/form", thread: thread %>
+</div>

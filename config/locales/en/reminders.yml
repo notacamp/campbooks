@@ -1,0 +1,57 @@
+---
+en:
+  activerecord:
+    attributes:
+      reminder:
+        reminder_types:
+          appointment: Appointment
+          deadline: Deadline
+          delivery: Delivery
+          event: Event
+          other: Reminder
+          payment_due: Payment due
+          renewal: Renewal
+          travel: Travel
+        statuses:
+          confirmed: Confirmed
+          dismissed: Dismissed
+          pending: Pending
+          snoozed: Snoozed
+  components:
+    calendar:
+      reminder_chip:
+        suggested: Suggested
+    reminder_row:
+      adjust_date: Adjust date and time
+      confirm: Add to calendar
+      confirmed: Added to calendar
+      dismiss: Dismiss
+      in_days:
+        one: In %{count} day
+        other: In %{count} days
+      overdue: Overdue
+      snooze: Snooze
+      today: Today
+      tomorrow: Tomorrow
+      view_event: View event
+  reminders:
+    confirm:
+      confirmed: Added to your calendar.
+      confirmed_no_calendar: Reminder confirmed. Connect a calendar to sync it automatically.
+    dismiss:
+      dismissed: Reminder dismissed.
+    index:
+      confirmed: Recently confirmed
+      empty_body: When Scout spots a due date, delivery, or deadline in your email
+        or documents, it shows up here to confirm.
+      empty_title: No reminders right now
+      snoozed: Snoozed
+      subtitle: Dated commitments Scout found in your email and documents. Confirm
+        the ones you want on your calendar.
+      title: Reminders
+      upcoming: Upcoming
+    snooze:
+      snoozed: Snoozed for a week.
+    source:
+      document: Document
+      email: Email

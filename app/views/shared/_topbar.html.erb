@@ -1,0 +1,31 @@
+<%#
+  Minimal mobile top bar (shown below `lg` only — the desktop nav lives in
+  Campbooks::NavRail). Just the brand, search, notifications, and the avatar
+  menu; primary destinations are in Campbooks::BottomNav. Sticky so it stays put
+  on document scroll.
+%>
+<header class="lg:hidden sticky top-0 z-40 flex h-14 items-center gap-2 bg-sidebar/80 px-4 backdrop-blur-md border-b border-border" aria-label="<%= t('.main_navigation') %>">
+  <%= link_to root_path,
+        class: "flex items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
+        "aria-label": "Campbooks home" do %>
+    <%= render(Campbooks::Logo.new(size: :md, beta: !self_hosted?)) %>
+  <% end %>
+
+  <div class="flex-1"></div>
+
+  <button type="button"
+          data-action="click->command-palette#open"
+          class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
+          aria-label="<%= t('.search_and_commands') %>">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+    </svg>
+  </button>
+
+  <%= render "notifications/bell", unread_count: current_user&.unread_notifications_count.to_i,
+        notifications: current_user&.notifications&.active&.recent&.limit(10) || [] %>
+
+  <%= render(Campbooks::BugReportButton.new(class: "inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer", icon_class: "w-5 h-5")) %>
+
+  <%= render "shared/user_menu" %>
+</header>

@@ -1,0 +1,19 @@
+<%= turbo_stream.append "documents_tbody" do %>
+  <%= render partial: "documents/row", collection: @documents, as: :doc %>
+<% end %>
+
+<%= turbo_stream.append "documents_cards" do %>
+  <%= render partial: "documents/card", collection: @documents, as: :doc %>
+<% end %>
+
+<% if @pagy.next %>
+  <%= turbo_stream.replace "documents_pagination" do %>
+    <%= turbo_frame_tag "documents_pagination", src: documents_path(page: @pagy.next, format: :turbo_stream, type: params[:type], category: params[:category], review_status: params[:review_status], month: params[:month]), loading: :lazy do %>
+      <div class="flex items-center justify-center py-6">
+        <%= render Campbooks::Spinner.new(size: :md) %>
+      </div>
+    <% end %>
+  <% end %>
+<% else %>
+  <%= turbo_stream.remove "documents_pagination" %>
+<% end %>

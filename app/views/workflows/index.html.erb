@@ -1,0 +1,76 @@
+<%= render(Campbooks::PageHeader.new(
+  title: t("shared.nav.workflows"),
+  subtitle: t(".subtitle"),
+  spacing: :lg
+)) do |header| %>
+  <% if current_entitlements.feature?(:workflows) %>
+    <% header.with_actions do %>
+      <%= button_to t(".new_workflow"), workflows_path,
+            method: :post,
+            class: "inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors cursor-pointer" %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<% if !current_entitlements.feature?(:workflows) %>
+  <%= render Campbooks::Entitlements::UpgradePrompt.new(feature: :workflows, reason: :not_allowed, variant: :panel) %>
+<% elsif @workflows.any? %>
+  <div class="space-y-3">
+    <% @workflows.each do |workflow| %>
+      <div class="bg-card rounded-xl shadow-sm border border-border p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex items-center gap-4 min-w-0">
+          <div class="w-10 h-10 rounded-full tone-blue flex items-center justify-center flex-shrink-0">
+            <% if workflow.webhook? %>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+              </svg>
+            <% else %>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+            <% end %>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <%= link_to workflow.name, edit_workflow_path(workflow), class: "text-sm font-medium text-foreground hover:text-muted-foreground" %>
+              <% if workflow.enabled? %>
+                <%= render(Campbooks::Badge.new(variant: :success, size: :md)) { t(".status_active") } %>
+              <% else %>
+                <%= render(Campbooks::Badge.new(variant: :neutral, size: :md)) { t(".status_paused") } %>
+              <% end %>
+            </div>
+            <div class="text-xs text-muted-foreground mt-0.5">
+              <%= t(".trigger_meta", trigger: human_enum(Workflow, :trigger_type, workflow.trigger_type), steps: t(".steps", count: workflow.steps.count)) %>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center flex-wrap gap-2 flex-shrink-0">
+          <%= button_to toggle_workflow_path(workflow),
+                method: :post,
+                class: "text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent cursor-pointer" do %>
+            <%= workflow.enabled? ? t(".pause") : t(".enable") %>
+          <% end %>
+          <%= link_to t("shared.actions.edit"), edit_workflow_path(workflow), class: "text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent" %>
+          <%= button_to workflow_path(workflow),
+                method: :delete,
+                form: { data: { turbo_confirm: t(".delete_confirm") } },
+                class: "text-xs text-destructive hover:text-destructive px-3 py-1.5 rounded-md hover:bg-destructive/10 cursor-pointer" do %>
+            <%= t("shared.actions.delete") %>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <%= render(Campbooks::EmptyState.new(
+    variant: :card,
+    title: t(".empty_title"),
+    description: t(".empty_description")
+  )) do |state| %>
+    <% state.with_actions do %>
+      <%= button_to t(".create_workflow"), workflows_path,
+            method: :post,
+            class: "inline-flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 transition-colors cursor-pointer" %>
+    <% end %>
+  <% end %>
+<% end %>

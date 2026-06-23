@@ -1,0 +1,62 @@
+# i18n-tasks configuration — https://github.com/glebm/i18n-tasks
+# English is the source of truth; pt/es/fr must reach full key parity.
+#   bundle exec i18n-tasks missing   # keys used in code or present in en, absent elsewhere
+#   bundle exec i18n-tasks unused     # keys defined but never referenced
+#   bundle exec i18n-tasks health     # summary
+#   bundle exec i18n-tasks normalize  # sort/format every locale file
+base_locale: en
+locales: [en, pt, es, fr]
+
+data:
+  read:
+    - config/locales/%{locale}/*.yml
+  write:
+    # `add-missing` writes untranslated placeholders here; we then translate + move.
+    - config/locales/%{locale}/untranslated.yml
+
+search:
+  # Default relative_roots already cover app/{controllers,helpers,mailers,views}
+  # for lazy `t(".key")` resolution.
+  paths:
+    - app/
+  exclude:
+    - app/assets
+    # Phlex components use a custom t() scope (components.<class>) the static
+    # scanner can't resolve from leading-dot keys; their keys are verified by
+    # component/render specs + Lookbook + Playwright instead. ignore_unused below
+    # keeps components.* from being flagged as unused.
+    - app/components
+
+# Keys the static scanner can't see (resolved dynamically or via a custom scope).
+ignore_unused:
+  - 'activerecord.*'        # human_attribute_name / human_enum_name lookups
+  - 'number.*'              # currency/format keys read by the Money gem & helpers
+  - 'date.*'
+  - 'time.*'
+  - 'helpers.*'
+  - 'components.*'          # Phlex t() uses a custom components.<name> scope
+  - 'contacts.skim.*'       # skim deck copy; `emails` is rendered by Campbooks::ContactSkimCard (components/* excluded from scan)
+  - 'events.*'              # activity-feed labels: resolved dynamically (events.names.<key>) and in Campbooks::Activity::EventRow (components/* excluded from scan)
+
+# Enum value keys are built dynamically (human_enum_name), so don't flag them as
+# missing from the static scan — parity across locales still covers them.
+ignore_missing:
+  - 'activerecord.attributes.*'
+  # Lazy t('.x') flash/notify keys called inside PRIVATE controller methods,
+  # lambdas, rescue_from handlers, and default params. The static scanner mis-
+  # attributes them to the method name; the real keys are action-scoped and DO
+  # exist (verified at runtime). These method-name scopes are never real keys.
+  - 'sessions_controller.*'
+  - 'passwords_controller.*'
+  - 'email_accounts.update_account_settings.*'
+  - 'email_accounts.update_user_permissions.*'
+  - 'calendar_accounts.update_account_settings.*'
+  - 'calendar_accounts.update_user_permissions.*'
+  - 'email_compose.remove_compose_area.*'
+  - 'email_compose.sent_redirect.*'
+  - 'email_messages.bulk.build_response.*'
+  - 'email_messages.bulk.success_message.*'
+  - 'email_tools.clear_thread_from_view.*'
+  - 'oauth.*.handle_*.*'
+  - 'setup.update_*.*'
+  - 'registrations.gate_signup!.*'

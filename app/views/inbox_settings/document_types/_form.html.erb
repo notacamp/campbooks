@@ -1,0 +1,65 @@
+<%# locals: type %>
+<% persisted = type.persisted? %>
+<%= form_with model: type,
+      url: (persisted ? inbox_settings_document_type_path(type) : inbox_settings_document_types_path),
+      method: (persisted ? :patch : :post),
+      class: "rounded-lg border border-border bg-muted/30 p-4 mb-4 space-y-4" do |f| %>
+  <% if type.errors.any? %>
+    <div class="rounded-md bg-red-50 dark:bg-red-500/10 text-xs text-red-700 dark:text-red-300 px-3 py-2">
+      <%= type.errors.full_messages.to_sentence %>
+    </div>
+  <% end %>
+
+  <div class="grid grid-cols-2 gap-3">
+    <div>
+      <%= f.label :name, class: "block text-xs font-medium text-foreground mb-1" %>
+      <%= f.text_field :name, autofocus: true,
+            class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+    </div>
+    <div>
+      <%= f.label :category, class: "block text-xs font-medium text-foreground mb-1" %>
+      <%= f.select :category,
+            options_for_select([[t(".none_option"), ""]] + DocumentType::CATEGORIES.map { |c| [human_enum(DocumentType, :category, c), c] }, type.category),
+            {}, class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+    </div>
+  </div>
+
+  <div>
+    <%= f.label :color, t(".color_label"), class: "block text-xs font-medium text-foreground mb-1" %>
+    <div class="flex items-center gap-2">
+      <%= f.text_field :color,
+            oninput: "document.getElementById('doc_type_color_swatch').style.backgroundColor = this.value",
+            class: "block w-32 rounded-md border-gray-300 shadow-sm text-sm font-mono focus:border-accent-500 focus:ring-accent-500" %>
+      <span id="doc_type_color_swatch" class="w-6 h-6 rounded-full border border-border flex-shrink-0"
+            style="background-color: <%= type.color.presence || '#9ca3af' %>"></span>
+    </div>
+  </div>
+
+  <div>
+    <%= render "shared/markdown_editor", form: f, field: :prompt, rows: 3, label: t(".ai_prompt_label") %>
+    <p class="text-xs text-muted-foreground mt-1"><%= t(".ai_prompt_hint") %></p>
+  </div>
+
+  <div>
+    <%= f.label :extraction_schema, t(".extraction_schema_label"), class: "block text-xs font-medium text-foreground mb-1" %>
+    <%= f.text_area :extraction_schema, rows: 6,
+          placeholder: t(".extraction_schema_placeholder"),
+          class: "block w-full rounded-md border-gray-300 shadow-sm text-sm font-mono focus:border-accent-500 focus:ring-accent-500" %>
+    <p class="text-xs text-muted-foreground mt-1"><%= t(".extraction_schema_hint") %></p>
+  </div>
+
+  <div>
+    <%# Hidden field so unchecking submits "0"; the Toggle's checked value is "1". %>
+    <input type="hidden" name="document_type[auto_star]" value="0">
+    <%= render Campbooks::Toggle.new(name: "document_type[auto_star]", checked: type.auto_star?, label: t(".auto_star_label"), value: "1") %>
+    <p class="text-xs text-muted-foreground mt-1"><%= t(".auto_star_hint") %></p>
+  </div>
+
+  <div class="flex items-center justify-end gap-2 pt-1">
+    <button type="button" onclick="this.closest('turbo-frame').innerHTML = ''"
+            class="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-gray-600 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer">
+      <%= t("shared.actions.cancel") %>
+    </button>
+    <%= render(Campbooks::Button.new(variant: :primary, size: :sm, type: :submit)) { persisted ? t("shared.actions.save_changes") : t(".create_type") } %>
+  </div>
+<% end %>

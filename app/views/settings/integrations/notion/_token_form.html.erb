@@ -1,0 +1,15 @@
+<%= form_with model: @new_integration, url: settings_integrations_notion_path, method: :put, class: "space-y-4" do |f| %>
+  <div>
+    <%= f.label :access_token, t(".token_label"), class: "block text-sm font-medium text-gray-700 mb-1" %>
+    <p class="text-xs text-gray-500 mb-2">
+      <%= t(".token_desc_html",
+            link: link_to("notion.so/my-integrations", "https://www.notion.so/my-integrations", class: "text-accent-600 hover:text-accent-700", target: "_blank"),
+            read: content_tag(:strong, "Read content"),
+            insert: content_tag(:strong, "Insert content")) %>
+    </p>
+    <%= f.password_field :access_token, class: "block w-full rounded-md border-gray-300 shadow-sm text-sm font-mono focus:border-accent-500 focus:ring-accent-500",
+        placeholder: t(".token_placeholder") %>
+  </div>
+
+  <%= render(Campbooks::Button.new(variant: :primary, size: :sm, type: :submit)) { t("shared.actions.connect") } %>
+<% end %>

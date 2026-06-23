@@ -1,0 +1,26 @@
+# Development Dockerfile — designed for volume-mounted source code.
+# Used by the private ops compose stack's dev service.
+# Source is bind-mounted from the host checkout for hot reload.
+
+ARG RUBY_VERSION=3.2.2
+FROM ruby:${RUBY_VERSION}-slim
+
+WORKDIR /rails
+
+# System dependencies: build tools, PostgreSQL client, Node.js 22.x (for tailwind & importmap),
+# libvips (image processing for campbooks document attachments), libjemalloc2 (perf).
+RUN apt-get update -qq && \
+    apt-get install --no-install-recommends -y curl gnupg lsb-release && \
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
+    apt-get install --no-install-recommends -y \
+      build-essential git libpq-dev libyaml-dev pkg-config \
+      libvips libjemalloc2 imagemagick \
+      nodejs postgresql-client && \
+    ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so && \
+    rm -rf /var/lib/apt/lists /var/cache/apt/archives
+
+# Foreman runs Procfile.dev (web + tailwind watcher).
+RUN gem install foreman
+
+ENTRYPOINT ["/rails/bin/docker-dev-entrypoint"]
+CMD ["foreman", "start", "-f", "Procfile.dev"]

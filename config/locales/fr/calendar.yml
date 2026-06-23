@@ -1,0 +1,75 @@
+---
+fr:
+  calendar:
+    index:
+      connect_cta: Connecter un calendrier
+      empty_desc: Connectez un calendrier Google ou Zoho pour voir et gérer vos événements
+        ici.
+      empty_title: Aucun calendrier connecté
+      new_event: Nouvel événement
+      next: Suivant
+      previous: Précédent
+      reminders: Rappels
+      title: Calendrier
+      today: Aujourd'hui
+      upcoming: À venir
+      view_agenda: Agenda
+      view_day: Jour
+      view_month: Mois
+      view_week: Semaine
+  calendar_events:
+    create:
+      created: Événement créé.
+      no_calendar: Choisissez un calendrier pour ajouter l'événement.
+    destroy:
+      deleted: Événement supprimé.
+    edit:
+      rsvp_prompt: Serez-vous présent ?
+      title: Modifier l'événement
+    errors:
+      not_writable: Vous n'avez pas la permission de modifier cet événement.
+    form:
+      all_day_label: Toute la journée
+      calendar_label: Calendrier
+      cancel: Annuler
+      color_default: Couleur du calendrier
+      color_label: Couleur
+      create: Créer un événement
+      delete: Supprimer l'événement
+      delete_confirm: Supprimer cet événement ?
+      description_label: Description
+      ends_label: Fin
+      location_label: Lieu
+      recurrence_all: Tous les événements de la série
+      recurrence_label: Appliquer à
+      recurrence_this: Cet événement
+      rsvp_accepted: Oui
+      rsvp_declined: Non
+      rsvp_tentative: Peut-être
+      save: Enregistrer
+      starts_label: Début
+      title_label: Titre
+      title_placeholder: Ajouter un titre
+    new:
+      title: Nouvel événement
+    rsvp:
+      invalid_rsvp: Réponse non valide.
+      rsvp_saved: Votre réponse a été enregistrée.
+    update:
+      updated: Événement mis à jour.
+  components:
+    calendar:
+      agenda_list:
+        empty_desc: Aucun événement dans cette plage.
+        empty_title: Rien à venir
+        today: Aujourd'hui
+        tomorrow: Demain
+      event_modal:
+        aria_label: Événement
+      event_row:
+        all_day: Toute la journée
+        untitled: "(Sans titre)"
+        video_call: Appel vidéo
+      week_grid:
+        add: "+ Ajouter"
+        untitled: "(Sans titre)"

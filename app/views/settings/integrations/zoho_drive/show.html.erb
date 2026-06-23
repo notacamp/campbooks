@@ -1,0 +1,135 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) do |header| %>
+  <% header.with_actions do %>
+    <%= render(Campbooks::Button.new(variant: :primary, size: :md, href: new_zoho_drive_account_path)) { t(".connect_account") } %>
+  <% end %>
+<% end %>
+
+<!-- Connected Accounts -->
+<h2 class="text-sm font-semibold text-gray-700 mb-3"><%= t(".connected_accounts_heading") %></h2>
+
+<% if @accounts.any? %>
+  <div class="space-y-3 mb-8">
+    <% @accounts.each do |account| %>
+      <%= render(Campbooks::Card.new(padding: :sm)) do %>
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm font-medium text-gray-900"><%= account.display_name %></div>
+            <div class="text-xs text-gray-500 mt-0.5">
+              <% if account.active? %>
+                <span class="text-green-600 dark:text-green-400"><%= t(".active") %></span>
+              <% else %>
+                <span class="text-red-600 dark:text-red-400"><%= t(".inactive") %></span>
+              <% end %>
+              &middot; <%= t(".last_synced", time: account.last_synced_at ? l(account.last_synced_at, format: :at) : t(".never")) %>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <%= button_to t(".reauth"), zoho_drive_accounts_path, method: :post,
+                data: { turbo: false },
+                class: "text-xs text-accent-600 hover:text-accent-700 font-medium" %>
+            <%= button_to t(".disconnect"), zoho_drive_account_path(account), method: :delete,
+                class: "text-xs text-red-600 hover:text-red-800 font-medium dark:text-red-400 dark:hover:text-red-300",
+                data: { turbo_confirm: t(".disconnect_confirm", name: account.display_name) } %>
+          </div>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
+<% else %>
+  <%= render(Campbooks::EmptyState.new(variant: :inline, title: t(".no_accounts"))) %>
+<% end %>
+
+<!-- Folder Mappings -->
+<% if @accounts.any? %>
+  <h2 class="text-sm font-semibold text-gray-700 mb-3"><%= t(".folder_mappings_heading") %></h2>
+  <p class="text-xs text-gray-500 mb-4"><%= t(".folder_mappings_desc") %></p>
+
+  <div class="overflow-x-auto mb-8">
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="border-b text-left text-xs font-medium text-gray-500">
+        <th class="py-2 pr-4"><%= t(".col_document_type") %></th>
+        <th class="py-2 pr-4"><%= t(".col_account") %></th>
+        <th class="py-2 pr-4"><%= t(".col_drive_folder") %></th>
+        <th class="py-2 pr-4"><%= t(".col_auto_sync") %></th>
+        <th class="py-2"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @mappings.each do |mapping| %>
+        <tr class="border-b last:border-0">
+          <td class="py-2 pr-4">
+            <% if mapping.document_type %>
+              <span class="inline-flex items-center gap-1.5">
+                <%= render(Campbooks::ColorDot.new(color: mapping.document_type.color, size: :sm)) %>
+                <%= mapping.document_type.name.humanize %>
+              </span>
+            <% else %>
+              <span class="text-gray-400"><%= t(".all_other_docs") %></span>
+            <% end %>
+          </td>
+          <td class="py-2 pr-4 text-gray-500"><%= mapping.zoho_drive_account.display_name %></td>
+          <td class="py-2 pr-4 text-gray-500 font-mono text-xs"><%= mapping.drive_folder_path || mapping.drive_folder_id %></td>
+          <td class="py-2 pr-4">
+            <% if mapping.auto_sync? %>
+              <%= render(Campbooks::Badge.new(variant: :success, size: :md)) { t(".auto_badge") } %>
+            <% else %>
+              <%= render(Campbooks::Badge.new(variant: :neutral, size: :md)) { t(".manual_badge") } %>
+            <% end %>
+          </td>
+          <td class="py-2 text-right">
+            <%= button_to t(".remove"), settings_integrations_zoho_drive_path,
+                method: :delete, params: { id: mapping.id },
+                class: "text-xs text-red-600 hover:text-red-800 font-medium dark:text-red-400 dark:hover:text-red-300",
+                data: { turbo_confirm: t(".remove_confirm") } %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+  </div>
+
+  <!-- New Mapping Form -->
+  <h3 class="text-sm font-semibold text-gray-700 mb-3"><%= t(".add_mapping_heading") %></h3>
+  <%= render(Campbooks::Card.new(padding: :md)) do %>
+    <%= form_with url: settings_integrations_zoho_drive_path, method: :patch, class: "space-y-4" do |f| %>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1"><%= t(".drive_account_label") %></label>
+          <%= f.select :zoho_drive_account_id,
+              @accounts.active.map { |a| [a.select_label, a.id] },
+              {}, class: "block w-full rounded-md border-gray-300 shadow-sm text-sm" %>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1"><%= t(".document_type_label") %></label>
+          <%= f.select :document_type_id,
+              options_from_collection_for_select(@document_types, :id, :name),
+              { include_blank: t(".all_other_docs_option") },
+              class: "block w-full rounded-md border-gray-300 shadow-sm text-sm" %>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">
+            <%= t(".drive_folder_id_label") %>
+            <span class="text-gray-400 font-normal"><%= t(".drive_folder_id_hint") %></span>
+          </label>
+          <%= f.text_field :drive_folder_id, placeholder: t(".drive_folder_id_placeholder"),
+              class: "block w-full rounded-md border-gray-300 shadow-sm text-sm" %>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1"><%= t(".display_path_label") %> <span class="text-gray-400 font-normal"><%= t(".display_path_optional") %></span></label>
+          <%= f.text_field :drive_folder_path, placeholder: t(".display_path_placeholder"),
+              class: "block w-full rounded-md border-gray-300 shadow-sm text-sm" %>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <%= f.check_box :auto_sync, class: "rounded border-gray-300 text-accent-600" %>
+        <label class="text-xs font-medium text-gray-700"><%= t(".auto_sync_label") %></label>
+      </div>
+      <div>
+        <%= render(Campbooks::Button.new(variant: :primary, size: :md, type: :submit)) { t(".add_mapping_button") } %>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>

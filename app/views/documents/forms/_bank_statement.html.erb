@@ -1,0 +1,15 @@
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  <%= render Campbooks::Input.new("document[bank_name]", label: t(".bank_name"), value: f.object.bank_name) %>
+
+  <%= render Campbooks::Input.new("document[account_number]", label: t(".account_number"), value: f.object.account_number) %>
+
+  <%= render Campbooks::Input.new("document[period_start]", type: :date, label: t(".period_start"), value: f.object.period_start) %>
+
+  <%= render Campbooks::Input.new("document[period_end]", type: :date, label: t(".period_end"), value: f.object.period_end) %>
+
+  <%= render Campbooks::Input.new("document[opening_balance_cents]", type: :number, label: t(".opening_balance"), value: f.object.opening_balance_cents) %>
+
+  <%= render Campbooks::Input.new("document[closing_balance_cents]", type: :number, label: t(".closing_balance"), value: f.object.closing_balance_cents) %>
+
+  <%= render Campbooks::Input.new("document[currency]", label: t(".currency"), value: f.object.currency) %>
+</div>

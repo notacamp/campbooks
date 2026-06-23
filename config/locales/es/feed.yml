@@ -1,0 +1,127 @@
+---
+es:
+  components:
+    feed:
+      calendar_event_card:
+        at_time: A las %{time}
+        dismiss: Descartar
+        in_minutes:
+          one: En %{count} min
+          other: En %{count} min
+        join: Unirse
+        now: Comenzando ahora
+        untitled: "(Sin título)"
+        view: Ver
+      email_action_card:
+        archive: Archivar
+        archive_hint: Archiva toda la conversación. Puedes deshacerlo.
+        attachment: Adjunto
+        file_as: 'Etiquetar: %{tag}'
+        messages:
+          one: "%{count} mensaje"
+          other: "%{count} mensajes"
+        open: Abrir
+      follow_up_card:
+        aged:
+          one: Respondiste hace %{count} día · sin respuesta aún
+          other: Respondiste hace %{count} días · sin respuesta aún
+        dismiss: Descartar
+        draft_follow_up: Redactar seguimiento
+        waiting: Esperando su respuesta
+      highlight_card:
+        reason:
+          attachment: Adjunto
+          busy_thread: Conversación activa
+          high_priority: Prioridad alta
+          important: Importante
+          starred: Remitente con estrella
+      reminder_card:
+        confirm: Añadir al calendario
+        dismiss: Descartar
+        in_days:
+          one: En %{count} día
+          other: En %{count} días
+        overdue: Vencido
+        today: Hoy
+        tomorrow: Mañana
+      reply_reminder_card:
+        aged:
+          one: "%{count} día, sin respuesta"
+          other: "%{count} días, sin respuesta"
+        dismiss: Descartar
+        reply: Responder
+        snoozed_back: De vuelta de la posposición
+      shared:
+        kbd_navigate: Navegar
+        many_participants: "%{names} y %{count} más"
+        two_participants: "%{first} y %{second}"
+        no_subject: "(sin asunto)"
+        priority: Prioridad
+        scout_read: lo leí hace un momento
+        unknown_sender: Remitente desconocido
+        working: Procesando…
+        yesterday: Ayer
+      starred_email_card:
+        archive: Archivar
+        archive_hint: Archiva toda la conversación. Puedes deshacerlo.
+        open: Abrir
+        starred: Destacado
+        unstar: Quitar destacado
+      tag_suggestion_card:
+        file_it: Etiquetar
+        not_now: Ahora no
+        prefix: Etiquetar
+        under: como
+    time_of_day_greeting:
+      greeting:
+        afternoon: Buenas tardes, %{name}.
+        evening: Buenas noches, %{name}.
+        morning: Buenos días, %{name}.
+        night: De madrugada, %{name}.
+  feed:
+    items:
+      dismissed: Descartado.
+      follow_up_dismissed: Seguimiento descartado.
+      gone: Esto ya no está disponible.
+      reminder_confirmed: "%{title} añadido a tu calendario."
+      reminder_confirmed_no_calendar: Recordatorio confirmado. Conecta un calendario
+        para sincronizar automáticamente.
+      reminder_dismissed: Recordatorio descartado.
+      restored: Restaurado.
+      unsupported: Esa acción no es compatible aquí.
+  home:
+    index:
+      ask_scout: Pregúntale lo que sea a Scout…
+      connect_body: Scout lee y ordena tu correo antes de que llegues. Conecta una
+        bandeja y tu feed cobra vida.
+      connect_cta: Conectar bandeja
+      connect_title: Conecta tu bandeja de entrada para empezar
+      disconnected_body: 'Scout no puede acceder a tu bandeja ahora mismo: vuelve
+        a conectarla para que tu feed cobre vida de nuevo.'
+      disconnected_cta: Reconectar bandeja
+      disconnected_title: Vuelve a conectar tu bandeja
+      documents_ring: Documentos
+      empty_body: Scout lo ha leído todo y ahora mismo nada te necesita. Toca una
+        pila arriba para hojear, o vuelve más tarde.
+      empty_title: Todo al día ✨
+      feed_end: Eso es todo. Scout vigila la bandeja para que tú no tengas que hacerlo.
+      needs_attention: Necesita atención
+      rewind_count:
+        one: "%{count} destacado"
+        other: "%{count} destacados"
+      rewind_this_month: Este mes
+      rings_coach_body: Cada anillo agrupa correos relacionados. Toca uno para despacharlos
+        en una pasada rápida y deslizable.
+      rings_coach_cta: Entendido
+      rings_coach_title: Skim de tu bandeja de entrada
+      scout_coach_body: Tu asistente de IA lee y ordena tu bandeja, y destaca lo que
+        te necesita. Pídele que busque o resuma lo que sea.
+      scout_coach_cta: Entendido
+      scout_coach_title: Conoce a Scout
+      subtitle:
+        clear: Todo al día — Scout vigila para que siga así.
+        lots: "%{n} cosas te necesitan. Scout las apiló para que hojees sin agobios."
+        single: Solo una cosa te necesita — Scout archivó el resto.
+        some: "%{n} cosas te necesitan — Scout las apiló. Un hojeo rápido y listo."
+      take_tour: Hacer la visita
+      your_feed: Tu feed

@@ -1,0 +1,19 @@
+---
+pt:
+  email_comments:
+    draft:
+      discard: Descartar
+      drafted_reply: redigiu uma resposta
+      drafted_reply_outdated: redigiu uma resposta (desatualizada)
+      edit_in_composer: Editar no compositor
+      save_draft_label: Guardar rascunho
+      send_reply_confirm: Enviar esta resposta agora?
+    draft_questions:
+      answer_placeholder: Escreva a sua resposta…
+      needs_details: precisa de alguns detalhes antes de redigir
+    draft_saved:
+      discard: Descartar
+      saved_to_zoho: Guardado no Zoho
+      send_confirm: Enviar este rascunho agora?
+    form:
+      placeholder: Comentário, ou mencione um colega ou @scout…

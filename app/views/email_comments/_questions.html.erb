@@ -1,0 +1,20 @@
+<% questions = local_assigns[:questions] || [] %>
+<% return if questions.empty? %>
+
+<div class="mt-2 space-y-2">
+  <% questions.each do |q| %>
+    <div class="bg-gray-50 rounded-lg px-3 py-2">
+      <p class="text-[12px] font-medium text-gray-700 mb-1.5"><%= q["question"] %></p>
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <% (q["options"] || []).each do |option| %>
+          <%= form_with url: email_message_comments_path(email_message), method: :post,
+                class: "inline" do |f| %>
+            <%= f.hidden_field :content, value: option %>
+            <%= f.submit option,
+                  class: "inline-flex items-center font-medium transition-colors text-gray-600 bg-card hover:bg-gray-100 border border-gray-300 rounded-full px-2.5 py-0.5 cursor-pointer text-[11px]" %>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>

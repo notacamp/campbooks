@@ -1,0 +1,53 @@
+<%# Horizontally-scrollable folder chips shown at the top of the thread list on
+    every viewport (replaces the old desktop folder sidebar). Each chip jumps to
+    that folder's list view, and is also a drag-and-drop / tap-to-move target
+    (mail-folder-drop controller). The "+" opens the New Folder dialog (new-folder
+    controller). %>
+<%# In the native app there's no nav bar above the inbox (it's a tab root), so
+    the folder chips would sit flush against the status bar — give them extra
+    top breathing room there. %>
+<div id="folder_chip_bar"
+     class="flex items-center gap-1.5 overflow-x-auto px-3 <%= hotwire_native_app? ? "pt-5" : "pt-2" %> pb-3 border-b border-border bg-card"
+     data-controller="mail-folder-drop new-folder"
+     data-action="dragover->mail-folder-drop#dragover drop->mail-folder-drop#drop dragleave->mail-folder-drop#dragleave click->mail-folder-drop#click">
+  <% @common_folders&.each do |folder| %>
+    <% active = (@current_folder == folder[:id]) || (folder[:id].nil? && @current_folder.nil?) %>
+    <%= link_to email_messages_path(folder_id: folder[:id]),
+          data: { turbo_frame: "_top", mail_folder_drop_target: "chip", folder_name: folder[:name], folder_active: active.to_s },
+          class: class_names(
+            "flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
+            active ? "bg-accent-600 text-white" : "bg-muted text-muted-foreground hover:bg-accent"
+          ) do %>
+      <%= folder[:name] %>
+      <% if folder[:count].to_i > 0 %>
+        <span class="<%= active ? "text-white/80" : "text-muted-foreground/70" %>"><%= folder[:count] %></span>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <%# User-defined folders (drop targets); appended to on create. display:contents
+      so the span itself doesn't break the flex row. %>
+  <span id="custom_folder_chips" class="contents">
+    <% @mail_folders&.each do |folder| %>
+      <%= render partial: "email_messages/folder_chip", locals: { folder: folder, active: @current_folder == folder.name } %>
+    <% end %>
+  </span>
+
+  <%# Add a folder — provisioned across every connected account. %>
+  <button type="button"
+          data-action="new-folder#open"
+          aria-label="<%= t(".new_folder") %>"
+          title="<%= t(".new_folder") %>"
+          class="flex-shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+  </button>
+
+  <%= link_to t(".all"), email_messages_path(folder_id: "all"),
+        data: { turbo_frame: "_top" },
+        class: class_names(
+          "flex-shrink-0 inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
+          @current_folder == "all" ? "bg-accent-600 text-white" : "bg-muted text-muted-foreground hover:bg-accent"
+        ) %>
+
+  <%= render(Campbooks::NewFolderModal.new) %>
+</div>

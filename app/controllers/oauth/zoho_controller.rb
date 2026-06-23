@@ -1,0 +1,175 @@
+class Oauth::ZohoController < ApplicationController
+  include OauthNativeHandoff
+  include EmailAccountCapGuard
+  before_action :require_authentication, unless: :unauthenticated_oauth_flow?
+  rate_limit to: 20, within: 3.minutes, only: :callback,
+             with: -> { redirect_to new_session_path, error: t("auth.oauth_sign_in.rate_limited") }
+
+  def callback
+    code = params.require(:code)
+
+    case oauth_state["flow"]
+    when "sign_in"
+      handle_sign_in(code)
+    when "account_link"
+      handle_account_link(code, oauth_state["email"])
+    when "add_sign_in"
+      handle_add_sign_in(code)
+    when "drive_link"
+      handle_drive_link(code)
+    else
+      redirect_to new_session_path, error: t(".invalid_request")
+    end
+  rescue => e
+    Rails.logger.error("[Oauth::ZohoController] OAuth callback failed: #{e.class}: #{e.message}")
+    Rails.logger.error("[Oauth::ZohoController] #{e.backtrace.first(10).join("\n")}")
+    Rails.logger.error("[Oauth::ZohoController] Params: code=#{params[:code].present?}, state=#{params[:state]}, error=#{params[:error]}")
+    if native_oauth?
+      redirect_to_native(flow: oauth_state["flow"], status: "error")
+    else
+      target = case @oauth_flow
+      when "sign_in" then new_session_path
+      when "add_sign_in" then settings_security_path
+      when "drive_link" then new_zoho_drive_account_path
+      else account_link_failure_path
+      end
+      redirect_to target, error: t(".auth_failed")
+    end
+  end
+
+  private
+
+  def handle_sign_in(code)
+    @oauth_flow = "sign_in"
+
+    oauth = Zoho::OauthClient.new
+    token_data = oauth.exchange_code(code, oauth_callback_url)
+
+    identity = Zoho::AccountDiscovery.new(token_data["access_token"]).discover_identity
+    unless identity
+      redirect_to new_session_path, error: t(".sign_in_failed")
+      return
+    end
+
+    complete_oauth_sign_in(
+      Auth::OauthSignIn.call(
+        provider: oauth_provider,
+        uid: identity[:account_id],
+        email: identity[:email],
+        name: identity[:name]
+      )
+    )
+  end
+
+  # Provider key for this controller — feeds Auth::OauthSignIn and the shared
+  # block-message helper (OauthNativeHandoff#handle_oauth_block).
+  def oauth_provider = :zoho
+
+  # Attach this Zoho account as a sign-in method for the authenticated user
+  # (Settings → Security). Linking lives in Auth::IdentityLinker.
+  def handle_add_sign_in(code)
+    @oauth_flow = "add_sign_in"
+
+    oauth = Zoho::OauthClient.new
+    token_data = oauth.exchange_code(code, oauth_callback_url)
+
+    identity = Zoho::AccountDiscovery.new(token_data["access_token"]).discover_identity
+    unless identity && identity[:account_id].present?
+      redirect_to settings_security_path, error: t(".account_discovery_failed")
+      return
+    end
+
+    complete_oauth_add_sign_in(
+      Auth::IdentityLinker.call(
+        user: Current.user, provider: oauth_provider,
+        uid: identity[:account_id], email: identity[:email]
+      )
+    )
+  end
+
+  def handle_account_link(code, _email = nil)
+    @oauth_flow = "account_link"
+
+    oauth = Zoho::OauthClient.new
+    token_data = oauth.exchange_code(code, oauth_callback_url)
+
+    identity = Zoho::AccountDiscovery.new(token_data["access_token"]).discover_identity
+    unless identity
+      redirect_to account_link_failure_path, error: t(".account_discovery_failed")
+      return
+    end
+
+    existing = EmailAccount.find_by(email_address: identity[:email])
+    # Plan cap only gates genuinely new mailboxes; a reconnect reuses its slot.
+    return if existing.nil? && email_account_cap_reached?
+
+    account = if existing
+      existing.update!(refresh_token: token_data["refresh_token"], active: true)
+      existing
+    else
+      EmailAccount.create!(
+        email_address: identity[:email],
+        provider_account_id: identity[:account_id],
+        refresh_token: token_data["refresh_token"],
+        workspace: Current.workspace
+      )
+    end
+
+    account.email_account_users.find_or_create_by!(user: Current.user) do |entry|
+      entry.owner = true
+      entry.can_read = true
+      entry.can_send = true
+      entry.can_manage = true
+    end
+
+    # The same grant covers Zoho Calendar — provision its calendar too.
+    Calendars::AccountProvisioner.call(
+      email_address: identity[:email], provider: :zoho,
+      refresh_token: token_data["refresh_token"], provider_account_id: identity[:account_id],
+      workspace: Current.workspace, owner: Current.user
+    )
+
+    Events.publish("email_account.connected", subject: account, payload: { "email_address" => account.email_address, "provider" => account.provider })
+
+    complete_oauth_account_link(t(".linked", email: identity[:email]))
+  end
+
+  def handle_drive_link(code)
+    @oauth_flow = "drive_link"
+
+    # CSRF guard: only honour a state WE signed for THIS user (see M2). Without it
+    # an attacker could trick a victim's session into linking the attacker's Drive.
+    unless oauth_state["verified"] && oauth_state["user_id"] == Current.user&.id
+      redirect_to new_zoho_drive_account_path, error: t(".invalid_request")
+      return
+    end
+
+    oauth = Zoho::OauthClient.new
+    token_data = oauth.exchange_code(code, oauth_callback_url)
+
+    identity = Zoho::AccountDiscovery.new(token_data["access_token"]).discover_identity
+    unless identity
+      redirect_to new_zoho_drive_account_path, error: t(".drive_discovery_failed")
+      return
+    end
+
+    # Scope to the acting user's workspace so accounts never cross tenants.
+    scope = Current.workspace.zoho_drive_accounts
+    account = if (existing = scope.find_by(email_address: identity[:email]))
+      existing.update!(zoho_refresh_token: token_data["refresh_token"], active: true)
+      existing
+    else
+      scope.create!(
+        email_address: identity[:email],
+        zoho_account_id: identity[:account_id],
+        zoho_refresh_token: token_data["refresh_token"]
+      )
+    end
+
+    redirect_to settings_integrations_drive_path, success: t(".drive_linked", email: identity[:email])
+  end
+
+  def oauth_callback_url
+    oauth_zoho_callback_url
+  end
+end

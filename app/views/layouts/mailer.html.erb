@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="<%= I18n.locale %>">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0; padding:0; background-color:<%= MailerStyleHelper::COLORS[:page_bg] %>; font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:<%= MailerStyleHelper::COLORS[:page_bg] %>;">
+    <tr>
+      <td style="padding:44px 24px 32px;">
+        <table width="540" cellpadding="0" cellspacing="0" role="presentation" align="center">
+          <tr>
+            <td style="padding:0 0 28px;">
+              <table cellpadding="0" cellspacing="0" role="presentation"><tr>
+                <td style="vertical-align:middle;"><img src="<%= root_url %>campbooks-mark.png" width="30" height="30" alt="Campbooks" style="display:block; border:0; outline:none;"></td>
+                <td style="padding-left:10px; font-size:18px; font-weight:700; color:<%= MailerStyleHelper::COLORS[:text_heading] %>; letter-spacing:-0.01em; vertical-align:middle;">Campbooks</td>
+              </tr></table>
+            </td>
+          </tr>
+          <tr>
+            <td style="<%= email_text_body %>">
+              <%= yield %>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-top:32px; border-top:1px solid <%= MailerStyleHelper::COLORS[:border] %>; color:<%= MailerStyleHelper::COLORS[:footer_text] %>; font-size:12px; line-height:1.6;">
+              Campbooks &mdash; your paperwork, sorted.
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -1,0 +1,62 @@
+---
+fr:
+  admin:
+    beta_codes:
+      create:
+        success: "%{count} code(s) d'invitation générés."
+      destroy:
+        success: Code d'invitation supprimé.
+      index:
+        count_label: Combien
+        delete: Supprimer
+        delete_confirm: Supprimer ce code inutilisé ?
+        empty_title: Aucun code d'invitation pour l'instant — générez-en ci-dessus.
+        generate: Générer des codes
+        label_label: Libellé (facultatif)
+        label_placeholder: ex. Liste de lancement, amis et famille
+        no_label: Sans libellé
+        redeemed_note: utilisé par %{email} · il y a %{time_ago}
+        status:
+          available: Disponible
+          expired: Expiré
+          redeemed: Utilisé
+        subtitle: Générez des codes à usage unique pour les inscriptions en beta fermée.
+        title: Codes d'invitation
+    dashboard:
+      show:
+        available_beta_codes: Codes disponibles
+        pending_invitations: Invitations en attente
+        pending_signups: Inscriptions en attente
+        subtitle: Gérez l'accès à la plateforme et les utilisateurs.
+        title: Admin
+        total_users: Total des utilisateurs
+        workspaces: Espaces de travail
+    invitations:
+      index:
+        approve: Approuver
+        empty_title: Aucune invitation en attente.
+        invited_by: Invité par %{name} depuis %{workspace} · il y a %{time_ago}
+        reject: Rejeter
+        subtitle: Examinez et approuvez les invitations en attente des membres non
+          administrateurs.
+        title: Invitations
+    sidebar:
+      beta_codes: Codes d'invitation
+      dashboard: Tableau de bord
+      invitations: Invitations
+      signup_requests: Demandes d'inscription
+      users: Utilisateurs
+    signup_requests:
+      index:
+        approve: Approuver
+        empty_title: Aucune demande d'inscription %{status}.
+        reject: Rejeter
+        subtitle: Approuvez ou rejetez les demandes de compte.
+        title: Demandes d'inscription
+    users:
+      index:
+        demote_to_member: Rétrograder en membre
+        empty_title: Aucun utilisateur.
+        promote_to_admin: Promouvoir en administrateur
+        subtitle: Gérez les utilisateurs de la plateforme et leurs rôles.
+        title: Utilisateurs

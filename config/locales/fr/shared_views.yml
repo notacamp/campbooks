@@ -1,0 +1,99 @@
+---
+fr:
+  shared:
+    doc_skim_overlay:
+      gathering_documents: Chargement des documents à examiner…
+      review_documents_label: Examiner vos documents
+    markdown_editor:
+      preview: Aperçu
+      write: Écrire
+    modals:
+      ai_configuration_form:
+        api_key_hint: Stockée de manière chiffrée. Vous pouvez obtenir une clé DeepSeek
+          gratuite sur platform.deepseek.com.
+        api_key_label: Clé API
+        api_key_placeholder: Saisissez votre clé API
+        byo_description: Utilisez vos propres clés de fournisseur.
+        byo_title: Utiliser mes propres clés
+        choose_mode: Choisissez comment vous souhaitez configurer l'IA.
+        close_dialog: Fermer la boîte de dialogue
+        document_api_key_placeholder: Ajoutez une clé pour activer l'analyse de documents
+        documents_api_key_hint: Laissez vide pour ignorer — vous pouvez ajouter l'analyse
+          de documents à tout moment.
+        documents_intro_html: 'Facultatif : ajoutez un modèle avec capacité vision
+          — <strong>OpenAI</strong>, Anthropic ou Gemini — pour lire les PDF et les
+          images. Laissez la clé vide pour ignorer.'
+        documents_title: Ajouter une IA de documents et d'images
+        managed_description: Aucune clé API — Campbooks gère l'IA pour vous.
+        managed_title: Campbooks AI
+        provider_label: Fournisseur
+        save: Enregistrer les fournisseurs
+        step_of: Étape %{step} sur %{total}
+        text_intro_html: Choisissez le modèle qui alimente le tri des e-mails, les
+          réponses et le chat Scout. <strong>DeepSeek</strong> est gratuit et rapide
+          pour le texte.
+        title: Configurer votre IA de texte
+      document_types_form:
+        add_your_own: Ajouter le vôtre
+        close_dialog: Fermer la boîte de dialogue
+        custom_placeholder: ex. bon de livraison
+        description: Sélectionnez ceux que vous gérez. Scout s'en sert pour reconnaître
+          et organiser les documents, avec une invite de départ adaptée à chacun.
+          Vous pourrez les affiner plus tard.
+        legend: Types de documents courants
+        submit: Ajouter des types de documents
+        title: Quels types de documents traitez-vous ?
+      tags_form:
+        add_your_own: Ajouter la vôtre
+        close_dialog: Fermer la boîte de dialogue
+        custom_placeholder: ex. projet-alpha
+        description: Les étiquettes aident Scout à trier les e-mails entrants par
+          sujet et priorité. Choisissez-en quelques-unes pour commencer, chacune est
+          accompagnée d'une règle intelligente que vous pourrez affiner.
+        legend: Étiquettes courantes
+        submit: Ajouter des étiquettes
+        title: Comment souhaitez-vous organiser vos e-mails ?
+      workspace_form:
+        city_label: Ville
+        city_placeholder: Paris
+        close_dialog: Fermer la boîte de dialogue
+        country_label: Pays
+        country_placeholder: France
+        postal_code_label: Code postal
+        postal_code_placeholder: '75001'
+        save_workspace: Enregistrer le profil de l'espace de travail
+        step0_title: Parlez-nous de votre espace de travail
+        step1_description: Décrivez votre activité, les clients que vous accompagnez
+          et ce qui compte au quotidien. Scout lit cela à chaque requête IA.
+        step1_title: Que fait votre espace de travail ?
+        step2_description: Tout est optionnel, mais cela aide Scout à comprendre les
+          réglementations locales et votre contexte fiscal.
+        step2_title: Où êtes-vous basé ?
+        step_of: Étape %{step} sur %{total}
+        tax_id_label: Numéro de TVA
+        tax_id_placeholder: FR12345678901
+        type_company_description: Documents pour une société, organisation ou entité
+          juridique.
+        type_company_label: Une entreprise
+        type_individual_description: 'Mes propres documents : reçus, garanties, contrats
+          personnels.'
+        type_individual_label: Pour moi seul
+        workspace_context_placeholder: 'Exemple : Je dirige un cabinet de conseil
+          qui aide les petites entreprises dans la gestion financière et la conformité
+          fiscale…'
+        workspace_name_label: Nom de l'espace de travail
+        workspace_name_placeholder: Votre entreprise ou nom d'espace de travail
+        workspace_type_legend: Pour qui est-ce ?
+    skim_overlay:
+      gathering_inbox: Chargement de votre boîte de réception…
+      skim_inbox_label: Parcourir votre boîte de réception
+    topbar:
+      keyboard_shortcuts: Raccourcis clavier
+      main_navigation: Navigation principale
+      open_main_menu: Ouvrir le menu principal
+      search: Rechercher…
+      search_and_commands: Recherche et commandes (⌘K)
+      toggle_dark_mode: Basculer le mode sombre
+      toggle_theme: Changer le thème
+    user_menu:
+      sign_out: Se déconnecter

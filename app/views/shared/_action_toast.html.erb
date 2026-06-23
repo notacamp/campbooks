@@ -1,0 +1,2 @@
+<%# locals: message (String), variant (Symbol - :success, :error, :warning, :info) %>
+<%= render(Campbooks::ActionToast.new(message: message, variant: local_assigns.fetch(:variant, :info))) %>

@@ -1,0 +1,18 @@
+<%= turbo_frame_tag "email_drawer_content" do %>
+  <div data-controller="email-shortcuts"
+       data-email-shortcuts-message-id-value="<%= @message.id %>"
+       data-email-shortcuts-context-value="drawer">
+    <%# Reply / Reply-all / Forward live in the drawer footer (Gmail-style) and
+        inject the composer into this drawer's own compose slot — see
+        Campbooks::EmailDetail#drawer_footer. %>
+    <%= render(Campbooks::EmailDetail.new(
+      message: @message,
+      thread: @thread,
+      thread_documents: @thread_documents || [],
+      thread_files: @thread_files || {},
+      context: :drawer,
+      can_send: @can_send,
+      discussion_count: @discussion_count
+    )) %>
+  </div>
+<% end %>

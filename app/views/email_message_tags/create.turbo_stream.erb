@@ -1,0 +1,11 @@
+<%= turbo_stream.replace dom_id(@message, :tags) do %>
+  <%= render "email_messages/tags", message: @message %>
+<% end %>
+
+<%= turbo_stream.replace dom_id(@message, :thread_tags) do %>
+  <%= render "email_messages/thread_tags", message: @message %>
+<% end %>
+
+<%= turbo_stream.append "action_toasts" do %>
+  <%= render "shared/action_toast", message: t(".tagged_as", name: @tag.name), variant: :success %>
+<% end %>

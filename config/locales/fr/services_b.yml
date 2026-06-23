@@ -1,0 +1,85 @@
+---
+fr:
+  command_palette:
+    categories:
+      actions: Actions
+      admin: Admin
+      calendar: Calendrier
+      docs: Documents
+      navigate: Naviguer
+      settings: Paramètres
+    commands:
+      admin_dashboard: Tableau de bord admin
+      admin_invitations: Invitations
+      admin_signups: Demandes d'inscription
+      admin_users: Utilisateurs
+      calendar: Calendrier
+      calendar_agenda: 'Calendrier : vue agenda'
+      calendar_day: 'Calendrier : vue jour'
+      calendar_month: 'Calendrier : vue mois'
+      calendar_today: 'Calendrier : aujourd''hui'
+      calendar_week: 'Calendrier : vue semaine'
+      documents: Documents
+      email_scans: Analyses d'e-mails
+      inbox: Boîte de réception
+      new_calendar_event: Nouvel événement d'agenda
+      new_email: Rédiger un nouvel e-mail
+      new_workflow: Créer un flux de travail
+      notifications: Notifications
+      scan_emails: Analyser les e-mails maintenant
+      scout_ai_chat: Chat IA Scout
+      settings: Paramètres
+      settings_account: Compte
+      settings_ai: Paramètres IA
+      settings_contacts: Contacts
+      settings_doctypes: Types de documents
+      settings_gdrive: Intégration Google Drive
+      settings_integrations: Intégrations
+      settings_members: Membres
+      settings_notifications: Paramètres de notification
+      settings_notion: Intégration Notion
+      settings_signatures: Signatures
+      settings_sync: Comptes e-mail
+      settings_tags: Étiquettes
+      settings_zdrive: Intégration Zoho Drive
+      workflows: Flux de travail
+  scout:
+    briefing:
+      greeting:
+        afternoon: Bon après-midi
+        evening: Bonsoir
+        morning: Bonjour
+        with_name: "%{time_of_day}, %{name}"
+      stats:
+        docs_review:
+          label: Documents à examiner
+          prompt: Quels documents nécessitent encore un examen ?
+        high_priority:
+          label: Haute priorité
+          prompt: Quels sont mes e-mails haute priorité en ce moment ?
+        this_week:
+          label: Cette semaine
+          prompt: Résumez l'activité e-mail de cette semaine
+        unread:
+          label: Non lus
+          prompt: Résumez mes e-mails non lus
+      subtitle:
+        all_caught_up: Vous êtes à jour. Interrogez-moi sur vos e-mails, documents
+          ou contacts quand vous en avez besoin.
+        has_unread: Faisons le point sur votre boîte de réception. Posez-moi n'importe
+          quelle question ou appuyez sur une carte pour plonger dedans.
+        urgent:
+          one: Un e-mail semble urgent. Voulez-vous que je l'affiche ?
+          other: "%{count} e-mails semblent urgents. Voulez-vous que je les affiche
+            ?"
+      suggestions:
+        attention_today: Qu'est-ce qui nécessite mon attention aujourd'hui ?
+        newsletters: Quelles newsletters puis-je archiver ?
+        recent_invoices: Trouvez mes factures récentes
+        week_summary: Résumez les e-mails de cette semaine
+    status:
+      generate_report: Calcul en cours…
+      query_contacts: Vérification de vos contacts…
+      query_documents: Parcours de vos documents…
+      query_emails: Recherche dans votre boîte de réception…
+      working: En cours…

@@ -1,0 +1,11 @@
+---
+en:
+  activity:
+    index:
+      all: All
+      count:
+        one: 1 event
+        other: "%{count} events"
+      empty: No activity yet.
+      heading: Activity
+      subheading: Everything that's happened across your workspace.

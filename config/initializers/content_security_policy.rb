@@ -1,0 +1,62 @@
+# Be sure to restart your server when you modify this file.
+
+# Define an application-wide content security policy.
+# See the Securing Rails Applications Guide for more information:
+# https://guides.rubyonrails.org/security.html#content-security-policy-header
+
+# Rails.application.configure do
+#   config.content_security_policy do |policy|
+#     policy.default_src :self, :https
+#     policy.font_src    :self, :https, :data
+#     policy.img_src     :self, :https, :data
+#     policy.object_src  :none
+#     policy.script_src  :self, :https
+#     policy.style_src   :self, :https
+#     # Specify URI for violation reports
+#     # policy.report_uri "/csp-violation-report-endpoint"
+#   end
+#
+#   # Generate session nonces for permitted importmap, inline scripts, and inline styles.
+#   config.content_security_policy_nonce_generator = ->(request) { request.session.id.to_s }
+#   config.content_security_policy_nonce_directives = %w(script-src style-src)
+#
+#   # Automatically add `nonce` to `javascript_tag`, `javascript_include_tag`, and `stylesheet_link_tag`
+#   # if the corresponding directives are specified in `content_security_policy_nonce_directives`.
+#   # config.content_security_policy_nonce_auto = true
+#
+#   # Report violations without enforcing the policy.
+#   # config.content_security_policy_report_only = true
+# end
+
+# Baseline Content-Security-Policy. These directives need no nonce and cannot
+# break inline scripts, so they are safe to enforce now: they shut down plugin/
+# object injection, <base> hijacking, clickjacking, and cross-origin form posting.
+#
+# NOTE: a full `script-src 'self'` + per-request nonce (the real reflected/stored
+# XSS backstop) is a deliberate follow-up — it requires noncing every inline
+# <script> and Playwright-verifying each page. The known stored-XSS sinks are
+# already neutralised at the source: email bodies via Loofah :prune
+# (EmailMessageHelpers), Scout/AI output via Redcarpet `filter_html`, and SVG
+# attachments served sandboxed + nosniff (EmailImagesController).
+Rails.application.configure do
+  config.content_security_policy do |policy|
+    policy.object_src      :none
+    policy.base_uri        :self
+    policy.frame_ancestors :self
+    # 'self' plus the mailbox OAuth providers: connecting Google/Zoho/Microsoft
+    # POSTs to /email_accounts and the server 302s to the provider's consent
+    # screen. Browsers enforce form-action across the POST's redirect chain, so
+    # without these origins the redirect is blocked and "Connect …" silently does
+    # nothing (the provider auth hosts, matching the OauthClient AUTH_URLs).
+    policy.form_action :self,
+      "https://accounts.google.com",
+      "https://accounts.zoho.eu",
+      "https://login.microsoftonline.com"
+  end
+end
+
+Rails.application.config.action_dispatch.default_headers.merge!(
+  "X-Content-Type-Options" => "nosniff",
+  "Referrer-Policy" => "strict-origin-when-cross-origin",
+  "Permissions-Policy" => "camera=(), microphone=(), geolocation=()"
+)

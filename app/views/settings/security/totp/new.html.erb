@@ -1,0 +1,39 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"))) %>
+
+<div class="max-w-md">
+  <div class="bg-card rounded-xl shadow-sm border border-border p-5 sm:p-6 space-y-6">
+    <%# Step 1 — scan QR %>
+    <div>
+      <h2 class="text-sm font-semibold text-foreground mb-1"><%= t(".step1_title") %></h2>
+      <p class="text-sm text-muted-foreground mb-3"><%= t(".step1_hint") %></p>
+      <div class="inline-flex p-3 bg-white rounded-lg border border-border [&_svg]:w-44 [&_svg]:h-44">
+        <%= @qr_svg %>
+      </div>
+    </div>
+
+    <%# Step 2 — manual key (copyable) %>
+    <div data-controller="clipboard">
+      <h2 class="text-sm font-semibold text-foreground mb-2"><%= t(".step2_title") %></h2>
+      <div class="flex items-center gap-2">
+        <input type="text" readonly value="<%= @secret %>" data-clipboard-target="source"
+               class="block w-full font-mono text-sm tracking-wider rounded-lg border-gray-300 bg-gray-50 text-gray-700 shadow-sm" />
+        <%= render(Campbooks::Button.new(variant: :outline, size: :sm, type: :button, class: "flex-shrink-0", data: { action: "clipboard#copy", clipboard_target: "button" })) { t(".copy_key") } %>
+      </div>
+    </div>
+
+    <%# Step 3 — verify a code %>
+    <%= form_with url: settings_security_totp_path, method: :post, class: "space-y-3", data: { turbo: false } do %>
+      <div>
+        <label for="totp_code" class="block text-sm font-semibold text-foreground mb-2"><%= t(".step3_title") %></label>
+        <input type="text" name="code" id="totp_code" inputmode="numeric" autocomplete="one-time-code"
+               pattern="[0-9]*" maxlength="6" required autofocus placeholder="000000"
+               class="block w-full text-center text-lg font-mono tracking-[0.5em] rounded-lg border-gray-300 shadow-sm focus:border-accent-500 focus:ring-accent-500" />
+      </div>
+      <div class="flex gap-2 pt-1">
+        <%= render(Campbooks::Button.new(variant: :primary, type: :submit)) { t(".submit") } %>
+        <%= render(Campbooks::Button.new(variant: :ghost, href: settings_security_path)) { t(".cancel") } %>
+      </div>
+    <% end %>
+  </div>
+</div>

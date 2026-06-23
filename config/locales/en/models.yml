@@ -1,0 +1,252 @@
+---
+en:
+  activerecord:
+    attributes:
+      agent_message:
+        reply_statuses:
+          failed: Failed
+          pending: Pending
+          processing: Processing
+          replied: Replied
+      ai_adapter:
+        providers:
+          anthropic: Anthropic
+          deepseek: DeepSeek
+          gemini: Gemini
+          mistral: Mistral
+          openai: OpenAI
+      ai_configuration:
+        providers:
+          anthropic: Anthropic
+          deepseek: DeepSeek
+          gemini: Gemini
+          mistral: Mistral
+          openai: OpenAI
+        purposes:
+          compose_chat: Compose Chat
+          document_analysis: Document Analysis
+          draft_reply: Draft Reply
+          email_analysis: Email Analysis
+          email_chat: Email Chat
+          email_classification: Email Classification
+          global_chat: Global Chat
+      bug_report:
+        statuses:
+          closed: Closed
+          open: Open
+          resolved: Resolved
+          triaged: Triaged
+      calendar_account:
+        providers:
+          google: Google Calendar
+          zoho: Zoho Calendar
+      calendar_account_user:
+        roles:
+          editor: Editor
+          manager: Manager
+          owner: Owner
+          viewer: Viewer
+      calendar_sync_log:
+        statuses:
+          completed: Completed
+          failed: Failed
+          running: Running
+      connection:
+        auth_types:
+          basic: Basic Auth
+          bearer: Bearer Token
+          header: Custom Header
+          none: None
+      document:
+        ai_statuses:
+          completed: Analyzed
+          failed: Failed
+          pending: Pending
+          processing: Processing
+        document_types:
+          bank_journal_entry: Bank Journal Entry
+          bank_statement: Bank Statement
+          certificate: Certificate
+          contract: Contract
+          correspondence: Correspondence
+          expense_invoice: Expense Invoice
+          identification: Identification
+          insurance_policy: Insurance Policy
+          other: Other
+          proposal: Proposal
+          receipt: Receipt
+          revenue_invoice: Revenue Invoice
+          tax_document: Tax Document
+          vehicle_document: Vehicle Document
+        expense_categories:
+          equipment: Equipment
+          marketing: Marketing
+          meals: Meals & Entertainment
+          office_supplies: Office Supplies
+          other: Other
+          professional_services: Professional Services
+          rent: Rent
+          software: Software & Subscriptions
+          travel: Travel
+          utilities: Utilities
+        review_statuses:
+          approved: Approved
+          pending: Needs review
+          rejected: Rejected
+        sources:
+          email: Email
+          manual_upload: Manual Upload
+          notion: Notion
+      document_type:
+        categories:
+          accounting: Accounting
+          correspondence: Correspondence
+          identification: Identification
+          insurance: Insurance
+          legal: Legal
+          other: Other
+          vehicles: Vehicles
+      email_account:
+        providers:
+          google: Gmail
+          microsoft: Microsoft 365
+          zoho: Zoho Mail
+      email_account_user:
+        roles:
+          collaborator: Collaborator
+          manager: Manager
+          owner: Owner
+          viewer: Viewer
+      email_message:
+        ai_priorities:
+          high: High
+          low: Low
+          medium: Medium
+        statuses:
+          failed: Failed
+          fetched: Fetched
+          ignored: Ignored
+          processed: Processed
+          processing: Processing
+      email_scan_log:
+        statuses:
+          completed: Completed
+          failed: Failed
+          running: Running
+      export:
+        statuses:
+          failed: Failed
+          generated: Generated
+          generating: Generating
+          pending: Pending
+      google_drive_config:
+        subfolder_patterns:
+          entity: Entity
+          flat: Flat
+          year: Year
+          year_month: Year / Month
+      invitation:
+        statuses:
+          accepted: Accepted
+          cancelled: Cancelled
+          expired: Expired
+          pending: Pending
+      notification:
+        categories:
+          activity: Activity
+          ai_reply: AI Reply
+          comment: Comment
+          contact: Contact
+          document: Document
+          export: Export
+          mention: Mention
+          system: System
+        priorities:
+          action_required: Action Required
+          activity: Activity
+          awaiting: Awaiting
+      notion_page:
+        sync_statuses:
+          error: Error
+          outdated: Outdated
+          synced: Synced
+      person:
+        relationship_types:
+          client: Client
+          colleague: Colleague
+          partner: Partner
+          personal: Personal
+          self: Self
+          service_provider: Service Provider
+          unknown: Unknown
+          vendor: Vendor
+      signup_request:
+        statuses:
+          accepted: Accepted
+          approved: Approved
+          pending: Pending
+          rejected: Rejected
+      user:
+        roles:
+          admin: Admin
+          member: Member
+      workflow:
+        trigger_types:
+          email_received: Email Received
+          webhook: Webhook
+      workflow_execution:
+        statuses:
+          completed: Completed
+          failed: Failed
+          running: Running
+      workflow_execution_step:
+        statuses:
+          completed: Completed
+          failed: Failed
+          pending: Pending
+          running: Running
+          skipped: Skipped
+      workflow_step:
+        action_types:
+          custom_action: Custom Action
+          discord_message: Discord Message
+          email_action: Email Action
+          google_drive_create_folder: Create Drive Folder
+          google_drive_upload: Upload to Drive
+          http_request: HTTP Request
+          notion_create_database_item: Create Notion Item
+          notion_create_page: Create Notion Page
+          send_email: Send Email
+          slack_message: Slack Message
+    errors:
+      models:
+        ai_adapter:
+          attributes:
+            api_key:
+              must_be_blank_for_managed: must be blank for Campbooks-managed providers
+            endpoint_url:
+              unsafe: must be a public http(s) URL — internal or loopback addresses
+                aren't allowed
+            managed:
+              unavailable_self_hosted: is not available on self-hosted installations
+        ai_configuration:
+          attributes:
+            ai_adapter:
+              not_vision_capable: must be a vision-capable provider for Document Analysis.
+                DeepSeek does not support image/PDF processing. Use OpenAI, Anthropic,
+                or Gemini instead.
+            system_prompt:
+              too_long: must be under 2000 characters
+        contact:
+          attributes:
+            email:
+              taken: already exists as a contact
+        invitation:
+          attributes:
+            email:
+              already_invited: has already been invited
+              already_member: is already a member of this workspace
+        mail_folder:
+          attributes:
+            name:
+              reserved: is reserved for a system folder

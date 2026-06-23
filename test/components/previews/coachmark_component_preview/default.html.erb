@@ -1,0 +1,31 @@
+<div class="p-12">
+  <%# Mock skim-rings strip for the coachmark to anchor to. %>
+  <div id="coachmark_demo_target" class="flex items-start gap-2.5">
+    <div class="flex w-[4.25rem] flex-col items-center gap-1.5">
+      <div class="rounded-full bg-ember-gradient p-[2.5px] shadow-ember">
+        <div class="h-14 w-14 rounded-full bg-card"></div>
+      </div>
+      <span class="text-xs text-muted-foreground">Skim all</span>
+    </div>
+    <div class="flex w-[4.25rem] flex-col items-center gap-1.5">
+      <div class="rounded-full bg-ember-gradient p-[2.5px] shadow-ember">
+        <div class="h-14 w-14 rounded-full bg-card"></div>
+      </div>
+      <span class="text-xs text-muted-foreground">People</span>
+    </div>
+    <div class="flex w-[4.25rem] flex-col items-center gap-1.5">
+      <div class="rounded-full bg-ember-gradient p-[2.5px] shadow-ember">
+        <div class="h-14 w-14 rounded-full bg-card"></div>
+      </div>
+      <span class="text-xs text-muted-foreground">Alerts</span>
+    </div>
+  </div>
+
+  <%= render Campbooks::Coachmark.new(
+        tour_key: "preview_demo",
+        anchor: "#coachmark_demo_target",
+        title: "Skim through your inbox",
+        body: "Each ring groups related emails. Tap one to clear them in a quick, swipeable pass.",
+        cta: "Got it"
+      ) %>
+</div>

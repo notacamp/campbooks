@@ -1,0 +1,23 @@
+<%# One template for every surface: it removes the acted index row (which
+    re-homes to its section on next load), replaces the profile header controls,
+    and replaces the hover-popover actions (when the act came from a popover).
+    Whichever target isn't on the current page is simply a no-op. The contact
+    skim asks for JSON instead, so it never renders this. %>
+<%= turbo_stream.remove dom_id(@contact, :contact_row) %>
+<%= turbo_stream.replace "contact_state_actions_#{@contact.id}" do %>
+  <%= render "contacts/state_actions", contact: @contact %>
+<% end %>
+<%= turbo_stream.replace "contact_popover_actions_#{@contact.id}" do %>
+  <%= render Campbooks::ContactStateActions.new(contact: @contact) %>
+<% end %>
+<%= turbo_stream.append "action_toasts" do %>
+  <% if params[:state] == "block" %>
+    <%= render Campbooks::ActionToast.new(
+          message: contact_state_toast(@contact, "block"),
+          variant: :success,
+          undo: { endpoint: set_state_contact_path(@contact, state: "unblock"), params: {} }
+        ) %>
+  <% else %>
+    <%= render Campbooks::ActionToast.new(message: contact_state_toast(@contact, params[:state]), variant: :success) %>
+  <% end %>
+<% end %>

@@ -1,0 +1,221 @@
+---
+fr:
+  email_messages:
+    notion_exports:
+      new:
+        title: Enregistrer dans Notion
+        subtitle: "Ajouter cet e-mail (%{subject}) à Notion."
+        no_subject: "(sans objet)"
+        heading: "Où doit-il aller ?"
+        workspace: Espace de travail
+        workspace_one: "Espace de travail : %{name}"
+        to_database: Ajouter à une base de données
+        to_database_desc: "Créer un élément dans la base de données et remplir ses champs."
+        to_page: "Créer une page"
+        to_page_desc: "Ajouter une sous-page sous une page de votre choix."
+      databases:
+        search: Rechercher des bases de données…
+        none: "Aucune base de données trouvée. Partagez une base de données avec cette\
+          \ intégration dans Notion."
+        error: "Impossible de charger les bases de données : %{message}"
+      database_form:
+        untitled: Base de données sans titre
+        back: "← Bases de données"
+        create_item: "Créer un élément dans Notion"
+        error: "Impossible de charger la base de données : %{message}"
+        attachments_count:
+          one: "%{count} pièce jointe"
+          other: "%{count} pièces jointes"
+      pages:
+        search: Rechercher des pages…
+        parent_page: Page parente
+        none: "Aucune page trouvée. Partagez une page avec cette intégration dans Notion."
+        page_title: Titre de la page
+        note: Note (facultatif)
+        attach_files:
+          one: "Joindre la pièce jointe de l'e-mail"
+          other: "Joindre les %{count} pièces jointes de l'e-mail"
+        create_page: "Créer une page dans Notion"
+        error: "Impossible de charger les pages : %{message}"
+      create:
+        pick_destination: "Choisissez une destination dans Notion."
+        created: "Enregistré dans Notion."
+        failed: "Impossible de créer l'élément dans Notion."
+        failed_with: "Échec de l'export Notion : %{message}"
+      errors:
+        not_connected: Connectez Notion d'abord.
+    board:
+      index:
+        heading: Tableau
+    empty:
+      add_account_button: Ajouter un compte e-mail
+      connect_email_description: Liez un compte e-mail pour commencer à recevoir et
+        traiter vos e-mails automatiquement.
+      connect_email_title: Connectez votre e-mail
+      manage_accounts_button: Gérer les comptes e-mail
+      no_mail_yet_description: Vos comptes e-mail sont connectés. Les messages apparaîtront
+        ici après la prochaine analyse.
+      no_mail_yet_title: Aucun courrier pour l'instant
+    empty_detail:
+      no_email_selected: Aucun e-mail sélectionné
+      select_prompt: Sélectionnez un e-mail dans la barre latérale pour l'afficher
+        ici.
+    index:
+      all_folder_label: Tous
+      collapse_sidebar_aria: Réduire la barre latérale
+      expand_sidebar_aria: Développer la barre latérale
+      folders_heading: Dossiers
+      inbox_heading: Boîte de réception
+      inbox_settings_aria: Paramètres de la boîte de réception
+      new_message_title: Nouveau message
+      no_email_selected: Aucun e-mail sélectionné
+      no_emails_in_folder: Aucun e-mail dans ce dossier.
+      select_all_label: Tous
+      toolbar_clear_selection_title: Effacer la sélection
+      toolbar_delete_title: Supprimer
+      toolbar_mark_read_title: Marquer comme lu
+      toolbar_mark_unread_title: Marquer comme non lu
+      toolbar_move_folder_title: Déplacer vers un dossier
+      toolbar_scout_chat_title: Envoyer à Scout
+      toolbar_send_to_scout_title: Envoyer à Scout
+      toolbar_snooze_title: Reporter
+      toolbar_tag_title: Étiquette
+    mobile_folder_bar:
+      all: Tous
+      new_folder: Nouveau dossier
+    new:
+      all_folder_label: Tous
+      bcc_label: 'Cci :'
+      bcc_placeholder: Ajouter en Cci...
+      bcc_toggle_label: Cci
+      cc_label: 'Cc :'
+      cc_placeholder: Ajouter en Cc...
+      close_scout_aria: Fermer Scout
+      collapse_sidebar_aria: Réduire la barre latérale
+      expand_sidebar_aria: Développer la barre latérale
+      folders_heading: Dossiers
+      from_label: 'De :'
+      inbox_heading: Boîte de réception
+      inbox_settings_aria: Paramètres de la boîte de réception
+      new_message_heading: Nouveau message
+      no_emails_yet: Aucun e-mail pour l'instant.
+      no_sendable_accounts_description: Vous avez besoin d'un compte e-mail avec la
+        permission d'envoi pour rédiger de nouveaux messages.
+      no_sendable_accounts_title: Aucun compte d'envoi
+      no_signature_option: Sans signature
+      scout_keyboard_hint: Cmd+Shift+E pour manuel
+      scout_label: Scout
+      signature_default_suffix: "(par défaut)"
+      signature_label: 'Sig. :'
+      signature_preview_heading: Signature
+      subject_label: 'Objet :'
+      subject_placeholder: Objet
+      to_label: 'À :'
+      to_placeholder: Rechercher des contacts ou saisir un e-mail...
+      toggle_chat_aria: Afficher/masquer le chat
+      write_message_placeholder: Rédigez votre message...
+    reply_actions:
+      forward_title: Transférer
+      reply_all_title: Répondre à tous
+      reply_title: Répondre
+    search:
+      chips:
+        account: 'Compte : %{value}'
+        category: 'Catégorie : %{value}'
+        date_from: Après %{value}
+        date_to: Avant %{value}
+        domain: 'Domaine : %{value}'
+        folder: 'Dossier : %{value}'
+        has_attachment: Avec pièce jointe
+        priority: 'Priorité : %{value}'
+        sender: 'De : %{value}'
+        tag: 'Étiquette : %{value}'
+        unread: Non lus
+      no_results: Aucun e-mail correspondant
+      no_results_hint: Essayez moins de filtres ou une requête plus large.
+      results_heading: Résultats de recherche
+    show:
+      ai_processed_badge: Traité par IA
+      all_folder_label: Tous
+      back_to_inbox_label: Boîte de réception
+      close_discussion_aria: Fermer la discussion
+      close_scout_aria: Fermer Scout
+      collapse_discussion_aria: Réduire la discussion
+      collapse_sidebar_aria: Réduire la barre latérale
+      compose_label: Composer
+      discussion_button_label: Discussion
+      discussion_empty_body: Laissez une note à votre équipe, ou mentionnez %{scout_mention}
+        pour interroger l'IA sur cet e-mail.
+      discussion_empty_heading: Démarrer la discussion
+      discussion_label: Discussion
+      expand_sidebar_aria: Développer la barre latérale
+      folders_heading: Dossiers
+      inbox_heading: Boîte de réception
+      inbox_settings_aria: Paramètres de la boîte de réception
+      new_message_title: Nouveau message
+      no_emails_yet: Aucun e-mail pour l'instant.
+      scout_keyboard_hint: Cmd+Shift+E pour manuel
+      scout_label: Scout
+      show_discussion_aria: Afficher la discussion
+      show_discussion_title: Afficher la discussion
+      snoozed_until_badge: Reporté jusqu'au %{time}
+      toggle_chat_aria: Afficher/masquer le chat
+      toolbar_clear_selection_title: Effacer la sélection
+      toolbar_delete_title: Supprimer
+      toolbar_mark_read_title: Marquer comme lu
+      toolbar_mark_unread_title: Marquer comme non lu
+      toolbar_move_folder_title: Déplacer vers un dossier
+      toolbar_scout_chat_title: Envoyer à Scout
+      toolbar_send_to_scout_title: Envoyer à Scout
+      toolbar_snooze_title: Reporter
+      toolbar_tag_title: Étiquette
+      unsnooze_label: Annuler le report
+      unsnooze_title: Annuler le report
+    snooze_button:
+      ok: OK
+      snooze_title: Reporter
+    tags:
+      add_tag_aria: Ajouter une étiquette
+      remove_tag_title: Retirer l'étiquette
+      search_tags_placeholder: Rechercher des étiquettes...
+    thread_list:
+      back_to_inbox: "— retour à la boîte de réception"
+      drag_to_folder: Glisser vers un dossier
+      no_subject: "(sans objet)"
+      pin_title: Rendre prioritaire
+      priority_section: Prioritaire
+      senders_more: "%{first}, %{second}, et d'autres"
+      sent_to_prefix: 'À :'
+      unpin_title: Retirer la priorité
+    zoho_labels:
+      add_label_aria: Ajouter un libellé
+      remove_label_title: Retirer le libellé
+      search_labels_placeholder: Rechercher des libellés...
+  email_scans:
+    show:
+      account_label: Compte
+      breadcrumb_scans: Analyses
+      completed_label: Terminée
+      documents_created_label: Documents créés
+      emails_found_label: E-mails trouvés
+      emails_in_scan_heading: E-mails de cette analyse
+      emails_processed_label: E-mails traités
+      error_details_heading: Détails des erreurs
+      errors_label: Erreurs
+      no_subject: "(sans objet)"
+      page_heading: Analyse n°%{id}
+      started_label: Démarrée
+      status_label: Statut
+      table_from: De
+      table_received: Reçu
+      table_status: Statut
+      table_subject: Objet
+  email_threads:
+    show:
+      added_to_discussion: Vous avez été ajouté(e) à cette discussion. Vous pouvez
+        voir la conversation ci-dessous et y répondre.
+      back_to_inbox: Retour à la boîte de réception
+      discussion_empty_body: Laissez une note, ou mentionnez %{scout_mention} pour
+        interroger l'IA sur cet e-mail.
+      discussion_empty_heading: Démarrer la discussion
+      discussion_heading: Discussion

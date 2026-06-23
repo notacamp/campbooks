@@ -1,0 +1,81 @@
+<%# Cloud AI setup: choose Campbooks AI (managed) or bring your own keys. Single-page
+    (not multi-step) so the managed choice can submit in one click. Rendered inside the
+    parent's <turbo-frame> by _ai_configuration_form. Posts ai_mode + (BYO) provider
+    fields to setup#update_ai_configuration. Absolute i18n keys (shared partial). %>
+<% text_provider = local_assigns[:text_provider] || "deepseek" %>
+<% document_provider = local_assigns[:document_provider] || "openai" %>
+<% ai_mode = local_assigns[:ai_mode] %>
+<%= form_with url: setup_path(:ai_configuration), method: :patch do |f| %>
+  <%# Header %>
+  <div class="px-6 pt-4 pb-3 border-b border-gray-100">
+    <div class="flex items-center justify-between gap-3">
+      <h2 class="text-base font-semibold text-gray-900"><%= t("shared.modals.ai_configuration_form.title") %></h2>
+      <button type="button" data-setup-modal-close=""
+              class="p-1.5 -mr-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
+              aria-label="<%= t('shared.modals.ai_configuration_form.close_dialog') %>">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <%# Body %>
+  <div class="p-6 space-y-5" data-controller="ai-mode-selector">
+    <%= render "shared/modals/form_error", error: local_assigns[:error] %>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <%= render(Campbooks::CheckableCard.new(
+            name: "ai_mode", value: "managed", type: :radio, checked: ai_mode == "managed",
+            title: t("shared.modals.ai_configuration_form.managed_title"),
+            description: t("shared.modals.ai_configuration_form.managed_description"),
+            variant: :horizontal, data: { action: "change->ai-mode-selector#select" })) %>
+      <%= render(Campbooks::CheckableCard.new(
+            name: "ai_mode", value: "byo", type: :radio, checked: ai_mode == "byo",
+            title: t("shared.modals.ai_configuration_form.byo_title"),
+            description: t("shared.modals.ai_configuration_form.byo_description"),
+            variant: :horizontal, data: { action: "change->ai-mode-selector#select" })) %>
+    </div>
+
+    <div data-ai-mode-selector-target="managedPanel" class="<%= "hidden" unless ai_mode == "managed" %>">
+      <%= render(Campbooks::ManagedAiCard.new) %>
+    </div>
+
+    <%# Bring-your-own provider fields (both stacked; no multi-step here). %>
+    <div data-ai-mode-selector-target="byoPanel" class="space-y-4 <%= "hidden" unless ai_mode == "byo" %>">
+      <div class="space-y-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5"><%= t("shared.modals.ai_configuration_form.provider_label") %></label>
+          <%= select_tag "text_provider[provider]",
+                options_for_select(AiConfiguration::PROVIDERS.map { |p| [human_enum(AiConfiguration, :provider, p), p] }, text_provider),
+                class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-accent-500 focus:ring-accent-500 sm:text-sm" %>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5"><%= t("shared.modals.ai_configuration_form.api_key_label") %></label>
+          <%= password_field_tag "text_provider[api_key]", nil,
+                class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-accent-500 focus:ring-accent-500 sm:text-sm",
+                placeholder: t("shared.modals.ai_configuration_form.api_key_placeholder") %>
+        </div>
+      </div>
+      <div class="space-y-3 pt-3 border-t border-gray-100">
+        <p class="text-xs font-medium text-gray-500"><%= t("shared.modals.ai_configuration_form.documents_title") %></p>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5"><%= t("shared.modals.ai_configuration_form.provider_label") %></label>
+          <%= select_tag "document_provider[provider]",
+                options_for_select(AiConfiguration::VISION_PROVIDERS.map { |p| [human_enum(AiConfiguration, :provider, p), p] }, document_provider),
+                class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-accent-500 focus:ring-accent-500 sm:text-sm" %>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5"><%= t("shared.modals.ai_configuration_form.api_key_label") %></label>
+          <%= password_field_tag "document_provider[api_key]", nil,
+                class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-accent-500 focus:ring-accent-500 sm:text-sm",
+                placeholder: t("shared.modals.ai_configuration_form.document_api_key_placeholder") %>
+        </div>
+      </div>
+    </div>
+
+    <%# Navigation — Cancel + Save (no step nav). %>
+    <div class="flex items-center justify-end gap-2 pt-3 border-t border-gray-100">
+      <%= render(Campbooks::Button.new(variant: :outline, size: :md, type: :button, data: { setup_modal_close: "" })) { t("shared.actions.cancel") } %>
+      <%= render(Campbooks::Button.new(variant: :primary, size: :md, type: :submit, class: "shadow-sm hover:shadow-md transition-all duration-150 active:scale-[0.98]")) { t("shared.modals.ai_configuration_form.save") } %>
+    </div>
+  </div>
+<% end %>

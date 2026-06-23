@@ -1,0 +1,55 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t(".title", name: @calendar_account.display_name), subtitle: t(".subtitle"))) %>
+
+<%= link_to t(".back"), settings_integrations_calendars_path, class: "text-sm text-accent-700 hover:underline mb-4 inline-block" %>
+
+<%= render(Campbooks::Card.new(padding: :lg, class: "mb-6")) do %>
+  <h2 class="text-sm font-semibold text-gray-900 mb-3"><%= t(".members_heading") %></h2>
+  <div class="space-y-2">
+    <% @members.each do |member| %>
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="min-w-0">
+          <span class="text-sm text-gray-900"><%= member.user.name %></span>
+          <span class="text-xs text-gray-500">&middot; <%= member.user.email_address %></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <% if member.owner? %>
+            <%= render(Campbooks::Badge.new(variant: :accent, size: :md)) { human_enum(CalendarAccountUser, :role, "owner") } %>
+          <% else %>
+            <%= form_with url: calendar_account_path(@calendar_account), method: :patch, class: "contents" do %>
+              <input type="hidden" name="user_email" value="<%= member.user.email_address %>">
+              <select name="role" onchange="this.form.requestSubmit()"
+                      class="text-xs border border-border rounded px-1.5 py-1 bg-card">
+                <% CalendarAccountUser::ROLES.each do |role| %>
+                  <option value="<%= role %>" <%= "selected" if member.role == role %>><%= human_enum(CalendarAccountUser, :role, role) %></option>
+                <% end %>
+              </select>
+            <% end %>
+            <%= button_to t(".remove"), calendar_account_path(@calendar_account), method: :patch,
+                  params: { user_email: member.user.email_address, remove: "true" },
+                  class: "text-xs text-gray-500 hover:text-red-600 cursor-pointer" %>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<% if @addable_users.any? %>
+  <%= render(Campbooks::Card.new(padding: :lg)) do %>
+    <h2 class="text-sm font-semibold text-gray-900 mb-3"><%= t(".add_heading") %></h2>
+    <%= form_with url: calendar_account_path(@calendar_account), method: :patch, class: "flex flex-wrap items-end gap-2" do %>
+      <select name="user_email" class="text-sm border border-border rounded-lg px-2 py-1.5 bg-card">
+        <% @addable_users.each do |u| %>
+          <option value="<%= u.email_address %>"><%= u.name %> (<%= u.email_address %>)</option>
+        <% end %>
+      </select>
+      <select name="role" class="text-sm border border-border rounded-lg px-2 py-1.5 bg-card">
+        <% CalendarAccountUser::ROLES.each do |role| %>
+          <option value="<%= role %>"><%= human_enum(CalendarAccountUser, :role, role) %></option>
+        <% end %>
+      </select>
+      <%= render(Campbooks::Button.new(variant: :primary, size: :sm, type: "submit")) { t(".add_button") } %>
+    <% end %>
+  <% end %>
+<% end %>

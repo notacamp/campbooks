@@ -1,0 +1,64 @@
+---
+es:
+  inbox_settings:
+    document_types:
+      create:
+        success: Tipo de documento creado.
+      destroy:
+        success: Tipo de documento eliminado.
+      document_type:
+        delete_confirm: "¿Eliminar %{name}?"
+        documents_title: Documentos
+      form:
+        ai_prompt_hint: Lo que la IA usa para clasificar este tipo de documento. Admite
+          markdown.
+        ai_prompt_label: Instrucción para la IA
+        auto_star_hint: Los documentos destacados aparecen al principio de la lista.
+        auto_star_label: Destacar automáticamente los documentos de este tipo
+        color_label: Color (hex)
+        create_type: Crear tipo
+        extraction_schema_hint: Opcional. Campos a extraer, cada uno con un tipo (string/integer/number)
+          y descripción.
+        extraction_schema_label: Esquema de extracción (JSON)
+        extraction_schema_placeholder: '{"field_name":{"type":"string","description":"What
+          this field represents"}}'
+        none_option: Ninguno
+      index:
+        add_type: Añadir tipo
+        empty: Aún no hay tipos de documento. Añada uno para indicar a Scout qué clasificar.
+        heading: Tipos de documento
+        subtitle: Qué documentos busca Scout y los datos que extrae.
+      update:
+        success: Tipo de documento actualizado.
+    external_labels:
+      index:
+        account_label: Cuenta
+        color_label: Color
+        heading: Etiquetas
+        new_label_label: Nueva etiqueta
+        new_label_placeholder: Nombre de la etiqueta
+        no_accounts: Aún no hay cuentas de correo conectadas.
+        subtitle: Etiquetas del proveedor sincronizadas con su buzón.
+        sync: Sincronizar
+      labels:
+        delete_confirm: "¿Eliminar esta etiqueta de su buzón?"
+        empty: Aún no hay etiquetas. Sincronice desde su proveedor o añada una arriba.
+    signatures:
+      form:
+        assign_accounts_heading: Asignar a cuentas
+        content_label: Contenido
+        create_signature: Crear firma
+        editor_placeholder: Escriba su firma de correo...
+        name_label: Nombre
+        name_placeholder: p. ej. Profesional, Informal
+        set_default_label: Establecer como firma predeterminada
+      index:
+        add_signature: Añadir firma
+        heading: Firmas
+        subtitle: Firmas reutilizables para redactar correos.
+      list:
+        empty: Aún no hay firmas. Añada una para incluirla al redactar.
+      signature:
+        default_badge: predeterminada
+        delete_confirm: "¿Eliminar esta firma?"
+        set_default: Establecer como predeterminada

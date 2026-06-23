@@ -1,0 +1,10 @@
+<%# Infinite-scroll sentinel for the home feed timeline. A lazy turbo frame that
+    fetches the next page as a turbo stream when it scrolls into view. Rendered
+    only when `pagy.next` is present (`pagy` is a required local). %>
+<%= turbo_frame_tag "feed_pagination",
+      src: home_path(page: pagy.next, format: :turbo_stream),
+      loading: :lazy do %>
+  <div class="flex items-center justify-center py-6">
+    <%= render(Campbooks::Spinner.new(size: :sm)) %>
+  </div>
+<% end %>

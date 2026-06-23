@@ -1,0 +1,36 @@
+<% all_tags = (@all_tags || Tag.order(:name)).map { |t| { id: t.id, name: t.name, color: t.color } } %>
+
+<div id="<%= dom_id(message, :tags) %>"
+     class="relative inline-flex items-center gap-1 flex-wrap"
+     data-controller="email-tags"
+     data-email-tags-message-id-value="<%= message.id %>"
+     data-email-tags-all-tags-value="<%= all_tags.to_json %>"
+     data-email-tags-assigned-ids-value="<%= message.tags.loaded? ? message.tags.map(&:id) : message.tags.pluck(:id) %>">
+
+  <% message.tags.each do |tag| %>
+    <span class="text-[11px] rounded px-2 py-0.5 font-medium inline-flex items-center gap-1 select-none"
+          style="background-color:<%= tag.color %>20;color:<%= tag.color %>">
+      <%= tag.name %>
+      <button type="button"
+              data-action="email-tags#remove"
+              data-email-tags-tag-id-param="<%= tag.id %>"
+              class="hover:opacity-60 leading-none text-[12px] ml-0.5"
+              title="<%= t(".remove_tag_title") %>">&times;</button>
+    </span>
+  <% end %>
+
+  <%= render(Campbooks::IconButton.new(aria_label: t(".add_tag_aria"), size: :md, class: "hover:text-accent-600", data: { action: "click->email-tags#open" })) do %>
+    <span class="text-sm font-medium leading-none">+</span>
+  <% end %>
+
+  <div data-email-tags-target="dropdown"
+       class="hidden absolute top-full left-0 z-50 mt-1 bg-card border border-gray-200 rounded-lg shadow-lg"
+       style="min-width:180px;max-height:200px;overflow-y:auto">
+    <input type="text"
+           data-email-tags-target="search"
+           data-action="input->email-tags#search keydown->email-tags#navigate"
+           placeholder="<%= t(".search_tags_placeholder") %>"
+           class="w-full border-0 border-b border-gray-200 px-3 py-2 text-xs focus:ring-0 focus:outline-none sticky top-0 bg-card rounded-t-lg">
+    <div data-email-tags-target="results" class="py-1"></div>
+  </div>
+</div>

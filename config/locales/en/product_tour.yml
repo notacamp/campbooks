@@ -1,0 +1,67 @@
+---
+en:
+  components:
+    product_tour:
+      aria_label: Product tour
+      back: Back
+      next: Next
+      s1_body: Campbooks is an inbox that sorts itself. In about a minute, I'll show
+        you the four things that make it different — try each one as we go.
+      s1_point_ask: Ask your inbox anything
+      s1_point_remind: Deadlines never slip
+      s1_point_skim: Skim a whole pile in seconds
+      s1_point_surface: Scout surfaces only what needs you
+      s1_title: Welcome to Campbooks
+      s2_badge: Needs you
+      s2_eyebrow: Your home
+      s2_feedback: That's the gist, without opening the email. The LinkedIn notification
+        below was noise, so Scout left it be.
+      s2_summary: A one-time code to confirm your bank transfer — it expires in 10
+        minutes, so it's worth a look now.
+      s2_task: Tap the message Scout flagged to see what it pulled out.
+      s2_title: Scout surfaces what needs you
+      s2_why: Scout reads every email as it arrives and brings forward only what matters.
+        Everything else stays quietly out of your way.
+      s3_eyebrow: Skim
+      s3_feedback: That's the whole pile, handled. Archived mail stays searchable,
+        and every action can be undone.
+      s3_progress: "%{done} of %{total} stacks cleared"
+      s3_task: 'Work through all three: Archive the noise, Keep what matters.'
+      s3_title: Clear a pile in seconds
+      s3_why: Skim groups your inbox into stacks and plays them like Stories. You
+        make one decision per stack — keep what matters, archive the noise — instead
+        of opening dozens of emails.
+      s4_dismiss: or dismiss
+      s4_extracted: 'Scout spotted a due date: Friday'
+      s4_eyebrow: Reminders
+      s4_feedback: Set. It'll resurface on Friday, and you can turn any reminder into
+        a calendar event with one tap.
+      s4_remind_cta: Remind me
+      s4_reminder_title: Pay Acme invoice — $248.00
+      s4_reminder_when: Reminder set · Friday, 9:00
+      s4_task: This invoice is due Friday. Tap “Remind me” to set it.
+      s4_title: Deadlines never slip
+      s4_why: When an email carries a due date or a promise you made, Scout pulls
+        it out so it doesn't get buried.
+      s5_eyebrow: Scout
+      s5_feedback: Scout does this across your real inbox once it's connected — and
+        can draft the replies too.
+      s5_greeting: Hi! I'm Scout. Ask me about your inbox — or tap a suggestion to
+        start.
+      s5_prompt: What needs a reply today?
+      s5_reply_intro: 'Two emails are waiting on you:'
+      s5_reply_item_1: Sarah — she asked about lunch on Thursday
+      s5_reply_item_2: Acme Supply Co. — the invoice due Friday
+      s5_task: Tap the question to ask Scout.
+      s5_title: Ask your inbox anything
+      s5_why: Scout can search, summarise, and take action across your mail and documents.
+        Just ask in plain words.
+      s6_body: 'That''s the loop: Scout surfaces what matters, you Skim the rest in
+        seconds, deadlines stay caught, and you can ask anything. Connect your inbox
+        to make it real.'
+      s6_cta_connect: Connect your inbox
+      s6_cta_explore: Explore on my own
+      s6_title: You're ready
+      scout_says: Scout
+      skip: Skip tour
+      step: "%{current} of %{total}"

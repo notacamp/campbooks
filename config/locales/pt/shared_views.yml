@@ -1,0 +1,99 @@
+---
+pt:
+  shared:
+    doc_skim_overlay:
+      gathering_documents: A recolher documentos para rever…
+      review_documents_label: Rever os seus documentos
+    markdown_editor:
+      preview: Pré-visualização
+      write: Escrever
+    modals:
+      ai_configuration_form:
+        api_key_hint: Armazenada encriptada. Pode obter uma chave DeepSeek gratuita
+          em platform.deepseek.com.
+        api_key_label: Chave de API
+        api_key_placeholder: Introduza a sua chave de API
+        byo_description: Use as suas próprias chaves de fornecedor.
+        byo_title: Usar as minhas chaves
+        choose_mode: Escolha como pretende configurar a IA.
+        close_dialog: Fechar diálogo
+        document_api_key_placeholder: Adicione uma chave para ativar a análise de
+          documentos
+        documents_api_key_hint: Deixe em branco para ignorar — pode adicionar análise
+          de documentos a qualquer momento.
+        documents_intro_html: 'Opcional: adicione um modelo com capacidade de visão
+          — <strong>OpenAI</strong>, Anthropic ou Gemini — para ler PDFs e imagens.
+          Deixe a chave em branco para ignorar.'
+        documents_title: Adicionar IA para documentos e imagens
+        managed_description: Sem chaves de API — o Campbooks trata da IA por si.
+        managed_title: Campbooks AI
+        provider_label: Fornecedor
+        save: Guardar fornecedores
+        step_of: Passo %{step} de %{total}
+        text_intro_html: Escolha o modelo que alimenta a triagem de email, respostas
+          e o chat do Scout. O <strong>DeepSeek</strong> é gratuito e rápido para
+          texto.
+        title: Configurar a sua IA de texto
+      document_types_form:
+        add_your_own: Adicionar o seu próprio
+        close_dialog: Fechar diálogo
+        custom_placeholder: 'ex.: guia de remessa'
+        description: Selecione os que lida habitualmente. O Scout utiliza-os para
+          reconhecer e organizar documentos, com um prompt de partida inteligente
+          para cada um. Pode ajustá-los mais tarde.
+        legend: Tipos de documentos comuns
+        submit: Adicionar tipos de documentos
+        title: Que documentos trata?
+      tags_form:
+        add_your_own: Adicionar a sua própria
+        close_dialog: Fechar diálogo
+        custom_placeholder: 'ex.: projeto-alfa'
+        description: As etiquetas ajudam o Scout a ordenar os e-mails recebidos por
+          tema e prioridade. Escolha algumas para começar — cada uma vem com uma regra
+          inteligente que pode refinar mais tarde.
+        legend: Etiquetas comuns
+        submit: Adicionar etiquetas
+        title: Como pretende organizar os e-mails?
+      workspace_form:
+        city_label: Cidade
+        city_placeholder: Lisboa
+        close_dialog: Fechar diálogo
+        country_label: País
+        country_placeholder: Portugal
+        postal_code_label: Código postal
+        postal_code_placeholder: 1000-001
+        save_workspace: Guardar perfil do espaço de trabalho
+        step0_title: Fale-nos sobre o seu espaço de trabalho
+        step1_description: Descreva o seu trabalho, os clientes que serve e o que
+          é importante no dia a dia. O Scout lê isto em cada pedido à IA.
+        step1_title: O que faz o seu espaço de trabalho?
+        step2_description: Tudo opcional, mas ajuda o Scout a compreender regulamentos
+          locais e o seu contexto fiscal.
+        step2_title: Onde está localizado?
+        step_of: Passo %{step} de %{total}
+        tax_id_label: NIF
+        tax_id_placeholder: '123456789'
+        type_company_description: Documentos de uma empresa, organização ou entidade
+          jurídica.
+        type_company_label: Uma empresa
+        type_individual_description: 'Os meus próprios documentos: recibos, garantias,
+          contratos pessoais.'
+        type_individual_label: Apenas eu
+        workspace_context_placeholder: 'Exemplo: Dirijo uma consultora que ajuda pequenas
+          empresas com gestão financeira e conformidade fiscal...'
+        workspace_name_label: Nome do espaço de trabalho
+        workspace_name_placeholder: O nome da sua empresa ou espaço de trabalho
+        workspace_type_legend: Para quem é?
+    skim_overlay:
+      gathering_inbox: A recolher a sua caixa de entrada…
+      skim_inbox_label: Skim da sua caixa de entrada
+    topbar:
+      keyboard_shortcuts: Atalhos de teclado
+      main_navigation: Navegação principal
+      open_main_menu: Abrir menu principal
+      search: Pesquisar…
+      search_and_commands: Pesquisa e comandos (⌘K)
+      toggle_dark_mode: Alternar modo escuro
+      toggle_theme: Alternar tema
+    user_menu:
+      sign_out: Terminar sessão

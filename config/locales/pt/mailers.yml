@@ -1,0 +1,64 @@
+---
+pt:
+  invitation_mailer:
+    invitation:
+      accept_button: Aceitar convite
+      accept_text: 'Aceite o convite aqui:'
+      body_html: "%{inviter} convidou-o a juntar-se a %{workspace} no Campbooks."
+      body_text: "%{inviter} convidou-o a juntar-se a %{workspace} no Campbooks."
+      expires: Este convite expira em 7 dias.
+      greeting: Olá,
+      ignore: Não estava à espera disto? Sem problema — ignore esta mensagem.
+      subject: "%{inviter} convidou-o a juntar-se a %{workspace} no Campbooks"
+  notification_mailer:
+    mention:
+      body_html: "%{actor} mencionou-o na discussão sobre %{subject}."
+      body_text: '%{actor} mencionou-o na discussão sobre "%{subject}".'
+      footer: Está a receber este e-mail porque foi mencionado. Desative os e-mails
+        de menção nas suas definições de notificação.
+      greeting: Olá %{name},
+      subject: "%{actor} mencionou-o numa discussão"
+      view_button: Ver discussão
+      view_text: 'Ver a discussão:'
+    thread_activity:
+      body_html: "%{actor} adicionou um comentário a uma discussão que segue, %{subject}."
+      body_text: '%{actor} adicionou um comentário a uma discussão que segue, "%{subject}".'
+      footer: Está a receber este e-mail porque segue esta conversa. Pode deixar de
+        seguir a partir do painel de discussão.
+      greeting: Olá %{name},
+      subject: Novo comentário em "%{subject}"
+      view_button: Ver discussão
+      view_text: 'Ver a discussão:'
+  passwords_mailer:
+    reset:
+      body: 'Pediu a redefinição da sua palavra-passe do Campbooks. Aqui está o link
+        para o fazer:'
+      body_text: Pode redefinir a sua palavra-passe em
+      expires: Este link expira em %{duration}.
+      expires_text: Este link expirará em %{duration}.
+      greeting: Olá,
+      ignore: Não foi você? Pode ignorar este e-mail com segurança.
+      reset_button: Redefinir palavra-passe
+      subject: Redefina a sua palavra-passe
+  signup_request_mailer:
+    approved:
+      body: O seu pedido de conta Campbooks foi aprovado. Clique no botão abaixo para
+        concluir a criação da sua conta.
+      body_text: 'O seu pedido de conta Campbooks foi aprovado. Visite o link abaixo
+        para concluir a criação da sua conta:'
+      complete_button: Concluir registo
+      greeting: Olá %{name},
+      ignore: Se não solicitou acesso, pode ignorar este e-mail.
+      subject: A sua conta Campbooks foi aprovada
+      unique: Este link é exclusivo para si e não deve ser partilhado.
+  verification_mailer:
+    verify:
+      body: 'Aqui está o seu código de verificação Campbooks:'
+      body_text: 'O seu código de verificação Campbooks é: %{code}'
+      expires: É válido durante 10 minutos.
+      expires_text: Este código expira em 10 minutos.
+      greeting: Olá %{name},
+      ignore: Não solicitou um código? Não é necessária qualquer ação — ignore esta
+        mensagem.
+      ignore_text: Se não solicitou este código, pode ignorar este e-mail com segurança.
+      subject: "%{code} é o seu código de verificação Campbooks"

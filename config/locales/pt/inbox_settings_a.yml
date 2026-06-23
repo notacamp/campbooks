@@ -1,0 +1,90 @@
+---
+pt:
+  inbox_settings:
+    accounts:
+      show:
+        active: Activa
+        connect_label: 'Ligar:'
+        disconnect_confirm: Desligar %{name}?
+        heading: Contas e sincronização
+        inactive: Inactiva
+        last_scan: 'Última pesquisa: %{time}'
+        last_scan_never: nunca
+        manage_access: Gerir acesso
+        no_accounts: Nenhuma conta de email ligada. Ligue uma acima para começar.
+        no_scans: Nenhuma pesquisa ainda.
+        re_auth: Reautenticar
+        recent_scans_heading: Pesquisas recentes
+        scan_found: "%{found} encontrados · %{docs} documentos"
+        scan_now: Pesquisar agora
+        scanning: A pesquisar…
+        subheading: Caixas de entrada ligadas e pesquisas recentes.
+    display:
+      show:
+        attachments_option: Indicador de anexos
+        chat_option: Painel de chat Scout
+        density_breathable: Espaçada
+        density_compact: Compacta
+        density_default: Predefinida
+        density_heading: Densidade
+        email_accounts_heading: Contas de email
+        heading: Visualização
+        hide_account_hint: Oculte uma conta para remover as suas conversas da lista.
+        labels_option: Etiquetas
+        no_accounts: Ainda não há contas de email ligadas.
+        show_heading: Mostrar
+        subheading: Como a sua caixa de entrada aparece neste dispositivo. Guardado
+          neste browser.
+    filtering:
+      show:
+        allowed_heading: Remetentes permitidos
+        blocked_heading: Remetentes bloqueados
+        blocked_hint: O email deles é arquivado automaticamente. Desbloqueie para
+          voltar a recebê-lo.
+        heading: Filtragem da caixa
+        no_allowed: Ainda não há remetentes permitidos.
+        no_blocked: Não há remetentes bloqueados.
+        no_starred: Ainda não há remetentes destacados.
+        remove: Remover
+        save: Guardar
+        starred_heading: Remetentes destacados
+        strategy:
+          blacklist:
+            desc: Todos chegam à sua caixa. Bloqueie remetentes um a um — o email
+              deles é arquivado automaticamente.
+            label: Lista negra (predefinição)
+          whitelist:
+            desc: Apenas remetentes permitidos e destacados chegam à sua caixa. Os
+              novos aguardam no grupo Pendentes do Skim para permitir ou recusar.
+            label: Lista branca
+        strategy_heading: Estratégia
+        subheading: Decida quais remetentes chegam à sua caixa de entrada.
+        unblock: Desbloquear
+        unstar: Remover destaque
+    tags:
+      create:
+        created_toast: Etiqueta criada.
+      destroy:
+        deleted_toast: Etiqueta eliminada.
+      form:
+        ai_prompt_hint: O que a IA usa para decidir se aplica esta etiqueta. Suporta
+          markdown.
+        ai_prompt_label: Instrução para a IA
+        cancel: Cancelar
+        color_label: Cor (hex)
+        create_tag: Criar etiqueta
+        group_label: Grupo
+        group_placeholder: ex. Finanças
+      index:
+        add_tag: Adicionar etiqueta
+        heading: Etiquetas
+        no_tags: Ainda não há etiquetas. Adicione uma para começar a organizar a sua
+          caixa de entrada.
+        subheading: As etiquetas ajudam o Scout a organizar a sua caixa de entrada
+          automaticamente.
+      tag:
+        delete_confirm: Eliminar %{name}?
+        edit: Editar
+        tagged_messages_title: Mensagens com etiqueta
+      update:
+        updated_toast: Etiqueta actualizada.

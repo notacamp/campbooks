@@ -1,0 +1,95 @@
+<%
+  # locals: title, rows, kind (:tag or :document_type), id_method, current_user, visible_count: 8
+  visible_count = local_assigns.fetch(:visible_count, 8)
+  hidden = rows.size > visible_count
+  target_key = kind == :tag ? :tag_id : :document_type_id
+%>
+
+<div class="bg-card shadow-sm rounded-lg border border-gray-200 mb-6">
+  <div class="px-5 py-3.5 border-b border-gray-200">
+    <h2 class="text-sm font-semibold text-gray-900"><%= title %></h2>
+  </div>
+
+  <table class="w-full">
+    <thead>
+      <tr class="border-b border-gray-100 bg-gray-50/50">
+        <th class="px-5 py-2.5 text-left text-xs text-gray-400 font-medium w-full"><%= t(".toggle_all") %></th>
+        <th class="px-3 py-2.5 text-center w-[88px]">
+          <%= form_with url: bulk_toggle_notification_preferences_path, method: :patch, class: "inline-flex items-center gap-1.5" do |f| %>
+            <%= f.hidden_field :kind, value: kind %>
+            <%= f.hidden_field :channel, value: :in_app %>
+            <span class="text-[11px] text-gray-500"><%= t(".in_app_label") %></span>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <%= f.check_box :value, { class: "sr-only peer", onchange: "this.form.requestSubmit()" }, true, false %>
+              <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-600"></div>
+            </label>
+          <% end %>
+        </th>
+        <th class="px-3 py-2.5 text-center w-[88px]">
+          <%= form_with url: bulk_toggle_notification_preferences_path, method: :patch, class: "inline-flex items-center gap-1.5" do |f| %>
+            <%= f.hidden_field :kind, value: kind %>
+            <%= f.hidden_field :channel, value: :email %>
+            <span class="text-[11px] text-gray-500"><%= t(".email_label") %></span>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <%= f.check_box :value, { class: "sr-only peer", onchange: "this.form.requestSubmit()" }, true, false %>
+              <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-600"></div>
+            </label>
+          <% end %>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <% rows.each_with_index do |row, idx| %>
+        <%
+          target_id = row.send(id_method)
+          pref = current_user.notification_preferences.find_or_initialize_by(kind: kind, target_key => target_id)
+          hidden_class = (hidden && idx >= visible_count) ? "hidden" : ""
+        %>
+        <tr class="border-b border-gray-100 last:border-b-0 <%= hidden_class %>" data-pref-row>
+          <td class="px-5 py-2.5">
+            <div class="flex items-center gap-3 min-w-0">
+              <%= render(Campbooks::ColorDot.new(color: row.color)) %>
+              <span class="text-sm text-gray-700 truncate"><%= row.name %></span>
+            </div>
+          </td>
+          <td class="px-3 py-2.5 text-center">
+            <%= form_with model: pref, url: toggle_notification_preferences_path, method: :patch do |f| %>
+              <%= f.hidden_field target_key, value: target_id %>
+              <%= f.hidden_field :kind, value: kind %>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <%= f.check_box :notify_in_app, { class: "sr-only peer", onchange: "this.form.requestSubmit()" }, true, false %>
+                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-600"></div>
+              </label>
+            <% end %>
+          </td>
+          <td class="px-3 py-2.5 text-center">
+            <%= form_with model: pref, url: toggle_notification_preferences_path, method: :patch do |f| %>
+              <%= f.hidden_field target_key, value: target_id %>
+              <%= f.hidden_field :kind, value: kind %>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <%= f.check_box :notify_email, { class: "sr-only peer", onchange: "this.form.requestSubmit()" }, true, false %>
+                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-600"></div>
+              </label>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+
+  <% if hidden %>
+    <div class="px-5 py-2.5 border-t border-gray-100 bg-gray-50/50 rounded-b-lg">
+      <button type="button"
+              class="text-xs text-gray-500 hover:text-gray-700 font-medium flex items-center gap-1 w-full justify-center"
+              onclick="
+                this.closest('.bg-card').querySelectorAll('[data-pref-row].hidden').forEach(function(r) { r.classList.remove('hidden'); });
+                this.remove();
+              ">
+        <%= t(".show_all", count: rows.size) %>
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+    </div>
+  <% end %>
+</div>

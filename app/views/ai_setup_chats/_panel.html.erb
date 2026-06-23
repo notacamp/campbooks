@@ -1,0 +1,57 @@
+<%# locals: thread (AgentThread|nil), kind (String), messages (Array), proposal_items (Array|nil) %>
+<% kind_label = kind == "document_types" ? t(".kind_document_types") : t(".kind_tags") %>
+<div class="flex flex-col h-[68vh] max-h-[80vh]" data-controller="ai-setup-chat">
+  <div class="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
+    <%= render(Campbooks::ScoutAvatar.new(size: :sm)) %>
+    <div class="min-w-0 flex-1">
+      <p class="text-sm font-semibold text-foreground"><%= t(".heading", kind_label: kind_label) %></p>
+      <p class="text-xs text-muted-foreground truncate"><%= t(".subtitle") %></p>
+    </div>
+    <button type="button" data-setup-modal-close aria-label="<%= t("shared.actions.close") %>"
+            class="text-muted-foreground hover:text-foreground rounded-md p-1 cursor-pointer">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
+    </button>
+  </div>
+
+  <% if thread.present? && messages.present? %>
+    <div class="flex-1 overflow-y-auto" data-ai-setup-chat-target="list">
+      <div id="setup_chat_messages_<%= thread.id %>" class="py-2">
+        <% messages.each do |m| %>
+          <%= render(Campbooks::AiSetupMessage.new(message: m)) %>
+        <% end %>
+        <% if messages.last&.from_user? %>
+          <%= render(Campbooks::ChatTyping.new(id: "setup_chat_typing_#{thread.id}", status: t(".thinking"))) %>
+        <% end %>
+      </div>
+      <%= render "ai_setup_chats/proposal", thread: thread, kind: kind, items: proposal_items %>
+    </div>
+
+    <div class="border-t border-border p-3 shrink-0">
+      <%= form_with url: ai_setup_chat_message_path(kind: kind), method: :post, class: "flex items-end gap-2",
+                    data: { action: "turbo:submit-end->ai-setup-chat#reset" } do %>
+        <textarea name="content" rows="1" placeholder="<%= t(".input_placeholder") %>"
+                  data-ai-setup-chat-target="input"
+                  data-action="keydown->ai-setup-chat#keydown"
+                  class="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500"></textarea>
+        <%= render(Campbooks::Button.new(variant: :primary, size: :sm, type: :submit)) { t("shared.actions.send") } %>
+      <% end %>
+    </div>
+  <% else %>
+    <div class="flex-1 overflow-y-auto px-6 py-8 flex flex-col items-center justify-center text-center gap-4">
+      <%= render(Campbooks::ScoutAvatar.new(size: :xl)) %>
+      <div class="space-y-1">
+        <p class="text-sm font-medium text-foreground"><%= t(".empty_heading") %></p>
+        <p class="text-sm text-muted-foreground max-w-xs mx-auto">
+          <%= t(".empty_body", kind_label: kind_label) %>
+        </p>
+      </div>
+      <%= button_to start_ai_setup_chat_path(kind: kind), method: :post, class: "inline-flex" do %>
+        <span class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 cursor-pointer">
+          <%= t(".start") %>
+        </span>
+      <% end %>
+    </div>
+  <% end %>
+</div>

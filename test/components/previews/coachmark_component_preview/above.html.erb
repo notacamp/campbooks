@@ -1,0 +1,17 @@
+<div class="flex min-h-[340px] items-end justify-center p-12">
+  <%# Single target near the bottom — the coachmark sits above it (placement: top),
+      highlighting the element's own box (union_children off). %>
+  <button id="coachmark_demo_button" type="button"
+          class="rounded-2xl bg-ember-gradient px-5 py-3 text-sm font-semibold text-white shadow-ember">
+    Ask Scout anything…
+  </button>
+
+  <%= render Campbooks::Coachmark.new(
+        tour_key: "preview_demo_top",
+        anchor: "#coachmark_demo_button",
+        placement: :top,
+        title: "Meet Scout",
+        body: "Your AI sidekick reads and sorts your inbox, then surfaces what needs you. Ask it to find or summarise anything.",
+        cta: "Got it"
+      ) %>
+</div>

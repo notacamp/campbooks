@@ -1,0 +1,4 @@
+<%# locals: message (String) %>
+<div class="px-4 py-2.5">
+  <%= render(Campbooks::Alert.new(variant: :warning, message: message)) %>
+</div>

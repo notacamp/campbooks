@@ -1,0 +1,254 @@
+---
+fr:
+  activerecord:
+    attributes:
+      agent_message:
+        reply_statuses:
+          failed: Échoué
+          pending: En attente
+          processing: En cours de traitement
+          replied: Répondu
+      ai_adapter:
+        providers:
+          anthropic: Anthropic
+          deepseek: DeepSeek
+          gemini: Gemini
+          mistral: Mistral
+          openai: OpenAI
+      ai_configuration:
+        providers:
+          anthropic: Anthropic
+          deepseek: DeepSeek
+          gemini: Gemini
+          mistral: Mistral
+          openai: OpenAI
+        purposes:
+          compose_chat: Chat de composition
+          document_analysis: Analyse de documents
+          draft_reply: Brouillon de réponse
+          email_analysis: Analyse des emails
+          email_chat: Chat par email
+          email_classification: Classification des emails
+          global_chat: Chat global
+      bug_report:
+        statuses:
+          closed: Fermé
+          open: Ouvert
+          resolved: Résolu
+          triaged: Trié
+      calendar_account:
+        providers:
+          google: Google Calendar
+          zoho: Zoho Calendar
+      calendar_account_user:
+        roles:
+          editor: Éditeur
+          manager: Gestionnaire
+          owner: Propriétaire
+          viewer: Observateur
+      calendar_sync_log:
+        statuses:
+          completed: Terminé
+          failed: Échoué
+          running: En cours
+      connection:
+        auth_types:
+          basic: Auth basique
+          bearer: Jeton Bearer
+          header: En-tête personnalisé
+          none: Aucune
+      document:
+        ai_statuses:
+          completed: Analysé
+          failed: Échoué
+          pending: En attente
+          processing: En cours de traitement
+        document_types:
+          bank_journal_entry: Écriture de journal bancaire
+          bank_statement: Relevé bancaire
+          certificate: Certificat
+          contract: Contrat
+          correspondence: Correspondance
+          expense_invoice: Facture de dépense
+          identification: Identification
+          insurance_policy: Police d'assurance
+          other: Autre
+          proposal: Proposition
+          receipt: Reçu
+          revenue_invoice: Facture de revenu
+          tax_document: Document fiscal
+          vehicle_document: Document de véhicule
+        expense_categories:
+          equipment: Équipement
+          marketing: Marketing
+          meals: Repas et Représentation
+          office_supplies: Fournitures de Bureau
+          other: Autre
+          professional_services: Services Professionnels
+          rent: Loyer
+          software: Logiciels et Abonnements
+          travel: Déplacements
+          utilities: Charges
+        review_statuses:
+          approved: Approuvé
+          pending: À vérifier
+          rejected: Rejeté
+        sources:
+          email: Email
+          manual_upload: Téléversement manuel
+          notion: Notion
+      document_type:
+        categories:
+          accounting: Comptabilité
+          correspondence: Correspondance
+          identification: Identification
+          insurance: Assurance
+          legal: Juridique
+          other: Autre
+          vehicles: Véhicules
+      email_account:
+        providers:
+          google: Gmail
+          microsoft: Microsoft 365
+          zoho: Zoho Mail
+      email_account_user:
+        roles:
+          collaborator: Collaborateur
+          manager: Gestionnaire
+          owner: Propriétaire
+          viewer: Lecteur
+      email_message:
+        ai_priorities:
+          high: Élevé
+          low: Faible
+          medium: Moyen
+        statuses:
+          failed: Échoué
+          fetched: Récupéré
+          ignored: Ignoré
+          processed: Traité
+          processing: En cours de traitement
+      email_scan_log:
+        statuses:
+          completed: Terminé
+          failed: Échoué
+          running: En cours
+      export:
+        statuses:
+          failed: Échoué
+          generated: Généré
+          generating: En cours de génération
+          pending: En attente
+      google_drive_config:
+        subfolder_patterns:
+          entity: Entité
+          flat: Plat
+          year: Année
+          year_month: Année / Mois
+      invitation:
+        statuses:
+          accepted: Acceptée
+          cancelled: Annulée
+          expired: Expirée
+          pending: En attente
+      notification:
+        categories:
+          activity: Activité
+          ai_reply: Réponse IA
+          comment: Commentaire
+          contact: Contact
+          document: Document
+          export: Export
+          mention: Mention
+          system: Système
+        priorities:
+          action_required: Action requise
+          activity: Activité
+          awaiting: En attente
+      notion_page:
+        sync_statuses:
+          error: Erreur
+          outdated: Obsolète
+          synced: Synchronisé
+      person:
+        relationship_types:
+          client: Client
+          colleague: Collègue
+          partner: Partenaire
+          personal: Personnel
+          self: Moi-même
+          service_provider: Prestataire de services
+          unknown: Inconnu
+          vendor: Fournisseur
+      signup_request:
+        statuses:
+          accepted: Acceptée
+          approved: Approuvée
+          pending: En attente
+          rejected: Refusée
+      user:
+        roles:
+          admin: Admin
+          member: Membre
+      workflow:
+        trigger_types:
+          email_received: Email reçu
+          webhook: Webhook
+      workflow_execution:
+        statuses:
+          completed: Terminé
+          failed: Échoué
+          running: En cours
+      workflow_execution_step:
+        statuses:
+          completed: Terminé
+          failed: Échoué
+          pending: En attente
+          running: En cours
+          skipped: Ignoré
+      workflow_step:
+        action_types:
+          custom_action: Action personnalisée
+          discord_message: Message Discord
+          email_action: Action e-mail
+          google_drive_create_folder: Créer un dossier dans Drive
+          google_drive_upload: Importer vers Drive
+          http_request: Requête HTTP
+          notion_create_database_item: Créer un élément Notion
+          notion_create_page: Créer une page Notion
+          send_email: Envoyer un email
+          slack_message: Message Slack
+    errors:
+      models:
+        ai_adapter:
+          attributes:
+            api_key:
+              must_be_blank_for_managed: doit être vide pour les fournisseurs gérés
+                par Campbooks
+            endpoint_url:
+              unsafe: doit être une URL http(s) publique — les adresses internes ou
+                de loopback ne sont pas autorisées
+            managed:
+              unavailable_self_hosted: n'est pas disponible sur les installations
+                auto-hébergées
+        ai_configuration:
+          attributes:
+            ai_adapter:
+              not_vision_capable: doit être un fournisseur compatible vision pour
+                l'analyse de documents. DeepSeek ne prend pas en charge le traitement
+                des images/PDF. Utilisez OpenAI, Anthropic ou Gemini.
+            system_prompt:
+              too_long: doit contenir moins de 2000 caractères
+        contact:
+          attributes:
+            email:
+              taken: existe déjà en tant que contact
+        invitation:
+          attributes:
+            email:
+              already_invited: a déjà été invité
+              already_member: est déjà membre de cet espace de travail
+        mail_folder:
+          attributes:
+            name:
+              reserved: est réservé à un dossier système

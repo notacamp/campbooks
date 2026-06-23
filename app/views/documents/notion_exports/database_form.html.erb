@@ -1,0 +1,23 @@
+<%= turbo_frame_tag "notion_export_step" do %>
+  <% if @error %>
+    <p class="text-sm text-red-600 dark:text-red-400"><%= t(".error", message: @error) %></p>
+  <% else %>
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-sm font-semibold text-gray-900"><%= @database_title || t(".untitled") %></h3>
+      <%= link_to t(".back"), databases_document_notion_export_path(@document, integration_id: @integration.id),
+            data: { turbo_frame: "notion_export_step" }, class: "text-xs text-accent-600 hover:text-accent-700" %>
+    </div>
+
+    <%= form_with url: document_notion_export_path(@document), method: :post, data: { turbo: false }, class: "space-y-4" do %>
+      <%= hidden_field_tag :integration_id, @integration.id %>
+      <%= hidden_field_tag :database_id, @database_id %>
+      <%= hidden_field_tag :kind, "database" %>
+
+      <%= render Campbooks::Notion::DatabaseForm.new(schema: @schema, file_label: @document.original_file.filename.to_s) %>
+
+      <div class="flex justify-end">
+        <%= render Campbooks::Button.new(variant: :primary, type: :submit) { t(".create_item") } %>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>

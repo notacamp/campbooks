@@ -1,0 +1,188 @@
+---
+en:
+  components:
+    board_card:
+      no_subject: "(no subject)"
+      snoozed_prefix: Until
+    board_column:
+      awaiting: Awaiting reply
+      awaiting_hint: Auto-curated — drag cards out, not in
+      done: Done
+      empty: Nothing here
+      inbox: Inbox
+      more: "+ more"
+      snoozed: Snoozed
+    category_chip:
+      labels:
+        important: Important
+        notifications: Notifications
+        personal: Personal
+        promotions: Promotions
+        social: Social
+        updates: Updates
+    compose_actions:
+      section_labels:
+        select_account: From
+        send_email: Send
+        set_body: Body
+        set_recipients: To
+        set_signature: Signature
+        set_subject: Subject
+      use_this_draft: Use this draft
+    compose_area:
+      bcc_button: Bcc
+      discard: Discard
+      discard_aria: Discard compose
+      header_forward: Forwarding message
+      header_new_message: New message
+      header_reply: Replying to %{address}
+      header_reply_all: Replying to all
+      label_bcc: 'Bcc:'
+      label_cc: 'Cc:'
+      label_signature: 'Sig:'
+      label_subject: 'Subj:'
+      label_to: 'To:'
+      no_signature: No signature
+      placeholder_bcc: Add BCC...
+      placeholder_body: Write your message...
+      placeholder_cc: Add CC...
+      placeholder_to: Search contacts or type email...
+      send: Send
+      signature_default: "%{name} (default)"
+      signature_preview_label: Signature
+      toolbar_bold: Bold
+      toolbar_bullet_list: Bullet List
+      toolbar_italic: Italic
+      toolbar_link: Insert Link
+      toolbar_ordered_list: Numbered List
+      toolbar_redo: Redo
+      toolbar_undo: Undo
+    compose_attachments:
+      attach: Attach files
+      upload_failed: Upload failed
+    contact_avatar:
+      received_indicator: "↓"
+      sent_indicator: "↑"
+    contact_popover:
+      email_count_label: emails
+      last_email_label: 'last:'
+      view_profile: View profile →
+    document_chip:
+      unclassified: Unclassified
+    email_account_popover:
+      connected: Connected
+      disconnected: Disconnected
+      emails_label: emails
+      manage: Manage account →
+      never_synced: Not synced yet
+      synced_ago: Synced %{time} ago
+      syncing: Syncing…
+    email_account_sharing:
+      add_button: Add
+      add_section_title: Add someone
+      all_have_access: Everyone in your workspace already has access to this account.
+      back_to_accounts: Accounts
+      owner_badge: Owner
+      panel_description: 'Choose who in your workspace can view or send from '
+      panel_title: Manage access
+      remove_access_title: Remove access
+      remove_confirm: Remove %{name}'s access to %{email}?
+      role_aria_label: Role
+      role_for_aria: Role for %{name}
+      select_person_placeholder: Select a person…
+      you_badge: "(you)"
+    email_detail:
+      attachments:
+        count:
+          one: "%{count} attachment"
+          other: "%{count} attachments"
+        from_message_title: 'From message: %{time}'
+        from_thread:
+          one: " from %{count} message in thread"
+          other: " from %{count} messages in thread"
+      discussion: Discussion
+      forward: Forward
+      labels_label: Labels
+      no_content: No content.
+      no_subject: "(no subject)"
+      open_full_view: Open in full view
+      reply: Reply
+      reply_all: Reply all
+      selected_badge: Selected
+      send_to_notion: Save to Notion
+      tags_label: Tags
+    email_filter_panel:
+      accounts: Accounts
+      all_folders: All folders
+      any_category: Any category
+      any_priority: Any priority
+      category: Category
+      date_from: From
+      date_to: To
+      domain: Domain
+      domain_placeholder: example.com
+      folder: Folder
+      has_attachment: Has attachment
+      priority: Priority
+      priority_high: High
+      priority_low: Low
+      priority_medium: Medium
+      sender: Sender
+      sender_placeholder: name or email
+      tag_filter_placeholder: Filter tags…
+      tag_match_all: All tags
+      tag_match_any: Any tag
+      tags: Tags
+      unread: Unread only
+    email_list_item:
+      no_subject: "(no subject)"
+      sent_to: To %{address}
+    email_search_bar:
+      clear: Clear search
+      filters: Filters
+      placeholder: Search mail…
+    email_search_result:
+      no_subject: "(no subject)"
+      sent_to: To %{address}
+    inbox_view_switcher:
+      aria_label: Inbox layout
+      board: Board view
+      default: Default view
+      list: List view
+    new_folder_modal:
+      name_label: Folder name
+      name_placeholder: e.g. Receipts
+      submit: Create folder
+      subtitle: Added to all your connected inboxes.
+      title: New folder
+    rich_text_editor:
+      align_center: Align center
+      align_left: Align left
+      align_right: Align right
+      block_type: Text style
+      blockquote: Quote
+      bold: Bold
+      bullet_list: Bullet list
+      clear_formatting: Clear formatting
+      code_block: Code block
+      heading_1: Heading 1
+      heading_2: Heading 2
+      heading_3: Heading 3
+      horizontal_rule: Divider
+      image: Insert image
+      image_insert: Insert
+      image_upload: Upload
+      image_url_placeholder: Paste image URL…
+      inline_code: Inline code
+      italic: Italic
+      link: Link
+      link_apply: Apply
+      link_remove: Remove
+      link_url_placeholder: Paste or type a URL…
+      numbered_list: Numbered list
+      paragraph: Normal text
+      redo: Redo
+      strikethrough: Strikethrough
+      text_color: Text color
+      underline: Underline
+      undo: Undo

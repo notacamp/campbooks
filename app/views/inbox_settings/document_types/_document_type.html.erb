@@ -1,0 +1,26 @@
+<%# locals: type %>
+<%= turbo_frame_tag dom_id(type) do %>
+  <div class="flex items-center gap-3 py-2.5 px-1 border-b border-border last:border-0">
+    <%= render(Campbooks::ColorDot.new(color: type.color)) %>
+    <div class="min-w-0 flex-1">
+      <div class="flex items-center gap-2">
+        <span class="text-[13px] font-medium text-foreground truncate"><%= type.name %></span>
+        <% if type.category.present? %>
+          <%= render(Campbooks::Badge.new(variant: :neutral, size: :md)) { human_enum(DocumentType, :category, type.category) } %>
+        <% end %>
+      </div>
+      <% if type.prompt.present? %>
+        <p class="text-xs text-muted-foreground truncate mt-0.5"><%= type.prompt.truncate(90) %></p>
+      <% end %>
+    </div>
+    <span class="text-xs text-muted-foreground tabular-nums flex-shrink-0" title="<%= t(".documents_title") %>"><%= type.documents.count %></span>
+    <div class="flex items-center gap-1 flex-shrink-0">
+      <%= link_to t("shared.actions.edit"), edit_inbox_settings_document_type_path(type),
+            data: { turbo_frame: "inbox_settings_doc_type_form" },
+            class: "px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded cursor-pointer transition-colors" %>
+      <%= button_to t("shared.actions.delete"), inbox_settings_document_type_path(type), method: :delete,
+            data: { turbo_confirm: t(".delete_confirm", name: type.name) },
+            class: "px-2 py-0.5 text-xs font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 rounded cursor-pointer transition-colors" %>
+    </div>
+  </div>
+<% end %>

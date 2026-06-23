@@ -1,0 +1,84 @@
+---
+en:
+  command_palette:
+    categories:
+      actions: Actions
+      admin: Admin
+      calendar: Calendar
+      docs: Docs
+      navigate: Navigate
+      settings: Settings
+    commands:
+      admin_dashboard: Admin dashboard
+      admin_invitations: Invitations
+      admin_signups: Signup requests
+      admin_users: Users
+      calendar: Calendar
+      calendar_agenda: 'Calendar: agenda view'
+      calendar_day: 'Calendar: day view'
+      calendar_month: 'Calendar: month view'
+      calendar_today: 'Calendar: today'
+      calendar_week: 'Calendar: week view'
+      documents: Documents
+      email_scans: Email scans
+      inbox: Inbox
+      new_calendar_event: New calendar event
+      new_email: Start new email
+      new_workflow: Create workflow
+      notifications: Notifications
+      scan_emails: Scan emails now
+      scout_ai_chat: Scout AI Chat
+      settings: Settings
+      settings_account: Account
+      settings_ai: AI settings
+      settings_contacts: Contacts
+      settings_doctypes: Document types
+      settings_gdrive: Google Drive integration
+      settings_integrations: Integrations
+      settings_members: Members
+      settings_notifications: Notification settings
+      settings_notion: Notion integration
+      settings_signatures: Signatures
+      settings_sync: Email accounts
+      settings_tags: Tags
+      settings_zdrive: Zoho Drive integration
+      workflows: Workflows
+  scout:
+    briefing:
+      greeting:
+        afternoon: Good afternoon
+        evening: Good evening
+        morning: Good morning
+        with_name: "%{time_of_day}, %{name}"
+      stats:
+        docs_review:
+          label: Docs to review
+          prompt: Which documents still need review?
+        high_priority:
+          label: High priority
+          prompt: What are my high-priority emails right now?
+        this_week:
+          label: This week
+          prompt: Summarize this week's email activity
+        unread:
+          label: Unread
+          prompt: Summarize my unread emails
+      subtitle:
+        all_caught_up: You're all caught up. Ask me about your emails, documents,
+          or contacts whenever you need.
+        has_unread: Let's make sense of your inbox. Ask me anything, or tap a card
+          to dive in.
+        urgent:
+          one: One email looks urgent. Want me to pull it up?
+          other: "%{count} emails look urgent. Want me to pull them up?"
+      suggestions:
+        attention_today: What needs my attention today?
+        newsletters: Which newsletters can I archive?
+        recent_invoices: Find my recent invoices
+        week_summary: Summarize this week's emails
+    status:
+      generate_report: Crunching the numbers…
+      query_contacts: Checking your contacts…
+      query_documents: Looking through your documents…
+      query_emails: Searching your inbox…
+      working: Working on it…

@@ -1,0 +1,4 @@
+<%# Inline flash alerts (error, warning). Rendered at the top of <main>. %>
+<% flash_inline_alerts.each do |notification| %>
+  <%= render(Campbooks::Alert.new(variant: notification[:severity], message: notification[:message])) %>
+<% end %>

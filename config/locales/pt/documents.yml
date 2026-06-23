@@ -1,0 +1,212 @@
+---
+pt:
+  documents:
+    drive_exports:
+      create:
+        no_file: Este documento não tem ficheiro para carregar.
+        upload_failed: 'Falha no carregamento: %{message}'
+        uploaded: Carregado para o Google Drive.
+      create_folder:
+        folder_created: Pasta "%{name}" criada.
+        folder_failed: 'Não foi possível criar a pasta: %{message}'
+        folder_name_required: Introduza um nome para a pasta.
+      errors:
+        not_connected: Ligue primeiro o Google Drive.
+        reconnect_needed: Religue o Google Drive para ativar a navegação de pastas.
+      new:
+        browse_failed: 'Não foi possível navegar no Drive: %{message}'
+        choose_folder: Escolher uma pasta
+        create_folder: Criar pasta
+        my_drive: My Drive
+        new_folder_placeholder: Nome da nova pasta
+        no_subfolders: Ainda não há pastas aqui.
+        subtitle: Escolha onde colocar %{document}.
+        title: Enviar para o Google Drive
+        upload_here: Carregar para %{folder}
+    forms:
+      bank_statement:
+        account_number: Número de Conta
+        bank_name: Nome do Banco
+        closing_balance: Saldo Final (cêntimos)
+        currency: Moeda
+        opening_balance: Saldo Inicial (cêntimos)
+        period_end: Fim do Período
+        period_start: Início do Período
+      expense_invoice:
+        amount_cents: Montante (cêntimos)
+        buyer_nif: NIF do Comprador
+        company_vat_present: NIF da empresa presente
+        currency: Moeda
+        document_date: Data do Documento
+        due_date: Data de Vencimento
+        expense_category: Categoria de Despesa
+        invoice_number: Número de Factura
+        select_category: Selecionar categoria
+        tax_amount_cents: Montante de IVA (cêntimos)
+        tax_rate: Taxa de IVA (%)
+        vendor_name: Nome do Fornecedor
+        vendor_nif: NIF do Fornecedor
+      other:
+        document_date: Data do Documento
+        entity_name: Nome da Entidade
+      receipt:
+        amount_cents: Montante (cêntimos)
+        document_date: Data do Documento
+        payment_method: Método de Pagamento
+        receipt_number: Número de Recibo
+        select_method: Seleccionar método
+        vendor_name: Nome do Fornecedor
+        vendor_nif: NIF do Fornecedor
+      revenue_invoice:
+        amount_cents: Montante (cêntimos)
+        client_name: Nome do Cliente
+        client_nif: NIF do Cliente
+        currency: Moeda
+        document_date: Data do Documento
+        due_date: Data de Vencimento
+        invoice_number: Número de Factura
+        tax_amount_cents: Montante de IVA (cêntimos)
+        tax_rate: Taxa de IVA (%)
+    index:
+      accepted_formats: PDF, JPG, PNG, WEBP, HEIC
+      click_to_upload: Clique para carregar
+      col_date: Data
+      col_name: Nome
+      col_reference: Referência
+      col_source: Origem
+      col_status: Estado
+      col_type: Tipo
+      download_zip: Transferir ZIP
+      drag_and_drop: ou arraste e largue
+      empty_connect_email: Ligar uma conta de email
+      empty_description: O Scout arquiva automaticamente os documentos da sua caixa
+        de entrada. Ligue uma conta de email ou carregue um ficheiro para começar.
+      empty_description_connected: O Scout está a vigiar a sua caixa de entrada e
+        arquiva aqui os documentos à medida que chegam. Também pode carregar um manualmente.
+      empty_title: Ainda não há documentos
+      empty_upload: Carregar um documento
+      export: Exportar
+      export_confirm: Gerar um ZIP com todos os documentos que correspondem aos filtros
+        actuais?
+      export_failed: Falhou
+      exports_col_date: Data
+      exports_col_documents: Documentos
+      exports_col_download: Transferir
+      exports_col_status: Estado
+      exports_heading: Exportações
+      filter_all_categories: Todas as categorias
+      filter_all_statuses: Todos os estados
+      filter_all_types: Todos os tipos
+      filter_category: Categoria
+      filter_month: Mês
+      filter_status: Estado
+      filter_type: Tipo
+      filter_types_selected:
+        one: "%{count} seleccionado"
+        other: "%{count} seleccionados"
+      filters: Filtros
+      no_documents: Nenhum documento corresponde a estes filtros.
+      reanalyze_all: Reanalisar Todos (%{count})
+      selected_files: 'Ficheiros seleccionados:'
+      title: Documentos
+      upload: Carregar
+      upload_and_process: Carregar e Processar
+    merge:
+      keep_this_one: Manter Este
+      label_date: 'Data:'
+      label_file: 'Ficheiro:'
+      label_linked_emails: 'Emails associados:'
+      label_ref: 'Ref.:'
+      label_status: 'Estado:'
+      merge_confirm: Fundir %{count} documento(s) neste? Os restantes serão eliminados.
+      subtitle: Escolha qual o documento a manter. As ligações de email dos outros
+        documentos serão movidas para o documento escolhido.
+      title: Fundir Documentos
+    notion_exports:
+      create:
+        created: Enviado para o Notion.
+        failed: Não foi possível criar o item no Notion.
+        failed_with: 'Falha na exportação para o Notion: %{message}'
+        pick_destination: Escolha um destino no Notion.
+      database_form:
+        back: "← Bases de dados"
+        create_item: Criar item no Notion
+        error: 'Não foi possível carregar a base de dados: %{message}'
+        untitled: Base de dados sem título
+      databases:
+        error: 'Não foi possível carregar as bases de dados: %{message}'
+        none: Nenhuma base de dados encontrada. Partilhe uma base de dados com esta
+          integração no Notion.
+        search: Pesquisar bases de dados…
+      errors:
+        not_connected: Ligue primeiro o Notion.
+      new:
+        heading: Para onde deve ir?
+        subtitle: Adicionar %{document} ao Notion.
+        title: Enviar para o Notion
+        to_database: Adicionar a uma base de dados
+        to_database_desc: Crie um item na base de dados e preencha os campos.
+        to_page: Criar uma página
+        to_page_desc: Adicione uma subpágina abaixo de uma página à sua escolha.
+        workspace: Espaço de trabalho
+        workspace_one: 'Espaço de trabalho: %{name}'
+      pages:
+        attach_file: Anexar %{file}
+        create_page: Criar página no Notion
+        error: 'Não foi possível carregar as páginas: %{message}'
+        none: Nenhuma página encontrada. Partilhe uma página com esta integração no
+          Notion.
+        note: Nota (opcional)
+        page_title: Título da página
+        parent_page: Página principal
+        search: Pesquisar páginas…
+      shared:
+        untitled: Sem título
+    pdf_overlay:
+      close_aria_label: Fechar
+      close_title: Fechar
+      fullscreen_iframe_title: Pré-visualização do PDF em ecrã inteiro
+    row:
+      approve: Aprovar
+      reanalyze: Reanalisar
+      reject: Rejeitar
+      rename: Mudar o nome
+      unclassified: Não classificado
+    show:
+      ai_confidence: Confiança da IA
+      ai_failed_hint: Reanalise para tentar de novo, ou defina o tipo manualmente
+        e aprove.
+      ai_failed_title: A análise da IA falhou
+      approve: Aprovar
+      back: Voltar aos documentos
+      created_at: Criado há %{time}
+      document_fallback_title: 'Documento #%{id}'
+      download: Transferir
+      email_link_fallback: Email
+      extracted_data: Dados extraídos
+      from: De
+      label_description: Descrição
+      label_document_type: Classificação
+      learned_hint: Sugerido a partir de %{count} de %{total} documentos aprovados
+        classificados como %{type}.
+      maximize: Maximizar
+      original_pdf_iframe_title: Pré-visualização do PDF original
+      original_pdf_label: PDF Original
+      processed_pdf_iframe_title: Pré-visualização do PDF processado
+      processed_pdf_label: PDF Processado
+      reanalyze: Reanalisar
+      reclassify_hint: Alterar o tipo marca este documento como revisto.
+      reviewed_by: Revisto por %{name}
+      save_changes: Guardar alterações
+      send_to_drive: Enviar para o Drive
+      send_to_notion: Enviar para o Notion
+    skim:
+      show:
+        back_to_documents: Voltar aos documentos
+        close: Fechar
+        no_documents_body: Tudo o que a IA sinalizou já foi tratado.
+        no_documents_title: Nenhum documento para rever
+      tray_content:
+        ai_unsure: "%{count} sobre os quais a IA ficou em dúvida — reveja para confirmar
+          ou reclassificar"
+        needs_review: Necessita de revisão

@@ -1,0 +1,54 @@
+<%= render(Campbooks::PageHeader.new(
+  title: t(".title"),
+  subtitle: l(@execution.created_at, format: :at),
+  spacing: :md
+)) do |header| %>
+  <% header.with_actions do %>
+    <%= link_to t(".all_runs"), workflow_executions_path(@workflow), class: "text-sm text-muted-foreground hover:text-foreground" %>
+  <% end %>
+<% end %>
+
+<div class="max-w-3xl space-y-4">
+  <%= render(Campbooks::Card.new(padding: :md)) do %>
+    <div class="flex flex-wrap items-center gap-3 mb-3">
+      <%= render(Campbooks::Badge.new(variant: execution_badge_variant(@execution), size: :md)) { human_enum(WorkflowExecution, :status, @execution.status) } %>
+      <span class="text-sm font-medium text-foreground"><%= @workflow.name %></span>
+      <% if @execution.completed_at && @execution.started_at %>
+        <span class="text-xs text-muted-foreground"><%= t(".took", duration: distance_of_time_in_words(@execution.started_at, @execution.completed_at, include_seconds: true)) %></span>
+      <% end %>
+    </div>
+
+    <% if @execution.error_message.present? %>
+      <%= render(Campbooks::Alert.new(variant: :error, class: "mb-3")) { @execution.error_message } %>
+    <% end %>
+
+    <h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5"><%= t(".trigger_data") %></h3>
+    <%= render(Campbooks::CodeBlock.new(content: @execution.trigger_data)) %>
+  <% end %>
+
+  <div>
+    <h2 class="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3"><%= t(".steps_heading") %></h2>
+    <div class="space-y-3">
+      <% @steps.each_with_index do |step_exec, idx| %>
+        <%= render(Campbooks::Card.new(padding: :md)) do %>
+          <div class="flex items-center justify-between gap-3 mb-3">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="w-6 h-6 rounded-full bg-muted text-muted-foreground text-xs flex items-center justify-center flex-shrink-0"><%= idx + 1 %></span>
+              <span class="text-sm font-medium text-foreground truncate"><%= step_exec.workflow_step&.heading || t(".step_fallback") %></span>
+            </div>
+            <%= render(Campbooks::Badge.new(variant: execution_badge_variant(step_exec), size: :md)) { human_enum(WorkflowExecutionStep, :status, step_exec.status) } %>
+          </div>
+
+          <% if step_exec.error_message.present? %>
+            <p class="text-xs text-destructive mb-3"><%= step_exec.error_message %></p>
+          <% end %>
+
+          <% if step_exec.output_data.present? && step_exec.output_data != {} %>
+            <h4 class="text-xs font-medium text-muted-foreground mb-1.5"><%= t(".result") %></h4>
+            <%= render(Campbooks::CodeBlock.new(content: step_exec.output_data, max_height: "max-h-60")) %>
+          <% end %>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+</div>

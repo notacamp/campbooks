@@ -1,0 +1,64 @@
+---
+en:
+  inbox_settings:
+    document_types:
+      create:
+        success: Document type created.
+      destroy:
+        success: Document type deleted.
+      document_type:
+        delete_confirm: Delete %{name}?
+        documents_title: Documents
+      form:
+        ai_prompt_hint: What the AI uses to classify this document type. Supports
+          markdown.
+        ai_prompt_label: AI prompt
+        auto_star_hint: Starred documents appear at the top of the list.
+        auto_star_label: Auto-star documents of this type
+        color_label: Color (hex)
+        create_type: Create type
+        extraction_schema_hint: Optional. Fields to extract, each with a type (string/integer/number)
+          and description.
+        extraction_schema_label: Extraction schema (JSON)
+        extraction_schema_placeholder: '{"field_name":{"type":"string","description":"What
+          this field represents"}}'
+        none_option: None
+      index:
+        add_type: Add type
+        empty: No document types yet. Add one to tell Scout what to classify.
+        heading: Document types
+        subtitle: What documents Scout looks for and the data it extracts.
+      update:
+        success: Document type updated.
+    external_labels:
+      index:
+        account_label: Account
+        color_label: Color
+        heading: Labels
+        new_label_label: New label
+        new_label_placeholder: Label name
+        no_accounts: No email accounts connected yet.
+        subtitle: Provider labels synced with your mailbox.
+        sync: Sync
+      labels:
+        delete_confirm: Delete this label from your mailbox?
+        empty: No labels yet. Sync from your provider or add one above.
+    signatures:
+      form:
+        assign_accounts_heading: Assign to accounts
+        content_label: Content
+        create_signature: Create signature
+        editor_placeholder: Write your email signature...
+        name_label: Name
+        name_placeholder: e.g. Professional, Casual
+        set_default_label: Set as default signature
+      index:
+        add_signature: Add signature
+        heading: Signatures
+        subtitle: Reusable signatures for composing email.
+      list:
+        empty: No signatures yet. Add one to append it when composing.
+      signature:
+        default_badge: default
+        delete_confirm: Delete this signature?
+        set_default: Set default

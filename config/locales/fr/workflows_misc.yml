@@ -1,0 +1,119 @@
+---
+fr:
+  dashboard:
+    show:
+      all_set_description: Les nouveaux e-mails et documents apparaîtront ici quand
+        ils nécessiteront votre attention.
+      all_set_title: Tout est configuré — en attente de données.
+      attention_empty_idle: Les nouveaux e-mails et documents apparaîtront ici quand
+        ils nécessiteront une action.
+      attention_empty_recent: Voici ce qui est arrivé depuis votre dernière visite.
+      attention_empty_title: Rien ne nécessite votre attention.
+      attention_heading: Nécessite votre attention
+      high_priority: Haute priorité
+      no_subject: "(sans objet)"
+      recent_activity_heading: Activité récente
+      recent_syncs_heading: Synchronisations récentes
+      scan_documents:
+        one: 1 document
+        other: "%{count} documents"
+      scan_emails:
+        one: 1 e-mail
+        other: "%{count} e-mails"
+      scan_errors:
+        one: 1 erreur
+        other: "%{count} erreurs"
+      setup_description: Complétez ces étapes pour commencer à traiter des documents
+        et des e-mails.
+      setup_title: Finalisez la configuration de votre espace de travail.
+      stuck_documents:
+        one: 1 document bloqué en cours de traitement.
+        other: "%{count} documents bloqués en cours de traitement."
+      time_ago: il y a %{time}
+      title: Accueil
+      unnamed_document: Document sans nom
+      view: Voir
+  email_message_tags:
+    create:
+      tagged_as: Étiqueté « %{name} »
+    destroy:
+      tag_removed: Étiquette « %{name} » supprimée
+  email_message_zoho_labels:
+    create:
+      label_applied: Libellé « %{name} » appliqué
+    destroy:
+      label_removed: Libellé « %{name} » supprimé
+  workflow_executions:
+    index:
+      back_to_workflow: Retour au flux de travail
+      empty_description: Ce flux de travail apparaîtra ici à chaque déclenchement.
+      empty_title: Aucune exécution pour l'instant
+      steps:
+        one: 1 étape
+        other: "%{count} étapes"
+      subtitle: Chaque déclenchement de ce flux de travail et ce qui s'est passé
+      title: "%{name} — Exécutions"
+      triggered: Déclenché
+    show:
+      all_runs: Toutes les exécutions
+      result: Résultat
+      step_fallback: Étape
+      steps_heading: Étapes
+      title: Détail de l'exécution
+      took: durée %{duration}
+      trigger_data: Données du déclencheur
+  workflows:
+    notion_fields:
+      error: "Impossible de charger les champs : %{message}"
+      prompt: "Saisissez un ID de base de données et chargez ses champs."
+      no_fields: "Cette base de données n'a pas de champs que Campbooks peut remplir."
+    edit:
+      back_to_workflows: Retour aux flux de travail
+      description_label: Description (optionnelle)
+      description_placeholder: Que fait ce flux de travail ?
+      name_label: Nom du flux de travail
+      name_placeholder: Mon automatisation
+      new_workflow: Nouveau flux de travail
+      no_runs_yet: Aucune exécution pour l'instant. Ce flux de travail s'exécute automatiquement
+        quand son déclencheur se déclenche.
+      recent_runs_heading: Exécutions récentes
+      regenerate_url: Régénérer l'URL
+      regenerate_url_confirm: Générer une nouvelle URL ? L'URL actuelle cessera de
+        fonctionner.
+      subtitle: Configurez votre automatisation
+      template_variables_heading: Variables de gabarit
+      then_label: Alors
+      time_ago: il y a %{time}
+      trigger_email_received: E-mail reçu
+      trigger_event: Événement de domaine
+      trigger_webhook: Webhook entrant
+      view_all: Voir tout
+      webhook_url_description: Pointez un service externe ici pour déclencher ce flux
+        de travail.
+      webhook_url_heading: URL du webhook
+      when_label: Quand
+    index:
+      create_workflow: Créer un flux de travail
+      delete_confirm: Supprimer ce flux de travail ?
+      empty_description: Créez votre premier flux de travail pour automatiser le traitement
+        des e-mails.
+      empty_title: Aucun flux de travail pour l'instant
+      enable: Activer
+      new_workflow: Nouveau flux de travail
+      pause: Mettre en pause
+      status_active: Actif
+      status_paused: En pause
+      steps:
+        one: 1 étape
+        other: "%{count} étapes"
+      subtitle: Automatisez le traitement de vos e-mails avec des déclencheurs et
+        des actions
+      trigger_meta: déclencheur %{trigger} · %{steps}
+  zoho_drive_accounts:
+    new:
+      connect_button: Connecter un compte Zoho Drive
+      description: Connectez votre compte Zoho Drive pour transférer des documents
+        depuis Campbooks. Vous serez redirigé vers Zoho pour autoriser l'accès.
+      permissions_note: Cela demandera l'autorisation de créer et lire des fichiers
+        dans votre Zoho WorkDrive.
+      title: Connecter Zoho Drive

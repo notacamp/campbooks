@@ -1,0 +1,51 @@
+<%= turbo_frame_tag "notion_export_step" do %>
+  <% if @error %>
+    <p class="text-sm text-red-600 dark:text-red-400"><%= t(".error", message: @error) %></p>
+  <% else %>
+    <%= form_with url: pages_email_message_notion_export_path(@email_message, integration_id: @integration.id),
+          method: :get, data: { turbo_frame: "notion_export_step" }, class: "mb-3" do %>
+      <%= text_field_tag :q, params[:q], placeholder: t(".search"),
+            class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+    <% end %>
+
+    <%= form_with url: email_message_notion_export_path(@email_message), method: :post, data: { turbo: false }, class: "space-y-4" do %>
+      <%= hidden_field_tag :integration_id, @integration.id %>
+      <%= hidden_field_tag :kind, "page" %>
+
+      <div class="space-y-1">
+        <label class="block text-sm font-medium text-gray-700"><%= t(".parent_page") %></label>
+        <% if @pages.any? %>
+          <div class="border border-gray-200 rounded-lg divide-y divide-gray-100 max-h-56 overflow-y-auto dark:border-white/10 dark:divide-white/5">
+            <% @pages.each_with_index do |pg, i| %>
+              <label class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer dark:hover:bg-white/5">
+                <%= radio_button_tag :parent_page_id, pg["id"], i.zero?, class: "text-accent-600 focus:ring-accent-500" %>
+                <span class="text-sm text-gray-700 truncate"><%= notion_page_title(pg) %></span>
+              </label>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-sm text-gray-500"><%= t(".none") %></p>
+        <% end %>
+      </div>
+
+      <%= render Campbooks::Input.new("title", label: t(".page_title"), value: @email_message.subject) %>
+
+      <div class="space-y-1">
+        <label for="note" class="block text-sm font-medium text-gray-700"><%= t(".note") %></label>
+        <%= text_area_tag :note, nil, rows: 3,
+              class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+      </div>
+
+      <% if @email_message.files.attached? %>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <%= check_box_tag :attach_file, "1", true, class: "rounded border-gray-300 text-accent-600 focus:ring-accent-500" %>
+          <span class="text-sm text-gray-700"><%= t(".attach_files", count: @email_message.files.count) %></span>
+        </label>
+      <% end %>
+
+      <div class="flex justify-end">
+        <%= render Campbooks::Button.new(variant: :primary, type: :submit, disabled: @pages.empty?) { t(".create_page") } %>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>
