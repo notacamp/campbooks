@@ -25,7 +25,7 @@ gem "bcrypt", "~> 3.1.7"
 #   rqrcode  — QR provisioning codes (rendered as inline SVG) for TOTP enrollment
 #   webauthn — FIDO2/passkeys (second factor): verifies registration/auth ceremonies
 gem "rotp", "~> 6.3"
-gem "rqrcode", "~> 2.2"
+gem "rqrcode", "~> 3.2"
 gem "webauthn", "~> 3.0"
 
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
