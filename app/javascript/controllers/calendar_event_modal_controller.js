@@ -62,7 +62,11 @@ export default class extends Controller {
     if (!this.dialogTarget.open) this.dialogTarget.showModal()
   }
 
-  close() {
+  // The close/cancel controls are links to the calendar (so they still work on the
+  // standalone full-page form, where this controller isn't mounted). When the modal
+  // IS present we handle the close in-place: swallow the click so it doesn't navigate.
+  close(event) {
+    if (event) event.preventDefault()
     if (this.dialogTarget.open) this.dialogTarget.close()
   }
 
