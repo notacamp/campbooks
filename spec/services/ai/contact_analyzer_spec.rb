@@ -25,6 +25,11 @@ RSpec.describe Ai::ContactAnalyzer, type: :service do
     end
 
     before do
+      # The legacy single-provider Anthropic path is gated to self-hosted now
+      # (Ai::LegacyFallback) so the managed cloud can't silently process contact
+      # data on a shared key. These specs exercise the model call + parse/apply
+      # logic, so allow the fallback here regardless of the residency gate.
+      allow(Ai::LegacyFallback).to receive(:allowed?).and_return(true)
       allow(Anthropic::Client).to receive(:new).and_return(claude_client)
       allow(claude_client).to receive_message_chain(:messages, :create).and_return(fake_response)
     end
