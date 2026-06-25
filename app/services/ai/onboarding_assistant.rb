@@ -165,7 +165,7 @@ module Ai
       return { type: :error, reason: :empty } if raw.blank?
 
       json = raw.strip
-      json = json[/```(?:json)?\s*(.*?)```/m, 1]&.strip || json
+      json = json[/```(?:json)?(.*?)```/m, 1]&.strip || json
       data = JSON.parse(json)
 
       if data.is_a?(Hash) && data["question"].present?
@@ -263,7 +263,7 @@ module Ai
       return [] if text.blank?
 
       json = text.strip
-      json = json[/```(?:json)?\s*(.*?)```/m, 1]&.strip || json
+      json = json[/```(?:json)?(.*?)```/m, 1]&.strip || json
       normalize_items(JSON.parse(json), with_schema: with_schema)
     rescue JSON::ParserError => e
       Rails.logger.error("[Ai::OnboardingAssistant] JSON parse error: #{e.message}")
