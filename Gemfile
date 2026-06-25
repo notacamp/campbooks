@@ -132,6 +132,14 @@ gem "yabeda-prometheus"
 # See config/initializers/prometheus_multiproc.rb.
 gem "webrick", require: false
 
+# Distributed tracing (OpenTelemetry → Grafana Tempo). Auto-instruments Rails,
+# Active Record, HTTP clients, Active Job, etc.; spans export via OTLP. Inert
+# unless OTEL_EXPORTER_OTLP_ENDPOINT is set, so dev/test/self-host are unaffected.
+# See config/initializers/opentelemetry.rb + docs/observability.md.
+gem "opentelemetry-sdk", require: false
+gem "opentelemetry-exporter-otlp", require: false
+gem "opentelemetry-instrumentation-all", require: false
+
 group :development, :test do
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
   gem "bundler-audit", require: false
