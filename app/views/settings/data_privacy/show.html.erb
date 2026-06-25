@@ -81,6 +81,30 @@
     </div>
   <% end %>
 
+  <%# ── Content retention (opt-in auto-delete of OUR stored copy) ────────── %>
+  <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-6">
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+      <div class="min-w-0">
+        <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".retention_heading") %></h2>
+        <p class="text-sm text-gray-500"><%= t(".retention_desc") %></p>
+      </div>
+      <%= form_with url: settings_data_privacy_path, method: :patch, class: "shrink-0",
+            data: { controller: "auto-submit", action: "change->auto-submit#submit" } do %>
+        <%= select_tag :email_retention_months,
+              options_for_select(
+                [[t(".retention_off"), ""]] + [6, 12, 24, 36].map { |m| [t(".retention_months", count: m), m] },
+                @org.email_retention_months
+              ),
+              class: "block w-full sm:w-auto rounded-lg border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+      <% end %>
+    </div>
+    <% if @org.email_retention_months.present? %>
+      <div class="mt-4 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+        <%= t(".retention_active_note", count: @org.email_retention_months) %>
+      </div>
+    <% end %>
+  </div>
+
   <%# ── Where your data lives ───────────────────────────────────────────── %>
   <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-6">
     <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".hosting_heading") %></h2>

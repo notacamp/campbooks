@@ -44,5 +44,20 @@ RSpec.describe "Settings::DataPrivacy", type: :request do
 
       expect(user.workspace.reload.required_data_region).to be_blank
     end
+
+    it "sets an email retention window" do
+      patch settings_data_privacy_path, params: { email_retention_months: "12" }
+
+      expect(response).to redirect_to(settings_data_privacy_path)
+      expect(user.workspace.reload.email_retention_months).to eq(12)
+    end
+
+    it "clears the retention window when set back to Off" do
+      user.workspace.update!(email_retention_months: 12)
+
+      patch settings_data_privacy_path, params: { email_retention_months: "" }
+
+      expect(user.workspace.reload.email_retention_months).to be_nil
+    end
   end
 end

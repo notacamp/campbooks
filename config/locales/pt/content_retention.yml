@@ -1,0 +1,14 @@
+---
+pt:
+  settings:
+    data_privacy:
+      show:
+        retention_heading: "Eliminar emails antigos automaticamente"
+        retention_desc: "Remove automaticamente a cópia guardada no Campbooks de emails mais
+          antigos do que a idade escolhida. Isto elimina apenas a nossa cópia — o original
+          permanece intacto na sua caixa de correio."
+        retention_off: "Desligado — manter tudo"
+        retention_months: "Há mais de %{count} meses"
+        retention_active_note: "A cópia no Campbooks de emails com mais de %{count} meses é
+          eliminada definitivamente na próxima limpeza diária. A sua caixa de correio não é
+          afetada — só a nossa cópia guardada (e o respetivo índice de pesquisa e anexos) é removida."

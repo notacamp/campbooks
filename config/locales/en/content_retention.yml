@@ -1,0 +1,13 @@
+---
+en:
+  settings:
+    data_privacy:
+      show:
+        retention_heading: "Auto-delete old email"
+        retention_desc: "Automatically remove Campbooks' stored copy of email older than the
+          chosen age. This deletes only our copy — the original stays in your mailbox, untouched."
+        retention_off: "Off — keep everything"
+        retention_months: "Older than %{count} months"
+        retention_active_note: "Campbooks' copy of email older than %{count} months is permanently
+          deleted on the next daily cleanup. Your mailbox is not affected — only our stored copy
+          (and its search index and attachments) is removed."
