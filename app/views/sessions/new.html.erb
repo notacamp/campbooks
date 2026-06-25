@@ -36,7 +36,9 @@
           web, use the normal /session/:provider redirect. %>
       <div class="space-y-3">
         <%= render(Campbooks::OauthButton.new(provider: :google, href: @oauth_urls&.dig(:google) || google_session_path, size: :lg)) %>
-        <%= render(Campbooks::OauthButton.new(provider: :microsoft, href: @oauth_urls&.dig(:microsoft) || microsoft_session_path, size: :lg)) %>
+        <% if microsoft_enabled? %>
+          <%= render(Campbooks::OauthButton.new(provider: :microsoft, href: @oauth_urls&.dig(:microsoft) || microsoft_session_path, size: :lg)) %>
+        <% end %>
         <%= render(Campbooks::OauthButton.new(provider: :zoho, href: @oauth_urls&.dig(:zoho) || zoho_session_path, size: :lg)) %>
       </div>
 

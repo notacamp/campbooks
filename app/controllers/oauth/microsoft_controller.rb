@@ -1,6 +1,9 @@
 class Oauth::MicrosoftController < ApplicationController
   include OauthNativeHandoff
   include EmailAccountCapGuard
+  # Microsoft is gated end-to-end (Features.microsoft?); 404 the callback when off
+  # so a replayed/crafted code can't drive sign-in, linking or mailbox connect.
+  before_action -> { head :not_found unless microsoft_enabled? }
   # Sign-in happens before the user has a session, so the callback must run
   # unauthenticated for that flow. Account-linking requires a logged-in user
   # (web) or a verified native state (native shell).

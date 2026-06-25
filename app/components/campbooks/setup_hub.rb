@@ -151,8 +151,8 @@ module Campbooks
     def render_email_ctas
       raw(safe(provider_button(t(".connect_zoho"), "zoho", "bg-red-600 hover:bg-red-700")))
       raw(safe(provider_button(t(".connect_google"), "google", "bg-blue-600 hover:bg-blue-700")))
-      # Microsoft 365 mailbox connect is hidden until the Entra app is wired up.
-      if helpers.microsoft_mailbox_connect_enabled?
+      # Microsoft is gated end-to-end (Features.microsoft?) until the Entra app is wired up.
+      if helpers.microsoft_enabled?
         raw(safe(provider_button(t(".connect_microsoft"), "microsoft", "bg-accent-600 hover:bg-accent-700")))
       end
     end

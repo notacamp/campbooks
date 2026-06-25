@@ -44,7 +44,7 @@ module Events
 
       track_metric
 
-      Workflows::EventTriggerJob.perform_later(event.id) if listeners?(workspace)
+      Workflows::EventTriggerJob.perform_later(event.id) if Features.workflows? && listeners?(workspace)
 
       event
     rescue StandardError => e

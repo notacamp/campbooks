@@ -8,7 +8,10 @@ class Settings::SecurityController < Settings::BaseController
     @passkeys = current_user.webauthn_credentials.order(created_at: :desc)
     @recovery_codes_remaining = current_user.recovery_codes.unused.count
     @identities = current_user.identities.order(:provider)
+    # Existing linked identities still show (with an unlink button) regardless;
+    # the gate only hides the "Add Microsoft" affordance for new links.
     @linkable_providers = Settings::Security::SignInMethodsController::PROVIDERS - @identities.map(&:provider)
+    @linkable_providers -= %w[ microsoft ] unless microsoft_enabled?
     # Whether removing a sign-in method would leave the user locked out (drives the
     # "this is your only way in" hint instead of a remove button).
     @only_sign_in_method = current_user.sign_in_methods_count <= 1

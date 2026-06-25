@@ -1,7 +1,7 @@
 # Campbooks Public REST API
 
 The public API lets customers reach their own Campbooks data — email,
-documents, contacts, tags, document types, workflows, and Scout chat — from
+documents, contacts, tags, document types, and Scout chat — from
 their own apps and scripts. It is authenticated with **OAuth 2.0 client
 credentials** via [Doorkeeper](https://github.com/doorkeeper-gem/doorkeeper).
 
@@ -69,10 +69,10 @@ client's tokens (and rotate its secret) from Settings → API access.
 | `tags:read` | List the workspace's tags |
 | `tags:write` | Add/remove tags on emails |
 | `document_types:read` | List the workspace's document types |
-| `workflows:read` | List workflows and their run history |
-| `workflows:trigger` | Trigger a webhook workflow |
 | `scout:read` | Read Scout chat threads and messages |
 | `scout:write` | Create Scout threads and send messages |
+
+<!-- The `workflows:read` / `workflows:trigger` scopes are omitted while the Workflows feature is disabled by default (ENABLE_WORKFLOWS). Restore both rows above when it ships. -->
 
 Scopes are a ceiling, not a grant of new power: a request must satisfy **both**
 the token's scope **and** the acting user's own permissions (e.g. `emails:send`
@@ -225,6 +225,8 @@ Body: `tag_id` **or** `name` (must be an existing workspace tag — tags aren't 
 
 Returns the workspace's document types (`id`, `name`, `color`, `category`, `auto_star`, `extraction_schema`) — use a type's `id` with document upload/update and reclassify.
 
+<!-- TEMPORARILY DISABLED: the Workflows feature ships gated off by default (ENABLE_WORKFLOWS); these endpoints return 404 until it's enabled. Restore this section — plus the workflows:* scope rows and "workflows" in the intro above — when the feature ships.
+
 ## Workflows
 
 Workflows are workspace-wide automations. The API can list them, read their run
@@ -261,6 +263,7 @@ curl -X POST https://<your-campbooks-host>/api/v1/workflows/42/trigger \
 Only **webhook** workflows can be triggered this way — triggering a disabled
 workflow returns `422 workflow_disabled`, and a non-webhook one returns
 `422 not_triggerable`.
+-->
 
 ## Scout
 

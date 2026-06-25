@@ -1,4 +1,5 @@
 class WorkflowExecutionsController < ApplicationController
+  before_action :require_workflows_enabled
   before_action :require_authentication
   before_action :set_workflow
 

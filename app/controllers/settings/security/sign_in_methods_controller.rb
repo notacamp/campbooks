@@ -9,7 +9,10 @@ class Settings::Security::SignInMethodsController < Settings::BaseController
 
   def create
     provider = params[:provider].to_s
-    redirect_to(settings_security_path, error: t(".unknown_provider")) and return unless PROVIDERS.include?(provider)
+    # Microsoft is treated as not-offerable while gated off (Features.microsoft?),
+    # so a stale "Add Microsoft" POST falls through to the unknown-provider path.
+    allowed = microsoft_enabled? ? PROVIDERS : PROVIDERS - %w[ microsoft ]
+    redirect_to(settings_security_path, error: t(".unknown_provider")) and return unless allowed.include?(provider)
 
     if current_user.identities.exists?(provider: provider)
       redirect_to(settings_security_path, notice: t(".already_linked", provider: provider.titleize)) and return

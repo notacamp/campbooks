@@ -35,7 +35,7 @@
       <%= button_to "Connect Google", email_accounts_path(provider: "google"), method: :post,
           data: { turbo: false },
           class: "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors cursor-pointer border-0" %>
-      <% if microsoft_mailbox_connect_enabled? %>
+      <% if microsoft_enabled? %>
         <%= button_to "Connect Microsoft 365", email_accounts_path(provider: "microsoft"), method: :post,
             data: { turbo: false },
             class: "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-accent-600 hover:bg-accent-700 transition-colors cursor-pointer border-0" %>
