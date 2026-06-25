@@ -30,6 +30,13 @@ major, minor, or patch change here.
   tagged by semantic version (`1.2.3`, `1.2`) plus `latest` for the newest stable
   release, so self-hosters can pull a prebuilt image instead of building from
   source. The full test suite re-runs as a gate before any image is pushed.
+- A **Select mode** for the inbox — a toolbar toggle that turns the thread list
+  into a batch organizer: persistent checkboxes on every row *and* every date /
+  Priority section divider (so multi-select works on touch, not just on hover),
+  tap-a-row-to-select, a select-all-per-section checkbox with an indeterminate
+  state when only some of a section's threads are picked, and the docked
+  bulk-action bar (archive, tag, snooze, move, delete, …). Toggle off or press
+  Esc to exit.
 
 ## [0.1.0] - 2026-06-25
 
