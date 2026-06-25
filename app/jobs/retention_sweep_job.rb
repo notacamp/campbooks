@@ -11,6 +11,7 @@ class RetentionSweepJob < ApplicationJob
 
   LOG_RETENTION = 90.days
   DISMISSED_FEED_RETENTION = 30.days
+  AUDIT_EVENT_RETENTION = 12.months
 
   def perform
     log_cutoff = LOG_RETENTION.ago
@@ -33,5 +34,10 @@ class RetentionSweepJob < ApplicationJob
     FeedItem.where.not(dismissed_at: nil)
             .where(dismissed_at: ..DISMISSED_FEED_RETENTION.ago)
             .in_batches.delete_all
+
+    # Security/audit events (sign-ins, MFA changes, exports…) are kept long enough
+    # to be useful in the Settings → Security log, then pruned so the table doesn't
+    # grow forever. Deleted-user rows (user_id NULL) age out the same way.
+    AuditEvent.where(created_at: ..AUDIT_EVENT_RETENTION.ago).in_batches.delete_all
   end
 end

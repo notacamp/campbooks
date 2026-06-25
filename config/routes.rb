@@ -234,6 +234,8 @@ Rails.application.routes.draw do
       # OAuth sign-in methods (create → provider consent for flow=add_sign_in;
       # destroy → unlink an Identity). The provider callbacks land back in Oauth::*.
       resources :sign_in_methods, only: [ :create, :destroy ], controller: "security/sign_in_methods"
+      # Read-only personal security/audit history (sign-ins, MFA changes, exports…).
+      get "audit_log", to: "security/audit_log#index"
     end
     resources :members, only: [ :index ]
     resources :invitations, only: [ :create, :destroy ] do
