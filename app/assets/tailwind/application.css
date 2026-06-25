@@ -871,6 +871,7 @@ dialog[open] {
   display: none !important;
 }
 [data-inbox-layout="list"] [data-inbox-pane="list"] {
+  display: flex !important; /* overrides Tailwind `hidden` (display:none) below lg */
   flex: 1 1 auto !important;
   max-width: none !important;
   width: auto !important;
