@@ -51,4 +51,32 @@ RSpec.describe Ai::ProviderSetup do
       expect(described_class.apply_managed_default(ws)).to be(false)
     end
   end
+
+  describe "switching a role to a new provider" do
+    def doc_model(ws)
+      ws.ai_configurations.find_by(purpose: "document_analysis").model
+    end
+
+    it "resets a stale model that isn't valid for the new provider (prevents a 400)" do
+      ws = create(:workspace)
+      setup = described_class.new(ws)
+      setup.apply_documents(provider: "openai", api_key: "k")
+      ws.ai_configurations.find_by(purpose: "document_analysis").update!(model: "gpt-4o-mini")
+
+      setup.apply_documents(provider: "anthropic", api_key: "k2")
+
+      expect(doc_model(ws)).to eq("claude-sonnet-4-6") # Anthropic's default, not the stale gpt-4o-mini
+    end
+
+    it "keeps an explicit model that is valid for the (unchanged) provider" do
+      ws = create(:workspace)
+      setup = described_class.new(ws)
+      setup.apply_documents(provider: "openai", api_key: "k")
+      ws.ai_configurations.find_by(purpose: "document_analysis").update!(model: "gpt-4o")
+
+      setup.apply_documents(provider: "openai", api_key: "k")
+
+      expect(doc_model(ws)).to eq("gpt-4o")
+    end
+  end
 end

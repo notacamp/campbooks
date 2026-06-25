@@ -1,7 +1,12 @@
 module Ai
   module Adapters
     class Anthropic < Base
-      ANTHROPIC_VERSION = "2024-02-15"
+      # Anthropic's stable API version. PDF document blocks (type: "document")
+      # are GA under this version — no beta header needed. The previous value
+      # ("2024-02-15") is not a valid anthropic-version and made every call
+      # (text, image, and document) 400, which silently broke document analysis
+      # and ContactAnalyzer whenever they were routed to Claude.
+      ANTHROPIC_VERSION = "2023-06-01"
 
       def initialize(api_key:, endpoint_url: nil)
         super

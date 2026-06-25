@@ -129,6 +129,14 @@ module Ai
           { type: :image, media_type: blob.content_type, data: base64_data },
           { type: :text, text: "Analyze this Portuguese business document image and extract structured data." }
         ]
+      elsif (text = office_text(file_data, blob.content_type)).present?
+        # Office documents (.docx) carry no image the vision model can read, so we
+        # extract their text and send THAT — otherwise the model only ever saw the
+        # filename and could extract nothing.
+        [
+          { type: :text, text: "The attached file \"#{filename}\" is a Word document. Its extracted text content follows:\n\n#{text[0, 50_000]}" },
+          { type: :text, text: "Analyze this Portuguese business document and extract structured data." }
+        ]
       else
         # For unsupported formats, send a text-only prompt with filename hints
         # so the analyzer can at least classify by name
@@ -147,6 +155,28 @@ module Ai
 
     def classification_memory
       @classification_memory ||= Documents::ClassificationMemory.new(@document)
+    end
+
+    # Extract the body text from a .docx (Office Open XML is a zip whose
+    # word/document.xml holds the content). Paragraph breaks become newlines; the
+    # remaining tags are stripped. Returns nil for non-docx or on any failure, so
+    # the caller falls back to the filename-only prompt.
+    def office_text(file_data, content_type)
+      return nil unless content_type.to_s.include?("wordprocessingml.document")
+
+      xml = nil
+      Zip::File.open_buffer(StringIO.new(file_data)) do |zip|
+        xml = zip.find_entry("word/document.xml")&.get_input_stream&.read
+      end
+      return nil if xml.blank?
+
+      # The zip entry reads as binary (ASCII-8BIT); docx XML is UTF-8.
+      xml = xml.force_encoding("UTF-8")
+      text = xml.gsub(%r{</w:p>}, "\n").gsub(/<[^>]+>/, "")
+      CGI.unescapeHTML(text).gsub(/[ \t]+/, " ").gsub(/\n{3,}/, "\n\n").strip.presence
+    rescue => e
+      Rails.logger.warn("[Ai::DocumentAnalyzer] office_text extraction failed: #{e.message}")
+      nil
     end
 
     def parse_response(text)

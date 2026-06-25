@@ -49,14 +49,33 @@ major, minor, or patch change here.
 
 ### Fixed
 
+- Document analysis now reliably extracts structured fields, so documents in the
+  review queue stop showing up empty. Several problems combined to leave most
+  reviewed documents with no extracted data: the Anthropic (Claude) adapter sent
+  an invalid API-version header and failed every call; PDFs analysed through
+  OpenAI were flattened to just their first page (losing pages 2+ and misreading
+  amounts); Word (`.docx`) files were classified from their filename alone; and the
+  review card hid data the AI had stored under non-standard keys (e.g. a boarding
+  pass's flight number, gate, and seat). Document analysis can now run on Claude —
+  which reads full, multi-page PDFs natively — `.docx` text is extracted and
+  analysed, and the review/Skim card always surfaces whatever was extracted. Two
+  maintenance tasks apply this to existing data:
+  `rails ai:route_documents_to_anthropic` points a workspace's document analysis at
+  Claude, and `rails documents:reprocess_blank` re-analyses queue documents that
+  previously came back empty (both support `DRY_RUN`/`WORKSPACE_ID`/`LIMIT`).
+- Switching an AI role to a new provider in Settings no longer leaves a model from
+  the old provider attached (which the new provider would reject) — the model
+  resets to the new provider's default unless the chosen one is valid for it.
 - The `emails:write` API scope description shown in Settings → API access no
   longer overstates what it grants — it marks emails read/unread (it does not
   archive, snooze, or tag).
-
-### Fixed
-
 - Drag-and-drop and tap-to-move no longer offer Sent or Drafts as destinations (moving received mail into outbound/compose folders made no sense).
-
+- The Zoho data-center region (`ZOHO_REGION`, default `eu`) is now honored across
+  every Zoho integration — mailbox sync, OAuth sign-in/connect, calendar, and
+  WorkDrive — instead of being hardcoded to the EU data center. Self-hosters whose
+  Zoho account lives in another region (US, IN, AU, JP, CA, CN, SA) can point at
+  their own data center; the default is unchanged.
+  
 ### Security
 
 - AI features now only process your data through a provider your workspace has
@@ -70,14 +89,6 @@ major, minor, or patch change here.
   unchanged — those keys are the operator's own and stay on their infrastructure.
   Part of the data-governance work giving users control over which AI sees their
   data.
-
-### Fixed
-
-- The Zoho data-center region (`ZOHO_REGION`, default `eu`) is now honored across
-  every Zoho integration — mailbox sync, OAuth sign-in/connect, calendar, and
-  WorkDrive — instead of being hardcoded to the EU data center. Self-hosters whose
-  Zoho account lives in another region (US, IN, AU, JP, CA, CN, SA) can point at
-  their own data center; the default is unchanged.
 
 ## [0.1.0] - 2026-06-25
 
