@@ -2,13 +2,25 @@ class Settings::AccountController < Settings::BaseController
   def show
   end
 
-  # GDPR right of access / portability (Art. 15 / 20): a machine-readable JSON
-  # copy of the user's personal data, streamed as a download.
+  # GDPR right of access / portability (Art. 15 / 20): queue a background job that
+  # assembles a COMPLETE archive (the JSON copy plus email bodies, attachments, and
+  # document files) and notifies the user when it's ready to download.
   def export
     AuditEvent.log("data_exported", user: current_user, request: request)
-    send_data Accounts::DataExporter.new(current_user).to_json,
-              filename: "campbooks-data-export-#{Date.current.iso8601}.json",
-              type: :json, disposition: "attachment"
+    account_export = current_user.account_exports.create!(status: :pending)
+    AccountExportJob.perform_later(account_export.id)
+    redirect_to settings_account_path, success: t(".export_queued")
+  end
+
+  # Serves the user's most recent finished archive, scoped to them so the download
+  # link is only ever resolved for its owner.
+  def download_export
+    account_export = current_user.account_exports.generated.recent.first
+    if account_export&.archive&.attached?
+      redirect_to rails_blob_path(account_export.archive, disposition: "attachment")
+    else
+      redirect_to settings_account_path, alert: t(".export_not_ready")
+    end
   end
 
   def update
