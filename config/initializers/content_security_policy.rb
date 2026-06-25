@@ -62,6 +62,11 @@ Rails.application.configure do
       "https://accounts.google.com",
       "https://accounts.#{zoho_accounts_domain}",
       "https://login.microsoftonline.com"
+
+    # Report violations of the enforced policy above (object/base/frame/form) to an
+    # internal endpoint so they surface in logs/GlitchTip. Cheap: these directives
+    # rarely trip, so this is low-volume telemetry, not noise.
+    policy.report_uri "/csp-reports"
   end
 end
 
@@ -70,3 +75,15 @@ Rails.application.config.action_dispatch.default_headers.merge!(
   "Referrer-Policy" => "strict-origin-when-cross-origin",
   "Permissions-Policy" => "camera=(), microphone=(), geolocation=()"
 )
+
+# Report-only `script-src 'self'` observation — OFF by default, opt-in via
+# CSP_REPORT_ONLY_SCRIPT_SRC=1. Emits a SECOND, non-enforcing
+# Content-Security-Policy-Report-Only header so we can collect the exact inventory
+# of inline scripts (app + Matomo/Chatwoot overlays + Turbo/importmap) that a
+# future enforced `script-src 'self'` + nonce would block — WITHOUT breaking
+# anything. Flip on in prod to gather reports, then off. (Report-only never blocks.)
+if ENV["CSP_REPORT_ONLY_SCRIPT_SRC"].to_s == "1"
+  Rails.application.config.action_dispatch.default_headers.merge!(
+    "Content-Security-Policy-Report-Only" => "script-src 'self' 'report-sample'; report-uri /csp-reports"
+  )
+end
