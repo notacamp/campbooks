@@ -153,6 +153,7 @@ fr:
       default: Vue par défaut
       list: Vue liste
     new_folder_modal:
+      icon_label: Icône du dossier
       name_label: Nom du dossier
       name_placeholder: 'ex. : Reçus'
       submit: Créer le dossier

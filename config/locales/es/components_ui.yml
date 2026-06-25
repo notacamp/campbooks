@@ -56,6 +56,9 @@ es:
       empty: "(vacío)"
     email_html_preview:
       frame_title: Vista previa del correo
+    icon_picker:
+      default: Predeterminado
+      label: Elegir un icono
     inbox_settings_modal:
       close_label: Cerrar configuración de la bandeja de entrada
       nav:
