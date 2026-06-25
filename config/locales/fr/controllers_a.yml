@@ -199,6 +199,13 @@ fr:
         other: "« %{name} » créé, mais impossible de l'ajouter à %{count} boîtes"
     destroy:
       removed: Dossier « %{name} » supprimé
+    show:
+      back: Retour à la boîte de réception
+      documents: Documents
+      emails: E-mails
+      no_documents: Aucun document dans ce dossier pour l'instant.
+      no_emails: Aucun e-mail dans ce dossier pour l'instant.
+      subtitle: E-mails et documents classés dans ce dossier
     update:
       updated: Dossier « %{name} » mis à jour
   notifications:

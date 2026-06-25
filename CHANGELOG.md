@@ -27,6 +27,8 @@ major, minor, or patch change here.
   data exports, and account-deletion requests. It's included in your data export and
   is automatically pruned after 12 months.
 - **Documents in folders** — file a document into one or more custom folders (from the document page) and filter the Documents page by folder. Folders now organize documents as well as emails.
+- **Rename a custom folder** — and the change renames the real folder/label on every connected account (Gmail, Zoho, and Microsoft), not just inside Campbooks.
+- **Folder pages** — open any custom folder (from its settings) to see everything filed in it: its emails and documents together on one page. The inbox folder list also shows a document count per folder.
 - A **Data & Privacy** settings page (Settings → Data & Privacy) — a privacy-framed
   overview of how your workspace's data is handled: a global **AI processing**
   switch that pauses all AI (Scout, triage, tagging, summaries, embeddings, and

@@ -57,6 +57,35 @@ module MailFolders
         { created: created, failed: failed }
       end
 
+      # Rename `mail_folder`'s provider folder on every active account in its
+      # workspace that `user` can manage, locating each provider folder by its OLD
+      # name in the mirror. Returns { renamed: [accounts], failed: [accounts] };
+      # one account's failure never aborts the others, and accounts without a
+      # mirror row for the old name are simply skipped.
+      def rename_all(mail_folder, old_name, user)
+        renamed = []
+        failed = []
+
+        mail_folder.workspace.email_accounts.active.each do |account|
+          next unless account.managed_by?(user)
+
+          mirror = account.email_folders.find_by("LOWER(name) = ?", old_name.to_s.downcase)
+          next unless mirror
+
+          begin
+            rename_remote_folder(account, mirror.provider_folder_id, mail_folder.name)
+            mirror.update!(name: mail_folder.name)
+            Rails.cache.delete("email_account/#{account.id}/folders")
+            renamed << account
+          rescue => e
+            Rails.logger.error("[MailFolders::Provisioner] rename #{old_name.inspect} → #{mail_folder.name.inspect} failed on #{account.email_address}: #{e.message}")
+            failed << account
+          end
+        end
+
+        { renamed: renamed, failed: failed }
+      end
+
       private
 
       def create_remote_folder(account, name)
@@ -69,6 +98,16 @@ module MailFolders
           client.create_folder(name)&.dig("id")
         else # zoho
           client.create_folder(name)&.dig("folderId")
+        end
+      end
+
+      def rename_remote_folder(account, provider_folder_id, name)
+        client = account.mail_client
+        case account.provider.to_sym
+        when :google
+          client.update_label(provider_folder_id, name: name) # Gmail folders are labels
+        else # microsoft, zoho
+          client.update_folder(provider_folder_id, name)
         end
       end
 

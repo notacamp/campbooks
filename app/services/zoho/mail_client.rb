@@ -126,6 +126,16 @@ module Zoho
       data.is_a?(Hash) ? data["data"] : data
     end
 
+    # Rename a mail folder (PUT the new name). Used by MailFolders::Provisioner
+    # when a user renames a custom folder.
+    def update_folder(folder_id, name)
+      url = "#{BASE_URL}/accounts/#{@email_account.provider_account_id}/folders/#{folder_id}"
+      connection.put(url) do |req|
+        req.headers["Content-Type"] = "application/json"
+        req.body = { folderName: name }.to_json
+      end
+    end
+
     # --- Labels API ---
 
     def list_labels

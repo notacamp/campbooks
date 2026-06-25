@@ -201,6 +201,13 @@ es:
         other: "'%{name}' creada, pero no se pudo añadir a %{count} bandejas"
     destroy:
       removed: Carpeta '%{name}' eliminada
+    show:
+      back: Volver a la bandeja
+      documents: Documentos
+      emails: Correos
+      no_documents: Aún no hay documentos en esta carpeta.
+      no_emails: Aún no hay correos en esta carpeta.
+      subtitle: Correos y documentos archivados en esta carpeta
     update:
       updated: Carpeta '%{name}' actualizada
   notifications:

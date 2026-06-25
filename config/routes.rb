@@ -323,7 +323,7 @@ Rails.application.routes.draw do
 
   # User-defined inbox folders (chips on top of the inbox). Creating one
   # provisions a real folder/label on every connected account.
-  resources :mail_folders, only: [ :create, :update, :destroy ]
+  resources :mail_folders, only: [ :show, :create, :update, :destroy ]
 
   # Filing content (documents now) into custom folders — the Stage 3 "filesystem" layer.
   resources :folder_memberships, only: [ :create, :destroy ]
