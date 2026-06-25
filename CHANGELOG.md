@@ -46,9 +46,11 @@ major, minor, or patch change here.
 - Prometheus metrics at an internal `/metrics` endpoint ([yabeda](https://github.com/yabeda-rb/yabeda)):
   HTTP request rate / error rate / latency (RED), background-job execution counts
   and duration, and a domain-action counter sourced from the Events bus. Meant to
-  be scraped over a private network and visualized in Grafana. Multi-process safe
-  via the Prometheus client's `DirectFileStore` (`PROMETHEUS_MULTIPROC_DIR`), with
-  the Solid Queue worker exposing its own metrics server on `:9394`. See
+  be scraped over a private network and visualized in Grafana. Off by default —
+  enable it by setting `PROMETHEUS_MULTIPROC_DIR` or `CAMPBOOKS_METRICS_ENABLED=1`,
+  so builds that don't opt in stay inert. Multi-process safe via the Prometheus
+  client's `DirectFileStore` (`PROMETHEUS_MULTIPROC_DIR`), with the Solid Queue
+  worker exposing its own metrics server on `:9394`. See
   [docs/observability.md](docs/observability.md).
 - Official production container images, published to the GitHub Container
   Registry (`ghcr.io/notacamp/campbooks`) when a release is published. Multi-arch

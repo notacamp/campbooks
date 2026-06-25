@@ -29,6 +29,12 @@ module Campbooks
     # Common ones are `templates`, `generators`, or `middleware`, for example.
     config.autoload_lib(ignore: %w[assets tasks])
 
+    # Boot infrastructure required directly from config/initializers/metrics.rb
+    # (it wires Prometheus middleware during initialization, before reloadable
+    # constants are safe to reference). Not reloadable app code, so it's required
+    # explicitly rather than autoloaded — keep Zeitwerk out of it.
+    Rails.autoloaders.main.ignore(Rails.root.join("lib/campbooks/metrics.rb"))
+
     config.active_record.encryption.primary_key = ENV.fetch("ACTIVE_RECORD_PRIMARY_KEY")
     config.active_record.encryption.deterministic_key = ENV.fetch("ACTIVE_RECORD_DETERMINISTIC_KEY")
     config.active_record.encryption.key_derivation_salt = ENV.fetch("ACTIVE_RECORD_KEY_DERIVATION_SALT")
