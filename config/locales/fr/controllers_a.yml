@@ -199,6 +199,8 @@ fr:
         other: "« %{name} » créé, mais impossible de l'ajouter à %{count} boîtes"
     destroy:
       removed: Dossier « %{name} » supprimé
+    update:
+      updated: Dossier « %{name} » mis à jour
   notifications:
     archive:
       success: Notification archivée.
