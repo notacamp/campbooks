@@ -62,11 +62,16 @@ en:
       new_folder: New folder
     folder_pane_custom_folders:
       delete_confirm: 'Remove the %{name} folder? Your emails and provider folders are untouched.'
+      document_count:
+        one: '%{count} document'
+        other: '%{count} documents'
       edit_title: Folder settings
       icon_label: Folder icon
       move_label: Move to
+      name_label: Name
       toggle: Toggle subfolders
       top_level: Top level
+      view_contents: View folder contents
     icon_picker:
       default: Default
       label: Choose an icon

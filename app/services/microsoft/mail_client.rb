@@ -158,6 +158,16 @@ module Microsoft
       JSON.parse(response.body)
     end
 
+    # Rename a mail folder (PATCH the new displayName). Used by
+    # MailFolders::Provisioner when a user renames a custom folder.
+    def update_folder(folder_id, name)
+      url = "#{BASE_URL}/me/mailFolders/#{folder_id}"
+      connection.patch(url) do |req|
+        req.headers["Content-Type"] = "application/json"
+        req.body = { displayName: name }.to_json
+      end
+    end
+
     # Move messages into a folder. NB: Graph reassigns each message a NEW id in
     # the destination folder, so the locally stored provider_message_id goes stale
     # until the next delta sync reconciles it (acceptable: folder filtering keys on

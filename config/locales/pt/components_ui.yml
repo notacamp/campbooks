@@ -62,11 +62,16 @@ pt:
       new_folder: Nova pasta
     folder_pane_custom_folders:
       delete_confirm: 'Remover a pasta %{name}? Os seus emails e as pastas do fornecedor não são afetados.'
+      document_count:
+        one: '%{count} documento'
+        other: '%{count} documentos'
       edit_title: Definições da pasta
       icon_label: Ícone da pasta
       move_label: Mover para
+      name_label: Nome
       toggle: Mostrar/ocultar subpastas
       top_level: Nível superior
+      view_contents: Ver conteúdo da pasta
     icon_picker:
       default: Predefinido
       label: Escolher um ícone

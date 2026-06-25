@@ -115,4 +115,22 @@ RSpec.describe MailFolder, type: :model do
       expect(described_class.next_position_for(workspace)).to eq(2)
     end
   end
+
+  describe ".document_counts" do
+    it "maps folder id → filed-document count, omitting empty folders" do
+      folder = MailFolder.create!(workspace: workspace, name: "Receipts")
+      empty = MailFolder.create!(workspace: workspace, name: "Empty")
+      folder.documents << create(:document, workspace: workspace)
+      folder.documents << create(:document, workspace: workspace)
+
+      counts = described_class.document_counts([ folder, empty ])
+
+      expect(counts[folder.id]).to eq(2)
+      expect(counts[empty.id]).to be_nil
+    end
+
+    it "returns an empty hash when given no folders" do
+      expect(described_class.document_counts([])).to eq({})
+    end
+  end
 end

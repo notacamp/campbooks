@@ -17,9 +17,10 @@ module Campbooks
     CLOSE_SVG = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>'
     CHEVRON_SVG = '<svg class="w-3.5 h-3.5 rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/></svg>'
 
-    def initialize(custom_folders:, current_folder: nil)
+    def initialize(custom_folders:, current_folder: nil, document_counts: {})
       @custom = custom_folders || []
       @current = current_folder
+      @counts = document_counts || {}
       @children_by_parent = @custom.group_by(&:parent_id)
     end
 
@@ -64,6 +65,7 @@ module Campbooks
             render(Campbooks::Icon.new(folder.display_icon, css_class: "w-[18px] h-[18px]"))
           end
           span(class: "truncate") { folder.name }
+          folder_count(folder, active)
         end
         edit_button(dialog_id)
         edit_dialog(folder, dialog_id)
@@ -108,12 +110,18 @@ module Campbooks
           input(type: "hidden", name: "_method", value: "patch")
           input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
           div(class: "space-y-4 px-5 py-5") do
+            name_field(folder)
             move_field(folder)
             icon_field(folder)
           end
           div(class: "flex items-center justify-end border-t border-border px-5 py-3") do
             render(Campbooks::Button.new(variant: :primary, size: :sm, type: "submit")) { t("shared.actions.save") }
           end
+        end
+
+        a(href: helpers.mail_folder_path(folder), data: { turbo_frame: "_top" },
+          class: "block border-t border-border px-5 py-3 text-xs font-medium text-accent-600 hover:text-accent-700 dark:text-accent-300") do
+          t(".view_contents")
         end
 
         # Delete — a separate sibling form (a <dialog> may hold several forms).
@@ -126,6 +134,14 @@ module Campbooks
             t("shared.actions.delete")
           end
         end
+      end
+    end
+
+    def name_field(folder)
+      div(class: "space-y-1.5") do
+        span(class: "block text-xs font-medium text-foreground") { t(".name_label") }
+        input(type: "text", name: "mail_folder[name]", value: folder.name, required: true, maxlength: 100,
+          class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground")
       end
     end
 
@@ -153,6 +169,17 @@ module Campbooks
 
     def indent_for(depth)
       "#{(0.375 + depth * 0.875).round(3)}rem"
+    end
+
+    # Document count badge (Stage 3 filesystem). Hidden at zero so empty folders
+    # stay quiet; sits before the hover "edit" affordance.
+    def folder_count(folder, active)
+      count = @counts[folder.id].to_i
+      return if count.zero?
+
+      span(class: class_names("ml-auto mr-1 inline-flex h-4 min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold",
+            active ? "bg-accent-600 text-white" : "bg-muted text-muted-foreground"),
+        title: t(".document_count", count: count)) { count.to_s }
     end
   end
 end

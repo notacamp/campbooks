@@ -17,10 +17,11 @@ module Campbooks
   # @param custom_folders [Array<MailFolder>]
   # @param current_folder [String, Integer, nil] the active folder id / name
   class FolderPane < Campbooks::Base
-    def initialize(system_folders:, custom_folders:, current_folder:)
+    def initialize(system_folders:, custom_folders:, current_folder:, document_counts: {})
       @system = system_folders || []
       @custom = custom_folders || []
       @current = current_folder
+      @document_counts = document_counts || {}
     end
 
     def view_template
@@ -51,7 +52,7 @@ module Campbooks
                          count: f[:count], active: system_active?(f),
                          glyph: Campbooks::Icon.for_folder_name(f[:name]), droppable: EmailFolder.droppable_name?(f[:name]))
           end
-          render(Campbooks::FolderPaneCustomFolders.new(custom_folders: @custom, current_folder: @current))
+          render(Campbooks::FolderPaneCustomFolders.new(custom_folders: @custom, current_folder: @current, document_counts: @document_counts))
           new_folder_button
         end
       end

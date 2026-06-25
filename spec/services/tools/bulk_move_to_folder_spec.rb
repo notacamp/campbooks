@@ -53,4 +53,18 @@ RSpec.describe Tools::BulkMoveToFolder do
     expect(result[:count]).to eq(0)
     expect(msg.reload.provider_folder_id).not_to eq("Receipts")
   end
+
+  it "records a local folder membership for emails moved by name" do
+    create(:mail_folder, workspace: workspace, name: "Receipts")
+    msg = create(:email_message, email_account: account, provider_folder_id: "inbox-1", provider_message_id: "m1")
+    allow(client).to receive(:list_folders).and_return([])
+    allow(client).to receive(:create_folder).with("Receipts").and_return({ "folderId" => "z-r" })
+    allow(client).to receive(:move_to_folder)
+
+    expect { described_class.call(email_ids: [ msg.id ], folder_name: "Receipts") }
+      .to change(FolderMembership, :count).by(1)
+
+    folder = workspace.mail_folders.find_by(name: "Receipts")
+    expect(folder.folder_memberships.first.folderable).to eq(msg)
+  end
 end
