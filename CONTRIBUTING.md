@@ -54,9 +54,10 @@ environment variable and integration, are in
 
 ## Branch & pull-request workflow
 
-`main` is **protected and continuously deployed** — see
-[Deployment](#deployment-merging-ships-to-production). All changes go through a
-pull request. **Never commit directly to `main`.**
+`main` is **protected**; merges don't deploy on their own — **publishing a
+release ships to production** (see
+[Deployment](#deployment-publishing-a-release-ships-to-production)). All changes
+go through a pull request. **Never commit directly to `main`.**
 
 1. **Branch off `main`.** Use a short, prefixed name that matches the change:
 
@@ -212,22 +213,28 @@ Because Campbooks is an application (not a library), here's what each bump means
 2. Bump [`VERSION`](VERSION) to the new `X.Y.Z`.
 3. In `CHANGELOG.md`, move the `[Unreleased]` entries under a new
    `## [X.Y.Z] - YYYY-MM-DD` heading and update the compare links at the bottom.
-4. Open a `chore(release): vX.Y.Z` PR and merge it (this deploys to prod).
+4. Open a `chore(release): vX.Y.Z` PR and merge it (this lands the version bump;
+   it does **not** deploy).
 5. Tag and push: `git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z`.
 6. Publish a **GitHub Release** from the tag, pasting that CHANGELOG section.
+   **This is the step that ships to prod** — it builds the image and triggers the deploy.
 
 ---
 
-## Deployment (merging ships to production)
+## Deployment (publishing a release ships to production)
 
-A merge to `main` triggers `.github/workflows/notify-deploy.yml`, which signals
-the private cloud repo to build and deploy **that exact commit to production —
-with no automatic rollback.** Forks never deploy (they lack the dispatch token).
+Publishing a **GitHub Release** triggers `.github/workflows/publish-image.yml`,
+which re-runs the test suite, builds the multi-arch image, pushes it to GHCR,
+then signals the private cloud repo to **pull and deploy that version**. There's
+no automatic rollback, but any prior version can be redeployed. **Merges to
+`main` no longer deploy on their own.** Forks never deploy (they lack the
+dispatch token).
 
-Practically, this means **the bar for merging is "production-ready"**: CI green,
-tested (including the UI at mobile and desktop), migrations safe to run on boot,
-and no secrets in the diff. If you're not a maintainer, you don't deploy —
-your job is a clean, green, well-described PR; a maintainer merges.
+Practically, this means **the bar for merging is still "production-ready"** —
+`main` should always be releasable: CI green, tested (including the UI at mobile
+and desktop), migrations safe to run on boot, and no secrets in the diff. If
+you're not a maintainer, you don't release — your job is a clean, green,
+well-described PR; a maintainer merges and cuts the release.
 
 ---
 
