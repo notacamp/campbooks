@@ -19,10 +19,14 @@ major, minor, or patch change here.
 ### Added
 
 - Official production container images, published to the GitHub Container
-  Registry (`ghcr.io/notacamp/campbooks`) when a release is published. Images are
+  Registry (`ghcr.io/notacamp/campbooks`) when a release is published. Multi-arch
+  (`linux/amd64` + `linux/arm64`) and tagged by semantic version (`1.2.3`, `1.2`)
+  plus `latest` for the newest stable release, so self-hosters can pull a prebuilt
+  image — on x86 or ARM — instead of building from source. Images are
   tagged by semantic version (`1.2.3`, `1.2`) plus `latest` for the newest stable
   release, so self-hosters can pull a prebuilt image instead of building from
   source. The full test suite re-runs as a gate before any image is pushed.
+
 ## [0.1.0] - 2026-06-25
 
 ### Added
