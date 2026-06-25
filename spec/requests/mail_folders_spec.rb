@@ -22,6 +22,31 @@ RSpec.describe "MailFolders", type: :request do
     end
   end
 
+  describe "PATCH /mail_folders/:id (move)" do
+    it "moves a folder under a parent" do
+      parent = create(:mail_folder, workspace: workspace, name: "Work")
+      folder = create(:mail_folder, workspace: workspace, name: "Clients")
+      patch mail_folder_path(folder), params: { mail_folder: { parent_id: parent.id } }, as: :turbo_stream
+      expect(response).to have_http_status(:ok)
+      expect(folder.reload.parent_id).to eq(parent.id)
+    end
+
+    it "moves a folder back to top level" do
+      parent = create(:mail_folder, workspace: workspace, name: "Work")
+      folder = create(:mail_folder, workspace: workspace, name: "Clients", parent: parent)
+      patch mail_folder_path(folder), params: { mail_folder: { parent_id: "" } }, as: :turbo_stream
+      expect(folder.reload.parent_id).to be_nil
+    end
+
+    it "rejects a cyclic move" do
+      a = create(:mail_folder, workspace: workspace, name: "A")
+      b = create(:mail_folder, workspace: workspace, name: "B", parent: a)
+      patch mail_folder_path(a), params: { mail_folder: { parent_id: b.id } }, as: :turbo_stream
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(a.reload.parent_id).to be_nil
+    end
+  end
+
   describe "DELETE /mail_folders/:id" do
     it "removes the folder and refreshes the pane section" do
       folder = create(:mail_folder, workspace: workspace, name: "Receipts")

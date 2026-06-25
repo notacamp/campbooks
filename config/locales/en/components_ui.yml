@@ -64,6 +64,9 @@ en:
       delete_confirm: 'Remove the %{name} folder? Your emails and provider folders are untouched.'
       edit_title: Folder settings
       icon_label: Folder icon
+      move_label: Move to
+      toggle: Toggle subfolders
+      top_level: Top level
     icon_picker:
       default: Default
       label: Choose an icon
