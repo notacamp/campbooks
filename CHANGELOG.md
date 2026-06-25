@@ -69,6 +69,10 @@ major, minor, or patch change here.
 
 ### Fixed
 
+- Closing the event editor now works when it's opened as a full page (a direct
+  link, an event opened in a new tab, or a bookmarked URL): the "X" and "Cancel"
+  controls take you back to the calendar instead of doing nothing. Inside the
+  calendar's pop-up they still just close the dialog as before.
 - Publishing a domain event (`Events.publish`) no longer aborts on an internal
   `NameError` from a leftover metrics call — events publish cleanly again and
   event-triggered workflows fire reliably.
