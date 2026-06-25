@@ -46,7 +46,9 @@ Lead with whichever fits the context — don't list all five every time.
    tracked documents with a clear review-and-approval flow.
 4. **Scout, your assistant** — briefs you, answers questions about your inbox and documents
    in plain language, and drafts replies you can approve.
-5. **Yours to run** — source-available and self-hostable, private and EU-hosted, no lock-in.
+5. **Yours to run** — **free to self-host for your own business or personal use**, on your own
+   server; source-available, private and EU-hosted, no lock-in. The license only draws the line at
+   reselling it or running it as a service for others.
 
 ## Voice & tone
 
@@ -59,7 +61,7 @@ Use "calm" for the *outcome* (relief, headspace), never as the product's definin
 ## Vocabulary
 
 **Use:** email client · inbox · declutter · sorts itself · Scout · paperwork / documents ·
-reimagined · surface what needs you · source-available · fair-code.
+reimagined · surface what needs you · source-available · fair-code · free to self-host · yours to run.
 
 **Avoid:** "document management platform" or "document manager" as the *primary* label (it
 undersells the email half) · "Sign in to manage your documents" and similar doc-only framings
@@ -72,6 +74,10 @@ itself (the license is the Sustainable Use License, a fair-code source-available
 - **Secondary tagline:** "Your paperwork, sorted."
 - **Lede:** "Campbooks reads your email and attachments, files the invoices, receipts, and
   contracts on its own, and hands you one short list of what actually needs you."
+- **Self-host / "Yours to run":** "Read, modify, and self-host Campbooks for free, for your own
+  business or personal use." When there's room, add the one limit: "The license only restricts
+  reselling it or running it as a commercial service for others." Lead with the *permission*
+  (you can run it yourself, free) — never just "view the source," which undersells the right.
 
 ## Where this applies (sync checklist)
 
