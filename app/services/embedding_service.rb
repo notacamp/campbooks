@@ -55,6 +55,11 @@ class EmbeddingService
   private
 
   def find_embedding_adapter
+    # EU data-residency: embedding providers (OpenAI/Gemini) are US-only, so a
+    # workspace that requires EU residency gets NO embedding adapter — semantic
+    # search and tag classification pause rather than send text to a US provider.
+    return nil if @workspace && EMBEDDING_PROVIDERS.none? { |p| @workspace.region_allows?(p) }
+
     # Try workspace's configured adapters first
     if @workspace.present?
       # Prefer OpenAI adapter if available
@@ -89,6 +94,7 @@ class EmbeddingService
   # this isn't their primary route.
   def env_fallback_adapter
     return nil unless Rails.application.config.self_hosted
+    return nil if @workspace && EMBEDDING_PROVIDERS.none? { |p| @workspace.region_allows?(p) }
 
     if ENV["OPENAI_API_KEY"].present?
       Ai::Adapters::Openai.new(api_key: ENV["OPENAI_API_KEY"])

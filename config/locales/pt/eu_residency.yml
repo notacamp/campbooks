@@ -1,0 +1,17 @@
+---
+pt:
+  entitlements:
+    features:
+      eu_data_residency: Residência de dados na UE
+  settings:
+    data_privacy:
+      show:
+        residency_heading: "Residência de dados"
+        residency_desc: "Restrinja a região onde os seus dados podem ser processados pelos fornecedores de IA."
+        residency_eu_label: "Exigir residência de dados na UE"
+        residency_eu_hint: "Só podem ser usados fornecedores de IA da região da UE. A IA de
+          texto permanece na UE (Mistral). Como ainda não há um fornecedor da UE para IA de
+          documentos ou pesquisa semântica, essas funcionalidades ficam em pausa enquanto isto estiver ativo."
+        residency_paused_note: "A residência de dados na UE está ativa. A IA de documentos e a
+          pesquisa semântica estão em pausa por ainda não terem um fornecedor da UE; a IA de texto continua num fornecedor da UE."
+        paused_badge: "Em pausa"

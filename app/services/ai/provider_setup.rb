@@ -115,7 +115,10 @@ module Ai
       text = upsert_managed_adapter(MANAGED_TEXT_ADAPTER_NAME, provider: Ai::Platform::MANAGED_TEXT_PROVIDER)
       assign_purposes(text, AiConfiguration::TEXT_PURPOSES)
 
-      if Ai::Platform.documents_available?
+      # Managed document analysis runs on a US provider (MANAGED_DOC_PROVIDER); skip
+      # wiring it for an EU-residency workspace so we don't provision a path that the
+      # runtime gate would only pause. Managed text is Mistral/EU, so it's unaffected.
+      if Ai::Platform.documents_available? && @workspace.region_allows?(Ai::Platform::MANAGED_DOC_PROVIDER)
         docs = upsert_managed_adapter(MANAGED_VISION_ADAPTER_NAME, provider: Ai::Platform::MANAGED_DOC_PROVIDER)
         assign_purposes(docs, AiConfiguration::DOCUMENT_PURPOSES)
       end
