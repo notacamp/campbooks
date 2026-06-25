@@ -139,6 +139,9 @@ class EmailMessagesController < ApplicationController
       if unread_ids.any?
         @thread.email_messages.where(read: false).update_all(read: true, updated_at: Time.current)
         MarkReadJob.perform_later(@message.email_account_id, unread_ids) if @message.email_account_id
+        # Live inbox: clear the unread dot on this thread's row in every other open
+        # inbox (other tabs/devices, teammates sharing the mailbox).
+        Emails::InboxBroadcaster.replace(@thread)
       end
     end
 

@@ -83,7 +83,9 @@ class EmailActions
       return failure(tool, I18n.t("email_actions.send_permission_denied")) if defn.sends? && !account.sendable_by?(user)
     end
 
-    defn.runner.call(email_message, args).merge(tool: tool)
+    result = defn.runner.call(email_message, args).merge(tool: tool)
+    broadcast_inbox_change(tool, email_message, result)
+    result
   rescue => e
     Rails.logger.error("[EmailActions] #{tool} failed: #{e.class}: #{e.message}")
     failure(tool, "#{tool} failed: #{e.message}")
@@ -91,6 +93,32 @@ class EmailActions
 
   def self.failure(tool, message)
     { success: false, tool: tool.to_s, message: message, result: nil }
+  end
+
+  # --- live inbox sync ------------------------------------------------------
+  # Which single-thread actions change the inbox row, and how. This is the one
+  # chokepoint every interactive surface dispatches through (manual, bulk-via-
+  # registry, Cmd+K, board drag, Scout, workflows), so broadcasting here makes the
+  # change reflect on every open inbox — across tabs, devices, and teammates who
+  # share the mailbox — with no per-surface wiring. See Emails::InboxBroadcaster.
+  INBOX_REMOVE_TOOLS  = %w[archive trash snooze block_sender].freeze
+  INBOX_UPSERT_TOOLS  = %w[unarchive unsnooze].freeze
+  INBOX_REPLACE_TOOLS = %w[pin unpin add_tag remove_tag].freeze
+
+  def self.broadcast_inbox_change(tool, email_message, result)
+    return unless result[:success] && email_message
+    return unless (thread = email_message.email_thread)
+
+    if INBOX_REMOVE_TOOLS.include?(tool)
+      Emails::InboxBroadcaster.remove(thread)
+    elsif INBOX_UPSERT_TOOLS.include?(tool)
+      Emails::InboxBroadcaster.upsert(thread)
+    elsif INBOX_REPLACE_TOOLS.include?(tool)
+      Emails::InboxBroadcaster.replace(thread)
+    end
+  rescue => e
+    # A broadcast must never break the action itself.
+    Rails.logger.error("[EmailActions] inbox broadcast failed for #{tool}: #{e.class}: #{e.message}")
   end
 
   # --- sender-scoped helpers ------------------------------------------------
