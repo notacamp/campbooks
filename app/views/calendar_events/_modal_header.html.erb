@@ -1,9 +1,15 @@
 <%# Modal chrome shared by the new/edit event forms. `title` local is required. %>
 <div class="flex items-center justify-between border-b border-border px-5 py-3.5">
   <h2 class="text-sm font-semibold text-foreground"><%= title %></h2>
-  <button type="button" data-action="click->calendar-event-modal#close"
-          class="-mr-1 cursor-pointer rounded p-1 text-gray-400 transition-colors hover:bg-muted hover:text-gray-600 border-0 bg-transparent"
-          aria-label="<%= t("shared.actions.close") %>">
+  <%# An <a> (not a <button>) so the close still works on the standalone full-page
+      edit/new view, where the calendar-event-modal controller isn't mounted. In the
+      modal the controller's #close intercepts the click (preventDefault) and just
+      closes the dialog; standalone, the link navigates back to the calendar.
+      data-turbo-frame="_top" breaks out of the calendar_event_modal frame. %>
+  <a href="<%= calendar_path(view: params[:view].presence) %>" data-turbo-frame="_top"
+     data-action="click->calendar-event-modal#close"
+     class="-mr-1 inline-flex cursor-pointer rounded p-1 text-gray-400 transition-colors hover:bg-muted hover:text-gray-600"
+     aria-label="<%= t("shared.actions.close") %>">
     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-  </button>
+  </a>
 </div>
