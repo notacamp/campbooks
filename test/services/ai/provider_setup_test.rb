@@ -82,5 +82,41 @@ module Ai
       assert_not @setup.using_managed?
       assert @setup.text_configured?
     end
+
+    # --- Data-residency: availability must not count silent shared platform keys ---
+
+    test "text_available? ignores a bare platform ANTHROPIC_API_KEY on the cloud" do
+      with_env("ANTHROPIC_API_KEY" => "sk-test") do
+        assert_not @setup.text_available?,
+          "a bare shared Anthropic key must not count as configured AI on the cloud"
+      end
+    end
+
+    test "text_available? counts the operator's own env key on self-hosted" do
+      with_self_hosted do
+        with_env("ANTHROPIC_API_KEY" => "sk-test") do
+          assert @setup.text_available?
+        end
+      end
+    end
+
+    test "embeddings_available? ignores bare platform OPENAI/GEMINI keys on the cloud" do
+      with_env("OPENAI_API_KEY" => "sk", "GEMINI_API_KEY" => "g") do
+        assert_not @setup.embeddings_available?
+      end
+    end
+
+    test "embeddings_available? is true with a configured OpenAI adapter" do
+      @ws.ai_adapters.create!(name: "Embeds", provider: "openai", api_key: "byo", enabled: true)
+      assert @setup.embeddings_available?
+    end
+
+    test "embeddings_available? counts the operator env key on self-hosted" do
+      with_self_hosted do
+        with_env("OPENAI_API_KEY" => "sk", "GEMINI_API_KEY" => nil) do
+          assert @setup.embeddings_available?
+        end
+      end
+    end
   end
 end

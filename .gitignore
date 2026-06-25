@@ -48,6 +48,11 @@
 # Private cloud ops context, written by campbooks-cloud/install.sh.
 /CLAUDE.local.md
 
+# Private cloud analytics overlay (Matomo), dropped into the public checkout by
+# campbooks-cloud/install.sh + deploy.yml. Analytics code must never land in the
+# open-source core — it is inert here unless MATOMO_URL/MATOMO_SITE_ID are set.
+/config/initializers/cloud_analytics.rb
+
 # Kotlin/Gradle build artifacts (native app).
 .kotlin/
 native/**/.kotlin/

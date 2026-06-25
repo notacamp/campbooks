@@ -65,19 +65,6 @@ module Events
       @actor == :current ? Current.user : @actor
     end
 
-    # Count the published action for the /metrics endpoint. The event label is
-    # bounded to registered Registry keys (any other name buckets as "custom")
-    # so arbitrary Events.publish names can't blow up Prometheus cardinality.
-    # Fail-safe: a metrics error must never change what Publisher#call returns.
-    def track_metric
-      definition = Events::Registry.definition(@name)
-      Yabeda.campbooks.domain_events_total.increment(
-        { event: definition ? @name : "custom", group: (definition&.group || :custom).to_s }
-      )
-    rescue StandardError => e
-      Rails.logger.error("[Events::Publisher] metric failed: #{e.class}: #{e.message}")
-    end
-
     # Skip the fan-out job entirely when nothing is listening, so high-volume
     # events don't flood the queue with no-op jobs.
     def listeners?(workspace)

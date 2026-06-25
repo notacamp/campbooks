@@ -118,20 +118,6 @@ gem "aws-sdk-s3", require: false
 gem "sentry-ruby"
 gem "sentry-rails"
 
-# Prometheus metrics. yabeda-rails auto-collects HTTP RED metrics (rate, errors,
-# duration per controller#action) plus custom app/job metrics defined in
-# config/initializers/yabeda.rb; yabeda-prometheus renders them at the
-# internal-only /metrics endpoint, scraped by Prometheus over the private
-# network (never exposed via the public reverse proxy). See docs/observability.md.
-gem "yabeda-rails"
-gem "yabeda-prometheus"
-
-# Backs the standalone metrics server that the background-job worker (Solid
-# Queue, a separate process from Puma) exposes on :9394 so its job metrics are
-# scrapable. The web process serves /metrics through Puma and doesn't use this.
-# See config/initializers/prometheus_multiproc.rb.
-gem "webrick", require: false
-
 group :development, :test do
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
   gem "bundler-audit", require: false

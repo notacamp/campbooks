@@ -12,12 +12,17 @@
      data-action="dragover->mail-folder-drop#dragover drop->mail-folder-drop#drop dragleave->mail-folder-drop#dragleave click->mail-folder-drop#click">
   <% @common_folders&.each do |folder| %>
     <% active = (@current_folder == folder[:id]) || (folder[:id].nil? && @current_folder.nil?) %>
+    <%# Sent/Drafts are outbound/compose folders — moving received mail into them
+        makes no sense, so they get no drop-target attr (see EmailFolder.droppable_name?). %>
+    <% chip_data = { turbo_frame: "_top", folder_name: folder[:name], folder_active: active.to_s } %>
+    <% chip_data[:mail_folder_drop_target] = "chip" if EmailFolder.droppable_name?(folder[:name]) %>
     <%= link_to email_messages_path(folder_id: folder[:id]),
-          data: { turbo_frame: "_top", mail_folder_drop_target: "chip", folder_name: folder[:name], folder_active: active.to_s },
+          data: chip_data,
           class: class_names(
             "flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
             active ? "bg-accent-600 text-white" : "bg-muted text-muted-foreground hover:bg-accent"
           ) do %>
+      <%= render(Campbooks::Icon.new(Campbooks::Icon.for_folder_name(folder[:name]), css_class: "w-4 h-4")) %>
       <%= folder[:name] %>
       <% if folder[:count].to_i > 0 %>
         <span class="<%= active ? "text-white/80" : "text-muted-foreground/70" %>"><%= folder[:count] %></span>

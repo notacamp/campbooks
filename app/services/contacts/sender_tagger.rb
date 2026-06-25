@@ -67,7 +67,7 @@ module Contacts
           messages: [ { role: "user", content: prompt } ],
           model: config[:model], max_tokens: 16, temperature: 0
         )
-      else
+      elsif Ai::LegacyFallback.allowed?
         client = Anthropic::Client.new
         resp = client.messages.create(
           model: "claude-haiku-4-5", max_tokens: 16,

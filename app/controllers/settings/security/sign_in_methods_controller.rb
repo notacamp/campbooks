@@ -66,7 +66,7 @@ class Settings::Security::SignInMethodsController < Settings::BaseController
         prompt: "consent",
         state: state
       }
-      "https://accounts.zoho.eu/oauth/v2/auth?#{zoho_params.to_query}"
+      "#{Zoho::OauthClient::AUTH_URL}?#{zoho_params.to_query}"
     end
   end
 end

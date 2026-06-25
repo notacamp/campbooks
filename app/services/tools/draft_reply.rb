@@ -128,6 +128,8 @@ module Tools
     end
 
     def self.call_legacy(system_prompt, user_message)
+      return nil unless Ai::LegacyFallback.allowed?
+
       client = Anthropic::Client.new
       response = client.messages.create(
         model: MODEL,

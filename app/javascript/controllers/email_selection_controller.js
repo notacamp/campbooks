@@ -1,10 +1,11 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["toolbar", "header", "count", "checkbox", "tagMenu", "folderMenu", "snoozeMenu"]
+  static targets = ["toolbar", "header", "count", "checkbox", "sectionToggle", "selectToggle", "tagMenu", "folderMenu", "snoozeMenu"]
 
   connect() {
     this.selected = new Set()
+    this.selectMode = this.element.dataset.selectMode === "on"
   }
 
   // --- Selection ---
@@ -32,6 +33,20 @@ export default class extends Controller {
     this.updateUI()
   }
 
+  // Select/deselect every row in one date section (Today / This Week / Priority …).
+  toggleSection(event) {
+    const checked = event.target.checked
+    this.sectionCheckboxes(event.target.dataset.section).forEach(cb => {
+      cb.checked = checked
+      if (checked) {
+        this.selected.add(cb.value)
+      } else {
+        this.selected.delete(cb.value)
+      }
+    })
+    this.updateUI()
+  }
+
   clear() {
     this.selected.clear()
     this.checkboxTargets.forEach(cb => cb.checked = false)
@@ -39,6 +54,45 @@ export default class extends Controller {
     if (selectAll) selectAll.checked = false
     this.updateUI()
     this.closeDropdowns()
+  }
+
+  // --- Select mode (persistent checkboxes + tap-to-select, works on touch) ---
+
+  toggleMode() {
+    this.setMode(!this.selectMode)
+  }
+
+  setMode(on) {
+    this.selectMode = on
+    this.element.dataset.selectMode = on ? "on" : "off"
+    if (this.hasSelectToggleTarget) {
+      this.selectToggleTarget.setAttribute("aria-pressed", on ? "true" : "false")
+    }
+    // Leaving select mode drops any pending selection.
+    if (!on) this.clear()
+  }
+
+  // In select mode, a tap anywhere on a row toggles its checkbox instead of
+  // opening the email — so selection works without a hover (touch). Delegated
+  // from the controller root; taps on the checkbox, pin, or other controls
+  // (which aren't inside the row's <a>) fall through to their normal behavior.
+  rowClick(event) {
+    if (!this.selectMode) return
+    const link = event.target.closest("a[href]")
+    if (!link) return
+    const item = link.closest("[id^='thread_item']")
+    if (!item || !this.element.contains(item)) return
+    const cb = item.querySelector("input[data-email-selection-target='checkbox']")
+    if (!cb) return
+
+    event.preventDefault()
+    cb.checked = !cb.checked
+    if (cb.checked) {
+      this.selected.add(cb.value)
+    } else {
+      this.selected.delete(cb.value)
+    }
+    this.updateUI()
   }
 
   // --- Actions ---
@@ -135,7 +189,11 @@ export default class extends Controller {
 
   keydown(event) {
     if (event.key === "Escape") {
-      this.clear()
+      if (this.selectMode) {
+        this.setMode(false)
+      } else {
+        this.clear()
+      }
     }
   }
 
@@ -150,5 +208,22 @@ export default class extends Controller {
       this.toolbarTarget.classList.add("hidden")
       this.headerTarget.classList.remove("hidden")
     }
+    this.syncSectionToggles()
+  }
+
+  // Reflect each section toggle as checked (all rows selected), indeterminate
+  // (some), or unchecked (none) so it tracks individual row changes.
+  syncSectionToggles() {
+    this.sectionToggleTargets.forEach(toggle => {
+      const rows = this.sectionCheckboxes(toggle.dataset.section)
+      const checkedCount = rows.filter(cb => cb.checked).length
+      toggle.checked = rows.length > 0 && checkedCount === rows.length
+      toggle.indeterminate = checkedCount > 0 && checkedCount < rows.length
+    })
+  }
+
+  sectionCheckboxes(section) {
+    if (!section) return []
+    return this.checkboxTargets.filter(cb => cb.dataset.section === section)
   }
 }

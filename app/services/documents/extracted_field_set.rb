@@ -85,15 +85,25 @@ module Documents
     def fields
       schema = @document.classification&.extraction_schema
       if schema.is_a?(Hash) && schema.any?
-        schema_fields(schema)
+        never_blank(schema_fields(schema))
       elsif (defn = TYPE_FIELDS[@document.document_type.to_s])
-        column_fields(defn)
+        never_blank(column_fields(defn))
       else
         metadata_fields
       end
     end
 
     private
+
+    # Never return an all-empty field set when the AI actually extracted data into
+    # metadata under keys outside the typed/schema set — e.g. a boarding pass filed
+    # as "other", whose flight_number/gate/seat live in metadata but not in the
+    # type's two columns. Fall back to the raw metadata so nothing extracted is hidden.
+    def never_blank(fields)
+      return fields if fields.any? { |f| f[:value].to_s.strip.present? }
+
+      metadata_fields.presence || fields
+    end
 
     def metadata
       @metadata ||= (@document.metadata.presence || {})

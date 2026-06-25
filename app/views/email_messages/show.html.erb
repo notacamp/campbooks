@@ -10,11 +10,12 @@
     <!-- Thread list (mobile: shown in list mode; desktop: always shown) -->
     <%# Below lg the whole pane scrolls so the folder bar + search scroll away
         with the list; at lg+ the pane is fixed and only the inner list scrolls. %>
-    <div class="hidden lg:flex w-full lg:w-64 flex-shrink-0 border-r border-gray-200 flex-col bg-card relative overflow-y-auto lg:overflow-visible"
+    <div class="group/select hidden lg:flex w-full lg:w-64 flex-shrink-0 border-r border-gray-200 flex-col bg-card relative overflow-y-auto lg:overflow-visible"
          data-controller="email-selection panel-resize"
          data-email-mobile-target="list"
          data-inbox-pane="list"
-         data-action="keydown@window->email-selection#keydown"
+         data-select-mode="off"
+         data-action="keydown@window->email-selection#keydown click->email-selection#rowClick"
          data-panel-resize-edge-value="right"
          data-panel-resize-storage-key-value="campbooks:email-list-width"
          data-panel-resize-min-width-value="224"
@@ -174,6 +175,23 @@
               </button>
             </div>
           </div>
+
+          <%# Select mode — flips the inbox into batch-organize: persistent
+              checkboxes on every row + section, and tap-a-row-to-select (so it
+              works on touch). Active state is driven purely by data-select-mode
+              on the email-selection root. %>
+          <button type="button"
+                  data-email-selection-target="selectToggle"
+                  data-action="click->email-selection#toggleMode"
+                  aria-pressed="false"
+                  title="<%= t(".select_mode_title") %>"
+                  aria-label="<%= t(".select_mode_title") %>"
+                  class="flex-shrink-0 mr-0.5 inline-flex items-center justify-center rounded-lg p-1.5 transition-colors cursor-pointer border-0 bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-500 group-data-[select-mode=on]/select:bg-accent-100 group-data-[select-mode=on]/select:text-accent-700 dark:group-data-[select-mode=on]/select:bg-accent-500/15 dark:group-data-[select-mode=on]/select:text-accent-300">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="4" width="16" height="16" rx="3" stroke-width="1.8"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8.5 12.4l2.2 2.2 4.8-5.2"/>
+            </svg>
+          </button>
 
           <%= render(Campbooks::InboxViewSwitcher.new(class: "flex-shrink-0 mr-0.5")) %>
 

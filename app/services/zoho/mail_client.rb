@@ -1,6 +1,6 @@
 module Zoho
   class MailClient
-    BASE_URL = "https://mail.zoho.eu/api"
+    BASE_URL = Region.mail_api_url.freeze
 
     def initialize(email_account)
       @email_account = email_account
