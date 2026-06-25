@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_25_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_25_180000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -1371,6 +1371,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_170000) do
     t.jsonb "entitlement_overrides", default: {}, null: false
     t.string "name", null: false
     t.string "plan", default: "free", null: false
+    t.string "required_data_region"
     t.jsonb "settings", default: {}, null: false
     t.string "slug", null: false
     t.datetime "updated_at", null: false

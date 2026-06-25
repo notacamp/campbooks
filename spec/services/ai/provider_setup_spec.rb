@@ -39,6 +39,17 @@ RSpec.describe Ai::ProviderSetup do
       expect(described_class.new(ws).using_managed?).to be(false)
     end
 
+    it "skips the US document adapter for an EU-residency workspace (managed text stays EU)" do
+      allow(Ai::Platform).to receive(:available?).and_return(true)
+      allow(Ai::Platform).to receive(:documents_available?).and_return(true)
+      ws = create(:workspace, required_data_region: "EU")
+
+      expect(described_class.apply_managed_default(ws)).to be(true)
+      setup = described_class.new(ws)
+      expect(setup.using_managed?).to be(true)               # text = Mistral/EU
+      expect(setup.document_provider).to be_nil              # US docs adapter skipped
+    end
+
     it "returns false for a nil workspace without touching the platform" do
       expect(described_class.apply_managed_default(nil)).to be(false)
     end
