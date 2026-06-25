@@ -153,6 +153,8 @@ class GlobalSearch
   end
 
   def workflow_results
+    return [] unless Features.workflows?
+
     @workspace.workflows
               .where("name ILIKE ?", like)
               .order(:name)

@@ -5,10 +5,10 @@ class EmailAccountsController < ApplicationController
   def create
     provider = params[:provider] || "zoho"
 
-    # Microsoft 365 mailbox connect is hidden/disabled until the Entra app is
-    # wired up — refuse it server-side too so a stale link can't reach the broken
-    # flow. (Toggle with ENABLE_MICROSOFT_MAILBOX=1.)
-    if provider == "microsoft" && !microsoft_mailbox_connect_enabled?
+    # Microsoft is gated end-to-end (Features.microsoft?) — refuse the connect
+    # server-side too so a stale link can't reach the half-wired Entra flow.
+    # (Toggle with ENABLE_MICROSOFT=1.)
+    if provider == "microsoft" && !microsoft_enabled?
       back = session[:onboarding_return_to] || email_messages_path(inbox_settings: "accounts")
       redirect_to(back, alert: t(".microsoft_unavailable", default: "Microsoft 365 connections aren't available yet.")) and return
     end

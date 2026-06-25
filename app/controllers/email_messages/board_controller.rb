@@ -6,6 +6,7 @@
 # EmailActions tool on the :board surface. "Awaiting reply" is AI-computed and
 # read-only: cards can be dragged OUT of it, never INTO it.
 class EmailMessages::BoardController < ApplicationController
+  before_action :require_email_board_enabled
   before_action :require_authentication
 
   COLUMN_LIMIT = 50

@@ -10,7 +10,9 @@ import { Controller } from "@hotwired/stimulus"
 // in localStorage so it survives reloads and full-page folder navigations, and
 // re-apply it on connect (the server always renders the default shell).
 const STORAGE_KEY = "inbox_layout"
-const LAYOUTS = ["default", "list", "board"]
+// The valid layouts are derived at runtime from the rendered switcher buttons
+// (see `get layouts()`), not hardcoded: the server omits the Board segment when
+// its feature flag is off, and a stale saved "board" then falls back to "default".
 
 export default class extends Controller {
   static targets = ["button", "boardFrame"]
@@ -36,14 +38,21 @@ export default class extends Controller {
     this._syncButtons(this.current)
   }
 
+  // Layouts actually on offer = whatever the server rendered as switcher buttons.
+  // Falls back to ["default"] if the buttons haven't connected yet.
+  get layouts() {
+    const fromButtons = this.buttonTargets.map((b) => b.dataset.layout)
+    return fromButtons.length ? fromButtons : ["default"]
+  }
+
   get current() {
     const saved = localStorage.getItem(STORAGE_KEY)
-    return LAYOUTS.includes(saved) ? saved : "default"
+    return this.layouts.includes(saved) ? saved : "default"
   }
 
   select(event) {
     const layout = event.currentTarget.dataset.layout
-    if (!LAYOUTS.includes(layout)) return
+    if (!this.layouts.includes(layout)) return
     localStorage.setItem(STORAGE_KEY, layout)
     this.apply(layout)
   }

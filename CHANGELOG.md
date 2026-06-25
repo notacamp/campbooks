@@ -90,6 +90,22 @@ major, minor, or patch change here.
   Part of the data-governance work giving users control over which AI sees their
   data.
 
+### Changed
+
+- ⚠️ Several features that aren't production-ready yet now ship **disabled by
+  default** and are opt-in via environment flags (all default off, in both cloud
+  and self-hosted builds). Set the matching var to `1` to re-enable:
+  - **Workflow engine** (`ENABLE_WORKFLOWS`) — the builder UI, navigation/Cmd+K
+    entries, controllers, public webhook ingress, public API, and the automatic
+    email/event triggers are all gated; when off the UI/API return 404 and no
+    workflow fires.
+  - **Inbox "Board" (kanban) layout** (`ENABLE_EMAIL_BOARD`) — the inbox view
+    switcher offers only Default and List; the board route returns 404.
+  - **Microsoft 365** (`ENABLE_MICROSOFT`) — every Microsoft surface, now
+    including "Sign in with Microsoft" (previously always shown), is hidden. This
+    supersedes the old `ENABLE_MICROSOFT_MAILBOX` flag, which is still honored for
+    backward compatibility.
+
 ## [0.1.0] - 2026-06-25
 
 ### Added

@@ -93,6 +93,8 @@ client's tokens (and rotate its secret) from Settings → API access.
 | `scout:read` | Read Scout chat threads and messages |
 | `scout:write` | Create Scout threads and send messages |
 
+<!-- The `workflows:read` / `workflows:trigger` scopes are omitted while the Workflows feature is disabled by default (ENABLE_WORKFLOWS). Restore both rows above when it ships. -->
+
 Scopes are a ceiling, not a grant of new power: a request must satisfy **both**
 the token's scope **and** the acting user's own permissions (e.g. `emails:send`
 still requires that the user may send from the chosen account).

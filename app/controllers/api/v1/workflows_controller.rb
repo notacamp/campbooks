@@ -6,6 +6,9 @@ module Api
     # access is gated through Current.workspace. Listing is read-only; triggering
     # is the authenticated equivalent of the public POST /webhooks/:token.
     class WorkflowsController < BaseController
+      # Workflows ship gated off by default (Features.workflows?); 404 the whole
+      # resource when disabled, consistent with the API's not-found leak rule.
+      before_action -> { render_not_found unless Features.workflows? }
       before_action -> { doorkeeper_authorize! :"workflows:read" },    only: :index
       before_action -> { doorkeeper_authorize! :"workflows:trigger" }, only: :trigger
       before_action :set_workflow, only: :trigger
