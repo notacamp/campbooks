@@ -10,7 +10,7 @@ module Api
     # scope name (String) => short, human-readable description
     CATALOG = {
       "emails:read"     => "Read email messages, threads, and folders",
-      "emails:write"    => "Mark emails read/unread, archive, snooze, and tag them",
+      "emails:write"    => "Mark emails read/unread",
       "emails:send"     => "Compose, send, and reply to email",
       "documents:read"  => "List and download documents",
       "documents:write" => "Upload, update, approve, reject, and reclassify documents",
