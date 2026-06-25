@@ -13,7 +13,7 @@ info:
   version: "1.0.0"
   description: |
     The public API lets customers reach their own Campbooks data — email,
-    documents, contacts, tags, document types, workflows, and Scout chat — from
+    documents, contacts, tags, document types, and Scout chat — from
     their own apps and scripts.
 
     ## Authentication
@@ -76,8 +76,6 @@ tags:
     description: List the workspace's tags.
   - name: Document types
     description: List the workspace's document types.
-  - name: Workflows
-    description: List workflows, read run history, and trigger webhook workflows.
   - name: Scout
     description: The in-app AI assistant — async chat threads and messages.
 
@@ -900,120 +898,6 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  # ------------------------------------------------------------- Workflows ----
-  /api/v1/workflows:
-    get:
-      tags: [Workflows]
-      summary: List workflows
-      operationId: listWorkflows
-      security:
-        - oauth2: [workflows:read]
-      parameters:
-        - $ref: "#/components/parameters/page"
-        - $ref: "#/components/parameters/perPage"
-      responses:
-        "200":
-          description: A page of workflows.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/Workflow"
-                  meta:
-                    $ref: "#/components/schemas/PageMeta"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-
-  /api/v1/workflows/{id}/trigger:
-    parameters:
-      - $ref: "#/components/parameters/idPath"
-    post:
-      tags: [Workflows]
-      summary: Trigger a webhook workflow
-      description: >-
-        Fires a workflow asynchronously (the authenticated equivalent of the
-        public `POST /webhooks/:token`). Returns **202 Accepted**; the run
-        happens in the background. Only **webhook** workflows can be triggered.
-      operationId: triggerWorkflow
-      security:
-        - oauth2: [workflows:trigger]
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                payload:
-                  type: object
-                  description: Exposed to the workflow's Liquid templates like an inbound webhook body.
-                  additionalProperties: true
-      responses:
-        "202":
-          description: The workflow was queued.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      ok:
-                        type: boolean
-                      workflow_id:
-                        type: integer
-                      message:
-                        type: string
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "422":
-          description: >-
-            The workflow is disabled (`workflow_disabled`) or is not a webhook
-            workflow (`not_triggerable`).
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Error"
-
-  /api/v1/workflows/{workflow_id}/executions:
-    parameters:
-      - name: workflow_id
-        in: path
-        required: true
-        schema:
-          type: integer
-    get:
-      tags: [Workflows]
-      summary: List a workflow's run history
-      description: Runs newest-first.
-      operationId: listWorkflowExecutions
-      security:
-        - oauth2: [workflows:read]
-      parameters:
-        - $ref: "#/components/parameters/page"
-        - $ref: "#/components/parameters/perPage"
-      responses:
-        "200":
-          description: A page of executions.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/WorkflowExecution"
-                  meta:
-                    $ref: "#/components/schemas/PageMeta"
-        "404":
-          $ref: "#/components/responses/NotFound"
-
   # ---------------------------------------------------------------- Scout -----
   /api/v1/scout/threads:
     get:
@@ -1169,8 +1053,6 @@ components:
             tags:read: List tags
             tags:write: Add and remove tags on emails
             document_types:read: List document types
-            workflows:read: List workflows and their run history
-            workflows:trigger: Trigger a workflow
             scout:read: Read Scout chat threads and messages
             scout:write: Create Scout threads and send messages
 
@@ -1578,65 +1460,6 @@ components:
           type: integer
           nullable: true
           description: Set when the tag is scoped to a single email account.
-
-    Workflow:
-      type: object
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-        description:
-          type: string
-          nullable: true
-        trigger_type:
-          type: string
-          enum: [email_received, webhook, event]
-        enabled:
-          type: boolean
-        webhook_token:
-          type: string
-          nullable: true
-          description: >-
-            Present for webhook workflows. Combine with your host as
-            https://<your-campbooks-host>/webhooks/<webhook_token> for the
-            no-auth inbound URL.
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-
-    WorkflowExecution:
-      type: object
-      properties:
-        id:
-          type: integer
-        workflow_id:
-          type: integer
-        status:
-          type: string
-          enum: [running, completed, failed]
-        started_at:
-          type: string
-          format: date-time
-          nullable: true
-        completed_at:
-          type: string
-          format: date-time
-          nullable: true
-        error_message:
-          type: string
-          nullable: true
-        trigger_data:
-          type: object
-          nullable: true
-          description: The payload/context the run started from.
-          additionalProperties: true
-        created_at:
-          type: string
-          format: date-time
 
     AgentThread:
       type: object

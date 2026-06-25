@@ -1,7 +1,7 @@
 # Campbooks Public REST API
 
 The public API lets customers reach their own Campbooks data — email,
-documents, contacts, tags, document types, workflows, and Scout chat — from
+documents, contacts, tags, document types, and Scout chat — from
 their own apps and scripts. It is authenticated with **OAuth 2.0 client
 credentials** via [Doorkeeper](https://github.com/doorkeeper-gem/doorkeeper).
 
@@ -90,8 +90,6 @@ client's tokens (and rotate its secret) from Settings → API access.
 | `tags:read` | List the workspace's tags |
 | `tags:write` | Add/remove tags on emails |
 | `document_types:read` | List the workspace's document types |
-| `workflows:read` | List workflows and their run history |
-| `workflows:trigger` | Trigger a webhook workflow |
 | `scout:read` | Read Scout chat threads and messages |
 | `scout:write` | Create Scout threads and send messages |
 
@@ -128,8 +126,6 @@ Every error response is `{ "error": { "code": "…", "message": "…" } }`.
 | 404 | `no_file` | `GET /documents/:id/file`: the document has no attached file |
 | 422 | `validation_failed` | The payload was rejected (`error.details`) |
 | 422 | `invalid_state` | `POST /contacts/:id/state`: `state` wasn't a valid value |
-| 422 | `workflow_disabled` | `POST /workflows/:id/trigger`: the workflow is disabled |
-| 422 | `not_triggerable` | `POST /workflows/:id/trigger`: not a webhook workflow |
 | 429 | `rate_limit_exceeded` | Too many requests |
 | 503 | `ai_provider_unconfigured` | Scout: the workspace has no AI provider for chat |
 
@@ -339,58 +335,6 @@ upload/update and reclassify. **Unpaginated** (no `meta`).
   ]
 }
 ```
-
-## Workflows
-
-Workflows are workspace-wide automations. The API can list them, read their run
-history, and trigger **webhook** workflows on demand (the authenticated
-equivalent of the public `POST /webhooks/:token` endpoint).
-
-### `GET /api/v1/workflows` — list (scope `workflows:read`)
-
-Returns `id`, `name`, `description`, `trigger_type` (`email_received`/`webhook`/
-`event`), `enabled`, `webhook_token` (present for webhook workflows — combine
-with your host as `https://<your-campbooks-host>/webhooks/<webhook_token>` for the
-no-auth inbound URL), plus `created_at`/`updated_at`. Paginated.
-
-```json
-{
-  "data": [
-    {
-      "id": 12, "name": "Invoice paid → Slack", "description": null,
-      "trigger_type": "webhook", "enabled": true,
-      "webhook_token": "wh_abc123", "created_at": "2026-06-10T08:00:00Z",
-      "updated_at": "2026-06-21T08:00:00Z"
-    }
-  ],
-  "meta": { "page": 1, "per_page": 25, "total": 1, "total_pages": 1 }
-}
-```
-
-### `GET /api/v1/workflows/:id/executions` — run history (scope `workflows:read`)
-
-Lists the workflow's runs newest-first: `id`, `workflow_id`, `status`
-(`running`/`completed`/`failed`), `started_at`, `completed_at`,
-`error_message`, `trigger_data` (the payload/context the run started from), and
-`created_at`. Paginated.
-
-### `POST /api/v1/workflows/:id/trigger` — trigger (scope `workflows:trigger`)
-
-Fires a workflow asynchronously. Body: an optional `payload` object, exposed to
-the workflow's Liquid templates exactly like an inbound webhook body. Returns
-**`202 Accepted`**; the run happens in the background (poll the executions
-endpoint to watch it).
-
-```bash
-curl -X POST https://<your-campbooks-host>/api/v1/workflows/42/trigger \
-  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"payload": {"status": "paid", "invoice": "INV-1"}}'
-```
-
-Only **webhook** workflows can be triggered this way — triggering a disabled
-workflow returns `422 workflow_disabled`, and a non-webhook one returns
-`422 not_triggerable`.
 
 ## Scout
 
