@@ -18,7 +18,7 @@ module Google
           email_account_id: @account.id,
           external_label_id: external_id
         )
-        tag.assign_attributes(name: name, color: color, source: :external)
+        tag.assign_attributes(name: name, color: color, source: :external, workspace: @account.workspace)
         tag.save!
       end
 
