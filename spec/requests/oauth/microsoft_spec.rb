@@ -60,7 +60,9 @@ RSpec.describe "Microsoft OAuth", type: :request do
       end
     end
 
-    context "when Microsoft mailbox connect is disabled (default)" do
+    context "when Microsoft is disabled (the default — Features.microsoft? off)" do
+      before { allow(Features).to receive(:microsoft?).and_return(false) }
+
       it "refuses the connect and does not redirect to Microsoft" do
         sign_in(user)
         post email_accounts_path(provider: "microsoft")

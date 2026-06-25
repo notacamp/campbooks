@@ -5,6 +5,8 @@ module Api
     # Read-only run history for a workflow. Nested under /workflows/:workflow_id.
     # Workspace-scoped via the parent workflow lookup (404 if it isn't visible).
     class WorkflowExecutionsController < BaseController
+      # Workflows ship gated off by default (Features.workflows?); 404 when disabled.
+      before_action -> { render_not_found unless Features.workflows? }
       before_action -> { doorkeeper_authorize! :"workflows:read" }, only: :index
       before_action :set_workflow
 

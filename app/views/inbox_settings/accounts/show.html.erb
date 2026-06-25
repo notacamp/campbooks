@@ -13,7 +13,7 @@
       <!-- Connect -->
       <div class="flex flex-wrap items-center gap-2">
         <span class="text-xs font-medium text-foreground mr-1"><%= t(".connect_label") %></span>
-        <% providers = microsoft_mailbox_connect_enabled? ? %w[zoho google microsoft] : %w[zoho google] %>
+        <% providers = microsoft_enabled? ? %w[zoho google microsoft] : %w[zoho google] %>
         <% providers.each do |provider| %>
           <%= button_to human_enum(EmailAccount, :provider, provider), email_accounts_path(provider: provider), method: :post,
                 data: { turbo: false },

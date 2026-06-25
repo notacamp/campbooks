@@ -5,6 +5,8 @@ class WorkflowWebhookJob < ApplicationJob
   queue_as :default
 
   def perform(workflow_id, payload: {}, headers: {}, query: {}, source_ip: nil)
+    return unless Features.workflows?
+
     workflow = Workflow.enabled.find_by(id: workflow_id)
     return unless workflow&.webhook?
 

@@ -1,4 +1,5 @@
 class WorkflowsController < ApplicationController
+  before_action :require_workflows_enabled
   before_action :require_authentication
   before_action :set_workflow, only: [ :edit, :update, :destroy, :toggle, :add_step, :remove_step, :regenerate_webhook ]
 

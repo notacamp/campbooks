@@ -17,8 +17,8 @@ class ApplicationController < ActionController::Base
   before_action :redirect_to_onboarding_if_incomplete
 
   helper_method :current_user, :self_hosted?, :signup_mode, :public_signup_allowed?, :beta_code_required?,
-                :microsoft_mailbox_connect_enabled?, :ai_provider_available?, :show_beta_banner?,
-                :current_entitlements
+                :workflows_enabled?, :email_board_enabled?, :microsoft_enabled?, :ai_provider_available?,
+                :show_beta_banner?, :current_entitlements
 
   private
 
@@ -60,13 +60,35 @@ class ApplicationController < ActionController::Base
     !self_hosted? && cookies[:beta_banner_dismissed] != "1"
   end
 
-  # Microsoft 365 mailbox connect is code-complete but the Entra app isn't fully
-  # wired yet, so the "Connect Microsoft 365" buttons are hidden until
-  # ENABLE_MICROSOFT_MAILBOX=1. Cred presence alone isn't a safe signal —
-  # MICROSOFT_CLIENT_ID may be set while the app registration is still
-  # incomplete. Does NOT affect "Sign in with Microsoft" on the auth pages.
-  def microsoft_mailbox_connect_enabled?
-    ENV["ENABLE_MICROSOFT_MAILBOX"] == "1"
+  # Production-readiness feature gates (see Features). These features are built
+  # but not yet production-ready, so they're hidden/inert by default and opt-in
+  # via ENV. Exposed to views/components here; jobs and service objects read
+  # Features.* directly.
+  def workflows_enabled?
+    Features.workflows?
+  end
+
+  def email_board_enabled?
+    Features.email_board?
+  end
+
+  # Unlike the others, this gates EVERYTHING Microsoft, including "Sign in with
+  # Microsoft" on the auth pages (the old, mailbox-only flag deliberately did
+  # not). Cred presence alone isn't a safe signal — MICROSOFT_CLIENT_ID may be
+  # set while the Entra app registration is still incomplete.
+  def microsoft_enabled?
+    Features.microsoft?
+  end
+
+  # 404 a request for a feature gated off by a readiness flag (Features.*). Used
+  # as a before_action by the controllers behind one. A 404 (rather than a
+  # redirect) keeps a disabled feature from advertising its own existence.
+  def require_workflows_enabled
+    head :not_found unless Features.workflows?
+  end
+
+  def require_email_board_enabled
+    head :not_found unless Features.email_board?
   end
 
   # ── Signup gating (see config/initializers/registration.rb) ──

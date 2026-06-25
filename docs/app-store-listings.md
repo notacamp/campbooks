@@ -40,11 +40,12 @@ Campbooks is a calm, AI-assisted workspace for the email and documents that run 
 Connect your mailbox and Campbooks brings in your messages and attachments, uses AI to classify and surface what actually needs you, and gives you a clear place to review, approve, and file it — instead of a cluttered inbox.
 
 WHAT YOU CAN DO
-• Connect Zoho, Google, or Microsoft email over secure OAuth
+• Connect Zoho or Google email over secure OAuth
+<!-- Held until Microsoft ships (gated behind ENABLE_MICROSOFT): "Connect Zoho, Google, or Microsoft email over secure OAuth" -->
 • Let AI triage your inbox and pull out invoices, receipts, and key documents
 • Review and approve documents with a clear, human workflow — nothing is filed behind your back
 • Keep meetings in view with a built-in two-way calendar
-• Automate repetitive steps with simple workflows
+<!-- Held until the Workflow engine ships (gated behind ENABLE_WORKFLOWS): • Automate repetitive steps with simple workflows -->
 • Search everything in one place
 
 PRIVATE BY DESIGN

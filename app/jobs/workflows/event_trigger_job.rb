@@ -13,6 +13,8 @@ module Workflows
     queue_as :default
 
     def perform(event_id)
+      return unless Features.workflows?
+
       event = Event.find_by(id: event_id)
       return unless event
       return if event.depth >= Event::MAX_CHAIN_DEPTH
