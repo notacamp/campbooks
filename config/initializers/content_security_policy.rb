@@ -48,9 +48,19 @@ Rails.application.configure do
     # screen. Browsers enforce form-action across the POST's redirect chain, so
     # without these origins the redirect is blocked and "Connect …" silently does
     # nothing (the provider auth hosts, matching the OauthClient AUTH_URLs).
+    # Zoho's data center is region-configurable (ZOHO_REGION). Resolve its accounts
+    # host from ENV here — this initializer runs before Zeitwerk can autoload
+    # Zoho::Region, so we can't reference it. Keep this map in sync with
+    # Zoho::Region::DOMAINS.
+    zoho_accounts_domain = {
+      "eu" => "zoho.eu", "us" => "zoho.com", "com" => "zoho.com", "in" => "zoho.in",
+      "au" => "zoho.com.au", "com.au" => "zoho.com.au", "jp" => "zoho.jp",
+      "ca" => "zohocloud.ca", "cn" => "zoho.com.cn", "sa" => "zoho.sa"
+    }.fetch(ENV.fetch("ZOHO_REGION", "eu").to_s.strip.downcase, "zoho.eu")
+
     policy.form_action :self,
       "https://accounts.google.com",
-      "https://accounts.zoho.eu",
+      "https://accounts.#{zoho_accounts_domain}",
       "https://login.microsoftonline.com"
   end
 end

@@ -9,7 +9,7 @@ module Zoho
   # tested one; revisit the field mappings + write payloads here once a real Zoho
   # calendar is connected. Reads are defensive (return empty on surprises).
   class CalendarClient
-    BASE_URL = "https://calendar.zoho.eu/api/v1"
+    BASE_URL = Region.calendar_api_url.freeze
 
     def initialize(calendar_account)
       @account = calendar_account

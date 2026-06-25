@@ -10,7 +10,7 @@ class ZohoDriveAccountsController < ApplicationController
     # attacker's Drive to a victim's workspace (was an unsigned JSON blob).
     state = Oauth::State.encode(flow: "drive_link", user_id: Current.user.id)
 
-    auth_url = "https://accounts.zoho.eu/oauth/v2/auth"
+    auth_url = Zoho::OauthClient::AUTH_URL
     params = {
       client_id: ENV.fetch("ZOHO_CLIENT_ID"),
       response_type: "code",
