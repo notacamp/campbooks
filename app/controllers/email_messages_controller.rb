@@ -131,6 +131,8 @@ class EmailMessagesController < ApplicationController
       end
     end
 
+    AuditEvent.log("email_message_read", user: Current.user, request: request, target: @message, via: "web")
+
     # Mark all messages in thread as read
     if @thread
       unread_ids = @thread.email_messages.where(read: false).pluck(:provider_message_id)

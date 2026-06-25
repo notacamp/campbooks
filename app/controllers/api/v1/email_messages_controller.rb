@@ -22,6 +22,7 @@ module Api
       end
 
       def show
+        AuditEvent.log("email_message_read", user: Current.user, request: request, target: @email, via: "api")
         render_data(EmailSerializer.new(@email, detail: true).as_json)
       end
 
