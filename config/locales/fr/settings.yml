@@ -6,6 +6,7 @@ fr:
         title: Accès API
         subtitle: Créez des clients OAuth pour accéder à vos données Campbooks depuis vos propres applications et scripts.
         new_client: Nouveau client
+        read_docs: Consulter la documentation de l'API
         col_name: Nom
         col_client_id: ID client
         col_scopes: Autorisations
