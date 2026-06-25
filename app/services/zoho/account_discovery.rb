@@ -1,6 +1,6 @@
 module Zoho
   class AccountDiscovery
-    BASE_URL = "https://mail.zoho.eu/api"
+    BASE_URL = Region.mail_api_url.freeze
 
     def initialize(access_token)
       @access_token = access_token

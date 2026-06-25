@@ -56,6 +56,9 @@ fr:
       empty: "(vide)"
     email_html_preview:
       frame_title: Aperçu de l'e-mail
+    icon_picker:
+      default: Par défaut
+      label: Choisir une icône
     inbox_settings_modal:
       close_label: Fermer les paramètres de la boîte de réception
       nav:
