@@ -26,6 +26,13 @@ major, minor, or patch change here.
   tagged by semantic version (`1.2.3`, `1.2`) plus `latest` for the newest stable
   release, so self-hosters can pull a prebuilt image instead of building from
   source. The full test suite re-runs as a gate before any image is pushed.
+- A **Select mode** for the inbox — a toolbar toggle that turns the thread list
+  into a batch organizer: persistent checkboxes on every row *and* every date /
+  Priority section divider (so multi-select works on touch, not just on hover),
+  tap-a-row-to-select, a select-all-per-section checkbox with an indeterminate
+  state when only some of a section's threads are picked, and the docked
+  bulk-action bar (archive, tag, snooze, move, delete, …). Toggle off or press
+  Esc to exit.
 - A machine-readable [OpenAPI 3 specification](openapi.yaml) for the public REST
   API, plus an expanded reference ([docs/api.md](docs/api.md)) with per-resource
   response examples, Python/JavaScript samples, and a complete error-code table.
