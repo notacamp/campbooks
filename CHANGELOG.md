@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-25
+
 ### Added
 
 - **AI provenance in context** — every AI output now shows which provider and data
@@ -50,10 +52,8 @@ major, minor, or patch change here.
   Registry (`ghcr.io/notacamp/campbooks`) when a release is published. Multi-arch
   (`linux/amd64` + `linux/arm64`) and tagged by semantic version (`1.2.3`, `1.2`)
   plus `latest` for the newest stable release, so self-hosters can pull a prebuilt
-  image — on x86 or ARM — instead of building from source. Images are
-  tagged by semantic version (`1.2.3`, `1.2`) plus `latest` for the newest stable
-  release, so self-hosters can pull a prebuilt image instead of building from
-  source. The full test suite re-runs as a gate before any image is pushed.
+  image — on x86 or ARM — instead of building from source. The full test suite
+  re-runs as a gate before any image is pushed.
 - A **Select mode** for the inbox — a toolbar toggle that turns the thread list
   into a batch organizer: persistent checkboxes on every row *and* every date /
   Priority section divider (so multi-select works on touch, not just on hover),
@@ -135,5 +135,6 @@ major, minor, or patch change here.
 
 - Initial public, source-available release of Campbooks.
 
-[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/notacamp/campbooks/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/notacamp/campbooks/releases/tag/v0.1.0
