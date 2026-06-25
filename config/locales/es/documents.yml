@@ -68,6 +68,10 @@ es:
         invoice_number: Número de factura
         tax_amount_cents: Importe del impuesto (céntimos)
         tax_rate: Tipo impositivo (%)
+    folders:
+      add_prompt: Añadir a carpeta…
+      label: Carpetas
+      remove: Quitar de %{name}
     index:
       accepted_formats: PDF, JPG, PNG, WEBP, HEIC
       click_to_upload: Haga clic para subir
@@ -96,9 +100,11 @@ es:
       exports_col_status: Estado
       exports_heading: Exportaciones
       filter_all_categories: Todas las categorías
+      filter_all_folders: Todas las carpetas
       filter_all_statuses: Todos los estados
       filter_all_types: Todos los tipos
       filter_category: Categoría
+      filter_folder: Carpeta
       filter_month: Mes
       filter_status: Estado
       filter_type: Tipo
