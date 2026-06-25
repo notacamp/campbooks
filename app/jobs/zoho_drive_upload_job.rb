@@ -6,11 +6,12 @@ class ZohoDriveUploadJob < ApplicationJob
     document = Document.find(document_id)
     return unless document.review_approved?
 
-    mapping = DriveFolderMapping.find_by(document_type_id: document.document_type_id)
-    unless mapping
-      # Try catch-all mapping (nil document_type_id)
-      mapping = DriveFolderMapping.find_by(document_type_id: nil, zoho_drive_account: ZohoDriveAccount.active.first)
-    end
+    # Scope to THIS document's workspace so an approval can never route to another
+    # tenant's Drive (both the mapping and the account lookups were previously global).
+    accounts = document.workspace.zoho_drive_accounts.active
+    mapping = DriveFolderMapping.where(zoho_drive_account: accounts).find_by(document_type_id: document.document_type_id)
+    # Fall back to the workspace's catch-all mapping (nil document_type_id).
+    mapping ||= DriveFolderMapping.where(zoho_drive_account: accounts).find_by(document_type_id: nil)
     return unless mapping
 
     account = mapping.zoho_drive_account

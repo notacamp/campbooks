@@ -16,6 +16,7 @@ module Api
       end
 
       def show
+        AuditEvent.log("document_read", user: Current.user, request: request, target: @document, via: "api")
         render_data(DocumentSerializer.new(@document, detail: true).as_json)
       end
 

@@ -42,8 +42,6 @@ module Events
         occurred_at: @occurred_at || Time.current
       )
 
-      track_metric
-
       Workflows::EventTriggerJob.perform_later(event.id) if Features.workflows? && listeners?(workspace)
 
       event

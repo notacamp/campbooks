@@ -702,6 +702,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_160000) do
     t.index ["workspace_id"], name: "index_feed_items_on_workspace_id"
   end
 
+  create_table "folder_memberships", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "folderable_id", null: false
+    t.string "folderable_type", null: false
+    t.bigint "mail_folder_id", null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["folderable_type", "folderable_id"], name: "index_folder_memberships_on_folderable"
+    t.index ["mail_folder_id", "folderable_type", "folderable_id"], name: "index_folder_memberships_unique", unique: true
+    t.index ["mail_folder_id"], name: "index_folder_memberships_on_mail_folder_id"
+  end
+
   create_table "google_drive_accounts", force: :cascade do |t|
     t.boolean "connected", default: true, null: false
     t.datetime "created_at", null: false
@@ -1436,6 +1448,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_160000) do
   add_foreign_key "exports", "workspaces"
   add_foreign_key "feed_items", "users"
   add_foreign_key "feed_items", "workspaces"
+  add_foreign_key "folder_memberships", "mail_folders"
   add_foreign_key "google_drive_accounts", "workspaces"
   add_foreign_key "google_drive_configs", "document_types"
   add_foreign_key "identities", "users"
