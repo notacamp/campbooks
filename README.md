@@ -16,8 +16,9 @@ its own, and hands you one short list of what actually needs you — so your att
 decisions, not drudgery. Its AI assistant, **Scout**, briefs you each morning, answers
 questions about your inbox and documents, and drafts replies you can approve.
 
-Source-available under the Sustainable Use License — run it on our hosted cloud or self-host it on your own
-server.
+Source-available under the Sustainable Use License — read, modify, and self-host it **for free, for your
+own business or personal use**. Run it on our hosted cloud, or on your own server. (The license only draws
+the line at reselling it or running it as a service for others.)
 
 ## Stack
 
