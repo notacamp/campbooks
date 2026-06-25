@@ -6,9 +6,11 @@
 <%# In the native app there's no nav bar above the inbox (it's a tab root), so
     the folder chips would sit flush against the status bar — give them extra
     top breathing room there. %>
+<%# `desktop_hidden` hides the bar on lg+ where the folder pane takes over; `with_modal`
+    is false when an ancestor already renders the shared New Folder dialog + controller. %>
 <div id="folder_chip_bar"
-     class="flex items-center gap-1.5 overflow-x-auto px-3 <%= hotwire_native_app? ? "pt-5" : "pt-2" %> pb-3 border-b border-border bg-card"
-     data-controller="mail-folder-drop new-folder"
+     class="flex<%= " lg:hidden" if local_assigns.fetch(:desktop_hidden, false) %> items-center gap-1.5 overflow-x-auto px-3 <%= hotwire_native_app? ? "pt-5" : "pt-2" %> pb-3 border-b border-border bg-card"
+     data-controller="mail-folder-drop<%= " new-folder" if local_assigns.fetch(:with_modal, true) %>"
      data-action="dragover->mail-folder-drop#dragover drop->mail-folder-drop#drop dragleave->mail-folder-drop#dragleave click->mail-folder-drop#click">
   <% @common_folders&.each do |folder| %>
     <% active = (@current_folder == folder[:id]) || (folder[:id].nil? && @current_folder.nil?) %>
@@ -54,5 +56,5 @@
           @current_folder == "all" ? "bg-accent-600 text-white" : "bg-muted text-muted-foreground hover:bg-accent"
         ) %>
 
-  <%= render(Campbooks::NewFolderModal.new) %>
+  <% if local_assigns.fetch(:with_modal, true) %><%= render(Campbooks::NewFolderModal.new) %><% end %>
 </div>

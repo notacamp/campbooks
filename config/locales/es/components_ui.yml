@@ -56,6 +56,18 @@ es:
       empty: "(vacío)"
     email_html_preview:
       frame_title: Vista previa del correo
+    folder_pane:
+      collapse: Contraer
+      expand: Expandir
+      folders: Carpetas
+      new_folder: Nueva carpeta
+    folder_pane_custom_folders:
+      delete_confirm: '¿Eliminar la carpeta %{name}? Tus correos y las carpetas del proveedor no se modifican.'
+      edit_title: Ajustes de la carpeta
+      icon_label: Icono de la carpeta
+      move_label: Mover a
+      toggle: Mostrar/ocultar subcarpetas
+      top_level: Nivel superior
     icon_picker:
       default: Predeterminado
       label: Elegir un icono

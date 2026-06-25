@@ -55,6 +55,18 @@ pt:
       empty: "(vazio)"
     email_html_preview:
       frame_title: Pré-visualização do email
+    folder_pane:
+      collapse: Recolher
+      expand: Expandir
+      folders: Pastas
+      new_folder: Nova pasta
+    folder_pane_custom_folders:
+      delete_confirm: 'Remover a pasta %{name}? Os seus emails e as pastas do fornecedor não são afetados.'
+      edit_title: Definições da pasta
+      icon_label: Ícone da pasta
+      move_label: Mover para
+      toggle: Mostrar/ocultar subpastas
+      top_level: Nível superior
     icon_picker:
       default: Predefinido
       label: Escolher um ícone
