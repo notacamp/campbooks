@@ -46,7 +46,7 @@ class MailFoldersController < ApplicationController
   private
 
   def mail_folder_params
-    params.require(:mail_folder).permit(:name)
+    params.require(:mail_folder).permit(:name, :icon)
   end
 
   def created_streams(result)

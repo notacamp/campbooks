@@ -153,6 +153,7 @@ es:
       default: Vista predeterminada
       list: Vista de lista
     new_folder_modal:
+      icon_label: Icono de la carpeta
       name_label: Nombre de la carpeta
       name_placeholder: p. ej. Recibos
       submit: Crear carpeta

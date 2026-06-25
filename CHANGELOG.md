@@ -18,6 +18,7 @@ major, minor, or patch change here.
 
 ### Added
 
+- Configurable folder icons — the inbox folder bar now renders an icon on every folder chip, and custom folders can be given an icon from a picker when created.
 - Prometheus metrics at an internal `/metrics` endpoint ([yabeda](https://github.com/yabeda-rb/yabeda)):
   HTTP request rate / error rate / latency (RED), background-job execution counts
   and duration, and a domain-action counter sourced from the Events bus. Meant to
@@ -26,7 +27,10 @@ major, minor, or patch change here.
   the Solid Queue worker exposing its own metrics server on `:9394`. See
   [docs/observability.md](docs/observability.md).
 - Official production container images, published to the GitHub Container
-  Registry (`ghcr.io/notacamp/campbooks`) when a release is published. Images are
+  Registry (`ghcr.io/notacamp/campbooks`) when a release is published. Multi-arch
+  (`linux/amd64` + `linux/arm64`) and tagged by semantic version (`1.2.3`, `1.2`)
+  plus `latest` for the newest stable release, so self-hosters can pull a prebuilt
+  image — on x86 or ARM — instead of building from source. Images are
   tagged by semantic version (`1.2.3`, `1.2`) plus `latest` for the newest stable
   release, so self-hosters can pull a prebuilt image instead of building from
   source. The full test suite re-runs as a gate before any image is pushed.
@@ -65,7 +69,13 @@ major, minor, or patch change here.
 - The `emails:write` API scope description shown in Settings → API access no
   longer overstates what it grants — it marks emails read/unread (it does not
   archive, snooze, or tag).
-
+- Drag-and-drop and tap-to-move no longer offer Sent or Drafts as destinations (moving received mail into outbound/compose folders made no sense).
+- The Zoho data-center region (`ZOHO_REGION`, default `eu`) is now honored across
+  every Zoho integration — mailbox sync, OAuth sign-in/connect, calendar, and
+  WorkDrive — instead of being hardcoded to the EU data center. Self-hosters whose
+  Zoho account lives in another region (US, IN, AU, JP, CA, CN, SA) can point at
+  their own data center; the default is unchanged.
+  
 ### Security
 
 - AI features now only process your data through a provider your workspace has
