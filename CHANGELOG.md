@@ -59,6 +59,9 @@ major, minor, or patch change here.
 
 ### Fixed
 
+- Publishing a domain event (`Events.publish`) no longer aborts on an internal
+  `NameError` from a leftover metrics call — events publish cleanly again and
+  event-triggered workflows fire reliably.
 - Document analysis now reliably extracts structured fields, so documents in the
   review queue stop showing up empty. Several problems combined to leave most
   reviewed documents with no extracted data: the Anthropic (Claude) adapter sent
