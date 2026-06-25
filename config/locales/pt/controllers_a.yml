@@ -199,6 +199,8 @@ pt:
         other: "'%{name}' criada, mas não foi possível adicioná-la a %{count} caixas"
     destroy:
       removed: Pasta '%{name}' removida
+    update:
+      updated: Pasta '%{name}' atualizada
   notifications:
     archive:
       success: Notificação arquivada.
