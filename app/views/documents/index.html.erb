@@ -80,7 +80,7 @@
 
 <% if @has_any_documents %>
 <!-- Filters: collapsed by default on mobile (tap to expand), always open on desktop (md+) -->
-<% active_filter_count = [ params[:category].presence, Array(params[:type]).reject(&:blank?).presence, params[:review_status].presence, params[:month].presence ].compact.size %>
+<% active_filter_count = [ params[:category].presence, Array(params[:type]).reject(&:blank?).presence, params[:review_status].presence, params[:month].presence, params[:folder_id].presence ].compact.size %>
 <details class="filters-disclosure group/filters bg-card rounded-xl shadow-sm border border-gray-200 mb-6">
   <summary class="md:hidden flex items-center justify-between gap-2 p-4 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
     <span class="flex items-center gap-2 text-sm font-medium text-gray-700">
@@ -135,6 +135,15 @@
       <%= month_field_tag :month, params[:month], class: "mt-1 block w-full sm:w-auto rounded-md border-gray-300 shadow-sm text-sm",
           onchange: "this.form.requestSubmit()" %>
     </div>
+    <% if @mail_folders&.any? %>
+      <div class="w-full sm:w-auto">
+        <label class="block text-sm font-medium text-gray-700"><%= t(".filter_folder") %></label>
+        <%= select_tag :folder_id,
+            options_for_select([ [ t(".filter_all_folders"), "" ] ] + @mail_folders.map { |mf| [ mf.name, mf.id ] }, params[:folder_id]),
+            class: "mt-1 block w-full sm:w-auto rounded-md border-gray-300 shadow-sm text-sm",
+            onchange: "this.form.requestSubmit()" %>
+      </div>
+    <% end %>
   <% end %>
   </div>
 </details>

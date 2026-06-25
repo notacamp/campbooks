@@ -20,6 +20,7 @@ class Document < ApplicationRecord
   # orthogonal to its DocumentType *kind*).
   has_many :folder_memberships, as: :folderable, dependent: :destroy
   has_many :mail_folders, through: :folder_memberships
+  scope :in_folder, ->(folder_id) { joins(:folder_memberships).where(folder_memberships: { mail_folder_id: folder_id }) }
 
   has_one :notion_page, dependent: :destroy
   has_one :notion_database_mapping, through: :classification

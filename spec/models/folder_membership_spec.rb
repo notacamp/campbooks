@@ -34,4 +34,11 @@ RSpec.describe FolderMembership, type: :model do
     folder.documents << document
     expect { document.destroy }.to change(FolderMembership, :count).by(-1)
   end
+
+  it "scopes documents to a folder (Document.in_folder)" do
+    in_folder = create(:document, workspace: workspace)
+    folder.documents << in_folder
+    create(:document, workspace: workspace) # filed nowhere
+    expect(Document.in_folder(folder.id)).to contain_exactly(in_folder)
+  end
 end
