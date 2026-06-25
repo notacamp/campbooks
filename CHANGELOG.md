@@ -43,13 +43,6 @@ major, minor, or patch change here.
 - Configurable folder icons — the inbox folder bar now renders an icon on every folder chip, and custom folders can be given an icon from a picker when created.
 - A collapsible folder pane in the desktop inbox — system and custom folders as a vertical list with icons, counts, and a collapse-to-icons toggle; a custom folder's icon can be changed, or the folder deleted, from the pane. The horizontal chip bar still serves folders on mobile.
 - Nested folders — custom folders can be organized into a tree in the folder pane (collapsible per branch); move a folder under another, or back to top level, from its settings. Each folder still maps to a flat provider folder by its name.
-- Prometheus metrics at an internal `/metrics` endpoint ([yabeda](https://github.com/yabeda-rb/yabeda)):
-  HTTP request rate / error rate / latency (RED), background-job execution counts
-  and duration, and a domain-action counter sourced from the Events bus. Meant to
-  be scraped over a private network and visualized in Grafana. Multi-process safe
-  via the Prometheus client's `DirectFileStore` (`PROMETHEUS_MULTIPROC_DIR`), with
-  the Solid Queue worker exposing its own metrics server on `:9394`. See
-  [docs/observability.md](docs/observability.md).
 - Official production container images, published to the GitHub Container
   Registry (`ghcr.io/notacamp/campbooks`) when a release is published. Multi-arch
   (`linux/amd64` + `linux/arm64`) and tagged by semantic version (`1.2.3`, `1.2`)
@@ -136,6 +129,14 @@ major, minor, or patch change here.
     including "Sign in with Microsoft" (previously always shown), is hidden. This
     supersedes the old `ENABLE_MICROSOFT_MAILBOX` flag, which is still honored for
     backward compatibility.
+- Features specific to the managed Not A Camp cloud service (e.g. the in-app
+  support chat, analytics, and observability) now live in a separate private
+  package, installed only through an optional `:cloud` Bundler group that is
+  **excluded by default**. Self-hosting is unaffected: `bundle install` skips the
+  group, never contacts the private repository, and needs no extra credentials —
+  the open-source core stays free of managed-service code. (Prometheus `/metrics`
+  observability, briefly added here, moved into that package and is no longer part
+  of the open-source build.)
 
 ## [0.1.0] - 2026-06-25
 
