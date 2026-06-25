@@ -172,7 +172,8 @@ module Ai
 
       # The zip entry reads as binary (ASCII-8BIT); docx XML is UTF-8.
       xml = xml.force_encoding("UTF-8")
-      text = xml.gsub(%r{</w:p>}, "\n").gsub(/<[^>]+>/, "")
+      text = xml.gsub(%r{</w:p>}, "\n")
+      text = text.gsub(/<[^>]+>/, "") while text.match?(/<[^>]+>/)
       CGI.unescapeHTML(text).gsub(/[ \t]+/, " ").gsub(/\n{3,}/, "\n\n").strip.presence
     rescue => e
       Rails.logger.warn("[Ai::DocumentAnalyzer] office_text extraction failed: #{e.message}")
