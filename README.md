@@ -1,5 +1,12 @@
 # Campbooks
 
+[![CI](https://github.com/notacamp/campbooks/actions/workflows/ci.yml/badge.svg)](https://github.com/notacamp/campbooks/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/github/v/tag/notacamp/campbooks?sort=semver&label=version&color=blue)](CHANGELOG.md)
+[![License: Sustainable Use](https://img.shields.io/badge/license-Sustainable%20Use-blue.svg)](LICENSE)
+[![Ruby](https://img.shields.io/badge/Ruby-3.2-CC342D?logo=ruby&logoColor=white)](https://www.ruby-lang.org)
+[![Rails](https://img.shields.io/badge/Rails-8.1-D30001?logo=rubyonrails&logoColor=white)](https://rubyonrails.org)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 **The email client that declutters your work** — an AI-native inbox that sorts itself,
 reimagined so it feels nothing like the email you're used to. Built for young professionals
 and small-business owners buried in email and paperwork.
