@@ -64,7 +64,7 @@ module Campbooks
     end
 
     def body
-      div(class: "px-5 py-5 space-y-3") do
+      div(class: "px-5 py-5 space-y-4") do
         render(Campbooks::Input.new(
           "mail_folder[name]",
           label: t(".name_label"),
@@ -73,6 +73,10 @@ module Campbooks
           autocomplete: "off",
           data: { new_folder_target: "input", action: "input->new-folder#clearError" }
         ))
+        div(class: "space-y-1.5") do
+          span(class: "block text-xs font-medium text-foreground") { t(".icon_label") }
+          render(Campbooks::IconPicker.new(name: "mail_folder[icon]"))
+        end
         # Turbo Stream target the server fills with a validation error (kept open).
         div(id: "new_folder_error") do
           if @error

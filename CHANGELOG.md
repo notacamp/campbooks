@@ -18,6 +18,14 @@ major, minor, or patch change here.
 
 ### Added
 
+- Configurable folder icons — the inbox folder bar now renders an icon on every folder chip, and custom folders can be given an icon from a picker when created.
+- Prometheus metrics at an internal `/metrics` endpoint ([yabeda](https://github.com/yabeda-rb/yabeda)):
+  HTTP request rate / error rate / latency (RED), background-job execution counts
+  and duration, and a domain-action counter sourced from the Events bus. Meant to
+  be scraped over a private network and visualized in Grafana. Multi-process safe
+  via the Prometheus client's `DirectFileStore` (`PROMETHEUS_MULTIPROC_DIR`), with
+  the Solid Queue worker exposing its own metrics server on `:9394`. See
+  [docs/observability.md](docs/observability.md).
 - Official production container images, published to the GitHub Container
   Registry (`ghcr.io/notacamp/campbooks`) when a release is published. Multi-arch
   (`linux/amd64` + `linux/arm64`) and tagged by semantic version (`1.2.3`, `1.2`)
@@ -44,6 +52,10 @@ major, minor, or patch change here.
 - The `emails:write` API scope description shown in Settings → API access no
   longer overstates what it grants — it marks emails read/unread (it does not
   archive, snooze, or tag).
+
+### Fixed
+
+- Drag-and-drop and tap-to-move no longer offer Sent or Drafts as destinations (moving received mail into outbound/compose folders made no sense).
 
 ## [0.1.0] - 2026-06-25
 

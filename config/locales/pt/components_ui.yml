@@ -55,6 +55,9 @@ pt:
       empty: "(vazio)"
     email_html_preview:
       frame_title: Pré-visualização do email
+    icon_picker:
+      default: Predefinido
+      label: Escolher um ícone
     inbox_settings_modal:
       close_label: Fechar definições da caixa de entrada
       nav:
