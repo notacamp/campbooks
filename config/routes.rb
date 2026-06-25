@@ -214,6 +214,7 @@ Rails.application.routes.draw do
     resource :ai, only: [ :show ], controller: "ai" do
       post :switch_mode
     end
+    resource :data_privacy, only: [ :show, :update ], controller: "data_privacy"
     resource :account, only: [ :show, :update, :destroy ], controller: "account" do
       patch :language
       patch :writing_style

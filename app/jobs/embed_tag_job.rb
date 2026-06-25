@@ -3,6 +3,7 @@ class EmbedTagJob < ApplicationJob
 
   def perform(tag)
     return unless tag.workspace.present?
+    return unless Ai::ProviderSetup.configured?(tag.workspace, :embeddings)
 
     content = build_tag_content(tag)
     content_hash = Digest::SHA256.hexdigest(content)

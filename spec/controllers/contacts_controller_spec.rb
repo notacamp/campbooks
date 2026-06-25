@@ -16,6 +16,10 @@ RSpec.describe ContactsController, type: :controller do
     # Isolate these specs from the onboarding gate; an otherwise-empty workspace
     # would redirect to onboarding before the action runs.
     allow(controller).to receive(:redirect_to_onboarding_if_incomplete)
+    # The behaviour under test is the enqueue, not AI-provider resolution. Since
+    # #24 stopped counting a bare ANTHROPIC_API_KEY and this workspace configures
+    # no provider, make text AI available explicitly.
+    allow(Ai::ProviderSetup).to receive(:available?).and_return(true)
   end
 
   describe "GET index" do

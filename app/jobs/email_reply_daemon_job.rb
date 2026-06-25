@@ -40,6 +40,9 @@ class EmailReplyDaemonJob < ApplicationJob
     Current.acting_user = agent_thread.user
     Current.workspace = agent_thread.workspace
 
+    # Respect the workspace's global AI kill-switch (Settings → Data & Privacy).
+    return unless Current.workspace&.ai_processing_enabled?
+
     return if agent_thread.agent_messages.where(author_type: :ai).where("created_at > ?", message.created_at).exists?
 
     agent_thread.agent_messages.where(draft: true, outdated: false).update_all(outdated: true)

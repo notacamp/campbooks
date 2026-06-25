@@ -1,0 +1,99 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+
+<div class="max-w-xl space-y-6">
+  <%# ── Global AI kill-switch ───────────────────────────────────────────── %>
+  <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-6">
+    <div class="flex items-start justify-between gap-4">
+      <div class="min-w-0">
+        <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".ai_toggle_heading") %></h2>
+        <p class="text-sm text-gray-500"><%= t(".ai_toggle_desc") %></p>
+      </div>
+      <%= form_with url: settings_data_privacy_path, method: :patch, class: "shrink-0 pt-1",
+            data: { controller: "auto-submit", action: "change->auto-submit#submit" } do %>
+        <%= hidden_field_tag :ai_processing_enabled, "0" %>
+        <%= render(Campbooks::Toggle.new(
+              name: "ai_processing_enabled",
+              checked: @org.ai_processing_enabled?,
+              value: "1"
+            )) %>
+      <% end %>
+    </div>
+    <% unless @org.ai_processing_enabled? %>
+      <div class="mt-4 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+        <%= t(".ai_paused_note") %>
+      </div>
+    <% end %>
+  </div>
+
+  <%# ── Which AI sees your data (read-only; edit in Settings → AI) ───────── %>
+  <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-6">
+    <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".ai_providers_heading") %></h2>
+    <p class="text-sm text-gray-500 mb-4"><%= t(".ai_providers_desc") %></p>
+    <div class="divide-y divide-gray-100">
+      <% AiConfiguration::PURPOSES.each do |purpose| %>
+        <% provider = @configs[purpose]&.ai_adapter&.provider %>
+        <div class="flex items-center justify-between gap-3 py-2">
+          <span class="text-sm text-gray-700"><%= human_enum(AiConfiguration, :purpose, purpose) %></span>
+          <% if provider %>
+            <span class="text-xs text-gray-500 text-right">
+              <%= human_enum(AiAdapter, :provider, provider) %>
+              <% if (region = AiConfiguration::PROVIDER_REGIONS[provider]) %>
+                <span class="ml-0.5 inline-flex items-center rounded px-1 text-[10px] font-medium <%= region == "EU" ? "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400" : "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" %>"><%= region %></span>
+              <% end %>
+            </span>
+          <% else %>
+            <span class="text-xs text-gray-400"><%= t(".not_configured") %></span>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+    <div class="mt-4">
+      <%= render(Campbooks::Button.new(variant: :outline, size: :sm, href: settings_ai_path)) { t(".configure_ai") } %>
+    </div>
+  </div>
+
+  <%# ── Where your data lives ───────────────────────────────────────────── %>
+  <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-6">
+    <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".hosting_heading") %></h2>
+    <p class="text-sm text-gray-500">
+      <%= Rails.application.config.self_hosted ? t(".hosting_self_hosted") : t(".hosting_cloud") %>
+    </p>
+  </div>
+
+  <%# ── Connected services (sub-processors) ─────────────────────────────── %>
+  <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-6">
+    <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".sub_processors_heading") %></h2>
+    <p class="text-sm text-gray-500 mb-4"><%= t(".sub_processors_desc") %></p>
+    <div class="divide-y divide-gray-100">
+      <% @email_accounts.each do |acct| %>
+        <div class="flex items-center justify-between gap-3 py-2">
+          <span class="text-sm text-gray-700 truncate"><%= acct.email_address %> · <%= acct.provider.to_s.titleize %></span>
+          <%= render(Campbooks::Badge.new(variant: :success)) { t(".connected") } %>
+        </div>
+      <% end %>
+      <% [[t(".google_drive"), @google_drive_connected],
+          [t(".notion"), @notion_connected],
+          [t(".zoho_drive"), @zoho_drive_connected],
+          [t(".calendar"), @calendar_connected]].each do |name, connected| %>
+        <div class="flex items-center justify-between gap-3 py-2">
+          <span class="text-sm text-gray-700"><%= name %></span>
+          <%= render(Campbooks::Badge.new(variant: connected ? :success : :neutral)) { connected ? t(".connected") : t(".not_connected") } %>
+        </div>
+      <% end %>
+    </div>
+    <div class="mt-4">
+      <%= render(Campbooks::Button.new(variant: :outline, size: :sm, href: settings_integrations_root_path)) { t(".manage_integrations") } %>
+    </div>
+  </div>
+
+  <%# ── Your data (export / delete) ─────────────────────────────────────── %>
+  <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-6">
+    <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".your_data_heading") %></h2>
+    <p class="text-sm text-gray-500 mb-4"><%= t(".your_data_desc") %></p>
+    <div class="flex flex-wrap gap-3">
+      <%= render(Campbooks::Button.new(variant: :outline, size: :sm, href: export_settings_account_path)) { t(".export_button") } %>
+      <%= render(Campbooks::Button.new(variant: :ghost, size: :sm, href: delete_settings_account_path)) { t(".delete_account") } %>
+    </div>
+  </div>
+</div>

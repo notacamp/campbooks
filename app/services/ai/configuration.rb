@@ -1,6 +1,10 @@
 module Ai
   class Configuration
     def self.for(purpose)
+      # Global AI kill-switch (Settings → Data & Privacy): no provider resolves when
+      # the workspace has turned AI processing off, so every AI surface fails closed.
+      return nil if Current.workspace && !Current.workspace.ai_processing_enabled?
+
       mapping = Current.workspace&.ai_configurations&.includes(:ai_adapter)&.find_by(purpose: purpose, enabled: true)
       return nil unless mapping
 
