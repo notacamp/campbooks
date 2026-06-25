@@ -15,6 +15,7 @@ fr:
       extracted_data: Données extraites
       junk: Indésirable
       new_type: "+ Nouveau type"
+      no_extracted_data: Aucune donnée n'a pu être extraite de ce document.
       no_types: Aucun type de document pour l'instant
       open: Ouvrir
       reclassify: Reclasser

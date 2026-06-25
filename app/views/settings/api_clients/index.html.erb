@@ -1,5 +1,6 @@
 <% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
 <%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) do %>
+  <%= render(Campbooks::Button.new(variant: :outline, size: :md, href: api_docs_url, target: "_blank", rel: "noopener")) { t(".read_docs") } %>
   <%= render(Campbooks::Button.new(variant: :primary, size: :md, href: new_settings_api_client_path)) { t(".new_client") } %>
 <% end %>
 

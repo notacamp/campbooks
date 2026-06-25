@@ -156,6 +156,7 @@ pt:
       no_emails_yet: Ainda não há emails.
       scout_keyboard_hint: Cmd+Shift+E para manual
       scout_label: Scout
+      select_mode_title: Selecionar e-mails
       show_discussion_aria: Mostrar discussão
       show_discussion_title: Mostrar discussão
       snoozed_until_badge: Adiado até %{time}
@@ -184,6 +185,7 @@ pt:
       no_subject: "(sem assunto)"
       pin_title: Tornar prioritário
       priority_section: Prioritário
+      select_section: "Selecionar tudo em %{section}"
       senders_more: "%{first}, %{second}, e mais"
       sent_to_prefix: 'Para:'
       unpin_title: Remover prioridade

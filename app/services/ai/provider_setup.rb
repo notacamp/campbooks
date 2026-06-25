@@ -17,7 +17,7 @@ module Ai
     MANAGED_VISION_ADAPTER_NAME = "Campbooks AI — Documents".freeze
 
     # The capabilities a feature can require. Each AI surface maps to exactly one:
-    #   • :text       — chat/triage/replies/reminders (legacy Anthropic fallback exists)
+    #   • :text       — chat/triage/replies/reminders (self-hosted-only legacy Anthropic fallback)
     #   • :documents  — PDF/image vision analysis (no fallback; DB config required)
     #   • :embeddings — semantic search & tag classification (OpenAI/Gemini only)
     CAPABILITIES = %i[text documents embeddings].freeze
@@ -119,12 +119,14 @@ module Ai
       text
     end
 
-    # Text AI is usable: a text purpose is configured, (self-hosted) an env key
-    # can stand in, or the global ANTHROPIC_API_KEY drives the legacy fallback
-    # (Ai::*ChatService#call_legacy → Anthropic::Client.new, works in any env).
+    # Text AI is usable: a text purpose is configured, or (self-hosted) the
+    # operator's own env key stands in via the legacy Anthropic fallback. The bare
+    # shared ANTHROPIC_API_KEY is no longer counted on the cloud — the legacy
+    # fallback only fires on self-hosted now (Ai::LegacyFallback) — so "available"
+    # tracks a real configured/managed provider rather than a silent platform key.
     # This is the gate for "AI is set up" — see SetupStatus.
     def text_available?
-      text_configured? || self_hosted_env_provider? || ENV["ANTHROPIC_API_KEY"].present?
+      text_configured? || self_hosted_env_provider?
     end
 
     def text_configured?
@@ -149,11 +151,13 @@ module Ai
     end
 
     # Embeddings (semantic search + tag classification) only run on OpenAI/Gemini.
-    # EmbeddingService resolves a workspace adapter first, then falls back to the
-    # OPENAI_API_KEY/GEMINI_API_KEY env keys in ANY environment, so we mirror that.
+    # EmbeddingService resolves a workspace adapter first; its env-key fallback is
+    # self-hosted only (the operator's own key), so on the cloud "available" means a
+    # configured OpenAI/Gemini adapter exists (managed workspaces have one) — never
+    # a silent platform key. Mirrors EmbeddingService#env_fallback_adapter.
     def embeddings_available?
       @workspace.ai_adapters.enabled.where(provider: ::EmbeddingService::EMBEDDING_PROVIDERS).exists? ||
-        ENV["OPENAI_API_KEY"].present? || ENV["GEMINI_API_KEY"].present?
+        (Rails.application.config.self_hosted && (ENV["OPENAI_API_KEY"].present? || ENV["GEMINI_API_KEY"].present?))
     end
 
     # Strict embeddings check (a workspace adapter, or the operator's own env key
@@ -214,19 +218,25 @@ module Ai
         config = @workspace.ai_configurations.find_or_initialize_by(purpose: purpose)
         config.ai_adapter = adapter
         config.enabled = true
-        # Managed adapters always run the platform-chosen model for their provider —
-        # never carry over a model from a previous provider (e.g. a DeepSeek model
-        # left on a config that is now Mistral, which the provider rejects with 400).
-        # BYO adapters keep the user's explicit model choice.
-        config.model =
-          if adapter.managed?
-            AiConfiguration::DEFAULT_MODEL[adapter.provider] || config.model.presence || "gpt-4o-mini"
-          else
-            config.model.presence || AiConfiguration::DEFAULT_MODEL[adapter.provider] || "gpt-4o-mini"
-          end
+        config.model = resolved_model_for(adapter, config.model)
         config.max_tokens ||= 1000
         config.temperature ||= 0.0
         config.save!
+      end
+    end
+
+    # Pick the model for a (purpose, adapter) pair. A managed adapter always runs
+    # the platform-chosen default for its provider. A BYO adapter keeps the user's
+    # explicit model ONLY when it's valid for the adapter's provider; otherwise it
+    # falls back to that provider's default — so switching a role to a new provider
+    # (e.g. document analysis OpenAI → Anthropic) never leaves a stale model like
+    # "gpt-4o-mini" on a Claude adapter, which the provider would reject with a 400.
+    def resolved_model_for(adapter, current_model)
+      valid = AiConfiguration::MODELS[adapter.provider] || []
+      if !adapter.managed? && current_model.present? && valid.include?(current_model)
+        current_model
+      else
+        AiConfiguration::DEFAULT_MODEL[adapter.provider] || valid.first || "gpt-4o-mini"
       end
     end
 

@@ -1,0 +1,1513 @@
+# Campbooks Public REST API — OpenAPI 3.0 specification.
+#
+# This file is the machine-readable source of truth for the public API. The
+# human guide in docs/api.md is written to match it; the hosted reference (the
+# Docusaurus "Developers" section) renders this file directly. When you add or
+# change an endpoint, update this spec and docs/api.md together.
+#
+# Validate with:  npx @redocly/cli@latest lint openapi.yaml
+openapi: 3.0.3
+
+info:
+  title: Campbooks Public REST API
+  version: "1.0.0"
+  description: |
+    The public API lets customers reach their own Campbooks data — email,
+    documents, contacts, tags, document types, and Scout chat — from
+    their own apps and scripts.
+
+    ## Authentication
+
+    The API uses **OAuth 2.0 client credentials**. A credential acts as the user
+    who created it, inside that user's workspace — there is no per-end-user
+    authorization step.
+
+    1. In the app, go to **Settings → API access** and create a client. Pick the
+       scopes it needs. The **client secret** is shown **once** — store it
+       safely (it's hashed at rest and can be regenerated, not re-displayed).
+    2. Exchange the credentials for a short-lived bearer token (valid 2 hours) at
+       `POST /api/oauth/token`. **Always pass a `scope` parameter** — a token
+       requested with no scope can call nothing.
+    3. Send the token as `Authorization: Bearer <token>` on every `/api/v1`
+       request.
+
+    Scopes are a ceiling, not a grant of new power: a request must satisfy
+    **both** the token's scope **and** the acting user's own permissions (e.g.
+    `emails:send` still requires that the user may send from the chosen account).
+
+    ## Conventions
+
+    - **Format:** JSON. Single resources are `{ "data": { … } }`; paginated
+      collections are `{ "data": [ … ], "meta": { … } }`.
+    - **Pagination:** `?page=` and `?per_page=` (default 25, max 100). A few
+      small reference collections (document types, Scout messages) are returned
+      unpaginated and carry no `meta`.
+    - **Rate limit:** 600 requests/minute per client (HTTP 429 when exceeded).
+    - **Errors:** `{ "error": { "code": "…", "message": "…" } }`, with validation
+      details under `error.details` where relevant.
+    - **404, not 403,** is returned for resources you can't see, so the API never
+      reveals the existence of another workspace's data.
+  license:
+    name: Sustainable Use License
+    url: https://github.com/notacamp/campbooks/blob/main/LICENSE.md
+
+servers:
+  - url: https://{host}
+    description: Your Campbooks deployment
+    variables:
+      host:
+        default: your-campbooks-host
+        description: >-
+          Your deployment's host (e.g. the value of APP_HOST). All endpoints are
+          served over HTTPS in production.
+
+tags:
+  - name: OAuth
+    description: Token issuance and revocation.
+  - name: Emails
+    description: List, read, send, and reply to email; mark read/unread.
+  - name: Email tags
+    description: Attach and detach workspace tags on an email.
+  - name: Documents
+    description: List, read, upload, edit, approve, reject, and reclassify documents.
+  - name: Contacts
+    description: List and read contacts; edit and change their state.
+  - name: Tags
+    description: List the workspace's tags.
+  - name: Document types
+    description: List the workspace's document types.
+  - name: Scout
+    description: The in-app AI assistant — async chat threads and messages.
+
+security:
+  - oauth2: []
+
+paths:
+  # ----------------------------------------------------------------- OAuth ----
+  /api/oauth/token:
+    post:
+      tags: [OAuth]
+      summary: Issue a bearer token
+      description: >-
+        Exchange a client ID and secret for a short-lived bearer token (valid 2
+        hours) via the `client_credentials` grant. Always include `scope`.
+      operationId: createToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [grant_type, client_id, client_secret]
+              properties:
+                grant_type:
+                  type: string
+                  enum: [client_credentials]
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+                scope:
+                  type: string
+                  description: Space-delimited list of scopes (e.g. "emails:read documents:read").
+                  example: emails:read documents:read
+      responses:
+        "200":
+          description: A bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          description: Invalid client credentials.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: invalid_client
+
+  /api/oauth/revoke:
+    post:
+      tags: [OAuth]
+      summary: Revoke a token
+      description: Revoke a single access token. Returns 200 with an empty body.
+      operationId: revokeToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [token, client_id, client_secret]
+              properties:
+                token:
+                  type: string
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+      responses:
+        "200":
+          description: The token was revoked (empty body).
+        "401":
+          description: Invalid client credentials.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ---------------------------------------------------------------- Emails ----
+  /api/v1/emails:
+    get:
+      tags: [Emails]
+      summary: List emails
+      operationId: listEmails
+      security:
+        - oauth2: [emails:read]
+      parameters:
+        - name: account_ids[]
+          in: query
+          description: Restrict to one or more email account IDs.
+          schema:
+            type: array
+            items:
+              type: integer
+        - name: unread
+          in: query
+          schema:
+            type: boolean
+        - name: has_attachment
+          in: query
+          schema:
+            type: boolean
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: priority
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high]
+        - name: q
+          in: query
+          description: Matches subject or sender address.
+          schema:
+            type: string
+        - name: received_after
+          in: query
+          description: ISO 8601 timestamp.
+          schema:
+            type: string
+            format: date-time
+        - name: received_before
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/perPage"
+      responses:
+        "200":
+          description: A page of emails.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Email"
+                  meta:
+                    $ref: "#/components/schemas/PageMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      tags: [Emails]
+      summary: Send an email
+      operationId: sendEmail
+      security:
+        - oauth2: [emails:send]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email_account_id, to_address]
+              properties:
+                email_account_id:
+                  type: integer
+                  description: An account the acting user may send from.
+                to_address:
+                  type: string
+                subject:
+                  type: string
+                body:
+                  type: string
+                cc_address:
+                  type: string
+                bcc_address:
+                  type: string
+      responses:
+        "201":
+          description: The message was sent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendResult"
+        "400":
+          $ref: "#/components/responses/MissingParameter"
+        "403":
+          description: >-
+            The token lacks `emails:send`, or the acting user cannot send from
+            that account (`no_sendable_account`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/emails/{id}:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    get:
+      tags: [Emails]
+      summary: Get an email
+      description: Same fields as the list item, plus `bcc` and the full HTML `body`.
+      operationId: getEmail
+      security:
+        - oauth2: [emails:read]
+      responses:
+        "200":
+          description: The email.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/EmailDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/emails/{id}/mark_read:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    post:
+      tags: [Emails]
+      summary: Mark an email read
+      description: Marks the message read and syncs the flag to the provider mailbox.
+      operationId: markEmailRead
+      security:
+        - oauth2: [emails:write]
+      responses:
+        "200":
+          description: The updated email.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/EmailDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/emails/{id}/mark_unread:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    post:
+      tags: [Emails]
+      summary: Mark an email unread
+      description: Local-only — there is no cross-provider "mark unread" path.
+      operationId: markEmailUnread
+      security:
+        - oauth2: [emails:write]
+      responses:
+        "200":
+          description: The updated email.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/EmailDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/emails/{id}/reply:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    post:
+      tags: [Emails]
+      summary: Reply to an email
+      description: >-
+        Threads automatically via the source message. Sends from the source
+        message's account unless `email_account_id` is given; replies to the
+        original sender unless `to_address` is given.
+      operationId: replyEmail
+      security:
+        - oauth2: [emails:send]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+                to_address:
+                  type: string
+                cc_address:
+                  type: string
+                bcc_address:
+                  type: string
+                email_account_id:
+                  type: integer
+      responses:
+        "201":
+          description: The reply was sent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendResult"
+        "400":
+          $ref: "#/components/responses/MissingParameter"
+        "403":
+          description: Lacks `emails:send`, or the user cannot send from the account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  # ------------------------------------------------------------- Email tags ---
+  /api/v1/emails/{email_id}/tags:
+    parameters:
+      - name: email_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    post:
+      tags: [Email tags]
+      summary: Add a tag to an email
+      description: >-
+        Provide `tag_id` **or** `name`. The tag must already exist in the
+        workspace — tags are not created here.
+      operationId: addEmailTag
+      security:
+        - oauth2: [tags:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tag_id:
+                  type: integer
+                name:
+                  type: string
+      responses:
+        "201":
+          description: The tag that was attached.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Tag"
+        "400":
+          $ref: "#/components/responses/MissingParameter"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/emails/{email_id}/tags/{id}:
+    parameters:
+      - name: email_id
+        in: path
+        required: true
+        schema:
+          type: integer
+      - name: id
+        in: path
+        required: true
+        description: The tag ID to remove.
+        schema:
+          type: integer
+    delete:
+      tags: [Email tags]
+      summary: Remove a tag from an email
+      operationId: removeEmailTag
+      security:
+        - oauth2: [tags:write]
+      responses:
+        "204":
+          description: The tag was detached (empty body).
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ------------------------------------------------------------- Documents ----
+  /api/v1/documents:
+    get:
+      tags: [Documents]
+      summary: List documents
+      description: Documents are workspace-wide — every member sees them all.
+      operationId: listDocuments
+      security:
+        - oauth2: [documents:read]
+      parameters:
+        - name: type
+          in: query
+          description: Document type ID.
+          schema:
+            type: integer
+        - name: review_status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+        - name: ai_status
+          in: query
+          schema:
+            type: string
+            enum: [pending, processing, completed, failed]
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/perPage"
+      responses:
+        "200":
+          description: A page of documents.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Document"
+                  meta:
+                    $ref: "#/components/schemas/PageMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Documents]
+      summary: Upload documents
+      description: >-
+        Upload one or more files. AI classification/extraction runs
+        asynchronously, so the response is **202 Accepted** and each document
+        starts with `ai_status: "pending"`.
+      operationId: uploadDocuments
+      security:
+        - oauth2: [documents:write]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: ["files[]"]
+              properties:
+                "files[]":
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        "202":
+          description: The documents were created and queued for processing.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Document"
+        "400":
+          $ref: "#/components/responses/MissingParameter"
+
+  /api/v1/documents/{id}:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    get:
+      tags: [Documents]
+      summary: Get a document
+      description: Includes the attached file's metadata and the raw AI `extraction` data.
+      operationId: getDocument
+      security:
+        - oauth2: [documents:read]
+      responses:
+        "200":
+          description: The document.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/DocumentDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Documents]
+      summary: Update document fields
+      description: >-
+        Edit extracted fields. Does **not** change review state (use approve /
+        reclassify for that). Only the fields you send change.
+      operationId: updateDocument
+      security:
+        - oauth2: [documents:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DocumentUpdate"
+      responses:
+        "200":
+          description: The updated document.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/DocumentDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/documents/{id}/file:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    get:
+      tags: [Documents]
+      summary: Download a document's file
+      description: >-
+        Streams the original uploaded file. Send the same bearer token. Returns
+        404 (`no_file`) if the document has no attached file.
+      operationId: downloadDocumentFile
+      security:
+        - oauth2: [documents:read]
+      responses:
+        "200":
+          description: The file stream.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/documents/{id}/approve:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    post:
+      tags: [Documents]
+      summary: Approve a document
+      description: Approve a document under review; records the acting user as the reviewer.
+      operationId: approveDocument
+      security:
+        - oauth2: [documents:write]
+      responses:
+        "200":
+          description: The approved document.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/DocumentDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/documents/{id}/reject:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    post:
+      tags: [Documents]
+      summary: Reject a document
+      operationId: rejectDocument
+      security:
+        - oauth2: [documents:write]
+      responses:
+        "200":
+          description: The rejected document.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/DocumentDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/documents/{id}/reclassify:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    post:
+      tags: [Documents]
+      summary: Reclassify a document
+      description: Change the document type. Reclassifying also signs the document off (it becomes `approved`).
+      operationId: reclassifyDocument
+      security:
+        - oauth2: [documents:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [document_type_id]
+              properties:
+                document_type_id:
+                  type: integer
+      responses:
+        "200":
+          description: The reclassified document.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/DocumentDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  # -------------------------------------------------------------- Contacts ----
+  /api/v1/contacts:
+    get:
+      tags: [Contacts]
+      summary: List contacts
+      description: Contacts are auto-created from email sync (no create endpoint) and are workspace-wide.
+      operationId: listContacts
+      security:
+        - oauth2: [contacts:read]
+      parameters:
+        - name: list_status
+          in: query
+          schema:
+            type: string
+            enum: [neutral, allowed, blocked]
+        - name: starred
+          in: query
+          schema:
+            type: boolean
+        - name: q
+          in: query
+          description: Matches name or email.
+          schema:
+            type: string
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/perPage"
+      responses:
+        "200":
+          description: A page of contacts.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Contact"
+                  meta:
+                    $ref: "#/components/schemas/PageMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/contacts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    get:
+      tags: [Contacts]
+      summary: Get a contact
+      operationId: getContact
+      security:
+        - oauth2: [contacts:read]
+      responses:
+        "200":
+          description: The contact.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Contact"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Contacts]
+      summary: Update a contact
+      description: Only the fields you send change.
+      operationId: updateContact
+      security:
+        - oauth2: [contacts:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                relationship_type:
+                  type: string
+                  enum: [self, client, vendor, partner, service_provider, colleague, personal, unknown]
+      responses:
+        "200":
+          description: The updated contact.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Contact"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/contacts/{id}/state:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    post:
+      tags: [Contacts]
+      summary: Change a contact's state
+      description: Blocking also archives the contact's inbox messages.
+      operationId: setContactState
+      security:
+        - oauth2: [contacts:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [state]
+              properties:
+                state:
+                  type: string
+                  enum: [star, unstar, allow, block, unblock]
+      responses:
+        "200":
+          description: The updated contact.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Contact"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          description: "`state` was not one of the allowed values (`invalid_state`)."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ------------------------------------------------------------------ Tags ----
+  /api/v1/tags:
+    get:
+      tags: [Tags]
+      summary: List tags
+      description: Tags apply to emails only (documents are organized by document type).
+      operationId: listTags
+      security:
+        - oauth2: [tags:read]
+      parameters:
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/perPage"
+      responses:
+        "200":
+          description: A page of tags.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Tag"
+                  meta:
+                    $ref: "#/components/schemas/PageMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # -------------------------------------------------------- Document types ----
+  /api/v1/document_types:
+    get:
+      tags: [Document types]
+      summary: List document types
+      description: >-
+        The workspace's document types — use a type's `id` with document upload,
+        update, and reclassify. Returned **unpaginated** (no `meta`).
+      operationId: listDocumentTypes
+      security:
+        - oauth2: [document_types:read]
+      responses:
+        "200":
+          description: All document types.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DocumentType"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ---------------------------------------------------------------- Scout -----
+  /api/v1/scout/threads:
+    get:
+      tags: [Scout]
+      summary: List Scout threads
+      description: The acting user's chat threads, newest-first.
+      operationId: listScoutThreads
+      security:
+        - oauth2: [scout:read]
+      parameters:
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/perPage"
+      responses:
+        "200":
+          description: A page of threads.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AgentThread"
+                  meta:
+                    $ref: "#/components/schemas/PageMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [Scout]
+      summary: Create a Scout thread
+      operationId: createScoutThread
+      security:
+        - oauth2: [scout:write]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  default: New chat
+      responses:
+        "201":
+          description: The new thread.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AgentThread"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/scout/threads/{thread_id}/messages:
+    parameters:
+      - name: thread_id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: [Scout]
+      summary: Read / poll thread messages
+      description: >-
+        Messages in chronological order, **unpaginated** (no `meta`). Pass
+        `after_message_id` to fetch only messages created after that one — the
+        poll loop for the async AI reply.
+      operationId: listScoutMessages
+      security:
+        - oauth2: [scout:read]
+      parameters:
+        - name: after_message_id
+          in: query
+          description: Return only messages created after this message ID.
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The thread's messages.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AgentMessage"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      tags: [Scout]
+      summary: Send a message
+      description: >-
+        Post a user message and kick off the async AI reply. Returns **202
+        Accepted** with the created user message. The AI reply lands later as a
+        new message with `author_type: "ai"` and `reply_status: "replied"` —
+        poll the GET endpoint with `after_message_id` set to the returned ID.
+      operationId: createScoutMessage
+      security:
+        - oauth2: [scout:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+      responses:
+        "202":
+          description: The created user message (the AI reply follows asynchronously).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AgentMessage"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+        "503":
+          description: The workspace has no AI provider configured for chat (`ai_provider_unconfigured`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      description: OAuth 2.0 client-credentials grant. Send the issued token as a bearer token.
+      flows:
+        clientCredentials:
+          tokenUrl: https://your-campbooks-host/api/oauth/token
+          scopes:
+            emails:read: Read email messages, threads, and folders
+            emails:write: Mark emails read/unread
+            emails:send: Compose, send, and reply to email
+            documents:read: List and download documents
+            documents:write: Upload, update, approve, reject, and reclassify documents
+            contacts:read: Read contacts
+            contacts:write: Update contacts and change their state (star, block, allow)
+            tags:read: List tags
+            tags:write: Add and remove tags on emails
+            document_types:read: List document types
+            scout:read: Read Scout chat threads and messages
+            scout:write: Create Scout threads and send messages
+
+  parameters:
+    idPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+    page:
+      name: page
+      in: query
+      description: Page number (1-based).
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+    perPage:
+      name: per_page
+      in: query
+      description: Items per page (max 100).
+      schema:
+        type: integer
+        default: 25
+        maximum: 100
+        minimum: 1
+
+  responses:
+    Unauthorized:
+      description: >-
+        Missing/invalid/expired/revoked token (`invalid_token`); the client's
+        workspace/user no longer matches (`client_revoked`); or the account is
+        scheduled for deletion (`account_pending_deletion`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: The token lacks the scope (or has none) for the action (`insufficient_scope`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: The resource doesn't exist **or isn't visible to you** (`not_found`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    MissingParameter:
+      description: A required parameter is absent (`missing_parameter`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ValidationFailed:
+      description: The payload was rejected (`validation_failed`); see `error.details`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    RateLimited:
+      description: Too many requests — 600/minute per client (`rate_limit_exceeded`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+          example: 7200
+        scope:
+          type: string
+          example: emails:read documents:read
+        created_at:
+          type: integer
+          description: Unix timestamp.
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: not_found
+            message:
+              type: string
+            details:
+              type: object
+              nullable: true
+              description: Present on validation errors — field → messages.
+              additionalProperties: true
+
+    PageMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+        total_pages:
+          type: integer
+
+    SendResult:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: integer
+              nullable: true
+              description: The stored EmailMessage ID, when one was created.
+            provider_message_id:
+              type: string
+              nullable: true
+
+    Email:
+      type: object
+      properties:
+        id:
+          type: integer
+        subject:
+          type: string
+          nullable: true
+        from:
+          type: string
+          nullable: true
+        to:
+          type: string
+          nullable: true
+        cc:
+          type: string
+          nullable: true
+        read:
+          type: boolean
+        has_attachment:
+          type: boolean
+        priority:
+          type: string
+          enum: [low, medium, high]
+        category:
+          type: string
+          nullable: true
+        summary:
+          type: string
+          nullable: true
+          description: AI-generated one-line summary.
+        pinned:
+          type: boolean
+        received_at:
+          type: string
+          format: date-time
+          nullable: true
+        thread_id:
+          type: integer
+          nullable: true
+        account_id:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+
+    EmailDetail:
+      allOf:
+        - $ref: "#/components/schemas/Email"
+        - type: object
+          properties:
+            bcc:
+              type: string
+              nullable: true
+            body:
+              type: string
+              nullable: true
+              description: Full HTML body.
+
+    Document:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+          nullable: true
+        document_type:
+          type: object
+          nullable: true
+          description: The full document type record (or null when unclassified).
+        document_type_id:
+          type: integer
+          nullable: true
+        ai_status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        review_status:
+          type: string
+          enum: [pending, approved, rejected]
+        source:
+          type: string
+          enum: [manual_upload, email, notion]
+        starred:
+          type: boolean
+        document_date:
+          type: string
+          format: date
+          nullable: true
+        vendor_name:
+          type: string
+          nullable: true
+        client_name:
+          type: string
+          nullable: true
+        invoice_number:
+          type: string
+          nullable: true
+        amount_cents:
+          type: integer
+          nullable: true
+        currency:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        canonical_filename:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    DocumentDetail:
+      allOf:
+        - $ref: "#/components/schemas/Document"
+        - type: object
+          properties:
+            file:
+              type: object
+              nullable: true
+              properties:
+                filename:
+                  type: string
+                content_type:
+                  type: string
+                byte_size:
+                  type: integer
+                download_path:
+                  type: string
+                  description: Path relative to the API host; fetch with the same bearer token.
+            extraction:
+              type: object
+              nullable: true
+              description: Raw AI extraction data (shape varies by document type).
+              additionalProperties: true
+
+    DocumentUpdate:
+      type: object
+      description: Any subset of the editable extracted fields.
+      properties:
+        document_type_id:
+          type: integer
+        vendor_name:
+          type: string
+        vendor_nif:
+          type: string
+        document_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date
+        invoice_number:
+          type: string
+        amount_cents:
+          type: integer
+        currency:
+          type: string
+        buyer_nif:
+          type: string
+        tax_amount_cents:
+          type: integer
+        tax_rate:
+          type: number
+        description:
+          type: string
+        expense_category:
+          type: string
+        company_vat_present:
+          type: boolean
+        client_name:
+          type: string
+        client_nif:
+          type: string
+        bank_name:
+          type: string
+        account_number:
+          type: string
+        period_start:
+          type: string
+          format: date
+        period_end:
+          type: string
+          format: date
+        opening_balance_cents:
+          type: integer
+        closing_balance_cents:
+          type: integer
+        receipt_number:
+          type: string
+        payment_method:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    DocumentType:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        color:
+          type: string
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        auto_star:
+          type: boolean
+        extraction_schema:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: The fields the AI extracts for this type.
+
+    Contact:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        organization:
+          type: string
+          nullable: true
+        relationship_type:
+          type: string
+          nullable: true
+          enum: [self, client, vendor, partner, service_provider, colleague, personal, unknown]
+        list_status:
+          type: string
+          enum: [neutral, allowed, blocked]
+        starred:
+          type: boolean
+        email_count:
+          type: integer
+        last_email_at:
+          type: string
+          format: date-time
+          nullable: true
+        context_summary:
+          type: string
+          nullable: true
+        person_id:
+          type: integer
+          nullable: true
+
+    Tag:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        color:
+          type: string
+          nullable: true
+        group_name:
+          type: string
+          nullable: true
+        source:
+          type: string
+          description: How the tag was created (e.g. user, ai).
+        email_account_id:
+          type: integer
+          nullable: true
+          description: Set when the tag is scoped to a single email account.
+
+    AgentThread:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+          nullable: true
+        purpose:
+          type: string
+          enum: [global, email_chat, compose_chat]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AgentMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        thread_id:
+          type: integer
+        author_type:
+          type: string
+          enum: [user, ai]
+        content:
+          type: string
+          nullable: true
+        reply_status:
+          type: string
+          enum: [pending, processing, replied, failed]
+        suggested_actions:
+          type: array
+          nullable: true
+          description: Actions Scout proposed (shape varies).
+          items:
+            type: object
+            additionalProperties: true
+        prompts:
+          type: array
+          nullable: true
+          description: Suggested follow-up prompts.
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time

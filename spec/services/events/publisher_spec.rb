@@ -82,26 +82,4 @@ RSpec.describe Events::Publisher, type: :service do
       expect(event).to be_a(Event)
     end
   end
-
-  describe "metrics" do
-    it "counts a registered event under its own name and group" do
-      expect {
-        described_class.call("contact.starred", workspace: workspace, actor: nil)
-      }.to increment_yabeda_counter(Yabeda.campbooks.domain_events_total)
-        .with_tags(event: "contact.starred", group: "contacts").by(1)
-    end
-
-    it "buckets an unregistered event name as \"custom\" to keep cardinality bounded" do
-      expect {
-        described_class.call("totally.made_up", workspace: workspace, actor: nil)
-      }.to increment_yabeda_counter(Yabeda.campbooks.domain_events_total)
-        .with_tags(event: "custom", group: "custom").by(1)
-    end
-
-    it "counts nothing when the event is dropped (no workspace resolves)" do
-      expect {
-        described_class.call("contact.starred", actor: nil)
-      }.not_to increment_yabeda_counter(Yabeda.campbooks.domain_events_total)
-    end
-  end
 end

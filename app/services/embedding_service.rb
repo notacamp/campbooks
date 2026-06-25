@@ -76,10 +76,17 @@ class EmbeddingService
     nil
   end
 
-  # Env-key adapter used as a resilience fallback when the workspace adapter is
-  # absent or its stored key fails. Returns nil when no env key is set, so hosted
-  # deployments without env keys behave exactly as before.
+  # Env-key adapter used as a resilience fallback when the workspace's configured
+  # embedding adapter is absent or its stored key fails. SELF-HOSTED ONLY: there the
+  # key is the operator's own and stays on infrastructure they control. On the
+  # managed cloud, falling back to the platform OPENAI_API_KEY/GEMINI_API_KEY would
+  # embed user email/document text on a US provider the workspace never configured —
+  # a silent data-residency leak — so we fail closed (return nil) instead. Managed
+  # cloud workspaces resolve a real OpenAI adapter via #find_embedding_adapter, so
+  # this isn't their primary route.
   def env_fallback_adapter
+    return nil unless Rails.application.config.self_hosted
+
     if ENV["OPENAI_API_KEY"].present?
       Ai::Adapters::Openai.new(api_key: ENV["OPENAI_API_KEY"])
     elsif ENV["GEMINI_API_KEY"].present?

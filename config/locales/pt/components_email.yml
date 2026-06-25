@@ -152,6 +152,7 @@ pt:
       default: Vista predefinida
       list: Vista de lista
     new_folder_modal:
+      icon_label: Ícone da pasta
       name_label: Nome da pasta
       name_placeholder: 'ex.: Recibos'
       submit: Criar pasta

@@ -1,6 +1,7 @@
 # Self-hosting Campbooks
 
-Campbooks is source-available (Sustainable Use License). You can run your own instance with Docker in a
+Campbooks is source-available under the Sustainable Use License — you're free to self-host it **for free,
+for your own business or personal use**. You can run your own instance with Docker in a
 few minutes. This guide covers the full setup: the stack, the secrets you need,
 and how to wire up each external integration.
 
