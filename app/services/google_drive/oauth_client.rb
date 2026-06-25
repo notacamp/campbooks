@@ -2,6 +2,7 @@ module GoogleDrive
   class OauthClient
     AUTHORIZATION_URL = "https://accounts.google.com/o/oauth2/v2/auth"
     TOKEN_URL = "https://oauth2.googleapis.com/token"
+    REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 
     # Full Drive scope so users can browse and pick any existing folder (not just
     # app-created ones, which is all `drive.file` would expose). This is a Google
@@ -65,6 +66,24 @@ module GoogleDrive
         raise OauthError, data["error_description"] || data["error"] if data["error"]
         data["access_token"]
       end
+    end
+
+    # Revoke the grant at Google so disconnecting/deleting an account kills the
+    # token provider-side, not just locally. Drive tokens are Google tokens, so
+    # this hits the same revoke endpoint as Google::OauthClient. Stateless (the
+    # token is passed in, unlike the mail client). Best-effort: an already-invalid
+    # token returns HTTP 400, which our raise_error connection turns into a
+    # BadRequestError — treated as "already revoked" → success.
+    def revoke_token(refresh_token)
+      return false if refresh_token.blank?
+
+      connection.post(REVOKE_URL) { |req| req.body = { token: refresh_token } }
+      true
+    rescue Faraday::BadRequestError
+      true
+    rescue Faraday::Error => e
+      Rails.logger.warn("[GoogleDrive::OauthClient] Token revoke failed: #{e.message}")
+      false
     end
 
     private
