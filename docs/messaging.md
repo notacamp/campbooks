@@ -36,7 +36,7 @@ sorts your inbox," it's underselling.
 
 ## USP pillars
 
-Lead with whichever fits the context — don't list all five every time.
+Lead with whichever fits the context — don't list all six every time.
 
 1. **It sorts itself** — Scout reads, classifies, and files your email and attachments; you
    get one short list of what actually needs you.
@@ -49,6 +49,10 @@ Lead with whichever fits the context — don't list all five every time.
 5. **Yours to run** — **free to self-host for your own business or personal use**, on your own
    server; source-available, private and EU-hosted, no lock-in. The license only draws the line at
    reselling it or running it as a service for others.
+6. **Your data, your rules** — you stay in control of where your data lives and which AI, if any,
+   touches it: one switch pauses all AI, you can bring your own AI keys or point at your own
+   model, or use the EU-default managed AI — and the app shows you which provider and region
+   handles each task. Export or delete your data whenever you want.
 
 ## Voice & tone
 
@@ -61,12 +65,18 @@ Use "calm" for the *outcome* (relief, headspace), never as the product's definin
 ## Vocabulary
 
 **Use:** email client · inbox · declutter · sorts itself · Scout · paperwork / documents ·
-reimagined · surface what needs you · source-available · fair-code · free to self-host · yours to run.
+reimagined · surface what needs you · source-available · fair-code · free to self-host · yours to run ·
+you control your data · which AI sees your data · pause AI · bring your own keys / your own model ·
+EU-default managed AI · export or delete anytime.
 
 **Avoid:** "document management platform" or "document manager" as the *primary* label (it
 undersells the email half) · "Sign in to manage your documents" and similar doc-only framings
 · "calm" as the headline adjective for the product itself · "open source" / "MIT" for Campbooks
-itself (the license is the Sustainable Use License, a fair-code source-available license).
+itself (the license is the Sustainable Use License, a fair-code source-available license) ·
+**absolute privacy claims** like "your data never leaves the EU", "fully private", or "we can't
+see your data" — managed document analysis uses a US provider and hosted data isn't end-to-end
+encrypted yet, so promise the *controls* (pause AI, bring your own keys, EU-default, export/delete),
+not absolutes.
 
 ## Approved lines (reuse freely)
 
@@ -78,6 +88,8 @@ itself (the license is the Sustainable Use License, a fair-code source-available
   business or personal use." When there's room, add the one limit: "The license only restricts
   reselling it or running it as a commercial service for others." Lead with the *permission*
   (you can run it yourself, free) — never just "view the source," which undersells the right.
+- **Data & privacy:** "You decide which AI sees your email — pause it entirely, bring your own
+  keys, or use our EU-default managed AI — and you can export or delete your data anytime."
 
 ## Where this applies (sync checklist)
 
