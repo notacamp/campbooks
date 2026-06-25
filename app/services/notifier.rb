@@ -245,6 +245,32 @@ module Notifier
     end
   end
 
+  # The personal-data (GDPR) export has a requester, so it notifies that one user
+  # rather than the whole workspace.
+  def account_export_ready(account_export)
+    notify_account_export(account_export, "notifier.account_export_ready")
+  end
+
+  def account_export_failed(account_export)
+    notify_account_export(account_export, "notifier.account_export_failed")
+  end
+
+  def notify_account_export(account_export, key)
+    user = account_export.user
+    locale = user.locale.presence || I18n.default_locale
+    Notification.notify(
+      user: user,
+      category: :export,
+      priority: :awaiting,
+      title: I18n.t("#{key}.title", locale: locale),
+      body: I18n.t("#{key}.body", locale: locale),
+      link_url: "/settings/account",
+      group_key: "account_export/#{account_export.id}",
+      notifiable: account_export,
+      respect_preferences: false
+    )
+  end
+
   def notify_workspace(export, link_url:, &strings)
     export.workspace.users.find_each do |user|
       locale = user.locale.presence || I18n.default_locale

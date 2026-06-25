@@ -22,6 +22,8 @@ class User < ApplicationRecord
   # Security/audit trail. The FK is on_delete: :nullify so rows survive a user's
   # deletion (anonymized) for accountability; nullify here matches that intent.
   has_many :audit_events, dependent: :nullify
+  # Async GDPR data-portability archives the user requested (purged with them).
+  has_many :account_exports, dependent: :destroy
   # Images uploaded into the compose / signature editor. Attaching them to the
   # user keeps the blobs from being purged and ties them to the owner (GDPR).
   has_many_attached :outbound_images

@@ -74,7 +74,16 @@
   <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-6">
     <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".data_export_title") %></h2>
     <p class="text-sm text-gray-500 mb-4"><%= t(".data_export_desc") %></p>
-    <%= render(Campbooks::Button.new(variant: :outline, href: export_settings_account_path)) { t(".data_export_button") } %>
+    <% latest_export = current_user.account_exports.recent.first %>
+    <div class="flex flex-wrap items-center gap-3">
+      <%= button_to t(".data_export_button"), export_settings_account_path, method: :post,
+            class: "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-card px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer" %>
+      <% if latest_export&.generated? %>
+        <%= render(Campbooks::Button.new(variant: :ghost, size: :sm, href: download_export_settings_account_path)) { t(".data_export_download") } %>
+      <% elsif latest_export&.pending? || latest_export&.generating? %>
+        <span class="text-sm text-gray-500"><%= t(".data_export_preparing") %></span>
+      <% end %>
+    </div>
   </div>
 
   <div class="bg-card rounded-xl shadow-sm border border-red-200 p-6">

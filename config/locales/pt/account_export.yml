@@ -1,0 +1,18 @@
+---
+pt:
+  settings:
+    account:
+      show:
+        data_export_download: Transferir
+        data_export_preparing: "A preparar a sua exportação — avisamos quando estiver pronta."
+      export:
+        export_queued: "Estamos a preparar a exportação dos seus dados. Avisamos quando estiver pronta."
+      download_export:
+        export_not_ready: A sua exportação ainda não está pronta.
+  notifier:
+    account_export_ready:
+      title: Exportação de dados pronta
+      body: "A exportação dos seus dados está pronta para transferir em Definições → Conta."
+    account_export_failed:
+      title: Falha na exportação de dados
+      body: Ocorreu um erro ao preparar a exportação dos seus dados. Tente novamente.
