@@ -1,7 +1,8 @@
 module Zoho
   class OauthClient
-    TOKEN_URL = "https://accounts.zoho.eu/oauth/v2/token"
-    REVOKE_URL = "https://accounts.zoho.eu/oauth/v2/token/revoke"
+    AUTH_URL = "#{Region.accounts_url}/oauth/v2/auth".freeze
+    TOKEN_URL = "#{Region.accounts_url}/oauth/v2/token".freeze
+    REVOKE_URL = "#{Region.accounts_url}/oauth/v2/token/revoke".freeze
 
     def initialize(refresh_token: nil)
       @client_id = ENV.fetch("ZOHO_CLIENT_ID")
@@ -72,7 +73,7 @@ module Zoho
       end
     end
 
-    # Revoke the grant at Zoho (EU) so deleting/disconnecting an account kills the
+    # Revoke the grant at Zoho (the configured region) so deleting/disconnecting an account kills the
     # token provider-side, not just locally. Best-effort; drops the cached token.
     def revoke_token
       return false unless @refresh_token

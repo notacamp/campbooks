@@ -71,6 +71,14 @@ major, minor, or patch change here.
   Part of the data-governance work giving users control over which AI sees their
   data.
 
+### Fixed
+
+- The Zoho data-center region (`ZOHO_REGION`, default `eu`) is now honored across
+  every Zoho integration — mailbox sync, OAuth sign-in/connect, calendar, and
+  WorkDrive — instead of being hardcoded to the EU data center. Self-hosters whose
+  Zoho account lives in another region (US, IN, AU, JP, CA, CN, SA) can point at
+  their own data center; the default is unchanged.
+
 ## [0.1.0] - 2026-06-25
 
 ### Added

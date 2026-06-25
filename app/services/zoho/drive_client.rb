@@ -1,6 +1,6 @@
 module Zoho
   class DriveClient
-    BASE_URL = "https://workdrive.zoho.eu/api/v1"
+    BASE_URL = Region.workdrive_api_url.freeze
 
     def initialize(drive_account)
       @drive_account = drive_account
