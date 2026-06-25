@@ -15,6 +15,7 @@ es:
       extracted_data: Datos extraídos
       junk: Basura
       new_type: "+ Nuevo tipo"
+      no_extracted_data: No se pudieron extraer datos de este documento.
       no_types: Aún no hay tipos de documento
       open: Abrir
       reclassify: Reclasificar

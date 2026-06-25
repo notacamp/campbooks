@@ -116,6 +116,23 @@ class Document < ApplicationRecord
   # count (Notifier), the Skim feed (SkimScope) and the list-view review filter, so a
   # document leaves every "needs review" surface the moment it's approved or rejected.
   scope :needs_review, -> { where(review_status: :pending, ai_status: :completed) }
+  # Attachments that aren't reviewable business documents — calendar invites, raw
+  # emails, archives, DMARC/feedback reports. They carry no extractable data and only
+  # clutter the Skim review queue, so SkimScope filters them out. A subquery (rather
+  # than a join) keeps this composable with `includes`/`with_attached_original_file`;
+  # documents with no attachment are unaffected.
+  NON_DOCUMENT_CONTENT_TYPES = %w[
+    text/calendar message/rfc822
+    application/zip application/gzip application/x-gzip application/x-bzip2
+    application/xhtml+xml text/html
+  ].freeze
+  scope :reviewable_attachment, -> {
+    where.not(
+      id: joins(original_file_attachment: :blob)
+            .where(ActiveStorage::Blob.table_name => { content_type: NON_DOCUMENT_CONTENT_TYPES })
+            .select(:id)
+    )
+  }
   # AI broke (adapter/parse/config error) — a separate "needs attention" lane. These
   # have no classification to approve; the human action is reprocess or manual-classify.
   scope :ai_failed_attention, -> { where(ai_status: :failed) }

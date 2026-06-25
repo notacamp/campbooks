@@ -106,5 +106,24 @@ RSpec.describe Documents::SkimBuilder do
         expect(card_for(empty.reload)[:extracted_fields]).to eq([])
       end
     end
+
+    context "when a typed-column document hides its data in metadata (boarding pass filed as 'other')" do
+      # "other" has only two canonical columns (entity_name, document_date); a boarding
+      # pass leaves both blank but fills metadata with flight details. The card must
+      # surface that metadata rather than show an all-empty field set.
+      let(:doc) do
+        create(:document, :in_review, workspace: workspace, vendor_name: nil, document_date: nil,
+               metadata: { "title" => "Boarding pass", "flight_number" => "TP123", "seat" => "28D" })
+          .tap { |d| d.update_columns(document_type: Document.document_types[:other], document_type_id: nil) }
+          .reload
+      end
+
+      it "falls back to the extracted metadata fields instead of an all-blank column set" do
+        fields = card_for(doc)[:extracted_fields]
+
+        expect(fields.map { |f| f[:key] }).to contain_exactly("flight_number", "seat")
+        expect(fields.find { |f| f[:key] == "flight_number" }[:value]).to eq("TP123")
+      end
+    end
   end
 end

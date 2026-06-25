@@ -185,6 +185,8 @@ module Ai
     end
 
     def call_legacy(messages)
+      return nil unless Ai::LegacyFallback.allowed?
+
       client = Anthropic::Client.new
       response = client.messages.create(
         model: MODEL,

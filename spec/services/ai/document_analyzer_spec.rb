@@ -48,4 +48,40 @@ RSpec.describe Ai::DocumentAnalyzer do
       expect(other_ws.document_types.where(name: "vehicle_inspection_report")).to be_empty
     end
   end
+
+  describe "Word (.docx) document handling" do
+    let(:document) { create(:document, workspace: create(:workspace)) }
+    let(:analyzer) { described_class.new(document) }
+    let(:docx_ct)  { "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }
+
+    # A minimal Office Open XML package: a zip whose word/document.xml holds the body.
+    def docx_bytes(text)
+      Zip::OutputStream.write_buffer do |zip|
+        zip.put_next_entry("word/document.xml")
+        zip.write(%(<?xml version="1.0"?><w:document><w:body><w:p><w:r><w:t>#{text}</w:t></w:r></w:p></w:body></w:document>))
+      end.string
+    end
+
+    it "extracts the body text from a .docx" do
+      text = analyzer.send(:office_text, docx_bytes("Declaração de Aceitação da Gerência"), docx_ct)
+      expect(text).to include("Declaração de Aceitação da Gerência")
+    end
+
+    it "returns nil for a non-docx content type" do
+      expect(analyzer.send(:office_text, "anything", "application/pdf")).to be_nil
+    end
+
+    it "returns nil (never raises) on corrupt data" do
+      expect(analyzer.send(:office_text, "not a zip", docx_ct)).to be_nil
+    end
+
+    it "sends the extracted text to the model instead of only the filename" do
+      document.original_file.attach(io: StringIO.new(docx_bytes("Total a pagar: 500 EUR")),
+                                    filename: "decl.docx", content_type: docx_ct)
+      parts = analyzer.send(:build_generic_parts)
+
+      expect(parts).to be_present
+      expect(parts.any? { |p| p[:text].to_s.include?("Total a pagar: 500 EUR") }).to be(true)
+    end
+  end
 end
