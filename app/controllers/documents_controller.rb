@@ -63,6 +63,7 @@ class DocumentsController < ApplicationController
   end
 
   def show
+    AuditEvent.log("document_read", user: Current.user, request: request, target: @document, via: "web")
     @document_types = Current.workspace.document_types.order(:category, :name)
     @drive_account = Current.workspace.google_drive_accounts.connected.first
     @notion_connected = Current.workspace.notion_integrations.active.exists?
