@@ -1,14 +1,5 @@
 #!/bin/bash -e
 
-# Clear the Prometheus multi-process metrics dir on boot so stale per-pid files
-# from a previous run aren't aggregated into the next one. No-op unless
-# PROMETHEUS_MULTIPROC_DIR is set (the production multi-process setup); see
-# config/initializers/prometheus_multiproc.rb. Runs for web and worker alike.
-if [ -n "${PROMETHEUS_MULTIPROC_DIR}" ]; then
-  mkdir -p "${PROMETHEUS_MULTIPROC_DIR}"
-  rm -f "${PROMETHEUS_MULTIPROC_DIR}"/* 2>/dev/null || true
-fi
-
 # If running the rails server then create or migrate existing database
 if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
   ./bin/rails db:prepare
