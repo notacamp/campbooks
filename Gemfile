@@ -118,6 +118,14 @@ gem "aws-sdk-s3", require: false
 gem "sentry-ruby"
 gem "sentry-rails"
 
+# Prometheus metrics. yabeda-rails auto-collects HTTP RED metrics (rate, errors,
+# duration per controller#action) plus custom app/job metrics defined in
+# config/initializers/yabeda.rb; yabeda-prometheus renders them at the
+# internal-only /metrics endpoint, scraped by Prometheus over the private
+# network (never exposed via the public reverse proxy). See docs/observability.md.
+gem "yabeda-rails"
+gem "yabeda-prometheus"
+
 group :development, :test do
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
   gem "bundler-audit", require: false

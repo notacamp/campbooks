@@ -16,6 +16,14 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- Prometheus metrics at an internal `/metrics` endpoint ([yabeda](https://github.com/yabeda-rb/yabeda)):
+  HTTP request rate / error rate / latency (RED), background-job execution counts
+  and duration, and a domain-action counter sourced from the Events bus. Meant to
+  be scraped over a private network and visualized in Grafana — see
+  [docs/observability.md](docs/observability.md).
+
 ## [0.1.0] - 2026-06-25
 
 ### Added

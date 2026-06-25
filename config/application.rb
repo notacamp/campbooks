@@ -54,5 +54,14 @@ module Campbooks
     config.i18n.default_locale = :en
     config.i18n.fallbacks = true
     config.i18n.load_path += Dir[Rails.root.join("config/locales/**/*.yml")]
+
+    # Expose yabeda metrics at the internal-only GET /metrics for Prometheus to
+    # scrape over the private network. Registered as Rack middleware (not a
+    # route) because the exporter matches the exact "/metrics" PATH_INFO, whereas
+    # a Rails `mount` only answers at "/metrics/". The public reverse proxy
+    # blocks /metrics; it exposes metric values only, never secrets. See
+    # docs/observability.md.
+    require "yabeda/prometheus/exporter"
+    config.middleware.use Yabeda::Prometheus::Exporter
   end
 end
