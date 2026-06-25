@@ -57,6 +57,18 @@ module ApplicationHelper
     "#{MARKETING_BASE_URL}#{path}"
   end
 
+  # URL for the public REST API reference, linked from Settings → API access.
+  # Defaults to the source-available guide on GitHub so self-hosters always have
+  # a working link; the hosted cloud overrides API_DOCS_URL to point at the
+  # rendered reference on the docs site.
+  API_DOCS_URL = ENV.fetch(
+    "API_DOCS_URL", "https://github.com/notacamp/campbooks/blob/main/docs/api.md"
+  ).freeze
+
+  def api_docs_url
+    API_DOCS_URL
+  end
+
   # Localized label for an enum value, looked up at
   # activerecord.attributes.<model>.<attribute_plural>.<value> (e.g.
   # activerecord.attributes.document.statuses.processed). Falls back to a

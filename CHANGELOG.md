@@ -30,6 +30,17 @@ major, minor, or patch change here.
   tagged by semantic version (`1.2.3`, `1.2`) plus `latest` for the newest stable
   release, so self-hosters can pull a prebuilt image instead of building from
   source. The full test suite re-runs as a gate before any image is pushed.
+- A machine-readable [OpenAPI 3 specification](openapi.yaml) for the public REST
+  API, plus an expanded reference ([docs/api.md](docs/api.md)) with per-resource
+  response examples, Python/JavaScript samples, and a complete error-code table.
+  Settings → API access now links to the documentation (the URL is configurable
+  via `API_DOCS_URL`).
+
+### Fixed
+
+- The `emails:write` API scope description shown in Settings → API access no
+  longer overstates what it grants — it marks emails read/unread (it does not
+  archive, snooze, or tag).
 
 ## [0.1.0] - 2026-06-25
 
