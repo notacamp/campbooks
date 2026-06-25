@@ -70,6 +70,11 @@ major, minor, or patch change here.
   link, an event opened in a new tab, or a bookmarked URL): the "X" and "Cancel"
   controls take you back to the calendar instead of doing nothing. Inside the
   calendar's pop-up they still just close the dialog as before.
+- The inbox view switcher (Default / List / Board) is now reachable at all
+  viewport sizes in List mode — it was previously hidden on narrower widths
+  because the list pane's responsive `hidden` class wasn't overridden. Also
+  floats to the left of the header on short desktop viewports where the
+  bottom-right email drawer would otherwise bury it. [#54]
 - Publishing a domain event (`Events.publish`) no longer aborts on an internal
   `NameError` from a leftover metrics call — events publish cleanly again and
   event-triggered workflows fire reliably.
