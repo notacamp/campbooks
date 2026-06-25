@@ -888,6 +888,9 @@ DEPENDENCIES
   web-console
   webauthn (~> 3.0)
   webmock
+  webrick
+  yabeda-prometheus
+  yabeda-rails
 
 BUNDLED WITH
    2.4.10

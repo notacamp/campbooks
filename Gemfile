@@ -118,6 +118,16 @@ gem "aws-sdk-s3", require: false
 gem "sentry-ruby"
 gem "sentry-rails"
 
+# Prometheus application metrics (APM) — opt-in, see config/initializers/metrics.rb.
+#   yabeda-rails       — auto-collects HTTP RED metrics (rate/errors/duration)
+#   yabeda-prometheus  — the /metrics exporter (+ prometheus-client DirectFileStore)
+#   webrick            — backs the Solid Queue worker's standalone metrics server
+# Inert unless PROMETHEUS_MULTIPROC_DIR / CAMPBOOKS_METRICS_ENABLED is set, so the
+# default self-host build pays only the lightweight in-memory yabeda-rails railtie.
+gem "yabeda-rails"
+gem "yabeda-prometheus"
+gem "webrick", require: false
+
 group :development, :test do
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
   gem "bundler-audit", require: false
