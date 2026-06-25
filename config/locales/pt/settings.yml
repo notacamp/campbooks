@@ -82,9 +82,10 @@ pt:
         current_password: Palavra-passe atual
         danger_zone_desc: Eliminar a sua conta é permanente e não pode ser desfeito.
         danger_zone_title: Zona de perigo
-        data_export_button: Descarregar os meus dados
-        data_export_desc: Descarregue uma cópia dos seus dados pessoais (perfil, sessões,
-          conversas de IA e mais) num ficheiro JSON.
+        data_export_button: Pedir os meus dados
+        data_export_desc: Obtenha uma cópia completa dos seus dados pessoais — perfil,
+          sessões, conversas de IA, além do conteúdo dos seus emails, anexos e
+          documentos — num ficheiro para transferir.
         data_export_title: Os seus dados
         delete_account_button: Eliminar conta
         language_subtitle: Escolha o idioma da interface do Campbooks.

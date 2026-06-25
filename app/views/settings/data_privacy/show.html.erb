@@ -90,7 +90,8 @@
     <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".your_data_heading") %></h2>
     <p class="text-sm text-gray-500 mb-4"><%= t(".your_data_desc") %></p>
     <div class="flex flex-wrap gap-3">
-      <%= render(Campbooks::Button.new(variant: :outline, size: :sm, href: export_settings_account_path)) { t(".export_button") } %>
+      <%= button_to t(".export_button"), export_settings_account_path, method: :post,
+            class: "inline-flex items-center justify-center rounded-lg border border-gray-300 bg-card px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer" %>
       <%= render(Campbooks::Button.new(variant: :ghost, size: :sm, href: delete_settings_account_path)) { t(".delete_account") } %>
     </div>
   </div>

@@ -85,9 +85,10 @@ fr:
         current_password: Mot de passe actuel
         danger_zone_desc: Supprimer votre compte est permanent et irréversible.
         danger_zone_title: Zone de danger
-        data_export_button: Télécharger mes données
-        data_export_desc: Téléchargez une copie de vos données personnelles (profil,
-          sessions, conversations IA, etc.) dans un fichier JSON.
+        data_export_button: Demander mes données
+        data_export_desc: Obtenez une copie complète de vos données personnelles — profil,
+          sessions, conversations IA, ainsi que le contenu de vos e-mails, pièces jointes
+          et documents — dans une archive téléchargeable.
         data_export_title: Vos données
         delete_account_button: Supprimer le compte
         language_subtitle: Choisissez la langue de votre interface Campbooks.

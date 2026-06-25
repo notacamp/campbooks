@@ -81,9 +81,10 @@ en:
         current_password: Current Password
         danger_zone_desc: Deleting your account is permanent and cannot be undone.
         danger_zone_title: Danger zone
-        data_export_button: Download my data
-        data_export_desc: Download a copy of your personal data (profile, sessions,
-          AI conversations, and more) as a JSON file.
+        data_export_button: Request my data
+        data_export_desc: Get a complete copy of your personal data — your profile,
+          sessions, AI conversations, plus your email content, attachments, and
+          documents — packaged as a downloadable archive.
         data_export_title: Your data
         delete_account_button: Delete account
         language_subtitle: Choose the language for your Campbooks interface.
