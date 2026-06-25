@@ -19,6 +19,9 @@ class User < ApplicationRecord
   has_many :devices, dependent: :destroy
   has_many :feed_items, dependent: :delete_all
   has_many :bug_reports, dependent: :destroy
+  # Security/audit trail. The FK is on_delete: :nullify so rows survive a user's
+  # deletion (anonymized) for accountability; nullify here matches that intent.
+  has_many :audit_events, dependent: :nullify
   # Images uploaded into the compose / signature editor. Attaching them to the
   # user keeps the blobs from being purged and ties them to the owner (GDPR).
   has_many_attached :outbound_images

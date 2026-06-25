@@ -112,7 +112,7 @@ module NavigationHelper
       ] ],
       [ t("navigation.settings.groups.your_account"), [
         [ settings_account_path, %w[account], t("navigation.settings.items.account"), "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" ],
-        [ settings_security_path, %w[security totp passkeys recovery_codes email_otp], t("navigation.settings.items.security"), "M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" ],
+        [ settings_security_path, %w[security totp passkeys recovery_codes email_otp audit_log], t("navigation.settings.items.security"), "M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" ],
         [ settings_notifications_path, %w[notifications], t("navigation.settings.items.notifications"), "M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" ]
       ] ]
     ]

@@ -11,6 +11,16 @@
     <p class="text-sm text-muted-foreground"><%= t(".status_off") %></p>
   <% end %>
 
+  <%# ── Sign-in & security activity (audit log) ── %>
+  <%= link_to audit_log_settings_security_path,
+        class: "flex items-center justify-between gap-3 bg-card rounded-xl shadow-sm border border-border px-4 py-3 hover:bg-muted/50 transition-colors" do %>
+    <span class="min-w-0">
+      <span class="block text-sm font-medium text-foreground"><%= t("settings.security.audit_log.link") %></span>
+      <span class="block text-xs text-muted-foreground"><%= t("settings.security.audit_log.link_hint") %></span>
+    </span>
+    <svg class="w-4 h-4 flex-shrink-0 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+  <% end %>
+
   <%# ── Sign-in methods (Google / Microsoft / Zoho logins) ── %>
   <%= render(Campbooks::SecurityMethodCard.new(title: t(".sign_in_methods_title"), description: t(".sign_in_methods_description"), enabled: @identities.any?, icon: "M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l3 3m0 0-3 3m3-3H2.25")) do %>
     <div class="space-y-3">

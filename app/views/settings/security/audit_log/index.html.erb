@@ -1,0 +1,22 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t(".heading"), subtitle: t(".subheading"))) %>
+
+<div class="max-w-2xl">
+  <div id="isc_rows" class="divide-y divide-border rounded-xl border border-border bg-card overflow-hidden">
+    <% if @events.any? %>
+      <% @events.each do |event| %>
+        <%= render(Campbooks::AuditEventRow.new(event: event)) %>
+      <% end %>
+    <% else %>
+      <p class="text-sm text-muted-foreground py-12 text-center"><%= t(".empty") %></p>
+    <% end %>
+  </div>
+
+  <% if @pagy.next %>
+    <%= turbo_frame_tag "isc_pagination",
+          src: audit_log_settings_security_path(page: @pagy.next, format: :turbo_stream),
+          loading: :lazy do %>
+      <div class="flex justify-center py-4"><%= render(Campbooks::Spinner.new(size: :sm)) %></div>
+    <% end %>
+  <% end %>
+</div>
