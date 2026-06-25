@@ -137,6 +137,30 @@ RSpec.describe Accounts::Deleter do
 
       expect { described_class.new(user).delete! }.not_to raise_error
     end
+
+    it "revokes the Google Drive grant at Google" do
+      GoogleDriveAccount.create!(workspace: workspace, refresh_token: "drive-token", connected: true, email: "d@example.com")
+
+      drive_client = instance_double(GoogleDrive::OauthClient)
+      allow(GoogleDrive::OauthClient).to receive(:new).and_return(drive_client)
+      expect(drive_client).to receive(:revoke_token).with("drive-token").and_return(true)
+
+      described_class.new(user).delete!
+    end
+
+    it "does not raise when the Google Drive revoke fails" do
+      GoogleDriveAccount.create!(workspace: workspace, refresh_token: "drive-token", connected: true, email: "d@example.com")
+      allow_any_instance_of(GoogleDrive::OauthClient).to receive(:revoke_token).and_raise(StandardError, "boom")
+
+      expect { described_class.new(user).delete! }.not_to raise_error
+    end
+
+    it "does not raise for a Notion integration (no revoke API), and drops it" do
+      NotionIntegration.create!(workspace: workspace, access_token: "notion-token", active: true)
+
+      expect { described_class.new(user).delete! }.not_to raise_error
+      expect(NotionIntegration.where(workspace_id: workspace.id)).to be_empty
+    end
   end
 
   describe "#delete! — attached blob purging" do

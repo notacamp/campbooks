@@ -102,6 +102,11 @@ major, minor, or patch change here.
   
 ### Security
 
+- Deleting your account now **revokes the external OAuth grants** it held, not just the
+  local rows: connected Google/Zoho mailboxes and calendars (already), and now your
+  **Google Drive** grant too. Notion has no token-revoke API, so its access is removed on
+  our side and the delete-confirmation page tells you to remove the integration in Notion
+  to fully revoke it.
 - AI features now only process your data through a provider your workspace has
   explicitly configured (or, on a self-hosted install, the operator's own API
   keys). Two fallbacks that could route content to a shared platform provider you

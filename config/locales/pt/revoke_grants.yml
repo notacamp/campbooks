@@ -1,0 +1,9 @@
+---
+pt:
+  settings:
+    account:
+      delete:
+        connected_services_note: "Também vamos desligar as suas contas associadas (email,
+          calendário e Google Drive) revogando o respetivo acesso. O acesso ao Notion é
+          removido do nosso lado, mas para o revogar totalmente terá de remover a
+          integração nas definições do Notion."
