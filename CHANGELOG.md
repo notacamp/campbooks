@@ -21,7 +21,9 @@ major, minor, or patch change here.
 - Prometheus metrics at an internal `/metrics` endpoint ([yabeda](https://github.com/yabeda-rb/yabeda)):
   HTTP request rate / error rate / latency (RED), background-job execution counts
   and duration, and a domain-action counter sourced from the Events bus. Meant to
-  be scraped over a private network and visualized in Grafana — see
+  be scraped over a private network and visualized in Grafana. Multi-process safe
+  via the Prometheus client's `DirectFileStore` (`PROMETHEUS_MULTIPROC_DIR`), with
+  the Solid Queue worker exposing its own metrics server on `:9394`. See
   [docs/observability.md](docs/observability.md).
 
 ## [0.1.0] - 2026-06-25

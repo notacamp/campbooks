@@ -44,8 +44,29 @@ scrape_configs:
   - job_name: campbooks
     metrics_path: /metrics
     static_configs:
-      - targets: ["campbooks-web:3000"]   # internal service address, not the public host
+      # web (Puma, serves /metrics) and the Solid Queue worker (its own metrics
+      # server) — both internal service addresses, never the public host.
+      - targets: ["campbooks-web:3000", "campbooks-worker:9394"]
 ```
+
+## Production topology (multi-process)
+
+Production runs metrics across several processes, so a single in-memory store
+would under-report (counters would jump between workers). Set
+**`PROMETHEUS_MULTIPROC_DIR`** (a writable dir, cleared on boot by the container
+entrypoint) and the Prometheus client's `DirectFileStore` has every forked
+process write there; the endpoint aggregates them at scrape time (see
+`config/initializers/prometheus_multiproc.rb`):
+
+- **`campbooks-web`** — Puma forks `WEB_CONCURRENCY` workers; any worker serves
+  `/metrics` and aggregates them all.
+- **`campbooks-worker`** — a separate container running Solid Queue (which forks
+  its own job workers) with no Puma, so a small metrics server is started from
+  the Solid Queue supervisor (`SolidQueue.on_start`) on `:9394` — the second
+  scrape target above.
+
+Without `PROMETHEUS_MULTIPROC_DIR` (single-process self-host or dev) the default
+in-memory store is used and only `campbooks-web:3000` need be scraped.
 
 ## Cardinality
 

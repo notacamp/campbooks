@@ -126,6 +126,12 @@ gem "sentry-rails"
 gem "yabeda-rails"
 gem "yabeda-prometheus"
 
+# Backs the standalone metrics server that the background-job worker (Solid
+# Queue, a separate process from Puma) exposes on :9394 so its job metrics are
+# scrapable. The web process serves /metrics through Puma and doesn't use this.
+# See config/initializers/prometheus_multiproc.rb.
+gem "webrick", require: false
+
 group :development, :test do
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"
   gem "bundler-audit", require: false
