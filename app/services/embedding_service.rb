@@ -24,6 +24,9 @@ class EmbeddingService
   end
 
   def embed_batch(texts, model: DEFAULT_MODEL)
+    # Global AI kill-switch (Settings → Data & Privacy) — covers the embedding-only
+    # jobs and search paths that bypass ProviderSetup/Configuration.
+    return [] if @workspace && !@workspace.ai_processing_enabled?
     return [] if texts.blank?
 
     valid_texts = texts.select(&:present?)

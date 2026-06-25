@@ -18,6 +18,13 @@ major, minor, or patch change here.
 
 ### Added
 
+- A **Data & Privacy** settings page (Settings → Data & Privacy) — a privacy-framed
+  overview of how your workspace's data is handled: a global **AI processing**
+  switch that pauses all AI (Scout, triage, tagging, summaries, embeddings, and
+  document analysis) in one click; a read-only summary of which provider and data
+  region handles each AI task; the third-party services connected to the workspace;
+  and quick links to export or delete your data. Existing AI-derived data (summaries,
+  tags) is kept when AI is paused.
 - Configurable folder icons — the inbox folder bar now renders an icon on every folder chip, and custom folders can be given an icon from a picker when created.
 - Prometheus metrics at an internal `/metrics` endpoint ([yabeda](https://github.com/yabeda-rb/yabeda)):
   HTTP request rate / error rate / latency (RED), background-job execution counts
