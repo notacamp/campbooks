@@ -90,6 +90,6 @@ class BugReportGithubSyncJob < ApplicationJob
   # Keep markdown-table cells on one line and stop stray pipes from breaking the
   # table layout.
   def cell(value)
-    value.to_s.gsub("|", "\\|").gsub(/\s+/, " ").strip
+    value.to_s.gsub("|") { "\\|" }.gsub(/\s+/, " ").strip
   end
 end
