@@ -19,6 +19,7 @@ Full guide for both human contributors and AI agents: **`CONTRIBUTING.md`**. The
 
 - **Branch + PR, never commit straight to `main`.** `main` is protected and **continuously deployed** — a merge ships that commit to prod with no rollback, so the bar to merge is "production-ready". Branch off `main` (`feat/…`, `fix/…`, `docs/…`, `refactor/…`, `chore/…`), open a PR, get CI green, squash-merge.
 - **PR title is a Conventional Commit** (`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`; `!` or `BREAKING CHANGE` for breaks) — the squash-merge uses the **PR title** as the commit on `main`, so it's what's strict; individual branch commits can be free-form.
+- **`main` requires signed commits** (branch protection enforces verified signatures) — set up SSH/GPG signing once; see `CONTRIBUTING.md` → *Signed commits*.
 - **CI gates (must pass before merge):** `bin/rubocop`, `bin/brakeman --no-pager`, `bin/bundler-audit`, `bin/importmap audit`, `bin/rails db:test:prepare test`. Run them locally first; keep i18n at parity (`bundle exec i18n-tasks missing`).
 - **Update `CHANGELOG.md`** (Keep a Changelog format) under `[Unreleased]` for any user-visible change.
 - **Semver:** the **`VERSION`** file at the repo root is the single source of truth (also reported at `/up` and in the Settings sidebar; constant is `Campbooks::VERSION`). Releases are `vX.Y.Z` git tags + a `CHANGELOG.md` section + a GitHub Release. MAJOR = breaks self-hosters/config/API; MINOR = backward-compatible feature; PATCH = fix. Pre-1.0, a minor may still break — call it out.
