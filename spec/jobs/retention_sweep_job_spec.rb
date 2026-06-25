@@ -39,4 +39,16 @@ RSpec.describe RetentionSweepJob, type: :job do
     expect(EmailScanLog.exists?(recent.id)).to be(true)
     expect(EmailMessage.exists?(message.id)).to be(true)
   end
+
+  it "prunes audit events past the retention window, keeps recent ones" do
+    user = create(:user, workspace: workspace)
+    old_event = AuditEvent.create!(user: user, action: "sign_in")
+    old_event.update_column(:created_at, (described_class::AUDIT_EVENT_RETENTION + 1.month).ago)
+    recent_event = AuditEvent.create!(user: user, action: "sign_in")
+
+    described_class.new.perform
+
+    expect(AuditEvent.exists?(old_event.id)).to be(false)
+    expect(AuditEvent.exists?(recent_event.id)).to be(true)
+  end
 end
