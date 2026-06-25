@@ -10,6 +10,10 @@ class EmailMessages::BulkController < ApplicationController
 
     result = dispatch_tool(params[:tool], all_ids, email_ids)
 
+    # Live inbox: reflect the bulk change on every reader's open inbox (other
+    # tabs/devices, teammates) the same way single-thread actions do.
+    broadcast_inbox_bulk(params[:tool], all_ids) if result
+
     respond_to do |format|
       format.turbo_stream do
         if result
@@ -168,6 +172,26 @@ class EmailMessages::BulkController < ApplicationController
     base = EmailMessage.accessible_to(Current.user)
     thread_ids = base.where(id: email_ids).where.not(email_thread_id: nil).pluck(:email_thread_id).uniq
     base.where(email_thread_id: thread_ids).pluck(:id)
+  end
+
+  # Push the bulk change to every reader's open inbox, one broadcast per affected
+  # thread. Removals are cheap (no render); read/tag re-render the row. Tools that
+  # don't change the inbox list (forward, process_ai, scout_chat) are skipped.
+  INBOX_BULK_REMOVE  = %w[archive snooze delete move_to_folder].freeze
+  INBOX_BULK_UPSERT  = %w[unarchive unsnooze].freeze
+  INBOX_BULK_REPLACE = %w[mark_read mark_unread tag].freeze
+
+  def broadcast_inbox_bulk(tool, message_ids)
+    kind = if INBOX_BULK_REMOVE.include?(tool) then :remove
+    elsif INBOX_BULK_UPSERT.include?(tool) then :upsert
+    elsif INBOX_BULK_REPLACE.include?(tool) then :replace
+    end
+    return unless kind
+
+    thread_ids = EmailMessage.where(id: message_ids).where.not(email_thread_id: nil).distinct.pluck(:email_thread_id)
+    EmailThread.where(id: thread_ids).find_each { |thread| Emails::InboxBroadcaster.public_send(kind, thread) }
+  rescue => e
+    Rails.logger.error("[BulkController] inbox broadcast failed for #{tool}: #{e.class}: #{e.message}")
   end
 
   def reload_threads

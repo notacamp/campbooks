@@ -31,6 +31,16 @@
       <%# Live updates for the Skim tray: counts drop as you address mail, and new
           mail appears, without a manual reload. %>
       <%= turbo_stream_from "skim_#{current_user.id}" %>
+      <%# Live inbox sync (Emails::InboxBroadcaster). "inbox_#{id}" carries the
+          filter-safe ops — a row refresh or removal targeted by DOM id, which no-ops
+          when the row isn't on this page — so every inbox view subscribes. The
+          new-mail/restore INSERT ("inbox_feed_#{id}") is subscribed only on the
+          unfiltered default inbox, so a folder/group/search view never gets a row
+          floated in where it doesn't belong. %>
+      <%= turbo_stream_from "inbox_#{current_user.id}" %>
+      <% unless @search_active || @current_group.present? || params[:folder_id].present? || params[:folder_name].present? %>
+        <%= turbo_stream_from "inbox_feed_#{current_user.id}" %>
+      <% end %>
       <%# Skim ring tray — lazily loaded so it never blocks the inbox; preserved
           across email navigations so it does not re-fetch on every click. %>
       <%# skim-compact shrinks the rings for the dense inbox (see application.css);

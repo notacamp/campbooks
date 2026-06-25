@@ -230,10 +230,11 @@ class EmailToolsController < ApplicationController
                     layout: false
                   )) ]
             else
-              # Restore the thread to the top of the inbox list (no-op target if the
-              # list isn't on the page). Plain success toast.
-              thread = email_message.email_thread
-              thread ? [ turbo_stream.prepend("email_threads", partial: "email_messages/thread_row", locals: { thread: thread, active: false }) ] : []
+              # The live inbox broadcast (Emails::InboxBroadcaster#upsert, fired from
+              # EmailActions.run) owns re-inserting the row at the top of the inbox —
+              # for this tab and every other reader alike — and removes-before-prepends
+              # so it can't duplicate against this response. Nothing to add here.
+              []
             end
           when "trash"
             toast = { message: t(".thread_trashed"), variant: :success }
