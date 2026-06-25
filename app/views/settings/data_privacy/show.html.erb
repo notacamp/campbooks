@@ -36,9 +36,12 @@
         <div class="flex items-center justify-between gap-3 py-2">
           <span class="text-sm text-gray-700"><%= human_enum(AiConfiguration, :purpose, purpose) %></span>
           <% if provider %>
-            <span class="text-xs text-gray-500 text-right">
+            <span class="text-xs text-gray-500 text-right inline-flex items-center gap-1.5 flex-wrap justify-end">
               <%= human_enum(AiAdapter, :provider, provider) %>
               <%= render(Campbooks::AiRegionBadge.new(provider: provider)) %>
+              <% unless @org.region_allows?(provider) %>
+                <span class="inline-flex items-center rounded px-1 text-[10px] font-medium bg-gray-100 text-gray-600"><%= t(".paused_badge") %></span>
+              <% end %>
             </span>
           <% else %>
             <span class="text-xs text-gray-400"><%= t(".not_configured") %></span>
@@ -50,6 +53,33 @@
       <%= render(Campbooks::Button.new(variant: :outline, size: :sm, href: settings_ai_path)) { t(".configure_ai") } %>
     </div>
   </div>
+
+  <%# ── Data residency (EU-only AI) ─────────────────────────────────────── %>
+  <% if @org.entitlements.feature?(:eu_data_residency) %>
+    <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div class="min-w-0">
+          <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".residency_heading") %></h2>
+          <p class="text-sm text-gray-500"><%= t(".residency_desc") %></p>
+        </div>
+        <%= form_with url: settings_data_privacy_path, method: :patch, class: "shrink-0 pt-1",
+              data: { controller: "auto-submit", action: "change->auto-submit#submit" } do %>
+          <%= hidden_field_tag :required_data_region, "" %>
+          <%= render(Campbooks::Toggle.new(
+                name: "required_data_region",
+                checked: @org.required_data_region == "EU",
+                value: "EU"
+              )) %>
+        <% end %>
+      </div>
+      <p class="mt-3 text-sm text-gray-600"><%= t(".residency_eu_label") %> — <span class="text-gray-500"><%= t(".residency_eu_hint") %></span></p>
+      <% if @org.required_data_region == "EU" %>
+        <div class="mt-4 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-800">
+          <%= t(".residency_paused_note") %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
 
   <%# ── Where your data lives ───────────────────────────────────────────── %>
   <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-6">

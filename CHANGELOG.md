@@ -18,6 +18,12 @@ major, minor, or patch change here.
 
 ### Added
 
+- **EU data residency** (Settings → Data & Privacy) — an opt-in workspace policy that
+  restricts AI processing to EU-region providers. When on, only EU providers may be used:
+  text AI continues on an EU provider (Mistral), while document AI and semantic search —
+  which have no EU provider yet — **pause** rather than send data to a US provider. The
+  page shows a "Paused" badge on each affected AI task so it's never silent.
+
 - **Complete data export** (Settings → Account → "Your data") — your data export is now
   assembled in the background as a downloadable archive that includes your actual email
   content, attachments, and document files (not just a JSON summary). You're notified when

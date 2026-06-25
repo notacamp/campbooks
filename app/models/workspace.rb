@@ -46,6 +46,17 @@ class Workspace < ApplicationRecord
     settings&.fetch(key.to_s, default)
   end
 
+  # Data-residency policy: may this workspace use an AI provider in the given
+  # provider's region? True when no policy is set, or the provider's region
+  # (AiConfiguration::PROVIDER_REGIONS) matches the required one. The single gate
+  # behind EU-residency enforcement (Ai::Configuration.for, EmbeddingService,
+  # managed provisioning all consult it).
+  def region_allows?(provider)
+    return true if required_data_region.blank?
+
+    AiConfiguration::PROVIDER_REGIONS[provider.to_s] == required_data_region
+  end
+
   # Effective feature entitlements for this workspace. Self-hosted installs are
   # always unlimited (NullResolver); cloud workspaces resolve their plan from the
   # catalog deep-merged with entitlement_overrides (Entitlements::Resolver).
