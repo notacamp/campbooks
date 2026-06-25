@@ -11,6 +11,11 @@ class MailFolder < ApplicationRecord
   # Cap nesting depth so the tree (and any future provider label paths) stay sane.
   MAX_DEPTH = 3
 
+  # Stage 3 "filesystem" layer — a folder can hold heterogeneous content via a
+  # polymorphic join. Documents are wired first; emails stay provider-backed for now.
+  has_many :folder_memberships, dependent: :destroy
+  has_many :documents, through: :folder_memberships, source: :folderable, source_type: "Document"
+
   # A user-defined folder shown as a chip on top of the inbox. Creating one
   # provisions a real provider folder (or Gmail label) on every connected
   # account — see MailFolders::Provisioner. This record is the canonical,
