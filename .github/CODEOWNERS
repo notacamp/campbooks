@@ -1,0 +1,9 @@
+# Code owners for notacamp/campbooks
+#
+# Listed owners are automatically requested for review when a pull request
+# touches a matching path. The "Main protection" ruleset on `main` requires
+# one approving review before merge — this routes that request automatically.
+# See CONTRIBUTING.md for the full workflow.
+
+# Default owner for everything in the repository.
+* @guilherme-andrade
