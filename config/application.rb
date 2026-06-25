@@ -8,6 +8,15 @@ require "rails/all"
 # you've limited to :test, :development, or :production.
 Bundler.require(*Rails.groups)
 
+# Load cloud-only features when the optional :cloud gem is present in the bundle
+# (the hosted-cloud image, built with BUNDLE_WITH=cloud). A no-op for the
+# open-source / self-host build, where the :cloud group is excluded.
+begin
+  require "campbooks_cloud"
+rescue LoadError
+  # not a cloud build — fine
+end
+
 module Campbooks
   # The running application version, following Semantic Versioning. The single
   # source of truth is the VERSION file at the repo root; it's read once at boot

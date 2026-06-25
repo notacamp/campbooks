@@ -153,3 +153,16 @@ group :test do
   gem "webmock"
   gem "shoulda-matchers"
 end
+
+# Cloud-only features for Not A Camp's hosted instance — a private engine that is
+# NOT part of the open-source / self-host core. The group is optional, so a plain
+# `bundle install` (open-source, self-host, CI) excludes it and needs no GitHub
+# token; the cloud image build installs it with `BUNDLE_WITH=cloud` + a read token.
+# Local dev against the engine source:
+#   bundle config set --local local.campbooks_cloud /path/to/campbooks-cloud
+group :cloud, optional: true do
+  gem "campbooks_cloud",
+      git: "https://github.com/notacamp/campbooks-cloud.git",
+      glob: "engine/*.gemspec",
+      branch: "main"
+end
