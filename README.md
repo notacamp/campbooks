@@ -53,6 +53,17 @@ The login form is at `/session/new`.
 - **Product vision:** [`PRODUCT.md`](PRODUCT.md), [`DESIGN.md`](DESIGN.md)
 - **Feature & deployment guides:** [`docs/`](docs/)
 
+## Contributing
+
+Contributions are welcome — from human developers and AI agents alike. Start with
+[`CONTRIBUTING.md`](CONTRIBUTING.md): branch off `main`, open a PR with a
+[Conventional Commits](https://www.conventionalcommits.org/) title, and make CI
+green. Please also read our [Code of Conduct](CODE_OF_CONDUCT.md). Found a
+security issue? Follow [`SECURITY.md`](SECURITY.md) — never a public issue.
+
+Changes are tracked in [`CHANGELOG.md`](CHANGELOG.md) and released as
+[semver](https://semver.org) `vX.Y.Z` tags.
+
 ## License
 
 [Sustainable Use License](LICENSE).

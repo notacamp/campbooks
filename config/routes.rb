@@ -493,5 +493,9 @@ Rails.application.routes.draw do
   # android_v1, …) so installed apps can roll forward independently.
   get "configurations/:platform", to: "configurations#show", as: :path_configuration
 
-  get "up" => "rails/health#show", as: :rails_health_check
+  # Liveness probe. Custom controller (mirrors rails/health#show) that also
+  # reports Campbooks::VERSION so operators can see what's deployed. Keeps the
+  # path and route name so the production SSL exclusion and any path helpers
+  # continue to work.
+  get "up" => "health#show", as: :rails_health_check
 end

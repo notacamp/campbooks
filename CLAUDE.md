@@ -9,9 +9,20 @@ Not A Camp's AI-native email client — an inbox that sorts itself, for young pr
 - **Private stuff → `campbooks-cloud`, never here:** the production deploy pipeline, the secrets-management / Infisical runbook, the security pentest, app-store submission docs, server IPs / SSH / host details, and the private ops Claude context (`CLAUDE.cloud.md`). `campbooks-cloud/install.sh` overlays that onto a local checkout by writing a **gitignored `CLAUDE.local.md`** that `@`-imports the private context — so Claude sees ops info locally while this repo stays clean. **If you're about to add anything with an IP, hostname, secret name, account ID, or a real person's name/email, it belongs in `campbooks-cloud`.**
 - **Genericize in this repo:** use `ENV` with neutral `example.com` defaults; no hardcoded infra. The domain `not-a-camp.com` and the product name "Not A Camp" are fine (public product). ⚠️ The GitHub org is **`notacamp`** (no hyphens) — distinct from the domain.
 - **History is intentionally FRESH:** the public repo is a single "initial public release" commit because the original dev history contained sensitive files. The full history lives ONLY in the private archive remote (`legacy-private` → the old personal repo). **Never push a full-history branch to `origin`** — only ever publish clean history.
-- **Deploy:** push to `origin/main` → `.github/workflows/notify-deploy.yml` fires a `repository_dispatch` → `campbooks-cloud`'s `deploy.yml` checks out this repo at that commit and deploys to prod (no rollback). Secrets: `CAMPBOOKS_CLOUD_DISPATCH_TOKEN` lives here; `DEPLOY_SSH_KEY` lives in `campbooks-cloud`.
+- **Deploy:** every push to `origin/main` (i.e. a squash-merged PR — see *Contributing & development workflow* below) → `.github/workflows/notify-deploy.yml` fires a `repository_dispatch` → `campbooks-cloud`'s `deploy.yml` checks out this repo at that commit and deploys to prod (no rollback). Secrets: `CAMPBOOKS_CLOUD_DISPATCH_TOKEN` lives here; `DEPLOY_SSH_KEY` lives in `campbooks-cloud`.
 
 **Positioning & voice:** the canonical product positioning, USPs, and vocabulary live in `docs/messaging.md` — keep all user-facing copy (app, website, in-repo docs) consistent with it. Aim for consistency, not uniformity: never contradict it, but don't robotically repeat the same lines either.
+
+## Contributing & development workflow
+
+Full guide for both human contributors and AI agents: **`CONTRIBUTING.md`**. The essentials:
+
+- **Branch + PR, never commit straight to `main`.** `main` is protected and **continuously deployed** — a merge ships that commit to prod with no rollback, so the bar to merge is "production-ready". Branch off `main` (`feat/…`, `fix/…`, `docs/…`, `refactor/…`, `chore/…`), open a PR, get CI green, squash-merge.
+- **PR title is a Conventional Commit** (`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`; `!` or `BREAKING CHANGE` for breaks) — the squash-merge uses the **PR title** as the commit on `main`, so it's what's strict; individual branch commits can be free-form.
+- **CI gates (must pass before merge):** `bin/rubocop`, `bin/brakeman --no-pager`, `bin/bundler-audit`, `bin/importmap audit`, `bin/rails db:test:prepare test`. Run them locally first; keep i18n at parity (`bundle exec i18n-tasks missing`).
+- **Update `CHANGELOG.md`** (Keep a Changelog format) under `[Unreleased]` for any user-visible change.
+- **Semver:** the **`VERSION`** file at the repo root is the single source of truth (also reported at `/up` and in the Settings sidebar; constant is `Campbooks::VERSION`). Releases are `vX.Y.Z` git tags + a `CHANGELOG.md` section + a GitHub Release. MAJOR = breaks self-hosters/config/API; MINOR = backward-compatible feature; PATCH = fix. Pre-1.0, a minor may still break — call it out.
+- **AI agents follow the same rules as humans**, plus: always branch (never `main`), Conventional PR title, update the changelog, run the gates and verify UI in a browser (Playwright, **375px + desktop**) before reporting done — and above all keep this public repo clean (no secrets/IPs/hostnames/account IDs/real names; see the section above). Details: `CONTRIBUTING.md` → *Working as an AI agent*.
 
 ## UI Components
 
