@@ -36,11 +36,20 @@ module Campbooks
         aria: { label: t(".aria_label") },
         **@attrs
       ) do
-        LAYOUTS.each { |layout| segment(layout) }
+        enabled_layouts.each { |layout| segment(layout) }
       end
     end
 
     private
+
+    # Board ships gated off by default until it's production-ready
+    # (Features.email_board?); when off, only Default + List are offered. The
+    # inbox-layout Stimulus controller derives its valid set from the rendered
+    # buttons, so dropping the segment here is enough — a stale saved "board"
+    # falls back to Default.
+    def enabled_layouts
+      Features.email_board? ? LAYOUTS : LAYOUTS - %i[board]
+    end
 
     def segment(layout)
       button(

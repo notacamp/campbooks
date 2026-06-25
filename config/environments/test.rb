@@ -7,6 +7,14 @@
 # the cloud beta_code default; gate-specific specs override signup_mode at runtime.
 ENV["SIGNUP_MODE"] ||= "open"
 
+# Production-readiness feature gates (see Features) ship OFF by default in real
+# builds. Enable them in tests so the existing coverage for these features keeps
+# exercising them; the gate-specific specs stub Features.* to assert the
+# disabled-by-default behavior. Run with e.g. ENABLE_WORKFLOWS=0 to flip one off.
+ENV["ENABLE_WORKFLOWS"] ||= "1"
+ENV["ENABLE_EMAIL_BOARD"] ||= "1"
+ENV["ENABLE_MICROSOFT"] ||= "1"
+
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
 

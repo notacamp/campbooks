@@ -159,13 +159,18 @@ The interactive Drive export uses the **full `drive` scope**, which is a Google
 
 ### Microsoft 365 / Outlook
 
+> **Not production-ready — disabled by default.** Every Microsoft surface (the
+> "Sign in with Microsoft" button, "Connect Microsoft 365", and the OAuth
+> callbacks) is hidden unless `ENABLE_MICROSOFT=1`. Leave it unset to keep
+> Microsoft off entirely.
+
 1. [Entra admin center](https://entra.microsoft.com) → **App registrations** →
    New registration. Supported account types: *Accounts in any organizational
    directory* (work/school accounts; the app uses the `/organizations/` endpoint).
 2. Add a **Web** redirect URI: `<your-app-url>/oauth/microsoft/callback`.
 3. Create a **client secret**.
-4. Set `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, and `ENABLE_MICROSOFT_MAILBOX=1`
-   (the latter reveals the "Connect Microsoft 365" button).
+4. Set `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, and `ENABLE_MICROSOFT=1`
+   (the last reveals the Microsoft sign-in + "Connect Microsoft 365" surfaces).
 
 ### Notion — "Send to Notion"
 

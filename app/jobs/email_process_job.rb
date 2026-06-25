@@ -109,7 +109,7 @@ class EmailProcessJob < ApplicationJob
 
     email.processed! unless was_already_processed
 
-    WorkflowTriggerJob.perform_later(email.id) unless was_already_processed
+    WorkflowTriggerJob.perform_later(email.id) if Features.workflows? && !was_already_processed
 
     # Generic domain event (system-originated). Coexists with the dedicated
     # email_received trigger above; lets workflows/activity react to inbound mail

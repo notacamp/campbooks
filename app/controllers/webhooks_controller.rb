@@ -18,6 +18,11 @@ class WebhooksController < ApplicationController
   SENSITIVE_HEADERS = %w[Cookie Authorization X-Api-Key X-Api-Token Proxy-Authorization].freeze
 
   def receive
+    # Workflows ship gated off by default (Features.workflows?) — when off the
+    # ingress is inert. Return the same 404 as an unknown token so a disabled
+    # feature doesn't reveal itself.
+    return render(json: { ok: false, error: "Unknown or inactive webhook" }, status: :not_found) unless Features.workflows?
+
     # Look up by token first for efficiency, then confirm with a constant-time
     # comparison (mirrors CalendarWebhooksController) to prevent timing oracles.
     candidate = Workflow.enabled.find_by(webhook_token: params[:token])

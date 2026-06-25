@@ -2,6 +2,10 @@ class WorkflowTriggerJob < ApplicationJob
   queue_as :default
 
   def perform(email_message_id)
+    # Defense in depth: the enqueue sites already gate on Features.workflows?, but
+    # bail here too so a job enqueued before the flag flipped can't still run.
+    return unless Features.workflows?
+
     email = EmailMessage.find(email_message_id)
     workspace = email.email_account.workspace
 

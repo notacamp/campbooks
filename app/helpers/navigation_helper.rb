@@ -50,10 +50,11 @@ module NavigationHelper
       nav_item(:calendar, t("shared.nav.calendar"), calendar_path, badge: nav_attention.dot?(:calendar)),
       nav_item(:scout, t("shared.nav.scout"), scout_path, ember: true, badge: nav_attention.dot?(:scout)),
       nav_item(:documents, t("shared.nav.documents"), documents_path, badge: nav_attention.dot?(:documents)),
-      nav_item(:workflows, t("shared.nav.workflows"), workflows_path),
+      # Workflows is gated off by default until it's production-ready (Features.workflows?).
+      (nav_item(:workflows, t("shared.nav.workflows"), workflows_path) if Features.workflows?),
       nav_item(:contacts, t("shared.nav.contacts"), contacts_path),
       nav_item(:activity, t("shared.nav.activity"), activity_path)
-    ]
+    ].compact
   end
 
   # Memoized per request: the "action required" dots for the primary nav, read by

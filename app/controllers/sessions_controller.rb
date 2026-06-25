@@ -2,6 +2,10 @@ class SessionsController < ApplicationController
   allow_unauthenticated_access only: %i[ new create zoho google microsoft native ]
   before_action :redirect_if_authenticated, only: %i[ new create ]
   rate_limit to: 10, within: 3.minutes, only: :create, with: -> { redirect_to new_session_path, error: t(".try_later") }
+  # "Sign in with Microsoft" is gated together with everything else Microsoft
+  # (Features.microsoft?). 404 the route when off so a stale/crafted link can't
+  # reach the half-wired Entra flow.
+  before_action -> { head :not_found unless microsoft_enabled? }, only: :microsoft
 
   def new
     # In the native app, link OAuth buttons straight to the provider authorize
@@ -66,7 +70,9 @@ class SessionsController < ApplicationController
   # Providers whose credentials aren't configured are skipped (the view falls
   # back to the /session/:provider redirect for those).
   def native_oauth_urls
-    %i[ google microsoft zoho ].index_with do |provider|
+    providers = %i[ google zoho ]
+    providers << :microsoft if microsoft_enabled?
+    providers.index_with do |provider|
       provider_authorize_url(provider)
     rescue => e
       Rails.logger.warn("[oauth] native authorize URL for #{provider} unavailable: #{e.class}")

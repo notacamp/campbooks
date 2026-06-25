@@ -42,7 +42,9 @@ module Events
         occurred_at: @occurred_at || Time.current
       )
 
-      Workflows::EventTriggerJob.perform_later(event.id) if listeners?(workspace)
+      track_metric
+
+      Workflows::EventTriggerJob.perform_later(event.id) if Features.workflows? && listeners?(workspace)
 
       event
     rescue StandardError => e
