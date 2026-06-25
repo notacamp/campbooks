@@ -76,6 +76,18 @@ Every metric tag is bounded to a small, fixed set (event names, job classes,
 combination, so an unbounded tag will exhaust it. Use logs or traces for
 per-tenant debugging.
 
+## Tracing (OpenTelemetry)
+
+Distributed traces (request → SQL → outbound HTTP → jobs) are exported via OTLP
+to a tracing backend (Grafana Tempo in the hosted deployment), giving span-level
+waterfalls and metrics↔traces↔logs correlation. Auto-instrumented with
+`opentelemetry-instrumentation-all`; see `config/initializers/opentelemetry.rb`.
+
+**Off by default** — the SDK only configures when `OTEL_EXPORTER_OTLP_ENDPOINT`
+is set, so dev, test, and self-hosted installs with no backend load nothing and
+pay no overhead. To enable it, point that env var at your collector/Tempo (e.g.
+`http://tempo:4318`); optionally set `OTEL_SERVICE_NAME` (defaults to `campbooks`).
+
 ## Errors
 
 Error and performance monitoring is handled separately by Sentry/GlitchTip

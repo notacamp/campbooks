@@ -25,6 +25,10 @@ major, minor, or patch change here.
   via the Prometheus client's `DirectFileStore` (`PROMETHEUS_MULTIPROC_DIR`), with
   the Solid Queue worker exposing its own metrics server on `:9394`. See
   [docs/observability.md](docs/observability.md).
+- OpenTelemetry distributed tracing (auto-instrumented; exports via OTLP to a
+  backend such as Grafana Tempo). Off unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set,
+  so dev/test/self-host are unaffected. See
+  [docs/observability.md](docs/observability.md).
 
 ## [0.1.0] - 2026-06-25
 
