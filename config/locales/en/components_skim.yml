@@ -15,6 +15,7 @@ en:
       extracted_data: Extracted data
       junk: Junk
       new_type: "+ New type"
+      no_extracted_data: No data could be extracted from this document.
       no_types: No document types yet
       open: Open
       reclassify: Reclassify

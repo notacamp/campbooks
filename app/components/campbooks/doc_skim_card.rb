@@ -258,7 +258,11 @@ module Campbooks
 
         div(class: "mt-3 space-y-2") do
           edit_input(t(".edit_name"), "title", @title_value, placeholder: @display_title.to_s)
-          editable_fields.each { |f| field_edit_input(f) }
+          if editable_fields.empty?
+            p(class: "text-xs text-muted-foreground/70") { t(".no_extracted_data") }
+          else
+            editable_fields.each { |f| field_edit_input(f) }
+          end
           div(class: "flex items-center gap-2 pt-1") do
             mini_button(t("shared.actions.save"), :primary, action: "saveFields")
           end

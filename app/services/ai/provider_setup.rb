@@ -218,19 +218,25 @@ module Ai
         config = @workspace.ai_configurations.find_or_initialize_by(purpose: purpose)
         config.ai_adapter = adapter
         config.enabled = true
-        # Managed adapters always run the platform-chosen model for their provider —
-        # never carry over a model from a previous provider (e.g. a DeepSeek model
-        # left on a config that is now Mistral, which the provider rejects with 400).
-        # BYO adapters keep the user's explicit model choice.
-        config.model =
-          if adapter.managed?
-            AiConfiguration::DEFAULT_MODEL[adapter.provider] || config.model.presence || "gpt-4o-mini"
-          else
-            config.model.presence || AiConfiguration::DEFAULT_MODEL[adapter.provider] || "gpt-4o-mini"
-          end
+        config.model = resolved_model_for(adapter, config.model)
         config.max_tokens ||= 1000
         config.temperature ||= 0.0
         config.save!
+      end
+    end
+
+    # Pick the model for a (purpose, adapter) pair. A managed adapter always runs
+    # the platform-chosen default for its provider. A BYO adapter keeps the user's
+    # explicit model ONLY when it's valid for the adapter's provider; otherwise it
+    # falls back to that provider's default — so switching a role to a new provider
+    # (e.g. document analysis OpenAI → Anthropic) never leaves a stale model like
+    # "gpt-4o-mini" on a Claude adapter, which the provider would reject with a 400.
+    def resolved_model_for(adapter, current_model)
+      valid = AiConfiguration::MODELS[adapter.provider] || []
+      if !adapter.managed? && current_model.present? && valid.include?(current_model)
+        current_model
+      else
+        AiConfiguration::DEFAULT_MODEL[adapter.provider] || valid.first || "gpt-4o-mini"
       end
     end
 
