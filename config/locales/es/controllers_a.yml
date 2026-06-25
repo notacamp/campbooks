@@ -201,6 +201,8 @@ es:
         other: "'%{name}' creada, pero no se pudo añadir a %{count} bandejas"
     destroy:
       removed: Carpeta '%{name}' eliminada
+    update:
+      updated: Carpeta '%{name}' actualizada
   notifications:
     archive:
       success: Notificación archivada.
