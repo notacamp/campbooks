@@ -1,0 +1,32 @@
+---
+en:
+  settings:
+    security:
+      audit_log:
+        link: "Sign-in & security activity"
+        link_hint: "Review recent sign-ins and security changes"
+        time_ago: "%{time} ago"
+        index:
+          heading: "Sign-in & security activity"
+          subheading: "A record of sign-ins and security changes on your account."
+          empty: "No security activity yet."
+        actions:
+          sign_in: "Signed in"
+          sign_out: "Signed out"
+          mfa_challenge_failed: "Two-factor check failed"
+          mfa_challenge_passed: "Two-factor check passed"
+          mfa_recovery_code_used: "Recovery code used"
+          mfa_recovery_codes_generated: "Recovery codes generated"
+          mfa_disabled: "Two-factor authentication disabled"
+          mfa_totp_enabled: "Authenticator app enabled"
+          mfa_totp_disabled: "Authenticator app disabled"
+          mfa_email_otp_enabled: "Email code enabled"
+          mfa_email_otp_disabled: "Email code disabled"
+          mfa_passkey_added: "Passkey added"
+          mfa_passkey_removed: "Passkey removed"
+          sign_in_method_added: "Sign-in method added"
+          sign_in_method_removed: "Sign-in method removed"
+          password_changed: "Password changed"
+          data_exported: "Data exported"
+          account_deletion_requested: "Account deletion requested"
+          admin_role_changed: "Admin role changed"

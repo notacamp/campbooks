@@ -29,6 +29,15 @@ RSpec.describe Accounts::DataExporter do
     expect(emails.map { |e| e[:email_address] }).to eq([ readable.email_address ])
   end
 
+  it "includes the user's security audit log" do
+    AuditEvent.create!(user: user, action: "password_changed", ip_address: "203.0.113.7", metadata: { "x" => 1 })
+
+    entry = described_class.new(user).as_json[:security_audit_log].first
+
+    expect(entry).to include(action: "password_changed", ip_address: "203.0.113.7")
+    expect(entry).to have_key(:occurred_at)
+  end
+
   it "produces valid JSON" do
     expect { JSON.parse(described_class.new(user).to_json) }.not_to raise_error
   end

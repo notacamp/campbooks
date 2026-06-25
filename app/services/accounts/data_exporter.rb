@@ -22,7 +22,8 @@ module Accounts
         ai_conversations: ai_data,
         bug_reports: bug_reports_data,
         connected_email_accounts: email_accounts_data,
-        connected_calendar_accounts: calendar_accounts_data
+        connected_calendar_accounts: calendar_accounts_data,
+        security_audit_log: audit_log_data
       }
     end
 
@@ -72,6 +73,13 @@ module Accounts
 
     def calendar_accounts_data
       @user.readable_calendar_accounts.map { |a| { email_address: a.email_address, provider: a.provider } }
+    end
+
+    def audit_log_data
+      @user.audit_events.order(created_at: :desc).map do |e|
+        { action: e.action, ip_address: e.ip_address, user_agent: e.user_agent,
+          metadata: e.metadata, occurred_at: iso(e.created_at) }
+      end
     end
 
     def iso(time)
