@@ -9,6 +9,17 @@ require "rails/all"
 Bundler.require(*Rails.groups)
 
 module Campbooks
+  # The running application version, following Semantic Versioning. The single
+  # source of truth is the VERSION file at the repo root; it's read once at boot
+  # and reported at /up and in the Settings sidebar. The rescue keeps boot
+  # resilient if the file is somehow absent. See CONTRIBUTING.md → Versioning.
+  VERSION =
+    begin
+      File.read(File.expand_path("../VERSION", __dir__)).strip.freeze
+    rescue Errno::ENOENT
+      "0.0.0"
+    end
+
   class Application < Rails::Application
     # Initialize configuration defaults for originally generated Rails version.
     config.load_defaults 8.1

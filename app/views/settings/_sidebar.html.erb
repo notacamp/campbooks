@@ -22,4 +22,13 @@
       </div>
     </div>
   <% end %>
+
+  <%# App version — single source of truth is the VERSION file (Campbooks::VERSION).
+      Links to the changelog so self-hosters can see what they're running / what's new.
+      Brand name + version number, so no translation needed. %>
+  <p class="mt-8 px-3 text-[11px] text-gray-400">
+    <a href="https://github.com/notacamp/campbooks/blob/main/CHANGELOG.md"
+       target="_blank" rel="noopener"
+       class="transition-colors hover:text-gray-600">Campbooks v<%= Campbooks::VERSION %></a>
+  </p>
 </nav>
