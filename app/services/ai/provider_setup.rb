@@ -58,6 +58,8 @@ module Ai
     # (Scout chat, "draft a reply"): true when the capability would genuinely
     # work, counting the shared platform env keys as a convenience.
     def available?(capability)
+      return false unless @workspace&.ai_processing_enabled?
+
       case capability.to_sym
       when :text       then text_available?
       when :documents  then documents_available?
@@ -73,6 +75,8 @@ module Ai
     # on the platform's keys before the user opts in. (Self-hosted env keys are
     # the operator's own, so they still count.)
     def configured?(capability)
+      return false unless @workspace&.ai_processing_enabled?
+
       case capability.to_sym
       when :text       then text_configured? || self_hosted_env_provider?
       when :documents  then documents_configured?
