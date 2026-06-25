@@ -32,6 +32,12 @@ RSpec.describe Events::Publisher, type: :service do
       expect(event.actor).to be_nil
     end
 
+    it "publishes without a stray metrics hook (regression: undefined track_metric)" do
+      event = described_class.call("email.received", workspace: workspace, actor: nil)
+      expect(event).to be_persisted
+      expect(event.name).to eq("email.received")
+    end
+
     it "returns nil and records nothing when no workspace can be resolved" do
       expect { described_class.call("contact.starred", actor: nil) }
         .not_to change(Event, :count)
