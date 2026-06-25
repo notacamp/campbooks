@@ -1,0 +1,5 @@
+---
+es:
+  components:
+    ai_provenance_note:
+      processed_by: "Procesado por %{provider}"

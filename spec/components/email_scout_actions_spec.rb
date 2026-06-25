@@ -52,6 +52,16 @@ RSpec.describe Campbooks::EmailScoutActions, type: :component do
     expect(html).to include("tool=archive")
   end
 
+  it "shows the AI provenance when the email's summary was AI-generated" do
+    account = EmailAccount.new(id: 3, email_address: "me@example.com")
+    message = EmailMessage.new(id: 3, ai_action_prompt: "Read me",
+                               ai_provenance: { "provider" => "mistral", "model" => "x", "region" => "EU" })
+    message.email_account = account
+    html = ApplicationController.render(described_class.new(message: message, surface: :drawer), layout: false)
+    expect(html).to include("Processed by")
+    expect(html).to include("EU")
+  end
+
   it "renders nothing when there is no read, no actions, and no send permission" do
     account = EmailAccount.new(id: 2, email_address: "me@example.com")
     message = EmailMessage.new(id: 2, ai_suggested_actions: [])

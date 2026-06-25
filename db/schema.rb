@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_25_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_25_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -57,6 +57,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_150000) do
     t.bigint "agent_thread_id"
     t.jsonb "ai_auto_actions", default: [], null: false
     t.jsonb "ai_prompts", default: [], null: false
+    t.jsonb "ai_provenance", default: {}, null: false
     t.jsonb "ai_suggested_actions", default: [], null: false
     t.integer "author_type", default: 0, null: false
     t.text "content", null: false
@@ -560,6 +561,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_150000) do
     t.bigint "ai_analysis_message_id"
     t.datetime "ai_analyzed_at"
     t.integer "ai_priority", default: 1, null: false
+    t.jsonb "ai_provenance", default: {}, null: false
     t.jsonb "ai_suggested_actions", default: [], null: false
     t.text "ai_summary"
     t.boolean "ai_todo_dismissed", default: false, null: false

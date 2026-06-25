@@ -33,7 +33,8 @@ module Ai
         auto_actions: result["auto_actions"] || [],
         suggested_actions: result["suggested_actions"] || [],
         prompts: Array(result["prompts"]).map(&:to_s).reject(&:blank?).first(4),
-        questions: result["questions"] || []
+        questions: result["questions"] || [],
+        provenance: Ai::Provenance.for_purpose(PURPOSE, legacy_model: MODEL)
       }
     rescue => e
       # A failure here means Scout returns no reply and the user is left staring
