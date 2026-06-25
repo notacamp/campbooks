@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_25_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_25_143041) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -757,10 +757,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_130000) do
     t.datetime "created_at", null: false
     t.string "icon"
     t.string "name", null: false
+    t.bigint "parent_id"
     t.integer "position", default: 0, null: false
     t.datetime "updated_at", null: false
     t.bigint "workspace_id", null: false
     t.index "workspace_id, lower((name)::text)", name: "index_mail_folders_on_workspace_and_lower_name", unique: true
+    t.index ["parent_id"], name: "index_mail_folders_on_parent_id"
     t.index ["workspace_id"], name: "index_mail_folders_on_workspace_id"
   end
 
@@ -1437,6 +1439,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_130000) do
   add_foreign_key "invitations", "users", column: "accepted_by_id"
   add_foreign_key "invitations", "users", column: "invited_by_id"
   add_foreign_key "invitations", "workspaces"
+  add_foreign_key "mail_folders", "mail_folders", column: "parent_id"
   add_foreign_key "mail_folders", "workspaces"
   add_foreign_key "mfa_email_challenges", "users"
   add_foreign_key "notification_preferences", "document_types"

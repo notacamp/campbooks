@@ -65,6 +65,9 @@ es:
       delete_confirm: '¿Eliminar la carpeta %{name}? Tus correos y las carpetas del proveedor no se modifican.'
       edit_title: Ajustes de la carpeta
       icon_label: Icono de la carpeta
+      move_label: Mover a
+      toggle: Mostrar/ocultar subcarpetas
+      top_level: Nivel superior
     icon_picker:
       default: Predeterminado
       label: Elegir un icono
