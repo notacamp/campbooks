@@ -17,7 +17,8 @@ module Ai
         reply: result["reply"],
         auto_actions: result["auto_actions"] || [],
         suggested_actions: result["suggested_actions"] || [],
-        questions: result["questions"] || []
+        questions: result["questions"] || [],
+        provenance: Ai::Provenance.for_purpose(PURPOSE, legacy_model: MODEL)
       }
     rescue => e
       Rails.logger.error("[EmailChatService] Error for thread #{@thread.id}: #{e.message}")

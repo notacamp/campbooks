@@ -238,6 +238,10 @@ module Ai
         }
       end
 
+      # Stash which AI provider/region produced this extraction (surfaced on the
+      # document page) alongside the extraction data.
+      result["_provenance"] = Ai::Provenance.for_purpose("document_analysis")
+
       # Populate existing columns from metadata for backward compat
       @document.update!(
         document_type: enum_value,

@@ -18,6 +18,10 @@ major, minor, or patch change here.
 
 ### Added
 
+- **AI provenance in context** — every AI output now shows which provider and data
+  region produced it ("Processed by Mistral · EU"): on Scout replies, the email
+  summary strip, and the document extraction panel. A reusable region badge (EU =
+  green, elsewhere = amber) now also backs the AI-settings and Data & Privacy pages.
 - A **security activity log** (Settings → Security → "Sign-in & security activity") —
   a per-user, paginated record of sign-ins, two-factor changes, password changes,
   data exports, and account-deletion requests. It's included in your data export and
