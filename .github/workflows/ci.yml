@@ -73,8 +73,13 @@ jobs:
       - name: Lint code for consistent style
         run: bin/rubocop -f github
 
+  # Primary suite — runs WITH the cloud engine installed (the private
+  # campbooks_cloud gem via the optional :cloud group). The engine needs
+  # CLOUD_BUNDLE_TOKEN, which fork PRs can't access, so this job is same-repo
+  # only; `test_without_cloud` below is the universal open-source gate.
   test:
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
 
     services:
       postgres:
@@ -86,11 +91,10 @@ jobs:
           - 5432:5432
         options: --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=3
 
-      # redis:
-      #   image: valkey/valkey:8
-      #   ports:
-      #     - 6379:6379
-      #   options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      # Install the optional :cloud group and authenticate the private git gem.
+      BUNDLE_WITH: cloud
+      BUNDLE_GITHUB__COM: x-access-token:${{ secrets.CLOUD_BUNDLE_TOKEN }}
 
     steps:
       - name: Install packages
@@ -104,15 +108,75 @@ jobs:
         with:
           bundler-cache: true
 
-      - name: Run tests
+      - name: Run tests (with the cloud engine installed)
         env:
           RAILS_ENV: test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
-          # Active Record encryption keys are read with ENV.fetch at boot
-          # (config/application.rb). Dummy values for CI; real keys live in prod env.
           ACTIVE_RECORD_PRIMARY_KEY: ci_dummy_primary_key_not_used_in_production
           ACTIVE_RECORD_DETERMINISTIC_KEY: ci_dummy_deterministic_key_not_for_prod
           ACTIVE_RECORD_KEY_DERIVATION_SALT: ci_dummy_key_derivation_salt_not_prod
-          # RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
-          # REDIS_URL: redis://localhost:6379/0
         run: bin/rails db:test:prepare test
+
+  # Duplicate of `test`, WITHOUT the :cloud group — the open-source / self-host
+  # path. No token needed, so it runs everywhere, including fork PRs. This is the
+  # universal gate (mark it required in branch protection).
+  test_without_cloud:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Install packages
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libpq-dev
+
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Run tests (open-source — :cloud excluded)
+        env:
+          RAILS_ENV: test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432
+          ACTIVE_RECORD_PRIMARY_KEY: ci_dummy_primary_key_not_used_in_production
+          ACTIVE_RECORD_DETERMINISTIC_KEY: ci_dummy_deterministic_key_not_for_prod
+          ACTIVE_RECORD_KEY_DERIVATION_SALT: ci_dummy_key_derivation_salt_not_prod
+        run: bin/rails db:test:prepare test
+
+  # Security guard — the private :cloud engine must NOT be installable without the
+  # secret. Runs WITHOUT a token and asserts `bundle install --with cloud` FAILS,
+  # catching any regression that would make the private repo publicly fetchable.
+  # Runs everywhere (no secret needed); a fork that could install :cloud would be a leak.
+  cloud_requires_secret:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: The :cloud engine must NOT install without CLOUD_BUNDLE_TOKEN
+        env:
+          GIT_TERMINAL_PROMPT: "0"
+          BUNDLE_RETRY: "0"
+        run: |
+          if bundle install --with cloud; then
+            echo "::error::The private :cloud engine installed WITHOUT a token — it is not gated!"
+            exit 1
+          fi
+          echo "✓ :cloud correctly refused to install without the secret"

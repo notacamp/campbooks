@@ -153,3 +153,19 @@ group :test do
   gem "webmock"
   gem "shoulda-matchers"
 end
+
+# ── Hosted-cloud-only features (Not A Camp's managed Campbooks) ────────────────
+# Cloud-only behaviour (support widget, observability, analytics) lives in a
+# private Rails engine and is installed ONLY via this OPTIONAL group. An optional
+# group is excluded by default, so open-source / self-host `bundle install` omits
+# it entirely — self-hosters never fetch it and never need a token. The hosted
+# build + the `test` CI job opt in with `bundle install --with cloud` and a GitHub
+# token (CLOUD_BUNDLE_TOKEN, supplied as BUNDLE_GITHUB__COM) that can read the
+# private repo. The lockfile pins the engine's revision; bumping it is a cloud-side
+# relock.
+group :cloud, optional: true do
+  gem "campbooks_cloud",
+      git: "https://github.com/notacamp/campbooks-cloud.git",
+      glob: "engine/*.gemspec",
+      branch: "main"
+end

@@ -39,7 +39,18 @@ RUN apt-get update -qq && \
 COPY vendor/* ./vendor/
 COPY Gemfile Gemfile.lock ./
 
-RUN bundle install && \
+# The optional :cloud group (the private campbooks_cloud engine) is installed ONLY
+# when a GitHub token is supplied as a BuildKit secret — the hosted-cloud image
+# build does this; a plain/self-host build omits it (the group is excluded by
+# default, so no token is needed). The token is a BuildKit secret plus a throwaway
+# global bundle credential removed in the same layer, so it never lands in any
+# image layer.
+RUN --mount=type=secret,id=cloud_bundle_token \
+    if [ -s /run/secrets/cloud_bundle_token ]; then \
+      bundle config set --global github.com "x-access-token:$(cat /run/secrets/cloud_bundle_token)" && \
+      export BUNDLE_WITH=cloud; \
+    fi && \
+    bundle install && \
     rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git && \
     # -j 1 disable parallel compilation to avoid a QEMU bug: https://github.com/rails/bootsnap/issues/495
     bundle exec bootsnap precompile -j 1 --gemfile
