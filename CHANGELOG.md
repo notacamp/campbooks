@@ -18,12 +18,19 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Auto-ingest document links from emails** — when an email body contains
+  direct links to downloadable files (PDFs, Office documents, spreadsheets,
+  CSVs), Campbooks now downloads them safely and creates Documents that flow
+  through the same AI analysis pipeline as regular attachments. Fetching is
+  SSRF-guarded (UrlGuard), content-type-verified, size-capped (25 MB),
+  and per-link failures are isolated so one broken link never blocks the
+  rest. Cloud-share links (Google Drive, Dropbox, WeTransfer) are deliberately
+  skipped in this first iteration. \[#56\]
 - **EU data residency** (Settings → Data & Privacy) — an opt-in workspace policy that
   restricts AI processing to EU-region providers. When on, only EU providers may be used:
   text AI continues on an EU provider (Mistral), while document AI and semantic search —
   which have no EU provider yet — **pause** rather than send data to a US provider. The
   page shows a "Paused" badge on each affected AI task so it's never silent.
-
 - An opt-in **"Auto-delete old email"** setting (Settings → Data & Privacy) — choose a
   retention window for Campbooks' stored copy of your email (6/12/24/36 months), and the
   daily sweep permanently deletes our local copy (message, search index, and cached
@@ -81,6 +88,11 @@ major, minor, or patch change here.
   link, an event opened in a new tab, or a bookmarked URL): the "X" and "Cancel"
   controls take you back to the calendar instead of doing nothing. Inside the
   calendar's pop-up they still just close the dialog as before.
+- The inbox view switcher (Default / List / Board) is now reachable at all
+  viewport sizes in List mode — it was previously hidden on narrower widths
+  because the list pane's responsive `hidden` class wasn't overridden. Also
+  floats to the left of the header on short desktop viewports where the
+  bottom-right email drawer would otherwise bury it. [#54]
 - Publishing a domain event (`Events.publish`) no longer aborts on an internal
   `NameError` from a leftover metrics call — events publish cleanly again and
   event-triggered workflows fire reliably.
@@ -157,6 +169,15 @@ major, minor, or patch change here.
 ## [0.1.0] - 2026-06-25
 
 ### Added
+
+- **Auto-ingest document links from emails** — when an email body contains
+  direct links to downloadable files (PDFs, Office documents, spreadsheets,
+  CSVs), Campbooks now downloads them safely and creates Documents that flow
+  through the same AI analysis pipeline as regular attachments. Fetching is
+  SSRF-guarded (UrlGuard), content-type-verified, size-capped (25 MB),
+  and per-link failures are isolated so one broken link never blocks the
+  rest. Cloud-share links (Google Drive, Dropbox, WeTransfer) are deliberately
+  skipped in this first iteration. \[#56\]
 
 - Initial public, source-available release of Campbooks.
 
