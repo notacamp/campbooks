@@ -22,8 +22,9 @@ env:
   ACTIVE_RECORD_KEY_DERIVATION_SALT: ci_dummy_key_derivation_salt_not_prod
 
 jobs:
-  # Hard gate: re-run the full test suite before publishing. Mirrors the `test`
-  # job in ci.yml — keep the two in sync.
+  # Hard gate: re-run the full test suite before publishing, WITH the :cloud
+  # engine installed — because the image we're about to publish carries it (the
+  # build_and_push step passes the same token). Mirrors the `test` job in ci.yml.
   test:
     runs-on: ubuntu-latest
 
@@ -37,6 +38,12 @@ jobs:
           - 5432:5432
         options: --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=3
 
+    env:
+      # Install the optional :cloud group and authenticate the private git gem,
+      # so the gate exercises the same code the published image will run.
+      BUNDLE_WITH: cloud
+      BUNDLE_GITHUB__COM: x-access-token:${{ secrets.CLOUD_BUNDLE_TOKEN }}
+
     steps:
       - name: Install packages
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libpq-dev
@@ -49,7 +56,7 @@ jobs:
         with:
           bundler-cache: true
 
-      - name: Run tests
+      - name: Run tests (with the cloud engine installed)
         env:
           RAILS_ENV: test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
@@ -110,3 +117,13 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Pass the GitHub token to the build as the BuildKit secret the
+          # Dockerfile mounts (id=cloud_bundle_token). With it present, `bundle
+          # install` includes the optional :cloud group (the private
+          # campbooks_cloud engine), so the published image carries the cloud-only
+          # features (support widget, observability, analytics). The secret is
+          # mounted only for that RUN and never lands in a layer. Empty when
+          # CLOUD_BUNDLE_TOKEN is unset (e.g. a fork) → the build just omits the
+          # engine and ships the open-source image.
+          secrets: |
+            cloud_bundle_token=${{ secrets.CLOUD_BUNDLE_TOKEN }}
