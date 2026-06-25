@@ -11,6 +11,12 @@ module Ai
       adapter = mapping.ai_adapter
       return nil unless adapter&.enabled?
 
+      # EU data-residency: if the workspace requires a region this provider isn't in,
+      # this purpose PAUSES (returns nil) rather than route data to a non-EU provider.
+      # This is the universal runtime gate — it covers every purpose and every way an
+      # adapter got wired (managed, BYO setup, or the granular Settings → AI matrix).
+      return nil if Current.workspace && !Current.workspace.region_allows?(adapter.provider)
+
       {
         adapter: adapter.adapter_instance,
         provider: adapter.provider,

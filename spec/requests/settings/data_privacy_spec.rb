@@ -29,5 +29,20 @@ RSpec.describe "Settings::DataPrivacy", type: :request do
 
       expect(user.workspace.reload.ai_processing_enabled).to be(true)
     end
+
+    it "requires EU data residency" do
+      patch settings_data_privacy_path, params: { required_data_region: "EU" }
+
+      expect(response).to redirect_to(settings_data_privacy_path)
+      expect(user.workspace.reload.required_data_region).to eq("EU")
+    end
+
+    it "clears the residency policy when the toggle is off" do
+      user.workspace.update!(required_data_region: "EU")
+
+      patch settings_data_privacy_path, params: { required_data_region: "" }
+
+      expect(user.workspace.reload.required_data_region).to be_blank
+    end
   end
 end
