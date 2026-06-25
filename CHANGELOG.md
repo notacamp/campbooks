@@ -16,6 +16,14 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- Configurable folder icons — the inbox folder bar now renders an icon on every folder chip, and custom folders can be given an icon from a picker when created.
+
+### Fixed
+
+- Drag-and-drop and tap-to-move no longer offer Sent or Drafts as destinations (moving received mail into outbound/compose folders made no sense).
+
 ## [0.1.0] - 2026-06-25
 
 ### Added

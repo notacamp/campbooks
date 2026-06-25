@@ -150,6 +150,7 @@ en:
       default: Default view
       list: List view
     new_folder_modal:
+      icon_label: Folder icon
       name_label: Folder name
       name_placeholder: e.g. Receipts
       submit: Create folder

@@ -33,6 +33,26 @@ RSpec.describe MailFolder, type: :model do
     expect(MailFolder.create!(workspace: workspace, name: "  Receipts  ").name).to eq("Receipts")
   end
 
+  describe "icon" do
+    it "is valid when blank and falls back to the default glyph" do
+      mf = MailFolder.new(workspace: workspace, name: "Receipts", icon: "")
+      expect(mf).to be_valid
+      expect(mf.display_icon).to eq(Campbooks::Icon::DEFAULT)
+    end
+
+    it "accepts a known icon name and exposes it via display_icon" do
+      mf = MailFolder.new(workspace: workspace, name: "Receipts", icon: "currency-dollar")
+      expect(mf).to be_valid
+      expect(mf.display_icon).to eq("currency-dollar")
+    end
+
+    it "rejects an unknown icon name" do
+      mf = MailFolder.new(workspace: workspace, name: "Receipts", icon: "definitely-not-an-icon")
+      expect(mf).not_to be_valid
+      expect(mf.errors[:icon]).to be_present
+    end
+  end
+
   describe ".next_position_for" do
     it "returns 0 for an empty workspace and the next slot otherwise" do
       expect(described_class.next_position_for(workspace)).to eq(0)

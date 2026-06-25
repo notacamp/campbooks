@@ -55,6 +55,9 @@ en:
       empty: "(empty)"
     email_html_preview:
       frame_title: Email preview
+    icon_picker:
+      default: Default
+      label: Choose an icon
     inbox_settings_modal:
       close_label: Close inbox settings
       nav:
