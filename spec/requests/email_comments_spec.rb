@@ -10,6 +10,10 @@ RSpec.describe "Email discussion comments", type: :request do
   before do
     create(:email_account_user, :collaborator, user: author, email_account: account)
     sign_in(author)
+    # Scout replies only when text AI is available; post-#24 that needs a configured
+    # provider, which this bare workspace has none of. The behaviour under test is
+    # the @scout trigger, so make text AI available.
+    allow(Ai::ProviderSetup).to receive(:available?).and_return(true)
   end
 
   def post_comment(content)

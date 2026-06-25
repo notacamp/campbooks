@@ -16,6 +16,8 @@ class EmailRetagJob < ApplicationJob
     # AI model resolution reads Current.workspace (see EmailProcessJob). Without it
     # the classifier falls back to a keyless Anthropic client and no tag is assigned.
     Current.workspace = email.email_account.workspace
+    # Respect the workspace's global AI kill-switch + the AI opt-in gate.
+    return unless Ai::ProviderSetup.configured?(Current.workspace, :text)
 
     begin
       decision = Emails::Triage.new(email).call

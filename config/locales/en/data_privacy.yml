@@ -1,0 +1,42 @@
+---
+en:
+  navigation:
+    settings:
+      items:
+        data_privacy: "Data & Privacy"
+  activerecord:
+    attributes:
+      ai_configuration:
+        purposes:
+          reminder_extraction: "Reminder Extraction"
+  settings:
+    data_privacy:
+      show:
+        title: "Data & Privacy"
+        subtitle: "Control how your data is processed and stored, and which AI can see it."
+        ai_toggle_heading: "AI processing"
+        ai_toggle_desc: "When on, Scout uses AI to process your emails, documents, and contacts. Turn it off to pause all AI; your existing summaries and tags are kept."
+        ai_paused_note: "AI processing is paused. Scout, automatic tagging, summaries, and analysis won't run until you turn it back on."
+        ai_providers_heading: "AI providers & data regions"
+        ai_providers_desc: "Which provider handles each AI task, and where it runs. Green means EU data residency."
+        not_configured: "Not configured"
+        configure_ai: "Configure AI providers"
+        hosting_heading: "Where your data lives"
+        hosting_self_hosted: "This is a self-hosted Campbooks instance. Your data lives on infrastructure you control."
+        hosting_cloud: "Your data is stored on the Campbooks hosted service. See the privacy policy for details."
+        sub_processors_heading: "Connected services"
+        sub_processors_desc: "Third-party services that receive your data when you connect them."
+        google_drive: "Google Drive"
+        notion: "Notion"
+        zoho_drive: "Zoho WorkDrive"
+        calendar: "Calendar"
+        connected: "Connected"
+        not_connected: "Not connected"
+        manage_integrations: "Manage integrations"
+        your_data_heading: "Your data"
+        your_data_desc: "Download a copy of your personal data, or permanently delete your account."
+        export_button: "Download my data"
+        delete_account: "Delete account"
+      update:
+        updated: "Privacy settings saved."
+        update_failed: "Couldn't save your privacy settings."

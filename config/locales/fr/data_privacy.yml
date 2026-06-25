@@ -1,0 +1,42 @@
+---
+fr:
+  navigation:
+    settings:
+      items:
+        data_privacy: "Données et Confidentialité"
+  activerecord:
+    attributes:
+      ai_configuration:
+        purposes:
+          reminder_extraction: "Extraction de Rappels"
+  settings:
+    data_privacy:
+      show:
+        title: "Données et Confidentialité"
+        subtitle: "Contrôlez la façon dont vos données sont traitées et stockées, et quelle IA peut les voir."
+        ai_toggle_heading: "Traitement par IA"
+        ai_toggle_desc: "Lorsque cette option est activée, Scout utilise l'IA pour traiter vos e-mails, documents et contacts. Désactivez-la pour suspendre toute l'IA ; vos résumés et étiquettes existants sont conservés."
+        ai_paused_note: "Le traitement par IA est en pause. Scout, l'étiquetage automatique, les résumés et l'analyse ne s'exécuteront pas tant que vous ne l'aurez pas réactivé."
+        ai_providers_heading: "Fournisseurs d'IA et régions de données"
+        ai_providers_desc: "Quel fournisseur gère chaque tâche d'IA et où elle s'exécute. Le vert indique une résidence des données dans l'UE."
+        not_configured: "Non configuré"
+        configure_ai: "Configurer les fournisseurs d'IA"
+        hosting_heading: "Où vos données sont hébergées"
+        hosting_self_hosted: "Il s'agit d'une instance Campbooks auto-hébergée. Vos données se trouvent sur une infrastructure que vous contrôlez."
+        hosting_cloud: "Vos données sont stockées sur le service hébergé de Campbooks. Consultez la politique de confidentialité pour plus de détails."
+        sub_processors_heading: "Services connectés"
+        sub_processors_desc: "Services tiers qui reçoivent vos données lorsque vous les connectez."
+        google_drive: "Google Drive"
+        notion: "Notion"
+        zoho_drive: "Zoho WorkDrive"
+        calendar: "Calendrier"
+        connected: "Connecté"
+        not_connected: "Non connecté"
+        manage_integrations: "Gérer les intégrations"
+        your_data_heading: "Vos données"
+        your_data_desc: "Téléchargez une copie de vos données personnelles ou supprimez définitivement votre compte."
+        export_button: "Télécharger mes données"
+        delete_account: "Supprimer le compte"
+      update:
+        updated: "Paramètres de confidentialité enregistrés."
+        update_failed: "Impossible d'enregistrer vos paramètres de confidentialité."
