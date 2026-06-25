@@ -1,0 +1,9 @@
+---
+fr:
+  settings:
+    account:
+      delete:
+        connected_services_note: "Nous déconnecterons également vos comptes liés (e-mail,
+          agenda et Google Drive) en révoquant leur accès. L'accès à Notion est supprimé
+          de notre côté, mais pour le révoquer totalement vous devrez retirer
+          l'intégration dans les paramètres de Notion."

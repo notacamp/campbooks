@@ -28,6 +28,12 @@
         <% end %>
       </p>
     </div>
+
+    <% if @sole_owner %>
+      <div class="border-t border-red-100 pt-4">
+        <p class="text-sm text-gray-600"><%= t(".connected_services_note") %></p>
+      </div>
+    <% end %>
   </div>
 
   <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-6">

@@ -1,0 +1,9 @@
+---
+en:
+  settings:
+    account:
+      delete:
+        connected_services_note: "We'll also disconnect your linked accounts (email,
+          calendar, and Google Drive) by revoking their access. Notion access is removed
+          on our side, but to fully revoke it you'll need to remove the integration in
+          your Notion settings."

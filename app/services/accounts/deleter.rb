@@ -58,12 +58,43 @@ module Accounts
       end
     end
 
+    # Kill the external OAuth grants before we drop the local rows, so deleting an
+    # account doesn't leave Campbooks with live provider access. Best-effort: each
+    # call is isolated so one failure never blocks the deletion. Runs OUTSIDE the
+    # delete transaction (it does network I/O).
     def revoke_tokens_best_effort
       (@workspace.email_accounts.to_a + @workspace.calendar_accounts.to_a).each do |account|
         client = account.oauth_client
         client.revoke_token if client.respond_to?(:revoke_token)
       rescue StandardError
         # best-effort: swallow network/auth errors so deletion proceeds
+      end
+
+      revoke_google_drive_grants
+      drop_notion_access
+    end
+
+    # Google Drive grants live in a separate Google project; their tokens are still
+    # Google tokens, so revoke them at the same endpoint (the Drive client is
+    # stateless, so pass the token in).
+    def revoke_google_drive_grants
+      @workspace.google_drive_accounts.find_each do |drive|
+        GoogleDrive::OauthClient.new.revoke_token(drive.refresh_token)
+      rescue StandardError
+        # best-effort
+      end
+    end
+
+    # Notion has NO token-revoke API and its bot tokens don't expire. Destroying the
+    # NotionIntegration row (cascaded with the workspace) removes our copy, but the
+    # user must remove the integration in Notion to fully revoke access. Log the
+    # drop for the audit trail; the deletion-confirmation copy tells the user.
+    def drop_notion_access
+      @workspace.notion_integrations.find_each do |integration|
+        Rails.logger.info(
+          "[Accounts::Deleter] Dropping Notion integration #{integration.id} for workspace #{@workspace.id} " \
+          "(Notion has no revoke API — local token removed only)"
+        )
       end
     end
 
