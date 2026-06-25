@@ -35,6 +35,7 @@ module Campbooks
       div(id: @attrs.delete(:id) || scout_strip_id, class: class_names("space-y-2", @attrs.delete(:class)), **@attrs) do
         render(Campbooks::ScoutNote.new(message: note, compact: true)) if @show_note && note.present?
         render(chat_actions) if actions.any?
+        provenance_note
       end
     end
 
@@ -48,6 +49,15 @@ module Campbooks
 
     def anything_to_show?
       (@show_note && note.present?) || actions.any?
+    end
+
+    # Which AI provider/region produced this email's summary — data-governance
+    # transparency; renders nothing when the email wasn't AI-analysed.
+    def provenance_note
+      prov = @message.ai_provenance
+      return if prov.blank? || prov["provider"].blank?
+
+      render Campbooks::AiProvenanceNote.new(provenance: prov)
     end
 
     def note

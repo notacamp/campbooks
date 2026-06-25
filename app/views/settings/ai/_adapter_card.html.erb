@@ -5,9 +5,7 @@
       <p class="text-sm font-semibold text-gray-900 truncate"><%= adapter.name %></p>
       <p class="text-xs text-gray-500">
         <%= human_enum(AiAdapter, :provider, adapter.provider) %>
-        <% if (region = AiConfiguration::PROVIDER_REGIONS[adapter.provider]) %>
-          <span class="ml-0.5 inline-flex items-center rounded px-1 text-[10px] font-medium <%= region == "EU" ? "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400" : "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" %>"><%= region %></span>
-        <% end %>
+        <%= render(Campbooks::AiRegionBadge.new(provider: adapter.provider)) %>
         <% if adapter.endpoint_url.present? %>
           · <%= URI.parse(adapter.endpoint_url).host rescue adapter.endpoint_url.truncate(30) %>
         <% end %>

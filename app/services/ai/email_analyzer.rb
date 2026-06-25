@@ -20,6 +20,7 @@ module Ai
         ai_priority: result["priority"],
         ai_action_prompt: result["action_prompt"].presence,
         ai_suggested_actions: result["suggested_actions"] || [],
+        ai_provenance: Ai::Provenance.for_purpose(PURPOSE, legacy_model: MODEL),
         ai_analyzed_at: Time.current
       )
     rescue => e

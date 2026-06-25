@@ -50,6 +50,7 @@ class EmailChatReplyJob < ApplicationJob
       author_type: :ai,
       ai_suggested_actions: result[:suggested_actions] || [],
       ai_auto_actions: auto_results.map { |r| { "tool" => r[:tool], "message" => r[:message], "success" => r[:success] } },
+      ai_provenance: result[:provenance] || {},
       user: agent_thread.user
     )
 
