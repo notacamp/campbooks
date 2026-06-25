@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_25_143041) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_25_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -132,6 +132,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_143041) do
     t.index ["action"], name: "index_audit_events_on_action"
     t.index ["target_type", "target_id"], name: "index_audit_events_on_target"
     t.index ["user_id"], name: "index_audit_events_on_user_id"
+    t.index ["user_id", "created_at"], name: "index_audit_events_on_user_id_and_created_at"
   end
 
   create_table "beta_codes", force: :cascade do |t|
