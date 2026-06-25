@@ -101,3 +101,22 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Trigger production deploy (campbooks-cloud)
+        # Fire ONLY after the image is pushed, and ONLY for full releases (not
+        # prereleases) — so a prerelease can smoke-test the build without shipping
+        # to prod. Sends the version to campbooks-cloud's deploy.yml, which pulls
+        # ghcr.io/notacamp/campbooks:<version>. Replaces the old notify-deploy.yml
+        # (which deployed on every push to main).
+        if: ${{ github.event.release.prerelease == false }}
+        env:
+          DISPATCH_TOKEN: ${{ secrets.CAMPBOOKS_CLOUD_DISPATCH_TOKEN }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="${RELEASE_TAG#v}"   # strip leading v -> 1.2.3
+          curl -fsS -X POST \
+            -H "Authorization: Bearer $DISPATCH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${{ github.repository_owner }}/campbooks-cloud/dispatches" \
+            -d "{\"event_type\":\"campbooks-release\",\"client_payload\":{\"version\":\"$VERSION\"}}"
