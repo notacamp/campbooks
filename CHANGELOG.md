@@ -24,6 +24,11 @@ major, minor, or patch change here.
   which have no EU provider yet — **pause** rather than send data to a US provider. The
   page shows a "Paused" badge on each affected AI task so it's never silent.
 
+- An opt-in **"Auto-delete old email"** setting (Settings → Data & Privacy) — choose a
+  retention window for Campbooks' stored copy of your email (6/12/24/36 months), and the
+  daily sweep permanently deletes our local copy (message, search index, and cached
+  attachments) that's older than that window. **Your mailbox is never touched** — the
+  original stays in your inbox; only Campbooks' copy is removed. Off by default.
 - **Complete data export** (Settings → Account → "Your data") — your data export is now
   assembled in the background as a downloadable archive that includes your actual email
   content, attachments, and document files (not just a JSON summary). You're notified when

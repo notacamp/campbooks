@@ -30,7 +30,7 @@ class Settings::DataPrivacyController < Settings::BaseController
   end
 
   def data_privacy_params
-    params.permit(:ai_processing_enabled, :required_data_region)
+    params.permit(:ai_processing_enabled, :required_data_region, :email_retention_months)
   end
 
   def current_section
