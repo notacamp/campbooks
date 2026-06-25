@@ -323,6 +323,9 @@ Rails.application.routes.draw do
   # provisions a real folder/label on every connected account.
   resources :mail_folders, only: [ :create, :update, :destroy ]
 
+  # Filing content (documents now) into custom folders — the Stage 3 "filesystem" layer.
+  resources :folder_memberships, only: [ :create, :destroy ]
+
   get "email_messages/new", to: "email_messages#new", as: :new_email_message
   post "email_messages/compose_chat", to: "email_compose_chat#create"
 

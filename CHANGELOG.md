@@ -18,6 +18,7 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Documents in folders** — file a document into one or more custom folders (from the document page) and filter the Documents page by folder. Folders now organize documents as well as emails.
 - A **Data & Privacy** settings page (Settings → Data & Privacy) — a privacy-framed
   overview of how your workspace's data is handled: a global **AI processing**
   switch that pauses all AI (Scout, triage, tagging, summaries, embeddings, and

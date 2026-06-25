@@ -5,12 +5,14 @@ class DocumentsController < ApplicationController
   def index
     @document_types = Current.workspace.document_types.order(:name)
     @categories = DocumentType::CATEGORIES
+    @mail_folders = Current.workspace.mail_folders.ordered
 
     documents = Current.workspace.documents.includes(:classification).with_attached_original_file.starred_first.recent
     documents = documents.by_type(params[:type]) if params[:type].present?
     documents = documents.by_category(params[:category]) if params[:category].present?
     documents = documents.by_review_status(params[:review_status])
     documents = documents.by_ai_status(params[:ai_status])
+    documents = documents.in_folder(params[:folder_id]) if params[:folder_id].present?
 
     if params[:year].present? && params[:month].present?
       documents = documents.for_month(params[:year].to_i, params[:month].to_i)
