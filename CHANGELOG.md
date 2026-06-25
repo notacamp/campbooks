@@ -57,6 +57,20 @@ major, minor, or patch change here.
 
 - Drag-and-drop and tap-to-move no longer offer Sent or Drafts as destinations (moving received mail into outbound/compose folders made no sense).
 
+### Security
+
+- AI features now only process your data through a provider your workspace has
+  explicitly configured (or, on a self-hosted install, the operator's own API
+  keys). Two fallbacks that could route content to a shared platform provider you
+  never chose are now closed on the hosted product: the text-AI surfaces (Scout
+  chat, triage, classification, replies, contact analysis) no longer fall back to
+  a shared Anthropic key, and embeddings (semantic search, tag suggestions) no
+  longer fall back to a shared OpenAI/Gemini key. When no provider is configured a
+  feature now does nothing rather than silently using one. Self-hosted behavior is
+  unchanged — those keys are the operator's own and stay on their infrastructure.
+  Part of the data-governance work giving users control over which AI sees their
+  data.
+
 ## [0.1.0] - 2026-06-25
 
 ### Added

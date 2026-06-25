@@ -17,7 +17,7 @@ module Ai
     MANAGED_VISION_ADAPTER_NAME = "Campbooks AI — Documents".freeze
 
     # The capabilities a feature can require. Each AI surface maps to exactly one:
-    #   • :text       — chat/triage/replies/reminders (legacy Anthropic fallback exists)
+    #   • :text       — chat/triage/replies/reminders (self-hosted-only legacy Anthropic fallback)
     #   • :documents  — PDF/image vision analysis (no fallback; DB config required)
     #   • :embeddings — semantic search & tag classification (OpenAI/Gemini only)
     CAPABILITIES = %i[text documents embeddings].freeze
@@ -119,12 +119,14 @@ module Ai
       text
     end
 
-    # Text AI is usable: a text purpose is configured, (self-hosted) an env key
-    # can stand in, or the global ANTHROPIC_API_KEY drives the legacy fallback
-    # (Ai::*ChatService#call_legacy → Anthropic::Client.new, works in any env).
+    # Text AI is usable: a text purpose is configured, or (self-hosted) the
+    # operator's own env key stands in via the legacy Anthropic fallback. The bare
+    # shared ANTHROPIC_API_KEY is no longer counted on the cloud — the legacy
+    # fallback only fires on self-hosted now (Ai::LegacyFallback) — so "available"
+    # tracks a real configured/managed provider rather than a silent platform key.
     # This is the gate for "AI is set up" — see SetupStatus.
     def text_available?
-      text_configured? || self_hosted_env_provider? || ENV["ANTHROPIC_API_KEY"].present?
+      text_configured? || self_hosted_env_provider?
     end
 
     def text_configured?
@@ -149,11 +151,13 @@ module Ai
     end
 
     # Embeddings (semantic search + tag classification) only run on OpenAI/Gemini.
-    # EmbeddingService resolves a workspace adapter first, then falls back to the
-    # OPENAI_API_KEY/GEMINI_API_KEY env keys in ANY environment, so we mirror that.
+    # EmbeddingService resolves a workspace adapter first; its env-key fallback is
+    # self-hosted only (the operator's own key), so on the cloud "available" means a
+    # configured OpenAI/Gemini adapter exists (managed workspaces have one) — never
+    # a silent platform key. Mirrors EmbeddingService#env_fallback_adapter.
     def embeddings_available?
       @workspace.ai_adapters.enabled.where(provider: ::EmbeddingService::EMBEDDING_PROVIDERS).exists? ||
-        ENV["OPENAI_API_KEY"].present? || ENV["GEMINI_API_KEY"].present?
+        (Rails.application.config.self_hosted && (ENV["OPENAI_API_KEY"].present? || ENV["GEMINI_API_KEY"].present?))
     end
 
     # Strict embeddings check (a workspace adapter, or the operator's own env key
