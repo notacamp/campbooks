@@ -57,6 +57,18 @@ module ApplicationHelper
     "#{MARKETING_BASE_URL}#{path}"
   end
 
+  # URL for the public REST API reference, linked from Settings → API access.
+  # Defaults to the source-available guide on GitHub so self-hosters always have
+  # a working link; the hosted cloud overrides API_DOCS_URL to point at the
+  # rendered reference on the docs site.
+  API_DOCS_URL = ENV.fetch(
+    "API_DOCS_URL", "https://github.com/notacamp/campbooks/blob/main/docs/api.md"
+  ).freeze
+
+  def api_docs_url
+    API_DOCS_URL
+  end
+
   # Localized label for an enum value, looked up at
   # activerecord.attributes.<model>.<attribute_plural>.<value> (e.g.
   # activerecord.attributes.document.statuses.processed). Falls back to a
@@ -138,6 +150,27 @@ module ApplicationHelper
       t("helpers.date.last_month")
     else
       l(date, format: :section)
+    end
+  end
+
+  # Locale-independent slug for a date's section, mirroring the buckets in
+  # date_section_label. Used as a stable DOM key so a section's checkbox and its
+  # rows match across renders (and infinite-scroll pages) regardless of locale.
+  def date_section_key(date)
+    return unless date
+    today = Date.current
+    d = date.to_date
+
+    if d == today
+      "today"
+    elsif d >= today.beginning_of_week
+      "this-week"
+    elsif d >= today.beginning_of_month
+      "this-month"
+    elsif d >= (today - 1.month).beginning_of_month
+      "last-month"
+    else
+      date.strftime("%Y-%m")
     end
   end
 
@@ -244,11 +277,11 @@ module ApplicationHelper
     threads.each do |thread|
       latest = thread.latest_message
       next unless latest&.received_at
-      label = date_section_label(latest.received_at)
-      sections[label] ||= []
-      sections[label] << thread
+      key = date_section_key(latest.received_at)
+      sections[key] ||= { key: key, label: date_section_label(latest.received_at), threads: [] }
+      sections[key][:threads] << thread
     end
-    sections.map { |label, threads| { label: label, threads: threads } }
+    sections.values
   end
 
   public

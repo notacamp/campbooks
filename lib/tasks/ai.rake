@@ -60,4 +60,26 @@ namespace :ai do
     end
     puts "Enqueued #{enqueued} EmailRetagJob(s)."
   end
+
+  desc "Route every workspace's document analysis to Anthropic (Claude) — the vision " \
+       "model that reads full multi-page PDFs natively (replacing OpenAI's page-1 " \
+       "rasterization). DRY_RUN=true previews; WORKSPACE_ID=<id> scopes. Skips managed-AI " \
+       "and already-Anthropic workspaces. Idempotent."
+  task route_documents_to_anthropic: :environment do
+    dry_run = ENV.fetch("DRY_RUN", "true") != "false"
+    ws_id   = ENV["WORKSPACE_ID"]&.to_i
+    banner  = dry_run ? "DRY RUN (set DRY_RUN=false to apply)" : "APPLYING CHANGES"
+    puts "=== ai:route_documents_to_anthropic — #{banner} ==="
+
+    changes = Ai::DocumentProviderRouter.run(dry_run: dry_run, only_workspace_id: ws_id)
+    changes.each do |c|
+      if c[:skipped]
+        puts "  ws ##{c[:workspace_id]}: skip — #{c[:skipped]}"
+      else
+        puts "  ws ##{c[:workspace_id]}: #{c[:from]} -> #{c[:to]} (#{c[:model]})"
+      end
+    end
+    applied = changes.count { |c| !c[:skipped] }
+    puts "\n#{dry_run ? 'Would route' : 'Routed'} #{applied} workspace(s) to Anthropic."
+  end
 end

@@ -207,7 +207,7 @@ module Ai
           max_tokens: max_tokens,
           temperature: config[:temperature]
         )
-      else
+      elsif Ai::LegacyFallback.allowed?
         client = Anthropic::Client.new
         response = client.messages.create(
           model: MODEL,

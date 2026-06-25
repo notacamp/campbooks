@@ -25,6 +25,7 @@ module Documents
 
       @workspace.documents
                 .needs_review
+                .reviewable_attachment
                 .includes(:classification)
                 .with_attached_original_file
                 .order(Arel.sql("ai_confidence_score ASC NULLS FIRST, created_at ASC"))
