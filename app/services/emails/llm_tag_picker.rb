@@ -54,7 +54,7 @@ module Emails
           max_tokens: 8,
           temperature: 0
         )
-      else
+      elsif Ai::LegacyFallback.allowed?
         client = Anthropic::Client.new
         resp = client.messages.create(
           model: "claude-haiku-4-5",
