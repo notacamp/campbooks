@@ -65,6 +65,9 @@ fr:
       delete_confirm: 'Supprimer le dossier %{name} ? Vos e-mails et les dossiers du fournisseur ne sont pas affectés.'
       edit_title: Paramètres du dossier
       icon_label: Icône du dossier
+      move_label: Déplacer vers
+      toggle: Afficher/masquer les sous-dossiers
+      top_level: Niveau supérieur
     icon_picker:
       default: Par défaut
       label: Choisir une icône

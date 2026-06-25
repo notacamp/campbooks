@@ -19,4 +19,14 @@ RSpec.describe Campbooks::FolderPaneCustomFolders, type: :component do
     expect(html).to match(/value="currency-dollar"[^>]*checked/)
     expect(html).to include("folder-edit#open")
   end
+
+  it "renders nested folders as a collapsible tree with a move selector" do
+    parent = build_stubbed(:mail_folder, name: "Work", icon: "briefcase")
+    child = build_stubbed(:mail_folder, name: "Clients", icon: "folder", parent_id: parent.id)
+    html = render_section([ parent, child ])
+    expect(html).to include("folder-tree#toggle")
+    expect(html).to include('data-folder-tree-target="children"')
+    expect(html).to include('name="mail_folder[parent_id]"')
+    expect(html).to include("Top level")
+  end
 end

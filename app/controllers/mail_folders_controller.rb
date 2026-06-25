@@ -72,7 +72,7 @@ class MailFoldersController < ApplicationController
   end
 
   def update_params
-    params.require(:mail_folder).permit(:icon)
+    params.require(:mail_folder).permit(:icon, :parent_id)
   end
 
   def updated_streams
