@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-26
+
 ### Added
 
 - **Auto-ingest document links from emails** — when an email body contains
