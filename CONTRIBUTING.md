@@ -115,6 +115,26 @@ fix(threading): stop multi-sender conversations splitting in the feed
 docs(self-hosting): clarify FORCE_SSL behind a TLS proxy
 ```
 
+### Signed commits
+
+`main` requires **verified (signed) commits** — an unsigned commit is rejected
+when your PR is merged. Set this up once; SSH signing with a key you already have
+is simplest:
+
+```bash
+git config --global gpg.format ssh
+git config --global user.signingkey ~/.ssh/id_ed25519.pub   # your public key
+git config --global commit.gpgsign true
+```
+
+Then add that **same public key** to GitHub as a **Signing Key** (Settings → SSH
+and GPG keys → New SSH key → Key type: *Signing Key*) — this is separate from an
+authentication key, even if it's the same key. Confirm with
+`git log --show-signature -1`; GitHub shows a **Verified** badge once the key is
+registered. Prefer GPG or a hardware key? See GitHub's
+[commit signature verification](https://docs.github.com/authentication/managing-commit-signature-verification)
+guide.
+
 ---
 
 ## Quality gates (run before you push)

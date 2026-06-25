@@ -28,6 +28,8 @@
       [CONTRIBUTING.md](../CONTRIBUTING.md#-first-the-one-rule-that-matters-most-keep-this-repo-clean)).
 - [ ] CI is green locally: `bin/rubocop`, `bin/brakeman --no-pager`,
       `bin/bundler-audit`, `bin/importmap audit`, `bin/rails db:test:prepare test`.
+- [ ] Commits are **signed** — `main` requires verified signatures
+      ([how to set it up](../CONTRIBUTING.md#signed-commits)).
 - [ ] Tests added/updated for the change.
 - [ ] [`CHANGELOG.md`](../CHANGELOG.md) updated under `[Unreleased]`
       (or N/A: internal-only change).
