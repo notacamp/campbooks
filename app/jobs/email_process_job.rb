@@ -48,6 +48,11 @@ class EmailProcessJob < ApplicationJob
       process_attachments(email, mail_client)
     end
 
+    # Ingest direct document links from the email body (issue #56).
+    # Skipped on re-process to avoid redundant fetches; re-runs are
+    # idempotent (content-hash dedup) regardless.
+    Emails::DocumentLinkIngester.new(email).call unless was_already_processed
+
     # Until the workspace has set up a text provider, ingest the message but run
     # NO analysis — triage, classification, contact analysis, and reminder
     # extraction are all skipped. Uses the STRICT gate (Ai::ProviderSetup.configured?)
