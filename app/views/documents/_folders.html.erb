@@ -1,0 +1,24 @@
+<%# The folders this document is filed into (Stage 3 "filesystem" layer) + an add
+    control. Re-rendered by FolderMembershipsController on add/remove. Locals: document. %>
+<div id="<%= dom_id(document, :folders) %>" class="flex flex-wrap items-center gap-1.5">
+  <span class="text-xs font-medium text-muted-foreground"><%= t(".label") %></span>
+  <% document.folder_memberships.includes(:mail_folder).each do |fm| %>
+    <span class="inline-flex items-center gap-1 rounded-full bg-muted py-0.5 pl-2 pr-1 text-xs text-foreground">
+      <%= render(Campbooks::Icon.new(fm.mail_folder.display_icon, css_class: "w-3.5 h-3.5")) %>
+      <%= fm.mail_folder.name %>
+      <%= button_to "×", folder_membership_path(fm), method: :delete,
+            form: { class: "inline-flex" }, aria: { label: t(".remove", name: fm.mail_folder.name) },
+            class: "flex h-4 w-4 items-center justify-center rounded-full border-0 bg-transparent leading-none text-muted-foreground hover:bg-background hover:text-red-600 cursor-pointer" %>
+    </span>
+  <% end %>
+  <% available = Current.workspace.mail_folders.ordered.where.not(id: document.mail_folders.select(:id)) %>
+  <% if available.any? %>
+    <%= form_with url: folder_memberships_path, method: :post, class: "inline-flex" do |f| %>
+      <%= f.hidden_field :folderable_id, value: document.id %>
+      <%= f.hidden_field :folderable_type, value: "Document" %>
+      <%= f.select :mail_folder_id, options_for_select(available.map { |mf| [ mf.name, mf.id ] }),
+            { prompt: t(".add_prompt") },
+            { class: "rounded-md border-gray-300 py-1 pl-2 pr-7 text-xs", onchange: "this.form.requestSubmit()" } %>
+    <% end %>
+  <% end %>
+</div>

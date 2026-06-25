@@ -67,6 +67,10 @@ pt:
         invoice_number: Número de Factura
         tax_amount_cents: Montante de IVA (cêntimos)
         tax_rate: Taxa de IVA (%)
+    folders:
+      add_prompt: Adicionar à pasta…
+      label: Pastas
+      remove: Remover de %{name}
     index:
       accepted_formats: PDF, JPG, PNG, WEBP, HEIC
       click_to_upload: Clique para carregar
@@ -95,9 +99,11 @@ pt:
       exports_col_status: Estado
       exports_heading: Exportações
       filter_all_categories: Todas as categorias
+      filter_all_folders: Todas as pastas
       filter_all_statuses: Todos os estados
       filter_all_types: Todos os tipos
       filter_category: Categoria
+      filter_folder: Pasta
       filter_month: Mês
       filter_status: Estado
       filter_type: Tipo

@@ -68,6 +68,10 @@ fr:
         invoice_number: Numéro de facture
         tax_amount_cents: Montant de la taxe (centimes)
         tax_rate: Taux de taxe (%)
+    folders:
+      add_prompt: Ajouter au dossier…
+      label: Dossiers
+      remove: Retirer de %{name}
     index:
       accepted_formats: PDF, JPG, PNG, WEBP, HEIC
       click_to_upload: Cliquer pour téléverser
@@ -96,9 +100,11 @@ fr:
       exports_col_status: Statut
       exports_heading: Exports
       filter_all_categories: Toutes les catégories
+      filter_all_folders: Tous les dossiers
       filter_all_statuses: Tous les statuts
       filter_all_types: Tous les types
       filter_category: Catégorie
+      filter_folder: Dossier
       filter_month: Mois
       filter_status: Statut
       filter_type: Type
