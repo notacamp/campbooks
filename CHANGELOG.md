@@ -18,12 +18,19 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Auto-ingest document links from emails** — when an email body contains
+  direct links to downloadable files (PDFs, Office documents, spreadsheets,
+  CSVs), Campbooks now downloads them safely and creates Documents that flow
+  through the same AI analysis pipeline as regular attachments. Fetching is
+  SSRF-guarded (UrlGuard), content-type-verified, size-capped (25 MB),
+  and per-link failures are isolated so one broken link never blocks the
+  rest. Cloud-share links (Google Drive, Dropbox, WeTransfer) are deliberately
+  skipped in this first iteration. \[#56\]
 - **EU data residency** (Settings → Data & Privacy) — an opt-in workspace policy that
   restricts AI processing to EU-region providers. When on, only EU providers may be used:
   text AI continues on an EU provider (Mistral), while document AI and semantic search —
   which have no EU provider yet — **pause** rather than send data to a US provider. The
   page shows a "Paused" badge on each affected AI task so it's never silent.
-
 - **Complete data export** (Settings → Account → "Your data") — your data export is now
   assembled in the background as a downloadable archive that includes your actual email
   content, attachments, and document files (not just a JSON summary). You're notified when
@@ -157,6 +164,15 @@ major, minor, or patch change here.
 ## [0.1.0] - 2026-06-25
 
 ### Added
+
+- **Auto-ingest document links from emails** — when an email body contains
+  direct links to downloadable files (PDFs, Office documents, spreadsheets,
+  CSVs), Campbooks now downloads them safely and creates Documents that flow
+  through the same AI analysis pipeline as regular attachments. Fetching is
+  SSRF-guarded (UrlGuard), content-type-verified, size-capped (25 MB),
+  and per-link failures are isolated so one broken link never blocks the
+  rest. Cloud-share links (Google Drive, Dropbox, WeTransfer) are deliberately
+  skipped in this first iteration. \[#56\]
 
 - Initial public, source-available release of Campbooks.
 
