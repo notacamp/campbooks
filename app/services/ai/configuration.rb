@@ -13,6 +13,7 @@ module Ai
 
       {
         adapter: adapter.adapter_instance,
+        provider: adapter.provider,
         model: mapping.model,
         max_tokens: mapping.max_tokens,
         temperature: mapping.temperature,

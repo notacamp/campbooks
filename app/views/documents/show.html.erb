@@ -200,6 +200,12 @@
         <% end %>
       </div>
 
+      <% if (prov = @document.ai_extraction_data&.dig("_provenance")).present? && prov["provider"].present? %>
+        <div class="px-4 py-1.5 border-b border-border">
+          <%= render(Campbooks::AiProvenanceNote.new(provenance: prov)) %>
+        </div>
+      <% end %>
+
       <% if (mem = @document.ai_extraction_data&.dig("classification_memory")).present? %>
         <div class="px-4 py-2 border-b border-border bg-muted/40">
           <p class="text-xs text-muted-foreground flex items-start gap-1.5">

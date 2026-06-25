@@ -37,6 +37,7 @@ module Campbooks
         div(class: "flex flex-col #{align_reverse? ? 'items-end' : 'items-start'} flex-1 min-w-0") do
           header
           body
+          provenance_note
           draft_badge if @message.draft?
           actions if show_actions?
           followups if show_followups?
@@ -77,6 +78,15 @@ module Campbooks
         span(class: "text-[12px] font-semibold text-foreground") { @message.author_name }
         ai_badge if comments? && from_ai?
         span(class: "text-[11px] text-muted-foreground") { t(".time_ago", time: helpers.time_ago_in_words(@message.created_at)) }
+      end
+    end
+
+    # The provider/region that produced this AI reply — data-governance transparency.
+    def provenance_note
+      return unless from_ai? && @message.ai_provenance&.dig("provider").present?
+
+      div(class: "px-0.5 mt-1") do
+        render Campbooks::AiProvenanceNote.new(provenance: @message.ai_provenance)
       end
     end
 
