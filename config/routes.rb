@@ -155,6 +155,9 @@ Rails.application.routes.draw do
   # User-submitted bug reports (in-app "Report a bug" widget).
   resources :bug_reports, only: [ :create ]
 
+  # Browser CSP violation reports (the policy's report-uri target).
+  post "csp-reports" => "security/csp_reports#create"
+
   # Global AI Agent Chat
   resource :scout, only: [ :show, :create ], controller: "agent_chat" do
     resources :threads, only: [ :show, :create, :update, :destroy ], controller: "agent_threads" do
