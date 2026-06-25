@@ -140,7 +140,7 @@ module GoogleDrive
     end
 
     def escape_query(str)
-      str.gsub("'", "\\'")
+      str.gsub("'") { "\\'" }
     end
   end
 
