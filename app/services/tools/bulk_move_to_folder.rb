@@ -35,7 +35,22 @@ module Tools
         thread_id_set.concat(msgs.map(&:email_thread_id).compact)
       end
 
+      record_email_memberships(folder_name, messages) if folder_name.present?
+
       { count: moved, folder_id: folder_id, folder_name: folder_name, thread_ids: thread_id_set.uniq }
+    end
+
+    # Forward-record local folder membership for the moved emails (the Stage 3
+    # "filesystem" layer). Best-effort — the provider move is the source of truth,
+    # so a failure here never breaks the move. No backfill: only emails filed via
+    # the app land in the join, while the folder view still reads emails by provider.
+    def self.record_email_memberships(folder_name, messages)
+      folder = Current.user&.workspace&.mail_folders&.find_by("LOWER(name) = ?", folder_name.downcase)
+      return unless folder
+
+      messages.each { |message| folder.folder_memberships.find_or_create_by!(folderable: message) }
+    rescue => e
+      Rails.logger.warn("[BulkMoveToFolder] folder membership recording failed: #{e.message}")
     end
   end
 end

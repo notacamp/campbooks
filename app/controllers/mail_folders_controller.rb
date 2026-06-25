@@ -44,14 +44,17 @@ class MailFoldersController < ApplicationController
     end
   end
 
-  # Update a custom folder's icon. Renaming is deferred until provider folder
-  # rename lands (a custom folder maps to provider folders by name), so this is
-  # local-only — no provider call; the chip + pane row re-render with the glyph.
+  # Update a custom folder's icon, parent, and/or name. A name change renames the
+  # real provider folder on every connected account (found by its OLD name in the
+  # mirror) — see MailFolders::Provisioner.rename_all. Inline like create, so the
+  # rename takes effect immediately; the chip + pane row re-render with the result.
   def update
     @mail_folder = Current.user.workspace.mail_folders.find(params[:id])
+    old_name = @mail_folder.name
 
     respond_to do |format|
       if @mail_folder.update(update_params)
+        MailFolders::Provisioner.rename_all(@mail_folder, old_name, Current.user) if @mail_folder.name != old_name
         format.turbo_stream { render turbo_stream: updated_streams }
         format.html { redirect_to email_messages_path(folder_name: @mail_folder.name) }
       else
@@ -65,6 +68,25 @@ class MailFoldersController < ApplicationController
     end
   end
 
+  # The folder as a "place": its documents (the local folder_memberships join) and
+  # its emails (resolved by name through the provider mirror — the same mechanism the
+  # inbox folder filter uses). Read-only; 404s for a folder outside the workspace.
+  def show
+    @mail_folder = Current.user.workspace.mail_folders.find(params[:id])
+    @documents = @mail_folder.documents.includes(:classification).order(created_at: :desc).limit(100)
+
+    provider_ids = EmailFolder.where(email_account_id: Current.user.readable_email_accounts.select(:id))
+                              .where("LOWER(name) = ?", @mail_folder.name.downcase)
+                              .pluck(:provider_folder_id)
+    @emails = if provider_ids.any?
+      EmailMessage.where(email_account: Current.user.readable_email_accounts)
+                  .where(provider_folder_id: provider_ids)
+                  .order(received_at: :desc).limit(50)
+    else
+      EmailMessage.none
+    end
+  end
+
   private
 
   def mail_folder_params
@@ -72,7 +94,7 @@ class MailFoldersController < ApplicationController
   end
 
   def update_params
-    params.require(:mail_folder).permit(:icon, :parent_id)
+    params.require(:mail_folder).permit(:icon, :parent_id, :name)
   end
 
   def updated_streams
@@ -99,8 +121,9 @@ class MailFoldersController < ApplicationController
   # current set, so the desktop pane stays in sync when the chip bar can't (the
   # two surfaces share no DOM node — see FolderPaneCustomFolders).
   def pane_custom_folders_html
+    folders = Current.user.workspace.mail_folders.ordered.to_a
     render_to_string(
-      Campbooks::FolderPaneCustomFolders.new(custom_folders: Current.user.workspace.mail_folders.ordered),
+      Campbooks::FolderPaneCustomFolders.new(custom_folders: folders, document_counts: MailFolder.document_counts(folders)),
       layout: false
     )
   end

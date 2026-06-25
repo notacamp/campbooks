@@ -196,6 +196,13 @@ en:
         other: Created '%{name}', but couldn't add it to %{count} inboxes
     destroy:
       removed: Removed folder '%{name}'
+    show:
+      back: Back to inbox
+      documents: Documents
+      emails: Emails
+      no_documents: No documents in this folder yet.
+      no_emails: No emails in this folder yet.
+      subtitle: Emails and documents filed in this folder
     update:
       updated: Updated folder '%{name}'
   notifications:

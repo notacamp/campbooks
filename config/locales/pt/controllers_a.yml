@@ -199,6 +199,13 @@ pt:
         other: "'%{name}' criada, mas não foi possível adicioná-la a %{count} caixas"
     destroy:
       removed: Pasta '%{name}' removida
+    show:
+      back: Voltar à caixa de entrada
+      documents: Documentos
+      emails: Emails
+      no_documents: Ainda não há documentos nesta pasta.
+      no_emails: Ainda não há emails nesta pasta.
+      subtitle: Emails e documentos arquivados nesta pasta
     update:
       updated: Pasta '%{name}' atualizada
   notifications:

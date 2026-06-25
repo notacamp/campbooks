@@ -63,11 +63,16 @@ fr:
       new_folder: Nouveau dossier
     folder_pane_custom_folders:
       delete_confirm: 'Supprimer le dossier %{name} ? Vos e-mails et les dossiers du fournisseur ne sont pas affectés.'
+      document_count:
+        one: '%{count} document'
+        other: '%{count} documents'
       edit_title: Paramètres du dossier
       icon_label: Icône du dossier
       move_label: Déplacer vers
+      name_label: Nom
       toggle: Afficher/masquer les sous-dossiers
       top_level: Niveau supérieur
+      view_contents: Voir le contenu du dossier
     icon_picker:
       default: Par défaut
       label: Choisir une icône

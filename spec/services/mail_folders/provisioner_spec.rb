@@ -89,4 +89,43 @@ RSpec.describe MailFolders::Provisioner do
       expect(result[:failed].map(&:id)).to contain_exactly(managed.id, managed2.id)
     end
   end
+
+  describe ".rename_all" do
+    let(:mail_folder) { create(:mail_folder, workspace: workspace, name: "Bills") }
+
+    it "renames the Zoho folder (found by old name) and updates the mirror" do
+      account = create(:email_account, workspace: workspace, provider: :zoho)
+      create(:email_account_user, :manager, user: user, email_account: account)
+      create(:email_folder, email_account: account, name: "Receipts", provider_folder_id: "z-7")
+      client = instance_double(Zoho::MailClient)
+      allow(Zoho::MailClient).to receive(:new).and_return(client)
+      expect(client).to receive(:update_folder).with("z-7", "Bills")
+
+      result = described_class.rename_all(mail_folder, "Receipts", user)
+
+      expect(result[:renamed].map(&:id)).to contain_exactly(account.id)
+      expect(account.email_folders.find_by(provider_folder_id: "z-7").name).to eq("Bills")
+    end
+
+    it "renames a Gmail label via update_label" do
+      account = create(:email_account, workspace: workspace, provider: :google)
+      create(:email_account_user, :manager, user: user, email_account: account)
+      create(:email_folder, email_account: account, name: "Receipts", provider_folder_id: "Label_3")
+      client = instance_double(Google::MailClient)
+      allow(Google::MailClient).to receive(:new).and_return(client)
+      expect(client).to receive(:update_label).with("Label_3", name: "Bills")
+
+      described_class.rename_all(mail_folder, "Receipts", user)
+    end
+
+    it "skips accounts with no mirror row for the old name" do
+      account = create(:email_account, workspace: workspace, provider: :zoho)
+      create(:email_account_user, :manager, user: user, email_account: account)
+
+      result = described_class.rename_all(mail_folder, "Receipts", user)
+
+      expect(result[:renamed]).to be_empty
+      expect(result[:failed]).to be_empty
+    end
+  end
 end

@@ -16,6 +16,15 @@ class MailFolder < ApplicationRecord
   has_many :folder_memberships, dependent: :destroy
   has_many :documents, through: :folder_memberships, source: :folderable, source_type: "Document"
 
+  # Maps folder id → number of documents filed into it (for the pane badges).
+  # One grouped query for the whole set, so the pane stays N+1-free.
+  def self.document_counts(folders)
+    ids = Array(folders).map(&:id)
+    return {} if ids.empty?
+
+    FolderMembership.where(mail_folder_id: ids, folderable_type: "Document").group(:mail_folder_id).count
+  end
+
   # A user-defined folder shown as a chip on top of the inbox. Creating one
   # provisions a real provider folder (or Gmail label) on every connected
   # account — see MailFolders::Provisioner. This record is the canonical,

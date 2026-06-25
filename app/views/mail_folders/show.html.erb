@@ -1,0 +1,63 @@
+<% content_for :main_class, "px-4 sm:px-6 lg:px-8 py-6" %>
+
+<div class="mb-4">
+  <%= link_to email_messages_path(folder_name: @mail_folder.name), class: "inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors" do %>
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    <%= t(".back") %>
+  <% end %>
+</div>
+
+<header class="mb-6 flex items-center gap-3">
+  <span class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-muted text-foreground">
+    <%= render(Campbooks::Icon.new(@mail_folder.display_icon, css_class: "w-6 h-6")) %>
+  </span>
+  <div class="min-w-0">
+    <h1 class="truncate text-xl font-bold tracking-tight text-foreground sm:text-2xl"><%= @mail_folder.name %></h1>
+    <p class="text-sm text-muted-foreground"><%= t(".subtitle") %></p>
+  </div>
+</header>
+
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+  <%# Emails in this folder — resolved by name through the provider mirror (the same
+      mechanism the inbox folder filter uses), so every connected account is covered. %>
+  <section class="overflow-hidden rounded-xl border border-gray-200 bg-card shadow-sm">
+    <h2 class="flex items-center gap-2 border-b border-border px-5 py-3 text-sm font-semibold text-foreground">
+      <%= t(".emails") %>
+      <span class="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-muted px-1.5 text-xs font-medium text-muted-foreground"><%= @emails.size %></span>
+    </h2>
+    <% if @emails.any? %>
+      <div class="divide-y divide-border">
+        <% @emails.each do |message| %>
+          <%= render(Campbooks::EmailListItem.new(message: message)) %>
+        <% end %>
+      </div>
+    <% else %>
+      <p class="px-5 py-10 text-center text-sm text-muted-foreground"><%= t(".no_emails") %></p>
+    <% end %>
+  </section>
+
+  <%# Documents filed into this folder — the local folder_memberships join. %>
+  <section class="overflow-hidden rounded-xl border border-gray-200 bg-card shadow-sm">
+    <h2 class="flex items-center gap-2 border-b border-border px-5 py-3 text-sm font-semibold text-foreground">
+      <%= t(".documents") %>
+      <span class="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-muted px-1.5 text-xs font-medium text-muted-foreground"><%= @documents.size %></span>
+    </h2>
+    <% if @documents.any? %>
+      <ul class="divide-y divide-border">
+        <% @documents.each do |doc| %>
+          <li>
+            <%= link_to document_path(doc), class: "flex items-center gap-3 px-5 py-3 hover:bg-muted transition-colors" do %>
+              <svg class="h-5 w-5 flex-shrink-0 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/></svg>
+              <span class="min-w-0 flex-1 truncate text-sm text-foreground"><%= doc.display_title %></span>
+              <% if doc.classification %>
+                <span class="flex-shrink-0 text-xs text-muted-foreground"><%= doc.classification.name %></span>
+              <% end %>
+            <% end %>
+          </li>
+        <% end %>
+      </ul>
+    <% else %>
+      <p class="px-5 py-10 text-center text-sm text-muted-foreground"><%= t(".no_documents") %></p>
+    <% end %>
+  </section>
+</div>

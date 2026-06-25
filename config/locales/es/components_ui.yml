@@ -63,11 +63,16 @@ es:
       new_folder: Nueva carpeta
     folder_pane_custom_folders:
       delete_confirm: '¿Eliminar la carpeta %{name}? Tus correos y las carpetas del proveedor no se modifican.'
+      document_count:
+        one: '%{count} documento'
+        other: '%{count} documentos'
       edit_title: Ajustes de la carpeta
       icon_label: Icono de la carpeta
       move_label: Mover a
+      name_label: Nombre
       toggle: Mostrar/ocultar subcarpetas
       top_level: Nivel superior
+      view_contents: Ver contenido de la carpeta
     icon_picker:
       default: Predeterminado
       label: Elegir un icono
