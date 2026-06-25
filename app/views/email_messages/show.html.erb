@@ -6,7 +6,11 @@
 <% content_for :shortcuts_context, "show" %>
 
 <%= turbo_frame_tag "email_detail", class: "block h-full overflow-hidden" do %>
-  <div class="flex h-full" data-controller="scout-mobile email-mobile inbox-layout" data-email-mobile-breakpoint-value="1024" data-inbox-layout-board-src-value="<%= board_email_messages_path %>">
+  <div class="flex h-full" data-controller="scout-mobile email-mobile inbox-layout new-folder" data-email-mobile-breakpoint-value="1024" data-inbox-layout-board-src-value="<%= board_email_messages_path %>">
+    <%# Desktop folder pane (lg+); the mobile chip bar (below) covers < lg. The pane's
+        "+" and the chip bar's "+" both open this single shared New Folder dialog. %>
+    <%= render(Campbooks::FolderPane.new(system_folders: @common_folders, custom_folders: @mail_folders, current_folder: @current_folder)) %>
+    <%= render(Campbooks::NewFolderModal.new) %>
     <!-- Thread list (mobile: shown in list mode; desktop: always shown) -->
     <%# Below lg the whole pane scrolls so the folder bar + search scroll away
         with the list; at lg+ the pane is fixed and only the inner list scrolls. %>
@@ -22,7 +26,7 @@
          data-panel-resize-max-width-value="560"
          data-panel-resize-min-viewport-value="1024">
       <%= render(Campbooks::ResizeHandle.new(edge: :right)) %>
-      <%= render "mobile_folder_bar" %>
+      <%= render "mobile_folder_bar", with_modal: false, desktop_hidden: true %>
       <%# Live updates for the Skim tray: counts drop as you address mail, and new
           mail appears, without a manual reload. %>
       <%= turbo_stream_from "skim_#{current_user.id}" %>

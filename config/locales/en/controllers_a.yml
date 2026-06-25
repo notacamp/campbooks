@@ -196,6 +196,8 @@ en:
         other: Created '%{name}', but couldn't add it to %{count} inboxes
     destroy:
       removed: Removed folder '%{name}'
+    update:
+      updated: Updated folder '%{name}'
   notifications:
     archive:
       success: Notification archived.
