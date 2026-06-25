@@ -10,10 +10,18 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_25_160000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_25_170000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
+
+  create_table "account_exports", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["user_id"], name: "index_account_exports_on_user_id"
+  end
 
   create_table "action_text_rich_texts", force: :cascade do |t|
     t.text "body"
@@ -1385,6 +1393,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_160000) do
     t.index ["workspace_id"], name: "index_zoho_drive_accounts_on_workspace_id"
   end
 
+  add_foreign_key "account_exports", "users"
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "agent_messages", "agent_threads"

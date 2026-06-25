@@ -18,6 +18,10 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Complete data export** (Settings → Account → "Your data") — your data export is now
+  assembled in the background as a downloadable archive that includes your actual email
+  content, attachments, and document files (not just a JSON summary). You're notified when
+  it's ready. Replaces the previous inline JSON-only download.
 - **AI provenance in context** — every AI output now shows which provider and data
   region produced it ("Processed by Mistral · EU"): on Scout replies, the email
   summary strip, and the document extraction panel. A reusable region badge (EU =

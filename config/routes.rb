@@ -220,7 +220,8 @@ Rails.application.routes.draw do
       patch :writing_style
       post :analyze_writing_style
       get :delete
-      get :export
+      post :export
+      get :download_export
     end
     # Two-factor authentication management (opt-in second factors).
     resource :security, only: [ :show ], controller: "security" do

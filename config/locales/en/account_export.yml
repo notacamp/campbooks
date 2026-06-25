@@ -1,0 +1,18 @@
+---
+en:
+  settings:
+    account:
+      show:
+        data_export_download: Download
+        data_export_preparing: "Preparing your export — we'll notify you when it's ready."
+      export:
+        export_queued: "We're preparing your data export. We'll notify you when it's ready."
+      download_export:
+        export_not_ready: Your export isn't ready yet.
+  notifier:
+    account_export_ready:
+      title: Data export ready
+      body: "Your data export is ready to download from Settings → Account."
+    account_export_failed:
+      title: Data export failed
+      body: Something went wrong preparing your data export. Please try again.
