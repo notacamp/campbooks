@@ -187,8 +187,9 @@ class DocumentsController < ApplicationController
   end
 
   def push_to_zoho_drive
-    mapping = DriveFolderMapping.find_by(document_type_id: @document.document_type_id)
-    mapping ||= DriveFolderMapping.find_by(document_type_id: nil, zoho_drive_account: ZohoDriveAccount.active.first)
+    accounts = Current.workspace.zoho_drive_accounts.active
+    mapping = DriveFolderMapping.where(zoho_drive_account: accounts).find_by(document_type_id: @document.document_type_id)
+    mapping ||= DriveFolderMapping.where(zoho_drive_account: accounts).find_by(document_type_id: nil)
     unless mapping
       redirect_to @document, error: t(".no_mapping") and return
     end
