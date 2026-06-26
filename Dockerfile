@@ -49,6 +49,8 @@ RUN --mount=type=secret,id=cloud_bundle_token \
     if [ -s /run/secrets/cloud_bundle_token ]; then \
       bundle config set --global github.com "x-access-token:$(cat /run/secrets/cloud_bundle_token)" && \
       export BUNDLE_WITH=cloud; \
+    else \
+      bundle config set --local without cloud; \
     fi && \
     bundle install && \
     rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git && \
