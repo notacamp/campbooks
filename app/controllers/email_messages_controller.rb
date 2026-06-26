@@ -304,7 +304,7 @@ class EmailMessagesController < ApplicationController
   end
 
   def workspace_tags
-    @workspace_tags ||= Current.user.workspace.tags.by_name.to_a
+    @workspace_tags ||= Tag.visible_for(Current.workspace).by_name.to_a
   end
 
   # Search params the bar may submit. `q` is the free-text relevance query; the

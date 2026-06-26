@@ -33,7 +33,10 @@ en:
         labels_option: Labels
         no_accounts: No email accounts connected yet.
         show_heading: Show
+        show_system_labels: Show system labels (Inbox, Personal, Promotions…)
         subheading: How your inbox looks on this device. Saved in this browser.
+        system_labels_heading: System labels
+        system_labels_hint: Labels from your connected mailbox (Gmail). Hidden by default — turn on to see them as tags.
     filtering:
       show:
         allowed_heading: Allowed senders
