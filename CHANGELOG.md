@@ -82,6 +82,14 @@ major, minor, or patch change here.
   Settings → API access now links to the documentation (the URL is configurable
   via `API_DOCS_URL`).
 
+- Real-time inbox sync: email CRUD changes (new mail, archive, snooze, trash, pin,
+  tag, read/unread, folder moves, sender blocks) now reflect live across every open
+  inbox — across browser tabs, devices, and teammates sharing a mailbox — without a
+  manual reload. Uses the app's existing Solid Cable + Turbo Stream infrastructure;
+  broadcasts are targeted and permission-scoped, so users only see changes on the
+  mailboxes they can read.
+
+
 ### Fixed
 
 - Closing the event editor now works when it's opened as a full page (a direct
@@ -165,6 +173,11 @@ major, minor, or patch change here.
   the open-source core stays free of managed-service code. (Prometheus `/metrics`
   observability, briefly added here, moved into that package and is no longer part
   of the open-source build.)
+- Inbox thread-list Turbo responses (archive, unarchive, pin, snooze) no longer
+  duplicate the live broadcast — the per-user cable broadcast owns the row
+  insertion/removal, so the acting tab's request response is simpler and the
+  two can't race.
+
 
 ## [0.1.0] - 2026-06-25
 
