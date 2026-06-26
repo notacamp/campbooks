@@ -35,8 +35,11 @@ es:
         labels_option: Etiquetas
         no_accounts: Aún no hay cuentas de correo conectadas.
         show_heading: Mostrar
+        show_system_labels: Mostrar etiquetas del sistema (Principal, Personal, Promociones…)
         subheading: Cómo se ve su bandeja de entrada en este dispositivo. Guardado
           en este navegador.
+        system_labels_heading: Etiquetas del sistema
+        system_labels_hint: Etiquetas de su buzón conectado (Gmail). Ocultas por defecto — actívelas para verlas.
     filtering:
       show:
         allowed_heading: Remitentes permitidos

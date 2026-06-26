@@ -26,6 +26,15 @@ class Tag < ApplicationRecord
 
   enum :source, { local: 0, external: 1 }
 
+  # Exclude system labels (INBOX, CATEGORY_PERSONAL, …) unless the workspace has
+  # opted in via Settings → Inbox → "Show system labels". User-created and local
+  # tags are always visible.
+  scope :excluding_system_labels, -> { where(system_label: false) }
+
+  def self.visible_for(workspace)
+    workspace&.setting("show_system_labels") ? all : excluding_system_labels
+  end
+
   validates :name, presence: true
   validates :color, presence: true
   validates :name, uniqueness: { scope: :email_account_id }, if: :external?
