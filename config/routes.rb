@@ -276,7 +276,8 @@ Rails.application.routes.draw do
   # Inbox settings — the gear-icon management modal on the email page. Each
   # action renders a panel into the modal's Turbo Frame (inbox_settings_panel).
   namespace :inbox_settings do
-    get "display", to: "display#show", as: :display
+    get "display", to: "display#show",   as: :display
+    patch "display", to: "display#update", as: :display_update
 
     # Inbox filtering strategy (whitelist/blacklist) + blocked/starred/allowed
     # sender management.

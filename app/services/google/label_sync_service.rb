@@ -11,14 +11,20 @@ module Google
 
       google_labels.each do |gl|
         external_id = gl["id"]
-        name = gl["name"]
-        color = extract_color(gl)
+        sys = @client.respond_to?(:system_label?) && @client.system_label?(external_id)
+
+        # Humanize system-label names (CATEGORY_PERSONAL → "Personal") and use a
+        # muted colour palette so they blend into the UI rather than competing with
+        # user-created tags. Hidden by default in the inbox (see Tag.visible).
+        name  = sys ? humanize_system_label(gl["name"]) : gl["name"]
+        color = sys ? system_label_color(gl["name"])     : extract_color(gl)
 
         tag = Tag.find_or_initialize_by(
           email_account_id: @account.id,
           external_label_id: external_id
         )
-        tag.assign_attributes(name: name, color: color, source: :external, workspace: @account.workspace)
+        tag.assign_attributes(name: name, color: color, source: :external,
+                              workspace: @account.workspace, system_label: sys)
         tag.save!
       end
 
@@ -30,6 +36,36 @@ module Google
     end
 
     private
+
+    # ── System-label helpers ────────────────────────────────────────────────
+
+    SYSTEM_LABEL_NAMES = {
+      "INBOX" => "Inbox", "SENT" => "Sent", "DRAFT" => "Drafts",
+      "TRASH" => "Trash", "SPAM" => "Spam", "UNREAD" => "Unread",
+      "IMPORTANT" => "Important", "STARRED" => "Starred",
+      "CHAT" => "Chat", "SNOOZED" => "Snoozed",
+      "CATEGORY_PERSONAL" => "Personal", "CATEGORY_SOCIAL" => "Social",
+      "CATEGORY_PROMOTIONS" => "Promotions", "CATEGORY_UPDATES" => "Updates",
+      "CATEGORY_FORUMS" => "Forums"
+    }.freeze
+
+    SYSTEM_LABEL_COLORS = {
+      "INBOX" => "#8FA4B0", "SENT" => "#8FA4B0", "DRAFT" => "#8FA4B0",
+      "TRASH" => "#8FA4B0", "SPAM" => "#C49585", "UNREAD" => "#8FA4B0",
+      "IMPORTANT" => "#C99D9D", "STARRED" => "#B8A870",
+      "CHAT" => "#8FA4B0", "SNOOZED" => "#8FA4B0",
+      "CATEGORY_PERSONAL" => "#8B9DC3", "CATEGORY_SOCIAL" => "#8BA89B",
+      "CATEGORY_PROMOTIONS" => "#B0987A", "CATEGORY_UPDATES" => "#A898B8",
+      "CATEGORY_FORUMS" => "#C4957A"
+    }.freeze
+
+    def humanize_system_label(name)
+      SYSTEM_LABEL_NAMES[name] || name.titleize
+    end
+
+    def system_label_color(name)
+      SYSTEM_LABEL_COLORS[name] || "#8FA4B0"
+    end
 
     def extract_color(label)
       bg = label.dig("color", "backgroundColor")

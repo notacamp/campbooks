@@ -32,7 +32,8 @@ module Campbooks
 
         # Right side: tags + date
         div(class: "flex items-center gap-1.5 flex-shrink-0") do
-          @message.tags.first(2).each do |tag|
+          tags = Tag.visible_for(Current.workspace).where(id: @message.tags.select(:id))
+          tags.first(2).each do |tag|
             span(
               class: "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium",
               style: "background-color: #{tag.color}20; color: #{tag.color}"
