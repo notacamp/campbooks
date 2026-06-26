@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_25_190000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_26_013609) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -140,8 +140,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_190000) do
     t.bigint "user_id"
     t.index ["action"], name: "index_audit_events_on_action"
     t.index ["target_type", "target_id"], name: "index_audit_events_on_target"
-    t.index ["user_id"], name: "index_audit_events_on_user_id"
     t.index ["user_id", "created_at"], name: "index_audit_events_on_user_id_and_created_at"
+    t.index ["user_id"], name: "index_audit_events_on_user_id"
   end
 
   create_table "beta_codes", force: :cascade do |t|
@@ -1236,12 +1236,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_25_190000) do
     t.string "group_name"
     t.string "name"
     t.integer "source", default: 0, null: false
+    t.boolean "system_label", default: false, null: false
     t.datetime "updated_at", null: false
     t.bigint "workspace_id"
     t.index ["email_account_id", "external_label_id"], name: "idx_tags_on_account_and_external_label_id", unique: true, where: "(external_label_id IS NOT NULL)"
     t.index ["email_account_id", "name"], name: "idx_tags_on_account_and_name", unique: true, where: "(email_account_id IS NOT NULL)"
     t.index ["email_account_id"], name: "index_tags_on_email_account_id"
     t.index ["external_label_id"], name: "index_tags_on_external_label_id"
+    t.index ["system_label"], name: "index_tags_on_system_label", where: "(system_label = true)"
     t.index ["workspace_id", "group_name"], name: "index_tags_on_workspace_id_and_group_name"
     t.index ["workspace_id"], name: "index_tags_on_workspace_id"
   end
