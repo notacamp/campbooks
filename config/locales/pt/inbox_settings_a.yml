@@ -33,8 +33,11 @@ pt:
         labels_option: Etiquetas
         no_accounts: Ainda não há contas de email ligadas.
         show_heading: Mostrar
+        show_system_labels: Mostrar etiquetas do sistema (Principal, Pessoal, Promoções…)
         subheading: Como a sua caixa de entrada aparece neste dispositivo. Guardado
           neste browser.
+        system_labels_heading: Etiquetas do sistema
+        system_labels_hint: Etiquetas da sua caixa de correio (Gmail). Ocultas por predefinição — ative para vê-las.
     filtering:
       show:
         allowed_heading: Remetentes permitidos

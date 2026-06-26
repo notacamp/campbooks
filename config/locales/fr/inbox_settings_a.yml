@@ -35,8 +35,11 @@ fr:
         labels_option: Étiquettes
         no_accounts: Aucun compte e-mail connecté pour l'instant.
         show_heading: Afficher
+        show_system_labels: Afficher les étiquettes système (Boîte de réception, Personnel, Promotions…)
         subheading: L'apparence de votre boîte de réception sur cet appareil. Enregistré
           dans ce navigateur.
+        system_labels_heading: Étiquettes système
+        system_labels_hint: Étiquettes de votre messagerie (Gmail). Masquées par défaut — activez pour les voir.
     filtering:
       show:
         allowed_heading: Expéditeurs autorisés
