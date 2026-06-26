@@ -14,6 +14,13 @@
        data-panel-resize-min-viewport-value="1024">
     <%= render(Campbooks::ResizeHandle.new(edge: :right)) %>
     <%= render "mobile_folder_bar" %>
+    <%# Live inbox sync — see Emails::InboxBroadcaster and the note in show.html.erb.
+        Filter-safe row ops on every view; new-mail/restore inserts only on the
+        unfiltered default inbox. %>
+    <%= turbo_stream_from "inbox_#{current_user.id}" %>
+    <% unless @search_active || @current_group.present? || params[:folder_id].present? || params[:folder_name].present? %>
+      <%= turbo_stream_from "inbox_feed_#{current_user.id}" %>
+    <% end %>
     <%= render(Campbooks::EmailSearchBar.new(search_params: @search_params, folders: @folders || [], accounts: @accounts || [], tags: @all_tags || [])) %>
     <!-- Select-all header -->
     <div class="px-3 py-1.5 border-b border-gray-100 flex items-center gap-2 opacity-0 hover:opacity-100 transition-opacity">

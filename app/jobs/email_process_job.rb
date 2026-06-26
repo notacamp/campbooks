@@ -114,6 +114,12 @@ class EmailProcessJob < ApplicationJob
 
     email.processed! unless was_already_processed
 
+    # Live inbox: a freshly-ingested message floats its thread to the top of every
+    # reader's open inbox (and refreshes the row in place where it's already shown).
+    # First ingest only, so a full resync re-walking old mail doesn't re-surface it;
+    # the broadcaster's inbox-folder gate keeps sent-only threads out of the list.
+    Emails::InboxBroadcaster.upsert(thread) if thread && !was_already_processed
+
     WorkflowTriggerJob.perform_later(email.id) if Features.workflows? && !was_already_processed
 
     # Generic domain event (system-originated). Coexists with the dedicated
