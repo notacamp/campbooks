@@ -16,6 +16,13 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- System labels imported from Gmail (IMPORTANT, CATEGORY_PERSONAL, etc.) now get
+  human-readable names (e.g. "Personal"), a muted colour palette, and are **hidden
+  by default** in the inbox tag list. Toggle them back on via the new
+  `show_system_labels` workspace setting.
+
 ## [0.2.0] - 2026-06-26
 
 ### Added
