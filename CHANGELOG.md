@@ -18,6 +18,12 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Document writing tool** — author formatted documents from scratch at
+  **Documents → Write**. Built on the shared rich-text editor with a
+  document-focused toolbar (tables, font family, text highlight, and
+  super/subscript); the existing email-compose and signature editors are
+  unchanged. Saved documents are listed, viewable, and re-editable, scoped to
+  your workspace.
 - **Organizations** — first-class company/employer grouping on top of contacts,
   gated by billing entitlements. People can belong to multiple organizations
   (active or past). Includes scoped filtering for emails and documents, a
