@@ -258,7 +258,7 @@ Rails.application.routes.draw do
       end
     end
 
-    resources :document_templates do
+    resources :document_templates, except: :show do
       member { post :regenerate }
     end
 

@@ -97,6 +97,15 @@ pt:
           email: Email
           manual_upload: Carregamento manual
           notion: Notion
+      document_template:
+        ai_statuses:
+          completed: Pronto
+          failed: Falhado
+          pending: Rascunho
+          processing: A gerar
+        description: Descrição
+        html_content: HTML
+        name: Nome
       document_type:
         categories:
           accounting: Contabilidade

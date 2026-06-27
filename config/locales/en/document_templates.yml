@@ -1,12 +1,10 @@
 ---
 en:
   document_templates:
-    generator:
-      ai_not_configured: AI is not configured for template generation.
     fill:
       title: "Fill template: %{name}"
       variables_heading: Variables
-      pdf_preview_heading: PDF Preview
+      pdf_preview_heading: PDF preview
       no_preview_yet: Fill in the variables and click Preview PDF.
       send_heading: Send via email
       to_address: Recipient email
@@ -43,25 +41,27 @@ en:
         subtitle: Review and refine the AI-generated template or regenerate it.
         save: Save changes
         cancel: Back to templates
-        html_preview_heading: HTML preview
         variables_heading: Variables
         variable_key: Key
         variable_label: Label
         variable_type: Type
         variable_required: Required
-        yes: "Yes"
-        no: "No"
+        "yes": "Yes"
+        "no": "No"
         generate_heading: AI generation
         generate_description: Let AI generate HTML from your description.
-        generating: Generating…
         generate_button: Generate with AI
         preview_send_heading: Preview & send
         preview_send_description: Open the fill page to preview the PDF and send via email.
         open_fill_page: Open fill page
-      create: { created: Template created. }
-      update: { updated: Template updated. }
-      destroy: { destroyed: Template deleted. }
-      regenerate: { generating: AI generation started. }
+      create:
+        created: Template created.
+      update:
+        updated: Template updated.
+      destroy:
+        destroyed: Template deleted.
+      regenerate:
+        generating: AI generation started.
       form:
         name_placeholder: e.g. Invoice Reminder
         description_hint: Describe what kind of document you want AI to generate.

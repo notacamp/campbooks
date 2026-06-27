@@ -1,0 +1,69 @@
+---
+pt:
+  document_templates:
+    fill:
+      title: "Preencher modelo: %{name}"
+      variables_heading: Variáveis
+      pdf_preview_heading: Pré-visualização PDF
+      no_preview_yet: Preencha as variáveis e clique em Pré-visualizar PDF.
+      send_heading: Enviar por email
+      to_address: Email do destinatário
+      subject: Assunto
+      body: Corpo (opcional)
+      preview_pdf: Pré-visualizar PDF
+      send: Enviar
+      sent: Modelo enviado com sucesso.
+      send_failed: Falha ao enviar o modelo.
+      preview_ready: Pré-visualização PDF gerada.
+      preview_failed: Falha ao gerar a pré-visualização PDF.
+  settings:
+    document_templates:
+      index:
+        title: Modelos de documentos
+        subtitle: Crie e gira modelos de documentos reutilizáveis com conteúdo gerado por IA.
+        new_template: Novo modelo
+        edit: Editar
+        fill: Preencher e enviar
+        delete: Eliminar
+        delete_confirm: Eliminar este modelo?
+        empty_title: Sem modelos ainda
+        empty_description: Crie o seu primeiro modelo de documento e deixe a IA gerar o HTML.
+        variables_count:
+          one: "1 variável"
+          other: "%{count} variáveis"
+      new:
+        title: Novo modelo de documento
+        subtitle: Descreva o tipo de documento que pretende e a IA irá gerar o HTML.
+        save: Criar modelo
+        cancel: Cancelar
+      edit:
+        title: "Editar: %{name}"
+        subtitle: Reveja e refine o modelo gerado pela IA ou regenere-o.
+        save: Guardar alterações
+        cancel: Voltar aos modelos
+        variables_heading: Variáveis
+        variable_key: Chave
+        variable_label: Etiqueta
+        variable_type: Tipo
+        variable_required: Obrigatório
+        "yes": "Sim"
+        "no": "Não"
+        generate_heading: Geração por IA
+        generate_description: Deixe a IA gerar HTML a partir da sua descrição.
+        generate_button: Gerar com IA
+        preview_send_heading: Pré-visualizar e enviar
+        preview_send_description: Abra a página de preenchimento para pré-visualizar o PDF e enviar por email.
+        open_fill_page: Abrir página de preenchimento
+      create:
+        created: Modelo criado.
+      update:
+        updated: Modelo atualizado.
+      destroy:
+        destroyed: Modelo eliminado.
+      regenerate:
+        generating: Geração por IA iniciada.
+      form:
+        name_placeholder: "ex.: Lembrete de Fatura"
+        description_hint: Descreva o tipo de documento que pretende que a IA gere.
+        description_placeholder: "ex.: Um lembrete de fatura profissional para clientes."
+        html_content_hint: Edite o HTML diretamente. Use {{ variable_name }} para conteúdo dinâmico.

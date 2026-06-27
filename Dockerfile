@@ -22,6 +22,25 @@ RUN apt-get update -qq && \
     rm -rf /var/lib/apt/lists /var/cache/apt/archives && \
     sed -i 's/<policy domain="coder" rights="none" pattern="PDF" \/>/<policy domain="coder" rights="read|write" pattern="PDF" \/>/' /etc/ImageMagick-*/policy.xml
 
+# Optional: headless Chromium + Node for the Document Templates PDF renderer
+# (Grover/Puppeteer renders AI-generated HTML to PDF). Off by default to keep the
+# image lean; enable with `--build-arg INSTALL_PDF_BROWSER=1`. Pair it with the
+# runtime flag ENABLE_DOCUMENT_TEMPLATES=1. Without it the feature degrades
+# gracefully (the app shows "PDF unavailable" rather than crashing).
+ARG INSTALL_PDF_BROWSER=false
+RUN if [ "$INSTALL_PDF_BROWSER" = "true" ] || [ "$INSTALL_PDF_BROWSER" = "1" ]; then \
+      apt-get update -qq && \
+      apt-get install --no-install-recommends -y chromium nodejs fonts-liberation fonts-noto-color-emoji && \
+      rm -rf /var/lib/apt/lists /var/cache/apt/archives; \
+    fi
+
+# Used by Grover/Puppeteer at runtime. Inert unless the browser layer above is
+# installed: point puppeteer at the system Chromium and run it without the
+# sandbox (Chromium can't sandbox as the non-root container user).
+ENV PUPPETEER_SKIP_DOWNLOAD="true" \
+    PUPPETEER_EXECUTABLE_PATH="/usr/bin/chromium" \
+    GROVER_NO_SANDBOX="true"
+
 # Set production environment variables and enable jemalloc for reduced memory usage and latency.
 ENV RAILS_ENV="production" \
     BUNDLE_DEPLOYMENT="1" \
@@ -31,6 +50,8 @@ ENV RAILS_ENV="production" \
 
 # Throw-away build stage to reduce size of final image
 FROM base AS build
+
+ARG INSTALL_PDF_BROWSER=false
 
 # Install packages needed to build gems
 RUN apt-get update -qq && \
@@ -61,6 +82,16 @@ RUN --mount=type=secret,id=cloud_bundle_token \
 
 # Copy application code
 COPY . .
+
+# Install the Node deps for the PDF renderer (puppeteer-core) when the browser
+# layer is enabled. PUPPETEER_SKIP_DOWNLOAD (set above) keeps it from pulling its
+# own Chromium — it uses the system one. node_modules is carried into the final
+# image by the COPY --from=build below.
+RUN if [ "$INSTALL_PDF_BROWSER" = "true" ] || [ "$INSTALL_PDF_BROWSER" = "1" ]; then \
+      apt-get update -qq && apt-get install --no-install-recommends -y npm && \
+      npm install --omit=dev && \
+      rm -rf /var/lib/apt/lists /var/cache/apt/archives ~/.npm; \
+    fi
 
 # Precompile bootsnap code for faster boot times.
 # -j 1 disable parallel compilation to avoid a QEMU bug: https://github.com/rails/bootsnap/issues/495

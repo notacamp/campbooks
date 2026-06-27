@@ -103,6 +103,9 @@ en:
           failed: Failed
           pending: Draft
           processing: Generating
+        description: Description
+        html_content: HTML
+        name: Name
       document_type:
         categories:
           accounting: Accounting
