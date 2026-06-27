@@ -43,12 +43,6 @@ module Features
       flag?("ENABLE_MICROSOFT") || flag?("ENABLE_MICROSOFT_MAILBOX")
     end
 
-    # Email scheduling: snoozed-email visibility on the calendar + scheduled
-    # email sending (one-time or recurring, with Liquid template variables).
-    def email_scheduling?
-      flag?("ENABLE_EMAIL_SCHEDULING")
-    end
-
     private
 
     def flag?(name)

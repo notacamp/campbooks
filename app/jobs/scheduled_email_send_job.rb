@@ -6,8 +6,6 @@ class ScheduledEmailSendJob < ApplicationJob
   retry_on StandardError, wait: :polynomially_longer, attempts: 3
 
   def perform
-    return unless Features.email_scheduling?
-
     ScheduledEmail.due.find_each do |scheduled_email|
       process(scheduled_email)
     rescue => e

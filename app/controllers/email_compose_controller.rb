@@ -29,7 +29,7 @@ class EmailComposeController < ApplicationController
   end
 
   def send_message
-    if params[:send_action] == "schedule" && Features.email_scheduling?
+    if params[:send_action] == "schedule" && current_entitlements.feature?(:email_scheduling)
       return create_scheduled_email
     end
 

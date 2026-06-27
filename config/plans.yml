@@ -59,6 +59,10 @@ plans:
       enabled: true
       config:
         tier: basic
+    email_scheduling:
+      type: flag
+      allowed: false        # scheduled sending + calendar visibility — paid feature
+      enabled: true
     # ── deferred volume limits (enforced once metering exists) ──
     emails_synced:
       type: limit
@@ -106,6 +110,10 @@ plans:
       enabled: true
       config:
         tier: standard
+    email_scheduling:
+      type: flag
+      allowed: true
+      enabled: true
     emails_synced:
       type: limit
       allowed: true

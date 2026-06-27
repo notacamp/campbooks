@@ -41,7 +41,7 @@ module Campbooks
              class: "space-y-2") do
           input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
 
-          if helpers.email_scheduling_enabled?
+          if helpers.current_entitlements.feature?(:email_scheduling)
             default_scheduled_at = (Time.current + 1.hour).change(min: (Time.current.min / 30) * 30)
             input(type: "hidden", name: "scheduled_at", value: default_scheduled_at.strftime("%Y-%m-%dT%H:%M"))
             input(type: "hidden", name: "rrule", value: "")
@@ -139,7 +139,7 @@ module Campbooks
               plain t(".send")
             end
 
-            if helpers.email_scheduling_enabled?
+            if helpers.current_entitlements.feature?(:email_scheduling)
               button(type: "submit", name: "send_action", value: "schedule",
                      class: "inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors") do
                 svg(class: "w-3.5 h-3.5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24") do
