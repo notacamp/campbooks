@@ -1,7 +1,8 @@
 module Navigation
   # Decides the "action required" dot for each primary-nav section: true when a
-  # section has resources that need action or are new — unskimmed emails, pending
-  # reminders, documents awaiting review, unread Scout replies, active feed items.
+  # section has resources the user hasn't viewed yet — unskimmed emails, unseen
+  # feed items, unviewed pending reminders, unviewed docs needing review, unread
+  # Scout replies.
   #
   # One cheap EXISTS per section, memoized for the request. Fails closed — a nil
   # user lights no dots — mirroring the *.accessible_to permission gates.
@@ -32,36 +33,35 @@ module Navigation
       end
     end
 
-    # Active feed items — not dismissed, not acted-on. The home dot lights up
-    # whenever there's something in the feed to process.
+    # Feed items that haven't been seen yet and aren't dismissed/acted.
+    # seen_at is stamped when the item scrolls into view on the home feed.
     def new_feed?
-      @user.feed_items.active.exists?
+      @user.feed_items.where(seen_at: nil, dismissed_at: nil, acted_at: nil).exists?
     end
 
-    # Unskimmed mail on readable accounts. "Skimmed" means the user processed
-    # the email via Skim or a feed action — regardless of which surface they
-    # used. The dot clears naturally when the database state changes.
+    # Unskimmed mail on readable accounts. skimmed_at is the Mail equivalent
+    # of viewed_at — stamped when the user processes the email via Skim or a
+    # feed action, regardless of which surface they used.
     def new_mail?
       EmailMessage.accessible_to(@user).where(skimmed_at: nil).exists?
     end
 
-    # Pending reminders that need a decision (confirm / dismiss / snooze).
-    # Calendar events are a view, not action items — reminders are the things
-    # that actually need human attention.
+    # Pending reminders the user hasn't viewed yet. viewed_at is stamped when
+    # reminders appear on the Calendar or Reminders page.
     def new_calendar?
-      Reminder.accessible_to(@user).pending.exists?
+      Reminder.accessible_to(@user).pending.where(viewed_at: nil).exists?
     end
 
-    # Documents awaiting human sign-off (AI completed, review pending).
+    # Documents needing review that the user hasn't viewed yet. viewed_at is
+    # stamped when documents appear on the Documents index.
     def new_documents?
       return false unless @user.workspace
 
-      @user.workspace.documents.needs_review.exists?
+      @user.workspace.documents.needs_review.where(viewed_at: nil).exists?
     end
 
-    # Unread AI messages on the user's scout-visible threads. Marked read
-    # when the user visits Scout; new replies arrive as unread, lighting the
-    # dot back up.
+    # Unread AI messages on the user's scout-visible threads. read is the
+    # Scout equivalent of viewed_at — stamped when the user visits Scout.
     def new_scout?
       AgentMessage.where(agent_thread: @user.agent_threads.scout_visible,
                          author_type: :ai, read: false).exists?

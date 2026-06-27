@@ -14,11 +14,11 @@ RSpec.describe Navigation::Attention do
     end
 
     it "memoizes within the instance" do
-      create(:document, :in_review, workspace: user.workspace)
+      create(:document, :in_review, workspace: user.workspace, viewed_at: nil)
       expect(attention.dot?(:documents)).to be true
 
-      user.workspace.documents.needs_review.update_all(review_status: :approved)
-      expect(attention.dot?(:documents)).to be true
+      user.workspace.documents.needs_review.where(viewed_at: nil).update_all(viewed_at: Time.current)
+      expect(attention.dot?(:documents)).to be true # memoized
 
       expect(described_class.new(user).dot?(:documents)).to be false
     end
@@ -47,22 +47,27 @@ RSpec.describe Navigation::Attention do
   end
 
   describe ":calendar" do
-    it "lights up for a pending reminder" do
-      create(:reminder, workspace: user.workspace)
+    it "lights up for an unviewed pending reminder" do
+      create(:reminder, workspace: user.workspace, viewed_at: nil)
       expect(attention.dot?(:calendar)).to be true
     end
 
-    it "stays clear when reminders are confirmed" do
-      create(:reminder, :confirmed, workspace: user.workspace)
+    it "stays clear when the reminder has been viewed" do
+      create(:reminder, workspace: user.workspace, viewed_at: Time.current)
       expect(attention.dot?(:calendar)).to be false
     end
 
-    it "stays clear when reminders are dismissed" do
-      create(:reminder, status: :dismissed, workspace: user.workspace)
+    it "stays clear when reminders are confirmed (even if unviewed)" do
+      create(:reminder, :confirmed, workspace: user.workspace, viewed_at: nil)
       expect(attention.dot?(:calendar)).to be false
     end
 
-    it "ignores calendar events (events are a view, not action items)" do
+    it "stays clear when reminders are dismissed (even if unviewed)" do
+      create(:reminder, status: :dismissed, workspace: user.workspace, viewed_at: nil)
+      expect(attention.dot?(:calendar)).to be false
+    end
+
+    it "ignores calendar events" do
       account = create(:calendar_account, workspace: user.workspace)
       create(:calendar_account_user, user: user, calendar_account: account, can_read: true)
       calendar = create(:calendar, calendar_account: account)
@@ -72,18 +77,23 @@ RSpec.describe Navigation::Attention do
   end
 
   describe ":documents" do
-    it "lights up for a document needing review" do
-      create(:document, :in_review, workspace: user.workspace)
+    it "lights up for an unviewed document needing review" do
+      create(:document, :in_review, workspace: user.workspace, viewed_at: nil)
       expect(attention.dot?(:documents)).to be true
     end
 
-    it "stays clear when review is approved" do
-      create(:document, :approved, workspace: user.workspace)
+    it "stays clear when the document has been viewed" do
+      create(:document, :in_review, workspace: user.workspace, viewed_at: Time.current)
+      expect(attention.dot?(:documents)).to be false
+    end
+
+    it "stays clear when review is approved (even if unviewed)" do
+      create(:document, :approved, workspace: user.workspace, viewed_at: nil)
       expect(attention.dot?(:documents)).to be false
     end
 
     it "ignores documents in another workspace" do
-      create(:document, :in_review)
+      create(:document, :in_review, viewed_at: nil)
       expect(attention.dot?(:documents)).to be false
     end
   end
@@ -122,14 +132,23 @@ RSpec.describe Navigation::Attention do
       }.merge(overrides))
     end
 
-    it "lights up for an active feed item" do
-      feed_item
+    it "lights up for an unseen, active feed item" do
+      feed_item(seen_at: nil)
       expect(attention.dot?(:home)).to be true
     end
 
-    it "ignores dismissed or acted items" do
-      feed_item(dismissed_at: Time.current)
-      feed_item(acted_at: Time.current)
+    it "stays clear when the feed item has been seen" do
+      feed_item(seen_at: Time.current)
+      expect(attention.dot?(:home)).to be false
+    end
+
+    it "ignores dismissed items (even if unseen)" do
+      feed_item(seen_at: nil, dismissed_at: Time.current)
+      expect(attention.dot?(:home)).to be false
+    end
+
+    it "ignores acted items (even if unseen)" do
+      feed_item(seen_at: nil, acted_at: Time.current)
       expect(attention.dot?(:home)).to be false
     end
   end

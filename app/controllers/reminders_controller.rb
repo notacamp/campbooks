@@ -6,8 +6,6 @@ class RemindersController < ApplicationController
 
   before_action :require_authentication
   before_action :set_reminder, only: %i[confirm dismiss snooze]
-  # Reminders live inside the Calendar nav item, so visiting them clears the
-  # shared :calendar dot (which also covers new pending reminders).
 
   def index
     scope = Reminder.accessible_to(current_user)
@@ -16,6 +14,10 @@ class RemindersController < ApplicationController
     @upcoming  = scope.pending.where(due_at: Time.current.beginning_of_day..).order(:due_at)
     @snoozed   = scope.snoozed.order(:snoozed_until)
     @confirmed = scope.confirmed.order(due_at: :desc).limit(20)
+
+    # Stamp viewed_at so the Calendar dot only reflects reminders the user
+    # hasn't seen yet.
+    scope.where(viewed_at: nil).update_all(viewed_at: Time.current)
   end
 
   def confirm

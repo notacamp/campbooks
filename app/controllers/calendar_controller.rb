@@ -35,6 +35,10 @@ class CalendarController < ApplicationController
     # Pending reminders ride alongside events as distinct "suggestion" chips. Only
     # unconfirmed ones (confirmed reminders already exist as real CalendarEvents).
     @reminders = @has_calendars ? reminders_for_view : []
+
+    # Stamp viewed_at on displayed reminders so the Calendar dot only reflects
+    # reminders the user hasn't seen on this page yet.
+    Reminder.accessible_to(Current.user).where(viewed_at: nil).update_all(viewed_at: Time.current)
   end
 
   private
