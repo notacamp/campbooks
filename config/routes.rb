@@ -189,6 +189,8 @@ Rails.application.routes.draw do
 
   resources :zoho_drive_accounts, only: [ :new, :create, :destroy ]
 
+  resources :scheduled_emails
+
   resources :workflows do
     member do
       post :toggle

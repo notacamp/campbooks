@@ -4,7 +4,7 @@ require "rails_helper"
 # afterwards (the suite defaults them ON in config/environments/test.rb).
 RSpec.describe Features do
   around do |example|
-    keys = %w[ENABLE_WORKFLOWS ENABLE_EMAIL_BOARD ENABLE_MICROSOFT ENABLE_MICROSOFT_MAILBOX]
+    keys = %w[ENABLE_WORKFLOWS ENABLE_EMAIL_BOARD ENABLE_MICROSOFT ENABLE_MICROSOFT_MAILBOX ENABLE_EMAIL_SCHEDULING]
     saved = keys.index_with { |k| ENV[k] }
     begin
       example.run
@@ -54,6 +54,15 @@ RSpec.describe Features do
     it "honors the legacy ENABLE_MICROSOFT_MAILBOX flag" do
       ENV["ENABLE_MICROSOFT_MAILBOX"] = "1"
       expect(Features.microsoft?).to be(true)
+    end
+  end
+
+  describe ".email_scheduling?" do
+    it "is true only when ENABLE_EMAIL_SCHEDULING == '1'" do
+      ENV["ENABLE_EMAIL_SCHEDULING"] = "1"
+      expect(Features.email_scheduling?).to be(true)
+      ENV.delete("ENABLE_EMAIL_SCHEDULING")
+      expect(Features.email_scheduling?).to be(false)
     end
   end
 end

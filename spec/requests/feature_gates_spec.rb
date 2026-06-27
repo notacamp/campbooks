@@ -73,4 +73,24 @@ RSpec.describe "Production-readiness feature gates", type: :request do
       end
     end
   end
+
+  describe "Email scheduling (ENABLE_EMAIL_SCHEDULING)" do
+    context "when disabled" do
+      before { allow(Features).to receive(:email_scheduling?).and_return(false) }
+
+      it "404s the scheduled emails index" do
+        get "/scheduled_emails"
+        expect(response).to have_http_status(:not_found)
+      end
+    end
+
+    context "when enabled" do
+      before { allow(Features).to receive(:email_scheduling?).and_return(true) }
+
+      it "reaches the auth gate (a redirect, not a 404)" do
+        get "/scheduled_emails"
+        expect(response).to have_http_status(:redirect)
+      end
+    end
+  end
 end
