@@ -61,6 +61,7 @@ en:
       emails_exchanged_label: Emails exchanged
       go: Go
       last_contact_ago: "%{time} ago"
+      organization_label: Organization
       last_contact_label: Last contact
       name_label: Name
       no_email_history: No email history available.

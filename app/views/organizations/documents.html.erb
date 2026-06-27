@@ -1,0 +1,2 @@
+<div class="divide-y divide-border rounded-xl border border-border bg-card overflow-hidden"><% @documents.each do |doc| %><%= link_to document_path(doc), class: "block px-4 py-3 hover:bg-muted/40 transition-colors" do %><p class="text-sm text-foreground truncate"><%= doc.display_title %></p><% end %><% end %></div>
+<% if @pagy.pages > 1 %><div class="mt-4"><%== pagy_nav(@pagy) %></div><% end %>

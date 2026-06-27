@@ -61,6 +61,7 @@ pt:
       emails_exchanged_label: Emails trocados
       go: Ir
       last_contact_ago: há %{time}
+      organization_label: Organização
       last_contact_label: Último contacto
       name_label: Nome
       no_email_history: Sem histórico de email disponível.

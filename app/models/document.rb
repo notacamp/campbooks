@@ -63,7 +63,8 @@ class Document < ApplicationRecord
   enum :source, {
     manual_upload: 0,
     email: 1,
-    notion: 2
+    notion: 2,
+    sent_email: 3
   }
 
   enum :google_drive_push_status, {
@@ -149,6 +150,16 @@ class Document < ApplicationRecord
   # Surfaces starred documents at the top of the list, newest-first within each group.
   scope :starred_first, -> { order(starred: :desc) }
   scope :pushed_to_drive, -> { where(google_drive_push_status: :pushed) }
+    scope :by_organization, ->(org, active_only: true) {
+    people_ids = Person.joins(:organization_memberships)
+      .where(organization_memberships: { organization_id: org.id })
+    people_ids = people_ids.where(organization_memberships: { status: :active }) if active_only
+    contact_ids = Contact.where(person_id: people_ids.select(:id)).select(:id)
+    joins(:document_email_messages)
+      .where(document_email_messages: { email_message_id: EmailMessage.where(contact_id: contact_ids).select(:id) })
+      .distinct
+  }
+
   scope :not_pushed_to_drive, -> { where(google_drive_push_status: [ :not_pushed, :failed ]) }
 
   def generate_canonical_filename!
@@ -302,7 +313,8 @@ class Document < ApplicationRecord
       ("Vendor: #{vendor_name}"),
       ("Client: #{client_name}"),
       ("Invoice: #{invoice_number}")
-    ].compact.join("\n")
+    ].compact.join("
+")
 
     chunks << {
       content: primary,
@@ -324,14 +336,18 @@ class Document < ApplicationRecord
     expanded = []
     chunks.each do |chunk|
       if chunk[:content].length > 5000
-        paragraphs = chunk[:content].split(/\n\n+/)
+        paragraphs = chunk[:content].split(/
+
++/)
         current = ""
         paragraphs.each do |para|
           if (current.length + para.length) > 5000 && current.present?
             expanded << { content: current.strip, chunk_type: chunk[:chunk_type], metadata: chunk[:metadata] }
             current = para
           else
-            current += (current.empty? ? "" : "\n\n") + para
+            current += (current.empty? ? "" : "
+
+") + para
           end
         end
         expanded << { content: current.strip, chunk_type: chunk[:chunk_type], metadata: chunk[:metadata] } if current.present?
