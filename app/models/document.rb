@@ -1,5 +1,4 @@
 class Document < ApplicationRecord
-  include Pipelineable
   include Searchable
 
   belongs_to :workspace
@@ -64,7 +63,8 @@ class Document < ApplicationRecord
   enum :source, {
     manual_upload: 0,
     email: 1,
-    notion: 2
+    notion: 2,
+    sent_email: 3
   }
 
   enum :google_drive_push_status, {
@@ -303,7 +303,8 @@ class Document < ApplicationRecord
       ("Vendor: #{vendor_name}"),
       ("Client: #{client_name}"),
       ("Invoice: #{invoice_number}")
-    ].compact.join("\n")
+    ].compact.join("
+")
 
     chunks << {
       content: primary,
@@ -325,14 +326,18 @@ class Document < ApplicationRecord
     expanded = []
     chunks.each do |chunk|
       if chunk[:content].length > 5000
-        paragraphs = chunk[:content].split(/\n\n+/)
+        paragraphs = chunk[:content].split(/
+
++/)
         current = ""
         paragraphs.each do |para|
           if (current.length + para.length) > 5000 && current.present?
             expanded << { content: current.strip, chunk_type: chunk[:chunk_type], metadata: chunk[:metadata] }
             current = para
           else
-            current += (current.empty? ? "" : "\n\n") + para
+            current += (current.empty? ? "" : "
+
+") + para
           end
         end
         expanded << { content: current.strip, chunk_type: chunk[:chunk_type], metadata: chunk[:metadata] } if current.present?
