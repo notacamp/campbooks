@@ -7,9 +7,9 @@ require "rails_helper"
 # permission. Appearance is covered by the Lookbook preview + Playwright.
 RSpec.describe Campbooks::EmailScoutActions, type: :component do
   def render_for(surface:, can_send: true, **opts)
-    account = EmailAccount.new(id: 1, email_address: "me@example.com", color: "#000000")
+    account = EmailAccount.new(id: "11111111-1111-4111-8111-111111111111", email_address: "me@example.com", color: "#000000")
     message = EmailMessage.new(
-      id: 1,
+      id: "11111111-1111-4111-8111-111111111111",
       from_address: "emma@example.com",
       subject: "Invoice",
       ai_action_prompt: "Emma needs sign-off by Friday.",
@@ -53,8 +53,8 @@ RSpec.describe Campbooks::EmailScoutActions, type: :component do
   end
 
   it "shows the AI provenance when the email's summary was AI-generated" do
-    account = EmailAccount.new(id: 3, email_address: "me@example.com")
-    message = EmailMessage.new(id: 3, ai_action_prompt: "Read me",
+    account = EmailAccount.new(id: "33333333-3333-4333-8333-333333333333", email_address: "me@example.com")
+    message = EmailMessage.new(id: "33333333-3333-4333-8333-333333333333", ai_action_prompt: "Read me",
                                ai_provenance: { "provider" => "mistral", "model" => "x", "region" => "EU" })
     message.email_account = account
     html = ApplicationController.render(described_class.new(message: message, surface: :drawer), layout: false)
@@ -63,8 +63,8 @@ RSpec.describe Campbooks::EmailScoutActions, type: :component do
   end
 
   it "renders nothing when there is no read, no actions, and no send permission" do
-    account = EmailAccount.new(id: 2, email_address: "me@example.com")
-    message = EmailMessage.new(id: 2, ai_suggested_actions: [])
+    account = EmailAccount.new(id: "22222222-2222-4222-8222-222222222222", email_address: "me@example.com")
+    message = EmailMessage.new(id: "22222222-2222-4222-8222-222222222222", ai_suggested_actions: [])
     message.email_account = account
     html = ApplicationController.render(
       described_class.new(message: message, surface: :drawer, can_send: false), layout: false

@@ -32,8 +32,8 @@ RSpec.describe BugReport, type: :model do
 
     it "falls back to the record id when the body is blank" do
       report = build(:bug_report, description: "   ")
-      report.id = 7
-      expect(report.issue_title).to eq("Bug report #7")
+      report.id = "11111111-1111-4111-8111-111111111111"
+      expect(report.issue_title).to eq("Bug report #11111111-1111-4111-8111-111111111111")
     end
   end
 

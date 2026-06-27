@@ -247,7 +247,7 @@ module Campbooks
           select(name: f("notion_integration_id"), id: f("notion_integration_id"), class: INPUT,
                  data: target ? { notion_fields_target: target } : {}) do
             @notion_integrations.each do |integ|
-              option(value: integ.id, selected: @config[:notion_integration_id].to_i == integ.id) { integ.display_name }
+              option(value: integ.id, selected: @config[:notion_integration_id].to_s == integ.id.to_s) { integ.display_name }
             end
           end
         else
@@ -276,7 +276,7 @@ module Campbooks
           select(name: f("email_account_id"), id: f("email_account_id"), class: INPUT) do
             option(value: "") { t(".select_email_account") }
             @email_accounts.each do |account|
-              option(value: account.id, selected: @config[:email_account_id].to_i == account.id) { account.select_label }
+              option(value: account.id, selected: @config[:email_account_id].to_s == account.id.to_s) { account.select_label }
             end
           end
         end
@@ -338,7 +338,7 @@ module Campbooks
             select(name: f("connection_id"), id: f("connection_id"), class: INPUT) do
               option(value: "") { t(".select_integration") }
               @connections.each do |conn|
-                option(value: conn.id, selected: @config[:connection_id].to_i == conn.id) { conn.select_label }
+                option(value: conn.id, selected: @config[:connection_id].to_s == conn.id.to_s) { conn.select_label }
               end
             end
           else

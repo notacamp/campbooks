@@ -44,7 +44,7 @@ RSpec.describe User, "MFA", type: :model do
       user.update!(totp_secret: secret)
 
       expect(user.reload.totp_secret).to eq(secret)
-      raw = User.connection.select_value("SELECT totp_secret FROM users WHERE id = #{user.id}")
+      raw = User.connection.select_value("SELECT totp_secret FROM users WHERE id = '#{user.id}'")
       expect(raw).not_to eq(secret)
     end
   end

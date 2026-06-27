@@ -38,7 +38,7 @@ RSpec.describe "Settings::Integrations::Connections", type: :request do
 
     connection = workspace.connections.last
     expect(connection.auth_secret).to eq("sk_test")
-    raw = ActiveRecord::Base.connection.select_value("SELECT auth_secret FROM connections WHERE id = #{connection.id}")
+    raw = ActiveRecord::Base.connection.select_value("SELECT auth_secret FROM connections WHERE id = '#{connection.id}'")
     expect(raw).not_to include("sk_test")
   end
 

@@ -176,7 +176,8 @@ paths:
           schema:
             type: array
             items:
-              type: integer
+              type: string
+              format: uuid
         - name: unread
           in: query
           schema:
@@ -247,7 +248,8 @@ paths:
               required: [email_account_id, to_address]
               properties:
                 email_account_id:
-                  type: integer
+                  type: string
+                  format: uuid
                   description: An account the acting user may send from.
                 to_address:
                   type: string
@@ -380,7 +382,8 @@ paths:
                 bcc_address:
                   type: string
                 email_account_id:
-                  type: integer
+                  type: string
+                  format: uuid
       responses:
         "201":
           description: The reply was sent.
@@ -408,7 +411,8 @@ paths:
         in: path
         required: true
         schema:
-          type: integer
+          type: string
+          format: uuid
     post:
       tags: [Email tags]
       summary: Add a tag to an email
@@ -426,7 +430,8 @@ paths:
               type: object
               properties:
                 tag_id:
-                  type: integer
+                  type: string
+                  format: uuid
                 name:
                   type: string
       responses:
@@ -450,13 +455,15 @@ paths:
         in: path
         required: true
         schema:
-          type: integer
+          type: string
+          format: uuid
       - name: id
         in: path
         required: true
         description: The tag ID to remove.
         schema:
-          type: integer
+          type: string
+          format: uuid
     delete:
       tags: [Email tags]
       summary: Remove a tag from an email
@@ -691,7 +698,8 @@ paths:
               required: [document_type_id]
               properties:
                 document_type_id:
-                  type: integer
+                  type: string
+                  format: uuid
       responses:
         "200":
           description: The reclassified document.
@@ -961,7 +969,8 @@ paths:
         in: path
         required: true
         schema:
-          type: integer
+          type: string
+          format: uuid
     get:
       tags: [Scout]
       summary: Read / poll thread messages
@@ -977,7 +986,8 @@ paths:
           in: query
           description: Return only messages created after this message ID.
           schema:
-            type: integer
+            type: string
+            format: uuid
       responses:
         "200":
           description: The thread's messages.
@@ -1062,7 +1072,8 @@ components:
       in: path
       required: true
       schema:
-        type: integer
+        type: string
+        format: uuid
     page:
       name: page
       in: query
@@ -1177,7 +1188,8 @@ components:
           type: object
           properties:
             id:
-              type: integer
+              type: string
+              format: uuid
               nullable: true
               description: The stored EmailMessage ID, when one was created.
             provider_message_id:
@@ -1188,7 +1200,8 @@ components:
       type: object
       properties:
         id:
-          type: integer
+          type: string
+          format: uuid
         subject:
           type: string
           nullable: true
@@ -1222,10 +1235,12 @@ components:
           format: date-time
           nullable: true
         thread_id:
-          type: integer
+          type: string
+          format: uuid
           nullable: true
         account_id:
-          type: integer
+          type: string
+          format: uuid
         tags:
           type: array
           items:
@@ -1248,7 +1263,8 @@ components:
       type: object
       properties:
         id:
-          type: integer
+          type: string
+          format: uuid
         title:
           type: string
           nullable: true
@@ -1257,7 +1273,8 @@ components:
           nullable: true
           description: The full document type record (or null when unclassified).
         document_type_id:
-          type: integer
+          type: string
+          format: uuid
           nullable: true
         ai_status:
           type: string
@@ -1328,7 +1345,8 @@ components:
       description: Any subset of the editable extracted fields.
       properties:
         document_type_id:
-          type: integer
+          type: string
+          format: uuid
         vendor_name:
           type: string
         vendor_nif:
@@ -1387,7 +1405,8 @@ components:
       type: object
       properties:
         id:
-          type: integer
+          type: string
+          format: uuid
         name:
           type: string
         color:
@@ -1408,7 +1427,8 @@ components:
       type: object
       properties:
         id:
-          type: integer
+          type: string
+          format: uuid
         email:
           type: string
           nullable: true
@@ -1437,14 +1457,16 @@ components:
           type: string
           nullable: true
         person_id:
-          type: integer
+          type: string
+          format: uuid
           nullable: true
 
     Tag:
       type: object
       properties:
         id:
-          type: integer
+          type: string
+          format: uuid
         name:
           type: string
         color:
@@ -1457,7 +1479,8 @@ components:
           type: string
           description: How the tag was created (e.g. user, ai).
         email_account_id:
-          type: integer
+          type: string
+          format: uuid
           nullable: true
           description: Set when the tag is scoped to a single email account.
 
@@ -1465,7 +1488,8 @@ components:
       type: object
       properties:
         id:
-          type: integer
+          type: string
+          format: uuid
         title:
           type: string
           nullable: true
@@ -1483,9 +1507,11 @@ components:
       type: object
       properties:
         id:
-          type: integer
+          type: string
+          format: uuid
         thread_id:
-          type: integer
+          type: string
+          format: uuid
         author_type:
           type: string
           enum: [user, ai]

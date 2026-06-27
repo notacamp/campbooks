@@ -140,7 +140,7 @@ RSpec.describe Feed::Rewind do
       cur = described_class.cursor_from_params(before: at.iso8601(6), before_id: "7", period: "2024")
 
       expect(cur.sort_at).to be_within(0.001).of(at)
-      expect([ cur.id, cur.period ]).to eq([ 7, "2024" ])
+      expect([ cur.id, cur.period ]).to eq([ "7", "2024" ])
     end
 
     it "returns nil on missing or malformed params" do

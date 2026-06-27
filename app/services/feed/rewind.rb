@@ -23,6 +23,10 @@ module Feed
   class Rewind
     PAGE_SIZE = 8
 
+    # Sentinel for an empty id set in a `WHERE col IN (...)` — a uuid that
+    # can never be a real record id, so the clause matches nothing.
+    NO_MATCH = "00000000-0000-0000-0000-000000000000"
+
     # Categories Scout files as bulk/low-signal — excluded unless a strong signal
     # (starred sender, important) overrides. Tuned against real inbox data, where
     # these three are ~64% of all mail.
@@ -47,7 +51,7 @@ module Feed
       at = Time.zone.parse(before.to_s)
       return nil if at.nil?
 
-      Cursor.new(at, Integer(before_id), params[:period].presence)
+      Cursor.new(at, before_id.to_s, params[:period].presence)
     rescue ArgumentError, TypeError
       nil
     end
@@ -150,11 +154,11 @@ module Feed
           "OR email_messages.ai_priority = :high " \
           "OR (email_messages.has_attachment = TRUE AND (email_messages.category IS NULL OR email_messages.category NOT IN (:noise))) " \
           "OR (email_messages.email_thread_id IN (:busy) AND (email_messages.category IS NULL OR email_messages.category NOT IN (:noise)))",
-          starred: starred_contact_ids.presence || [ -1 ],
+          starred: starred_contact_ids.presence || [ NO_MATCH ],
           important: "important",
           high: EmailMessage.ai_priorities[:high],
           noise: NOISE_CATEGORIES,
-          busy: busy_thread_ids.presence || [ -1 ]
+          busy: busy_thread_ids.presence || [ NO_MATCH ]
         ),
         readable_accounts
       )
