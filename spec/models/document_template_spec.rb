@@ -4,11 +4,11 @@ RSpec.describe DocumentTemplate, type: :model do
   it { is_expected.to belong_to(:workspace) }
   it { is_expected.to have_one_attached(:preview_pdf) }
   it { is_expected.to validate_presence_of(:name) }
-  it { is_expected.to define_enum_for(:ai_status).with_values(pending:0,processing:1,completed:2,failed:3).with_prefix(:ai) }
+  it { is_expected.to define_enum_for(:ai_status).with_values(pending: 0, processing: 1, completed: 2, failed: 3).with_prefix(:ai) }
   describe "#variable_definitions" do
     it "returns schema when present" do
-      t.variables_schema = [{"key"=>"n","label"=>"N"}]
-      expect(t.variable_definitions).to eq([{"key"=>"n","label"=>"N"}])
+      t.variables_schema = [ { "key"=>"n", "label"=>"N" } ]
+      expect(t.variable_definitions).to eq([ { "key"=>"n", "label"=>"N" } ])
     end
     it "returns [] when nil" do
       t.variables_schema = nil
@@ -18,7 +18,7 @@ RSpec.describe DocumentTemplate, type: :model do
   describe "#extract_used_variables" do
     it "finds Liquid vars" do
       t.html_content = "<p>{{ a }}, {{ b }}</p>"
-      expect(t.extract_used_variables).to contain_exactly("a","b")
+      expect(t.extract_used_variables).to contain_exactly("a", "b")
     end
     it "returns [] when blank" do
       t.html_content = ""
