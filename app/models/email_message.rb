@@ -1,4 +1,5 @@
 class EmailMessage < ApplicationRecord
+  include Pipelineable
   include Searchable
 
   belongs_to :email_account

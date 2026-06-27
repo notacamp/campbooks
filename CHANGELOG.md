@@ -49,6 +49,10 @@ major, minor, or patch change here.
 - **Sent-email attachments** — files attached to emails you send are now stored
   locally as documents (the same way received attachments are), and the AI
   biases their classification toward revenue/outgoing types.
+- Configurable pipeline kanban boards for documents and emails. Workspaces can
+  define custom stages, drag items between them, and hook stage transitions into
+  workflows. Gated by plan (1 pipeline on Free, 5 on Pro, unlimited on
+  Business/Unlimited).
 
 ### Changed
 

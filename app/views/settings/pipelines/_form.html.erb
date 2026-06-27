@@ -1,0 +1,47 @@
+<%= form_with(model: [ :settings, pipeline ], class: "space-y-6") do %>
+  <% if pipeline.errors.any? %>
+    <div class="rounded-lg border border-red-200 bg-red-50 p-3 text-[13px] text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+      <%= pipeline.errors.full_messages.to_sentence %>
+    </div>
+  <% end %>
+
+  <div class="max-w-xl space-y-4">
+    <%= render(Campbooks::Input.new("pipeline[name]",
+          label: Pipeline.human_attribute_name(:name),
+          placeholder: t(".name_placeholder"), value: pipeline.name, required: true)) %>
+    <%= render(Campbooks::Input.new("pipeline[description]",
+          label: Pipeline.human_attribute_name(:description),
+          placeholder: t(".description_placeholder"), value: pipeline.description)) %>
+    <%= render(Campbooks::Select.new("pipeline[applies_to]",
+          label: Pipeline.human_attribute_name(:applies_to),
+          options: Pipeline.applies_tos.keys.map { |k| [ t(".applies_to_options.#{k}"), k ] },
+          selected: pipeline.applies_to)) %>
+  </div>
+
+  <div data-controller="pipeline-builder" class="border-t border-border pt-6">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-sm font-semibold text-foreground"><%= t(".stages_heading") %></h3>
+      <%= render(Campbooks::Button.new(variant: :outline, size: :sm, type: :button,
+            data: { action: "click->pipeline-builder#addStage" })) { t(".add_stage") } %>
+    </div>
+
+    <div data-pipeline-builder-target="stages" class="space-y-2">
+      <% pipeline.stages.each_with_index do |stage, i| %>
+        <%= render(Campbooks::Pipeline::StageRow.new(index: i, stage: stage)) %>
+      <% end %>
+    </div>
+
+    <%# Cloned by the pipeline-builder controller when "Add stage" is clicked. %>
+    <template data-pipeline-builder-target="stageTemplate">
+      <%= render(Campbooks::Pipeline::StageRow.new(index: "NEW_RECORD")) %>
+    </template>
+
+    <p class="mt-2 text-[12px] text-muted-foreground"><%= t(".stages_hint") %></p>
+  </div>
+
+  <div class="flex items-center gap-3 pt-4 border-t border-border">
+    <%= render(Campbooks::Button.new(variant: :primary, type: :submit)) { t("shared.actions.save") } %>
+    <%= link_to t("shared.actions.cancel"), settings_pipelines_path,
+          class: "text-sm text-muted-foreground hover:text-foreground transition" %>
+  </div>
+<% end %>

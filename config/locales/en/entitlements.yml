@@ -55,9 +55,9 @@ en:
       emails_synced: Emails synced
       managed_ai: Campbooks AI
       notifications: Notifications
+      pipelines: Pipelines
       scout: Scout
       workflow_executions: Workflow runs
-      organizations: Organizations
       workflows: Workflows
   navigation:
     settings:
