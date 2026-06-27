@@ -77,7 +77,8 @@
       <div class="relative shrink-0 mt-px">
         <% if multi_sender %>
           <%= render(Campbooks::ContactAvatarGroup.new(
-                participants: participants, size: :lg, max: 3, variant: :neutral
+                participants: participants, size: :lg, max: 3, variant: :neutral,
+                account_color: account&.color
               )) %>
         <% else %>
           <%= render(Campbooks::ContactAvatar.new(

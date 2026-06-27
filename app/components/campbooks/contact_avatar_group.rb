@@ -28,11 +28,13 @@ module Campbooks
     # @param size [Symbol] :sm | :md | :lg | :xl (matches ContactAvatar)
     # @param max [Integer] how many faces before the rest fold into "+N"
     # @param variant [Symbol] :neutral | :accent (passed to each ContactAvatar)
-    def initialize(participants:, size: :md, max: 3, variant: :neutral)
+    # @param account_color [String, nil] optional hex color for the email-account ring
+    def initialize(participants:, size: :md, max: 3, variant: :neutral, account_color: nil)
       @participants = dedupe(participants)
       @size = size
       @max = [ max, 1 ].max
       @variant = variant
+      @account_color = account_color
     end
 
     def view_template
@@ -46,7 +48,8 @@ module Campbooks
           # Leftmost (latest sender) sits on top; the pile cascades under it.
           span(class: class_names("relative rounded-full", RING), style: "z-index: #{shown.size - i}") do
             render Campbooks::ContactAvatar.new(
-              email: p[:email], contact_id: p[:contact_id], size: @size, variant: @variant
+              email: p[:email], contact_id: p[:contact_id], size: @size, variant: @variant,
+              account_color: @account_color
             )
           end
         end

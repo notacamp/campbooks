@@ -36,7 +36,8 @@ module Campbooks
         div(class: "flex items-start gap-2") do
           if multi
             render(Campbooks::ContactAvatarGroup.new(
-              participants: participants, size: :sm, max: 3, variant: :neutral
+              participants: participants, size: :sm, max: 3, variant: :neutral,
+              account_color: @thread.email_account&.color
             ))
           else
             render(Campbooks::ContactAvatar.new(

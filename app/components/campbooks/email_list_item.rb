@@ -58,7 +58,8 @@ module Campbooks
         size: :lg,
         contact_id: @message.contact_id,
         variant: :neutral,
-        show_direction: true
+        show_direction: true,
+        account_color: @message.email_account&.color
       ))
     end
 
