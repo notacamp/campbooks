@@ -18,6 +18,11 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Organizations** — first-class company/employer grouping on top of contacts,
+  gated by billing entitlements. People can belong to multiple organizations
+  (active or past). Includes scoped filtering for emails and documents, a
+  directory page, per-organization profile pages, and a backfill from existing
+  AI-extracted `Person.organization` strings.
 - **Google Drive folder picker** — the Drive config form now offers an
   interactive folder browser (browse, select, or create folders) instead of
   requiring a pasted folder ID. The selected folder path is stored and

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_27_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_27_013613) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -402,6 +402,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_000001) do
     t.index ["email_message_id"], name: "index_document_email_messages_on_email_message_id"
   end
 
+  create_table "document_templates", force: :cascade do |t|
+    t.jsonb "ai_provenance", default: {}, null: false
+    t.integer "ai_status", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.text "html_content", default: "", null: false
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.jsonb "variables_schema", default: [], null: false
+    t.bigint "workspace_id", null: false
+    t.index ["workspace_id", "name"], name: "index_document_templates_on_workspace_id_and_name"
+    t.index ["workspace_id"], name: "index_document_templates_on_workspace_id"
+  end
+
   create_table "document_types", force: :cascade do |t|
     t.boolean "auto_star", default: false, null: false
     t.string "category"
@@ -463,6 +477,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_000001) do
     t.datetime "updated_at", null: false
     t.string "vendor_name"
     t.string "vendor_nif"
+    t.datetime "viewed_at"
     t.bigint "workspace_id"
     t.index ["ai_status"], name: "index_documents_on_ai_status"
     t.index ["client_nif"], name: "index_documents_on_client_nif"
@@ -734,7 +749,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_000001) do
   end
 
   create_table "google_drive_configs", force: :cascade do |t|
-    t.boolean "auto_push", default: false, null: false
+    t.boolean "auto_push", default: true, null: false
     t.datetime "created_at", null: false
     t.bigint "document_type_id", null: false
     t.string "folder_id"
@@ -932,6 +947,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_000001) do
     t.index ["workspace_id"], name: "index_oauth_applications_on_workspace_id"
   end
 
+  create_table "organization_memberships", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "organization_id", null: false
+    t.bigint "person_id", null: false
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_id", "status"], name: "index_organization_memberships_on_organization_id_and_status"
+    t.index ["organization_id"], name: "index_organization_memberships_on_organization_id"
+    t.index ["person_id", "organization_id"], name: "idx_on_person_id_organization_id_a4053ecbba", unique: true
+    t.index ["person_id"], name: "index_organization_memberships_on_person_id"
+  end
+
+  create_table "organizations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "domain"
+    t.string "name", null: false
+    t.text "notes"
+    t.datetime "updated_at", null: false
+    t.bigint "workspace_id", null: false
+    t.index ["workspace_id", "name"], name: "index_organizations_on_workspace_id_and_name", unique: true
+    t.index ["workspace_id"], name: "index_organizations_on_workspace_id"
+  end
+
   create_table "people", force: :cascade do |t|
     t.datetime "analyzed_at"
     t.jsonb "communication_patterns", default: {}
@@ -978,6 +1016,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_000001) do
     t.integer "status", default: 0, null: false
     t.string "title", null: false
     t.datetime "updated_at", null: false
+    t.datetime "viewed_at"
     t.bigint "workspace_id", null: false
     t.index ["calendar_event_id"], name: "index_reminders_on_calendar_event_id"
     t.index ["confirmed_by_id"], name: "index_reminders_on_confirmed_by_id"
@@ -1381,7 +1420,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_000001) do
     t.string "workspace_type", default: "company", null: false
     t.index ["plan"], name: "index_workspaces_on_plan"
     t.index ["slug"], name: "index_workspaces_on_slug", unique: true
-    t.check_constraint "workspace_type::text = ANY (ARRAY['company'::character varying, 'individual'::character varying]::text[])", name: "chk_organizations_workspace_type"
+    t.check_constraint "workspace_type::text = ANY (ARRAY['company'::character varying::text, 'individual'::character varying::text])", name: "chk_organizations_workspace_type"
   end
 
   create_table "zoho_drive_accounts", force: :cascade do |t|
@@ -1434,6 +1473,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_000001) do
   add_foreign_key "document_drive_uploads", "zoho_drive_accounts"
   add_foreign_key "document_email_messages", "documents"
   add_foreign_key "document_email_messages", "email_messages"
+  add_foreign_key "document_templates", "workspaces"
   add_foreign_key "document_types", "workspaces"
   add_foreign_key "documents", "document_types"
   add_foreign_key "documents", "email_accounts"
@@ -1484,6 +1524,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_000001) do
   add_foreign_key "oauth_access_tokens", "oauth_applications", column: "application_id"
   add_foreign_key "oauth_applications", "users", column: "created_by_id"
   add_foreign_key "oauth_applications", "workspaces"
+  add_foreign_key "organization_memberships", "organizations"
+  add_foreign_key "organization_memberships", "people"
+  add_foreign_key "organizations", "workspaces"
   add_foreign_key "people", "workspaces"
   add_foreign_key "recovery_codes", "users"
   add_foreign_key "reminders", "calendar_events"

@@ -63,6 +63,13 @@ class EmailMessage < ApplicationRecord
     SQL
   }
 
+    scope :by_organization, ->(org, active_only: true) {
+    people_ids = Person.joins(:organization_memberships)
+      .where(organization_memberships: { organization_id: org.id })
+    people_ids = people_ids.where(organization_memberships: { status: :active }) if active_only
+    where(contact_id: Contact.where(person_id: people_ids.select(:id)).select(:id))
+  }
+
   validates :provider_message_id, presence: true, uniqueness: { scope: :email_account_id }
 
   # Keep the search index's filter metadata fresh when a filter-only field changes,
