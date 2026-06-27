@@ -79,6 +79,29 @@ RSpec.describe Emails::Sender do
       expect(result.error_code).to eq("send_failed")
     end
 
+
+    it "enqueues SentAttachmentProcessJob and sets has_attachment when signed IDs are present" do
+      stub_mail_client(double("MailClient", send_message: { "id" => "PROVIDER456" }))
+      expect {
+        described_class.call(user: user, email_account_id: account.id,
+          to_address: "no-reply@example.com", subject: "With attachment", body: "See attached",
+          attachment_signed_ids: %w[signed-id-1 signed-id-2])
+      }.to have_enqueued_job(Emails::SentAttachmentProcessJob)
+        .with(kind_of(Integer), user.id, %w[signed-id-1 signed-id-2])
+      sent = account.email_messages.find_by(provider_message_id: "PROVIDER456")
+      expect(sent.has_attachment).to be true
+    end
+
+    it "does not enqueue SentAttachmentProcessJob when no signed IDs are present" do
+      stub_mail_client(double("MailClient", send_message: { "id" => "PROVIDER789" }))
+      expect {
+        described_class.call(user: user, email_account_id: account.id,
+          to_address: "no-reply@example.com", subject: "No attachment", body: "Plain")
+      }.not_to have_enqueued_job(Emails::SentAttachmentProcessJob)
+      sent = account.email_messages.find_by(provider_message_id: "PROVIDER789")
+      expect(sent.has_attachment).to be_falsey
+    end
+
     it "threads a reply via the source message" do
       client = double("GraphClient")
       allow(client).to receive(:save_draft).and_return({ "id" => "DRAFT9" })
