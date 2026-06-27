@@ -16,6 +16,13 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- Configurable pipeline kanban boards for documents and emails. Workspaces can
+  define custom stages, drag items between them, and hook stage transitions into
+  workflows. Gated by plan (1 pipeline on Free, 5 on Pro, unlimited on
+  Business/Unlimited).
+
 ### Fixed
 
 - Avatar stacks (facepiles) in the email list and board view now show the
