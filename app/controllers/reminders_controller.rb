@@ -15,9 +15,9 @@ class RemindersController < ApplicationController
     @snoozed   = scope.snoozed.order(:snoozed_until)
     @confirmed = scope.confirmed.order(due_at: :desc).limit(20)
 
-    # Stamp viewed_at so the Calendar dot only reflects reminders the user
-    # hasn't seen yet.
-    scope.where(viewed_at: nil).update_all(viewed_at: Time.current)
+    # Visiting Reminders clears the Calendar nav dot: stamp the pending reminders
+    # that drive it (confirmed/dismissed/snoozed reminders never dot).
+    scope.pending.where(viewed_at: nil).update_all(viewed_at: Time.current)
   end
 
   def confirm

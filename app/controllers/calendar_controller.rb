@@ -36,9 +36,9 @@ class CalendarController < ApplicationController
     # unconfirmed ones (confirmed reminders already exist as real CalendarEvents).
     @reminders = @has_calendars ? reminders_for_view : []
 
-    # Stamp viewed_at on displayed reminders so the Calendar dot only reflects
-    # reminders the user hasn't seen on this page yet.
-    Reminder.accessible_to(Current.user).where(viewed_at: nil).update_all(viewed_at: Time.current)
+    # Visiting the calendar clears its nav dot: stamp the pending reminders that
+    # drive it (Navigation::Attention#new_calendar?).
+    Reminder.accessible_to(Current.user).pending.where(viewed_at: nil).update_all(viewed_at: Time.current)
   end
 
   private

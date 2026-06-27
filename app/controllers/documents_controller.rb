@@ -26,9 +26,10 @@ class DocumentsController < ApplicationController
     @has_any_documents = Current.workspace.documents.exists?
     @email_connected = Current.workspace.email_accounts.active.exists?
 
-    # Stamp viewed_at on the currently loaded page so the Documents dot
-    # reflects only documents the user hasn't scrolled to yet.
-    documents.where(viewed_at: nil).update_all(viewed_at: Time.current)
+    # Visiting Documents clears its nav attention dot: stamp viewed_at on the docs
+    # that drive the dot (needs_review), independent of the active filter. Matches
+    # Navigation::Attention#new_documents?.
+    Current.workspace.documents.needs_review.where(viewed_at: nil).update_all(viewed_at: Time.current)
 
     @pagy, @documents = pagy(documents)
 

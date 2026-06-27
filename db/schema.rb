@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_27_010101) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_27_013613) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -78,6 +78,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_010101) do
     t.datetime "viewed_at"
     t.index ["agent_thread_id", "created_at"], name: "index_agent_messages_on_agent_thread_id_and_created_at"
     t.index ["agent_thread_id"], name: "index_agent_messages_on_agent_thread_id"
+    t.index ["agent_thread_id"], name: "index_agent_messages_on_thread_unviewed", where: "(viewed_at IS NULL)"
     t.index ["user_id", "created_at"], name: "index_agent_messages_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_agent_messages_on_user_id"
   end
@@ -498,6 +499,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_010101) do
     t.index ["workspace_id", "review_status"], name: "index_documents_on_workspace_id_and_review_status"
     t.index ["workspace_id", "starred"], name: "index_documents_on_workspace_id_and_starred"
     t.index ["workspace_id"], name: "index_documents_on_workspace_id"
+    t.index ["workspace_id"], name: "index_documents_on_workspace_unviewed", where: "(viewed_at IS NULL)"
   end
 
   create_table "drive_folder_mappings", force: :cascade do |t|
@@ -624,6 +626,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_010101) do
     t.index ["contact_id"], name: "index_email_messages_on_contact_id"
     t.index ["email_account_id", "provider_message_id"], name: "index_emails_on_account_and_provider_message", unique: true
     t.index ["email_account_id", "provider_thread_id"], name: "index_email_messages_on_account_and_provider_thread"
+    t.index ["email_account_id"], name: "index_email_messages_on_account_unviewed", where: "(viewed_at IS NULL)"
     t.index ["email_account_id"], name: "index_email_messages_on_email_account_id"
     t.index ["email_scan_log_id"], name: "index_email_messages_on_email_scan_log_id"
     t.index ["email_thread_id"], name: "index_email_messages_on_email_thread_id"
@@ -724,6 +727,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_010101) do
     t.index ["user_id", "dedupe_key"], name: "idx_feed_items_user_dedupe", unique: true
     t.index ["user_id", "score", "sort_at"], name: "idx_feed_items_attention", order: { score: :desc, sort_at: :desc }, where: "((dismissed_at IS NULL) AND (acted_at IS NULL) AND (attention = true))"
     t.index ["user_id", "sort_at"], name: "idx_feed_items_timeline", order: { sort_at: :desc }, where: "((dismissed_at IS NULL) AND (acted_at IS NULL) AND (attention = false))"
+    t.index ["user_id"], name: "index_feed_items_on_user_unseen_active", where: "((seen_at IS NULL) AND (dismissed_at IS NULL) AND (acted_at IS NULL))"
     t.index ["workspace_id"], name: "index_feed_items_on_workspace_id"
   end
 
@@ -1026,6 +1030,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_010101) do
     t.index ["source_type", "source_id"], name: "index_reminders_on_source"
     t.index ["workspace_id", "status", "due_at"], name: "index_reminders_on_workspace_status_due"
     t.index ["workspace_id"], name: "index_reminders_on_workspace_id"
+    t.index ["workspace_id"], name: "index_reminders_on_workspace_unviewed", where: "(viewed_at IS NULL)"
   end
 
   create_table "search_chunks", force: :cascade do |t|

@@ -33,10 +33,10 @@ module Navigation
       end
     end
 
-    # Feed items that haven't been seen yet and aren't dismissed/acted.
+    # Active feed items (not dismissed/acted) the user hasn't seen yet.
     # seen_at is stamped when the item scrolls into view on the home feed.
     def new_feed?
-      @user.feed_items.where(seen_at: nil, dismissed_at: nil, acted_at: nil).exists?
+      @user.feed_items.active.where(seen_at: nil).exists?
     end
 
     # Unviewed mail on readable accounts. viewed_at is stamped when the user
