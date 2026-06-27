@@ -1,9 +1,9 @@
 class CreateScheduledEmails < ActiveRecord::Migration[8.1]
   def change
     create_table :scheduled_emails do |t|
-      t.references :workspace, null: false, foreign_key: true
-      t.references :email_account, null: false, foreign_key: true
-      t.references :created_by, null: false, foreign_key: { to_table: :users }
+      t.references :workspace, null: false, foreign_key: true, type: :uuid
+      t.references :email_account, null: false, foreign_key: true, type: :uuid
+      t.references :created_by, null: false, foreign_key: { to_table: :users }, type: :uuid
       t.string :to_address, null: false
       t.string :cc_address
       t.string :bcc_address
