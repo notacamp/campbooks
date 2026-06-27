@@ -16,6 +16,11 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Avatar stacks (facepiles) in the email list and board view now show the
+  account-color ring, consistent with single-sender avatars and search results.
+
 ## [0.2.1] - 2026-06-27
 
 ### Changed
