@@ -22,9 +22,18 @@ major, minor, or patch change here.
   OpenAI adapter were failing silently because ImageMagick was missing from the
   Docker image (`convert: command not found`). Added `imagemagick ghostscript` to
   the base image and relaxed the default PDF security policy so `convert` can read
-  PDFs. Also switched the managed "Campbooks AI" document provider from OpenAI to
-  Anthropic, which reads PDFs natively (type: "document" blocks) and doesn't need
-  ImageMagick at all.
+  PDFs. Switched the managed "Campbooks AI" document provider from OpenAI to Mistral
+  (EU-based, `pixtral-large-latest`), so managed document analysis now runs entirely
+  on EU infrastructure.
+
+### Changed
+
+- Mistral is now available as a document-analysis (vision) provider
+  (`pixtral-large-latest`), and is the managed default for EU residents.
+  Document analysis now uses `pixtral-large-latest`; text AI continues on
+  `mistral-small-latest`.
+
+## [0.2.1] - 2026-06-27
 
 ### Changed
 
