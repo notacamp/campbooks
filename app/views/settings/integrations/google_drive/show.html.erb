@@ -85,7 +85,7 @@
               <%= config.subfolder_pattern == "flat" ? "—" : human_enum(GoogleDriveConfig, :subfolder_pattern, config.subfolder_pattern) %>
             </td>
             <td class="py-2 text-right">
-              <%= render(Campbooks::Button.new(variant: :ghost, size: :xs, href: settings_integrations_google_drive_edit_config_path(type.id))) { config.persisted? ? t(".edit_config") : t(".configure") } %>
+              <%= render(Campbooks::Button.new(variant: :ghost, size: :xs, href: edit_config_settings_integrations_google_drive_path(type.id))) { config.persisted? ? t(".edit_config") : t(".configure") } %>
             </td>
           </tr>
         <% end %>
