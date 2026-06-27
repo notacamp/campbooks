@@ -56,5 +56,4 @@ RSpec.describe Features do
       expect(Features.microsoft?).to be(true)
     end
   end
-
 end

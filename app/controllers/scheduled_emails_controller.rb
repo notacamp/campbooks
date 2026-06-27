@@ -2,7 +2,7 @@
 
 class ScheduledEmailsController < ApplicationController
   before_action :require_authentication
-  before_action -> { require_entitlement!(:email_scheduling) }, except: [:index, :show]
+  before_action -> { require_entitlement!(:email_scheduling) }, except: [ :index, :show ]
   before_action :load_scheduled_email, only: %i[show edit update destroy]
 
   def index
@@ -76,9 +76,9 @@ class ScheduledEmailsController < ApplicationController
 
     next_at = if @scheduled_email.rrule.present?
                 ScheduleCalculator.next_occurrence(@scheduled_email.scheduled_at, @scheduled_email.rrule)
-              else
+    else
                 @scheduled_email.scheduled_at
-              end
+    end
     @scheduled_email.update_columns(next_occurrence_at: next_at)
   end
 
