@@ -1,16 +1,14 @@
 module Campbooks
   module Calendar
-    # Traditional month grid (Mon-first), one cell per day with up to three event
-    # chips and a "+N" overflow. Tapping a day number opens the new-event form
-    # prefilled with that date; tapping a chip opens the event. Stays at 7 columns
-    # down to 375px (chips truncate) — no horizontal overflow.
     class MonthGrid < Campbooks::Base
       MAX_CHIPS = 3
 
-      def initialize(date:, events:, reminders: [])
+      def initialize(date:, events:, reminders: [], snoozed_threads: [], scheduled_emails: [])
         @date = date
         @events = events.to_a
         @reminders = reminders.to_a
+        @snoozed_threads = snoozed_threads.to_a
+        @scheduled_emails = scheduled_emails.to_a
       end
 
       def view_template
@@ -41,7 +39,14 @@ module Campbooks
         @reminders_by_day ||= @reminders.group_by { |r| r.due_at.to_date }
       end
 
-      # Localized abbreviated weekday names, rotated to start on Monday.
+      def snoozed_by_day
+        @snoozed_by_day ||= @snoozed_threads.group_by { |t| t.snoozed_until.to_date }
+      end
+
+      def scheduled_by_day
+        @scheduled_by_day ||= @scheduled_emails.group_by { |s| (s.next_occurrence_at || s.scheduled_at).to_date }
+      end
+
       def weekday_names
         names = t("date.abbr_day_names")
         (1..7).map { |i| names[i % 7] }
@@ -52,6 +57,8 @@ module Campbooks
         today = day == Date.current
         events = by_day[day] || []
         reminders = reminders_by_day[day] || []
+        snoozed = snoozed_by_day[day] || []
+        scheduled = scheduled_by_day[day] || []
 
         div(
           data: { "new-url": helpers.new_calendar_event_path(date: day.iso8601, view: "month") },
@@ -72,7 +79,11 @@ module Campbooks
             shown.each { |event| render_chip(event) }
             slots = MAX_CHIPS - shown.size
             reminders.first(slots).each { |reminder| render Campbooks::Calendar::ReminderChip.new(reminder: reminder) } if slots.positive?
-            overflow = events.size + reminders.size - MAX_CHIPS
+            slots -= [ reminders.size, slots ].min
+            snoozed.first(slots).each { |thread| render Campbooks::Calendar::SnoozedChip.new(thread: thread) } if slots.positive?
+            slots -= [ snoozed.size, slots ].min
+            scheduled.first(slots).each { |email| render Campbooks::Calendar::ScheduledEmailChip.new(scheduled_email: email) } if slots.positive?
+            overflow = events.size + reminders.size + snoozed.size + scheduled.size - MAX_CHIPS
             div(class: "px-1 text-[10px] text-gray-400") { "+#{overflow}" } if overflow.positive?
           end
         end
