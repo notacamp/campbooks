@@ -283,10 +283,6 @@ Rails.application.routes.draw do
     end
   end
 
-  # Document templates
-    end
-  end
-
   # Inbox settings — the gear-icon management modal on the email page. Each
   # action renders a panel into the modal's Turbo Frame (inbox_settings_panel).
   namespace :inbox_settings do
