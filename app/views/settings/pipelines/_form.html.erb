@@ -1,0 +1,128 @@
+<%= form_with(model: [:settings, pipeline], class: "space-y-6") do |f| %>
+  <% if pipeline.errors.any? %>
+    <div class="rounded-lg border border-red-200 bg-red-50 p-3 text-[13px] text-red-700">
+      <%= pipeline.errors.full_messages.to_sentence %>
+    </div>
+  <% end %>
+
+  <div class="max-w-xl space-y-4">
+    <div>
+      <%= f.label :name, class: "block text-sm font-medium text-foreground mb-1.5" %>
+      <%= f.text_field :name, placeholder: t(".name_placeholder"),
+            class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus:border-accent-500 focus:ring-1 focus:ring-accent-500",
+            required: true %>
+    </div>
+
+    <div>
+      <%= f.label :description, class: "block text-sm font-medium text-foreground mb-1.5" %>
+      <%= f.text_field :description, placeholder: t(".description_placeholder"),
+            class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus:border-accent-500 focus:ring-1 focus:ring-accent-500" %>
+    </div>
+
+    <div>
+      <%= f.label :applies_to, class: "block text-sm font-medium text-foreground mb-1.5" %>
+      <%= f.select :applies_to,
+            Pipeline.applies_tos.keys.map { |k| [t(".applies_to_options.#{k}"), k] },
+            {}, class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground shadow-sm focus:border-accent-500 focus:ring-1 focus:ring-accent-500" %>
+    </div>
+  </div>
+
+  <div data-controller="pipeline-builder" class="border-t border-border pt-6">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-sm font-semibold text-foreground"><%= t(".stages_heading") %></h3>
+      <button type="button" data-action="click->pipeline-builder#addStage"
+              class="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[12px] font-medium text-foreground hover:bg-muted transition">
+        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+        </svg>
+        <%= t(".add_stage") %>
+      </button>
+    </div>
+
+    <div data-pipeline-builder-target="stages" class="space-y-2">
+      <%= f.fields_for :stages do |sf| %>
+        <div data-pipeline-builder-target="stageRow"
+             class="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3"
+             draggable="true"
+             data-action="dragstart->pipeline-builder#dragStart dragover->pipeline-builder#dragOver dragleave->pipeline-builder#dragLeave drop->pipeline-builder#drop dragend->pipeline-builder#dragEnd">
+          <div class="flex-shrink-0 mt-1 cursor-grab text-muted-foreground/40 hover:text-muted-foreground">
+            <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+              <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
+              <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+              <circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/>
+            </svg>
+          </div>
+
+          <%= sf.hidden_field :id %>
+          <%= sf.hidden_field :position, value: sf.index + 1, data: { pipeline_builder_target: "position" } %>
+          <%= sf.hidden_field :_destroy, value: false %>
+
+          <div class="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <%= sf.text_field :name, placeholder: t(".stage_name_placeholder"),
+                  class: "w-full rounded-md border border-border bg-card px-2.5 py-1.5 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus:border-accent-500 focus:ring-1 focus:ring-accent-500",
+                  required: true %>
+            <%= sf.text_field :description, placeholder: t(".stage_description_placeholder"),
+                  class: "w-full rounded-md border border-border bg-card px-2.5 py-1.5 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus:border-accent-500 focus:ring-1 focus:ring-accent-500" %>
+            <div class="flex items-center gap-2">
+              <%= sf.color_field :color, class: "h-9 w-10 rounded-md border border-border cursor-pointer" %>
+              <label class="flex items-center gap-1.5 text-[12px] text-muted-foreground cursor-pointer select-none">
+                <%= sf.check_box :is_terminal, class: "rounded border-border" %>
+                <%= t(".terminal") %>
+              </label>
+            </div>
+          </div>
+
+          <button type="button" data-action="click->pipeline-builder#removeStage"
+                  class="flex-shrink-0 mt-1 p-1 text-muted-foreground/40 hover:text-red-500 transition">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      <% end %>
+    </div>
+
+    <template data-pipeline-builder-target="stageTemplate">
+      <div data-pipeline-builder-target="stageRow"
+           class="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3"
+           draggable="true"
+           data-action="dragstart->pipeline-builder#dragStart dragover->pipeline-builder#dragOver dragleave->pipeline-builder#dragLeave drop->pipeline-builder#drop dragend->pipeline-builder#dragEnd">
+        <div class="flex-shrink-0 mt-1 cursor-grab text-muted-foreground/40 hover:text-muted-foreground">
+          <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+            <circle cx="9" cy="5" r="1.5"/><circle cx="15" cy="5" r="1.5"/>
+            <circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/>
+            <circle cx="9" cy="19" r="1.5"/><circle cx="15" cy="19" r="1.5"/>
+          </svg>
+        </div>
+        <input type="hidden" name="pipeline[stages_attributes][NEW_RECORD][id]" value="">
+        <input type="hidden" name="pipeline[stages_attributes][NEW_RECORD][position]" value="" data-pipeline-builder-target="position">
+        <input type="hidden" name="pipeline[stages_attributes][NEW_RECORD][_destroy]" value="false">
+        <div class="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <input type="text" name="pipeline[stages_attributes][NEW_RECORD][name]" placeholder="<%= t(".stage_name_placeholder") %>" required class="w-full rounded-md border border-border bg-card px-2.5 py-1.5 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus:border-accent-500 focus:ring-1 focus:ring-accent-500">
+          <input type="text" name="pipeline[stages_attributes][NEW_RECORD][description]" placeholder="<%= t(".stage_description_placeholder") %>" class="w-full rounded-md border border-border bg-card px-2.5 py-1.5 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus:border-accent-500 focus:ring-1 focus:ring-accent-500">
+          <div class="flex items-center gap-2">
+            <input type="color" name="pipeline[stages_attributes][NEW_RECORD][color]" value="#6366f1" class="h-9 w-10 rounded-md border border-border cursor-pointer">
+            <label class="flex items-center gap-1.5 text-[12px] text-muted-foreground cursor-pointer select-none">
+              <input type="checkbox" name="pipeline[stages_attributes][NEW_RECORD][is_terminal]" value="1" class="rounded border-border">
+              <%= t(".terminal") %>
+            </label>
+          </div>
+        </div>
+        <button type="button" data-action="click->pipeline-builder#removeStage" class="flex-shrink-0 mt-1 p-1 text-muted-foreground/40 hover:text-red-500 transition">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+    </template>
+
+    <p class="mt-2 text-[12px] text-muted-foreground"><%= t(".stages_hint") %></p>
+  </div>
+
+  <div class="flex items-center gap-3 pt-4 border-t border-border">
+    <%= f.submit t("shared.actions.save"),
+          class: "inline-flex items-center gap-1.5 rounded-lg bg-accent-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-accent-700 transition cursor-pointer" %>
+    <%= link_to t("shared.actions.cancel"), settings_pipelines_path,
+          class: "text-sm text-muted-foreground hover:text-foreground transition" %>
+  </div>
+<% end %>

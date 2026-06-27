@@ -49,6 +49,11 @@ plans:
       type: flag
       allowed: true
       enabled: true
+    pipelines:
+      type: limit
+      allowed: true
+      enabled: true
+      limit: 1
     eu_data_residency:
       type: flag
       allowed: true         # a privacy control — granted to every tier (seam to gate later)
@@ -96,6 +101,11 @@ plans:
       type: flag
       allowed: true
       enabled: true
+    pipelines:
+      type: limit
+      allowed: true
+      enabled: true
+      limit: 5
     eu_data_residency:
       type: flag
       allowed: true
@@ -142,6 +152,11 @@ plans:
       type: flag
       allowed: true
       enabled: true
+    pipelines:
+      type: limit
+      allowed: true
+      enabled: true
+      limit: null
     eu_data_residency:
       type: flag
       allowed: true
@@ -188,6 +203,11 @@ plans:
       type: flag
       allowed: true
       enabled: true
+    pipelines:
+      type: limit
+      allowed: true
+      enabled: true
+      limit: null
     eu_data_residency:
       type: flag
       allowed: true
