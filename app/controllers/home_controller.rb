@@ -12,7 +12,6 @@ require "pagy/extras/countless"
 # paginated with pagy_countless (no COUNT) behind a lazy turbo-frame sentinel,
 # mirroring the email thread list.
 class HomeController < ApplicationController
-  tracks_section_visit :home, only: :index
 
   # Deliberately small: the feed favors a few large, breathing items per screen
   # over a dense list. More load lazily as you scroll.

@@ -1,7 +1,7 @@
 module Navigation
   # Decides the "action required" dot for each primary-nav section: true when a
-  # section has content newer than the user last looked at it
-  # (User#seen_section_at), cleared on visit by the TracksSectionVisit concern.
+  # section has resources that need action or are new — unskimmed emails, pending
+  # reminders, documents awaiting review, unread Scout replies, active feed items.
   #
   # One cheap EXISTS per section, memoized for the request. Fails closed — a nil
   # user lights no dots — mirroring the *.accessible_to permission gates.
@@ -32,45 +32,39 @@ module Navigation
       end
     end
 
-    def since(section)
-      @user.seen_section_at(section)
-    end
-
-    # Active feed items (not dismissed/acted) materialized since the last visit.
+    # Active feed items — not dismissed, not acted-on. The home dot lights up
+    # whenever there's something in the feed to process.
     def new_feed?
-      @user.feed_items.active.where("feed_items.created_at > ?", since(:home)).exists?
+      @user.feed_items.active.exists?
     end
 
-    # Mail that arrived (on a readable account) since the last inbox visit.
+    # Unskimmed mail on readable accounts. "Skimmed" means the user processed
+    # the email via Skim or a feed action — regardless of which surface they
+    # used. The dot clears naturally when the database state changes.
     def new_mail?
-      EmailMessage.accessible_to(@user)
-                  .where("email_messages.received_at > ?", since(:mail))
-                  .exists?
+      EmailMessage.accessible_to(@user).where(skimmed_at: nil).exists?
     end
 
-    # New events OR new pending reminders since the last calendar visit. Reminders
-    # have no nav item of their own — they ride inside the Calendar dot.
+    # Pending reminders that need a decision (confirm / dismiss / snooze).
+    # Calendar events are a view, not action items — reminders are the things
+    # that actually need human attention.
     def new_calendar?
-      ts = since(:calendar)
-      CalendarEvent.accessible_to(@user).visible
-                   .where("calendar_events.created_at > ?", ts).exists? ||
-        Reminder.accessible_to(@user).pending
-                .where("reminders.created_at > ?", ts).exists?
+      Reminder.accessible_to(@user).pending.exists?
     end
 
-    # Workspace documents (shared across the workspace) added since the last visit.
+    # Documents awaiting human sign-off (AI completed, review pending).
     def new_documents?
       return false unless @user.workspace
 
-      @user.workspace.documents.where("documents.created_at > ?", since(:documents)).exists?
+      @user.workspace.documents.needs_review.exists?
     end
 
-    # New Scout replies since the last visit — AI-authored messages on the user's
-    # own visible threads (proactive briefings aren't persisted, so they don't dot).
+    # Unread AI messages on the user's scout-visible threads. Marked read
+    # when the user visits Scout; new replies arrive as unread, lighting the
+    # dot back up.
     def new_scout?
-      AgentMessage.where(agent_thread: @user.agent_threads.scout_visible, author_type: :ai)
-                  .where("agent_messages.created_at > ?", since(:scout))
-                  .exists?
+      AgentMessage.where(agent_thread: @user.agent_threads.scout_visible,
+                         author_type: :ai, read: false).exists?
     end
   end
 end

@@ -6,7 +6,6 @@ require "pagy/extras/countless"
 class EmailMessagesController < ApplicationController
   before_action :require_authentication
   layout :select_layout
-  tracks_section_visit :mail, only: %i[index show]
 
   # Sidebar thread list page size. Sized to roughly fill the first viewport so the
   # initial render stays light; the rest streams in on scroll (infinite scroll).

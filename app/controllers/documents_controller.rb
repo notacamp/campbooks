@@ -1,6 +1,5 @@
 class DocumentsController < ApplicationController
   before_action :set_document, only: [ :show, :file, :rename, :update, :approve, :reject, :toggle_star, :reprocess, :push_to_notion, :push_to_drive, :push_to_zoho_drive ]
-  tracks_section_visit :documents, only: :index
 
   def index
     @document_types = Current.workspace.document_types.order(:name)

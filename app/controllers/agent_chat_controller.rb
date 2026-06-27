@@ -3,13 +3,18 @@ class AgentChatController < ApplicationController
   # Scout is a full-viewport multi-pane shell like the inbox, so it shares the
   # email layout (nav rail + mobile top/bottom bars + fixed shell region).
   layout "email"
-  tracks_section_visit :scout, only: :show
 
   def show
     @threads = current_user.agent_threads.scout_visible.with_messages.recent.limit(30)
     @thread = AgentThread.default_for(current_user)
     @messages = @thread.agent_messages.chronological.last(50)
     @briefing = Scout::Briefing.for(current_user) if @messages.empty?
+
+    # Mark unread AI replies as read on visit — clears the Scout nav dot. New
+    # replies arrive as read: false, lighting the dot back up until next visit.
+    AgentMessage.where(agent_thread: current_user.agent_threads.scout_visible)
+                .where(author_type: :ai, read: false)
+                .update_all(read: true)
   end
 
   def create

@@ -8,7 +8,6 @@ class RemindersController < ApplicationController
   before_action :set_reminder, only: %i[confirm dismiss snooze]
   # Reminders live inside the Calendar nav item, so visiting them clears the
   # shared :calendar dot (which also covers new pending reminders).
-  tracks_section_visit :calendar, only: :index
 
   def index
     scope = Reminder.accessible_to(current_user)

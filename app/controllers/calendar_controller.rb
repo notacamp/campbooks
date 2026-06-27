@@ -3,7 +3,6 @@
 # toggle nested under calendar_accounts.
 class CalendarController < ApplicationController
   before_action :require_authentication
-  tracks_section_visit :calendar, only: :index
 
   VIEWS = %w[agenda day week month].freeze
   AGENDA_LIMIT = 100 # how many upcoming events the agenda lists from the anchor date
