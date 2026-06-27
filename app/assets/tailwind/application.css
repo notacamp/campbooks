@@ -747,6 +747,72 @@ dialog[open] {
   color: var(--color-red-600, #dc2626);
 }
 
+/* ── TipTap tables ──────────────────────────────────────── */
+.tiptap-editor .ProseMirror .tableWrapper {
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+.tiptap-editor .ProseMirror table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+.tiptap-editor .ProseMirror td,
+.tiptap-editor .ProseMirror th {
+  border: 1px solid var(--color-gray-300);
+  padding: 0.4rem 0.6rem;
+  min-width: 2.5rem;
+  vertical-align: top;
+  position: relative;
+}
+.tiptap-editor .ProseMirror th {
+  background: var(--color-gray-100);
+  font-weight: 600;
+  text-align: left;
+}
+.tiptap-editor .ProseMirror td p,
+.tiptap-editor .ProseMirror th p {
+  margin: 0;
+}
+.tiptap-editor .ProseMirror .selectedCell {
+  background: var(--color-accent-50);
+}
+.tiptap-editor .ProseMirror .column-resize-handle {
+  background-color: var(--color-accent-500);
+  bottom: 0;
+  position: absolute;
+  right: -1px;
+  top: 0;
+  width: 2px;
+}
+
+/* ── TipTap highlight mark ─────────────────────────────── */
+.tiptap-editor .ProseMirror mark {
+  border-radius: 0.125rem;
+  padding: 0 0.125rem;
+}
+
+/* ── TipTap superscript / subscript ─────────────────────── */
+.tiptap-editor .ProseMirror sup {
+  font-size: 0.75em;
+  vertical-align: super;
+}
+.tiptap-editor .ProseMirror sub {
+  font-size: 0.75em;
+  vertical-align: sub;
+}
+
+/* ── TipTap font-family & toolbar selects ──────────────── */
+.tiptap-select--compact {
+  font-size: 0.75rem;
+  padding: 0.125rem 0.25rem;
+  border: 1px solid var(--color-gray-200);
+  border-radius: 0.25rem;
+  background: white;
+  color: var(--color-gray-700);
+  max-width: 6rem;
+}
+
 /* ── Compose attachment tray ──────────────────────────── */
 .compose-attachments-row {
   display: flex;

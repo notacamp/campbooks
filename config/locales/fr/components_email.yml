@@ -190,3 +190,14 @@ fr:
       text_color: Couleur du texte
       underline: Souligné
       undo: Annuler
+      table: Insérer un tableau
+      add_row_before: Ajouter une ligne
+      delete_row: Supprimer la ligne
+      add_column_before: Ajouter une colonne
+      delete_column: Supprimer la colonne
+      toggle_header: Basculer l'en-tête
+      font_family: Police
+      default_font: Police par défaut
+      highlight_color: Couleur de surbrillance
+      superscript: Exposant
+      subscript: Indice

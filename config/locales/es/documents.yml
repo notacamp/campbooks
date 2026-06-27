@@ -118,6 +118,31 @@ es:
       title: Docs
       upload: Subir
       upload_and_process: Subir y procesar
+      write: Escribir
+    written:
+      new:
+        title: Escribir documento
+        title_placeholder: Título del documento
+        editor_placeholder: Empieza a escribir…
+        save: Guardar documento
+        cancel: Cancelar
+        back_to_documents: Volver a Docs
+      create:
+        created: Documento guardado.
+      show:
+        edit: Editar
+        back_to_documents: Volver a Docs
+        created_at: "Creado el %{date}"
+        by: por %{name}
+      edit:
+        title: Editar documento
+        title_placeholder: Título del documento
+        editor_placeholder: Empieza a escribir…
+        save: Guardar cambios
+        cancel: Cancelar
+        back_to_document: Volver al documento
+      update:
+        updated: Documento actualizado.
     merge:
       keep_this_one: Conservar este
       label_date: 'Fecha:'

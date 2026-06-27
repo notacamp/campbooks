@@ -22,6 +22,7 @@
         <%= render Campbooks::Button.new(variant: :outline, size: :sm, type: :submit,
               data: { turbo_confirm: t(".export_confirm") }) { t(".export") } %>
       <% end %>
+      <%= render Campbooks::Button.new(variant: :outline, size: :sm, href: new_written_document_path) { t(".write") } %>
       <button type="button" data-action="click->upload#toggle"
           class="inline-flex items-center px-4 py-2 bg-accent-600 text-white text-sm font-medium rounded-md hover:bg-accent-700 cursor-pointer">
         <%= t(".upload") %>

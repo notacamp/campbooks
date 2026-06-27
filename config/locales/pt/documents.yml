@@ -117,6 +117,31 @@ pt:
       title: Documentos
       upload: Carregar
       upload_and_process: Carregar e Processar
+      write: Escrever
+    written:
+      new:
+        title: Escrever documento
+        title_placeholder: Título do documento
+        editor_placeholder: Comece a escrever…
+        save: Guardar documento
+        cancel: Cancelar
+        back_to_documents: Voltar para Docs
+      create:
+        created: Documento guardado.
+      show:
+        edit: Editar
+        back_to_documents: Voltar para Docs
+        created_at: "Criado a %{date}"
+        by: por %{name}
+      edit:
+        title: Editar documento
+        title_placeholder: Título do documento
+        editor_placeholder: Comece a escrever…
+        save: Guardar alterações
+        cancel: Cancelar
+        back_to_document: Voltar ao documento
+      update:
+        updated: Documento atualizado.
     merge:
       keep_this_one: Manter Este
       label_date: 'Data:'

@@ -36,11 +36,21 @@ module Campbooks
       image:        '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/>',
       undo:         '<path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>',
       redo:         '<path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>',
-      clear:        '<path d="M4 7V4h16v3"/><line x1="5" y1="20" x2="11" y2="20"/><line x1="13" y1="4" x2="8" y2="20"/><line x1="15" y1="15" x2="20" y2="20"/><line x1="20" y1="15" x2="15" y2="20"/>'
+      clear:        '<path d="M4 7V4h16v3"/><line x1="5" y1="20" x2="11" y2="20"/><line x1="13" y1="4" x2="8" y2="20"/><line x1="15" y1="15" x2="20" y2="20"/><line x1="20" y1="15" x2="15" y2="20"/>',
+      highlight:    '<path d="m9 11-3 3 3 3"/><path d="m8 12 6-6 4 4-6 6"/><path d="M16 4h4v4"/><line x1="8" y1="20" x2="20" y2="20"/>',
+      superscript:  '<path d="m4 19 8-8"/><path d="m12 11-8 8"/><path d="M17 8h4"/><path d="m19 4 2 4"/><path d="M15 4h4"/>',
+      subscript:    '<path d="m4 19 8-8"/><path d="m12 11-8 8"/><path d="M17 20h4"/><path d="m19 16 2 4"/><path d="M15 20h4"/>',
+      table:        '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/>',
+      add_row:      '<path d="M12 5v14"/><path d="M5 12h14"/>',
+      delete_row:   '<path d="M5 12h14"/>',
+      add_col:      '<path d="M12 5v14"/><path d="M5 12h14"/>',
+      delete_col:   '<path d="M12 5v14"/>',
+      toggle_header: '<path d="M6 4h12a2 2 0 0 1 2 2v2H4V6a2 2 0 0 1 2-2z"/><path d="M4 10h16v4H4z"/><path d="M6 16H4v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2h-2"/><path d="M9 4v16"/><path d="M4 10h16"/>'
     }.freeze
 
     def initialize(input_name:, content: nil, placeholder: nil, variant: :full, images: true,
-                   upload_url: nil, min_height: nil, editor_class: nil, wrapper_class: nil, toolbar: true)
+                   upload_url: nil, min_height: nil, editor_class: nil, wrapper_class: nil, toolbar: true,
+                   tables: nil, font_family: nil, highlight: nil, superscript: nil, subscript: nil)
       @input_name = input_name
       @content = content.to_s
       @placeholder = placeholder
@@ -51,7 +61,20 @@ module Campbooks
       @editor_class = editor_class
       @wrapper_class = wrapper_class
       @toolbar = toolbar
+      @tables = tables
+      @font_family = font_family
+      @highlight = highlight
+      @superscript = superscript
+      @subscript = subscript
     end
+
+    FEATURE_VARIANTS = {
+      tables:      { document: true,  full: false, compact: false }.freeze,
+      font_family: { document: true,  full: false, compact: false }.freeze,
+      highlight:   { document: true,  full: false, compact: false }.freeze,
+      superscript: { document: true,  full: false, compact: false }.freeze,
+      subscript:   { document: true,  full: false, compact: false }.freeze
+    }.freeze
 
     def view_template
       div(
@@ -67,7 +90,13 @@ module Campbooks
           tiptap_editor_toolbar_value: @toolbar.to_s,
           tiptap_editor_heading_value: advanced?.to_s,
           tiptap_editor_code_block_value: advanced?.to_s,
-          tiptap_editor_upload_url_value: @upload_url.to_s
+          tiptap_editor_blockquote_value: advanced?.to_s,
+          tiptap_editor_upload_url_value: @upload_url.to_s,
+          tiptap_editor_tables_value: feature_enabled?(:tables).to_s,
+          tiptap_editor_font_family_value: feature_enabled?(:font_family).to_s,
+          tiptap_editor_highlight_value: feature_enabled?(:highlight).to_s,
+          tiptap_editor_super_script_value: feature_enabled?(:superscript).to_s,
+          tiptap_editor_sub_script_value: feature_enabled?(:subscript).to_s
         }
       ) do
         input(type: "hidden", name: @input_name, value: @content, data: { tiptap_editor_target: "input" })
@@ -86,7 +115,13 @@ module Campbooks
     private
 
     def advanced?
-      @variant == :full
+      @variant == :full || @variant == :document
+    end
+
+    def feature_enabled?(name)
+      override = instance_variable_get(:"@#{name}")
+      return override unless override.nil?
+      FEATURE_VARIANTS.dig(name, @variant) || false
     end
 
     def render_toolbar
@@ -102,12 +137,21 @@ module Campbooks
         tool(:strike,    "toggleStrike",    t(".strikethrough"), active: "strike")
         tool(:code, "toggleCode", t(".inline_code"), active: "code") if advanced?
         color_control
+        if feature_enabled?(:highlight)
+          highlight_control
+        end
         divider
 
         tool(:align_left,   "setAlign", t(".align_left"),   active: { textAlign: "left" },   param: "left")
         tool(:align_center, "setAlign", t(".align_center"), active: { textAlign: "center" }, param: "center")
         tool(:align_right,  "setAlign", t(".align_right"),  active: { textAlign: "right" },  param: "right")
         divider
+
+        if feature_enabled?(:superscript) || feature_enabled?(:subscript)
+          tool(:superscript, "toggleSuperscript", t(".superscript"), active: "superscript") if feature_enabled?(:superscript)
+          tool(:subscript, "toggleSubscript", t(".subscript"), active: "subscript") if feature_enabled?(:subscript)
+          divider
+        end
 
         tool(:bullet_list,  "toggleBulletList",  t(".bullet_list"),  active: "bulletList")
         tool(:ordered_list, "toggleOrderedList", t(".numbered_list"), active: "orderedList")
@@ -118,6 +162,17 @@ module Campbooks
         end
         divider
 
+        if feature_enabled?(:tables)
+          tool(:table, "insertTable", t(".table"))
+          table_edit_buttons
+          divider
+        end
+
+        if feature_enabled?(:font_family)
+          font_family_select
+          divider
+        end
+
         tool(:link, "openLink", t(".link"), active: "link")
         tool(:image, "openImage", t(".image")) if @images
         divider
@@ -125,6 +180,43 @@ module Campbooks
         tool(:undo, "undo", t(".undo"))
         tool(:redo, "redo", t(".redo"))
         tool(:clear, "clearFormatting", t(".clear_formatting"))
+      end
+    end
+
+    def table_edit_buttons
+      div(data: { rte_table_only: true }, class: "hidden flex items-center gap-0.125") do
+        tool(:add_row,    "addRowBefore",    t(".add_row_before"))
+        tool(:delete_row, "deleteRow",       t(".delete_row"))
+        tool(:add_col,    "addColBefore",    t(".add_column_before"))
+        tool(:delete_col, "deleteCol",       t(".delete_column"))
+        tool(:toggle_header, "toggleHeaderCell", t(".toggle_header"))
+      end
+    end
+
+    def highlight_control
+      label(class: "tiptap-color", title: t(".highlight_color"), aria_label: t(".highlight_color")) do
+        span(class: "tiptap-color-glyph") { "H" }
+        input(
+          type: "color",
+          value: "#ffff00",
+          data: { tiptap_editor_target: "highlightInput", action: "input->tiptap-editor#setHighlight" }
+        )
+      end
+    end
+
+    def font_family_select
+      select(
+        data: { tiptap_editor_target: "fontFamilySelect", action: "change->tiptap-editor#setFontFamily" },
+        class: "tiptap-select tiptap-select--compact",
+        aria_label: t(".font_family")
+      ) do
+        option(value: "") { t(".default_font") }
+        option(value: "Inter, sans-serif") { "Inter" }
+        option(value: "Georgia, serif") { "Serif" }
+        option(value: "ui-monospace, monospace") { "Monospace" }
+        option(value: "Arial, sans-serif") { "Arial" }
+        option(value: "Times New Roman, serif") { "Times" }
+        option(value: "Courier New, monospace") { "Courier" }
       end
     end
 

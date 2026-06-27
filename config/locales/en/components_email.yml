@@ -187,3 +187,14 @@ en:
       text_color: Text color
       underline: Underline
       undo: Undo
+      table: Insert table
+      add_row_before: Add row
+      delete_row: Delete row
+      add_column_before: Add column
+      delete_column: Delete column
+      toggle_header: Toggle header
+      font_family: Font
+      default_font: Default font
+      highlight_color: Highlight color
+      superscript: Superscript
+      subscript: Subscript
