@@ -59,6 +59,6 @@ RSpec.describe "Opening an email keeps the active filter", type: :request do
     get search_email_messages_path(q: "invoice")
 
     # The result anchor points back at the message *with* the query preserved.
-    expect(response.body).to match(%r{/email_messages/\d+\?[^"]*q=invoice})
+    expect(response.body).to match(%r{/email_messages/[0-9a-f-]+\?[^"]*q=invoice})
   end
 end

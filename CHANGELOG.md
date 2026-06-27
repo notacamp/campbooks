@@ -24,6 +24,15 @@ major, minor, or patch change here.
   directory page, per-organization profile pages, and a backfill from existing
   AI-extracted `Person.organization` strings.
 
+### Changed
+
+- ⚠️ **All record identifiers are now UUIDs.** Primary keys across every domain
+  table moved from sequential integers to UUIDs, so ids in URLs and in the public
+  REST API are now non-sequential uuids (e.g. `/documents/9d94f3a1-…` instead of
+  `/documents/42`). Existing integer-id URLs, bookmarks, and stored API ids will
+  no longer resolve. Self-hosters: a single upgrade migration rewrites every
+  primary and foreign key in one transaction.
+
 ### Fixed
 
 - Avatar stacks (facepiles) in the email list and board view now show the

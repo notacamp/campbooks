@@ -99,14 +99,14 @@ module Emails
     end
 
     def filter_accounts(rel)
-      ids = int_array(@params[:account_ids])
+      ids = id_array(@params[:account_ids])
       return rel if ids.empty?
       allowed = @user.readable_email_accounts.where(id: ids).ids
       allowed.any? ? rel.where(email_account_id: allowed) : rel.none
     end
 
     def filter_tags(rel)
-      ids = int_array(@params[:tag_ids])
+      ids = id_array(@params[:tag_ids])
       return rel if ids.empty?
 
       if @params[:tag_match].to_s == "all"
@@ -181,11 +181,11 @@ module Emails
       )
       return [] if raw.blank?
 
-      allowed = @user.readable_email_accounts.ids.to_set
+      allowed = @user.readable_email_accounts.ids.map(&:to_s).to_set
       raw.filter_map do |r|
         sr = r.search_record
         next unless sr && r.searchable_type == "EmailMessage"
-        next unless allowed.include?(sr.filter_data["email_account_id"].to_i)
+        next unless allowed.include?(sr.filter_data["email_account_id"].to_s)
         r.searchable_id
       end
     rescue => e
@@ -198,8 +198,8 @@ module Emails
     # SQL safety net in #results re-applies every filter); they only improve recall.
     def search_service_filters
       filters = { searchable_type: "EmailMessage" }
-      account_ids = int_array(@params[:account_ids])
-      tag_names = Tag.where(id: int_array(@params[:tag_ids])).pluck(:name)
+      account_ids = id_array(@params[:account_ids])
+      tag_names = Tag.where(id: id_array(@params[:tag_ids])).pluck(:name)
 
       filters[:provider_folder_ids] = @folder_ids if @folder_ids.present?
       filters[:account_ids] = account_ids if account_ids.any?
@@ -219,8 +219,13 @@ module Emails
 
     # --- helpers ---
 
-    def int_array(value)
-      Array(value).filter_map { |v| Integer(v.to_s.strip, exception: false) }
+    UUID_RE = /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
+
+    # Record-id params arrive as uuid strings. Keep only well-formed uuids so a
+    # malformed value can't reach a uuid column (which would raise) — and so an
+    # all-garbage list yields [] (filter treated as absent), never a silent leak.
+    def id_array(value)
+      Array(value).filter_map { |v| s = v.to_s.strip.downcase; s if s.match?(UUID_RE) }
     end
 
     def sanitize_like(str)

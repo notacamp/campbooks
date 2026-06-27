@@ -87,7 +87,7 @@ RSpec.describe Emails::Sender do
           to_address: "no-reply@example.com", subject: "With attachment", body: "See attached",
           attachment_signed_ids: %w[signed-id-1 signed-id-2])
       }.to have_enqueued_job(Emails::SentAttachmentProcessJob)
-        .with(kind_of(Integer), user.id, %w[signed-id-1 signed-id-2])
+        .with(kind_of(String), user.id, %w[signed-id-1 signed-id-2])
       sent = account.email_messages.find_by(provider_message_id: "PROVIDER456")
       expect(sent.has_attachment).to be true
     end

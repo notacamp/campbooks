@@ -23,7 +23,7 @@ RSpec.describe Connection do
 
     expect(connection.reload.auth_secret).to eq("tok_secret")
     raw = ActiveRecord::Base.connection.select_value(
-      "SELECT auth_secret FROM connections WHERE id = #{connection.id}"
+      "SELECT auth_secret FROM connections WHERE id = '#{connection.id}'"
     )
     expect(raw).to be_present
     expect(raw).not_to include("tok_secret")

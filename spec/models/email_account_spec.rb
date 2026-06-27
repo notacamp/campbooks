@@ -132,7 +132,7 @@ RSpec.describe EmailAccount, type: :model do
       expect(account.refresh_token).to eq("secret-token-123")
       # The DB column should not contain the plain text
       raw = ActiveRecord::Base.connection.execute(
-        "SELECT refresh_token FROM email_accounts WHERE id = #{account.id}"
+        "SELECT refresh_token FROM email_accounts WHERE id = '#{account.id}'"
       ).first["refresh_token"]
       expect(raw).not_to include("secret-token-123")
     end

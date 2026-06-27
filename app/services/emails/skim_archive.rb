@@ -5,9 +5,13 @@ module Emails
   # user can actually read are touched, so a forged id list can't reach another
   # account's mail. Delegates the real work to the existing Tools::BulkArchive.
   class SkimArchive
-    # Pure input sanitiser (coerce, drop blanks/zeros/negatives, dedup).
+    UUID_RE = /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/i
+
+    # Pure input sanitiser: keep only well-formed uuids and dedup. Anything
+    # malformed (blank, garbage, a forged non-uuid) is dropped, so it can never
+    # reach the uuid `id` column — an all-garbage list sanitises to [].
     def self.sanitize_ids(raw)
-      Array(raw).map { |value| value.to_i }.reject { |id| id <= 0 }.uniq
+      Array(raw).filter_map { |value| s = value.to_s.strip.downcase; s if s.match?(UUID_RE) }.uniq
     end
 
     def initialize(user, raw_ids)

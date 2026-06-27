@@ -63,7 +63,7 @@ RSpec.describe "BugReports", type: :request do
 
         post bug_reports_path, params: { description: "hi" }, headers: { "Accept" => "application/json" }
 
-        expect(BugReportGithubSyncJob).to have_received(:perform_later).with(kind_of(Integer))
+        expect(BugReportGithubSyncJob).to have_received(:perform_later).with(kind_of(String))
       end
 
       it "skips the GitHub sync job when GitHub is not configured" do
