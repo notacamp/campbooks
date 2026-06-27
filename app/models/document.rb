@@ -157,6 +157,16 @@ class Document < ApplicationRecord
     save!
   end
 
+  scope :by_organization, ->(org, active_only: true) {
+    people_ids = Person.joins(:organization_memberships)
+      .where(organization_memberships: { organization_id: org.id })
+    people_ids = people_ids.where(organization_memberships: { status: :active }) if active_only
+    contact_ids = Contact.where(person_id: people_ids.select(:id)).select(:id)
+    joins(:document_email_messages)
+      .where(document_email_messages: { email_message_id: EmailMessage.where(contact_id: contact_ids).select(:id) })
+      .distinct
+  }
+
   # --- Skim review actions (shared by DocumentsController and Documents::SkimController) ---
 
   # Confirm the AI's classification: the human signs off (review_status: approved).
