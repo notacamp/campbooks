@@ -1,0 +1,26 @@
+<% content_for :cp_context, "scheduled_emails" %>
+
+<div class="mx-auto max-w-3xl px-4 py-6 sm:px-6 lg:px-8">
+  <div class="flex items-center justify-between mb-6">
+    <%= link_to t(".back"), scheduled_emails_path, class: "text-sm text-gray-500 hover:text-gray-700 no-underline" %>
+    <div class="flex items-center gap-2">
+      <%= link_to t(".edit"), edit_scheduled_email_path(@scheduled_email), class: "inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-muted no-underline" %>
+      <%= button_to t(".cancel"), @scheduled_email, method: :delete, form: { data: { turbo_confirm: t(".confirm_cancel") } }, class: "inline-flex items-center rounded-lg border border-red-200 text-red-600 px-3 py-1.5 text-sm hover:bg-red-50 cursor-pointer" %>
+    </div>
+  </div>
+
+  <div class="rounded-xl border border-border bg-card p-6">
+    <h1 class="text-lg font-semibold text-foreground mb-4"><%= @scheduled_email.subject %></h1>
+    <div class="space-y-3 text-sm">
+      <div class="flex gap-2"><span class="text-gray-400 w-20 shrink-0"><%= ScheduledEmail.human_attribute_name(:to_address) %></span><span class="text-foreground"><%= @scheduled_email.to_address %></span></div>
+      <% if @scheduled_email.cc_address.present? %><div class="flex gap-2"><span class="text-gray-400 w-20 shrink-0"><%= ScheduledEmail.human_attribute_name(:cc_address) %></span><span class="text-foreground"><%= @scheduled_email.cc_address %></span></div><% end %>
+      <div class="flex gap-2"><span class="text-gray-400 w-20 shrink-0"><%= t(".from") %></span><span class="text-foreground"><%= @scheduled_email.email_account.display_name %></span></div>
+      <div class="flex gap-2"><span class="text-gray-400 w-20 shrink-0"><%= t(".scheduled") %></span><span class="text-foreground"><%= l(@scheduled_email.display_time, format: :long) %></span><% if @scheduled_email.recurring? %><span class="text-cyan-600 text-xs"><%= t(".recurring_label", rule: @scheduled_email.rrule) %></span><% end %></div>
+      <div class="flex gap-2"><span class="text-gray-400 w-20 shrink-0"><%= t(".status") %></span><span class="<%= @scheduled_email.pending? ? 'bg-cyan-100 text-cyan-700' : 'bg-gray-100 text-gray-500' %> inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"><%= human_enum(ScheduledEmail, :status, @scheduled_email.status) %></span></div>
+    </div>
+    <div class="mt-6 p-4 bg-muted/50 rounded-lg">
+      <h2 class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2"><%= t(".preview") %></h2>
+      <div class="prose prose-sm max-w-none text-foreground"><%= raw @scheduled_email.body %></div>
+    </div>
+  </div>
+</div>

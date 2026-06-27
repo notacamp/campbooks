@@ -41,6 +41,12 @@ module Campbooks
              class: "space-y-2") do
           input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
 
+          if helpers.email_scheduling_enabled?
+            default_scheduled_at = (Time.current + 1.hour).change(min: (Time.current.min / 30) * 30)
+            input(type: "hidden", name: "scheduled_at", value: default_scheduled_at.strftime("%Y-%m-%dT%H:%M"))
+            input(type: "hidden", name: "rrule", value: "")
+          end
+
           # To field
           div(class: "flex items-start gap-2") do
             label(class: "w-10 text-xs font-medium text-gray-500 pt-1.5 flex-shrink-0 text-right") { t(".label_to") }
@@ -125,12 +131,22 @@ module Campbooks
 
           # Actions row
           div(id: "compose_actions_#{@email_message.id}", class: "flex items-center gap-2") do
-            button(type: "submit",
+            button(type: "submit", name: "send_action", value: "send_now",
                    class: "inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors") do
               svg(class: "w-3.5 h-3.5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24") do
                 raw(safe('<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>'))
               end
               plain t(".send")
+            end
+
+            if helpers.email_scheduling_enabled?
+              button(type: "submit", name: "send_action", value: "schedule",
+                     class: "inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors") do
+                svg(class: "w-3.5 h-3.5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24") do
+                  raw(safe('<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>'))
+                end
+                plain t(".schedule")
+              end
             end
 
             button(type: "button", data: { action: "click->compose-area#discard" },

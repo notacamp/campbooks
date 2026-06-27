@@ -14,6 +14,7 @@ ENV["SIGNUP_MODE"] ||= "open"
 ENV["ENABLE_WORKFLOWS"] ||= "1"
 ENV["ENABLE_EMAIL_BOARD"] ||= "1"
 ENV["ENABLE_MICROSOFT"] ||= "1"
+ENV["ENABLE_EMAIL_SCHEDULING"] ||= "1"
 
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.

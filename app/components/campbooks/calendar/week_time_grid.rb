@@ -1,19 +1,15 @@
 module Campbooks
   module Calendar
-    # Desktop 7-day time grid: a shared hour axis on the left and seven day columns
-    # with positioned events. Shares the hour scale + overlap packing with DayGrid
-    # via TimeGrid; each day's boxes (0-100% of one day) are scaled into that day's
-    # 1/7 slice of the track. Paired with the responsive WeekGrid column-list on
-    # mobile (the calendar view shows this only at md+).
     class WeekTimeGrid < Campbooks::Base
       include TimeGrid
-
       DAY_W = 100.0 / 7
 
-      def initialize(date:, events:, reminders: [])
+      def initialize(date:, events:, reminders: [], snoozed_threads: [], scheduled_emails: [])
         @date = date
         @events = events.to_a
         @reminders = reminders.to_a
+        @snoozed_threads = snoozed_threads.to_a
+        @scheduled_emails = scheduled_emails.to_a
       end
 
       def view_template
@@ -43,18 +39,14 @@ module Campbooks
       private
 
       def days = (@date.beginning_of_week..@date.end_of_week).to_a
-
-      def by_day
-        @by_day ||= @events.group_by { |e| e.start_at&.to_date }
-      end
-
+      def by_day = @by_day ||= @events.group_by { |e| e.start_at&.to_date }
       def events_for(day) = by_day[day] || []
-
-      def reminders_by_day
-        @reminders_by_day ||= @reminders.group_by { |r| r.due_at.to_date }
-      end
-
+      def reminders_by_day = @reminders_by_day ||= @reminders.group_by { |r| r.due_at.to_date }
       def reminders_for(day) = reminders_by_day[day] || []
+      def snoozed_by_day = @snoozed_by_day ||= @snoozed_threads.group_by { |t| t.snoozed_until.to_date }
+      def snoozed_for(day) = snoozed_by_day[day] || []
+      def scheduled_by_day = @scheduled_by_day ||= @scheduled_emails.group_by { |s| (s.next_occurrence_at || s.scheduled_at).to_date }
+      def scheduled_for(day) = scheduled_by_day[day] || []
 
       def render_header
         div(class: "flex border-b border-border") do
@@ -70,7 +62,7 @@ module Campbooks
       end
 
       def render_all_day_row
-        return unless days.any? { |d| events_for(d).any?(&:all_day) } || @reminders.any?
+        return unless days.any? { |d| events_for(d).any?(&:all_day) } || @reminders.any? || @snoozed_threads.any? || @scheduled_emails.any?
         div(class: "flex border-b border-border") do
           div(class: "w-14 shrink-0 px-2 py-1 text-[10px] text-muted-foreground") { t("components.calendar.event_row.all_day") }
           days.each do |day|
@@ -82,6 +74,8 @@ module Campbooks
                   style: "background-color: #{e.display_color}; color: #{contrast_on(e.display_color)}") { e.title.presence || t("components.calendar.event_row.untitled") }
               end
               reminders_for(day).each { |reminder| render Campbooks::Calendar::ReminderChip.new(reminder: reminder) }
+              snoozed_for(day).each { |thread| render Campbooks::Calendar::SnoozedChip.new(thread: thread) }
+              scheduled_for(day).each { |email| render Campbooks::Calendar::ScheduledEmailChip.new(scheduled_email: email) }
             end
           end
         end

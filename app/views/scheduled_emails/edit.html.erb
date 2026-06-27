@@ -1,0 +1,5 @@
+<% content_for :cp_context, "scheduled_emails" %>
+<div class="mx-auto max-w-3xl px-4 py-6 sm:px-6 lg:px-8">
+  <h1 class="text-xl font-semibold text-foreground mb-6"><%= t(".title") %></h1>
+  <%= render "form", scheduled_email: @scheduled_email, email_accounts: @email_accounts %>
+</div>
