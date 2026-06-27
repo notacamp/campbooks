@@ -24,6 +24,20 @@ major, minor, or patch change here.
   human-readable names (e.g. "Personal"), a muted colour palette, and are **hidden
   by default** in the inbox tag list. Toggle them back on via the new
   `show_system_labels` workspace setting.
+- Mistral is now available as a document-analysis (vision) provider
+  (`pixtral-large-latest`), and is the managed default for EU residents.
+  Document analysis now uses `pixtral-large-latest`; text AI continues on
+  `mistral-small-latest`.
+
+### Fixed
+
+- **Document AI extraction blank in prod** — PDF documents processed through the
+  OpenAI adapter were failing silently because ImageMagick was missing from the
+  Docker image (`convert: command not found`). Added `imagemagick ghostscript` to
+  the base image and relaxed the default PDF security policy so `convert` can read
+  PDFs. Switched the managed "Campbooks AI" document provider from OpenAI to Mistral
+  (EU-based, `pixtral-large-latest`), so managed document analysis now runs entirely
+  on EU infrastructure.
 
 ## [0.2.0] - 2026-06-26
 
