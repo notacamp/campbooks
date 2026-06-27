@@ -8,11 +8,12 @@ module Ai
   module Platform
     # Managed text runs on Mistral (Paris) so a cloud workspace's email/chat content
     # stays in the EU by default — the GDPR-preferred default (was DeepSeek/China).
-    # Documents need vision, so they still run on OpenAI (Mistral pixtral/vision for
-    # documents is a tracked follow-up). Both reuse the BYO-setup default models.
-    # NB: requires MISTRAL_API_KEY in the platform env, else managed AI is unavailable.
+    # Documents need vision. Anthropic reads PDFs natively (type: "document" blocks),
+    # so no ImageMagick/ghostscript dependency — unlike OpenAI, which requires a
+    # fragile PDF→image conversion step.
+    # NB: requires MISTRAL_API_KEY + ANTHROPIC_API_KEY in the platform env.
     MANAGED_TEXT_PROVIDER = "mistral".freeze
-    MANAGED_DOC_PROVIDER  = "openai".freeze
+    MANAGED_DOC_PROVIDER  = "anthropic".freeze
 
     module_function
 

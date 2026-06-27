@@ -16,6 +16,16 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Document AI extraction blank in prod** — PDF documents processed through the
+  OpenAI adapter were failing silently because ImageMagick was missing from the
+  Docker image (`convert: command not found`). Added `imagemagick ghostscript` to
+  the base image and relaxed the default PDF security policy so `convert` can read
+  PDFs. Also switched the managed "Campbooks AI" document provider from OpenAI to
+  Anthropic, which reads PDFs natively (type: "document" blocks) and doesn't need
+  ImageMagick at all.
+
 ### Changed
 
 - System labels imported from Gmail (IMPORTANT, CATEGORY_PERSONAL, etc.) now get
