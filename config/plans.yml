@@ -82,6 +82,10 @@ plans:
 
   # ── Pro ───────────────────────────────────────────────────────────────────
   pro:
+    organizations:
+      type: flag
+      allowed: true
+      enabled: true
     email_accounts:
       type: limit
       allowed: true
@@ -128,6 +132,10 @@ plans:
 
   # ── Business ──────────────────────────────────────────────────────────────
   business:
+    organizations:
+      type: flag
+      allowed: true
+      enabled: true
     email_accounts:
       type: limit
       allowed: true
@@ -174,6 +182,10 @@ plans:
 
   # ── Unlimited (self-hosted canonical / cloud escape hatch) ──────────────────
   unlimited:
+    organizations:
+      type: flag
+      allowed: true
+      enabled: true
     email_accounts:
       type: limit
       allowed: true
