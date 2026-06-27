@@ -18,10 +18,28 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Google Drive folder picker** — the Drive config form now offers an
+  interactive folder browser (browse, select, or create folders) instead of
+  requiring a pasted folder ID. The selected folder path is stored and
+  displayed as a human-readable label.
+- **Drive push status in document list** — a Drive column in the documents
+  table (desktop) and a Drive badge on document cards (mobile) show whether
+  a document has been pushed to Drive (green checkmark), failed (amber warning
+  with one-click retry), or hasn't been pushed yet.
+- **Retry all failed Drive pushes** — the Google Drive settings page now shows
+  a count of failed uploads and a "Retry all" button that re-enqueues every
+  failed document in one click.
 - **Organizations** — first-class company/employer grouping on top of contacts,
   behind the `ENABLE_ORGANIZATIONS` feature flag. People can belong to multiple
   organizations (active or past); organizations auto-populate from existing
   AI-extracted `Person.organization` strings via a workspace-scoped backfill.
+
+### Changed
+
+- **Google Drive auto-push now defaults to on** — when you configure a Drive
+  destination for a document type, approved documents are uploaded automatically
+  unless you explicitly pause it. The checkbox label now reads "Upload
+  automatically when approved." A migration flips the column default.
   Includes organization-scoped filtering for emails and documents, a directory
   page, and per-organization profile pages with member lists and recent activity.
   Organization badges appear on contact profiles, email detail, and document
