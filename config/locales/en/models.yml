@@ -97,6 +97,12 @@ en:
           email: Email
           manual_upload: Manual Upload
           notion: Notion
+      document_template:
+        ai_statuses:
+          completed: Ready
+          failed: Failed
+          pending: Draft
+          processing: Generating
       document_type:
         categories:
           accounting: Accounting
