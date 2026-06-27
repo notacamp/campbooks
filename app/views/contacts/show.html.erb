@@ -50,6 +50,19 @@
       <p class="text-xs font-medium text-muted-foreground mb-1"><%= t(".last_contact_label") %></p>
       <p class="text-sm text-foreground"><%= @contact.last_email_at ? t(".last_contact_ago", time: time_ago_in_words(@contact.last_email_at)) : "—" %></p>
     </div>
+    <% if current_entitlements.feature?(:organizations) %>
+      <div>
+        <p class="text-xs font-medium text-muted-foreground mb-1"><%= t(".organization_label") %></p>
+        <% org = @contact.person&.primary_organization %>
+        <% if org %>
+          <%= render(Campbooks::OrganizationBadge.new(organization: org)) %>
+        <% elsif @contact.organization.present? %>
+          <p class="text-sm text-muted-foreground"><%= @contact.organization %></p>
+        <% else %>
+          <p class="text-sm text-muted-foreground">—</p>
+        <% end %>
+      </div>
+    <% end %>
   </section>
 
   <div id="contact_analysis_section">

@@ -16,6 +16,14 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Organizations** — first-class company/employer grouping on top of contacts,
+  gated by billing entitlements. People can belong to multiple organizations
+  (active or past). Includes scoped filtering for emails and documents, a
+  directory page, per-organization profile pages, and a backfill from existing
+  AI-extracted `Person.organization` strings.
+
 ### Fixed
 
 - Avatar stacks (facepiles) in the email list and board view now show the
