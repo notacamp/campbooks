@@ -1,0 +1,15 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+
+<header class="flex items-center gap-3 pb-5 border-b border-border mb-6">
+  <%= link_to settings_pipelines_path, class: "text-muted-foreground hover:text-foreground -ml-1 p-1" do %>
+    <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
+    </svg>
+  <% end %>
+  <div class="min-w-0">
+    <h2 class="text-lg font-semibold text-foreground"><%= t(".heading") %></h2>
+    <p class="text-[13px] text-muted-foreground mt-0.5"><%= t(".subtitle") %></p>
+  </div>
+</header>
+
+<%= render "form", pipeline: @pipeline %>

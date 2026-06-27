@@ -1,0 +1,7 @@
+en:
+  pipeline_board:
+    index:
+      drag_hint: Drag cards between stages
+      empty_stage: No items yet
+      terminal_hint: Terminal stage
+      no_subject: No subject
