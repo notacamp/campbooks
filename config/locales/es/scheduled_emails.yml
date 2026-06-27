@@ -1,0 +1,85 @@
+---
+es:
+  scheduled_emails:
+    index:
+      title: Correos programados
+      new: Nuevo correo programado
+      empty_title: No hay correos programados
+      empty_description: Programa un correo para enviarlo más tarde, una vez o de forma recurrente.
+      to: "Para %{address}"
+      scheduled_for: "Programado para %{time}"
+      recurring: Recurrente
+    new:
+      title: Programar un correo
+    create:
+      created: Correo programado correctamente.
+    edit:
+      title: Editar correo programado
+    update:
+      updated: Correo programado actualizado.
+    destroy:
+      cancelled: Correo programado cancelado.
+    show:
+      title: Correo programado
+      back: ← Volver a los correos programados
+      edit: Editar
+      cancel: Cancelar programación
+      confirm_cancel: ¿Cancelar este correo programado?
+      from: De
+      scheduled: Programado
+      recurring_label: "Se repite: %{rule}"
+      status: Estado
+      preview: Vista previa
+    form:
+      errors:
+        one: "1 error impidió guardar este correo programado:"
+        other: "%{count} errores impidieron guardar este correo programado:"
+      select_account: Selecciona una cuenta de correo…
+      body_placeholder: Escribe tu correo aquí.
+      rrule_hint: 'Elige con qué frecuencia se repite este correo. "No se repite" lo envía una vez.'
+      cancel: Cancelar
+    recurrence:
+      none: No se repite
+      daily: A diario
+      weekly: Semanalmente
+      biweekly: Cada 2 semanas
+      monthly: Mensualmente
+      custom: Personalizado
+  email_compose:
+    send_message:
+      scheduled: "Correo programado para %{time}. Gestiónalo en Correos programados."
+      schedule_failed: No se pudo programar el correo. Revisa los campos obligatorios.
+  entitlements:
+    features:
+      email_scheduling: Programación de correos
+  components:
+    compose_area:
+      schedule: Programar
+      schedule_at_label: Enviar el
+      schedule_for_later: Programar para más tarde
+    calendar:
+      snoozed_row:
+        no_subject: "(Correo pospuesto)"
+        snoozed_from: "Vuelve — %{account}"
+      scheduled_email_row:
+        to: "Para %{address}"
+  activerecord:
+    attributes:
+      scheduled_email:
+        to_address: Para
+        cc_address: Cc
+        bcc_address: Cco
+        subject: Asunto
+        body: Cuerpo
+        scheduled_at: Enviar el
+        rrule: Recurrencia
+        email_account_id: De
+        statuses:
+          pending: Pendiente
+          sent: Enviado
+          cancelled: Cancelado
+          failed: Fallido
+    models:
+      scheduled_email:
+        one: Correo programado
+        other: Correos programados

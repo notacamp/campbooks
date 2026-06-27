@@ -34,6 +34,18 @@ class ScheduledEmail < ApplicationRecord
     rrule.present?
   end
 
+  # Maps the constrained RRULE values the UI offers back to a translation key
+  # (scheduled_emails.recurrence.*), so views never surface a raw RRULE string.
+  def recurrence_key
+    case rrule
+    when "FREQ=DAILY" then :daily
+    when "FREQ=WEEKLY" then :weekly
+    when "FREQ=WEEKLY;INTERVAL=2" then :biweekly
+    when "FREQ=MONTHLY" then :monthly
+    else :custom
+    end
+  end
+
   # The time this item next fires: the computed next occurrence for recurring
   # items, otherwise the one-time scheduled_at.
   def display_time
