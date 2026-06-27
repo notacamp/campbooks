@@ -89,4 +89,18 @@ RSpec.describe ScheduledEmail do
       expect(email.display_time).to eq(email.next_occurrence_at)
     end
   end
+
+  describe "#recurrence_key" do
+    {
+      "FREQ=DAILY" => :daily,
+      "FREQ=WEEKLY" => :weekly,
+      "FREQ=WEEKLY;INTERVAL=2" => :biweekly,
+      "FREQ=MONTHLY" => :monthly,
+      "FREQ=YEARLY" => :custom
+    }.each do |rrule, key|
+      it "maps #{rrule.inspect} to #{key.inspect}" do
+        expect(build(:scheduled_email, rrule: rrule).recurrence_key).to eq(key)
+      end
+    end
+  end
 end

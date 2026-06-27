@@ -31,22 +31,30 @@ class ScheduleCalculator
     end
   end
 
+  # Each advance_* method math-jumps close to `now` (so a schedule started years
+  # ago doesn't loop period-by-period), then steps forward by whole intervals
+  # until strictly after `now`. The final step also covers the exact-boundary
+  # case where the jump lands on `now`.
   def self.advance_daily(start_time, now, interval)
-    days_since = ((now - start_time) / 1.day).ceil.to_i
-    gaps = (days_since.to_f / interval).ceil
-    start_time + (gaps * interval).days
+    elapsed = [ ((now - start_time) / 1.day).floor, 0 ].max
+    occ = start_time + ((elapsed / interval) * interval).days
+    occ += interval.days while occ <= now
+    occ
   end
 
   def self.advance_weekly(start_time, now, interval)
-    days_since = ((now - start_time) / 1.day).ceil.to_i
-    gaps = (days_since.to_f / (7 * interval)).ceil
-    start_time + (gaps * 7 * interval).days
+    elapsed = [ ((now - start_time) / 1.week).floor, 0 ].max
+    occ = start_time + ((elapsed / interval) * interval).weeks
+    occ += interval.weeks while occ <= now
+    occ
   end
 
   def self.advance_monthly(start_time, now, interval)
-    total_months = (now.year * 12 + now.month) - (start_time.year * 12 + start_time.month)
-    gaps = (total_months.to_f / interval).ceil
-    start_time + gaps.months
+    elapsed = (now.year * 12 + now.month) - (start_time.year * 12 + start_time.month)
+    elapsed = [ elapsed, 0 ].max
+    occ = start_time + ((elapsed / interval) * interval).months
+    occ += interval.months while occ <= now
+    occ
   end
 
   private_class_method :advance_daily, :advance_weekly, :advance_monthly
