@@ -36,6 +36,23 @@ class CalendarController < ApplicationController
     # Pending reminders ride alongside events as distinct "suggestion" chips. Only
     # unconfirmed ones (confirmed reminders already exist as real CalendarEvents).
     @reminders = @has_calendars ? reminders_for_view : []
+
+    # Snoozed email threads shown on the calendar at their snooze-until time.
+    @snoozed_threads = if current_entitlements.feature?(:email_scheduling)
+      EmailThread.snoozed
+                 .where(email_account: Current.user.readable_email_accounts)
+                 .includes(:email_account)
+                 .then { |s| @view == "agenda" ? s.where(snoozed_until: @date.beginning_of_day..).order(:snoozed_until).limit(AGENDA_LIMIT) : s.where(snoozed_until: @range.begin..@range.end) }
+    else
+      EmailThread.none
+    end
+
+    # Scheduled emails shown on the calendar at their send time.
+    @scheduled_emails = if current_entitlements.feature?(:email_scheduling)
+      ScheduledEmail.accessible_to(Current.user).pending.then { |s| @view == "agenda" ? s.where("COALESCE(next_occurrence_at, scheduled_at) >= ?", @date.beginning_of_day).order(Arel.sql("COALESCE(next_occurrence_at, scheduled_at) ASC")).limit(AGENDA_LIMIT) : s.in_range(@range.begin, @range.end) }
+    else
+      ScheduledEmail.none
+    end
   end
 
   private

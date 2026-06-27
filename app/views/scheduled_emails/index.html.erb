@@ -1,0 +1,38 @@
+<% content_for :cp_context, "scheduled_emails" %>
+
+<div class="mx-auto max-w-3xl px-4 py-6 sm:px-6 lg:px-8">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-xl font-semibold text-foreground"><%= t(".title") %></h1>
+    <%= link_to t(".new"), new_scheduled_email_path, class: "inline-flex items-center rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 no-underline" %>
+  </div>
+
+  <% if @scheduled_emails.any? %>
+    <div class="space-y-3">
+      <% @scheduled_emails.each do |se| %>
+        <%= link_to se, class: "block rounded-xl border border-border bg-card p-4 transition-colors hover:bg-muted/30 no-underline" do %>
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <h3 class="text-sm font-medium text-foreground truncate"><%= se.subject %></h3>
+              <p class="text-xs text-gray-400 mt-0.5"><%= t(".to", address: se.to_address) %></p>
+            </div>
+            <span class="shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium <%= se.pending? ? 'bg-cyan-100 text-cyan-700' : 'bg-gray-100 text-gray-500' %>">
+              <%= human_enum(ScheduledEmail, :status, se.status) %>
+            </span>
+          </div>
+          <div class="flex items-center gap-3 mt-2 text-[11px] text-gray-400">
+            <span><%= t(".scheduled_for", time: l(se.display_time, format: :short)) %></span>
+            <% if se.recurring? %>
+              <span class="inline-flex items-center gap-1">
+                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 014-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 01-4 4H3"/></svg>
+                <%= t(".recurring") %>
+              </span>
+            <% end %>
+            <span><%= se.email_account.display_name %></span>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+  <% else %>
+    <%= render(Campbooks::EmptyState.new(variant: :card, title: t(".empty_title"), description: t(".empty_description"))) %>
+  <% end %>
+</div>
