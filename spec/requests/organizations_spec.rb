@@ -5,8 +5,7 @@ RSpec.describe "Organizations", type: :request do
   let(:org) { create(:organization, workspace: ws) }
 
   before do
-    allow_any_instance_of(Entitlements::Resolver).to receive(:feature?).and_return(false)
-    allow_any_instance_of(Entitlements::Resolver).to receive(:feature?).with(:organizations).and_return(true)
+    allow_any_instance_of(Entitlements::Resolver).to receive(:allow?).and_return(:ok)
     sign_in(user)
   end
 
@@ -21,7 +20,7 @@ RSpec.describe "Organizations", type: :request do
   end
 
   it "requires authentication" do
-    delete sign_out_path rescue nil
+    delete session_path
     get organizations_path
     expect(response).to redirect_to(new_session_path)
   end
@@ -33,7 +32,7 @@ RSpec.describe "Organizations", type: :request do
   end
 
   it "blocks when not entitled" do
-    allow_any_instance_of(Entitlements::Resolver).to receive(:feature?).with(:organizations).and_return(false)
+    allow_any_instance_of(Entitlements::Resolver).to receive(:allow?).with(:organizations).and_return(:not_allowed)
     get organizations_path
     expect(response).to have_http_status(:redirect)
   end
