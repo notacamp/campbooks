@@ -150,11 +150,11 @@ module Feed
           "OR email_messages.ai_priority = :high " \
           "OR (email_messages.has_attachment = TRUE AND (email_messages.category IS NULL OR email_messages.category NOT IN (:noise))) " \
           "OR (email_messages.email_thread_id IN (:busy) AND (email_messages.category IS NULL OR email_messages.category NOT IN (:noise)))",
-          starred: starred_contact_ids.presence || [ -1 ],
+          starred: starred_contact_ids.presence || [ "00000000-0000-0000-0000-000000000000" ],
           important: "important",
           high: EmailMessage.ai_priorities[:high],
           noise: NOISE_CATEGORIES,
-          busy: busy_thread_ids.presence || [ -1 ]
+          busy: busy_thread_ids.presence || [ "00000000-0000-0000-0000-000000000000" ]
         ),
         readable_accounts
       )
