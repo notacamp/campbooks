@@ -115,9 +115,7 @@ module Ai
       text = upsert_managed_adapter(MANAGED_TEXT_ADAPTER_NAME, provider: Ai::Platform::MANAGED_TEXT_PROVIDER)
       assign_purposes(text, AiConfiguration::TEXT_PURPOSES)
 
-      # Managed document analysis runs on a US provider (MANAGED_DOC_PROVIDER); skip
-      # wiring it for an EU-residency workspace so we don't provision a path that the
-      # runtime gate would only pause. Managed text is Mistral/EU, so it's unaffected.
+      # Managed document analysis runs on Mistral (EU), same as text.
       if Ai::Platform.documents_available? && @workspace.region_allows?(Ai::Platform::MANAGED_DOC_PROVIDER)
         docs = upsert_managed_adapter(MANAGED_VISION_ADAPTER_NAME, provider: Ai::Platform::MANAGED_DOC_PROVIDER)
         assign_purposes(docs, AiConfiguration::DOCUMENT_PURPOSES)
@@ -225,7 +223,7 @@ module Ai
         config = @workspace.ai_configurations.find_or_initialize_by(purpose: purpose)
         config.ai_adapter = adapter
         config.enabled = true
-        config.model = resolved_model_for(adapter, config.model)
+        config.model = resolved_model_for(adapter, config.model, purpose)
         config.max_tokens ||= 1000
         config.temperature ||= 0.0
         config.save!
@@ -233,15 +231,18 @@ module Ai
     end
 
     # Pick the model for a (purpose, adapter) pair. A managed adapter always runs
-    # the platform-chosen default for its provider. A BYO adapter keeps the user's
-    # explicit model ONLY when it's valid for the adapter's provider; otherwise it
-    # falls back to that provider's default — so switching a role to a new provider
-    # (e.g. document analysis OpenAI → Anthropic) never leaves a stale model like
-    # "gpt-4o-mini" on a Claude adapter, which the provider would reject with a 400.
-    def resolved_model_for(adapter, current_model)
+    # the platform-chosen default for its provider. Document analysis uses the
+    # DOC_DEFAULT_MODEL (vision-capable); everything else uses DEFAULT_MODEL.
+    # A BYO adapter keeps the user's explicit model ONLY when it's valid for the
+    # adapter's provider; otherwise it falls back to that provider's default — so
+    # switching a role to a new provider (e.g. document analysis OpenAI → Anthropic)
+    # never leaves a stale model like "gpt-4o-mini" on a Claude adapter.
+    def resolved_model_for(adapter, current_model, purpose = nil)
       valid = AiConfiguration::MODELS[adapter.provider] || []
       if !adapter.managed? && current_model.present? && valid.include?(current_model)
         current_model
+      elsif purpose == "document_analysis"
+        AiConfiguration::DOC_DEFAULT_MODEL[adapter.provider] || AiConfiguration::DEFAULT_MODEL[adapter.provider] || valid.first || "gpt-4o-mini"
       else
         AiConfiguration::DEFAULT_MODEL[adapter.provider] || valid.first || "gpt-4o-mini"
       end
