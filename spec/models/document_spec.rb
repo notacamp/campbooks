@@ -35,7 +35,7 @@ RSpec.describe Document, type: :model do
 
     it {
       is_expected.to define_enum_for(:source)
-        .with_values(manual_upload: 0, email: 1, notion: 2)
+        .with_values(manual_upload: 0, email: 1, notion: 2, sent_email: 3)
     }
   end
 

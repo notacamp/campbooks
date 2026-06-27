@@ -321,16 +321,16 @@ en:
             by entity name (vendor or client)."
           subfolder_pattern_label: Subfolder Workspace
           subtitle: Control how documents of this type are pushed to Google Drive.
-      browse_folders:
-        browse_failed: 'Could not list folders: %{message}'
-        create_folder: Create
-        my_drive: My Drive
-        new_folder_placeholder: New folder name
-        no_subfolders: No subfolders here
-        reconnect_needed: Reconnect Google Drive with full access to browse folders.
-        select: Select
-        select_my_drive: Use My Drive root
-        select_this: 'Select "%{name}"'
+        browse_folders:
+          browse_failed: 'Could not list folders: %{message}'
+          create_folder: Create
+          my_drive: My Drive
+          new_folder_placeholder: New folder name
+          no_subfolders: No subfolders here
+          reconnect_needed: Reconnect Google Drive with full access to browse folders.
+          select: Select
+          select_my_drive: Use My Drive root
+          select_this: 'Select "%{name}"'
       index:
         show:
           api_connections_desc: Save outbound API integrations (base URL + auth) once,
