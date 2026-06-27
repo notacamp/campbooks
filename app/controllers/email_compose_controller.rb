@@ -49,7 +49,8 @@ class EmailComposeController < ApplicationController
       cc_address: args[:cc_address],
       bcc_address: args[:bcc_address],
       source_message: @message,
-      attachments: collected_attachments
+      attachments: collected_attachments,
+      attachment_signed_ids: owned_attachment_ids
     )
 
     return error_response(error_message_for(result)) unless result.ok?
@@ -166,6 +167,20 @@ class EmailComposeController < ApplicationController
     end
   rescue => e
     Rails.logger.error("[EmailCompose] attachment resolve failed: #{e.message}")
+    []
+  end
+
+
+  def owned_attachment_ids
+    ids = Array(params[:attachments]).reject(&:blank?)
+    return [] if ids.empty?
+    owned_blob_ids = Current.user.outbound_attachments.blobs.pluck(:id).to_set
+    ids.select do |signed_id|
+      blob = ActiveStorage::Blob.find_signed(signed_id)
+      blob and owned_blob_ids.include?(blob.id)
+    end
+  rescue => e
+    Rails.logger.error("[EmailCompose] attachment id resolution failed: " + e.message.to_s)
     []
   end
 
