@@ -104,6 +104,10 @@ class Contact < ApplicationRecord
             .distinct
   end
 
+    def organization_name
+    person&.organization_name || read_attribute(:organization)
+  end
+
   def analysis_stale?
     analyzed_at.nil? || analyzed_at < 30.days.ago
   end
