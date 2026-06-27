@@ -54,7 +54,42 @@ class CalendarPreview < ViewComponent::Preview
     render Campbooks::Calendar::EventRow.new(event: event(id: 3, title: "Weekly standup", start_at: Time.current.change(hour: 9), recurring: true))
   end
 
+  # Snoozed email threads on the calendar (purple). The chip is the grid cell
+  # form; the row is the agenda-list form.
+  def snoozed_chip
+    render Campbooks::Calendar::SnoozedChip.new(thread: snoozed_thread)
+  end
+
+  def snoozed_row
+    render Campbooks::Calendar::SnoozedRow.new(thread: snoozed_thread)
+  end
+
+  # Scheduled outbound emails on the calendar (cyan). The row shows the recurring
+  # glyph when the schedule repeats.
+  def scheduled_email_chip
+    render Campbooks::Calendar::ScheduledEmailChip.new(scheduled_email: scheduled_mail)
+  end
+
+  def scheduled_email_row
+    render Campbooks::Calendar::ScheduledEmailRow.new(scheduled_email: scheduled_mail(id: 52, subject: "Weekly status update", rrule: "FREQ=WEEKLY"))
+  end
+
   private
+
+  def snoozed_thread(id: 41, subject: "Re: Q3 budget approval")
+    EmailThread.new(
+      id: id, subject: subject,
+      snoozed_until: Date.current.to_time.change(hour: 14),
+      email_account: EmailAccount.new(id: 1, name: "Personal", email_address: "me@example.com")
+    )
+  end
+
+  def scheduled_mail(id: 51, subject: "Reminder: send invoice", rrule: nil)
+    ScheduledEmail.new(
+      id: id, subject: subject, to_address: "client@example.com",
+      scheduled_at: Date.current.to_time.change(hour: 16), rrule: rrule
+    )
+  end
 
   def calendar(color: "#2ea55c")
     Calendar.new(id: 1, name: "Personal", color: color, calendar_account: CalendarAccount.new(id: 1, color: color))
