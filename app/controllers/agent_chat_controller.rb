@@ -10,8 +10,8 @@ class AgentChatController < ApplicationController
     @messages = @thread.agent_messages.chronological.last(50)
     @briefing = Scout::Briefing.for(current_user) if @messages.empty?
 
-    # Mark unread AI replies as read on visit — clears the Scout nav dot. New
-    # replies arrive as read: false, lighting the dot back up until next visit.
+    # Mark unviewed AI replies as viewed on visit — clears the Scout nav dot.
+    # New replies arrive with viewed_at NULL, lighting the dot back up.
     AgentMessage.where(agent_thread: current_user.agent_threads.scout_visible, viewed_at: nil)
                 .where(author_type: :ai)
                 .update_all(viewed_at: Time.current)
