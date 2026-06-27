@@ -12,7 +12,7 @@ module Campbooks
           span(class: "h-2 w-2 shrink-0 rounded-full", style: "background-color: #06b6d4")
           div(class: "min-w-0 flex-1") do
             span(class: "block truncate text-sm text-foreground") { @scheduled_email.subject }
-            span(class: "block text-xs text-gray-400") { t(".to", address: helpers.truncate(@scheduled_email.to_address, length: 30)) }
+            span(class: "block text-xs text-gray-400") { t(".to", address: @scheduled_email.to_address.to_s.truncate(30)) }
           end
           raw safe(recurring_icon) if @scheduled_email.recurring?
         end
