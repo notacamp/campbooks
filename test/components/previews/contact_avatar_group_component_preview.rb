@@ -58,4 +58,10 @@ class ContactAvatarGroupComponentPreview < ViewComponent::Preview
   def accent
     render(Campbooks::ContactAvatarGroup.new(participants: PEOPLE.first(4), size: :xl, max: 3, variant: :accent))
   end
+
+  def account_ring
+    render(Campbooks::ContactAvatarGroup.new(
+      participants: PEOPLE.first(4), size: :xl, max: 3, account_color: "#595dec"
+    ))
+  end
 end
