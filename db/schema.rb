@@ -1528,7 +1528,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_011622) do
     t.string "name", null: false
     t.integer "position", default: 0, null: false
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id"
+    t.uuid "workspace_id", null: false
+    t.index ["workspace_id", "name"], name: "index_pipelines_on_workspace_id_and_name", unique: true
+    t.index ["workspace_id", "position"], name: "index_pipelines_on_workspace_id_and_position"
   end
 
   create_table "pipeline_stages", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1539,9 +1541,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_011622) do
     t.jsonb "exit_action_config", default: {}, null: false
     t.boolean "is_terminal", default: false, null: false
     t.string "name", null: false
-    t.uuid "pipeline_id"
+    t.uuid "pipeline_id", null: false
     t.integer "position", null: false
     t.datetime "updated_at", null: false
+    t.index ["pipeline_id", "name"], name: "index_pipeline_stages_on_pipeline_id_and_name", unique: true
+    t.index ["pipeline_id", "position"], name: "index_pipeline_stages_on_pipeline_id_and_position"
   end
 
   create_table "pipeline_memberships", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1551,11 +1555,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_011622) do
     t.uuid "item_id", null: false
     t.string "item_type", null: false
     t.datetime "last_moved_at"
-    t.uuid "pipeline_id"
+    t.uuid "pipeline_id", null: false
     t.integer "position", default: 0, null: false
     t.jsonb "stage_history", default: [], null: false
     t.datetime "updated_at", null: false
-    t.index ["item_type", "item_id"], name: "idx_plm_on_item"
+    t.index ["current_stage_id"], name: "index_pipeline_memberships_on_current_stage_id"
     t.index ["item_type", "item_id"], name: "index_pipeline_memberships_on_item"
+    t.index ["pipeline_id", "item_type", "item_id"], name: "index_pipeline_memberships_on_pipeline_and_item", unique: true
   end
 end
