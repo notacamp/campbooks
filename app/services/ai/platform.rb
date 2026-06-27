@@ -6,13 +6,12 @@ module Ai
   # Ai::ProviderSetup#apply_managed all agree. Self-hosted installs never offer it —
   # operators supply their own keys via env (see Ai::ProviderSetup#self_hosted_env_provider?).
   module Platform
-    # Managed text runs on Mistral (Paris) so a cloud workspace's email/chat content
-    # stays in the EU by default — the GDPR-preferred default (was DeepSeek/China).
-    # Documents need vision, so they still run on OpenAI (Mistral pixtral/vision for
-    # documents is a tracked follow-up). Both reuse the BYO-setup default models.
+    # Both managed text and documents run on Mistral (Paris) so cloud workspace
+    # content stays in the EU by default — the GDPR-preferred default. Documents
+    # use pixtral-large-latest (vision); text uses mistral-small-latest.
     # NB: requires MISTRAL_API_KEY in the platform env, else managed AI is unavailable.
     MANAGED_TEXT_PROVIDER = "mistral".freeze
-    MANAGED_DOC_PROVIDER  = "openai".freeze
+    MANAGED_DOC_PROVIDER  = "mistral".freeze
 
     module_function
 
@@ -21,7 +20,7 @@ module Ai
     end
 
     def doc_model
-      AiConfiguration::DEFAULT_MODEL[MANAGED_DOC_PROVIDER]
+      AiConfiguration::DOC_DEFAULT_MODEL[MANAGED_DOC_PROVIDER]
     end
 
     # Can this installation offer "Campbooks AI"? Only on cloud, and only when the
@@ -32,9 +31,9 @@ module Ai
       ENV[AiAdapter::PROVIDER_ENV_KEYS[MANAGED_TEXT_PROVIDER]].present?
     end
 
-    # Managed document analysis additionally needs the vision provider key.
+    # Managed document analysis uses the same Mistral key as text.
     def documents_available?
-      available? && ENV[AiAdapter::PROVIDER_ENV_KEYS[MANAGED_DOC_PROVIDER]].present?
+      available?
     end
   end
 end
