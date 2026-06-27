@@ -43,6 +43,27 @@ module Features
       flag?("ENABLE_MICROSOFT") || flag?("ENABLE_MICROSOFT_MAILBOX")
     end
 
+    # Organizations — the company/employer grouping on top of contacts. When off,
+    # all routes return 404, the nav link is hidden, and org badges are suppressed.
+    def organizations?
+      flag?("ENABLE_ORGANIZATIONS")
+    end
+
+    # Email scheduling: snoozed-email visibility on the calendar + scheduled
+    # email sending (one-time or recurring, with Liquid template variables).
+    # When off, schedule-related routes 404, the compose "Schedule" button is
+    # hidden, and snoozed / scheduled items are absent from the calendar.
+    def email_scheduling?
+      flag?("ENABLE_EMAIL_SCHEDULING")
+    end
+
+    # Document templates — AI-generated HTML templates with Liquid variables,
+    # convertible to PDF and sendable to contacts. When off, all routes return
+    # 404 and the settings nav link is hidden.
+    def document_templates?
+      flag?("ENABLE_DOCUMENT_TEMPLATES")
+    end
+
     private
 
     def flag?(name)

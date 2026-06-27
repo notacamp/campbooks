@@ -258,18 +258,35 @@ Rails.application.routes.draw do
       end
     end
 
+    resources :document_templates do
+      member do
+        post :regenerate
+      end
+    end
+
     namespace :integrations do
       root to: "index#show"
       resource :notion, only: [ :show, :update ], controller: "notion"
       # Disconnect a specific connected Notion workspace (multi-workspace via OAuth).
       delete "notion/integrations/:id", to: "notion#destroy", as: :notion_integration
       resource :google_drive, only: [ :show, :destroy ], controller: "google_drive" do
+        post :retry_failed
         get "configs/:document_type_id/edit", to: "google_drive_configs#edit", as: :edit_config
+        get "configs/:document_type_id/folders", to: "google_drive_configs#browse_folders", as: :browse_folders_config
         patch "configs/:document_type_id", to: "google_drive_configs#update", as: :config
       end
       resource :zoho_drive, only: [ :show, :update, :destroy ], controller: "zoho_drive"
       resource :calendars, only: [ :show ], controller: "calendars"
       resources :connections, only: [ :index, :new, :create, :edit, :update, :destroy ]
+    end
+  end
+
+  # Document templates — fill & send flow (outside Settings).
+  resources :document_templates, only: [] do
+    member do
+      get :fill
+      post :preview
+      post :send_email
     end
   end
 
@@ -323,6 +340,17 @@ Rails.application.routes.draw do
     end
   end
 
+  # Organizations — companies / employers that group contacts. Feature-gated
+  # behind ENABLE_ORGANIZATIONS (the controller returns 404 when off).
+  resources :organizations, only: [ :index, :show, :update ] do
+    member do
+      get :emails
+      get :documents
+    end
+    collection do
+      post :backfill
+    end
+  end
 
   resources :email_threads, only: [ :index, :show ]
 

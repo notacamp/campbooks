@@ -17,6 +17,7 @@ module NavigationHelper
     workflows: '<circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="12" r="2.4"/><path d="M8 7.4 16 11M8 16.6 16 13"/>',
     calendar: '<rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 3v4M16 3v4"/>',
     contacts: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    organizations: '<path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11m16-11v11M8 14v.01M12 14v.01M16 14v.01M8 18v.01M12 18v.01M16 18v.01"/>',
     activity: '<path d="M3 12h4l2 6 4-13 2 7h6"/>'
   }.freeze
   # Four-point spark, centered in the 24×24 box (tips at 12,5 · 19.5,12 · 12,19 ·
@@ -53,6 +54,8 @@ module NavigationHelper
       # Workflows is gated off by default until it's production-ready (Features.workflows?).
       (nav_item(:workflows, t("shared.nav.workflows"), workflows_path) if Features.workflows?),
       nav_item(:contacts, t("shared.nav.contacts"), contacts_path),
+      # Organizations is gated off by default until it's production-ready (Features.organizations?).
+      (nav_item(:organizations, t("shared.nav.organizations"), organizations_path) if Features.organizations?),
       nav_item(:activity, t("shared.nav.activity"), activity_path)
     ].compact
   end
@@ -108,7 +111,8 @@ module NavigationHelper
         [ settings_data_privacy_path, %w[data_privacy], t("navigation.settings.items.data_privacy"), "M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" ]
       ] ],
       [ t("navigation.settings.groups.ai_and_automation"), [
-        [ settings_ai_path, %w[ai], t("navigation.settings.items.ai_providers_and_services"), "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.456-2.456L14.25 6l1.035-.259a3.375 3.375 0 002.456-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" ]
+        [ settings_ai_path, %w[ai], t("navigation.settings.items.ai_providers_and_services"), "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.456-2.456L14.25 6l1.035-.259a3.375 3.375 0 002.456-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" ],
+        [ settings_document_templates_path, %w[document_templates], t("navigation.settings.items.document_templates"), "M4.5 3.75h15a2.25 2.25 0 012.25 2.25v10.5A2.25 2.25 0 0119.5 18.75h-15a2.25 2.25 0 01-2.25-2.25V6A2.25 2.25 0 014.5 3.75zm.75 3.75v7.5a1.5 1.5 0 001.5 1.5h10.5a1.5 1.5 0 001.5-1.5v-7.5a1.5 1.5 0 00-1.5-1.5H6.75a1.5 1.5 0 00-1.5 1.5zM8.25 7.5h7.5M8.25 10.5h7.5M8.25 13.5h4.5" ]
       ] ],
       [ t("navigation.settings.groups.your_account"), [
         [ settings_account_path, %w[account], t("navigation.settings.items.account"), "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" ],

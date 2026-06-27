@@ -1,0 +1,34 @@
+es:
+  organizations:
+    index:
+      heading: "Organizaciones"
+      subheading: "%{count} organizaciones"
+      sync_from_contacts: "Sincronizar desde contactos"
+      empty: "Aún no hay organizaciones"
+      empty_hint: "Sincroniza desde tus contactos para crear el directorio de organizaciones."
+    show:
+      back: "Organizaciones"
+      edit: "Editar"
+      members_label: "Miembros"
+      emails_label: "Correos"
+      documents_label: "Documentos"
+      members_heading: "Miembros"
+      no_members: "No hay miembros en esta organización."
+      recent_emails_heading: "Correos recientes"
+      recent_documents_heading: "Documentos recientes"
+      no_emails: "Aún no hay correos de esta organización."
+      no_documents: "Aún no hay documentos de esta organización."
+      no_subject: "(sin asunto)"
+    update:
+      saved: "Organización actualizada."
+    backfill:
+      backfilled: "%{count} organizaciones sincronizadas desde contactos."
+    emails:
+      no_subject: "(sin asunto)"
+    organization_card:
+      members: "%{count} miembros"
+  components:
+    emails:
+      no_subject: "(sin asunto)"
+    organization_card:
+      members: "%{count} miembros"

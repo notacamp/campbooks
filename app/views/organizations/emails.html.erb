@@ -1,0 +1,11 @@
+<div class="divide-y divide-border rounded-xl border border-border bg-card overflow-hidden">
+  <% @email_messages.each do |msg| %>
+    <%= link_to email_message_path(msg), class: "block px-4 py-3 hover:bg-muted/40 transition-colors" do %>
+      <p class="text-sm text-foreground truncate"><%= msg.subject.presence || t(".no_subject") %></p>
+      <p class="text-xs text-muted-foreground truncate"><%= msg.from_address %></p>
+    <% end %>
+  <% end %>
+</div>
+<% if @pagy.pages > 1 %>
+  <div class="mt-4"><%== pagy_nav(@pagy) %></div>
+<% end %>

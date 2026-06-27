@@ -108,6 +108,12 @@ class Contact < ApplicationRecord
     analyzed_at.nil? || analyzed_at < 30.days.ago
   end
 
+  # The contact's organization name, preferring the joined Organization model via
+  # their Person, falling back to the legacy free-text `organization` column.
+  def organization_name
+    person&.organization_name || read_attribute(:organization)
+  end
+
   # --- Searchable concern implementation ---
 
   def build_search_chunks
