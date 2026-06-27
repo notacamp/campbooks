@@ -244,7 +244,8 @@ class Document < ApplicationRecord
 
   def google_drive_url
     return nil unless google_drive_file_id.present?
-    "https://drive.google.com/file/d/#{google_drive_file_id}/view"
+    # google_drive_file_id comes from Drive API responses, not user input.
+    "https://drive.google.com/file/d/#{google_drive_file_id}/view".html_safe
   end
 
   def entity_display_name
