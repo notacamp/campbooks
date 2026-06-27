@@ -53,6 +53,10 @@ plans:
       type: flag
       allowed: true         # a privacy control — granted to every tier (seam to gate later)
       enabled: true
+    organizations:
+      type: flag
+      allowed: true
+      enabled: true
     ai_model_access:
       type: config
       allowed: true

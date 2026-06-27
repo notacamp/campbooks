@@ -1,0 +1,18 @@
+<%= render(Campbooks::PageHeader.new(title: t(".heading"), subtitle: t(".subheading", count: @pagy.count), spacing: :lg)) do |header| %>
+  <% header.with_actions do %>
+    <%= form_tag backfill_organizations_path, method: :post, style: "display:inline" do %>
+      <%= render Campbooks::Button.new(variant: :outline, type: :submit, size: :sm) { t(".sync_from_contacts") } %>
+    <% end %>
+  <% end %>
+<% end %>
+<div class="space-y-2">
+  <% if @organizations.any? %>
+    <%= render partial: "organization_card", collection: @organizations, as: :organization %>
+  <% else %>
+    <div class="rounded-xl border border-border bg-card p-8 text-center">
+      <p class="text-sm text-muted-foreground"><%= t(".empty") %></p>
+      <p class="text-xs text-muted-foreground mt-2"><%= t(".empty_hint") %></p>
+    </div>
+  <% end %>
+</div>
+<% if @pagy.pages > 1 %><div class="mt-4"><%== pagy_nav(@pagy) %></div><% end %>
