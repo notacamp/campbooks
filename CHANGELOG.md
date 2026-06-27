@@ -16,6 +16,17 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Organizations** — first-class company/employer grouping on top of contacts,
+  behind the `ENABLE_ORGANIZATIONS` feature flag. People can belong to multiple
+  organizations (active or past); organizations auto-populate from existing
+  AI-extracted `Person.organization` strings via a workspace-scoped backfill.
+  Includes organization-scoped filtering for emails and documents, a directory
+  page, and per-organization profile pages with member lists and recent activity.
+  Organization badges appear on contact profiles, email detail, and document
+  detail pages when the flag is on.
+
 ### Fixed
 
 - Avatar stacks (facepiles) in the email list and board view now show the

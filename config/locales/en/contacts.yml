@@ -63,6 +63,7 @@ en:
       last_contact_ago: "%{time} ago"
       last_contact_label: Last contact
       name_label: Name
+      organization_label: Organization
       no_email_history: No email history available.
       no_subject: "(no subject)"
       re_analyze: Re-analyze

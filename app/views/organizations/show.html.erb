@@ -1,0 +1,82 @@
+<div class="mb-4">
+  <%= link_to organizations_path, class: "inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors" do %>
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    <%= t(".back") %>
+  <% end %>
+</div>
+
+<%= render(Campbooks::PageHeader.new(
+  title: @organization.name,
+  subtitle: @organization.domain,
+  spacing: :lg
+)) do |header| %>
+  <% header.with_actions do %>
+    <%= render Campbooks::Button.new(variant: :outline, size: :sm, tag: :a, href: "#") do %>
+      <%= t(".edit") %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<div class="grid grid-cols-3 gap-4 mb-6">
+  <div class="rounded-xl border border-border bg-card p-4 text-center">
+    <p class="text-2xl font-bold text-foreground"><%= @organization.active_member_count %></p>
+    <p class="text-xs text-muted-foreground"><%= t(".members_label") %></p>
+  </div>
+  <div class="rounded-xl border border-border bg-card p-4 text-center">
+    <p class="text-2xl font-bold text-foreground"><%= @organization.email_count %></p>
+    <p class="text-xs text-muted-foreground"><%= t(".emails_label") %></p>
+  </div>
+  <div class="rounded-xl border border-border bg-card p-4 text-center">
+    <p class="text-2xl font-bold text-foreground"><%= @organization.documents.count %></p>
+    <p class="text-xs text-muted-foreground"><%= t(".documents_label") %></p>
+  </div>
+</div>
+
+<section class="mb-6">
+  <h2 class="text-sm font-semibold text-foreground mb-3"><%= t(".members_heading") %></h2>
+  <% if @people.any? %>
+    <div class="divide-y divide-border rounded-xl border border-border bg-card overflow-hidden">
+      <% @people.each do |person| %>
+        <div class="flex items-center gap-3 px-4 py-3">
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium text-foreground truncate"><%= person.display_name %></p>
+            <p class="text-xs text-muted-foreground truncate"><%= person.primary_email %></p>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% else %>
+    <p class="text-sm text-muted-foreground"><%= t(".no_members") %></p>
+  <% end %>
+</section>
+
+<section class="mb-6">
+  <h2 class="text-sm font-semibold text-foreground mb-3"><%= t(".recent_emails_heading") %></h2>
+  <% if @recent_emails.any? %>
+    <div class="divide-y divide-border rounded-xl border border-border bg-card overflow-hidden">
+      <% @recent_emails.each do |msg| %>
+        <%= link_to email_message_path(msg), class: "block px-4 py-3 hover:bg-muted/40 transition-colors" do %>
+          <p class="text-sm text-foreground truncate"><%= msg.subject.presence || t(".no_subject") %></p>
+          <p class="text-xs text-muted-foreground truncate"><%= msg.from_address %> · <%= msg.received_at ? l(msg.received_at, format: :full) : "—" %></p>
+        <% end %>
+      <% end %>
+    </div>
+  <% else %>
+    <p class="text-sm text-muted-foreground"><%= t(".no_emails") %></p>
+  <% end %>
+</section>
+
+<section>
+  <h2 class="text-sm font-semibold text-foreground mb-3"><%= t(".recent_documents_heading") %></h2>
+  <% if @recent_documents.any? %>
+    <div class="divide-y divide-border rounded-xl border border-border bg-card overflow-hidden">
+      <% @recent_documents.each do |doc| %>
+        <%= link_to document_path(doc), class: "block px-4 py-3 hover:bg-muted/40 transition-colors" do %>
+          <p class="text-sm text-foreground truncate"><%= doc.display_title %></p>
+        <% end %>
+      <% end %>
+    </div>
+  <% else %>
+    <p class="text-sm text-muted-foreground"><%= t(".no_documents") %></p>
+  <% end %>
+</section>
