@@ -10,10 +10,18 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_23_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_27_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
+
+  create_table "account_exports", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["user_id"], name: "index_account_exports_on_user_id"
+  end
 
   create_table "action_text_rich_texts", force: :cascade do |t|
     t.text "body"
@@ -57,15 +65,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_140000) do
     t.bigint "agent_thread_id"
     t.jsonb "ai_auto_actions", default: [], null: false
     t.jsonb "ai_prompts", default: [], null: false
+    t.jsonb "ai_provenance", default: {}, null: false
     t.jsonb "ai_suggested_actions", default: [], null: false
     t.integer "author_type", default: 0, null: false
     t.text "content", null: false
     t.datetime "created_at", null: false
     t.boolean "draft", default: false, null: false
     t.boolean "outdated", default: false, null: false
+    t.boolean "read", default: false, null: false
     t.integer "reply_status"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
+    t.index ["agent_thread_id", "author_type"], name: "idx_agent_messages_unread", where: "(read = false)"
     t.index ["agent_thread_id", "created_at"], name: "index_agent_messages_on_agent_thread_id_and_created_at"
     t.index ["agent_thread_id"], name: "index_agent_messages_on_agent_thread_id"
     t.index ["user_id", "created_at"], name: "index_agent_messages_on_user_id_and_created_at"
@@ -131,6 +142,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_140000) do
     t.bigint "user_id"
     t.index ["action"], name: "index_audit_events_on_action"
     t.index ["target_type", "target_id"], name: "index_audit_events_on_target"
+    t.index ["user_id", "created_at"], name: "index_audit_events_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_audit_events_on_user_id"
   end
 
@@ -559,6 +571,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_140000) do
     t.bigint "ai_analysis_message_id"
     t.datetime "ai_analyzed_at"
     t.integer "ai_priority", default: 1, null: false
+    t.jsonb "ai_provenance", default: {}, null: false
     t.jsonb "ai_suggested_actions", default: [], null: false
     t.text "ai_summary"
     t.boolean "ai_todo_dismissed", default: false, null: false
@@ -699,6 +712,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_140000) do
     t.index ["workspace_id"], name: "index_feed_items_on_workspace_id"
   end
 
+  create_table "folder_memberships", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "folderable_id", null: false
+    t.string "folderable_type", null: false
+    t.bigint "mail_folder_id", null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["folderable_type", "folderable_id"], name: "index_folder_memberships_on_folderable"
+    t.index ["mail_folder_id", "folderable_type", "folderable_id"], name: "index_folder_memberships_unique", unique: true
+    t.index ["mail_folder_id"], name: "index_folder_memberships_on_mail_folder_id"
+  end
+
   create_table "google_drive_accounts", force: :cascade do |t|
     t.boolean "connected", default: true, null: false
     t.datetime "created_at", null: false
@@ -711,7 +736,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_140000) do
   end
 
   create_table "google_drive_configs", force: :cascade do |t|
-    t.boolean "auto_push", default: false, null: false
+    t.boolean "auto_push", default: true, null: false
     t.datetime "created_at", null: false
     t.bigint "document_type_id", null: false
     t.string "folder_id"
@@ -755,11 +780,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_140000) do
 
   create_table "mail_folders", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.string "icon"
     t.string "name", null: false
+    t.bigint "parent_id"
     t.integer "position", default: 0, null: false
     t.datetime "updated_at", null: false
     t.bigint "workspace_id", null: false
     t.index "workspace_id, lower((name)::text)", name: "index_mail_folders_on_workspace_and_lower_name", unique: true
+    t.index ["parent_id"], name: "index_mail_folders_on_parent_id"
     t.index ["workspace_id"], name: "index_mail_folders_on_workspace_id"
   end
 
@@ -1210,12 +1238,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_140000) do
     t.string "group_name"
     t.string "name"
     t.integer "source", default: 0, null: false
+    t.boolean "system_label", default: false, null: false
     t.datetime "updated_at", null: false
     t.bigint "workspace_id"
     t.index ["email_account_id", "external_label_id"], name: "idx_tags_on_account_and_external_label_id", unique: true, where: "(external_label_id IS NOT NULL)"
     t.index ["email_account_id", "name"], name: "idx_tags_on_account_and_name", unique: true, where: "(email_account_id IS NOT NULL)"
     t.index ["email_account_id"], name: "index_tags_on_email_account_id"
     t.index ["external_label_id"], name: "index_tags_on_external_label_id"
+    t.index ["system_label"], name: "index_tags_on_system_label", where: "(system_label = true)"
     t.index ["workspace_id", "group_name"], name: "index_tags_on_workspace_id_and_group_name"
     t.index ["workspace_id"], name: "index_tags_on_workspace_id"
   end
@@ -1340,17 +1370,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_140000) do
   end
 
   create_table "workspaces", force: :cascade do |t|
+    t.boolean "ai_processing_enabled", default: true, null: false
     t.datetime "created_at", null: false
+    t.integer "email_retention_months"
     t.jsonb "entitlement_overrides", default: {}, null: false
     t.string "name", null: false
     t.string "plan", default: "free", null: false
+    t.string "required_data_region"
     t.jsonb "settings", default: {}, null: false
     t.string "slug", null: false
     t.datetime "updated_at", null: false
     t.string "workspace_type", default: "company", null: false
     t.index ["plan"], name: "index_workspaces_on_plan"
     t.index ["slug"], name: "index_workspaces_on_slug", unique: true
-    t.check_constraint "workspace_type::text = ANY (ARRAY['company'::character varying, 'individual'::character varying]::text[])", name: "chk_organizations_workspace_type"
+    t.check_constraint "workspace_type::text = ANY (ARRAY['company'::character varying::text, 'individual'::character varying::text])", name: "chk_organizations_workspace_type"
   end
 
   create_table "zoho_drive_accounts", force: :cascade do |t|
@@ -1366,6 +1399,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_140000) do
     t.index ["workspace_id"], name: "index_zoho_drive_accounts_on_workspace_id"
   end
 
+  add_foreign_key "account_exports", "users"
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "agent_messages", "agent_threads"
@@ -1429,12 +1463,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_140000) do
   add_foreign_key "exports", "workspaces"
   add_foreign_key "feed_items", "users"
   add_foreign_key "feed_items", "workspaces"
+  add_foreign_key "folder_memberships", "mail_folders"
   add_foreign_key "google_drive_accounts", "workspaces"
   add_foreign_key "google_drive_configs", "document_types"
   add_foreign_key "identities", "users"
   add_foreign_key "invitations", "users", column: "accepted_by_id"
   add_foreign_key "invitations", "users", column: "invited_by_id"
   add_foreign_key "invitations", "workspaces"
+  add_foreign_key "mail_folders", "mail_folders", column: "parent_id"
   add_foreign_key "mail_folders", "workspaces"
   add_foreign_key "mfa_email_challenges", "users"
   add_foreign_key "notification_preferences", "document_types"

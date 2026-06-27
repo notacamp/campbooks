@@ -1,0 +1,67 @@
+<%= turbo_frame_tag "drive_folder_picker" do %>
+  <div class="border border-gray-200 rounded-lg dark:border-white/10">
+    <!-- Breadcrumb -->
+    <div class="flex items-center gap-1.5 text-sm px-3 py-2 border-b border-gray-100 dark:border-white/5 flex-wrap bg-gray-50/50 dark:bg-white/5">
+      <%= link_to t(".my_drive"), browse_folders_config_settings_integrations_google_drive_path(@config.document_type_id), class: "text-accent-600 hover:text-accent-700" %>
+      <% if @current %>
+        <span class="text-gray-400">/</span>
+        <% if @up_id != "root" %>
+          <%= link_to "…", browse_folders_config_settings_integrations_google_drive_path(@config.document_type_id, parent_id: @up_id), class: "text-accent-600 hover:text-accent-700" %>
+          <span class="text-gray-400">/</span>
+        <% end %>
+        <span class="font-medium text-gray-900 dark:text-white"><%= @current.name %></span>
+      <% end %>
+    </div>
+
+    <!-- Folder list -->
+    <div class="divide-y divide-gray-100 dark:divide-white/5 max-h-52 overflow-y-auto">
+      <% if @folders.any? %>
+        <% @folders.each do |folder| %>
+          <div class="flex items-center justify-between gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-white/5">
+            <%= link_to browse_folders_config_settings_integrations_google_drive_path(@config.document_type_id, parent_id: folder.id),
+                  class: "flex items-center gap-2 min-w-0 flex-1 text-gray-700 dark:text-gray-300 hover:text-accent-600 no-underline" do %>
+              <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+              <span class="truncate text-sm"><%= folder.name %></span>
+            <% end %>
+            <button type="button"
+                    data-action="click->drive-folder-picker#select"
+                    data-drive-folder-picker-id-param="<%= folder.id %>"
+                    data-drive-folder-picker-path-param="<%= [@current&.name, folder.name].compact.join(" / ") %>"
+                    class="flex-shrink-0 px-2 py-1 text-xs font-medium text-accent-600 hover:text-accent-700 hover:bg-accent-50 rounded cursor-pointer">
+              <%= t(".select") %>
+            </button>
+          </div>
+        <% end %>
+      <% else %>
+        <p class="px-3 py-4 text-sm text-gray-500"><%= t(".no_subfolders") %></p>
+      <% end %>
+    </div>
+
+    <!-- Current-folder "Select" + Create-folder form -->
+    <div class="border-t border-gray-100 dark:border-white/5 px-3 py-2 flex items-center gap-2 flex-wrap bg-gray-50/50 dark:bg-white/5">
+      <% if @current %>
+        <button type="button"
+                data-action="click->drive-folder-picker#select"
+                data-drive-folder-picker-id-param="<%= @current.id %>"
+                data-drive-folder-picker-path-param="<%= [@up_id != "root" ? "…" : nil, @current.name].compact.join(" / ") %>"
+                class="px-2 py-1 text-xs font-medium text-accent-700 bg-accent-50 hover:bg-accent-100 rounded cursor-pointer">
+          <%= t(".select_this", name: @current.name) %>
+        </button>
+      <% elsif @parent_id.blank? || @parent_id == "root" %>
+        <button type="button"
+                data-action="click->drive-folder-picker#select"
+                data-drive-folder-picker-id-param="root"
+                data-drive-folder-picker-path-param="<%= t('.my_drive') %>"
+                class="px-2 py-1 text-xs font-medium text-accent-700 bg-accent-50 hover:bg-accent-100 rounded cursor-pointer">
+          <%= t(".select_my_drive") %>
+        </button>
+      <% end %>
+
+      <%= form_with url: browse_folders_config_settings_integrations_google_drive_path(@config.document_type_id, parent_id: @parent_id), method: :get, class: "flex gap-1.5 flex-1 min-w-0" do %>
+        <%= text_field_tag :name, nil, placeholder: t(".new_folder_placeholder"),
+              class: "flex-1 min-w-0 rounded-md border-gray-300 shadow-sm text-xs focus:border-accent-500 focus:ring-accent-500" %>
+        <%= render Campbooks::Button.new(variant: :outline, size: :sm, type: :submit) { t(".create_folder") } %>
+      <% end %>
+    </div>
+  </div>
+<% end %>

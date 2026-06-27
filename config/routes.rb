@@ -264,7 +264,9 @@ Rails.application.routes.draw do
       # Disconnect a specific connected Notion workspace (multi-workspace via OAuth).
       delete "notion/integrations/:id", to: "notion#destroy", as: :notion_integration
       resource :google_drive, only: [ :show, :destroy ], controller: "google_drive" do
+        post :retry_failed
         get "configs/:document_type_id/edit", to: "google_drive_configs#edit", as: :edit_config
+        get "configs/:document_type_id/folders", to: "google_drive_configs#browse_folders", as: :browse_folders_config
         patch "configs/:document_type_id", to: "google_drive_configs#update", as: :config
       end
       resource :zoho_drive, only: [ :show, :update, :destroy ], controller: "zoho_drive"

@@ -76,6 +76,7 @@ es:
       accepted_formats: PDF, JPG, PNG, WEBP, HEIC
       click_to_upload: Haga clic para subir
       col_date: Fecha
+      col_drive_title: Google Drive
       col_name: Nombre
       col_reference: Referencia
       col_source: Origen
@@ -175,6 +176,10 @@ es:
       fullscreen_iframe_title: Vista previa del PDF en pantalla completa
     row:
       approve: Aprobar
+      drive_failed_retry: 'Error al enviar a Drive: %{error}. Pulse para reintentar.'
+      drive_pushed: En Drive desde %{at}
+      drive_retry: Reintentar
+      in_drive: En Drive
       reanalyze: Reanalizar
       reject: Rechazar
       rename: Cambiar nombre

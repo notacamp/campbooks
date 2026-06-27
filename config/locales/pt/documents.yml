@@ -75,6 +75,7 @@ pt:
       accepted_formats: PDF, JPG, PNG, WEBP, HEIC
       click_to_upload: Clique para carregar
       col_date: Data
+      col_drive_title: Google Drive
       col_name: Nome
       col_reference: Referência
       col_source: Origem
@@ -174,6 +175,10 @@ pt:
       fullscreen_iframe_title: Pré-visualização do PDF em ecrã inteiro
     row:
       approve: Aprovar
+      drive_failed_retry: 'Envio para o Drive falhou: %{error}. Clique para tentar novamente.'
+      drive_pushed: No Drive desde %{at}
+      drive_retry: Tentar novamente
+      in_drive: No Drive
       reanalyze: Reanalisar
       reject: Rejeitar
       rename: Mudar o nome

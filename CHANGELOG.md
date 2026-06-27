@@ -16,6 +16,27 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Google Drive folder picker** — the Drive config form now offers an
+  interactive folder browser (browse, select, or create folders) instead of
+  requiring a pasted folder ID. The selected folder path is stored and
+  displayed as a human-readable label.
+- **Drive push status in document list** — a Drive column in the documents
+  table (desktop) and a Drive badge on document cards (mobile) show whether
+  a document has been pushed to Drive (green checkmark), failed (amber warning
+  with one-click retry), or hasn't been pushed yet.
+- **Retry all failed Drive pushes** — the Google Drive settings page now shows
+  a count of failed uploads and a "Retry all" button that re-enqueues every
+  failed document in one click.
+
+### Changed
+
+- **Google Drive auto-push now defaults to on** — when you configure a Drive
+  destination for a document type, approved documents are uploaded automatically
+  unless you explicitly pause it. The checkbox label now reads "Upload
+  automatically when approved." A migration flips the column default.
+
 ### Fixed
 
 - Avatar stacks (facepiles) in the email list and board view now show the

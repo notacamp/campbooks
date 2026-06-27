@@ -42,6 +42,9 @@ es:
       google_drive:
         destroy:
           disconnected: Google Drive desconectado.
+        retry_failed:
+          none_failed: No hay envíos fallidos a Drive para reintentar.
+          retrying: Reintentando %{count} envío(s) fallido(s) a Drive…
       google_drive_configs:
         update:
           saved: Configuración de Google Drive actualizada.

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_26_013609) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_27_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -72,9 +72,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_26_013609) do
     t.datetime "created_at", null: false
     t.boolean "draft", default: false, null: false
     t.boolean "outdated", default: false, null: false
+    t.boolean "read", default: false, null: false
     t.integer "reply_status"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
+    t.index ["agent_thread_id", "author_type"], name: "idx_agent_messages_unread", where: "(read = false)"
     t.index ["agent_thread_id", "created_at"], name: "index_agent_messages_on_agent_thread_id_and_created_at"
     t.index ["agent_thread_id"], name: "index_agent_messages_on_agent_thread_id"
     t.index ["user_id", "created_at"], name: "index_agent_messages_on_user_id_and_created_at"
@@ -734,7 +736,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_26_013609) do
   end
 
   create_table "google_drive_configs", force: :cascade do |t|
-    t.boolean "auto_push", default: false, null: false
+    t.boolean "auto_push", default: true, null: false
     t.datetime "created_at", null: false
     t.bigint "document_type_id", null: false
     t.string "folder_id"
@@ -1381,7 +1383,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_26_013609) do
     t.string "workspace_type", default: "company", null: false
     t.index ["plan"], name: "index_workspaces_on_plan"
     t.index ["slug"], name: "index_workspaces_on_slug", unique: true
-    t.check_constraint "workspace_type::text = ANY (ARRAY['company'::character varying, 'individual'::character varying]::text[])", name: "chk_organizations_workspace_type"
+    t.check_constraint "workspace_type::text = ANY (ARRAY['company'::character varying::text, 'individual'::character varying::text])", name: "chk_organizations_workspace_type"
   end
 
   create_table "zoho_drive_accounts", force: :cascade do |t|
