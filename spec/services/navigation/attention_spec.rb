@@ -29,19 +29,19 @@ RSpec.describe Navigation::Attention do
 
     before { create(:email_account_user, user: user, email_account: account, can_read: true) }
 
-    it "lights up for unskimmed mail" do
-      create(:email_message, email_account: account, skimmed_at: nil)
+    it "lights up for unread mail" do
+      create(:email_message, email_account: account, read: false)
       expect(attention.dot?(:mail)).to be true
     end
 
-    it "stays clear when all mail is skimmed" do
-      create(:email_message, email_account: account, skimmed_at: Time.current)
+    it "stays clear when mail is read" do
+      create(:email_message, email_account: account, read: true)
       expect(attention.dot?(:mail)).to be false
     end
 
     it "ignores mail on accounts the user cannot read" do
       other = create(:email_account, workspace: user.workspace)
-      create(:email_message, email_account: other, skimmed_at: nil)
+      create(:email_message, email_account: other, read: false)
       expect(attention.dot?(:mail)).to be false
     end
   end

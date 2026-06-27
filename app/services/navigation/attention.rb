@@ -39,11 +39,12 @@ module Navigation
       @user.feed_items.where(seen_at: nil, dismissed_at: nil, acted_at: nil).exists?
     end
 
-    # Unskimmed mail on readable accounts. skimmed_at is the Mail equivalent
-    # of viewed_at — stamped when the user processes the email via Skim or a
-    # feed action, regardless of which surface they used.
+    # Unread mail on readable accounts. read is set when the user opens an
+    # email or processes it via Skim — regardless of which surface they used.
+    # SkimDismiss also marks emails read, so skimming from the home feed
+    # naturally clears the Mail dot.
     def new_mail?
-      EmailMessage.accessible_to(@user).where(skimmed_at: nil).exists?
+      EmailMessage.accessible_to(@user).where(read: false).exists?
     end
 
     # Pending reminders the user hasn't viewed yet. viewed_at is stamped when
