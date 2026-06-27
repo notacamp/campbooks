@@ -86,7 +86,7 @@ class CalendarPreview < ViewComponent::Preview
 
   def scheduled_mail(id: 51, subject: "Reminder: send invoice", rrule: nil)
     ScheduledEmail.new(
-      id: id, subject: subject, to_address: "client@example.com",
+      id: id, subject: subject, to_address: "Riley Chen <riley@client.com>",
       scheduled_at: Date.current.to_time.change(hour: 16), rrule: rrule
     )
   end
