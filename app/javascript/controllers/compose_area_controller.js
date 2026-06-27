@@ -61,29 +61,35 @@ export default class extends Controller {
       }
       return false
     }
-    // Show sending state
-    this.element.querySelector("button[type=submit]")?.setAttribute("disabled", "disabled")
-    this.showSending()
+    // Show the busy state on whichever button submitted the form (Send or
+    // Schedule) — keep its own label rather than forcing "Send".
+    this.showSubmitting(event.submitter)
+  }
+
+  showSubmitting(button) {
+    const btn = button || this.element.querySelector("button[type=submit]")
+    if (!btn) return
+    this.pendingButton = btn
+    btn.dataset.originalHtml = btn.innerHTML
+    const label = btn.textContent.trim()
+    btn.setAttribute("disabled", "disabled")
+    btn.classList.add("opacity-60")
+    btn.innerHTML = `<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+      </svg> ${label}`
   }
 
   restoreButton() {
-    const btn = this.element.querySelector("button[type=submit]")
-    if (btn) {
-      btn.removeAttribute("disabled")
-      btn.classList.remove("opacity-60")
-      btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg> Send`
+    const btn = this.pendingButton || this.element.querySelector("button[type=submit]")
+    if (!btn) return
+    btn.removeAttribute("disabled")
+    btn.classList.remove("opacity-60")
+    if (btn.dataset.originalHtml) {
+      btn.innerHTML = btn.dataset.originalHtml
+      delete btn.dataset.originalHtml
     }
-  }
-
-  showSending() {
-    const btn = this.element.querySelector("button[type=submit]")
-    if (btn) {
-      btn.innerHTML = `<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-      </svg> Sending…`
-      btn.classList.add("opacity-60")
-    }
+    this.pendingButton = null
   }
 
   selectSignature(event) {

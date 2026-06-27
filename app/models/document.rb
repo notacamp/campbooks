@@ -63,7 +63,8 @@ class Document < ApplicationRecord
   enum :source, {
     manual_upload: 0,
     email: 1,
-    notion: 2
+    notion: 2,
+    sent_email: 3
   }
 
   enum :google_drive_push_status, {
@@ -149,13 +150,15 @@ class Document < ApplicationRecord
   # Surfaces starred documents at the top of the list, newest-first within each group.
   scope :starred_first, -> { order(starred: :desc) }
   scope :pushed_to_drive, -> { where(google_drive_push_status: :pushed) }
-    scope :by_organization, ->(org, active_only: true) {
+  scope :by_organization, ->(org, active_only: true, accessible_to: nil) {
     people_ids = Person.joins(:organization_memberships)
       .where(organization_memberships: { organization_id: org.id })
     people_ids = people_ids.where(organization_memberships: { status: :active }) if active_only
     contact_ids = Contact.where(person_id: people_ids.select(:id)).select(:id)
+    email_messages = EmailMessage.where(contact_id: contact_ids)
+    email_messages = email_messages.accessible_to(accessible_to) if accessible_to
     joins(:document_email_messages)
-      .where(document_email_messages: { email_message_id: EmailMessage.where(contact_id: contact_ids).select(:id) })
+      .where(document_email_messages: { email_message_id: email_messages.select(:id) })
       .distinct
   }
 
@@ -341,7 +344,9 @@ class Document < ApplicationRecord
             expanded << { content: current.strip, chunk_type: chunk[:chunk_type], metadata: chunk[:metadata] }
             current = para
           else
-            current += (current.empty? ? "" : "\n\n") + para
+            current += (current.empty? ? "" : "
+
+") + para
           end
         end
         expanded << { content: current.strip, chunk_type: chunk[:chunk_type], metadata: chunk[:metadata] } if current.present?

@@ -74,11 +74,16 @@ module Ai
         desc = t.prompt || t.name.humanize
         schema = t.extraction_schema
         fields = schema.is_a?(Hash) ? schema.keys.join(", ") : "any relevant fields"
-        "  - #{t.name}: #{desc}\n    Fields: #{fields}"
-      end.join("\n\n")
+        "  - #{t.name}: #{desc}
+    Fields: #{fields}"
+      end.join("
+
+")
 
       <<~PROMPT
         #{BASE_PROMPT}
+
+        #{direction_hint}
 
         Existing document types and their extraction fields:
         #{type_list}
@@ -86,7 +91,7 @@ module Ai
         When creating a new type, provide:
         1. type_prompt: describe what this type is and when to use it
         2. Include a suggested extraction_schema in the type_prompt, e.g.:
-           "extraction_schema: {\\\"field_name\\\":{\\\"type\\\":\\\"string\\\",\\\"description\\\":\\\"...\\\"}}"
+           "extraction_schema: {\\"field_name\\":{\\"type\\":\\"string\\",\\"description\\":\\"...\\"}}"
 
         CRITICAL: When filling the metadata object, you MUST use the EXACT field names from the schema for the type you selected. Do NOT invent new field names. For example, if the schema says "vendor_name", use "vendor_name" not "supplier_name". For amounts, use integer cents (e.g., €123.45 = 12345).
         #{Ai::Configuration.user_prompt_suffix(PURPOSE)}
@@ -134,7 +139,9 @@ module Ai
         # extract their text and send THAT — otherwise the model only ever saw the
         # filename and could extract nothing.
         [
-          { type: :text, text: "The attached file \"#{filename}\" is a Word document. Its extracted text content follows:\n\n#{text[0, 50_000]}" },
+          { type: :text, text: "The attached file \"#{filename}\" is a Word document. Its extracted text content follows:
+
+#{text[0, 50_000]}" },
           { type: :text, text: "Analyze this Portuguese business document and extract structured data." }
         ]
       else
@@ -151,6 +158,22 @@ module Ai
       end
 
       parts
+    end
+
+
+    def direction_hint
+      if @document.sent_email?
+        "IMPORTANT: This document was SENT from your mailbox (outbound). " \
+          "For invoices or payment-related documents, prefer revenue/outgoing types " \
+          "(revenue_invoice, receipt for received payments). " \
+          "The counterparty is the recipient: " + (@document.sender_name || "unknown").to_s + "."
+      elsif @document.email?
+        "This document was RECEIVED in your mailbox (inbound). " \
+          "For invoices or payment-related documents, prefer expense/incoming types " \
+          "(expense_invoice, receipt for payments made)."
+      else
+        ""
+      end
     end
 
     def classification_memory
@@ -172,9 +195,13 @@ module Ai
 
       # The zip entry reads as binary (ASCII-8BIT); docx XML is UTF-8.
       xml = xml.force_encoding("UTF-8")
-      text = xml.gsub(%r{</w:p>}, "\n")
+      text = xml.gsub(%r{</w:p>}, "
+")
       text = text.gsub(/<[^>]+>/, "") while text.match?(/<[^>]+>/)
-      CGI.unescapeHTML(text).gsub(/[ \t]+/, " ").gsub(/\n{3,}/, "\n\n").strip.presence
+      CGI.unescapeHTML(text).gsub(/[ 	]+/, " ").gsub(/
+{3,}/, "
+
+").strip.presence
     rescue => e
       Rails.logger.warn("[Ai::DocumentAnalyzer] office_text extraction failed: #{e.message}")
       nil
