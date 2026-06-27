@@ -24,8 +24,23 @@
   <div><%= f.label :subject, class: "block text-sm font-medium text-foreground mb-1" %><%= f.text_field :subject, class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" %></div>
   <div><%= f.label :body, class: "block text-sm font-medium text-foreground mb-1" %><%= f.text_area :body, rows: 8, class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono", placeholder: t(".body_placeholder") %></div>
   <div><%= f.label :scheduled_at, class: "block text-sm font-medium text-foreground mb-1" %><%= f.datetime_local_field :scheduled_at, class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" %></div>
-  <div><%= f.label :rrule, class: "block text-sm font-medium text-foreground mb-1" %><%= f.text_field :rrule, class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono", placeholder: "FREQ=WEEKLY;INTERVAL=1" %><p class="text-[11px] text-gray-400 mt-1"><%= t(".rrule_hint") %></p></div>
-  <div><label class="block text-sm font-medium text-foreground mb-1"><%= t(".template_context") %></label><p class="text-[11px] text-gray-400 mb-1"><%= t(".template_context_hint") %></p><%= f.text_area :template_context, value: scheduled_email.template_context.to_json, rows: 4, class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono text-[11px]" %></div>
+  <div>
+    <%= f.label :rrule, class: "block text-sm font-medium text-foreground mb-1" %>
+    <%= f.select :rrule,
+          options_for_select(
+            [
+              [t("scheduled_emails.recurrence.none"), ""],
+              [t("scheduled_emails.recurrence.daily"), "FREQ=DAILY"],
+              [t("scheduled_emails.recurrence.weekly"), "FREQ=WEEKLY"],
+              [t("scheduled_emails.recurrence.biweekly"), "FREQ=WEEKLY;INTERVAL=2"],
+              [t("scheduled_emails.recurrence.monthly"), "FREQ=MONTHLY"]
+            ],
+            scheduled_email.rrule.to_s
+          ),
+          {},
+          class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" %>
+    <p class="text-[11px] text-gray-400 mt-1"><%= t(".rrule_hint") %></p>
+  </div>
 
   <div class="flex items-center gap-3 pt-2">
     <%= f.submit class: "inline-flex items-center rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 cursor-pointer border-0" %>
