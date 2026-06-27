@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_27_010001) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_27_030000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -1010,6 +1010,30 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_010001) do
     t.index ["workspace_id"], name: "index_reminders_on_workspace_id"
   end
 
+  create_table "scheduled_emails", force: :cascade do |t|
+    t.string "bcc_address"
+    t.text "body", null: false
+    t.string "cc_address"
+    t.datetime "created_at", null: false
+    t.bigint "created_by_id", null: false
+    t.bigint "email_account_id", null: false
+    t.datetime "last_sent_at"
+    t.datetime "next_occurrence_at"
+    t.string "rrule"
+    t.datetime "scheduled_at", null: false
+    t.integer "status", default: 0, null: false
+    t.string "subject", null: false
+    t.string "to_address", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "workspace_id", null: false
+    t.index ["created_by_id"], name: "index_scheduled_emails_on_created_by_id"
+    t.index ["email_account_id"], name: "index_scheduled_emails_on_email_account_id"
+    t.index ["next_occurrence_at"], name: "idx_scheduled_emails_pending_next_occurrence", where: "(status = 0)"
+    t.index ["scheduled_at"], name: "idx_scheduled_emails_pending_scheduled_at", where: "(status = 0)"
+    t.index ["workspace_id", "status"], name: "index_scheduled_emails_on_workspace_id_and_status"
+    t.index ["workspace_id"], name: "index_scheduled_emails_on_workspace_id"
+  end
+
   create_table "search_chunks", force: :cascade do |t|
     t.string "chunk_type", default: "text", null: false
     t.text "content", null: false
@@ -1515,6 +1539,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_010001) do
   add_foreign_key "reminders", "calendar_events"
   add_foreign_key "reminders", "users", column: "confirmed_by_id"
   add_foreign_key "reminders", "workspaces"
+  add_foreign_key "scheduled_emails", "email_accounts"
+  add_foreign_key "scheduled_emails", "users", column: "created_by_id"
+  add_foreign_key "scheduled_emails", "workspaces"
   add_foreign_key "search_chunks", "workspaces"
   add_foreign_key "search_records", "workspaces"
   add_foreign_key "search_tag_embeddings", "tags"
