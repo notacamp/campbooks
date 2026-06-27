@@ -20,7 +20,7 @@
     </div>
     <div class="mt-6 p-4 bg-muted/50 rounded-lg">
       <h2 class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2"><%= t(".preview") %></h2>
-      <div class="prose prose-sm max-w-none text-foreground"><%= raw @scheduled_email.body %></div>
+      <div class="prose prose-sm max-w-none text-foreground"><%= sanitize @scheduled_email.body %></div>
     </div>
   </div>
 </div>

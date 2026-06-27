@@ -79,9 +79,9 @@ module Campbooks
             shown.each { |event| render_chip(event) }
             slots = MAX_CHIPS - shown.size
             reminders.first(slots).each { |reminder| render Campbooks::Calendar::ReminderChip.new(reminder: reminder) } if slots.positive?
-            slots -= [reminders.size, slots].min
+            slots -= [ reminders.size, slots ].min
             snoozed.first(slots).each { |thread| render Campbooks::Calendar::SnoozedChip.new(thread: thread) } if slots.positive?
-            slots -= [snoozed.size, slots].min
+            slots -= [ snoozed.size, slots ].min
             scheduled.first(slots).each { |email| render Campbooks::Calendar::ScheduledEmailChip.new(scheduled_email: email) } if slots.positive?
             overflow = events.size + reminders.size + snoozed.size + scheduled.size - MAX_CHIPS
             div(class: "px-1 text-[10px] text-gray-400") { "+#{overflow}" } if overflow.positive?

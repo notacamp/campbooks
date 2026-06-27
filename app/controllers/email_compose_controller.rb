@@ -93,7 +93,7 @@ class EmailComposeController < ApplicationController
       respond_to do |format|
         format.turbo_stream do
           stream = @message ? turbo_stream.remove("compose_area_#{@message.id}") : sent_redirect
-          render turbo_stream: [notify_stream(t(".scheduled"), severity: :success), stream].flatten.compact
+          render turbo_stream: [ notify_stream(t(".scheduled"), severity: :success), stream ].flatten.compact
         end
         format.html { redirect_to scheduled_emails_path, notice: t(".scheduled") }
       end
