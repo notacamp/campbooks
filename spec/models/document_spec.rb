@@ -35,7 +35,7 @@ RSpec.describe Document, type: :model do
 
     it {
       is_expected.to define_enum_for(:source)
-        .with_values(manual_upload: 0, email: 1, notion: 2)
+        .with_values(manual_upload: 0, email: 1, notion: 2, sent_email: 3)
     }
   end
 
@@ -69,6 +69,42 @@ RSpec.describe Document, type: :model do
 
         expect(Document.ai_failed_attention).to include(failed_doc)
         expect(Document.ai_failed_attention).not_to include(review_doc)
+      end
+    end
+
+    describe ".by_organization" do
+      let(:user) { create(:user, workspace: workspace) }
+      let(:org) { create(:organization, workspace: workspace) }
+      let(:person) { create(:person, workspace: workspace) }
+      let(:contact) { create(:contact, workspace: workspace, person: person) }
+
+      before { create(:organization_membership, organization: org, person: person, status: :active) }
+
+      # A document linked (via document_email_messages) to an email that arrived
+      # in `account`, sent by the org member's contact.
+      def org_document_in(account)
+        message = create(:email_message, email_account: account, contact: contact)
+        document = create(:document, workspace: workspace, source: :email)
+        document.email_messages << message
+        document
+      end
+
+      it "returns documents tied to the organization's members" do
+        document = org_document_in(create(:email_account, workspace: workspace))
+        expect(Document.by_organization(org)).to include(document)
+      end
+
+      it "hides documents from email accounts the user cannot read (per-user sharing)" do
+        readable = create(:email_account, workspace: workspace)
+        create(:email_account_user, email_account: readable, user: user, can_read: true)
+        hidden = create(:email_account, workspace: workspace) # never shared with the user
+
+        visible_doc = org_document_in(readable)
+        hidden_doc  = org_document_in(hidden)
+
+        scoped = Document.by_organization(org, accessible_to: user)
+        expect(scoped).to include(visible_doc)
+        expect(scoped).not_to include(hidden_doc)
       end
     end
   end

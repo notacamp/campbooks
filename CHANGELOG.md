@@ -29,6 +29,9 @@ major, minor, or patch change here.
   (active or past). Includes scoped filtering for emails and documents, a
   directory page, per-organization profile pages, and a backfill from existing
   AI-extracted `Person.organization` strings.
+- **Sent-email attachments** — files attached to emails you send are now stored
+  locally as documents (the same way received attachments are), and the AI
+  biases their classification toward revenue/outgoing types.
 
 ### Fixed
 

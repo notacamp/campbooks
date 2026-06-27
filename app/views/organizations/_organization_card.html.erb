@@ -1,5 +1,5 @@
 <%= link_to organization_path(organization), class: "flex items-center gap-3 rounded-xl border border-border bg-card p-4 min-w-0 hover:bg-muted/40 transition-colors" do %>
   <div class="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground flex-shrink-0"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11m16-11v11M8 14v.01M12 14v.01M16 14v.01M8 18v.01M12 18v.01M16 18v.01"/></svg></div>
   <div class="min-w-0 flex-1"><p class="text-sm font-semibold text-foreground truncate"><%= organization.name %></p><p class="text-xs text-muted-foreground"><%= t("organizations.organization_card.members", count: organization.member_count) %><%= " · #{organization.domain}" if organization.domain.present? %></p></div>
-  <% if organization.email_count > 0 %><span class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"><%= organization.email_count %></span><% end %>
+  <% if (email_count = email_counts[organization.id].to_i) > 0 %><span class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"><%= email_count %></span><% end %>
 <% end %>
