@@ -10,12 +10,12 @@ RSpec.describe GoogleDrive::Client do
     allow(Faraday).to receive(:new).and_return(faraday_connection)
     allow(faraday_connection).to receive(:headers)
     allow(faraday_connection).to receive(:options).and_return(
-      double("options", open_timeout: 10, timeout: 30, open_timeout=: nil, timeout=: nil)
+      double("options", open_timeout: 10, timeout: 30)
     )
   end
 
   describe "#upload_file" do
-    let(:tempfile) { Tempfile.new(["test", ".pdf"]) }
+    let(:tempfile) { Tempfile.new([ "test", ".pdf" ]) }
 
     before { tempfile.write("fake pdf content"); tempfile.rewind }
     after  { tempfile.close! }
@@ -57,7 +57,7 @@ RSpec.describe GoogleDrive::Client do
 
   describe "#find_folder_by_name" do
     it "returns the folder when found" do
-      body = { files: [{ id: "f-1", name: "Invoices" }] }.to_json
+      body = { files: [ { id: "f-1", name: "Invoices" } ] }.to_json
       allow(faraday_connection).to receive(:get).and_return(double("r", body: body, status: 200))
 
       result = described_class.new(account).find_folder_by_name("Invoices")
@@ -72,7 +72,7 @@ RSpec.describe GoogleDrive::Client do
 
   describe "#list_folders" do
     it "lists child folders as OpenStructs" do
-      body = { files: [{ id: "f-1", name: "Finance" }, { id: "f-2", name: "HR" }] }.to_json
+      body = { files: [ { id: "f-1", name: "Finance" }, { id: "f-2", name: "HR" } ] }.to_json
       allow(faraday_connection).to receive(:get).and_return(double("r", body: body, status: 200))
 
       results = described_class.new(account).list_folders
@@ -125,7 +125,7 @@ RSpec.describe GoogleDrive::Client do
 
     it "reuses existing folders" do
       allow(faraday_connection).to receive(:get).and_return(
-        double("r", body: { files: [{ id: "existing", name: "2026" }] }.to_json, status: 200)
+        double("r", body: { files: [ { id: "existing", name: "2026" } ] }.to_json, status: 200)
       )
 
       result = described_class.new(account).find_or_create_folder(%w[2026], root_folder_id: "root")

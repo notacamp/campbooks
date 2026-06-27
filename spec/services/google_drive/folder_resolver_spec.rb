@@ -19,7 +19,7 @@ RSpec.describe GoogleDrive::FolderResolver do
       let(:pattern) { "year" }
 
       it "creates a year subfolder" do
-        allow(client).to receive(:find_or_create_folder).with(["2026"], root_folder_id: "base-folder").and_return("yr-id")
+        allow(client).to receive(:find_or_create_folder).with([ "2026" ], root_folder_id: "base-folder").and_return("yr-id")
         expect(described_class.new(document, config, client).call).to eq("yr-id")
       end
     end
@@ -28,7 +28,7 @@ RSpec.describe GoogleDrive::FolderResolver do
       let(:pattern) { "year_month" }
 
       it "creates year+month subfolders" do
-        allow(client).to receive(:find_or_create_folder).with(["2026", "06_June"], root_folder_id: "base-folder").and_return("mo-id")
+        allow(client).to receive(:find_or_create_folder).with([ "2026", "06_June" ], root_folder_id: "base-folder").and_return("mo-id")
         expect(described_class.new(document, config, client).call).to eq("mo-id")
       end
 
@@ -36,7 +36,7 @@ RSpec.describe GoogleDrive::FolderResolver do
         allow(document).to receive(:document_date).and_return(nil)
         today = Date.current
         allow(client).to receive(:find_or_create_folder)
-          .with([today.year.to_s, today.strftime("%m_%B")], root_folder_id: "base-folder")
+          .with([ today.year.to_s, today.strftime("%m_%B") ], root_folder_id: "base-folder")
           .and_return("today")
         expect(described_class.new(document, config, client).call).to eq("today")
       end
@@ -46,7 +46,7 @@ RSpec.describe GoogleDrive::FolderResolver do
       let(:pattern) { "entity" }
 
       it "creates an entity subfolder" do
-        allow(client).to receive(:find_or_create_folder).with(["ACME Corp"], root_folder_id: "base-folder").and_return("ent-id")
+        allow(client).to receive(:find_or_create_folder).with([ "ACME Corp" ], root_folder_id: "base-folder").and_return("ent-id")
         expect(described_class.new(document, config, client).call).to eq("ent-id")
       end
 
