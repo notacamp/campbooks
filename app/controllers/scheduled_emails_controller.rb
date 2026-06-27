@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 class ScheduledEmailsController < ApplicationController
-  before_action :require_email_scheduling_enabled
   before_action :require_authentication
+  before_action -> { require_entitlement!(:email_scheduling) }, except: [:index, :show]
   before_action :load_scheduled_email, only: %i[show edit update destroy]
 
   def index
