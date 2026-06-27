@@ -14,7 +14,7 @@ class Organization < ApplicationRecord
   scope :ordered, -> { order(:name) }
   scope :by_name, ->(name) { where("name ILIKE ?", "%#{sanitize_sql_like(name)}%") }
 
-  def member_count = people.count
+  def member_count = people.size
   def active_member_count = active_people.count
   def email_count = email_messages.count
 end
