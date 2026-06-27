@@ -324,6 +324,16 @@ Rails.application.routes.draw do
   end
 
 
+    resources :organizations, only: [ :index, :show, :update ] do
+    member do
+      get :emails
+      get :documents
+    end
+    collection do
+      post :backfill
+    end
+  end
+
   resources :email_threads, only: [ :index, :show ]
 
   # User-defined inbox folders (chips on top of the inbox). Creating one
