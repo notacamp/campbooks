@@ -2,7 +2,10 @@
 
 class ScheduledEmailsController < ApplicationController
   before_action :require_authentication
-  before_action -> { require_entitlement!(:email_scheduling) }, except: [ :index, :show ]
+  # Creating/editing a schedule needs the entitlement, but viewing and
+  # cancelling existing ones stays open so a downgraded workspace can still see
+  # and stop schedules it created while subscribed.
+  before_action -> { require_entitlement!(:email_scheduling) }, only: %i[new create edit update]
   before_action :load_scheduled_email, only: %i[show edit update destroy]
 
   def index
@@ -19,7 +22,7 @@ class ScheduledEmailsController < ApplicationController
       email_account_id: params[:email_account_id],
       to_address: params[:to_address],
       subject: params[:subject],
-      template_context: default_template_context
+      scheduled_at: default_scheduled_at
     )
     @email_accounts = Current.user.sendable_email_accounts.ordered
   end
@@ -66,8 +69,7 @@ class ScheduledEmailsController < ApplicationController
   def scheduled_email_params
     params.require(:scheduled_email).permit(
       :email_account_id, :to_address, :cc_address, :bcc_address,
-      :subject, :body, :scheduled_at, :rrule,
-      template_context: {}
+      :subject, :body, :scheduled_at, :rrule
     )
   end
 
@@ -82,11 +84,8 @@ class ScheduledEmailsController < ApplicationController
     @scheduled_email.update_columns(next_occurrence_at: next_at)
   end
 
-  def default_template_context
-    {
-      "contact" => { "first_name" => "", "last_name" => "", "email" => "" },
-      "date" => Date.current.iso8601,
-      "workspace" => { "name" => Current.workspace&.name || "" }
-    }
+  # Sensible default for a brand-new schedule: the next half-hour, one hour out.
+  def default_scheduled_at
+    (Time.current + 1.hour).change(min: (Time.current.min / 30) * 30)
   end
 end

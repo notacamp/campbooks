@@ -164,6 +164,10 @@ plans:
       enabled: true
       config:
         tier: premium
+    email_scheduling:
+      type: flag
+      allowed: true
+      enabled: true
     emails_synced:
       type: limit
       allowed: true
@@ -210,6 +214,10 @@ plans:
       enabled: true
       config:
         tier: premium
+    email_scheduling:
+      type: flag
+      allowed: true
+      enabled: true
     emails_synced:
       type: limit
       allowed: true

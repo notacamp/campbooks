@@ -1,5 +1,9 @@
 # frozen_string_literal: true
 
+# A one-time or recurring email queued to send at a future time. The compose
+# area ("Schedule" button) and the dedicated /scheduled_emails surface both
+# create these; ScheduledEmailSendJob (every minute) dispatches the due ones via
+# Emails::Sender and advances recurring items to their next occurrence.
 class ScheduledEmail < ApplicationRecord
   belongs_to :workspace
   belongs_to :email_account
@@ -30,24 +34,9 @@ class ScheduledEmail < ApplicationRecord
     rrule.present?
   end
 
+  # The time this item next fires: the computed next occurrence for recurring
+  # items, otherwise the one-time scheduled_at.
   def display_time
     next_occurrence_at || scheduled_at
-  end
-
-  def rendered_subject
-    render_liquid(subject)
-  end
-
-  def rendered_body
-    render_liquid(body)
-  end
-
-  private
-
-  def render_liquid(template)
-    Workflows::LiquidRenderer.render(template, template_context)
-  rescue Workflows::LiquidRenderer::Error => e
-    Rails.logger.warn("[ScheduledEmail##{id}] Liquid render error: #{e.message}")
-    template
   end
 end

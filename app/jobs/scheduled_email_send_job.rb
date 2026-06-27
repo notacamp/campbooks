@@ -21,8 +21,8 @@ class ScheduledEmailSendJob < ApplicationJob
       user: scheduled_email.created_by,
       email_account_id: scheduled_email.email_account_id,
       to_address: scheduled_email.to_address,
-      subject: scheduled_email.rendered_subject,
-      body: scheduled_email.rendered_body,
+      subject: scheduled_email.subject,
+      body: scheduled_email.body,
       cc_address: scheduled_email.cc_address.presence,
       bcc_address: scheduled_email.bcc_address.presence
     )
