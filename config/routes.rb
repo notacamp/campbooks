@@ -324,7 +324,7 @@ Rails.application.routes.draw do
   end
 
 
-    resources :organizations, only: [:index, :show, :update] do
+    resources :organizations, only: [ :index, :show, :update ] do
     member do
       get :emails
       get :documents

@@ -3,7 +3,7 @@ module Organizations
     def initialize(workspace) = @workspace = workspace
     def call
       created = 0
-      @workspace.people.where.not(organization: [nil, ""]).where.not(id: already_member_ids)
+      @workspace.people.where.not(organization: [ nil, "" ]).where.not(id: already_member_ids)
         .distinct.pluck(:organization).each do |org_name|
         name = org_name.strip
         next if name.blank?
