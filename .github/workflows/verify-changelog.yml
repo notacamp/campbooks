@@ -1,0 +1,44 @@
+name: Verify changelog
+
+# Gate: when a PR bumps the VERSION file, CHANGELOG.md must also be updated —
+# the [Unreleased] section must be rolled into a matching [X.Y.Z] heading.
+# Runs on every PR that touches VERSION; a no-op skip on PRs that don't.
+
+on:
+  pull_request:
+    paths:
+      - VERSION
+      - CHANGELOG.md
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Verify changelog was rolled with the version bump
+        run: |
+          set -euo pipefail
+
+          NEW_VERSION=$(cat VERSION)
+          echo "PR bumps VERSION to: $NEW_VERSION"
+
+          # Must have a [X.Y.Z] heading in CHANGELOG.md matching the new version.
+          if ! grep -q "^## \[${NEW_VERSION}\]" CHANGELOG.md; then
+            echo "::error::VERSION is $NEW_VERSION but CHANGELOG.md has no '## [$NEW_VERSION]' heading."
+            echo "Roll the [Unreleased] section into [$NEW_VERSION] before merging."
+            exit 1
+          fi
+
+          # The [Unreleased] section (between the comment block and the first
+          # version heading) must be empty — all content must be rolled.
+          # Collect lines between "## [Unreleased]" and the next "## [" heading.
+          UNRELEASED=$(awk '/^## \[Unreleased\]/{f=1; next} /^## \[/{f=0} f' CHANGELOG.md | grep -cv '^$' || true)
+          if [ "$UNRELEASED" -gt 0 ]; then
+            echo "::error::The [Unreleased] section is not empty ($UNRELEASED non-blank lines)."
+            echo "All content must be rolled into [$NEW_VERSION]."
+            exit 1
+          fi
+
+          echo "✅ CHANGELOG.md correctly rolled for v$NEW_VERSION"

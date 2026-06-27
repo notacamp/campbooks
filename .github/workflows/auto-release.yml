@@ -1,0 +1,85 @@
+name: Auto-release on version bump
+
+# When a commit lands on main that bumps the VERSION file, create a GitHub
+# Release automatically. The release notes are extracted from CHANGELOG.md's
+# [X.Y.Z] section. Prerelease versions (containing -rc, -alpha, -beta, -pre)
+# are marked as prereleases and skip the deploy dispatch.
+#
+# publish-image.yml triggers on the release event and builds + pushes the
+# multi-arch GHCR image; for stable releases, it also fires the deploy
+# dispatch to campbooks-cloud.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - VERSION
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # to create the release + tag
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2  # need the previous commit to diff VERSION
+
+      - name: Detect version bump
+        id: version
+        run: |
+          NEW_VERSION=$(cat VERSION)
+          OLD_VERSION=$(git show HEAD~1:VERSION 2>/dev/null || echo "none")
+
+          echo "old: $OLD_VERSION → new: $NEW_VERSION"
+
+          if [ "$NEW_VERSION" = "$OLD_VERSION" ]; then
+            echo "VERSION unchanged — nothing to release."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+
+          # Determine if prerelease based on version string
+          if echo "$NEW_VERSION" | grep -qE '\-(rc|alpha|beta|pre)'; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extract release notes from CHANGELOG
+        if: steps.version.outputs.changed == 'true'
+        id: notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # Extract the section between "## [VERSION]" and the next "## [OLDER]"
+          NOTES=$(awk "/^## \[$VERSION\]/{f=1; next} /^## \[/{f=0} f" CHANGELOG.md)
+          if [ -z "$NOTES" ]; then
+            echo "::error::No CHANGELOG section found for [$VERSION]"
+            exit 1
+          fi
+          # Write to file to avoid shell escaping issues with the gh CLI
+          echo "$NOTES" > /tmp/release-notes.md
+          echo "notes_file=/tmp/release-notes.md" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        if: steps.version.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          PRERELEASE="${{ steps.version.outputs.prerelease }}"
+          NOTES_FILE="${{ steps.notes.outputs.notes_file }}"
+
+          FLAGS="--target main --title \"v$VERSION\" --notes-file \"$NOTES_FILE\""
+          if [ "$PRERELEASE" = "true" ]; then
+            FLAGS="$FLAGS --prerelease"
+          fi
+
+          echo "Creating release v$VERSION (prerelease=$PRERELEASE)"
+          gh release create "v$VERSION" $FLAGS
+
+          echo "✅ Release v$VERSION created — publish-image.yml will now build the image"
