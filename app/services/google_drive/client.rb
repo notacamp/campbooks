@@ -1,3 +1,5 @@
+require "ostruct"
+
 module GoogleDrive
   class Client
     BASE_URL = "https://www.googleapis.com/drive/v3"
