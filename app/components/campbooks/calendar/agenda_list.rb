@@ -1,15 +1,15 @@
 module Campbooks
   module Calendar
-    # Upcoming events grouped by day (Today / Tomorrow / date). The default view,
-    # and the one mobile falls back to.
     class AgendaList < Campbooks::Base
-      def initialize(events:, reminders: [])
+      def initialize(events:, reminders: [], snoozed_threads: [], scheduled_emails: [])
         @events = events.to_a
         @reminders = reminders.to_a
+        @snoozed_threads = snoozed_threads.to_a
+        @scheduled_emails = scheduled_emails.to_a
       end
 
       def view_template
-        if @events.empty? && @reminders.empty?
+        if @events.empty? && @reminders.empty? && @snoozed_threads.empty? && @scheduled_emails.empty?
           render Campbooks::EmptyState.new(variant: :card, title: t(".empty_title"), description: t(".empty_desc"))
           return
         end
@@ -21,6 +21,8 @@ module Campbooks
               div(class: "space-y-1.5") do
                 (events_by_day[day] || []).each { |event| render Campbooks::Calendar::EventRow.new(event: event) }
                 (reminders_by_day[day] || []).each { |reminder| render Campbooks::Calendar::ReminderChip.new(reminder: reminder, variant: :row) }
+                (snoozed_by_day[day] || []).each { |thread| render Campbooks::Calendar::SnoozedRow.new(thread: thread) }
+                (scheduled_by_day[day] || []).each { |email| render Campbooks::Calendar::ScheduledEmailRow.new(scheduled_email: email) }
               end
             end
           end
@@ -37,9 +39,16 @@ module Campbooks
         @reminders_by_day ||= @reminders.group_by { |r| r.due_at.to_date }
       end
 
-      # Every day that has an event or a reminder, chronologically.
+      def snoozed_by_day
+        @snoozed_by_day ||= @snoozed_threads.group_by { |t| t.snoozed_until.to_date }
+      end
+
+      def scheduled_by_day
+        @scheduled_by_day ||= @scheduled_emails.group_by { |s| (s.next_occurrence_at || s.scheduled_at).to_date }
+      end
+
       def days
-        (events_by_day.keys | reminders_by_day.keys).sort
+        (events_by_day.keys | reminders_by_day.keys | snoozed_by_day.keys | scheduled_by_day.keys).sort
       end
 
       def day_label(date)

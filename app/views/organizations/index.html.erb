@@ -7,7 +7,7 @@
 <% end %>
 <div class="space-y-2">
   <% if @organizations.any? %>
-    <%= render partial: "organization_card", collection: @organizations, as: :organization %>
+    <%= render partial: "organization_card", collection: @organizations, as: :organization, locals: { email_counts: @email_counts } %>
   <% else %>
     <div class="rounded-xl border border-border bg-card p-8 text-center">
       <p class="text-sm text-muted-foreground"><%= t(".empty") %></p>
