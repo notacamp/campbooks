@@ -271,6 +271,20 @@ Rails.application.routes.draw do
       resource :calendars, only: [ :show ], controller: "calendars"
       resources :connections, only: [ :index, :new, :create, :edit, :update, :destroy ]
     end
+
+    resources :pipelines, except: [ :show ]
+  end
+
+  # Pipelines kanban board (outside Settings).
+  resources :pipelines, only: [] do
+    member do
+      get :board, to: "pipeline_board#index"
+      post :move, to: "pipeline_board#move"
+    end
+  end
+
+  # Document templates
+    end
   end
 
   # Inbox settings — the gear-icon management modal on the email page. Each

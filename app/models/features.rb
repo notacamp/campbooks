@@ -43,6 +43,13 @@ module Features
       flag?("ENABLE_MICROSOFT") || flag?("ENABLE_MICROSOFT_MAILBOX")
     end
 
+    # User-configurable pipelines: state machines / kanban boards for documents
+    # and emails. When off, all pipeline routes 404 and the settings nav link is
+    # hidden.
+    def pipelines?
+      flag?("ENABLE_PIPELINES")
+    end
+
     private
 
     def flag?(name)
