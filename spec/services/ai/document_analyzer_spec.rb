@@ -84,4 +84,25 @@ RSpec.describe Ai::DocumentAnalyzer do
       expect(parts.any? { |p| p[:text].to_s.include?("Total a pagar: 500 EUR") }).to be(true)
     end
   end
+
+  # Regression: the filename heuristic's `\bata\b` word boundary (Portuguese
+  # meeting-minute "ata") was corrupted into backspace control characters, which
+  # silently broke the rule. Guard the boundary so unrelated names that merely
+  # contain "ata" (e.g. "data") are not classified as correspondence.
+  describe "#guess_from_filename — ata word boundary" do
+    def guess_for(filename)
+      doc = create(:document, workspace: create(:workspace))
+      doc.original_file.attach(io: StringIO.new("x"), filename: filename, content_type: "application/pdf")
+      described_class.new(doc).send(:guess_from_filename)
+    end
+
+    it "classifies a meeting minute (ata) as correspondence" do
+      expect(guess_for("ata.pdf")).to eq("correspondence")
+    end
+
+    it "does not misclassify names that merely contain 'ata'" do
+      expect(guess_for("data.pdf")).not_to eq("correspondence")
+      expect(guess_for("database-export.pdf")).not_to eq("correspondence")
+    end
+  end
 end

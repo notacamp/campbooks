@@ -45,7 +45,7 @@ class Person < ApplicationRecord
     contacts.order(email_count: :desc).first&.email
   end
 
-    def organization_name
+  def organization_name
     primary_organization&.name || read_attribute(:organization)
   end
 
