@@ -1,6 +1,10 @@
 class Documents::WrittenController < ApplicationController
   before_action :set_document, only: [ :show, :edit, :update ]
 
+  def index
+    @documents = Current.workspace.authored_documents.recent
+  end
+
   def new
     @document = Current.workspace.authored_documents.new
   end

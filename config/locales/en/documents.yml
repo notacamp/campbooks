@@ -214,6 +214,12 @@ en:
         ai_unsure: "%{count} the AI wasn't sure about — skim to confirm or re-file"
         needs_review: Needs review
     written:
+      index:
+        title: Written documents
+        back_to_documents: Back to Docs
+        new: New document
+        empty_title: No written documents yet
+        empty_description: Write formatted documents like letters, reports, and notes from scratch.
       new:
         title: Write a document
         title_placeholder: Document title

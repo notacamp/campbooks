@@ -2,11 +2,7 @@
 
 <%= render Campbooks::PageHeader.new(title: @document.title) do |header| %>
   <% header.with_actions do %>
-    <%= link_to edit_written_document_path(@document),
-        class: "inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700
-                bg-white border border-gray-300 rounded-md hover:bg-gray-50" do %>
-      <%= t(".edit") %>
-    <% end %>
+    <%= render Campbooks::Button.new(variant: :outline, size: :sm, href: edit_written_document_path(@document)) { t(".edit") } %>
     <%= link_to documents_path,
         class: "text-sm text-muted-foreground hover:text-foreground transition-colors" do %>
       ← <%= t(".back_to_documents") %>
@@ -21,8 +17,8 @@
   <% end %>
 </div>
 
-<article class="bg-card rounded-xl border border-gray-200 p-6 sm:p-8">
-  <div class="prose prose-sm max-w-none">
+<article class="bg-card rounded-xl border border-gray-200 p-6 sm:p-8 overflow-x-auto">
+  <div class="authored-content prose prose-sm max-w-none">
     <%= render_authored_content(@document.html_content) %>
   </div>
 </article>

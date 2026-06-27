@@ -1,6 +1,6 @@
-class CreateAuthoredDocuments < ActiveRecord::Migration[8.0]
+class CreateAuthoredDocuments < ActiveRecord::Migration[8.1]
   def change
-    create_table :authored_documents, id: :uuid do |t|
+    create_table :authored_documents do |t|
       t.references :workspace, null: false, foreign_key: true
       t.string :title, null: false
       t.text :html_content

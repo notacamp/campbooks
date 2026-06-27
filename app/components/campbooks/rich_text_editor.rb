@@ -1,11 +1,12 @@
 # frozen_string_literal: true
 
 module Campbooks
-  # The one rich-text editor used everywhere we author HTML email: the reply
-  # drawer, the new-message page, and the signature editor. It renders the
-  # wrapper + hidden input + toolbar + popovers; all behaviour lives in the
-  # `tiptap-editor` Stimulus controller. Keep the markup here so the toolbar is
-  # never duplicated across surfaces again.
+  # The one rich-text editor used everywhere we author HTML: the reply drawer,
+  # the new-message page, the signature editor, and the document writing tool
+  # (the `:document` variant unlocks tables, font family, highlight, and
+  # super/subscript). It renders the wrapper + hidden input + toolbar + popovers;
+  # all behaviour lives in the `tiptap-editor` Stimulus controller. Keep the
+  # markup here so the toolbar is never duplicated across surfaces again.
   #
   # @param input_name  [String] name of the hidden <input> the editor HTML syncs into (e.g. "body").
   # @param content     [String] initial HTML.

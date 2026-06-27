@@ -120,6 +120,12 @@ fr:
       upload_and_process: Téléverser et traiter
       write: Écrire
     written:
+      index:
+        title: Documents rédigés
+        back_to_documents: Retour aux Docs
+        new: Nouveau document
+        empty_title: Aucun document rédigé pour l'instant
+        empty_description: Rédigez des documents mis en forme comme des lettres, des rapports et des notes à partir de zéro.
       new:
         title: Écrire un document
         title_placeholder: Titre du document

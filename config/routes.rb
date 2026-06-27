@@ -125,6 +125,7 @@ Rails.application.routes.draw do
 
   # Document writing tool — author formatted documents from scratch.
   # Declared BEFORE `resources :documents` to avoid :id = "write" capture.
+  get   "documents/write",      to: "documents/written#index", as: :written_documents
   get   "documents/write/new",  to: "documents/written#new",  as: :new_written_document
   post  "documents/write",      to: "documents/written#create"
   get   "documents/write/:id",  to: "documents/written#show", as: :written_document

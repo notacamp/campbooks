@@ -120,6 +120,12 @@ es:
       upload_and_process: Subir y procesar
       write: Escribir
     written:
+      index:
+        title: Documentos escritos
+        back_to_documents: Volver a Docs
+        new: Nuevo documento
+        empty_title: Aún no hay documentos escritos
+        empty_description: Escribe documentos con formato como cartas, informes y notas desde cero.
       new:
         title: Escribir documento
         title_placeholder: Título del documento
