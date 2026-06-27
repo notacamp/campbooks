@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_26_013609) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_27_011622) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -1519,4 +1519,43 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_26_013609) do
   add_foreign_key "workflows", "users", column: "created_by_id"
   add_foreign_key "workflows", "workspaces"
   add_foreign_key "zoho_drive_accounts", "workspaces"
+
+  create_table "pipelines", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.integer "applies_to", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "icon", default: "git-branch", null: false
+    t.string "name", null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.uuid "workspace_id"
+  end
+
+  create_table "pipeline_stages", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.jsonb "auto_assign_rules", default: {}, null: false
+    t.string "color", default: "#6366f1", null: false
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.jsonb "exit_action_config", default: {}, null: false
+    t.boolean "is_terminal", default: false, null: false
+    t.string "name", null: false
+    t.uuid "pipeline_id"
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "pipeline_memberships", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "current_stage_id"
+    t.datetime "entered_at"
+    t.uuid "item_id", null: false
+    t.string "item_type", null: false
+    t.datetime "last_moved_at"
+    t.uuid "pipeline_id"
+    t.integer "position", default: 0, null: false
+    t.jsonb "stage_history", default: [], null: false
+    t.datetime "updated_at", null: false
+    t.index ["item_type", "item_id"], name: "idx_plm_on_item"
+    t.index ["item_type", "item_id"], name: "index_pipeline_memberships_on_item"
+  end
 end
