@@ -115,12 +115,16 @@ module Ai
       text = upsert_managed_adapter(MANAGED_TEXT_ADAPTER_NAME, provider: Ai::Platform::MANAGED_TEXT_PROVIDER)
       assign_purposes(text, AiConfiguration::TEXT_PURPOSES)
 
-      # Managed document analysis runs on a US provider (MANAGED_DOC_PROVIDER); skip
-      # wiring it for an EU-residency workspace so we don't provision a path that the
-      # runtime gate would only pause. Managed text is Mistral/EU, so it's unaffected.
-      if Ai::Platform.documents_available? && @workspace.region_allows?(Ai::Platform::MANAGED_DOC_PROVIDER)
-        docs = upsert_managed_adapter(MANAGED_VISION_ADAPTER_NAME, provider: Ai::Platform::MANAGED_DOC_PROVIDER)
-        assign_purposes(docs, AiConfiguration::DOCUMENT_PURPOSES)
+      # Managed document analysis: prefers Anthropic (native PDF), degrades to
+      # OpenAI when only the OpenAI key is set. Both are US providers; skip wiring
+      # for EU-residency workspaces so we don't provision a path the runtime gate
+      # would only pause. Managed text is Mistral/EU, so it's unaffected.
+      if Ai::Platform.documents_available?
+        doc_provider = Ai::Platform.resolved_doc_provider
+        if doc_provider && @workspace.region_allows?(doc_provider)
+          docs = upsert_managed_adapter(MANAGED_VISION_ADAPTER_NAME, provider: doc_provider)
+          assign_purposes(docs, AiConfiguration::DOCUMENT_PURPOSES)
+        end
       end
 
       text
