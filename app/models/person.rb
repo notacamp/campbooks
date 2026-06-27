@@ -6,6 +6,13 @@ class Person < ApplicationRecord
   has_many :contacts, foreign_key: :person_id, dependent: :nullify
   has_many :suggested_contacts, class_name: "Contact", foreign_key: :suggested_person_id, dependent: :nullify
 
+  has_many :organization_memberships, dependent: :destroy
+  has_many :organizations, through: :organization_memberships
+  has_many :active_organization_memberships, -> { active }, class_name: "OrganizationMembership"
+  has_many :active_organizations, through: :active_organization_memberships, source: :organization
+  has_one :primary_organization_membership, -> { active.order(created_at: :desc) }, class_name: "OrganizationMembership"
+  has_one :primary_organization, through: :primary_organization_membership, source: :organization
+
   def display_name
     name.presence || contacts.first&.display_name || "Unknown"
   end
@@ -36,6 +43,10 @@ class Person < ApplicationRecord
 
   def primary_email
     contacts.order(email_count: :desc).first&.email
+  end
+
+    def organization_name
+    primary_organization&.name || read_attribute(:organization)
   end
 
   def all_emails

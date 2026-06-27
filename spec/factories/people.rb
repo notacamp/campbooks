@@ -1,5 +1,6 @@
 FactoryBot.define do
   factory :person do
+    workspace
     name { Faker::Name.name }
     organization { Faker::Company.name }
     relationship_type { "vendor" }
