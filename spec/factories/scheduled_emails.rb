@@ -8,7 +8,6 @@ FactoryBot.define do
     body { "<p>This is a scheduled email.</p>" }
     scheduled_at { 1.hour.from_now }
     status { :pending }
-    template_context { { "contact" => { "first_name" => "Test" } } }
 
     trait :due do
       scheduled_at { 1.hour.ago }

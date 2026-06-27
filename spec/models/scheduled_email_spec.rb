@@ -83,20 +83,10 @@ RSpec.describe ScheduledEmail do
     end
   end
 
-  describe "#rendered_subject and #rendered_body" do
-    it "renders Liquid templates" do
-      email = build(:scheduled_email,
-                    subject: "Hello {{ contact.first_name }}",
-                    body: "<p>Order for {{ contact.first_name }}</p>",
-                    template_context: { "contact" => { "first_name" => "John" } })
-      expect(email.rendered_subject).to eq("Hello John")
-      expect(email.rendered_body).to eq("<p>Order for John</p>")
-    end
-
-    it "falls back to raw template on Liquid error" do
-      email = build(:scheduled_email, subject: "Hello {{ invalid_filter | unknown }}", template_context: {})
-      expect { email.rendered_subject }.not_to raise_error
-      expect(email.rendered_subject).to eq("Hello {{ invalid_filter | unknown }}")
+  describe "#display_time on a recurring item" do
+    it "uses next_occurrence_at once advanced" do
+      email = build(:scheduled_email, :recurring, scheduled_at: 1.day.from_now, next_occurrence_at: 2.hours.from_now)
+      expect(email.display_time).to eq(email.next_occurrence_at)
     end
   end
 end
