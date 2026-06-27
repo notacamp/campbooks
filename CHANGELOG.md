@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-27
+
 ### Changed
 
 - System labels imported from Gmail (IMPORTANT, CATEGORY_PERSONAL, etc.) now get
