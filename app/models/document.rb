@@ -1,5 +1,6 @@
 class Document < ApplicationRecord
   include Searchable
+  include Pipelineable
 
   belongs_to :workspace
 

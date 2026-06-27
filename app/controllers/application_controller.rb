@@ -2,6 +2,7 @@ class ApplicationController < ActionController::Base
   include Authentication
   include Notifiable
   include Pagy::Backend
+  include TracksSectionVisit
   include AiProviderGuard
   include EntitlementGuard
 
@@ -17,7 +18,7 @@ class ApplicationController < ActionController::Base
 
   helper_method :current_user, :self_hosted?, :signup_mode, :public_signup_allowed?, :beta_code_required?,
                 :workflows_enabled?, :email_board_enabled?, :microsoft_enabled?, :email_scheduling_enabled?,
-                :document_templates_enabled?, :ai_provider_available?, :show_beta_banner?,
+                :document_templates_enabled?, :pipelines_enabled?, :ai_provider_available?, :show_beta_banner?,
                 :current_entitlements
 
   private
@@ -88,6 +89,10 @@ class ApplicationController < ActionController::Base
     Features.document_templates?
   end
 
+  def pipelines_enabled?
+    Features.pipelines?
+  end
+
   # 404 a request for a feature gated off by a readiness flag (Features.*). Used
   # as a before_action by the controllers behind one. A 404 (rather than a
   # redirect) keeps a disabled feature from advertising its own existence.
@@ -97,6 +102,10 @@ class ApplicationController < ActionController::Base
 
   def require_email_board_enabled
     head :not_found unless Features.email_board?
+  end
+
+  def require_pipelines_enabled
+    head :not_found unless Features.pipelines?
   end
 
   def require_organizations_enabled
