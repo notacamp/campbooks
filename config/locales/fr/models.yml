@@ -97,6 +97,15 @@ fr:
           email: Email
           manual_upload: Téléversement manuel
           notion: Notion
+      document_template:
+        ai_statuses:
+          completed: Prêt
+          failed: Échoué
+          pending: Brouillon
+          processing: En cours de génération
+        description: Description
+        html_content: HTML
+        name: Nom
       document_type:
         categories:
           accounting: Comptabilité

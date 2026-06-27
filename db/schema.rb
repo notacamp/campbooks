@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_26_013609) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_27_013613) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -400,6 +400,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_26_013609) do
     t.index ["document_id", "email_message_id"], name: "idx_document_email_messages_unique", unique: true
     t.index ["document_id"], name: "index_document_email_messages_on_document_id"
     t.index ["email_message_id"], name: "index_document_email_messages_on_email_message_id"
+  end
+
+  create_table "document_templates", force: :cascade do |t|
+    t.jsonb "ai_provenance", default: {}, null: false
+    t.integer "ai_status", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.text "html_content", default: "", null: false
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.jsonb "variables_schema", default: [], null: false
+    t.bigint "workspace_id", null: false
+    t.index ["workspace_id", "name"], name: "index_document_templates_on_workspace_id_and_name"
+    t.index ["workspace_id"], name: "index_document_templates_on_workspace_id"
   end
 
   create_table "document_types", force: :cascade do |t|
@@ -1434,6 +1448,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_26_013609) do
   add_foreign_key "document_drive_uploads", "zoho_drive_accounts"
   add_foreign_key "document_email_messages", "documents"
   add_foreign_key "document_email_messages", "email_messages"
+  add_foreign_key "document_templates", "workspaces"
   add_foreign_key "document_types", "workspaces"
   add_foreign_key "documents", "document_types"
   add_foreign_key "documents", "email_accounts"

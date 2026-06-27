@@ -52,6 +52,7 @@ fr:
         votre forfait pour en obtenir plus.
     features:
       ai_model_access: Modèles d'IA
+      document_templates: Modèles de documents
       email_accounts: Comptes e-mail
       emails_synced: E-mails synchronisés
       managed_ai: Campbooks AI

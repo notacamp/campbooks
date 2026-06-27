@@ -27,7 +27,6 @@ class AiConfiguration < ApplicationRecord
     draft_reply
     global_chat
     compose_chat
-    document_template_generation
   ].freeze
 
   # The seven granular purposes collapse into two user-facing provider "roles":
@@ -44,7 +43,6 @@ class AiConfiguration < ApplicationRecord
     email_classification
     draft_reply
     reminder_extraction
-    document_template_generation
   ].freeze
   DOCUMENT_PURPOSES = %w[document_analysis].freeze
 

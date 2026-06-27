@@ -1,37 +1,47 @@
 <% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
 <%= render(Campbooks::PageHeader.new(title: t("document_templates.fill.title", name: @template.name), subtitle: @template.description.presence)) %>
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-  <div class="lg:col-span-2 space-y-6">
+
+<% type_map = { "date" => :date, "number" => :number, "email" => :email } %>
+
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+  <div class="space-y-6 lg:col-span-2">
     <%= render(Campbooks::Card.new(padding: :md)) do %>
       <h2 class="text-base font-semibold text-gray-900 mb-4"><%= t("document_templates.fill.variables_heading") %></h2>
       <% if @variables.any? %>
-        <form method="post" action="<%= preview_document_template_path(@template) %>" class="space-y-4">
-          <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
-          <% @variables.each do |v| %><div><label class="block text-sm font-medium text-gray-700 mb-1"><%= v["label"]||v["key"] %><% if v["required"] %><span class="text-red-500">*</span><% end %></label>
-            <% val = @prefilled[v["key"]] || v["default"] || ""
-               case v["type"] when "text" %><textarea name="variables[<%= v["key"] %>]" rows="3" class="block w-full rounded-lg border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500"><%= val %></textarea>
-            <% when "date" %><input type="date" name="variables[<%= v["key"] %>]" value="<%= val %>" class="block w-full rounded-lg border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500">
-            <% when "number" %><input type="number" name="variables[<%= v["key"] %>]" value="<%= val %>" class="block w-full rounded-lg border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500">
-            <% when "email" %><input type="email" name="variables[<%= v["key"] %>]" value="<%= val %>" class="block w-full rounded-lg border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500">
-            <% else %><input type="text" name="variables[<%= v["key"] %>]" value="<%= val %>" class="block w-full rounded-lg border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500"><% end %>
-          </div><% end %>
-          <button type="submit" class="inline-flex items-center px-4 py-2 text-sm font-medium bg-accent-600 hover:bg-accent-700 text-white rounded-lg shadow-sm transition-colors cursor-pointer"><%= t("document_templates.fill.preview_pdf") %></button>
-        </form>
-      <% else %><p class="text-sm text-gray-500"><%= t("document_templates.fill.no_preview_yet") %></p><% end %>
+        <%= form_with url: preview_document_template_path(@template), method: :post, class: "space-y-4" do %>
+          <% @variables.each do |variable| %>
+            <%= render(Campbooks::Input.new(
+                  "variables[#{variable["key"]}]",
+                  type: type_map[variable["type"]] || :text,
+                  label: variable["label"].presence || variable["key"],
+                  value: @prefilled[variable["key"]].presence || variable["default"].presence,
+                  required: variable["required"] ? true : false)) %>
+          <% end %>
+          <%= render(Campbooks::Button.new(variant: :primary, size: :md, type: :submit)) { t("document_templates.fill.preview_pdf") } %>
+        <% end %>
+      <% else %>
+        <p class="text-sm text-gray-500"><%= t("document_templates.fill.no_preview_yet") %></p>
+      <% end %>
     <% end %>
+
     <%= render(Campbooks::Card.new(padding: :md)) do %>
       <h2 class="text-base font-semibold text-gray-900 mb-3"><%= t("document_templates.fill.pdf_preview_heading") %></h2>
-      <% if @template.preview_pdf.attached? %><iframe src="<%= url_for(@template.preview_pdf) %>" class="w-full rounded-lg border border-gray-200" style="height:600px;"></iframe><% else %><p class="text-sm text-gray-500"><%= t("document_templates.fill.no_preview_yet") %></p><% end %>
+      <% if @template.preview_pdf.attached? %>
+        <iframe src="<%= url_for(@template.preview_pdf) %>" class="w-full rounded-lg border border-gray-200" style="height: 600px;" title="<%= t("document_templates.fill.pdf_preview_heading") %>"></iframe>
+      <% else %>
+        <p class="text-sm text-gray-500"><%= t("document_templates.fill.no_preview_yet") %></p>
+      <% end %>
     <% end %>
   </div>
+
   <div class="lg:col-span-1">
     <%= render(Campbooks::Card.new(padding: :md)) do %>
       <h2 class="text-base font-semibold text-gray-900 mb-4"><%= t("document_templates.fill.send_heading") %></h2>
-      <%= form_with url: send_email_document_template_path(@template), method: :post, class: "space-y-4" do |f| %>
-        <div><label class="block text-sm font-medium text-gray-700 mb-1"><%= t("document_templates.fill.to_address") %></label><%= f.email_field :to_address, required: true, class: "block w-full rounded-lg border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %></div>
-        <div><label class="block text-sm font-medium text-gray-700 mb-1"><%= t("document_templates.fill.subject") %></label><%= f.text_field :subject, value: @template.name, class: "block w-full rounded-lg border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %></div>
-        <div><label class="block text-sm font-medium text-gray-700 mb-1"><%= t("document_templates.fill.body") %></label><%= f.text_area :body, rows: 3, class: "block w-full rounded-lg border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %></div>
-        <%= f.submit t("document_templates.fill.send"), class: "w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg shadow-sm cursor-pointer" %>
+      <%= form_with url: send_email_document_template_path(@template), method: :post, class: "space-y-4" do %>
+        <%= render(Campbooks::Input.new("to_address", type: :email, label: t("document_templates.fill.to_address"), required: true)) %>
+        <%= render(Campbooks::Input.new("subject", label: t("document_templates.fill.subject"), value: @template.name)) %>
+        <%= render(Campbooks::Textarea.new("body", label: t("document_templates.fill.body"), rows: 3)) %>
+        <%= render(Campbooks::Button.new(variant: :primary, size: :md, type: :submit, class: "w-full")) { t("document_templates.fill.send") } %>
       <% end %>
     <% end %>
   </div>

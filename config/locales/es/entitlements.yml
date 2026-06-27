@@ -51,6 +51,7 @@ es:
         para obtener más.
     features:
       ai_model_access: Modelos de IA
+      document_templates: Plantillas de documentos
       email_accounts: Cuentas de correo
       emails_synced: Correos sincronizados
       managed_ai: Campbooks AI
