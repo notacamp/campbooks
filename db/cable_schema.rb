@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_27_010000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_27_010100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -72,11 +72,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_010000) do
     t.datetime "created_at", null: false
     t.boolean "draft", default: false, null: false
     t.boolean "outdated", default: false, null: false
-    t.boolean "read", default: false, null: false
     t.integer "reply_status"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
-    t.index ["agent_thread_id", "author_type"], name: "idx_agent_messages_unread", where: "(read = false)"
     t.index ["agent_thread_id", "created_at"], name: "index_agent_messages_on_agent_thread_id_and_created_at"
     t.index ["agent_thread_id"], name: "index_agent_messages_on_agent_thread_id"
     t.index ["user_id", "created_at"], name: "index_agent_messages_on_user_id_and_created_at"
@@ -465,6 +463,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_010000) do
     t.datetime "updated_at", null: false
     t.string "vendor_name"
     t.string "vendor_nif"
+    t.datetime "viewed_at"
     t.bigint "workspace_id"
     t.index ["ai_status"], name: "index_documents_on_ai_status"
     t.index ["client_nif"], name: "index_documents_on_client_nif"
@@ -934,6 +933,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_010000) do
     t.index ["workspace_id"], name: "index_oauth_applications_on_workspace_id"
   end
 
+  create_table "organization_memberships", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "organization_id", null: false
+    t.bigint "person_id", null: false
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["organization_id", "status"], name: "index_organization_memberships_on_organization_id_and_status"
+    t.index ["organization_id"], name: "index_organization_memberships_on_organization_id"
+    t.index ["person_id", "organization_id"], name: "idx_on_person_id_organization_id_a4053ecbba", unique: true
+    t.index ["person_id"], name: "index_organization_memberships_on_person_id"
+  end
+
+  create_table "organizations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "domain"
+    t.string "name", null: false
+    t.text "notes"
+    t.datetime "updated_at", null: false
+    t.bigint "workspace_id", null: false
+    t.index ["workspace_id", "name"], name: "index_organizations_on_workspace_id_and_name", unique: true
+    t.index ["workspace_id"], name: "index_organizations_on_workspace_id"
+  end
+
   create_table "people", force: :cascade do |t|
     t.datetime "analyzed_at"
     t.jsonb "communication_patterns", default: {}
@@ -980,6 +1002,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_010000) do
     t.integer "status", default: 0, null: false
     t.string "title", null: false
     t.datetime "updated_at", null: false
+    t.datetime "viewed_at"
     t.bigint "workspace_id", null: false
     t.index ["calendar_event_id"], name: "index_reminders_on_calendar_event_id"
     t.index ["confirmed_by_id"], name: "index_reminders_on_confirmed_by_id"
@@ -1486,6 +1509,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_010000) do
   add_foreign_key "oauth_access_tokens", "oauth_applications", column: "application_id"
   add_foreign_key "oauth_applications", "users", column: "created_by_id"
   add_foreign_key "oauth_applications", "workspaces"
+  add_foreign_key "organization_memberships", "organizations"
+  add_foreign_key "organization_memberships", "people"
+  add_foreign_key "organizations", "workspaces"
   add_foreign_key "people", "workspaces"
   add_foreign_key "recovery_codes", "users"
   add_foreign_key "reminders", "calendar_events"
