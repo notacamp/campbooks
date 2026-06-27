@@ -149,6 +149,16 @@ class Document < ApplicationRecord
   # Surfaces starred documents at the top of the list, newest-first within each group.
   scope :starred_first, -> { order(starred: :desc) }
   scope :pushed_to_drive, -> { where(google_drive_push_status: :pushed) }
+    scope :by_organization, ->(org, active_only: true) {
+    people_ids = Person.joins(:organization_memberships)
+      .where(organization_memberships: { organization_id: org.id })
+    people_ids = people_ids.where(organization_memberships: { status: :active }) if active_only
+    contact_ids = Contact.where(person_id: people_ids.select(:id)).select(:id)
+    joins(:document_email_messages)
+      .where(document_email_messages: { email_message_id: EmailMessage.where(contact_id: contact_ids).select(:id) })
+      .distinct
+  }
+
   scope :not_pushed_to_drive, -> { where(google_drive_push_status: [ :not_pushed, :failed ]) }
 
   def generate_canonical_filename!
