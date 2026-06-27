@@ -59,6 +59,10 @@ plans:
       enabled: true
       config:
         tier: basic
+    document_templates:
+      type: flag
+      allowed: false
+      enabled: true
     # ── deferred volume limits (enforced once metering exists) ──
     emails_synced:
       type: limit
