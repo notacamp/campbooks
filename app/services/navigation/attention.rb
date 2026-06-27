@@ -39,12 +39,10 @@ module Navigation
       @user.feed_items.where(seen_at: nil, dismissed_at: nil, acted_at: nil).exists?
     end
 
-    # Unread mail on readable accounts. read is set when the user opens an
-    # email or processes it via Skim — regardless of which surface they used.
-    # SkimDismiss also marks emails read, so skimming from the home feed
-    # naturally clears the Mail dot.
+    # Unviewed mail on readable accounts. viewed_at is stamped when the user
+    # opens an email or processes it via Skim — regardless of which surface.
     def new_mail?
-      EmailMessage.accessible_to(@user).where(read: false).exists?
+      EmailMessage.accessible_to(@user).where(viewed_at: nil).exists?
     end
 
     # Pending reminders the user hasn't viewed yet. viewed_at is stamped when
@@ -61,11 +59,11 @@ module Navigation
       @user.workspace.documents.needs_review.where(viewed_at: nil).exists?
     end
 
-    # Unread AI messages on the user's scout-visible threads. read is the
-    # Scout equivalent of viewed_at — stamped when the user visits Scout.
+    # Unviewed AI messages on the user's scout-visible threads. viewed_at
+    # is stamped when the user visits Scout.
     def new_scout?
       AgentMessage.where(agent_thread: @user.agent_threads.scout_visible,
-                         author_type: :ai, read: false).exists?
+                         author_type: :ai, viewed_at: nil).exists?
     end
   end
 end

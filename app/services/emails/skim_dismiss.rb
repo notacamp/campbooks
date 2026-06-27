@@ -17,7 +17,7 @@ module Emails
 
       EmailMessage
         .where(id: @ids, email_account: @user.readable_email_accounts)
-        .update_all(skimmed_at: Time.current, read: true, updated_at: Time.current)
+        .update_all(skimmed_at: Time.current, viewed_at: Time.current, updated_at: Time.current)
     end
   end
 end

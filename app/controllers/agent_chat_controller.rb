@@ -12,9 +12,9 @@ class AgentChatController < ApplicationController
 
     # Mark unread AI replies as read on visit — clears the Scout nav dot. New
     # replies arrive as read: false, lighting the dot back up until next visit.
-    AgentMessage.where(agent_thread: current_user.agent_threads.scout_visible)
-                .where(author_type: :ai, read: false)
-                .update_all(read: true)
+    AgentMessage.where(agent_thread: current_user.agent_threads.scout_visible, viewed_at: nil)
+                .where(author_type: :ai)
+                .update_all(viewed_at: Time.current)
   end
 
   def create

@@ -29,19 +29,19 @@ RSpec.describe Navigation::Attention do
 
     before { create(:email_account_user, user: user, email_account: account, can_read: true) }
 
-    it "lights up for unread mail" do
-      create(:email_message, email_account: account, read: false)
+    it "lights up for unviewed mail" do
+      create(:email_message, email_account: account, viewed_at: nil)
       expect(attention.dot?(:mail)).to be true
     end
 
-    it "stays clear when mail is read" do
-      create(:email_message, email_account: account, read: true)
+    it "stays clear when mail has been viewed" do
+      create(:email_message, email_account: account, viewed_at: Time.current)
       expect(attention.dot?(:mail)).to be false
     end
 
     it "ignores mail on accounts the user cannot read" do
       other = create(:email_account, workspace: user.workspace)
-      create(:email_message, email_account: other, read: false)
+      create(:email_message, email_account: other, viewed_at: nil)
       expect(attention.dot?(:mail)).to be false
     end
   end
@@ -101,24 +101,24 @@ RSpec.describe Navigation::Attention do
   describe ":scout" do
     let(:thread) { create(:agent_thread, user: user) }
 
-    it "lights up for an unread AI reply" do
-      create(:agent_message, agent_thread: thread, author_type: :ai, read: false)
+    it "lights up for an unviewed AI reply" do
+      create(:agent_message, agent_thread: thread, author_type: :ai, viewed_at: nil)
       expect(attention.dot?(:scout)).to be true
     end
 
-    it "stays clear when AI messages are read" do
-      create(:agent_message, agent_thread: thread, author_type: :ai, read: true)
+    it "stays clear when AI messages have been viewed" do
+      create(:agent_message, agent_thread: thread, author_type: :ai, viewed_at: Time.current)
       expect(attention.dot?(:scout)).to be false
     end
 
     it "ignores the user's own messages" do
-      create(:agent_message, agent_thread: thread, author_type: :user, read: false)
+      create(:agent_message, agent_thread: thread, author_type: :user, viewed_at: nil)
       expect(attention.dot?(:scout)).to be false
     end
 
     it "ignores AI messages in setup_chat threads" do
       setup = create(:agent_thread, user: user, purpose: :setup_chat)
-      create(:agent_message, agent_thread: setup, author_type: :ai, read: false)
+      create(:agent_message, agent_thread: setup, author_type: :ai, viewed_at: nil)
       expect(attention.dot?(:scout)).to be false
     end
   end
