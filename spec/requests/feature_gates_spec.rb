@@ -74,12 +74,6 @@ RSpec.describe "Production-readiness feature gates", type: :request do
     end
   end
 
-  describe "Email scheduling (entitlement-gated)" do
-    before { sign_in create(:user) }
-
-    it "serves the index page" do
-      get "/scheduled_emails"
-      expect(response).to have_http_status(:ok)
-    end
-  end
+  # Email scheduling is gated by the billing Entitlements layer, not Features —
+  # its gate is covered in spec/requests/scheduled_emails_spec.rb.
 end

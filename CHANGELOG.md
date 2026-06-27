@@ -18,6 +18,12 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Email scheduling** — schedule one-time or recurring sends (daily, weekly,
+  every 2 weeks, or monthly), gated by billing entitlements. Schedule a message
+  from the composer's "Schedule for later" picker or the dedicated
+  `/scheduled_emails` page; a per-minute job sends due messages and rolls
+  recurring ones to their next occurrence. Snoozed threads and upcoming scheduled
+  sends also surface on the calendar.
 - **Organizations** — first-class company/employer grouping on top of contacts,
   gated by billing entitlements. People can belong to multiple organizations
   (active or past). Includes scoped filtering for emails and documents, a
