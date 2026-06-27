@@ -1,5 +1,6 @@
 class EmailMessage < ApplicationRecord
   include Searchable
+  include Pipelineable
 
   belongs_to :email_account
   belongs_to :email_scan_log, optional: true

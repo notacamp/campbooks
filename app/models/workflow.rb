@@ -21,7 +21,7 @@ class Workflow < ApplicationRecord
   #   event          — a domain Event was published; trigger_config["event_name"]
   #                    selects which one (exact "document.approved" or prefix
   #                    wildcard "document.*"). See Events::Registry for the catalog.
-  TRIGGER_TYPES = %w[email_received webhook event].freeze
+  TRIGGER_TYPES = %w[email_received webhook event stage_entered].freeze
 
   validates :trigger_type, inclusion: { in: TRIGGER_TYPES }
   validates :webhook_token, uniqueness: true, allow_nil: true

@@ -78,6 +78,11 @@ module Events
         description: "A document was restored to the review queue", subject_type: "Document",
         payload_keys: %w[filename]),
 
+      # --- Pipelines ----------------------------------------------------------
+      entry("pipeline.stage_entered", "Stage entered", group: :pipelines, icon: :git_branch,
+        description: "An item entered a pipeline stage", subject_type: "Document",
+        payload_keys: %w[pipeline_name stage_name stage_id pipeline_id]),
+
       # --- Calendar ------------------------------------------------------------
       entry("calendar_event.created", "Calendar event created", group: :calendar, icon: :calendar,
         description: "A calendar event was created", subject_type: "CalendarEvent",
