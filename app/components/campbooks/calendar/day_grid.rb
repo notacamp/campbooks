@@ -1,16 +1,14 @@
 module Campbooks
   module Calendar
-    # A single-day time grid: hour rows, timed events positioned by start/end with
-    # overlapping events split into side-by-side columns, an all-day row on top,
-    # and a current-time line on today. Single column, so it stays usable at 375px.
-    # Layout math is shared with WeekTimeGrid via TimeGrid.
     class DayGrid < Campbooks::Base
       include TimeGrid
 
-      def initialize(date:, events:, reminders: [])
+      def initialize(date:, events:, reminders: [], snoozed_threads: [], scheduled_emails: [])
         @date = date
         @events = events.to_a
         @reminders = reminders.to_a
+        @snoozed_threads = snoozed_threads.to_a
+        @scheduled_emails = scheduled_emails.to_a
       end
 
       def view_template
@@ -19,8 +17,6 @@ module Campbooks
           div(class: "relative", style: "height: #{grid_height}px") do
             render_hour_lines
             render_now_line if @date == Date.current
-            # Inline insets (not Tailwind left-14/inset-y-0) so the events track
-            # can't collapse if those utilities aren't in the compiled CSS.
             div(
               class: "cursor-pointer",
               data: { controller: "calendar-dnd calendar-create",
@@ -40,7 +36,7 @@ module Campbooks
 
       def render_all_day_row
         all_day = @events.select(&:all_day)
-        return if all_day.empty? && @reminders.empty?
+        return if all_day.empty? && @reminders.empty? && @snoozed_threads.empty? && @scheduled_emails.empty?
         div(class: "flex gap-2 border-b border-border px-3 py-2") do
           span(class: "w-11 shrink-0 pt-0.5 text-[11px] text-muted-foreground") { t("components.calendar.event_row.all_day") }
           div(class: "flex flex-1 flex-wrap gap-1") do
@@ -51,6 +47,8 @@ module Campbooks
                 style: "background-color: #{e.display_color}; color: #{contrast_on(e.display_color)}") { e.title.presence || t("components.calendar.event_row.untitled") }
             end
             @reminders.each { |reminder| render Campbooks::Calendar::ReminderChip.new(reminder: reminder) }
+            @snoozed_threads.each { |thread| render Campbooks::Calendar::SnoozedChip.new(thread: thread) }
+            @scheduled_emails.each { |email| render Campbooks::Calendar::ScheduledEmailChip.new(scheduled_email: email) }
           end
         end
       end

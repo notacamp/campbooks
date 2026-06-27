@@ -414,20 +414,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_010000) do
     t.index ["email_message_id"], name: "index_document_email_messages_on_email_message_id"
   end
 
-  create_table "document_templates", force: :cascade do |t|
-    t.jsonb "ai_provenance", default: {}, null: false
-    t.integer "ai_status", default: 0, null: false
-    t.datetime "created_at", null: false
-    t.text "description"
-    t.text "html_content", default: "", null: false
-    t.string "name", null: false
-    t.datetime "updated_at", null: false
-    t.jsonb "variables_schema", default: [], null: false
-    t.bigint "workspace_id", null: false
-    t.index ["workspace_id", "name"], name: "index_document_templates_on_workspace_id_and_name"
-    t.index ["workspace_id"], name: "index_document_templates_on_workspace_id"
-  end
-
   create_table "document_types", force: :cascade do |t|
     t.boolean "auto_star", default: false, null: false
     t.string "category"
@@ -489,7 +475,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_010000) do
     t.datetime "updated_at", null: false
     t.string "vendor_name"
     t.string "vendor_nif"
-    t.datetime "viewed_at"
     t.bigint "workspace_id"
     t.index ["ai_status"], name: "index_documents_on_ai_status"
     t.index ["client_nif"], name: "index_documents_on_client_nif"
@@ -761,7 +746,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_010000) do
   end
 
   create_table "google_drive_configs", force: :cascade do |t|
-    t.boolean "auto_push", default: true, null: false
+    t.boolean "auto_push", default: false, null: false
     t.datetime "created_at", null: false
     t.bigint "document_type_id", null: false
     t.string "folder_id"
@@ -1028,7 +1013,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_010000) do
     t.integer "status", default: 0, null: false
     t.string "title", null: false
     t.datetime "updated_at", null: false
-    t.datetime "viewed_at"
     t.bigint "workspace_id", null: false
     t.index ["calendar_event_id"], name: "index_reminders_on_calendar_event_id"
     t.index ["confirmed_by_id"], name: "index_reminders_on_confirmed_by_id"
@@ -1036,6 +1020,30 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_010000) do
     t.index ["source_type", "source_id"], name: "index_reminders_on_source"
     t.index ["workspace_id", "status", "due_at"], name: "index_reminders_on_workspace_status_due"
     t.index ["workspace_id"], name: "index_reminders_on_workspace_id"
+  end
+
+  create_table "scheduled_emails", force: :cascade do |t|
+    t.string "bcc_address"
+    t.text "body", null: false
+    t.string "cc_address"
+    t.datetime "created_at", null: false
+    t.bigint "created_by_id", null: false
+    t.bigint "email_account_id", null: false
+    t.datetime "last_sent_at"
+    t.datetime "next_occurrence_at"
+    t.string "rrule"
+    t.datetime "scheduled_at", null: false
+    t.integer "status", default: 0, null: false
+    t.string "subject", null: false
+    t.string "to_address", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "workspace_id", null: false
+    t.index ["created_by_id"], name: "index_scheduled_emails_on_created_by_id"
+    t.index ["email_account_id"], name: "index_scheduled_emails_on_email_account_id"
+    t.index ["next_occurrence_at"], name: "idx_scheduled_emails_pending_next_occurrence", where: "(status = 0)"
+    t.index ["scheduled_at"], name: "idx_scheduled_emails_pending_scheduled_at", where: "(status = 0)"
+    t.index ["workspace_id", "status"], name: "index_scheduled_emails_on_workspace_id_and_status"
+    t.index ["workspace_id"], name: "index_scheduled_emails_on_workspace_id"
   end
 
   create_table "search_chunks", force: :cascade do |t|
@@ -1487,7 +1495,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_010000) do
   add_foreign_key "document_drive_uploads", "zoho_drive_accounts"
   add_foreign_key "document_email_messages", "documents"
   add_foreign_key "document_email_messages", "email_messages"
-  add_foreign_key "document_templates", "workspaces"
   add_foreign_key "document_types", "workspaces"
   add_foreign_key "documents", "document_types"
   add_foreign_key "documents", "email_accounts"
@@ -1546,6 +1553,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_010000) do
   add_foreign_key "reminders", "calendar_events"
   add_foreign_key "reminders", "users", column: "confirmed_by_id"
   add_foreign_key "reminders", "workspaces"
+  add_foreign_key "scheduled_emails", "email_accounts"
+  add_foreign_key "scheduled_emails", "users", column: "created_by_id"
+  add_foreign_key "scheduled_emails", "workspaces"
   add_foreign_key "search_chunks", "workspaces"
   add_foreign_key "search_records", "workspaces"
   add_foreign_key "search_tag_embeddings", "tags"

@@ -163,9 +163,14 @@ module Ai
 
     def direction_hint
       if @document.sent_email?
-        "IMPORTANT: This document was SENT from your mailbox (outbound). "         "For invoices or payment-related documents, prefer revenue/outgoing types "         "(revenue_invoice, receipt for received payments). "         "The counterparty is the recipient: " + (@document.sender_name || "unknown").to_s + "."
+        "IMPORTANT: This document was SENT from your mailbox (outbound). " \
+          "For invoices or payment-related documents, prefer revenue/outgoing types " \
+          "(revenue_invoice, receipt for received payments). " \
+          "The counterparty is the recipient: " + (@document.sender_name || "unknown").to_s + "."
       elsif @document.email?
-        "This document was RECEIVED in your mailbox (inbound). "         "For invoices or payment-related documents, prefer expense/incoming types "         "(expense_invoice, receipt for payments made)."
+        "This document was RECEIVED in your mailbox (inbound). " \
+          "For invoices or payment-related documents, prefer expense/incoming types " \
+          "(expense_invoice, receipt for payments made)."
       else
         ""
       end
@@ -385,7 +390,7 @@ module Ai
       return "receipt" if name.match?(/recibo|receipt/)
       return "vehicle_document" if name.match?(/matricula|veiculo|vehicle|livrete/)
       return "proposal" if name.match?(/orcamento|proposta|proposal|budget/)
-      return "correspondence" if name.match?(/carta|email|oficio|comunic|ata|acta|reclama/i)
+      return "correspondence" if name.match?(/carta|email|oficio|comunic|\bata\b|acta|reclama/i)
       return "identification" if name.match?(/cc_pass|passaporte|bilhete|identif/)
       return "contract" if name.match?(/cess_quota|estatutos|acordo|constitui/i)
       # DMARC / email feedback reports are XML, not business documents

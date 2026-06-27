@@ -41,14 +41,14 @@
   <% if @has_calendars %>
     <% case @view %>
     <% when "month" %>
-      <%= render(Campbooks::Calendar::MonthGrid.new(date: @date, events: @events, reminders: @reminders)) %>
+      <%= render(Campbooks::Calendar::MonthGrid.new(date: @date, events: @events, reminders: @reminders, snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails)) %>
     <% when "day" %>
-      <%= render(Campbooks::Calendar::DayGrid.new(date: @date, events: @events, reminders: @reminders)) %>
+      <%= render(Campbooks::Calendar::DayGrid.new(date: @date, events: @events, reminders: @reminders, snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails)) %>
     <% when "week" %>
-      <div class="hidden md:block"><%= render(Campbooks::Calendar::WeekTimeGrid.new(date: @date, events: @events, reminders: @reminders)) %></div>
-      <div class="md:hidden"><%= render(Campbooks::Calendar::WeekGrid.new(date: @date, events: @events, reminders: @reminders)) %></div>
+      <div class="hidden md:block"><%= render(Campbooks::Calendar::WeekTimeGrid.new(date: @date, events: @events, reminders: @reminders, snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails)) %></div>
+      <div class="md:hidden"><%= render(Campbooks::Calendar::WeekGrid.new(date: @date, events: @events, reminders: @reminders, snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails)) %></div>
     <% else %>
-      <%= render(Campbooks::Calendar::AgendaList.new(events: @events, reminders: @reminders)) %>
+      <%= render(Campbooks::Calendar::AgendaList.new(events: @events, reminders: @reminders, snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails)) %>
     <% end %>
 
     <%= render(Campbooks::Calendar::EventModal.new) %>
