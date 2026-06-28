@@ -69,6 +69,7 @@ en:
           certificate: Certificate
           contract: Contract
           correspondence: Correspondence
+          credit_note: Credit Note
           expense_invoice: Expense Invoice
           identification: Identification
           insurance_policy: Insurance Policy
