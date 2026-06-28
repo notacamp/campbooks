@@ -2,6 +2,7 @@ class Workspace < ApplicationRecord
   has_many :users, dependent: :restrict_with_error
   has_many :email_accounts, dependent: :restrict_with_error
   has_many :calendar_accounts, dependent: :restrict_with_error
+  has_many :event_types, dependent: :destroy
   has_many :documents, dependent: :restrict_with_error
   has_many :authored_documents, dependent: :restrict_with_error
   has_many :document_types, dependent: :restrict_with_error

@@ -1,0 +1,57 @@
+<% client = @pre_auth.client %>
+<% workspace = current_resource_owner&.workspace %>
+<div class="w-full max-w-md">
+  <div class="text-center mb-8">
+    <%= render(Campbooks::Logo.new(size: :lg)) %>
+  </div>
+
+  <%= render(Campbooks::Card.new) do %>
+    <div class="space-y-6">
+      <div class="space-y-2 text-center">
+        <h1 class="text-xl font-semibold text-gray-900">
+          <%= t(".title", client: client.name) %>
+        </h1>
+        <% if current_resource_owner %>
+          <p class="text-sm text-gray-600">
+            <%= t(".signed_in_as_html",
+                   user: tag.span(current_resource_owner.email_address, class: "font-medium text-gray-900"),
+                   workspace: tag.span(workspace&.name, class: "font-medium text-gray-900")) %>
+          </p>
+        <% end %>
+      </div>
+
+      <% if @pre_auth.scopes.count.positive? %>
+        <div class="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+          <p class="mb-3 text-xs font-medium uppercase tracking-wide text-gray-500">
+            <%= t(".able_to") %>
+          </p>
+          <ul class="space-y-2">
+            <% @pre_auth.scopes.each do |scope| %>
+              <li class="flex items-start gap-2 text-sm text-gray-700">
+                <svg class="mt-0.5 h-4 w-4 flex-none text-accent-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 0 1 .006 1.414l-7.5 7.6a1 1 0 0 1-1.42 0l-3.5-3.55a1 1 0 1 1 1.424-1.404l2.79 2.83 6.79-6.884a1 1 0 0 1 1.414-.006Z" clip-rule="evenodd" />
+                </svg>
+                <span><%= Api::Scopes.description(scope) || scope %></span>
+              </li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+
+      <div class="space-y-3">
+        <%= form_tag oauth_authorization_path, method: :post do %>
+          <%= render "oauth_params" %>
+          <%= render(Campbooks::Button.new(variant: :primary, type: "submit", class: "w-full justify-center")) { t(".authorize") } %>
+        <% end %>
+        <%= form_tag oauth_authorization_path, method: :delete do %>
+          <%= render "oauth_params" %>
+          <%= render(Campbooks::Button.new(variant: :ghost, type: "submit", class: "w-full justify-center")) { t(".deny") } %>
+        <% end %>
+      </div>
+
+      <p class="text-center text-xs text-gray-400 break-all">
+        <%= t(".redirect_note", uri: @pre_auth.redirect_uri) %>
+      </p>
+    </div>
+  <% end %>
+</div>

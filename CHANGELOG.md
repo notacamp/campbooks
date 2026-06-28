@@ -17,17 +17,33 @@ major, minor, or patch change here.
 ## [Unreleased]
 
 ### Added
+
+- **Campbooks CLI + browser sign-in** — a new developer CLI (`campbooks`) drives
+  the public REST API from your terminal. `campbooks login` uses a new OAuth 2.0
+  **authorization-code + PKCE** grant (a styled consent screen at
+  `/api/oauth/authorize`) so you sign in through your browser instead of pasting
+  API keys; existing client-credentials clients are unchanged. See
+  [docs/cli.md](docs/cli.md) and [docs/api.md](docs/api.md).
+- **Calendar event types** — create calendar-only "types" (each a name, a color, and
+  an AI prompt) from the new **Event types** button on the calendar. New events are
+  auto-classified into a type and colored to match — both events created from email
+  and ones you add yourself — and you can always override the type (or choose "None")
+  on the event form. A one-click starter set gets you going, and the type's color
+  syncs out to Google/Zoho.
+- **Drag events across days in month view** — drag an event from one day to another
+  in the calendar's month view to reschedule it; the time of day and duration are
+  preserved. Works on touch as well as desktop.
 - **Public REST API — new resources** — added endpoints for scheduled emails
   (`scheduled_emails:read`/`:write`), calendar events (`calendar:read`/`:write`),
   reminders (`reminders:read`/`:write`), and folders with folder-membership
   filing (`folders:read`/`:write`). See [`docs/api.md`](docs/api.md) /
   `openapi.yaml`.
-- **MCP endpoint** (`POST /api/mcp`) — exposes the Campbooks API as a Model
+- **MCP endpoint** (`POST /api/mcp`) — exposes the full public API as a Model
   Context Protocol (JSON-RPC 2.0) server, authenticated with the same bearer
-  token as the REST API. Tools cover email (list/get/send/reply), documents,
-  contacts, calendar events (list/create), scheduled emails (list/create), and
-  reminders; `tools/list` is filtered per-scope so a token only sees the tools it
-  may call.
+  token as the REST API. Tools mirror the REST surface one-for-one across email
+  (incl. tags), documents, contacts, tags, document types, workflows, Scout chat,
+  scheduled emails, calendar events, reminders, and folders — each gated by its
+  REST scope, so `tools/list` only returns the tools a token may call.
 - **Credit Note document type** — "Nota de Crédito" (NC) is now a first-class
   document type instead of being filed under expense invoices. Documents the AI
   recognises as credit notes are classified, labelled (en/pt/es/fr), and filtered
@@ -54,6 +70,11 @@ major, minor, or patch change here.
   `/documents/42`). Existing integer-id URLs, bookmarks, and stored API ids will
   no longer resolve. Self-hosters: a single upgrade migration rewrites every
   primary and foreign key in one transaction.
+
+### Security
+
+- Bump the transitive `crass` dependency to 1.0.7, clearing four CSS-parser
+  denial-of-service advisories (no behavior change).
 
 ## [0.3.0] - 2026-06-28
 
@@ -118,6 +139,13 @@ major, minor, or patch change here.
 
 - Avatar stacks (facepiles) in the email list and board view now show the
   account-color ring, consistent with single-sender avatars and search results.
+- **Mobile usability** — fixed several small-screen issues found auditing the app
+  at 320–375px: the calendar/reminders view tabs no longer push the page into
+  horizontal scroll (they scroll within their own strip), the inbox settings
+  dialog stacks to a single column with a scrollable section strip instead of
+  crushing its content pane, and a number of undersized tap targets were enlarged
+  (the compose and email "back" buttons, the email reply/forward and Discussion
+  buttons, and the tag-remove "×").
 
 ## [0.2.1] - 2026-06-27
 

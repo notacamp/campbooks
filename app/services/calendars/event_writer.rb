@@ -97,7 +97,7 @@ module Calendars
         end_at: @event.end_at,
         all_day: @event.all_day,
         time_zone: @event.start_time_zone,
-        color: @event.color,
+        color: @event.provider_color,
         attendees: @event.attendees
       }
     end

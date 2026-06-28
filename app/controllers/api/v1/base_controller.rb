@@ -53,13 +53,21 @@ module Api
 
       private
 
-      # Bridge the resource-owner-less client_credentials token to the workspace
-      # and user it represents. Fails closed (401) if the client's workspace or
-      # acting user has gone away or the account is pending deletion.
+      # Resolve the token to the workspace + user it acts as, then fail closed
+      # (401) if that identity has gone away or is pending deletion.
+      #   • authorization_code (browser SSO): the token carries a resource owner —
+      #     the signed-in user — and the workspace is that user's workspace.
+      #   • client_credentials (headless): no resource owner; identity comes from
+      #     the application's workspace/created_by columns.
       def establish_acting_identity!
-        application = doorkeeper_token&.application
-        workspace   = application&.workspace
-        acting_user = application&.created_by
+        acting_user, workspace =
+          if (owner_id = doorkeeper_token&.resource_owner_id)
+            user = User.find_by(id: owner_id)
+            [ user, user&.workspace ]
+          else
+            application = doorkeeper_token&.application
+            [ application&.created_by, application&.workspace ]
+          end
 
         unless workspace && acting_user && acting_user.workspace_id == workspace.id
           return render_api_error("client_revoked",

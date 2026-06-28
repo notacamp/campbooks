@@ -1,13 +1,17 @@
 Rails.application.routes.draw do
-  # Public REST API OAuth token endpoint. Mounted under /api/oauth (NOT the
-  # default /oauth) so it never collides with the inbound provider callbacks in
-  # `namespace :oauth` below. client_credentials needs only token + revoke, so we
-  # skip the authorization-code/admin controllers.
-  #   POST /api/oauth/token   — exchange client_id/secret for a bearer token
-  #   POST /api/oauth/revoke  — revoke a token
+  # Public REST API OAuth endpoints. Mounted under /api/oauth (NOT the default
+  # /oauth) so they never collide with the inbound provider callbacks in
+  # `namespace :oauth` below.
+  #   POST    /api/oauth/token      — exchange client_id/secret (or an auth code) for a token
+  #   POST    /api/oauth/revoke     — revoke a token
+  #   GET/POST/DELETE /api/oauth/authorize — browser SSO consent (authorization_code + PKCE)
+  # The authorize endpoint uses a styled custom view + the app's cookie session
+  # (Oauth::AuthorizationsController). The applications-admin, authorized-apps, and
+  # token-introspection controllers stay disabled.
   scope "api" do
     use_doorkeeper scope: "oauth" do
-      skip_controllers :authorizations, :applications, :authorized_applications, :token_info
+      controllers authorizations: "oauth/authorizations"
+      skip_controllers :applications, :authorized_applications, :token_info
     end
   end
 
@@ -433,6 +437,12 @@ Rails.application.routes.draw do
     end
   end
 
+  # Calendar-only "tags": name + color + AI prompt used to auto-classify and color
+  # events. Managed from the calendar toolbar (turbo-frame inline form CRUD).
+  resources :event_types, except: [ :show ] do
+    collection { post :starters } # one-click starter set from the empty state
+  end
+
   # ── Public REST API (v1) ──────────────────────────────────────────────────
   # Authenticated with OAuth bearer tokens minted at /api/oauth/token. Every
   # controller inherits Api::V1::BaseController (token auth + workspace/acting-user
@@ -440,6 +450,10 @@ Rails.application.routes.draw do
   # even where the underlying model differs (EmailMessage).
   namespace :api do
     namespace :v1 do
+      # GET /api/v1/me — the identity behind the token (acting user + workspace +
+      # granted scopes). Needs only a valid token, so the CLI can confirm login.
+      get "me", to: "me#show"
+
       resources :emails, only: [ :index, :show, :create ], controller: "email_messages" do
         member do
           post :mark_read

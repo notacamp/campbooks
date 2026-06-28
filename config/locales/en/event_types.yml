@@ -1,0 +1,26 @@
+---
+en:
+  event_types:
+    create:
+      success: Event type created.
+    destroy:
+      success: Event type deleted.
+    event_type:
+      delete_confirm: Delete %{name}?
+    form:
+      ai_prompt_hint: What the AI uses to recognize this kind of event. Supports markdown.
+      ai_prompt_label: AI prompt
+      color_label: Color
+      create_type: Create type
+      name_label: Name
+    index:
+      add_starters: Add starter types
+      add_type: Add type
+      back: Back to calendar
+      empty: No event types yet. Add a few so new events get auto-colored by type.
+      heading: Event types
+      subtitle: Calendar-only tags that auto-color events by what they are.
+    starters:
+      success: Starter event types added.
+    update:
+      success: Event type updated.
