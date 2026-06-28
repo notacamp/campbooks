@@ -1,0 +1,47 @@
+<% content_for :main_class, "px-4 sm:px-6 lg:px-8 py-6" %>
+
+<%= render Campbooks::PageHeader.new(title: t(".title")) do |header| %>
+  <% header.with_actions do %>
+    <%= link_to documents_path, class: "text-sm text-muted-foreground hover:text-foreground transition-colors" do %>
+      ← <%= t(".back_to_documents") %>
+    <% end %>
+    <%= render Campbooks::Button.new(variant: :primary, size: :sm, href: new_written_document_path) { t(".new") } %>
+  <% end %>
+<% end %>
+
+<% if @documents.any? %>
+  <ul class="mt-4 divide-y divide-gray-100 rounded-xl border border-gray-200 bg-card overflow-hidden">
+    <% @documents.each do |doc| %>
+      <li>
+        <%= link_to written_document_path(doc),
+            class: "flex items-center justify-between gap-3 px-4 py-3 hover:bg-gray-50 transition-colors" do %>
+          <span class="min-w-0">
+            <span class="block truncate font-medium text-foreground"><%= doc.title %></span>
+            <span class="block text-xs text-muted-foreground">
+              <%= l(doc.created_at.to_date, format: :long) %><% if doc.author %> · <%= doc.author.name %><% end %>
+            </span>
+          </span>
+          <svg class="w-4 h-4 shrink-0 text-muted-foreground" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+<% else %>
+  <%= render(Campbooks::EmptyState.new(
+        variant: :standalone,
+        title: t(".empty_title"),
+        description: t(".empty_description"))) do |state| %>
+    <% state.with_icon do %>
+      <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z" />
+      </svg>
+    <% end %>
+    <% state.with_actions do %>
+      <%= render(Campbooks::Button.new(variant: :primary, href: new_written_document_path)) { t(".new") } %>
+    <% end %>
+  <% end %>
+<% end %>

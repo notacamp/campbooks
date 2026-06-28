@@ -3,6 +3,7 @@ class Workspace < ApplicationRecord
   has_many :email_accounts, dependent: :restrict_with_error
   has_many :calendar_accounts, dependent: :restrict_with_error
   has_many :documents, dependent: :restrict_with_error
+  has_many :authored_documents, dependent: :restrict_with_error
   has_many :document_types, dependent: :restrict_with_error
   has_many :tags, dependent: :restrict_with_error
   has_many :ai_adapters, dependent: :destroy
@@ -23,6 +24,7 @@ class Workspace < ApplicationRecord
   has_many :bug_reports, dependent: :destroy
   has_many :reminders, dependent: :destroy
   has_many :mail_folders, dependent: :destroy
+  has_many :scheduled_emails, dependent: :restrict_with_error
 
   has_many :invitations, dependent: :destroy
 

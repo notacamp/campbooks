@@ -51,6 +51,7 @@ fr:
       over_limit: Vous avez atteint la limite de votre forfait pour %{feature}. Améliorez
         votre forfait pour en obtenir plus.
     features:
+      organizations: Organisations
       ai_model_access: Modèles d'IA
       document_templates: Modèles de documents
       email_accounts: Comptes e-mail

@@ -123,6 +123,15 @@ Rails.application.routes.draw do
   post  "documents/skim/:id/dismiss",       to: "documents/skim#dismiss",       as: :dismiss_document_skim
   post  "documents/skim/:id/restore",       to: "documents/skim#restore",       as: :restore_document_skim
 
+  # Document writing tool — author formatted documents from scratch.
+  # Declared BEFORE `resources :documents` to avoid :id = "write" capture.
+  get   "documents/write",      to: "documents/written#index", as: :written_documents
+  get   "documents/write/new",  to: "documents/written#new",  as: :new_written_document
+  post  "documents/write",      to: "documents/written#create"
+  get   "documents/write/:id",  to: "documents/written#show", as: :written_document
+  get   "documents/write/:id/edit", to: "documents/written#edit", as: :edit_written_document
+  patch "documents/write/:id",  to: "documents/written#update"
+
   resources :documents, only: [ :index, :show, :update, :create ] do
     member do
       get :file
@@ -188,6 +197,8 @@ Rails.application.routes.draw do
   resources :email_scans, only: [ :show ]
 
   resources :zoho_drive_accounts, only: [ :new, :create, :destroy ]
+
+  resources :scheduled_emails
 
   resources :workflows do
     member do

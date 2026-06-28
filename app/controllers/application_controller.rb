@@ -2,7 +2,6 @@ class ApplicationController < ActionController::Base
   include Authentication
   include Notifiable
   include Pagy::Backend
-  include TracksSectionVisit
   include AiProviderGuard
   include EntitlementGuard
 

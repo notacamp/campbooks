@@ -66,6 +66,9 @@ plans:
     document_templates:
       type: flag
       allowed: false
+    email_scheduling:
+      type: flag
+      allowed: false        # scheduled sending + calendar visibility — paid feature
       enabled: true
     # ── deferred volume limits (enforced once metering exists) ──
     emails_synced:
@@ -86,6 +89,10 @@ plans:
 
   # ── Pro ───────────────────────────────────────────────────────────────────
   pro:
+    organizations:
+      type: flag
+      allowed: true
+      enabled: true
     email_accounts:
       type: limit
       allowed: true
@@ -117,6 +124,10 @@ plans:
     document_templates:
       type: flag
       allowed: true
+      enabled: true    
+    email_scheduling:
+      type: flag
+      allowed: true
       enabled: true
     emails_synced:
       type: limit
@@ -136,6 +147,10 @@ plans:
 
   # ── Business ──────────────────────────────────────────────────────────────
   business:
+    organizations:
+      type: flag
+      allowed: true
+      enabled: true
     email_accounts:
       type: limit
       allowed: true
@@ -167,6 +182,10 @@ plans:
     document_templates:
       type: flag
       allowed: true
+      enabled: true    
+    email_scheduling:
+      type: flag
+      allowed: true
       enabled: true
     emails_synced:
       type: limit
@@ -186,6 +205,10 @@ plans:
 
   # ── Unlimited (self-hosted canonical / cloud escape hatch) ──────────────────
   unlimited:
+    organizations:
+      type: flag
+      allowed: true
+      enabled: true
     email_accounts:
       type: limit
       allowed: true
@@ -215,6 +238,10 @@ plans:
       config:
         tier: premium
     document_templates:
+      type: flag
+      allowed: true
+      enabled: true    
+    email_scheduling:
       type: flag
       allowed: true
       enabled: true

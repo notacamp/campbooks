@@ -63,7 +63,7 @@ class EmailMessage < ApplicationRecord
     SQL
   }
 
-    scope :by_organization, ->(org, active_only: true) {
+  scope :by_organization, ->(org, active_only: true) {
     people_ids = Person.joins(:organization_memberships)
       .where(organization_memberships: { organization_id: org.id })
     people_ids = people_ids.where(organization_memberships: { status: :active }) if active_only
