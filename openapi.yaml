@@ -78,6 +78,16 @@ tags:
     description: List the workspace's document types.
   - name: Scout
     description: The in-app AI assistant — async chat threads and messages.
+  - name: Scheduled Emails
+    description: List, create, update, and cancel scheduled and recurring email sends.
+  - name: Calendar Events
+    description: List, create, update, RSVP, and delete calendar events.
+  - name: Reminders
+    description: Read and act on AI-extracted reminders (confirm, dismiss, snooze).
+  - name: Folders
+    description: List and inspect workspace custom mail folders.
+  - name: Folder memberships
+    description: File and unfile documents in workspace folders.
 
 security:
   - oauth2: []
@@ -1044,6 +1054,635 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  # ----------------------------------------------------- Scheduled Emails ----
+  /api/v1/scheduled_emails:
+    get:
+      tags: [Scheduled Emails]
+      summary: List scheduled emails
+      operationId: listScheduledEmails
+      security:
+        - oauth2: [scheduled_emails:read]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, sent, cancelled, failed]
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/perPage"
+      responses:
+        "200":
+          description: A page of scheduled emails, soonest occurrence first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ScheduledEmail"
+                  meta:
+                    $ref: "#/components/schemas/PageMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      tags: [Scheduled Emails]
+      summary: Schedule an email
+      description: >-
+        Schedule a one-shot or recurring send. Requires a plan that includes email
+        scheduling and an account the acting user may send from.
+      operationId: createScheduledEmail
+      security:
+        - oauth2: [scheduled_emails:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduledEmailInput"
+      responses:
+        "201":
+          description: The scheduled email.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ScheduledEmailDetail"
+        "403":
+          description: >-
+            The token lacks `scheduled_emails:write`, the plan excludes email
+            scheduling (`entitlement_required`), or the account is not sendable by
+            the acting user (`no_sendable_account`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/scheduled_emails/{id}:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    get:
+      tags: [Scheduled Emails]
+      summary: Get a scheduled email
+      operationId: getScheduledEmail
+      security:
+        - oauth2: [scheduled_emails:read]
+      responses:
+        "200":
+          description: The scheduled email.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ScheduledEmailDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Scheduled Emails]
+      summary: Update a scheduled email
+      operationId: updateScheduledEmail
+      security:
+        - oauth2: [scheduled_emails:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduledEmailInput"
+      responses:
+        "200":
+          description: The updated scheduled email.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ScheduledEmailDetail"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+    delete:
+      tags: [Scheduled Emails]
+      summary: Cancel a scheduled email
+      description: Soft-cancels (sets status to `cancelled`); the record is retained.
+      operationId: cancelScheduledEmail
+      security:
+        - oauth2: [scheduled_emails:write]
+      responses:
+        "200":
+          description: The cancelled scheduled email.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ScheduledEmailDetail"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ------------------------------------------------------- Calendar Events ----
+  /api/v1/calendar_events:
+    get:
+      tags: [Calendar Events]
+      summary: List calendar events
+      operationId: listCalendarEvents
+      security:
+        - oauth2: [calendar:read]
+      parameters:
+        - name: start_after
+          in: query
+          description: ISO 8601 timestamp; only events starting at/after this.
+          schema:
+            type: string
+            format: date-time
+        - name: start_before
+          in: query
+          description: ISO 8601 timestamp; only events starting before this.
+          schema:
+            type: string
+            format: date-time
+        - name: calendar_id
+          in: query
+          schema:
+            type: integer
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/perPage"
+      responses:
+        "200":
+          description: A page of calendar events, soonest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CalendarEvent"
+                  meta:
+                    $ref: "#/components/schemas/PageMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      tags: [Calendar Events]
+      summary: Create a calendar event
+      description: >-
+        Creates the event on a calendar the acting user may write to and queues
+        the write-through to the provider (Google/Zoho).
+      operationId: createCalendarEvent
+      security:
+        - oauth2: [calendar:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalendarEventInput"
+      responses:
+        "201":
+          description: The created event.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/CalendarEventDetail"
+        "403":
+          description: The calendar does not exist or is not writable (`calendar_not_writable`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+  /api/v1/calendar_events/{id}:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    get:
+      tags: [Calendar Events]
+      summary: Get a calendar event
+      operationId: getCalendarEvent
+      security:
+        - oauth2: [calendar:read]
+      responses:
+        "200":
+          description: The event.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/CalendarEventDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Calendar Events]
+      summary: Update a calendar event
+      description: >-
+        Requires write access to the event's calendar. Pass `recurrence_scope`
+        (`this` or `all`) to control how a recurring series is affected.
+      operationId: updateCalendarEvent
+      security:
+        - oauth2: [calendar:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/CalendarEventInput"
+                - type: object
+                  properties:
+                    recurrence_scope:
+                      type: string
+                      enum: [this, all]
+      responses:
+        "200":
+          description: The updated event.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/CalendarEventDetail"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+    delete:
+      tags: [Calendar Events]
+      summary: Delete a calendar event
+      description: >-
+        Queues the provider-side delete and returns 202; the local record is
+        tombstoned by the background job on success.
+      operationId: deleteCalendarEvent
+      security:
+        - oauth2: [calendar:write]
+      responses:
+        "202":
+          description: Deletion accepted (asynchronous).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/CalendarEventDetail"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/calendar_events/{id}/rsvp:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    post:
+      tags: [Calendar Events]
+      summary: RSVP to a calendar event
+      operationId: rsvpCalendarEvent
+      security:
+        - oauth2: [calendar:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rsvp_status]
+              properties:
+                rsvp_status:
+                  type: string
+                  enum: [needs_action, accepted, declined, tentative]
+      responses:
+        "200":
+          description: The updated event.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/CalendarEventDetail"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          description: The rsvp_status value is invalid (`invalid_rsvp_status`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # -------------------------------------------------------------- Reminders ----
+  /api/v1/reminders:
+    get:
+      tags: [Reminders]
+      summary: List reminders
+      operationId: listReminders
+      security:
+        - oauth2: [reminders:read]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, confirmed, dismissed, snoozed]
+        - $ref: "#/components/parameters/page"
+        - $ref: "#/components/parameters/perPage"
+      responses:
+        "200":
+          description: A page of reminders, soonest due first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Reminder"
+                  meta:
+                    $ref: "#/components/schemas/PageMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/reminders/{id}:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    get:
+      tags: [Reminders]
+      summary: Get a reminder
+      operationId: getReminder
+      security:
+        - oauth2: [reminders:read]
+      responses:
+        "200":
+          description: The reminder.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ReminderDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/reminders/{id}/confirm:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    post:
+      tags: [Reminders]
+      summary: Confirm a reminder
+      description: >-
+        Confirms the reminder into a calendar event. Optionally pass `due_at` to
+        adjust the time first.
+      operationId: confirmReminder
+      security:
+        - oauth2: [reminders:write]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                due_at:
+                  type: string
+                  format: date-time
+      responses:
+        "200":
+          description: The confirmed reminder (with the created calendar_event_id).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    allOf:
+                      - $ref: "#/components/schemas/ReminderDetail"
+                      - type: object
+                        properties:
+                          calendar_event_id:
+                            type: integer
+                            nullable: true
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          description: The reminder could not be confirmed (`confirm_failed`) or the due_at was invalid (`invalid_due_at`).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/reminders/{id}/dismiss:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    post:
+      tags: [Reminders]
+      summary: Dismiss a reminder
+      operationId: dismissReminder
+      security:
+        - oauth2: [reminders:write]
+      responses:
+        "200":
+          description: The dismissed reminder.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ReminderDetail"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/reminders/{id}/snooze:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    post:
+      tags: [Reminders]
+      summary: Snooze a reminder
+      description: Snoozes until the given time, or one week out when `until` is omitted.
+      operationId: snoozeReminder
+      security:
+        - oauth2: [reminders:write]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                until:
+                  type: string
+                  format: date-time
+      responses:
+        "200":
+          description: The snoozed reminder.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ReminderDetail"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ---------------------------------------------------------------- Folders ----
+  /api/v1/folders:
+    get:
+      tags: [Folders]
+      summary: List folders
+      description: Returns all of the workspace's custom folders (not paginated).
+      operationId: listFolders
+      security:
+        - oauth2: [folders:read]
+      responses:
+        "200":
+          description: The workspace's folders.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Folder"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/v1/folders/{id}:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    get:
+      tags: [Folders]
+      summary: Get a folder
+      description: The folder plus the documents filed into it.
+      operationId: getFolder
+      security:
+        - oauth2: [folders:read]
+      responses:
+        "200":
+          description: The folder and its documents.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/FolderDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ------------------------------------------------------ Folder memberships ----
+  /api/v1/folder_memberships:
+    post:
+      tags: [Folder memberships]
+      summary: File a document into a folder
+      operationId: createFolderMembership
+      security:
+        - oauth2: [folders:write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mail_folder_id, document_id]
+              properties:
+                mail_folder_id:
+                  type: integer
+                document_id:
+                  type: integer
+      responses:
+        "201":
+          description: The membership.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      folder_id:
+                        type: integer
+                      document_id:
+                        type: integer
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/v1/folder_memberships/{id}:
+    parameters:
+      - $ref: "#/components/parameters/idPath"
+    delete:
+      tags: [Folder memberships]
+      summary: Unfile a document from a folder
+      operationId: deleteFolderMembership
+      security:
+        - oauth2: [folders:write]
+      responses:
+        "204":
+          description: Removed (empty body).
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
 components:
   securitySchemes:
     oauth2:
@@ -1065,6 +1704,14 @@ components:
             document_types:read: List document types
             scout:read: Read Scout chat threads and messages
             scout:write: Create Scout threads and send messages
+            scheduled_emails:read: List and read scheduled emails
+            scheduled_emails:write: Schedule, update, and cancel emails
+            calendar:read: Read calendar events
+            calendar:write: Create, update, RSVP, and delete calendar events
+            reminders:read: Read AI reminders
+            reminders:write: Confirm, dismiss, and snooze reminders
+            folders:read: List folders and their contents
+            folders:write: File and unfile documents in folders
 
   parameters:
     idPath:
@@ -1537,3 +2184,268 @@ components:
         created_at:
           type: string
           format: date-time
+
+    ScheduledEmail:
+      type: object
+      properties:
+        id:
+          type: integer
+        to:
+          type: string
+          nullable: true
+        cc:
+          type: string
+          nullable: true
+        bcc:
+          type: string
+          nullable: true
+        subject:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [pending, sent, cancelled, failed]
+        recurring:
+          type: boolean
+        rrule:
+          type: string
+          nullable: true
+          description: iCal RRULE for recurring sends; null for one-shots.
+        scheduled_at:
+          type: string
+          format: date-time
+          nullable: true
+        next_occurrence_at:
+          type: string
+          format: date-time
+          nullable: true
+        last_sent_at:
+          type: string
+          format: date-time
+          nullable: true
+        account_id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    ScheduledEmailDetail:
+      allOf:
+        - $ref: "#/components/schemas/ScheduledEmail"
+        - type: object
+          properties:
+            body:
+              type: string
+              nullable: true
+
+    ScheduledEmailInput:
+      type: object
+      description: >-
+        Fields for create/update. email_account_id, to_address, subject, body, and
+        scheduled_at are required when scheduling.
+      properties:
+        email_account_id:
+          type: integer
+        to_address:
+          type: string
+        cc_address:
+          type: string
+        bcc_address:
+          type: string
+        subject:
+          type: string
+        body:
+          type: string
+        scheduled_at:
+          type: string
+          format: date-time
+        rrule:
+          type: string
+
+    CalendarEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        start_at:
+          type: string
+          format: date-time
+          nullable: true
+        end_at:
+          type: string
+          format: date-time
+          nullable: true
+        all_day:
+          type: boolean
+        status:
+          type: string
+          enum: [confirmed, tentative, cancelled]
+        rsvp_status:
+          type: string
+          enum: [needs_action, accepted, declined, tentative]
+        color:
+          type: string
+          nullable: true
+          description: Effective color (event override, else the calendar's color).
+        calendar_id:
+          type: integer
+        conference_url:
+          type: string
+          nullable: true
+        html_link:
+          type: string
+          nullable: true
+        is_organizer:
+          type: boolean
+        recurring:
+          type: boolean
+        source_email_message_id:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    CalendarEventDetail:
+      allOf:
+        - $ref: "#/components/schemas/CalendarEvent"
+        - type: object
+          properties:
+            description:
+              type: string
+              nullable: true
+            attendees:
+              type: array
+              nullable: true
+              items:
+                type: object
+                additionalProperties: true
+            rrule:
+              type: string
+              nullable: true
+
+    CalendarEventInput:
+      type: object
+      description: calendar_id, title, and start_at are required on create.
+      properties:
+        calendar_id:
+          type: integer
+          description: A calendar the acting user may write to (create only).
+        title:
+          type: string
+        description:
+          type: string
+        location:
+          type: string
+        start_at:
+          type: string
+          format: date-time
+        end_at:
+          type: string
+          format: date-time
+        all_day:
+          type: boolean
+        color:
+          type: string
+
+    Reminder:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        due_at:
+          type: string
+          format: date-time
+          nullable: true
+        all_day:
+          type: boolean
+        reminder_type:
+          type: string
+          enum: [payment_due, renewal, deadline, appointment, delivery, travel, event, other]
+        status:
+          type: string
+          enum: [pending, confirmed, dismissed, snoozed]
+        confidence:
+          type: number
+          nullable: true
+          description: AI extraction confidence, 0-1.
+        amount_cents:
+          type: integer
+          nullable: true
+        currency:
+          type: string
+          nullable: true
+        snoozed_until:
+          type: string
+          format: date-time
+          nullable: true
+        source_type:
+          type: string
+          nullable: true
+          description: The record the reminder was extracted from (EmailMessage or Document).
+        source_id:
+          type: integer
+          nullable: true
+        calendar_event_id:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    ReminderDetail:
+      allOf:
+        - $ref: "#/components/schemas/Reminder"
+        - type: object
+          properties:
+            justification:
+              type: string
+              nullable: true
+              description: The AI's reasoning for the extraction.
+            extracted_data:
+              type: object
+              nullable: true
+              additionalProperties: true
+
+    Folder:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        icon:
+          type: string
+          nullable: true
+        parent_id:
+          type: integer
+          nullable: true
+        position:
+          type: integer
+        document_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    FolderDetail:
+      allOf:
+        - $ref: "#/components/schemas/Folder"
+        - type: object
+          properties:
+            documents:
+              type: array
+              items:
+                $ref: "#/components/schemas/Document"

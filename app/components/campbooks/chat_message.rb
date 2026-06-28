@@ -36,6 +36,8 @@ module Campbooks
         div(class: "flex-shrink-0 mt-0.5") { avatar }
         div(class: "flex flex-col #{align_reverse? ? 'items-end' : 'items-start'} flex-1 min-w-0") do
           header
+          thinking_trace if from_ai?
+          tool_steps if from_ai?
           body
           provenance_note
           draft_badge if @message.draft?
@@ -63,6 +65,43 @@ module Campbooks
 
     def from_ai?
       @message.from_ai?
+    end
+
+    # Collapsible reasoning trace — present only when the model exposed thinking.
+    def thinking_trace
+      return unless @message.respond_to?(:ai_thinking) && @message.ai_thinking.present?
+
+      details(class: "mt-1 w-full max-w-[42rem]") do
+        summary(class: "cursor-pointer select-none text-[12px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1") do
+          plain "✦ "
+          plain t(".thinking_summary")
+        end
+        div(class: "mt-1 text-[12px] leading-relaxed text-muted-foreground whitespace-pre-wrap break-words border-l-2 border-border pl-3") do
+          plain @message.ai_thinking.to_s
+        end
+      end
+    end
+
+    # Compact trace of the tools Scout ran to reach this answer.
+    def tool_steps
+      return unless @message.respond_to?(:steps) && @message.steps.present?
+
+      div(class: "mt-1 w-full max-w-[42rem] flex flex-col gap-0.5") do
+        @message.steps.each do |step|
+          div(class: "text-[12px] text-muted-foreground inline-flex items-center gap-1.5") do
+            span(class: "inline-block w-1 h-1 rounded-full bg-muted-foreground/60")
+            plain step_label(step)
+          end
+        end
+      end
+    end
+
+    def step_label(step)
+      tool = step["tool"].to_s.sub(/\Aquery_/, "").tr("_", " ")
+      result = step["result"]
+      count = result.is_a?(Hash) ? (result["count"] || result.values.find { |v| v.to_s.match?(/\d+ items/) }) : nil
+      base = t(".step_searched", tool: tool)
+      count ? "#{base} → #{count}" : base
     end
 
     def avatar
