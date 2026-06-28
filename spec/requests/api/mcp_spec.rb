@@ -116,4 +116,68 @@ RSpec.describe "API MCP endpoint", type: :request do
       expect(response.parsed_body["error"]["code"]).to eq(-32_601)
     end
   end
+
+  describe "full API surface" do
+    let(:all_scopes) do
+      "emails:read emails:write emails:send documents:read documents:write " \
+      "contacts:read contacts:write tags:read tags:write document_types:read " \
+      "scout:read scout:write scheduled_emails:read scheduled_emails:write " \
+      "calendar:read calendar:write reminders:read reminders:write folders:read folders:write"
+    end
+
+    it "exposes tools across every domain when all scopes are granted" do
+      rpc({ jsonrpc: "2.0", id: 10, method: "tools/list" }, scopes: all_scopes)
+
+      names = response.parsed_body["result"]["tools"].map { |t| t["name"] }
+      expect(names).to include(
+        "mark_email_read", "add_email_tag", "list_documents", "update_document",
+        "approve_document", "get_contact", "set_contact_state", "list_tags",
+        "list_document_types", "get_scheduled_email", "update_calendar_event",
+        "rsvp_calendar_event", "confirm_reminder", "list_folders", "file_document"
+      )
+      expect(names.size).to be >= 40
+    end
+
+    it "hides workflow tools unless the Workflows feature is enabled" do
+      allow(Features).to receive(:workflows?).and_return(false)
+      rpc({ jsonrpc: "2.0", id: 11, method: "tools/list" }, scopes: "workflows:read workflows:trigger")
+      expect(response.parsed_body["result"]["tools"]).to be_empty
+
+      allow(Features).to receive(:workflows?).and_return(true)
+      rpc({ jsonrpc: "2.0", id: 12, method: "tools/list" }, scopes: "workflows:read workflows:trigger")
+      names = response.parsed_body["result"]["tools"].map { |t| t["name"] }
+      expect(names).to include("list_workflows", "trigger_workflow", "list_workflow_executions")
+    end
+
+    it "runs a read tool (list_tags)" do
+      Tag.create!(workspace: workspace, name: "Receipts", color: "#ccc", source: :local)
+
+      rpc({ jsonrpc: "2.0", id: 13, method: "tools/call",
+            params: { name: "list_tags", arguments: {} } }, scopes: "tags:read")
+
+      payload = JSON.parse(response.parsed_body["result"]["content"].first["text"])
+      expect(payload["tags"].map { |t| t["name"] }).to include("Receipts")
+    end
+
+    it "runs a write tool (mark_email_read)" do
+      email = create(:email_message, email_account: account, read: false)
+
+      rpc({ jsonrpc: "2.0", id: 14, method: "tools/call",
+            params: { name: "mark_email_read", arguments: { id: email.id } } }, scopes: "emails:write")
+
+      expect(response.parsed_body["result"]["content"]).to be_present
+      expect(email.reload.read).to be(true)
+    end
+
+    it "runs a state-change tool (set_contact_state)" do
+      contact = create(:contact, workspace: workspace)
+
+      rpc({ jsonrpc: "2.0", id: 15, method: "tools/call",
+            params: { name: "set_contact_state", arguments: { id: contact.id, state: "star" } } },
+          scopes: "contacts:write")
+
+      expect(response.parsed_body.dig("result", "isError")).to be_falsey
+      expect(contact.reload.starred?).to be(true)
+    end
+  end
 end

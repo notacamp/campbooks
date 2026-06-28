@@ -712,13 +712,32 @@ Tool error (tool was called successfully but the tool itself reports an error):
 | `get_email` | `emails:read` | Fetch a single email by ID including its body |
 | `send_email` | `emails:send` | Send a new email from a connected account |
 | `reply_email` | `emails:send` | Reply to an existing email |
-| `list_documents` | `documents:read` | List workspace documents, filtered by type/status |
-| `list_contacts` | `contacts:read` | List workspace contacts, filtered by name/email |
-| `list_calendar_events` | `calendar:read` | List calendar events with optional time bounds |
-| `create_calendar_event` | `calendar:write` | Create an event on a writable calendar |
-| `list_scheduled_emails` | `scheduled_emails:read` | List scheduled/recurring emails |
-| `create_scheduled_email` | `scheduled_emails:write` | Schedule an email (optionally recurring via RRULE) |
-| `list_reminders` | `reminders:read` | List AI-extracted reminders |
+| `mark_email_read` / `mark_email_unread` | `emails:write` | Toggle an email's read flag |
+| `add_email_tag` / `remove_email_tag` | `tags:write` | Attach/detach a tag on an email |
+| `list_documents` / `get_document` | `documents:read` | List documents / fetch one with fields + file info |
+| `upload_document` | `documents:write` | Upload a document from base64 content |
+| `update_document` | `documents:write` | Edit a document's extracted fields |
+| `approve_document` / `reject_document` / `reclassify_document` | `documents:write` | Change a document's review state |
+| `list_contacts` / `get_contact` | `contacts:read` | List/fetch contacts |
+| `update_contact` / `set_contact_state` | `contacts:write` | Edit a contact / star, block, allow |
+| `list_tags` | `tags:read` | List workspace tags |
+| `list_document_types` | `document_types:read` | List document types |
+| `list_workflows` / `list_workflow_executions` | `workflows:read` | List workflows / run history (feature-gated) |
+| `trigger_workflow` | `workflows:trigger` | Trigger a webhook workflow (feature-gated) |
+| `list_scout_threads` / `list_scout_messages` | `scout:read` | Read Scout chat |
+| `create_scout_thread` / `send_scout_message` | `scout:write` | Start a thread / post a message (async reply) |
+| `list_scheduled_emails` / `get_scheduled_email` | `scheduled_emails:read` | List/fetch scheduled emails |
+| `create_scheduled_email` / `update_scheduled_email` / `cancel_scheduled_email` | `scheduled_emails:write` | Schedule, edit, cancel |
+| `list_calendar_events` / `get_calendar_event` | `calendar:read` | List/fetch calendar events |
+| `create_calendar_event` / `update_calendar_event` / `delete_calendar_event` / `rsvp_calendar_event` | `calendar:write` | Create, edit, delete, RSVP |
+| `list_reminders` / `get_reminder` | `reminders:read` | List/fetch reminders |
+| `confirm_reminder` / `dismiss_reminder` / `snooze_reminder` | `reminders:write` | Act on a reminder |
+| `list_folders` / `get_folder` | `folders:read` | List folders / fetch a folder with its documents |
+| `file_document` / `unfile_document` | `folders:write` | File/unfile a document in a folder |
+
+The MCP surface mirrors the REST API one-for-one — same auth, same scopes, same
+permission checks. Workflow tools appear in `tools/list` only when the Workflows
+feature is enabled server-side (`ENABLE_WORKFLOWS`).
 
 ## Code samples
 
