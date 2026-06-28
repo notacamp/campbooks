@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_28_040001) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_28_050001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -922,6 +922,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_040001) do
 
   create_table "oauth_access_grants", force: :cascade do |t|
     t.bigint "application_id", null: false
+    t.string "code_challenge"
+    t.string "code_challenge_method"
     t.datetime "created_at", null: false
     t.integer "expires_in", null: false
     t.text "redirect_uri"
@@ -953,14 +955,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_040001) do
   create_table "oauth_applications", force: :cascade do |t|
     t.boolean "confidential", default: true, null: false
     t.datetime "created_at", null: false
-    t.bigint "created_by_id", null: false
+    t.bigint "created_by_id"
     t.string "name", null: false
     t.text "redirect_uri"
     t.string "scopes", default: "", null: false
     t.string "secret", null: false
     t.string "uid", null: false
     t.datetime "updated_at", null: false
-    t.bigint "workspace_id", null: false
+    t.bigint "workspace_id"
     t.index ["created_by_id"], name: "index_oauth_applications_on_created_by_id"
     t.index ["uid"], name: "index_oauth_applications_on_uid", unique: true
     t.index ["workspace_id"], name: "index_oauth_applications_on_workspace_id"

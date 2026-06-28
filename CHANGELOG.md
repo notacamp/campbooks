@@ -18,6 +18,12 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Campbooks CLI + browser sign-in** — a new developer CLI (`campbooks`) drives
+  the public REST API from your terminal. `campbooks login` uses a new OAuth 2.0
+  **authorization-code + PKCE** grant (a styled consent screen at
+  `/api/oauth/authorize`) so you sign in through your browser instead of pasting
+  API keys; existing client-credentials clients are unchanged. See
+  [docs/cli.md](docs/cli.md) and [docs/api.md](docs/api.md).
 - **Calendar event types** — create calendar-only "types" (each a name, a color, and
   an AI prompt) from the new **Event types** button on the calendar. New events are
   auto-classified into a type and colored to match — both events created from email

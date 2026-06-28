@@ -1,12 +1,18 @@
 # frozen_string_literal: true
 
-# Doorkeeper powers the public REST API's OAuth 2.0 layer. Campbooks uses the
-# **client_credentials** grant only: a customer mints a client_id/secret in
-# Settings → API access, exchanges them at POST /api/oauth/token for a bearer
-# token, and calls /api/v1/*. There is no resource owner — the token is bridged
-# to a workspace + acting user via columns on oauth_applications (see
-# config/initializers/doorkeeper_application_extensions.rb and
-# Api::V1::BaseController#establish_acting_identity!).
+# Doorkeeper powers the public REST API's OAuth 2.0 layer. Two grants are enabled:
+#
+#   • client_credentials — headless/CI. A customer mints a client_id/secret in
+#     Settings → API access and exchanges them at POST /api/oauth/token. There is
+#     no resource owner — the token is bridged to a workspace + acting user via
+#     columns on oauth_applications (config/initializers/doorkeeper_application_extensions.rb).
+#   • authorization_code + PKCE — browser SSO for the Campbooks CLI. The user signs
+#     in with their normal app session at GET /api/oauth/authorize and the issued
+#     token carries them as its resource owner.
+#
+# Either way Api::V1::BaseController#establish_acting_identity! resolves the token
+# to Current.workspace + Current.acting_user, and the app's normal permission gates
+# apply unchanged.
 #
 # The scope symbols below are mirrored (with human descriptions) in Api::Scopes
 # (app/models/api/scopes.rb) for the Settings UI; a spec asserts the two stay in
@@ -15,19 +21,55 @@
 Doorkeeper.configure do
   orm :active_record
 
-  # client_credentials never authenticates a resource owner, so this block is
-  # never invoked. It is required to be present; raise loudly if some future
-  # mis-config (e.g. enabling authorization_code) ever reaches it.
+  # Enable the headless grant (client_credentials) and the browser SSO grant
+  # (authorization_code + PKCE). Implicit and password flows stay disabled.
+  grant_flows %w[client_credentials authorization_code]
+
+  # Resolve the signed-in app user for the browser authorize endpoint
+  # (GET /api/oauth/authorize). Mirrors Authentication#find_session_by_cookie and
+  # #request_authentication: resume the cookie session, or bounce to sign-in and
+  # come back to the authorize URL (PKCE + query params intact) afterwards.
+  # client_credentials never reaches this block — it has no resource owner.
   resource_owner_authenticator do
-    raise "resource_owner_authenticator must not be called: Campbooks only uses " \
-          "the client_credentials grant (no resource owner)."
+    session_record = Session.find_by(id: cookies.signed[:session_id])
+    session_record = nil if session_record&.expired?
+
+    if session_record
+      session_record.user
+    else
+      session[:return_to_after_authenticating] = request.fullpath
+      redirect_to("/session/new")
+      nil
+    end
   end
 
-  # Lock the provider to client_credentials. Disables authorization_code,
-  # implicit, and password flows entirely.
-  grant_flows %w[client_credentials]
+  # Public clients (the first-party CLI) MUST use PKCE — there is no client secret
+  # to protect the authorization code exchange. Confidential client_credentials
+  # apps don't use the authorization_code flow, so they're unaffected.
+  force_pkce
 
-  # Short-lived bearer tokens. Clients request a fresh one when they get a 401.
+  # Issue refresh tokens so the CLI refreshes silently instead of re-opening the
+  # browser every 2 hours. client_credentials still gets none (per the OAuth spec) —
+  # it re-mints on 401. Works with hash_token_secrets (the refresh token is hashed
+  # at rest; the plaintext is only returned on the issuing/refresh response).
+  use_refresh_token
+
+  # Let the CLI's loopback redirect (http://127.0.0.1[:port]/callback, RFC 8252)
+  # validate in production, where http redirect URIs are otherwise rejected. Only
+  # loopback/localhost is exempt; every other redirect URI must still be https.
+  force_ssl_in_redirect_uri do |uri|
+    uri.host != "localhost" && !Doorkeeper::OAuth::Helpers::URIChecker.loopback_uri?(uri)
+  end
+
+  # Enabling authorization_code makes Doorkeeper require a redirect_uri on every
+  # application by default. Confidential client_credentials apps legitimately have
+  # none, so keep blank redirect URIs allowed for them; public authorization_code
+  # apps (the CLI) still must register one.
+  allow_blank_redirect_uri do |_grant_flows, application|
+    application.nil? || application.confidential?
+  end
+
+  # Short-lived bearer tokens. Clients request a fresh one (or refresh) on a 401.
   access_token_expires_in 2.hours
 
   # Hash secrets/tokens at rest. The plaintext client secret is only retrievable
