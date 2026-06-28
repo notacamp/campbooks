@@ -1,0 +1,50 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) do |header| %>
+  <% if current_entitlements.feature?(:document_templates) %>
+    <% header.with_actions do %>
+      <%= render(Campbooks::Button.new(variant: :primary, size: :md, href: new_settings_document_template_path)) { t(".new_template") } %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<% if @templates.any? %>
+  <% status_variants = { "pending" => :neutral, "processing" => :warning, "completed" => :success, "failed" => :danger } %>
+  <div class="grid grid-cols-1 gap-4">
+    <% @templates.each do |template| %>
+      <%= render(Campbooks::Card.new(padding: :md)) do %>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 mb-1">
+              <%= link_to template.name, edit_settings_document_template_path(template), class: "text-sm font-semibold text-gray-900 hover:text-accent-700 truncate" %>
+              <%= render(Campbooks::Badge.new(variant: status_variants[template.ai_status] || :neutral, size: :sm)) { human_enum(DocumentTemplate, :ai_status, template.ai_status) } %>
+            </div>
+            <% if template.description.present? %>
+              <p class="text-xs text-gray-500 truncate"><%= truncate(template.description, length: 120) %></p>
+            <% end %>
+            <% if template.variable_definitions.any? %>
+              <p class="text-xs text-gray-400 mt-1"><%= t(".variables_count", count: template.variable_definitions.size) %></p>
+            <% end %>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <%= render(Campbooks::Button.new(variant: :ghost, size: :sm, href: edit_settings_document_template_path(template))) { t(".edit") } %>
+            <% if template.ai_completed? %>
+              <%= render(Campbooks::Button.new(variant: :outline, size: :sm, href: fill_document_template_path(template))) { t(".fill") } %>
+            <% end %>
+            <%= button_to t(".delete"), settings_document_template_path(template), method: :delete,
+                  class: "cursor-pointer inline-flex items-center justify-center px-3 py-1.5 text-sm rounded-md text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors",
+                  form: { data: { turbo_confirm: t(".delete_confirm") } } %>
+          </div>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
+<% else %>
+  <%= render(Campbooks::EmptyState.new(variant: :card, title: t(".empty_title"), description: t(".empty_description"))) do %>
+    <% if current_entitlements.feature?(:document_templates) %>
+      <div class="mt-4 flex justify-center">
+        <%= render(Campbooks::Button.new(variant: :primary, size: :md, href: new_settings_document_template_path)) { t(".new_template") } %>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>

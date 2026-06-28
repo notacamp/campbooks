@@ -269,6 +269,10 @@ Rails.application.routes.draw do
       end
     end
 
+    resources :document_templates, except: :show do
+      member { post :regenerate }
+    end
+
     namespace :integrations do
       root to: "index#show"
       resource :notion, only: [ :show, :update ], controller: "notion"
@@ -296,6 +300,10 @@ Rails.application.routes.draw do
     end
     # Add/remove documents & emails to the board (the item picker).
     resources :memberships, only: [ :new, :create, :destroy ], controller: "pipeline_memberships"
+  end
+
+  resources :document_templates, only: [] do
+    member { get :fill; post :preview; post :send_email }
   end
 
   # Inbox settings — the gear-icon management modal on the email page. Each

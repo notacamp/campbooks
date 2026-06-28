@@ -68,6 +68,9 @@ plans:
       enabled: true
       config:
         tier: basic
+    document_templates:
+      type: flag
+      allowed: false
     email_scheduling:
       type: flag
       allowed: false        # scheduled sending + calendar visibility — paid feature
@@ -128,6 +131,10 @@ plans:
       enabled: true
       config:
         tier: standard
+    document_templates:
+      type: flag
+      allowed: true
+      enabled: true    
     email_scheduling:
       type: flag
       allowed: true
@@ -187,6 +194,10 @@ plans:
       enabled: true
       config:
         tier: premium
+    document_templates:
+      type: flag
+      allowed: true
+      enabled: true    
     email_scheduling:
       type: flag
       allowed: true
@@ -246,6 +257,10 @@ plans:
       enabled: true
       config:
         tier: premium
+    document_templates:
+      type: flag
+      allowed: true
+      enabled: true    
     email_scheduling:
       type: flag
       allowed: true

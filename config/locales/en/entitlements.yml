@@ -59,6 +59,7 @@ en:
       scout: Scout
       workflow_executions: Workflow runs
       workflows: Workflows
+      document_templates: Document templates
   navigation:
     settings:
       items:
