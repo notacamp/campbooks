@@ -22,7 +22,15 @@ module Api
       "workflows:read"     => "List workflows and their run history",
       "workflows:trigger"  => "Trigger a workflow",
       "scout:read"         => "Read Scout chat threads and messages",
-      "scout:write"        => "Create Scout threads and send messages"
+      "scout:write"        => "Create Scout threads and send messages",
+      "scheduled_emails:read"  => "List and read scheduled emails",
+      "scheduled_emails:write" => "Schedule, update, and cancel emails",
+      "calendar:read"          => "Read calendar events",
+      "calendar:write"         => "Create, update, RSVP, and delete calendar events",
+      "reminders:read"         => "Read AI reminders",
+      "reminders:write"        => "Confirm, dismiss, and snooze reminders",
+      "folders:read"           => "List folders and their contents",
+      "folders:write"          => "File and unfile documents in folders"
     }.freeze
 
     module_function
