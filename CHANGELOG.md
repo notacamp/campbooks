@@ -16,6 +16,24 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Scout can now think.** The global Scout chat shows a collapsible reasoning
+  trace and the tools it ran ("Searched email → 12 results") above each answer,
+  using the model's native reasoning where the configured model supports it
+  (Claude extended thinking, OpenAI/DeepSeek reasoning) and degrading cleanly
+  otherwise.
+
+### Changed
+
+- **Global Scout rebuilt on native tool calling.** Replaced the hand-rolled
+  "emit JSON in prose" protocol with the providers' native function/tool-calling
+  APIs, a single JSON-Schema tool registry (one source of truth, validated
+  before execution), and a model-driven loop that runs until Scout has a real
+  answer instead of erroring out after a fixed number of tool calls. Destructive
+  actions are never executed from model output — they're surfaced as one-click
+  confirmations.
+
 ## [0.3.0] - 2026-06-28
 
 ### Added
