@@ -37,7 +37,7 @@ class MigratePrimaryKeysToUuid < ActiveRecord::Migration[8.1]
     document_drive_uploads document_email_messages document_templates
     document_types documents drive_folder_mappings email_account_signatures
     email_account_users email_accounts email_folders email_message_tags
-    email_messages email_scan_logs email_threads events exports feed_items
+    email_messages email_scan_logs email_threads event_types events exports feed_items
     folder_memberships google_drive_accounts google_drive_configs identities
     invitations mail_folders mfa_email_challenges notification_preferences
     notifications notion_database_mappings notion_integrations notion_pages
