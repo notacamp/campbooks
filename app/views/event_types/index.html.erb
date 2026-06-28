@@ -1,0 +1,34 @@
+<% content_for :cp_context, "calendar" %>
+<div class="mx-auto max-w-3xl px-4 py-6 sm:px-6 lg:px-8">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
+    <div class="min-w-0">
+      <%= link_to calendar_path, class: "inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground no-underline mb-1.5" do %>
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        <%= t(".back") %>
+      <% end %>
+      <h1 class="text-xl font-semibold text-foreground"><%= t(".heading") %></h1>
+      <p class="text-sm text-muted-foreground mt-0.5"><%= t(".subtitle") %></p>
+    </div>
+    <%= render(Campbooks::Button.new(variant: :primary, size: :sm,
+          href: new_event_type_path,
+          data: { turbo_frame: "event_type_form" })) { t(".add_type") } %>
+  </div>
+
+  <div class="rounded-xl border border-border bg-card p-4 sm:p-5">
+    <%= turbo_frame_tag "event_type_form" %>
+
+    <div id="event_type_rows">
+      <% if @types.any? %>
+        <% @types.each do |type| %>
+          <%= render "event_types/event_type", type: type %>
+        <% end %>
+      <% else %>
+        <div id="event_types_empty" class="py-8 text-center">
+          <p class="text-[13px] text-muted-foreground mb-3"><%= t(".empty") %></p>
+          <%= button_to t(".add_starters"), starters_event_types_path, method: :post,
+                class: "inline-flex items-center rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 no-underline cursor-pointer" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>

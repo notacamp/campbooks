@@ -1,0 +1,28 @@
+---
+es:
+  event_types:
+    create:
+      success: Tipo de evento creado.
+    destroy:
+      success: Tipo de evento eliminado.
+    event_type:
+      delete_confirm: "¿Eliminar %{name}?"
+    form:
+      ai_prompt_hint: Lo que la IA usa para reconocer este tipo de evento. Admite markdown.
+      ai_prompt_label: Instrucción de IA
+      color_label: Color
+      create_type: Crear tipo
+      name_label: Nombre
+    index:
+      add_starters: Añadir tipos iniciales
+      add_type: Añadir tipo
+      back: Volver al calendario
+      empty: Aún no hay tipos de evento. Añade algunos para que los nuevos eventos
+        se coloreen automáticamente por tipo.
+      heading: Tipos de evento
+      subtitle: Etiquetas solo del calendario que colorean los eventos según lo que
+        son.
+    starters:
+      success: Tipos de evento iniciales añadidos.
+    update:
+      success: Tipo de evento actualizado.

@@ -16,6 +16,18 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Calendar event types** — create calendar-only "types" (each a name, a color, and
+  an AI prompt) from the new **Event types** button on the calendar. New events are
+  auto-classified into a type and colored to match — both events created from email
+  and ones you add yourself — and you can always override the type (or choose "None")
+  on the event form. A one-click starter set gets you going, and the type's color
+  syncs out to Google/Zoho.
+- **Drag events across days in month view** — drag an event from one day to another
+  in the calendar's month view to reschedule it; the time of day and duration are
+  preserved. Works on touch as well as desktop.
+
 ## [0.3.0] - 2026-06-28
 
 ### Added

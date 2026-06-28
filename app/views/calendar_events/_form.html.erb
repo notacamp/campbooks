@@ -31,9 +31,27 @@
     </div>
   <% end %>
 
+  <% event_types = Current.workspace.event_types.order(:name).to_a %>
+  <% selected_type = @event.type_status_manual? ? (@event.event_type_id&.to_s || "none") : "auto" %>
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".type_label") %></label>
+    <select name="type_choice" class="<%= field_classes %>">
+      <option value="auto" <%= "selected" if selected_type == "auto" %>><%= t(".type_auto") %></option>
+      <% event_types.each do |et| %>
+        <option value="<%= et.id %>" <%= "selected" if selected_type == et.id.to_s %>><%= et.name %></option>
+      <% end %>
+      <option value="none" <%= "selected" if selected_type == "none" %>><%= t(".type_none") %></option>
+    </select>
+    <p class="text-xs text-muted-foreground mt-1">
+      <%= t(".type_hint") %>
+      <%= link_to t(".type_manage"), event_types_path, data: { turbo_frame: "_top" }, class: "underline hover:text-foreground" %>
+    </p>
+  </div>
+
   <div>
     <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".color_label") %></label>
     <%= render Campbooks::ColorSwatchPicker.new(name: "calendar_event[color]", selected: @event.color, none_label: t(".color_default")) %>
+    <p class="text-xs text-muted-foreground mt-1"><%= t(".color_hint") %></p>
   </div>
 
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">

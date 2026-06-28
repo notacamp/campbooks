@@ -6,6 +6,7 @@ pt:
       empty_desc: Ligue um calendário Google ou Zoho para ver e gerir os seus eventos
         aqui.
       empty_title: Nenhum calendário ligado
+      event_types: Tipos de evento
       new_event: Novo evento
       next: Próximo
       previous: Anterior
@@ -33,6 +34,7 @@ pt:
       calendar_label: Calendário
       cancel: Cancelar
       color_default: Cor do calendário
+      color_hint: Mantenha a cor do calendário para usar a cor do tipo.
       color_label: Cor
       create: Criar evento
       delete: Eliminar evento
@@ -50,6 +52,11 @@ pt:
       starts_label: Início
       title_label: Título
       title_placeholder: Adicionar um título
+      type_auto: Deteção automática (IA)
+      type_hint: A IA escolhe o tipo automaticamente. Escolha um para substituir, ou
+      type_label: Tipo
+      type_manage: gerir tipos
+      type_none: Nenhum
     new:
       title: Novo evento
     rsvp:

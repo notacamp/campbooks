@@ -433,6 +433,12 @@ Rails.application.routes.draw do
     end
   end
 
+  # Calendar-only "tags": name + color + AI prompt used to auto-classify and color
+  # events. Managed from the calendar toolbar (turbo-frame inline form CRUD).
+  resources :event_types, except: [ :show ] do
+    collection { post :starters } # one-click starter set from the empty state
+  end
+
   # ── Public REST API (v1) ──────────────────────────────────────────────────
   # Authenticated with OAuth bearer tokens minted at /api/oauth/token. Every
   # controller inherits Api::V1::BaseController (token auth + workspace/acting-user
