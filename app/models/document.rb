@@ -40,7 +40,8 @@ class Document < ApplicationRecord
     identification: 10,
     proposal: 11,
     correspondence: 12,
-    bank_journal_entry: 13
+    bank_journal_entry: 13,
+    credit_note: 14
   }
 
   # Two orthogonal lifecycles, split out of a single overloaded `status` enum:
