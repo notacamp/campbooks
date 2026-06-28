@@ -30,11 +30,32 @@ module Ai
         raise NotImplementedError
       end
 
+      # Native, tool-aware single turn. Returns an Ai::ChatResult (text +
+      # tool_calls + thinking), using the provider's native tool-calling and
+      # extended-thinking features rather than a JSON-in-prose protocol.
+      #
+      # @param tools [Array<Hash>] neutral tool defs: {name:, description:, parameters: <JSON Schema>}
+      # @param thinking [Integer, nil] reasoning token budget; nil disables it
+      def converse(system:, messages:, model:, max_tokens:, temperature: 0.0, tools: [], thinking: nil)
+        raise NotImplementedError
+      end
+
+      # Whether this adapter implements native tool calling in `converse`.
+      def supports_tools? = false
+
+      # Whether the given model exposes native extended thinking / reasoning.
+      def supports_thinking?(_model) = false
+
       def embed(text, model: "text-embedding-3-small")
         raise NotImplementedError
       end
 
       private
+
+      def post_json(url, body)
+        response = connection.post(url) { |req| req.body = body.to_json }
+        JSON.parse(response.body)
+      end
 
       def connection
         @connection ||= Faraday.new(headers: default_headers) do |f|

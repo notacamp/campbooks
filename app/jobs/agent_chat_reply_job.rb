@@ -21,7 +21,7 @@ class AgentChatReplyJob < ApplicationJob
     # Stream live status into the typing indicator while Scout works its tools.
     on_status = ->(label) { broadcast_typing_status(thread, label) }
 
-    result = Ai::ChatService.reply_to(message, on_status: on_status)
+    result = compute_reply(thread, message, on_status)
     return broadcast_error(thread, message) if result.blank? || result[:reply].blank?
 
     # Execute auto_actions server-side
@@ -47,6 +47,8 @@ class AgentChatReplyJob < ApplicationJob
       ai_auto_actions: auto_results.map { |r| { "tool" => r[:tool], "message" => r[:message], "success" => r[:success] } },
       ai_prompts: result[:prompts] || [],
       ai_provenance: result[:provenance] || {},
+      ai_thinking: result[:thinking],
+      steps: result[:steps] || [],
       user: thread.user,
       reply_status: :replied
     )
@@ -80,6 +82,32 @@ class AgentChatReplyJob < ApplicationJob
   end
 
   private
+
+  # Global Scout runs the native-tool-calling agent; email/compose threads keep
+  # their existing services. Returns a uniform hash (always includes :thinking
+  # and :steps; un-migrated paths simply leave them nil/empty).
+  def compute_reply(thread, message, on_status)
+    return Ai::ChatService.reply_to(message, on_status: on_status) unless thread.global?
+
+    on_event = ->(type, label) { broadcast_typing_status(thread, agent_status(type, label)) }
+    result = Scout::Agent.new(thread, on_event: on_event).run(message.content)
+    return nil unless result
+
+    {
+      reply: result.reply, thinking: result.thinking, steps: result.steps,
+      suggested_actions: result.suggested_actions, prompts: result.prompts,
+      provenance: result.provenance, auto_actions: []
+    }
+  end
+
+  # Map an agent event to a human typing-indicator label.
+  def agent_status(type, label)
+    case type
+    when :tool     then I18n.t("scout.status.#{label}", default: I18n.t("scout.status.working", default: "Working…"))
+    when :proposal then I18n.t("scout.status.preparing", default: "Preparing an action…")
+    else label.presence || I18n.t("scout.status.working", default: "Working…")
+    end
+  end
 
   def execute_auto_actions(auto_actions)
     auto_actions.filter_map do |action|
