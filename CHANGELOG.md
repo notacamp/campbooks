@@ -35,12 +35,27 @@ major, minor, or patch change here.
   (active or past). Includes scoped filtering for emails and documents, a
   directory page, per-organization profile pages, and a backfill from existing
   AI-extracted `Person.organization` strings.
+- **Google Drive folder picker** — the Drive config form now offers an
+  interactive folder browser (browse, select, or create folders) instead of
+  requiring a pasted folder ID. The selected folder path is stored and
+  displayed as a human-readable label.
+- **Drive push status in document list** — a Drive column in the documents
+  table (desktop) and a Drive badge on document cards (mobile) show whether
+  a document has been pushed to Drive (green checkmark), failed (amber warning
+  with one-click retry), or hasn't been pushed yet.
+- **Retry all failed Drive pushes** — the Google Drive settings page now shows
+  a count of failed uploads and a "Retry all" button that re-enqueues every
+  failed document in one click.
 - **Sent-email attachments** — files attached to emails you send are now stored
   locally as documents (the same way received attachments are), and the AI
   biases their classification toward revenue/outgoing types.
 
 ### Changed
 
+- **Google Drive auto-push now defaults to on** — when you configure a Drive
+  destination for a document type, approved documents are uploaded automatically
+  unless you explicitly pause it. The checkbox label now reads "Upload
+  automatically when approved." A migration flips the column default.
 - Sidebar navigation attention dots now reflect whether a section still has
   something for you to look at — unread mail, new feed items, pending reminders,
   documents awaiting review, or unread Scout replies — and clear when you handle
