@@ -114,7 +114,7 @@
           </div>
         </div>
       <% elsif @document.pdf? %>
-        <div data-controller="pdf-preview" class="bg-card rounded-xl shadow-sm border border-border overflow-hidden flex flex-col" style="min-height: 80vh">
+        <div data-controller="pdf-preview" class="bg-card rounded-xl shadow-sm border border-border overflow-hidden flex flex-col min-h-[55vh] lg:min-h-[80vh]">
           <div class="flex items-center justify-between px-4 py-2 border-b border-border bg-muted shrink-0">
             <span class="text-sm font-medium text-foreground"><%= t(".original_pdf_label") %></span>
             <div class="flex items-center gap-2">
@@ -134,10 +134,18 @@
               <% end %>
             </div>
           </div>
-          <iframe src="<%= file_document_path(@document) %>"
-                  class="flex-1 w-full border-0"
-                  title="<%= t('.original_pdf_iframe_title') %>"
-                  data-pdf-preview-target="iframe"></iframe>
+          <div class="relative flex-1">
+            <iframe src="<%= file_document_path(@document) %>"
+                    class="absolute inset-0 h-full w-full border-0"
+                    title="<%= t('.original_pdf_iframe_title') %>"
+                    data-pdf-preview-target="iframe"></iframe>
+            <%# On touch screens the iframe swallows scroll gestures, trapping the
+                page. This transparent overlay (mobile only) lets a drag scroll the
+                page and a tap open the fullscreen viewer. %>
+            <button type="button" data-action="pdf-preview#open"
+                    class="lg:hidden absolute inset-0 h-full w-full cursor-zoom-in"
+                    aria-label="<%= t('.maximize') %>"></button>
+          </div>
           <%= render "documents/pdf_overlay" %>
         </div>
       <% else %>
@@ -150,7 +158,7 @@
     <% end %>
 
     <% if @document.processed_pdf.attached? %>
-      <div data-controller="pdf-preview" class="bg-card rounded-xl shadow-sm border border-border overflow-hidden flex flex-col mt-6" style="min-height: 50vh">
+      <div data-controller="pdf-preview" class="bg-card rounded-xl shadow-sm border border-border overflow-hidden flex flex-col mt-6 min-h-[45vh] lg:min-h-[50vh]">
         <div class="flex items-center justify-between px-4 py-2 border-b border-border bg-muted shrink-0">
           <div class="min-w-0">
             <span class="text-sm font-medium text-foreground"><%= t(".processed_pdf_label") %></span>
@@ -173,10 +181,15 @@
             <% end %>
           </div>
         </div>
-        <iframe src="<%= file_document_path(@document, type: :processed) %>"
-                class="flex-1 w-full border-0"
-                title="<%= t('.processed_pdf_iframe_title') %>"
-                data-pdf-preview-target="iframe"></iframe>
+        <div class="relative flex-1">
+          <iframe src="<%= file_document_path(@document, type: :processed) %>"
+                  class="absolute inset-0 h-full w-full border-0"
+                  title="<%= t('.processed_pdf_iframe_title') %>"
+                  data-pdf-preview-target="iframe"></iframe>
+          <button type="button" data-action="pdf-preview#open"
+                  class="lg:hidden absolute inset-0 h-full w-full cursor-zoom-in"
+                  aria-label="<%= t('.maximize') %>"></button>
+        </div>
         <%= render "documents/pdf_overlay" %>
       </div>
     <% end %>
