@@ -16,6 +16,14 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Credit Note document type** — "Nota de Crédito" (NC) is now a first-class
+  document type instead of being filed under expense invoices. Documents the AI
+  recognises as credit notes are classified, labelled (en/pt/es/fr), and filtered
+  under Accounting as their own type, with a dedicated extraction schema
+  (credit-note number, original invoice number, amounts, IVA).
+
 ## [0.3.0] - 2026-06-28
 
 ### Added
