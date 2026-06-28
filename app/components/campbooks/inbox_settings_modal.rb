@@ -45,7 +45,7 @@ module Campbooks
         open: @open ? "" : nil,
         **@attrs
       ) do
-        div(class: "flex w-[calc(100vw-2rem)] max-w-4xl h-[85vh] max-h-[680px] bg-card text-card-foreground") do
+        div(class: "flex flex-col sm:flex-row w-[calc(100vw-2rem)] max-w-4xl h-[85vh] max-h-[680px] bg-card text-card-foreground") do
           sidebar
           content_pane
         end
@@ -60,7 +60,7 @@ module Campbooks
     end
 
     def sidebar
-      div(class: "w-48 flex-shrink-0 border-r border-border flex flex-col bg-muted/30") do
+      div(class: "w-full sm:w-48 flex-shrink-0 border-b sm:border-b-0 sm:border-r border-border flex flex-col bg-muted/30") do
         div(class: "px-4 py-3.5 border-b border-border flex items-center justify-between") do
           h2(class: "text-sm font-semibold text-foreground") { t(".title") }
           form(method: "dialog", class: "contents") do
@@ -74,7 +74,7 @@ module Campbooks
           end
         end
 
-        nav(class: "flex-1 overflow-y-auto p-2 space-y-0.5", aria: { label: t(".settings_sections_label") }) do
+        nav(class: "flex gap-1 overflow-x-auto scrollbar-none sm:flex-1 sm:flex-col sm:gap-0 sm:space-y-0.5 sm:overflow-y-auto p-2", aria: { label: t(".settings_sections_label") }) do
           nav_items.each { |item| nav_item(item) }
         end
       end
@@ -92,7 +92,7 @@ module Campbooks
           action: "click->inbox-settings-modal#setActive"
         },
         class: class_names(
-          "flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] cursor-pointer transition-colors",
+          "flex shrink-0 whitespace-nowrap items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] cursor-pointer transition-colors",
           "text-gray-600 hover:text-gray-900 hover:bg-gray-100/70 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/5",
           "aria-[current=page]:bg-accent-50 aria-[current=page]:text-accent-700 aria-[current=page]:font-medium",
           "dark:aria-[current=page]:bg-accent-500/10 dark:aria-[current=page]:text-accent-300"

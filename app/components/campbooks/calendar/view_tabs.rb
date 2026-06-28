@@ -10,9 +10,16 @@ module Campbooks
       end
 
       def view_template
-        div(class: "inline-flex items-center gap-1 rounded-lg bg-muted p-1 text-sm") do
-          calendar_tabs.each { |key, label, href| tab(key, label, href) }
-          tab("reminders", t("calendar.index.reminders"), helpers.reminders_path)
+        # Mobile-first: the segmented bar scrolls horizontally instead of
+        # overflowing the viewport. Five tabs don't fit below ~360px (and longer
+        # locales overflow even at 375px), so the whole page used to scroll
+        # sideways and clip the last tab. `w-max` keeps the pill background
+        # hugging every tab; the outer container clips and scrolls.
+        div(class: "overflow-x-auto scrollbar-none -mx-1 px-1") do
+          div(class: "inline-flex w-max items-center gap-1 rounded-lg bg-muted p-1 text-sm") do
+            calendar_tabs.each { |key, label, href| tab(key, label, href) }
+            tab("reminders", t("calendar.index.reminders"), helpers.reminders_path)
+          end
         end
       end
 
@@ -29,7 +36,7 @@ module Campbooks
         # (d/w/m/a) and the Cmd+K palette read; the reminders tab does not.
         data = %w[agenda day week month].include?(key) ? { "calendar-view": key } : {}
         a(href: href, data: data, class: class_names(
-          "rounded-md px-3 py-1.5 font-medium no-underline transition-colors",
+          "shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 font-medium no-underline transition-colors",
           @current == key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
         )) { label }
       end

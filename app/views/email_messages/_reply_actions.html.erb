@@ -2,20 +2,20 @@
   <%= render "email_messages/snooze_button", message: message %>
   <%= button_to compose_email_message_path(message, mode: "reply"), method: :post,
         form: { data: { turbo: true, turbo_frame: local_assigns.fetch(:turbo_frame, "_top") } },
-        class: "inline-flex items-center gap-1 px-2 py-1 text-[11px] text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors cursor-pointer border-0",
+        class: "inline-flex items-center gap-1 px-2.5 py-2 text-[11px] text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors cursor-pointer border-0",
         title: t(".reply_title") do %>
-    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
   <% end %>
   <%= button_to compose_email_message_path(message, mode: "reply_all"), method: :post,
         form: { data: { turbo: true, turbo_frame: local_assigns.fetch(:turbo_frame, "_top") } },
-        class: "inline-flex items-center gap-1 px-2 py-1 text-[11px] text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors cursor-pointer border-0",
+        class: "inline-flex items-center gap-1 px-2.5 py-2 text-[11px] text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors cursor-pointer border-0",
         title: t(".reply_all_title") do %>
-    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6m4 0l6 6m-6-6l6-6"/></svg>
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6m4 0l6 6m-6-6l6-6"/></svg>
   <% end %>
   <%= button_to compose_email_message_path(message, mode: "forward"), method: :post,
         form: { data: { turbo: true, turbo_frame: local_assigns.fetch(:turbo_frame, "_top") } },
-        class: "inline-flex items-center gap-1 px-2 py-1 text-[11px] text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors cursor-pointer border-0",
+        class: "inline-flex items-center gap-1 px-2.5 py-2 text-[11px] text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md transition-colors cursor-pointer border-0",
         title: t(".forward_title") do %>
-    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6"/></svg>
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6"/></svg>
   <% end %>
 </div>

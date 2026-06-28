@@ -109,7 +109,7 @@
             <!-- Header: "New Message" -->
             <div class="px-5 py-4 border-b border-gray-200 flex-shrink-0 flex items-center justify-between gap-2">
               <div class="flex items-center gap-2 min-w-0">
-                <%= link_to email_messages_path, data: { turbo_frame: "_top" }, class: "lg:hidden inline-flex items-center text-accent-600 flex-shrink-0" do %>
+                <%= link_to email_messages_path, data: { turbo_frame: "_top" }, class: "lg:hidden inline-flex items-center justify-center min-w-[40px] min-h-[40px] -ml-2 rounded-md text-accent-600 hover:bg-accent-50 flex-shrink-0" do %>
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                 <% end %>
                 <svg class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
