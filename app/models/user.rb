@@ -88,23 +88,20 @@ class User < ApplicationRecord
     readable_calendar_accounts.actively_scanning.exists?
   end
 
-  # ── Primary-nav attention dots ──────────────────────────────────────────────
-  # Per-section "last seen at", stored in the section_seen_at jsonb as
-  # { "mail" => "<iso8601>", ... }. Stamped on visit by the TracksSectionVisit
-  # controller concern; read by Navigation::Attention to decide each nav dot.
+  # ── Primary-nav attention dots (deprecated) ─────────────────────────────────
+  # Formerly tracked per-section "last seen at" timestamps for
+  # Navigation::Attention. Replaced by resource-state queries (2026-06-27).
+  # The section_seen_at column stays for now — harmless, allows instant
+  # rollback. Will be removed in a future release.
   SECTION_KEYS = %i[home mail calendar documents scout].freeze
 
-  # When the user last looked at a section. Falls back to created_at so a section
-  # never reads as "all new" before its first recorded visit (new accounts); the
-  # migration backfills existing users to ship-time.
+  # @deprecated No longer used by Navigation::Attention. Will be removed.
   def seen_section_at(section)
     raw = section_seen_at&.dig(section.to_s)
     raw ? Time.zone.parse(raw) : created_at
   end
 
-  # Stamp a section as seen now, clearing its nav dot. update_column keeps this
-  # cheap — a single column write, no validations/callbacks/updated_at — since it
-  # fires on every section visit.
+  # @deprecated No longer used by Navigation::Attention. Will be removed.
   def mark_section_seen!(section, at: Time.current)
     return unless SECTION_KEYS.include?(section.to_sym)
 

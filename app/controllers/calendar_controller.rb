@@ -3,7 +3,6 @@
 # toggle nested under calendar_accounts.
 class CalendarController < ApplicationController
   before_action :require_authentication
-  tracks_section_visit :calendar, only: :index
 
   VIEWS = %w[agenda day week month].freeze
   AGENDA_LIMIT = 100 # how many upcoming events the agenda lists from the anchor date
@@ -53,6 +52,10 @@ class CalendarController < ApplicationController
     else
       ScheduledEmail.none
     end
+
+    # Visiting the calendar clears its nav dot: stamp the pending reminders that
+    # drive it (Navigation::Attention#new_calendar?).
+    Reminder.accessible_to(Current.user).pending.where(viewed_at: nil).update_all(viewed_at: Time.current)
   end
 
   private

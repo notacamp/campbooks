@@ -50,7 +50,11 @@ major, minor, or patch change here.
   destination for a document type, approved documents are uploaded automatically
   unless you explicitly pause it. The checkbox label now reads "Upload
   automatically when approved." A migration flips the column default.
-
+- Sidebar navigation attention dots now reflect whether a section still has
+  something for you to look at — unread mail, new feed items, pending reminders,
+  documents awaiting review, or unread Scout replies — and clear when you handle
+  the resource from any surface (home feed, skim, mail, or Scout), rather than
+  being tied to when you last opened that section's page.
 
 ### Fixed
 
