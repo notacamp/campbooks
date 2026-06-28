@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-28
+
 ### Added
 
 - **Campbooks CLI + browser sign-in** — a new developer CLI (`campbooks`) drives
