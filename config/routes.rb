@@ -450,6 +450,10 @@ Rails.application.routes.draw do
   # even where the underlying model differs (EmailMessage).
   namespace :api do
     namespace :v1 do
+      # GET /api/v1/me — the identity behind the token (acting user + workspace +
+      # granted scopes). Needs only a valid token, so the CLI can confirm login.
+      get "me", to: "me#show"
+
       resources :emails, only: [ :index, :show, :create ], controller: "email_messages" do
         member do
           post :mark_read

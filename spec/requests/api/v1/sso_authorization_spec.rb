@@ -53,6 +53,18 @@ RSpec.describe "API v1 browser SSO (authorization_code + PKCE)", type: :request 
 
       expect(response).to redirect_to("/session/new")
     end
+
+    it "widens the CSP form-action to the loopback so the consent redirect isn't blocked" do
+      sign_in(user)
+
+      get oauth_authorization_path, params: authorize_params
+
+      # Browsers enforce form-action across the consent POST's 302 to the CLI's
+      # loopback callback; without this the redirect is blocked (regression guard).
+      csp = response.headers["Content-Security-Policy"].to_s
+      expect(csp).to include("form-action")
+      expect(csp).to include("http://127.0.0.1:*")
+    end
   end
 
   describe "the full PKCE code exchange" do

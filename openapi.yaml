@@ -172,6 +172,45 @@ paths:
                 $ref: "#/components/schemas/Error"
 
   # ---------------------------------------------------------------- Emails ----
+  /api/v1/me:
+    get:
+      tags: [Identity]
+      summary: Identity behind the token
+      description: >-
+        The acting user, their workspace, and the token's granted scopes.
+        Requires only a valid token (any scope) — useful for confirming who a
+        token acts as. Used by `campbooks whoami`.
+      operationId: getMe
+      security:
+        - oauth2: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        type: object
+                        properties:
+                          id: { type: integer }
+                          name: { type: string }
+                          email: { type: string }
+                      workspace:
+                        type: object
+                        properties:
+                          id: { type: integer }
+                          name: { type: string }
+                      scopes:
+                        type: array
+                        items: { type: string }
+        '401':
+          description: Missing or invalid token.
+
   /api/v1/emails:
     get:
       tags: [Emails]
