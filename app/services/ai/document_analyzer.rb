@@ -37,7 +37,8 @@ module Ai
       6. For a "Nota de Lançamento" or single bank transaction record, use "bank_journal_entry".
       7. For an "Apolice de Seguro" or insurance policy, use "insurance_policy".
       8. For a "Certidão", "Declaração", or certificate, use "certificate".
-      9. Fill metadata fields according to the schema for the type you selected.
+      9. For a "Nota de Crédito" (NC) — a credit note that reverses, corrects, or refunds a prior invoice — use "credit_note", NOT "expense_invoice".
+      10. Fill metadata fields according to the schema for the type you selected.
     PROMPT
 
     def initialize(document)
@@ -315,7 +316,7 @@ module Ai
       "extrato_bancario" => "bank_statement",
       "movimento" => "bank_journal_entry",
       "lancamento" => "bank_journal_entry",
-      "nota_de_credito" => "expense_invoice",
+      "nota_de_credito" => "credit_note",
       "apolice_seguro" => "insurance_policy",
       "apolice" => "insurance_policy",
       "certidao" => "certificate",
@@ -330,7 +331,7 @@ module Ai
       "simulacao" => "insurance_policy",
       # English aliases / close matches
       "invoice" => "expense_invoice",
-      "credit_note" => "expense_invoice",
+      "credit_note" => "credit_note",
       "financial_statement" => "bank_statement",
       "bank_document" => "bank_statement",
       "balance_sheet" => "bank_statement",

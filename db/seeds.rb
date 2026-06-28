@@ -100,6 +100,22 @@ DOCUMENT_TYPES = {
       currency:       { type: "string", description: "Currency code, default EUR" }
     }
   },
+  "credit_note"       => {
+    category: "accounting",
+    color: "#ef4444",
+    prompt: "A credit note (Nota de Crédito / NC) that reverses, corrects, or refunds a prior invoice. Issued by a supplier to credit an amount back; references the original invoice.",
+    schema: {
+      vendor_name:    { type: "string", description: "Name of the issuer (supplier/vendor)" },
+      vendor_nif:     { type: "string", description: "9-digit NIF of the issuer" },
+      credit_note_number: { type: "string", description: "Credit note number/identifier" },
+      original_invoice_number: { type: "string", description: "Number of the original invoice being credited/corrected" },
+      amount_cents:   { type: "integer", description: "Credited amount in cents (e.g. €123.45 = 12345)" },
+      tax_amount_cents: { type: "integer", description: "IVA tax amount in cents" },
+      tax_rate:       { type: "number", description: "IVA rate (e.g. 23.0 for 23%)" },
+      document_date:  { type: "string", description: "Document date YYYY-MM-DD or null" },
+      currency:       { type: "string", description: "Currency code, default EUR" }
+    }
+  },
   "bank_statement"    => {
     category: "accounting",
     color: "#8b5cf6",
