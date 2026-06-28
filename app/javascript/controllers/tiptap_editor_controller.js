@@ -8,17 +8,26 @@ import Image from "@tiptap/extension-image"
 import TextAlign from "@tiptap/extension-text-align"
 import TextStyle from "@tiptap/extension-text-style"
 import { Color } from "@tiptap/extension-color"
+import Highlight from "@tiptap/extension-highlight"
+import Table from "@tiptap/extension-table"
+import TableRow from "@tiptap/extension-table-row"
+import TableCell from "@tiptap/extension-table-cell"
+import TableHeader from "@tiptap/extension-table-header"
+import FontFamily from "@tiptap/extension-font-family"
+import Superscript from "@tiptap/extension-superscript"
+import Subscript from "@tiptap/extension-subscript"
 
 // Rich-text editor backing every compose surface (reply drawer, new-message
-// page) and the signature editor. The markup + toolbar live in
-// Campbooks::RichTextEditor so there is one source of truth; this controller
-// owns behaviour: it mounts TipTap, mirrors the HTML into a hidden <input> on
-// every change, reflects the active marks/nodes back onto the toolbar buttons,
-// and drives the link/image popovers + image upload.
+// page), the signature editor, and the document writing tool. The markup +
+// toolbar live in Campbooks::RichTextEditor so there is one source of truth;
+// this controller owns behaviour: it mounts TipTap, mirrors the HTML into a
+// hidden <input> on every change, reflects the active marks/nodes back onto
+// the toolbar buttons, and drives the link/image popovers + image upload.
 export default class extends Controller {
   static targets = [
     "editor", "input", "toolbar", "blockType", "colorInput",
-    "linkPopover", "linkInput", "imagePopover", "imageInput", "imageError", "fileInput"
+    "linkPopover", "linkInput", "imagePopover", "imageInput", "imageError", "fileInput",
+    "highlightInput", "fontFamilySelect"
   ]
   static values = {
     content: String,
@@ -27,7 +36,12 @@ export default class extends Controller {
     heading: { type: Boolean, default: true },
     codeBlock: { type: Boolean, default: true },
     blockquote: { type: Boolean, default: true },
-    uploadUrl: String
+    uploadUrl: String,
+    tables: { type: Boolean, default: false },
+    fontFamily: { type: Boolean, default: false },
+    highlight: { type: Boolean, default: false },
+    superScript: { type: Boolean, default: false },
+    subScript: { type: Boolean, default: false }
   }
 
   connect() {
@@ -49,7 +63,17 @@ export default class extends Controller {
       Image.configure({ inline: false, allowBase64: true, HTMLAttributes: { class: "rte-img" } }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       TextStyle,
-      Color
+      Color,
+      ...(this.highlightValue ? [Highlight.configure({ multicolor: true })] : []),
+      ...(this.tablesValue ? [
+        Table.configure({ resizable: true }),
+        TableRow,
+        TableCell,
+        TableHeader
+      ] : []),
+      ...(this.fontFamilyValue ? [FontFamily] : []),
+      ...(this.superScriptValue ? [Superscript] : []),
+      ...(this.subScriptValue ? [Subscript] : [])
     ]
 
     this.editor = new Editor({
@@ -139,6 +163,39 @@ export default class extends Controller {
   undo() { this.editor?.chain().focus().undo().run() }
   redo() { this.editor?.chain().focus().redo().run() }
   clearFormatting() { this.editor?.chain().focus().unsetAllMarks().clearNodes().run() }
+
+  // ── Tables ────────────────────────────────────────────────────
+  insertTable() {
+    this.editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+  }
+  addRowBefore()    { this.editor?.chain().focus().addRowBefore().run() }
+  addRowAfter()     { this.editor?.chain().focus().addRowAfter().run() }
+  deleteRow()       { this.editor?.chain().focus().deleteRow().run() }
+  addColBefore()    { this.editor?.chain().focus().addColumnBefore().run() }
+  addColAfter()     { this.editor?.chain().focus().addColumnAfter().run() }
+  deleteCol()       { this.editor?.chain().focus().deleteColumn().run() }
+  toggleHeaderCell(){ this.editor?.chain().focus().toggleHeaderCell().run() }
+
+  // ── Font family ───────────────────────────────────────────────
+  setFontFamily(event) {
+    const value = event.target.value
+    if (value) this.editor?.chain().focus().setFontFamily(value).run()
+    else this.editor?.chain().focus().unsetFontFamily().run()
+  }
+
+  // ── Highlight ─────────────────────────────────────────────────
+  setHighlight(event) {
+    const color = event.target.value
+    if (color && color !== "#ffffff") {
+      this.editor?.chain().focus().toggleHighlight({ color }).run()
+    } else {
+      this.editor?.chain().focus().unsetHighlight().run()
+    }
+  }
+
+  // ── Superscript / Subscript ───────────────────────────────────
+  toggleSuperscript() { this.editor?.chain().focus().toggleSuperscript().run() }
+  toggleSubscript()   { this.editor?.chain().focus().toggleSubscript().run() }
 
   // ── Link popover ────────────────────────────────────────────
   openLink(event) {
@@ -240,6 +297,18 @@ export default class extends Controller {
     if (this.hasColorInputTarget) {
       const color = this.editor.getAttributes("textStyle").color
       if (color) this.colorInputTarget.value = this._toHex(color)
+    }
+
+    // Toggle table-edit buttons visibility based on whether cursor is in a table
+    const inTable = this.editor.isActive("table")
+    this.toolbarTarget.querySelectorAll("[data-rte-table-only]").forEach((el) => {
+      el.classList.toggle("hidden", !inTable)
+    })
+
+    // Update font-family select value
+    if (this.hasFontFamilySelectTarget) {
+      const font = this.editor.getAttributes("textStyle").fontFamily || ""
+      this.fontFamilySelectTarget.value = font
     }
   }
 

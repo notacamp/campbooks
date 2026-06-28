@@ -1,0 +1,24 @@
+<% content_for :main_class, "px-4 sm:px-6 lg:px-8 py-6" %>
+
+<%= render Campbooks::PageHeader.new(title: @document.title) do |header| %>
+  <% header.with_actions do %>
+    <%= render Campbooks::Button.new(variant: :outline, size: :sm, href: edit_written_document_path(@document)) { t(".edit") } %>
+    <%= link_to documents_path,
+        class: "text-sm text-muted-foreground hover:text-foreground transition-colors" do %>
+      ← <%= t(".back_to_documents") %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<div class="text-sm text-muted-foreground mb-6">
+  <%= t(".created_at", date: l(@document.created_at.to_date, format: :long)) %>
+  <% if @document.author %>
+    · <%= t(".by", name: @document.author.name) %>
+  <% end %>
+</div>
+
+<article class="bg-card rounded-xl border border-gray-200 p-6 sm:p-8 overflow-x-auto">
+  <div class="authored-content prose prose-sm max-w-none">
+    <%= render_authored_content(@document.html_content) %>
+  </div>
+</article>
