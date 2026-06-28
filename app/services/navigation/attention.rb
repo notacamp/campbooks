@@ -1,7 +1,8 @@
 module Navigation
   # Decides the "action required" dot for each primary-nav section: true when a
-  # section has content newer than the user last looked at it
-  # (User#seen_section_at), cleared on visit by the TracksSectionVisit concern.
+  # section has resources the user hasn't viewed yet — unskimmed emails, unseen
+  # feed items, unviewed pending reminders, unviewed docs needing review, unread
+  # Scout replies.
   #
   # One cheap EXISTS per section, memoized for the request. Fails closed — a nil
   # user lights no dots — mirroring the *.accessible_to permission gates.
@@ -32,45 +33,37 @@ module Navigation
       end
     end
 
-    def since(section)
-      @user.seen_section_at(section)
-    end
-
-    # Active feed items (not dismissed/acted) materialized since the last visit.
+    # Active feed items (not dismissed/acted) the user hasn't seen yet.
+    # seen_at is stamped when the item scrolls into view on the home feed.
     def new_feed?
-      @user.feed_items.active.where("feed_items.created_at > ?", since(:home)).exists?
+      @user.feed_items.active.where(seen_at: nil).exists?
     end
 
-    # Mail that arrived (on a readable account) since the last inbox visit.
+    # Unviewed mail on readable accounts. viewed_at is stamped when the user
+    # opens an email or processes it via Skim — regardless of which surface.
     def new_mail?
-      EmailMessage.accessible_to(@user)
-                  .where("email_messages.received_at > ?", since(:mail))
-                  .exists?
+      EmailMessage.accessible_to(@user).where(viewed_at: nil).exists?
     end
 
-    # New events OR new pending reminders since the last calendar visit. Reminders
-    # have no nav item of their own — they ride inside the Calendar dot.
+    # Pending reminders the user hasn't viewed yet. viewed_at is stamped when
+    # reminders appear on the Calendar or Reminders page.
     def new_calendar?
-      ts = since(:calendar)
-      CalendarEvent.accessible_to(@user).visible
-                   .where("calendar_events.created_at > ?", ts).exists? ||
-        Reminder.accessible_to(@user).pending
-                .where("reminders.created_at > ?", ts).exists?
+      Reminder.accessible_to(@user).pending.where(viewed_at: nil).exists?
     end
 
-    # Workspace documents (shared across the workspace) added since the last visit.
+    # Documents needing review that the user hasn't viewed yet. viewed_at is
+    # stamped when documents appear on the Documents index.
     def new_documents?
       return false unless @user.workspace
 
-      @user.workspace.documents.where("documents.created_at > ?", since(:documents)).exists?
+      @user.workspace.documents.needs_review.where(viewed_at: nil).exists?
     end
 
-    # New Scout replies since the last visit — AI-authored messages on the user's
-    # own visible threads (proactive briefings aren't persisted, so they don't dot).
+    # Unviewed AI messages on the user's scout-visible threads. viewed_at
+    # is stamped when the user visits Scout.
     def new_scout?
-      AgentMessage.where(agent_thread: @user.agent_threads.scout_visible, author_type: :ai)
-                  .where("agent_messages.created_at > ?", since(:scout))
-                  .exists?
+      AgentMessage.where(agent_thread: @user.agent_threads.scout_visible,
+                         author_type: :ai, viewed_at: nil).exists?
     end
   end
 end

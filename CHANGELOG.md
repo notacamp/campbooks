@@ -33,6 +33,14 @@ major, minor, or patch change here.
   locally as documents (the same way received attachments are), and the AI
   biases their classification toward revenue/outgoing types.
 
+### Changed
+
+- Sidebar navigation attention dots now reflect whether a section still has
+  something for you to look at — unread mail, new feed items, pending reminders,
+  documents awaiting review, or unread Scout replies — and clear when you handle
+  the resource from any surface (home feed, skim, mail, or Scout), rather than
+  being tied to when you last opened that section's page.
+
 ### Fixed
 
 - Avatar stacks (facepiles) in the email list and board view now show the
