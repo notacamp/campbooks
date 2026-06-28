@@ -16,6 +16,18 @@ module Oauth
   class AuthorizationsController < Doorkeeper::AuthorizationsController
     layout "doorkeeper"
 
+    # On approval the consent form POSTs here and the server 302s to the CLI's
+    # loopback callback (http://127.0.0.1:<port>/callback, RFC 8252). Browsers
+    # enforce `form-action` across that redirect chain, so the global policy
+    # (:self + the mailbox OAuth providers) would block it. Widen form-action to
+    # the loopback origins on this controller only — the sole form here is the
+    # consent form, so this can't enable cross-origin form posting elsewhere.
+    content_security_policy do |policy|
+      policy.form_action :self,
+                         "http://127.0.0.1:*", "http://localhost:*",
+                         "https://127.0.0.1:*", "https://localhost:*"
+    end
+
     rescue_from Doorkeeper::Errors::DoorkeeperError, with: :render_authorize_error
 
     private
