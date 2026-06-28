@@ -2,7 +2,7 @@ class EmailMessages::BulkController < ApplicationController
   before_action :require_authentication
 
   def create
-    email_ids = Array(params[:email_ids]).map(&:to_i).uniq
+    email_ids = Array(params[:email_ids]).map(&:to_s).reject(&:blank?).uniq
     return render_error(t(".no_emails_selected")) if email_ids.empty?
 
     # Expand to all messages in the selected threads

@@ -252,7 +252,7 @@ class DocumentsController < ApplicationController
   end
 
   def merge
-    ids = params[:ids].to_s.split(",").map(&:to_i).uniq
+    ids = params[:ids].to_s.split(",").map(&:strip).reject(&:blank?).uniq
     @docs = Current.workspace.documents.includes(:classification, :email_messages).where(id: ids).order(:id)
 
     if @docs.size < 2
@@ -262,7 +262,7 @@ class DocumentsController < ApplicationController
 
   def perform_merge
     keep = Current.workspace.documents.find(params[:keep_id])
-    merge_ids = Array(params[:merge_ids]).map(&:to_i) - [ keep.id ]
+    merge_ids = Array(params[:merge_ids]).map(&:to_s) - [ keep.id.to_s ]
     merged = 0
 
     merge_ids.each do |id|
@@ -308,7 +308,7 @@ class DocumentsController < ApplicationController
   # True when these params move the document to a different classification.
   def reclassifying?(permitted)
     new_id = permitted[:document_type_id]
-    new_id.present? && new_id.to_i != @document.document_type_id
+    new_id.present? && new_id.to_s != @document.document_type_id.to_s
   end
 
   # Human signed off — recount the review badge and run the post-approval drive pushes

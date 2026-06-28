@@ -219,10 +219,10 @@ class WorkflowsController < ApplicationController
     steps = workflow_params[:steps_attributes]
     return false if steps.blank?
 
-    sendable_ids = Current.user.sendable_email_accounts.ids
+    sendable_ids = Current.user.sendable_email_accounts.ids.map(&:to_s)
     steps.values.any? do |attrs|
       account_id = attrs.dig(:config, :email_account_id)
-      account_id.present? && sendable_ids.exclude?(account_id.to_i)
+      account_id.present? && sendable_ids.exclude?(account_id.to_s)
     end
   end
 
