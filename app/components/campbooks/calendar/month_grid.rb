@@ -13,7 +13,7 @@ module Campbooks
 
       def view_template
         div(class: "rounded-xl border border-border overflow-hidden bg-card",
-            data: { controller: "calendar-create", "calendar-create-mode-value": "month" }) do
+            data: { controller: "calendar-create calendar-month-dnd", "calendar-create-mode-value": "month" }) do
           div(class: "grid grid-cols-7 border-b border-border") do
             weekday_names.each do |name|
               div(class: "px-1 py-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400 text-center truncate") { name }
@@ -61,7 +61,11 @@ module Campbooks
         scheduled = scheduled_by_day[day] || []
 
         div(
-          data: { "new-url": helpers.new_calendar_event_path(date: day.iso8601, view: "month") },
+          data: {
+            "new-url": helpers.new_calendar_event_path(date: day.iso8601, view: "month"),
+            "calendar-month-dnd-target": "day",
+            "date": day.iso8601
+          },
           class: class_names(
             "min-h-[84px] sm:min-h-[104px] cursor-pointer border-b border-r border-border p-1 transition-colors hover:bg-muted/20 [&:nth-child(7n)]:border-r-0",
             in_month ? "bg-card" : "bg-muted/30"
@@ -91,8 +95,20 @@ module Campbooks
 
       def render_chip(event)
         color = event.display_color
+        # Writable events become drag targets (cross-day reschedule); read-only
+        # events stay plain links, matching DayGrid/WeekTimeGrid.
+        drag = event.calendar.is_writable
         a(href: helpers.edit_calendar_event_path(event),
-          data: { "calendar-event-modal-open": helpers.edit_calendar_event_path(event) },
+          data: {
+            "calendar-event-modal-open": helpers.edit_calendar_event_path(event)
+          }.merge(drag ? {
+            "calendar-month-dnd-target": "event",
+            "event-id": event.id,
+            # App-zone wall-clock (no zone) so the client shifts only the date and the
+            # server re-parses the same wall-clock — avoids a browser-vs-app TZ skew.
+            "start-at": event.start_at.strftime("%Y-%m-%dT%H:%M"),
+            "end-at": (event.end_at || event.start_at).strftime("%Y-%m-%dT%H:%M")
+          } : {}),
           class: "block truncate rounded px-1 py-0.5 text-[10px] sm:text-[11px] leading-tight",
           style: "background-color: #{color}; color: #{contrast_on(color)}",
           title: event.title) do

@@ -1,0 +1,20 @@
+<%# locals: type %>
+<%= turbo_frame_tag dom_id(type) do %>
+  <div class="flex items-center gap-3 py-2.5 px-1 border-b border-border last:border-0">
+    <%= render(Campbooks::ColorDot.new(color: type.color)) %>
+    <div class="min-w-0 flex-1">
+      <span class="text-[13px] font-medium text-foreground truncate"><%= type.name %></span>
+      <% if type.prompt.present? %>
+        <p class="text-xs text-muted-foreground truncate mt-0.5"><%= type.prompt.truncate(90) %></p>
+      <% end %>
+    </div>
+    <div class="flex items-center gap-1 flex-shrink-0">
+      <%= link_to t("shared.actions.edit"), edit_event_type_path(type),
+            data: { turbo_frame: "event_type_form" },
+            class: "px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:hover:bg-white/5 rounded cursor-pointer transition-colors" %>
+      <%= button_to t("shared.actions.delete"), event_type_path(type), method: :delete,
+            data: { turbo_confirm: t(".delete_confirm", name: type.name) },
+            class: "px-2 py-0.5 text-xs font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 rounded cursor-pointer transition-colors" %>
+    </div>
+  </div>
+<% end %>

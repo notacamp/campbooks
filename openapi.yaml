@@ -172,6 +172,45 @@ paths:
                 $ref: "#/components/schemas/Error"
 
   # ---------------------------------------------------------------- Emails ----
+  /api/v1/me:
+    get:
+      tags: [Identity]
+      summary: Identity behind the token
+      description: >-
+        The acting user, their workspace, and the token's granted scopes.
+        Requires only a valid token (any scope) — useful for confirming who a
+        token acts as. Used by `campbooks whoami`.
+      operationId: getMe
+      security:
+        - oauth2: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        type: object
+                        properties:
+                          id: { type: integer }
+                          name: { type: string }
+                          email: { type: string }
+                      workspace:
+                        type: object
+                        properties:
+                          id: { type: integer }
+                          name: { type: string }
+                      scopes:
+                        type: array
+                        items: { type: string }
+        '401':
+          description: Missing or invalid token.
+
   /api/v1/emails:
     get:
       tags: [Emails]
@@ -1687,9 +1726,43 @@ components:
   securitySchemes:
     oauth2:
       type: oauth2
-      description: OAuth 2.0 client-credentials grant. Send the issued token as a bearer token.
+      description: >-
+        OAuth 2.0. Use the **client-credentials** grant for your own apps and
+        scripts (mint a client in Settings → API access). The
+        **authorization-code + PKCE** grant powers browser sign-in for the
+        Campbooks CLI. Either way, send the issued token as a bearer token.
       flows:
         clientCredentials:
+          tokenUrl: https://your-campbooks-host/api/oauth/token
+          scopes:
+            emails:read: Read email messages, threads, and folders
+            emails:write: Mark emails read/unread
+            emails:send: Compose, send, and reply to email
+            documents:read: List and download documents
+            documents:write: Upload, update, approve, reject, and reclassify documents
+            contacts:read: Read contacts
+            contacts:write: Update contacts and change their state (star, block, allow)
+            tags:read: List tags
+            tags:write: Add and remove tags on emails
+            document_types:read: List document types
+            scout:read: Read Scout chat threads and messages
+            scout:write: Create Scout threads and send messages
+            scheduled_emails:read: List and read scheduled emails
+            scheduled_emails:write: Schedule, update, and cancel emails
+            calendar:read: Read calendar events
+            calendar:write: Create, update, RSVP, and delete calendar events
+            reminders:read: Read AI reminders
+            reminders:write: Confirm, dismiss, and snooze reminders
+            folders:read: List folders and their contents
+            folders:write: File and unfile documents in folders
+        authorizationCode:
+          description: >-
+            Browser SSO used by the Campbooks CLI (`campbooks login`). The
+            first-party public client `campbooks-cli` (PKCE required) opens a
+            browser; the user signs in and the issued token acts as that user.
+            Not for third-party apps — register a client-credentials client in
+            Settings → API access instead.
+          authorizationUrl: https://your-campbooks-host/api/oauth/authorize
           tokenUrl: https://your-campbooks-host/api/oauth/token
           scopes:
             emails:read: Read email messages, threads, and folders
