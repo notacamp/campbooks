@@ -17,7 +17,11 @@ major, minor, or patch change here.
 ## [Unreleased]
 
 ### Added
-
+- **Credit Note document type** — "Nota de Crédito" (NC) is now a first-class
+  document type instead of being filed under expense invoices. Documents the AI
+  recognises as credit notes are classified, labelled (en/pt/es/fr), and filtered
+  under Accounting as their own type, with a dedicated extraction schema
+  (credit-note number, original invoice number, amounts, IVA).
 - **Scout can now think.** The global Scout chat shows a collapsible reasoning
   trace and the tools it ran ("Searched email → 12 results") above each answer,
   using the model's native reasoning where the configured model supports it

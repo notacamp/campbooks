@@ -69,6 +69,7 @@ fr:
           certificate: Certificat
           contract: Contrat
           correspondence: Correspondance
+          credit_note: Note de crédit
           expense_invoice: Facture de dépense
           identification: Identification
           insurance_policy: Police d'assurance
