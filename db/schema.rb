@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_28_010000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_28_020002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -991,6 +991,51 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_010000) do
     t.index ["workspace_id"], name: "index_people_on_workspace_id"
   end
 
+  create_table "pipeline_memberships", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "current_stage_id"
+    t.datetime "entered_at"
+    t.bigint "item_id", null: false
+    t.string "item_type", null: false
+    t.datetime "last_moved_at"
+    t.bigint "pipeline_id", null: false
+    t.integer "position", default: 0, null: false
+    t.jsonb "stage_history", default: [], null: false
+    t.datetime "updated_at", null: false
+    t.index ["current_stage_id"], name: "index_pipeline_memberships_on_current_stage_id"
+    t.index ["item_type", "item_id"], name: "idx_plm_on_item"
+    t.index ["pipeline_id", "item_type", "item_id"], name: "idx_plm_on_pipeline_and_item", unique: true
+    t.index ["pipeline_id"], name: "index_pipeline_memberships_on_pipeline_id"
+  end
+
+  create_table "pipeline_stages", force: :cascade do |t|
+    t.string "color", default: "#6366f1", null: false
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.boolean "is_terminal", default: false, null: false
+    t.string "name", null: false
+    t.bigint "pipeline_id", null: false
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+    t.index ["pipeline_id", "name"], name: "index_pipeline_stages_on_pipeline_id_and_name", unique: true
+    t.index ["pipeline_id", "position"], name: "index_pipeline_stages_on_pipeline_id_and_position"
+    t.index ["pipeline_id"], name: "index_pipeline_stages_on_pipeline_id"
+  end
+
+  create_table "pipelines", force: :cascade do |t|
+    t.integer "applies_to", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "icon", default: "git-branch", null: false
+    t.string "name", null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.bigint "workspace_id", null: false
+    t.index ["workspace_id", "name"], name: "index_pipelines_on_workspace_id_and_name", unique: true
+    t.index ["workspace_id", "position"], name: "index_pipelines_on_workspace_id_and_position"
+    t.index ["workspace_id"], name: "index_pipelines_on_workspace_id"
+  end
+
   create_table "recovery_codes", force: :cascade do |t|
     t.string "code_digest", null: false
     t.datetime "created_at", null: false
@@ -1558,6 +1603,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_010000) do
   add_foreign_key "organization_memberships", "people"
   add_foreign_key "organizations", "workspaces"
   add_foreign_key "people", "workspaces"
+  add_foreign_key "pipeline_memberships", "pipeline_stages", column: "current_stage_id", on_delete: :nullify
+  add_foreign_key "pipeline_memberships", "pipelines"
+  add_foreign_key "pipeline_stages", "pipelines"
+  add_foreign_key "pipelines", "workspaces"
   add_foreign_key "recovery_codes", "users"
   add_foreign_key "reminders", "calendar_events"
   add_foreign_key "reminders", "users", column: "confirmed_by_id"

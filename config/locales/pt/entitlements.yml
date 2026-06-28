@@ -57,6 +57,7 @@ pt:
       emails_synced: Emails sincronizados
       managed_ai: Campbooks AI
       notifications: Notificações
+      pipelines: Pipelines
       scout: Scout
       workflow_executions: Execuções de fluxo
       workflows: Fluxos de trabalho

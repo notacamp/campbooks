@@ -1,0 +1,6 @@
+<%# Re-rendered on its own by the membership controller's Turbo Streams, so the
+    board refreshes in place after items are added/removed without touching the
+    open picker. %>
+<%= turbo_frame_tag "pipeline_board" do %>
+  <%= render(Campbooks::Pipeline::Board.new(pipeline: pipeline, columns: columns)) %>
+<% end %>

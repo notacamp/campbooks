@@ -1,0 +1,6 @@
+<%# Refresh the board (the new card appears) and drop the row from the still-open
+    picker so the user can keep adding. %>
+<%= turbo_stream.replace "pipeline_board" do %>
+  <%= render "pipeline_board/board_frame", pipeline: @pipeline, columns: @columns %>
+<% end %>
+<%= turbo_stream.remove dom_id(@item, :picker) %>

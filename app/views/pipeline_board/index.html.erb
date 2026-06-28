@@ -1,0 +1,6 @@
+<% content_for :main_class, "px-3 py-4 sm:px-4 lg:px-6" %>
+
+<%= render "pipeline_board/board_frame", pipeline: @pipeline, columns: @columns %>
+
+<%# Mount point for the "add items" modal (loaded on demand from the board). %>
+<%= turbo_frame_tag "pipeline_picker" %>

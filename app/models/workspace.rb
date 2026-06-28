@@ -18,6 +18,7 @@ class Workspace < ApplicationRecord
   has_many :exports, dependent: :destroy
   has_many :document_templates, dependent: :destroy
   has_many :workflows, dependent: :destroy
+  has_many :pipelines, dependent: :destroy
   has_many :connections, dependent: :destroy
   has_many :feed_items, dependent: :delete_all
   has_many :events, dependent: :delete_all

@@ -288,6 +288,18 @@ Rails.application.routes.draw do
       resource :calendars, only: [ :show ], controller: "calendars"
       resources :connections, only: [ :index, :new, :create, :edit, :update, :destroy ]
     end
+
+    resources :pipelines, except: [ :show ]
+  end
+
+  # Pipelines kanban board (outside Settings).
+  resources :pipelines, only: [] do
+    member do
+      get :board, to: "pipeline_board#index"
+      post :move, to: "pipeline_board#move"
+    end
+    # Add/remove documents & emails to the board (the item picker).
+    resources :memberships, only: [ :new, :create, :destroy ], controller: "pipeline_memberships"
   end
 
   resources :document_templates, only: [] do

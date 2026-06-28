@@ -57,6 +57,7 @@ es:
       emails_synced: Correos sincronizados
       managed_ai: Campbooks AI
       notifications: Notificaciones
+      pipelines: Pipelines
       scout: Scout
       workflow_executions: Ejecuciones de flujo
       workflows: Flujos de trabajo
