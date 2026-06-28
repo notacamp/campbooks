@@ -59,6 +59,11 @@ major, minor, or patch change here.
   actions are never executed from model output — they're surfaced as one-click
   confirmations.
 
+### Security
+
+- Bump the transitive `crass` dependency to 1.0.7, clearing four CSS-parser
+  denial-of-service advisories (no behavior change).
+
 ## [0.3.0] - 2026-06-28
 
 ### Added
