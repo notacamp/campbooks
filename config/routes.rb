@@ -269,6 +269,10 @@ Rails.application.routes.draw do
       end
     end
 
+    resources :document_templates, except: :show do
+      member { post :regenerate }
+    end
+
     namespace :integrations do
       root to: "index#show"
       resource :notion, only: [ :show, :update ], controller: "notion"
@@ -284,6 +288,10 @@ Rails.application.routes.draw do
       resource :calendars, only: [ :show ], controller: "calendars"
       resources :connections, only: [ :index, :new, :create, :edit, :update, :destroy ]
     end
+  end
+
+  resources :document_templates, only: [] do
+    member { get :fill; post :preview; post :send_email }
   end
 
   # Inbox settings — the gear-icon management modal on the email page. Each

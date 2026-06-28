@@ -59,6 +59,7 @@ en:
       workflow_executions: Workflow runs
       organizations: Organizations
       workflows: Workflows
+      document_templates: Document templates
   navigation:
     settings:
       items:

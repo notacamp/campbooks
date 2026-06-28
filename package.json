@@ -1,0 +1,8 @@
+{
+  "name": "campbooks",
+  "private": true,
+  "description": "Optional Node dependencies. puppeteer-core drives the system Chromium for the Document Templates PDF renderer (Grover). Installed only when the image is built with --build-arg INSTALL_PDF_BROWSER=1; the rest of the app uses importmap and needs no Node build step.",
+  "dependencies": {
+    "puppeteer-core": "^23.0.0"
+  }
+}

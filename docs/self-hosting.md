@@ -172,6 +172,25 @@ The interactive Drive export uses the **full `drive` scope**, which is a Google
 4. Set `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, and `ENABLE_MICROSOFT=1`
    (the last reveals the Microsoft sign-in + "Connect Microsoft 365" surfaces).
 
+### Document templates (AI-generated PDFs)
+
+> **Not production-ready — disabled by default.** Hidden unless
+> `ENABLE_DOCUMENT_TEMPLATES=1`. Users describe a document, AI generates the HTML
+> template, then they fill in variables and email it as a PDF attachment.
+
+PDF rendering uses headless Chromium (via Grover/Puppeteer), which the default
+image does **not** bundle, to keep it lean. To enable it, build the image with the
+browser layer, then turn on the flag:
+
+```bash
+docker build --build-arg INSTALL_PDF_BROWSER=1 -t campbooks .
+# then set ENABLE_DOCUMENT_TEMPLATES=1 in your .env
+```
+
+Without the browser layer the feature degrades gracefully — the app stays up and
+shows a "PDF preview failed" message instead of erroring. On the hosted cloud,
+document templates are a paid-plan entitlement.
+
 ### Notion — "Send to Notion"
 
 1. [notion.so/my-integrations](https://www.notion.so/my-integrations) → new
