@@ -27,9 +27,9 @@ class MigratePrimaryKeysToUuid < ActiveRecord::Migration[8.1]
   # tables) and tables already on uuid (organizations, organization_memberships).
   DOMAIN_TABLES = %w[
     account_exports agent_messages agent_threads ai_adapters ai_configurations
-    audit_events beta_codes bug_reports calendar_account_users calendar_accounts
-    calendar_events calendar_sync_logs calendar_webhook_channels calendars
-    connections contact_email_aliases contact_tags contacts devices
+    audit_events authored_documents beta_codes bug_reports calendar_account_users
+    calendar_accounts calendar_events calendar_sync_logs calendar_webhook_channels
+    calendars connections contact_email_aliases contact_tags contacts devices
     document_drive_uploads document_email_messages document_templates
     document_types documents drive_folder_mappings email_account_signatures
     email_account_users email_accounts email_folders email_message_tags
@@ -37,9 +37,10 @@ class MigratePrimaryKeysToUuid < ActiveRecord::Migration[8.1]
     folder_memberships google_drive_accounts google_drive_configs identities
     invitations mail_folders mfa_email_challenges notification_preferences
     notifications notion_database_mappings notion_integrations notion_pages
-    oauth_applications people recovery_codes reminders search_chunks
-    search_records search_tag_embeddings sessions signatures signup_requests
-    skim_decisions tags templates thread_follows users webauthn_credentials
+    oauth_applications people pipeline_memberships pipeline_stages pipelines
+    recovery_codes reminders scheduled_emails search_chunks search_records
+    search_tag_embeddings sessions signatures signup_requests skim_decisions
+    tags templates thread_follows users webauthn_credentials
     workflow_execution_steps workflow_executions workflow_steps workflows
     workspaces zoho_drive_accounts
   ].freeze
@@ -69,6 +70,7 @@ class MigratePrimaryKeysToUuid < ActiveRecord::Migration[8.1]
     %w[feed_items subject_id],
     %w[folder_memberships folderable_id],
     %w[notifications notifiable_id],
+    %w[pipeline_memberships item_id],
     %w[reminders source_id],
     %w[search_chunks searchable_id],
     %w[search_records searchable_id]
@@ -80,7 +82,13 @@ class MigratePrimaryKeysToUuid < ActiveRecord::Migration[8.1]
   end
 
   def up
-    domain = DOMAIN_TABLES.to_set
+    # Convert only tables that exist. A schema can lag its migrations (a table
+    # added by a migration newer than the loaded schema — e.g. document_templates
+    # on a fresh v0.3.0 install), so guard every table op rather than assume all
+    # of DOMAIN_TABLES is present. On a migrated database every table is there.
+    tables = DOMAIN_TABLES.select { |t| connection.table_exists?(t) }
+    poly   = POLYMORPHIC.select { |t, _| connection.table_exists?(t) }
+    domain = tables.to_set
 
     refs = connection.tables.flat_map { |t| connection.foreign_keys(t) }
                      .select { |fk| domain.include?(fk.to_table) }
@@ -93,15 +101,15 @@ class MigratePrimaryKeysToUuid < ActiveRecord::Migration[8.1]
 
     # Snapshot indexes on every table we touch, so we can restore any dropped
     # when their underlying FK/polymorphic column is dropped.
-    touched = (DOMAIN_TABLES + refs.map(&:from_table) + POLYMORPHIC.map(&:first)).uniq
+    touched = (tables + refs.map(&:from_table) + poly.map(&:first)).uniq
     indexes_before = touched.index_with { |t| connection.indexes(t) }
 
     # NOT NULL flags to restore on rewritten reference columns.
     ref_not_null  = refs.index_with { |r| column_not_null?(r.from_table, r.column) }
-    poly_not_null = POLYMORPHIC.index_with { |(t, c)| column_not_null?(t, c) }
+    poly_not_null = poly.index_with { |(t, c)| column_not_null?(t, c) }
 
-    say_with_time "Add uuid columns to #{DOMAIN_TABLES.size} domain tables" do
-      DOMAIN_TABLES.each do |t|
+    say_with_time "Add uuid columns to #{tables.size} domain tables" do
+      tables.each do |t|
         add_column t, :id_new, :uuid, default: -> { "gen_random_uuid()" }, null: false
       end
     end
@@ -118,11 +126,11 @@ class MigratePrimaryKeysToUuid < ActiveRecord::Migration[8.1]
       end
     end
 
-    say_with_time "Backfill #{POLYMORPHIC.size} polymorphic columns" do
-      POLYMORPHIC.each do |table, col|
+    say_with_time "Backfill #{poly.size} polymorphic columns" do
+      poly.each do |table, col|
         add_column table, "#{col}_new", :uuid
         type_col = col.sub(/_id\z/, "_type")
-        DOMAIN_TABLES.each do |dt|
+        tables.each do |dt|
           execute(<<~SQL.squish)
             UPDATE #{qt table} AS child
             SET #{qc "#{col}_new"} = parent.id_new
@@ -139,7 +147,7 @@ class MigratePrimaryKeysToUuid < ActiveRecord::Migration[8.1]
     end
 
     say_with_time "Promote uuid columns to primary keys" do
-      DOMAIN_TABLES.each do |t|
+      tables.each do |t|
         execute "ALTER TABLE #{qt t} DROP CONSTRAINT #{qc "#{t}_pkey"}"
         remove_column t, :id           # also drops the owned bigint sequence
         rename_column t, :id_new, :id
@@ -148,13 +156,13 @@ class MigratePrimaryKeysToUuid < ActiveRecord::Migration[8.1]
     end
 
     say_with_time "Swap reference columns into place" do
-      poly_refs = POLYMORPHIC.map { |t, c| Ref.new(from_table: t, column: c) }
+      poly_refs = poly.map { |t, c| Ref.new(from_table: t, column: c) }
       (refs + poly_refs).each do |r|
         remove_column r.from_table, r.column
         rename_column r.from_table, "#{r.column}_new", r.column
       end
       refs.each { |r| change_column_null r.from_table, r.column, false if ref_not_null[r] }
-      POLYMORPHIC.each { |t, c| change_column_null t, c, false if poly_not_null[[ t, c ]] }
+      poly.each { |t, c| change_column_null t, c, false if poly_not_null[[ t, c ]] }
     end
 
     say_with_time "Recreate foreign-key constraints" do

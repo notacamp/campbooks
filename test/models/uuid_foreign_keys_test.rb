@@ -58,6 +58,7 @@ class UuidForeignKeysTest < ActiveSupport::TestCase
       %w[feed_items subject_id],
       %w[folder_memberships folderable_id],
       %w[notifications notifiable_id],
+      %w[pipeline_memberships item_id],
       %w[reminders source_id],
       %w[search_chunks searchable_id],
       %w[search_records searchable_id]
