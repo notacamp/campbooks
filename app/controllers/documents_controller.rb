@@ -1,6 +1,5 @@
 class DocumentsController < ApplicationController
   before_action :set_document, only: [ :show, :file, :rename, :update, :approve, :reject, :toggle_star, :reprocess, :push_to_notion, :push_to_drive, :push_to_zoho_drive ]
-  tracks_section_visit :documents, only: :index
 
   def index
     @document_types = Current.workspace.document_types.order(:name)
@@ -26,6 +25,11 @@ class DocumentsController < ApplicationController
     # points the right way. The setup hub itself now lives on home only.
     @has_any_documents = Current.workspace.documents.exists?
     @email_connected = Current.workspace.email_accounts.active.exists?
+
+    # Visiting Documents clears its nav attention dot: stamp viewed_at on the docs
+    # that drive the dot (needs_review), independent of the active filter. Matches
+    # Navigation::Attention#new_documents?.
+    Current.workspace.documents.needs_review.where(viewed_at: nil).update_all(viewed_at: Time.current)
 
     @pagy, @documents = pagy(documents)
 

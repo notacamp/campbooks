@@ -1,0 +1,69 @@
+---
+es:
+  document_templates:
+    fill:
+      title: "Rellenar plantilla: %{name}"
+      variables_heading: Variables
+      pdf_preview_heading: Vista previa PDF
+      no_preview_yet: Rellena las variables y haz clic en Vista previa PDF.
+      send_heading: Enviar por correo
+      to_address: Correo del destinatario
+      subject: Asunto
+      body: Cuerpo (opcional)
+      preview_pdf: Vista previa PDF
+      send: Enviar
+      sent: Plantilla enviada correctamente.
+      send_failed: Error al enviar la plantilla.
+      preview_ready: Vista previa PDF generada.
+      preview_failed: Error al generar la vista previa PDF.
+  settings:
+    document_templates:
+      index:
+        title: Plantillas de documentos
+        subtitle: Crea y gestiona plantillas de documentos reutilizables con contenido generado por IA.
+        new_template: Nueva plantilla
+        edit: Editar
+        fill: Rellenar y enviar
+        delete: Eliminar
+        delete_confirm: "¿Eliminar esta plantilla?"
+        empty_title: Sin plantillas todavía
+        empty_description: Crea tu primera plantilla de documento y deja que la IA genere el HTML.
+        variables_count:
+          one: "1 variable"
+          other: "%{count} variables"
+      new:
+        title: Nueva plantilla de documento
+        subtitle: Describe qué tipo de documento quieres y la IA generará el HTML.
+        save: Crear plantilla
+        cancel: Cancelar
+      edit:
+        title: "Editar: %{name}"
+        subtitle: Revisa y perfecciona la plantilla generada por IA o vuelve a generarla.
+        save: Guardar cambios
+        cancel: Volver a plantillas
+        variables_heading: Variables
+        variable_key: Clave
+        variable_label: Etiqueta
+        variable_type: Tipo
+        variable_required: Obligatorio
+        "yes": "Sí"
+        "no": "No"
+        generate_heading: Generación con IA
+        generate_description: Deja que la IA genere HTML a partir de tu descripción.
+        generate_button: Generar con IA
+        preview_send_heading: Vista previa y envío
+        preview_send_description: Abre la página de relleno para ver el PDF y enviarlo por correo.
+        open_fill_page: Abrir página de relleno
+      create:
+        created: Plantilla creada.
+      update:
+        updated: Plantilla actualizada.
+      destroy:
+        destroyed: Plantilla eliminada.
+      regenerate:
+        generating: Generación con IA iniciada.
+      form:
+        name_placeholder: "ej.: Recordatorio de factura"
+        description_hint: Describe qué tipo de documento quieres que la IA genere.
+        description_placeholder: "ej.: Un recordatorio de factura profesional para clientes."
+        html_content_hint: Edita el HTML directamente. Usa {{ variable_name }} para contenido dinámico.

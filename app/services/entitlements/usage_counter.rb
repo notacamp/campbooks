@@ -7,6 +7,7 @@ module Entitlements
     COUNTERS = {
       email_accounts: ->(ws) { ws.email_accounts.active.count },
       workflows:      ->(ws) { ws.workflows.count },
+      pipelines:      ->(ws) { ws.pipelines.count },
 
       # Deferred (no per-period metering yet). Phase 2 swaps in a real counter.
       emails_synced:       nil,

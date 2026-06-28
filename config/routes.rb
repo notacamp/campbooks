@@ -123,6 +123,15 @@ Rails.application.routes.draw do
   post  "documents/skim/:id/dismiss",       to: "documents/skim#dismiss",       as: :dismiss_document_skim
   post  "documents/skim/:id/restore",       to: "documents/skim#restore",       as: :restore_document_skim
 
+  # Document writing tool — author formatted documents from scratch.
+  # Declared BEFORE `resources :documents` to avoid :id = "write" capture.
+  get   "documents/write",      to: "documents/written#index", as: :written_documents
+  get   "documents/write/new",  to: "documents/written#new",  as: :new_written_document
+  post  "documents/write",      to: "documents/written#create"
+  get   "documents/write/:id",  to: "documents/written#show", as: :written_document
+  get   "documents/write/:id/edit", to: "documents/written#edit", as: :edit_written_document
+  patch "documents/write/:id",  to: "documents/written#update"
+
   resources :documents, only: [ :index, :show, :update, :create ] do
     member do
       get :file
@@ -188,6 +197,8 @@ Rails.application.routes.draw do
   resources :email_scans, only: [ :show ]
 
   resources :zoho_drive_accounts, only: [ :new, :create, :destroy ]
+
+  resources :scheduled_emails
 
   resources :workflows do
     member do
@@ -258,19 +269,41 @@ Rails.application.routes.draw do
       end
     end
 
+    resources :document_templates, except: :show do
+      member { post :regenerate }
+    end
+
     namespace :integrations do
       root to: "index#show"
       resource :notion, only: [ :show, :update ], controller: "notion"
       # Disconnect a specific connected Notion workspace (multi-workspace via OAuth).
       delete "notion/integrations/:id", to: "notion#destroy", as: :notion_integration
       resource :google_drive, only: [ :show, :destroy ], controller: "google_drive" do
+        post :retry_failed
         get "configs/:document_type_id/edit", to: "google_drive_configs#edit", as: :edit_config
+        get "configs/:document_type_id/folders", to: "google_drive_configs#browse_folders", as: :browse_folders_config
         patch "configs/:document_type_id", to: "google_drive_configs#update", as: :config
       end
       resource :zoho_drive, only: [ :show, :update, :destroy ], controller: "zoho_drive"
       resource :calendars, only: [ :show ], controller: "calendars"
       resources :connections, only: [ :index, :new, :create, :edit, :update, :destroy ]
     end
+
+    resources :pipelines, except: [ :show ]
+  end
+
+  # Pipelines kanban board (outside Settings).
+  resources :pipelines, only: [] do
+    member do
+      get :board, to: "pipeline_board#index"
+      post :move, to: "pipeline_board#move"
+    end
+    # Add/remove documents & emails to the board (the item picker).
+    resources :memberships, only: [ :new, :create, :destroy ], controller: "pipeline_memberships"
+  end
+
+  resources :document_templates, only: [] do
+    member { get :fill; post :preview; post :send_email }
   end
 
   # Inbox settings — the gear-icon management modal on the email page. Each

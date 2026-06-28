@@ -54,6 +54,7 @@ ignore_missing:
   - 'calendar_accounts.update_user_permissions.*'
   - 'email_compose.remove_compose_area.*'
   - 'email_compose.sent_redirect.*'
+  - 'email_compose.create_scheduled_email.*'
   - 'email_messages.bulk.build_response.*'
   - 'email_messages.bulk.success_message.*'
   - 'email_tools.clear_thread_from_view.*'

@@ -6,6 +6,7 @@ class OrganizationsController < ApplicationController
   def index
     @organizations = Current.workspace.organizations.includes(:people).ordered
     @pagy, @organizations = pagy(@organizations, items: 30)
+    @email_counts = accessible_email_counts(@organizations)
   end
 
   def show
@@ -13,7 +14,10 @@ class OrganizationsController < ApplicationController
     @pagy_emails, @recent_emails = pagy(
       EmailMessage.accessible_to(current_user).by_organization(@organization).order(received_at: :desc), items: 10
     )
-    @recent_documents = Document.by_organization(@organization).includes(:classification).order(created_at: :desc).limit(10)
+    @recent_documents = Document.by_organization(@organization, accessible_to: current_user)
+      .includes(:classification).order(created_at: :desc).limit(10)
+    @email_count = @pagy_emails.count
+    @document_count = Document.by_organization(@organization, accessible_to: current_user).count
   end
 
   def update
@@ -33,7 +37,7 @@ class OrganizationsController < ApplicationController
 
   def documents
     @pagy, @documents = pagy(
-      Document.by_organization(@organization).includes(:classification).order(created_at: :desc), items: 30
+      Document.by_organization(@organization, accessible_to: current_user).includes(:classification).order(created_at: :desc), items: 30
     )
   end
 
@@ -43,6 +47,16 @@ class OrganizationsController < ApplicationController
   end
 
   private
+
+  # org_id => number of the current user's *accessible* emails involving each org,
+  # resolved in a single grouped query so the directory doesn't fire a per-card COUNT.
+  def accessible_email_counts(organizations)
+    EmailMessage.accessible_to(current_user)
+      .joins(contact: { person: :organization_memberships })
+      .where(organization_memberships: { organization_id: organizations.map(&:id) })
+      .group("organization_memberships.organization_id")
+      .count("DISTINCT email_messages.id")
+  end
 
   def set_organization
     @organization = Current.workspace.organizations.find(params[:id])

@@ -1,0 +1,3 @@
+<%= turbo_frame_tag "pipeline_picker" do %>
+  <%= render(Campbooks::Pipeline::ItemPicker.new(pipeline: @pipeline, items: @items, query: @query)) %>
+<% end %>

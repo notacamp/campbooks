@@ -3,7 +3,7 @@
 
 <div class="max-w-lg">
   <%= form_with model: @config,
-      url: settings_integrations_google_drive_config_path(@config.document_type_id),
+      url: config_settings_integrations_google_drive_path(@config.document_type_id),
       method: :patch,
       class: "space-y-5" do |f| %>
 
@@ -15,20 +15,32 @@
       <p class="text-xs text-gray-500 mt-1"><%= t(".auto_push_hint") %></p>
     </div>
 
-    <div>
-      <%= f.label :folder_id, t(".folder_id_label"), class: "block text-sm font-medium text-gray-700 mb-1" %>
-      <%= f.text_field :folder_id, class: "block w-full rounded-md border-gray-300 shadow-sm text-sm font-mono focus:border-accent-500 focus:ring-accent-500",
-          placeholder: t(".folder_id_placeholder") %>
-      <p class="text-xs text-gray-500 mt-1">
-        <%= t(".folder_id_hint_html", url: content_tag(:code, "drive.google.com/drive/folders/".html_safe + content_tag(:strong, "FOLDER_ID"), class: "text-xs bg-gray-100 px-1 rounded")) %>
-      </p>
+    <div class="rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-500/20 dark:bg-amber-500/10">
+      <p class="text-xs text-amber-800 dark:text-amber-300"><%= t(".auto_push_default_note") %></p>
     </div>
 
-    <div>
-      <%= f.label :folder_path, t(".folder_path_label"), class: "block text-sm font-medium text-gray-700 mb-1" %>
-      <%= f.text_field :folder_path, class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500",
-          placeholder: t(".folder_path_placeholder") %>
-      <p class="text-xs text-gray-500 mt-1"><%= t(".folder_path_hint") %></p>
+    <!-- Destination folder — interactive picker -->
+    <div data-controller="drive-folder-picker">
+      <%= f.label :folder_id, t(".folder_label"), class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= f.hidden_field :folder_id, data: { drive_folder_picker_target: "folderIdField" } %>
+      <%= f.hidden_field :folder_path, data: { drive_folder_picker_target: "folderPathField" } %>
+
+      <div class="flex items-center gap-2">
+        <span data-drive-folder-picker-target="selectedLabel"
+              class="flex-1 min-w-0 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300 truncate">
+          <%= @config.folder_path.presence || (@config.folder_id.present? ? t(".folder_from_id") : t(".no_folder_selected")) %>
+        </span>
+        <%= link_to browse_folders_config_settings_integrations_google_drive_path(@config.document_type_id),
+              data: { turbo_frame: "drive_folder_picker" },
+              class: "flex-shrink-0 inline-flex items-center gap-1 px-3 py-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10 cursor-pointer" do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+          <%= t(".browse") %>
+        <% end %>
+      </div>
+
+      <div data-drive-folder-picker-target="picker" class="mt-3">
+        <%= turbo_frame_tag "drive_folder_picker" %>
+      </div>
     </div>
 
     <div>

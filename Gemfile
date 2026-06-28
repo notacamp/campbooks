@@ -62,6 +62,12 @@ gem "faraday-multipart"
 gem "prawn"
 gem "prawn-table"
 
+# HTML -> PDF via headless Chromium (used by the Document Templates feature to
+# render AI-generated HTML templates). Requires a Chromium/Chrome binary at
+# runtime (see Dockerfile + docs/self-hosting.md); the feature degrades
+# gracefully when it's absent.
+gem "grover", "~> 1.1"
+
 # Image processing (image -> PDF conversion)
 gem "mini_magick"
 

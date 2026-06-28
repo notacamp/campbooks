@@ -75,6 +75,7 @@ en:
       accepted_formats: PDF, JPG, PNG, WEBP, HEIC
       click_to_upload: Click to upload
       col_date: Date
+      col_drive_title: Google Drive
       col_name: Name
       col_reference: Reference
       col_source: Source
@@ -116,6 +117,7 @@ en:
       title: Docs
       upload: Upload
       upload_and_process: Upload & Process
+      write: Write
     merge:
       keep_this_one: Keep This One
       label_date: 'Date:'
@@ -172,6 +174,10 @@ en:
       fullscreen_iframe_title: Full-screen PDF preview
     row:
       approve: Approve
+      drive_failed_retry: 'Drive push failed: %{error}. Click to retry.'
+      drive_pushed: In Drive since %{at}
+      drive_retry: Retry
+      in_drive: In Drive
       reanalyze: Re-analyze
       reject: Reject
       rename: Rename
@@ -212,3 +218,33 @@ en:
       tray_content:
         ai_unsure: "%{count} the AI wasn't sure about — skim to confirm or re-file"
         needs_review: Needs review
+    written:
+      index:
+        title: Written documents
+        back_to_documents: Back to Docs
+        new: New document
+        empty_title: No written documents yet
+        empty_description: Write formatted documents like letters, reports, and notes from scratch.
+      new:
+        title: Write a document
+        title_placeholder: Document title
+        editor_placeholder: Start writing…
+        save: Save document
+        cancel: Cancel
+        back_to_documents: Back to Docs
+      create:
+        created: Document saved.
+      show:
+        edit: Edit
+        back_to_documents: Back to Docs
+        created_at: "Created %{date}"
+        by: by %{name}
+      edit:
+        title: Edit document
+        title_placeholder: Document title
+        editor_placeholder: Start writing…
+        save: Save changes
+        cancel: Cancel
+        back_to_document: Back to document
+      update:
+        updated: Document updated.

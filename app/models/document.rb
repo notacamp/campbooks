@@ -1,4 +1,5 @@
 class Document < ApplicationRecord
+  include Pipelineable
   include Searchable
 
   belongs_to :workspace
@@ -150,13 +151,15 @@ class Document < ApplicationRecord
   # Surfaces starred documents at the top of the list, newest-first within each group.
   scope :starred_first, -> { order(starred: :desc) }
   scope :pushed_to_drive, -> { where(google_drive_push_status: :pushed) }
-    scope :by_organization, ->(org, active_only: true) {
+  scope :by_organization, ->(org, active_only: true, accessible_to: nil) {
     people_ids = Person.joins(:organization_memberships)
       .where(organization_memberships: { organization_id: org.id })
     people_ids = people_ids.where(organization_memberships: { status: :active }) if active_only
     contact_ids = Contact.where(person_id: people_ids.select(:id)).select(:id)
+    email_messages = EmailMessage.where(contact_id: contact_ids)
+    email_messages = email_messages.accessible_to(accessible_to) if accessible_to
     joins(:document_email_messages)
-      .where(document_email_messages: { email_message_id: EmailMessage.where(contact_id: contact_ids).select(:id) })
+      .where(document_email_messages: { email_message_id: email_messages.select(:id) })
       .distinct
   }
 
@@ -255,6 +258,9 @@ class Document < ApplicationRecord
 
   def google_drive_url
     return nil unless google_drive_file_id.present?
+    # google_drive_file_id is a Drive API file id (never user input), so this is
+    # always a safe https://drive.google.com link. Returned as a plain string —
+    # Rails escapes it normally when it's used as a link href.
     "https://drive.google.com/file/d/#{google_drive_file_id}/view"
   end
 
@@ -313,8 +319,7 @@ class Document < ApplicationRecord
       ("Vendor: #{vendor_name}"),
       ("Client: #{client_name}"),
       ("Invoice: #{invoice_number}")
-    ].compact.join("
-")
+    ].compact.join("\n")
 
     chunks << {
       content: primary,
@@ -336,9 +341,7 @@ class Document < ApplicationRecord
     expanded = []
     chunks.each do |chunk|
       if chunk[:content].length > 5000
-        paragraphs = chunk[:content].split(/
-
-+/)
+        paragraphs = chunk[:content].split(/\n\n+/)
         current = ""
         paragraphs.each do |para|
           if (current.length + para.length) > 5000 && current.present?

@@ -49,6 +49,11 @@ plans:
       type: flag
       allowed: true
       enabled: true
+    pipelines:
+      type: limit
+      allowed: true
+      enabled: true
+      limit: 1
     eu_data_residency:
       type: flag
       allowed: true         # a privacy control — granted to every tier (seam to gate later)
@@ -63,6 +68,13 @@ plans:
       enabled: true
       config:
         tier: basic
+    document_templates:
+      type: flag
+      allowed: false
+    email_scheduling:
+      type: flag
+      allowed: false        # scheduled sending + calendar visibility — paid feature
+      enabled: true
     # ── deferred volume limits (enforced once metering exists) ──
     emails_synced:
       type: limit
@@ -82,6 +94,10 @@ plans:
 
   # ── Pro ───────────────────────────────────────────────────────────────────
   pro:
+    organizations:
+      type: flag
+      allowed: true
+      enabled: true
     email_accounts:
       type: limit
       allowed: true
@@ -100,6 +116,11 @@ plans:
       type: flag
       allowed: true
       enabled: true
+    pipelines:
+      type: limit
+      allowed: true
+      enabled: true
+      limit: 5
     eu_data_residency:
       type: flag
       allowed: true
@@ -110,6 +131,14 @@ plans:
       enabled: true
       config:
         tier: standard
+    document_templates:
+      type: flag
+      allowed: true
+      enabled: true    
+    email_scheduling:
+      type: flag
+      allowed: true
+      enabled: true
     emails_synced:
       type: limit
       allowed: true
@@ -128,6 +157,10 @@ plans:
 
   # ── Business ──────────────────────────────────────────────────────────────
   business:
+    organizations:
+      type: flag
+      allowed: true
+      enabled: true
     email_accounts:
       type: limit
       allowed: true
@@ -146,6 +179,11 @@ plans:
       type: flag
       allowed: true
       enabled: true
+    pipelines:
+      type: limit
+      allowed: true
+      enabled: true
+      limit: null
     eu_data_residency:
       type: flag
       allowed: true
@@ -156,6 +194,14 @@ plans:
       enabled: true
       config:
         tier: premium
+    document_templates:
+      type: flag
+      allowed: true
+      enabled: true    
+    email_scheduling:
+      type: flag
+      allowed: true
+      enabled: true
     emails_synced:
       type: limit
       allowed: true
@@ -174,6 +220,10 @@ plans:
 
   # ── Unlimited (self-hosted canonical / cloud escape hatch) ──────────────────
   unlimited:
+    organizations:
+      type: flag
+      allowed: true
+      enabled: true
     email_accounts:
       type: limit
       allowed: true
@@ -192,6 +242,11 @@ plans:
       type: flag
       allowed: true
       enabled: true
+    pipelines:
+      type: limit
+      allowed: true
+      enabled: true
+      limit: null
     eu_data_residency:
       type: flag
       allowed: true
@@ -202,6 +257,14 @@ plans:
       enabled: true
       config:
         tier: premium
+    document_templates:
+      type: flag
+      allowed: true
+      enabled: true    
+    email_scheduling:
+      type: flag
+      allowed: true
+      enabled: true
     emails_synced:
       type: limit
       allowed: true

@@ -21,9 +21,15 @@ module EntitlementGuard
   # Renders an "upgrade your plan" response and returns true when <feature_key> is
   # not available (not allowed, toggled off, or at its limit) for the current
   # workspace; returns false (and does nothing) when the action may proceed.
-  def require_entitlement!(feature_key)
+  #
+  # Pass ignore_limit: true to gate only *access* (plan not allowed / toggled
+  # off) while letting an over-limit workspace through — e.g. so a free user who
+  # is at their pipeline cap can still view, edit, and delete the ones they have.
+  # Reserve the full check (default) for the create action.
+  def require_entitlement!(feature_key, ignore_limit: false)
     reason = current_entitlements.allow?(feature_key.to_sym)
     return false if reason == :ok
+    return false if ignore_limit && reason == :over_limit
 
     message = entitlement_block_message(feature_key, reason)
 

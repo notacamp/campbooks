@@ -1,0 +1,66 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t(".title", name: @template.name), subtitle: t(".subtitle"))) %>
+
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+  <div class="space-y-6 lg:col-span-2">
+    <%= render(Campbooks::Card.new(padding: :lg)) do %>
+      <%= form_with model: @template, url: settings_document_template_path(@template), method: :patch, class: "space-y-6" do |f| %>
+        <% if @template.errors.any? %>
+          <%= render(Campbooks::Alert.new(variant: :error, message: @template.errors.full_messages.to_sentence)) %>
+        <% end %>
+
+        <%= render "form", f: f %>
+
+        <div class="flex items-center gap-3">
+          <%= render(Campbooks::Button.new(variant: :primary, size: :md, type: :submit)) { t(".save") } %>
+          <%= render(Campbooks::Button.new(variant: :ghost, size: :md, href: settings_document_templates_path)) { t(".cancel") } %>
+        </div>
+      <% end %>
+    <% end %>
+
+    <% if @template.variable_definitions.any? %>
+      <%= render(Campbooks::Card.new(padding: :md)) do %>
+        <h2 class="text-base font-semibold text-gray-900 mb-3"><%= t(".variables_heading") %></h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-gray-200 text-left text-gray-600">
+                <th class="py-2 pr-4 font-medium"><%= t(".variable_key") %></th>
+                <th class="py-2 pr-4 font-medium"><%= t(".variable_label") %></th>
+                <th class="py-2 pr-4 font-medium"><%= t(".variable_type") %></th>
+                <th class="py-2 font-medium"><%= t(".variable_required") %></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @template.variable_definitions.each do |v| %>
+                <tr class="border-b border-gray-100">
+                  <td class="py-2 pr-4 font-mono text-xs"><code><%= v["key"] %></code></td>
+                  <td class="py-2 pr-4 text-gray-700"><%= v["label"] %></td>
+                  <td class="py-2 pr-4 text-gray-500"><%= v["type"] %></td>
+                  <td class="py-2 text-gray-500"><%= v["required"] ? t(".yes") : t(".no") %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
+
+  <div class="space-y-4 lg:col-span-1">
+    <%= render(Campbooks::Card.new(padding: :md)) do %>
+      <h3 class="text-sm font-semibold text-gray-900 mb-2"><%= t(".generate_heading") %></h3>
+      <p class="text-xs text-gray-500 mb-3"><%= t(".generate_description") %></p>
+      <%= button_to t(".generate_button"), regenerate_settings_document_template_path(@template), method: :post,
+            class: "cursor-pointer inline-flex w-full items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-accent-600 text-white hover:bg-accent-700 transition-colors" %>
+    <% end %>
+
+    <% if @template.ai_completed? %>
+      <%= render(Campbooks::Card.new(padding: :md)) do %>
+        <h3 class="text-sm font-semibold text-gray-900 mb-2"><%= t(".preview_send_heading") %></h3>
+        <p class="text-xs text-gray-500 mb-3"><%= t(".preview_send_description") %></p>
+        <%= render(Campbooks::Button.new(variant: :outline, size: :md, href: fill_document_template_path(@template), class: "w-full")) { t(".open_fill_page") } %>
+      <% end %>
+    <% end %>
+  </div>
+</div>

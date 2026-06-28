@@ -10,5 +10,5 @@ class GoogleDriveConfig < ApplicationRecord
 
   validates :document_type_id, uniqueness: true
   validates :naming_pattern, presence: true
-  validates :folder_id, presence: true, if: :auto_push?
+  validates :folder_id, presence: true
 end

@@ -1,0 +1,50 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+
+<%= render(Campbooks::PageHeader.new(title: t(".heading"), subtitle: t(".subtitle"), spacing: :lg)) do |header| %>
+  <% if current_entitlements.feature?(:pipelines) %>
+    <% header.with_actions do %>
+      <%= render(Campbooks::Button.new(variant: :primary, href: new_settings_pipeline_path)) { t(".new_pipeline") } %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<% if !current_entitlements.feature?(:pipelines) %>
+  <%= render Campbooks::Entitlements::UpgradePrompt.new(
+        feature: :pipelines, reason: current_entitlements.allow?(:pipelines), variant: :panel) %>
+<% elsif @pipelines.any? %>
+  <div class="space-y-3">
+    <% @pipelines.each do |pipeline| %>
+      <%= render(Campbooks::Card.new(padding: :xs)) do %>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div class="min-w-0 flex-1">
+            <h3 class="text-sm font-semibold text-foreground"><%= pipeline.name %></h3>
+            <% if pipeline.description.present? %>
+              <p class="text-[12px] text-muted-foreground mt-0.5 line-clamp-2"><%= pipeline.description %></p>
+            <% end %>
+            <div class="flex flex-wrap items-center gap-1.5 mt-2.5">
+              <% pipeline.stages.each do |stage| %>
+                <%= render(Campbooks::Pipeline::StageChip.new(stage: stage)) %>
+              <% end %>
+            </div>
+          </div>
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <%= render(Campbooks::Button.new(variant: :ghost, size: :sm, href: board_pipeline_path(pipeline), data: { turbo: false })) { t(".view_board") } %>
+            <%= render(Campbooks::Button.new(variant: :ghost, size: :sm, href: edit_settings_pipeline_path(pipeline))) { t("shared.actions.edit") } %>
+            <%= button_to settings_pipeline_path(pipeline), method: :delete,
+                  class: "rounded-md px-2.5 py-1.5 text-sm font-medium text-red-500 hover:bg-red-50 hover:text-red-600 transition cursor-pointer dark:hover:bg-red-500/10",
+                  form: { data: { turbo_confirm: t(".confirm_delete") } } do %>
+              <%= t("shared.actions.delete") %>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
+<% else %>
+  <%= render(Campbooks::EmptyState.new(
+        variant: :card, title: t(".empty_title"), description: t(".empty_description"))) do |state| %>
+    <% state.with_actions do %>
+      <%= render(Campbooks::Button.new(variant: :primary, href: new_settings_pipeline_path)) { t(".create_first") } %>
+    <% end %>
+  <% end %>
+<% end %>

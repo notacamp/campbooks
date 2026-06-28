@@ -289,6 +289,10 @@ pt:
           disconnect: Desligar
           disconnect_confirm: Desligar o Google Drive? Os envios de documentos serão
             interrompidos.
+          failed_count:
+            one: Um documento falhou o envio. Pode tentar novamente abaixo.
+            other: "%{count} documentos falharam o envio. Pode tentar novamente abaixo."
+          retry_all_failed: Tentar novamente todos os envios falhados
           drive_org_desc: Cada tipo de documento pode ter a sua própria pasta, padrão
             de nomenclatura e estrutura de subpastas.
           drive_org_heading: Como o Drive organiza os seus ficheiros
@@ -304,16 +308,13 @@ pt:
           title: Google Drive
       google_drive_configs:
         edit:
-          auto_push_hint: Quando ativado, os documentos aprovados deste tipo são automaticamente
-            enviados para o Google Drive.
-          auto_push_label: Envio automático quando o documento é aprovado
-          folder_id_hint_html: 'Encontre-o no URL da pasta do Google Drive: %{url}'
-          folder_id_label: ID da pasta do Drive
-          folder_id_placeholder: 'ex.: 1a2b3c4d5e...'
-          folder_path_hint: Uma etiqueta legível apresentada na interface. Não é utilizada
-            para o envio efetivo.
-          folder_path_label: Etiqueta da pasta
-          folder_path_placeholder: 'ex.: Campbooks / Faturas'
+          auto_push_default_note: O envio automático está ativo por padrão — documentos aprovados deste tipo serão enviados automaticamente para o Drive. Desmarque a caixa acima para pausar.
+          auto_push_hint: Quando marcado, os documentos aprovados deste tipo são enviados automaticamente para o Google Drive. Desmarque para pausar.
+          auto_push_label: Enviar automaticamente quando aprovado
+          browse: Explorar
+          folder_from_id: Pasta selecionada
+          folder_label: Pasta de destino
+          no_folder_selected: Nenhuma pasta selecionada — escolha uma abaixo
           naming_pattern_hint: 'Marcadores disponíveis: {date}, {entity}, {reference},
             {type}, {vendor}, {id}'
           naming_pattern_label: Padrão de nomenclatura dos ficheiros
@@ -325,6 +326,16 @@ pt:
           subfolder_pattern_label: Espaço de trabalho de subpastas
           subtitle: Controle como os documentos deste tipo são enviados para o Google
             Drive.
+        browse_folders:
+          browse_failed: 'Não foi possível listar as pastas: %{message}'
+          create_folder: Criar
+          my_drive: O Meu Drive
+          new_folder_placeholder: Nome da nova pasta
+          no_subfolders: Sem subpastas aqui
+          reconnect_needed: Religue o Google Drive com acesso completo para explorar pastas.
+          select: Selecionar
+          select_my_drive: Usar a raiz do Meu Drive
+          select_this: 'Selecionar "%{name}"'
       index:
         show:
           api_connections_desc: Guarde integrações de API de saída (URL base + autenticação)
