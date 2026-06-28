@@ -1,0 +1,36 @@
+<%# locals: type %>
+<% persisted = type.persisted? %>
+<%= form_with model: type,
+      url: (persisted ? event_type_path(type) : event_types_path),
+      method: (persisted ? :patch : :post),
+      class: "rounded-lg border border-border bg-muted/30 p-4 mb-4 space-y-4" do |f| %>
+  <% if type.errors.any? %>
+    <div class="rounded-md bg-red-50 dark:bg-red-500/10 text-xs text-red-700 dark:text-red-300 px-3 py-2">
+      <%= type.errors.full_messages.to_sentence %>
+    </div>
+  <% end %>
+
+  <div>
+    <%= f.label :name, t(".name_label"), class: "block text-xs font-medium text-foreground mb-1" %>
+    <%= f.text_field :name, autofocus: true,
+          class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+  </div>
+
+  <div>
+    <span class="block text-xs font-medium text-foreground mb-1.5"><%= t(".color_label") %></span>
+    <%= render(Campbooks::ColorSwatchPicker.new(name: "event_type[color]", selected: type.color, include_none: false)) %>
+  </div>
+
+  <div>
+    <%= render "shared/markdown_editor", form: f, field: :prompt, rows: 3, label: t(".ai_prompt_label") %>
+    <p class="text-xs text-muted-foreground mt-1"><%= t(".ai_prompt_hint") %></p>
+  </div>
+
+  <div class="flex items-center justify-end gap-2 pt-1">
+    <button type="button" onclick="this.closest('turbo-frame').innerHTML = ''"
+            class="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-gray-600 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer">
+      <%= t("shared.actions.cancel") %>
+    </button>
+    <%= render(Campbooks::Button.new(variant: :primary, size: :sm, type: :submit)) { persisted ? t("shared.actions.save_changes") : t(".create_type") } %>
+  </div>
+<% end %>

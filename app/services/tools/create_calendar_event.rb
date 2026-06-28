@@ -38,6 +38,10 @@ module Tools
       return nil unless event.save
 
       Calendars::EventWriteJob.perform_later(event.id, "create")
+      # Auto-classify into an EventType (which colors it) in the background. The
+      # short delay lets the create write swap in the real provider id first, so the
+      # type color can sync out. type_status defaults to pending → the job runs.
+      EventClassificationJob.set(wait: 10.seconds).perform_later(event.id)
       event
     end
 
