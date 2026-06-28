@@ -36,6 +36,13 @@ end
 
 puts "Users: #{User.count}"
 
+# ── Public API: first-party CLI OAuth client ────────────────
+# Well-known public client for `campbooks login` (authorization_code + PKCE).
+# Idempotent; identical client_id on every instance so one CLI binary works
+# against cloud and self-hosted alike.
+Api::CliApplication.ensure!
+puts "Campbooks CLI OAuth client: #{Api::CliApplication::UID}"
+
 # ── Email Tags ──────────────────────────────────────────────
 EMAIL_TAGS = {
   "invoice"           => { color: "#3b82f6", prompt: "The email contains content or attachments related to an invoice (fatura, bill), or refers to the sending, receiving, or payment of an invoice. Look for invoice numbers, amounts due, tax fields (IVA/VAT), and vendor NIF." },
