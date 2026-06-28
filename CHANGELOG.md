@@ -28,6 +28,13 @@ major, minor, or patch change here.
 
 - Avatar stacks (facepiles) in the email list and board view now show the
   account-color ring, consistent with single-sender avatars and search results.
+- **Mobile usability** — fixed several small-screen issues found auditing the app
+  at 320–375px: the calendar/reminders view tabs no longer push the page into
+  horizontal scroll (they scroll within their own strip), the inbox settings
+  dialog stacks to a single column with a scrollable section strip instead of
+  crushing its content pane, and a number of undersized tap targets were enlarged
+  (the compose and email "back" buttons, the email reply/forward and Discussion
+  buttons, and the tag-remove "×").
 
 ## [0.2.1] - 2026-06-27
 

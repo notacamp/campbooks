@@ -321,6 +321,11 @@
 }
 .skim-compact #skim_tray_content::-webkit-scrollbar { display: none; }
 
+/* Horizontal scroll containers (segmented tab bars, chip strips) that should
+   scroll on narrow screens without showing a scrollbar. */
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
 /* ── Feed scroll-focus — dim every entry except the one nearest the viewport
    centre, so the eye settles on one card at a time. Opt-in: the rules only bite
    once feed_focus_controller flags the list with [data-feed-focus] (so with no
