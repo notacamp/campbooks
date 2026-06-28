@@ -16,6 +16,15 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- `document_templates` was missing from `db/schema.rb`, so fresh installs and CI
+  databases (built via `schema:load`) never got the table — and because the load
+  also marks the migration as applied, `db:migrate` wouldn't re-create it. This
+  broke the document-templates feature on a new install when enabled. The table
+  is now in the schema (existing/upgraded databases already have it from the
+  migration).
+
 ## [0.4.0] - 2026-06-28
 
 ### Added
