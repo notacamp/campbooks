@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_28_020002) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_28_030000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -67,12 +67,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_020002) do
     t.jsonb "ai_prompts", default: [], null: false
     t.jsonb "ai_provenance", default: {}, null: false
     t.jsonb "ai_suggested_actions", default: [], null: false
+    t.text "ai_thinking"
     t.integer "author_type", default: 0, null: false
     t.text "content", null: false
     t.datetime "created_at", null: false
     t.boolean "draft", default: false, null: false
     t.boolean "outdated", default: false, null: false
     t.integer "reply_status"
+    t.jsonb "steps", default: [], null: false
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.datetime "viewed_at"
