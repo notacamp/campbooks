@@ -1,0 +1,16 @@
+---
+es:
+  doorkeeper:
+    authorizations:
+      new:
+        page_title: "Autorizar · Campbooks"
+        title: "Autorizar %{client}"
+        signed_in_as_html: "Sesión iniciada como %{user} en %{workspace}"
+        able_to: "Esto podrá:"
+        authorize: "Autorizar"
+        deny: "Cancelar"
+        redirect_note: "Volverás a %{uri}"
+      error:
+        title: "No se pudo autorizar"
+        generic: "Algo salió mal con esta solicitud de autorización."
+        retry_hint: "Cierra esta ventana y ejecuta el comando de nuevo."
