@@ -26,6 +26,39 @@ module Ai
         raise
       end
 
+      # Model-name fragments that identify a reasoning model (exposes a thinking
+      # trace via reasoning_content and needs max_completion_tokens, no temperature).
+      REASONING_MODELS = %w[reasoner o1 o3 o4-mini gpt-5].freeze
+
+      def supports_tools? = true
+
+      def supports_thinking?(model)
+        REASONING_MODELS.any? { |frag| model.to_s.include?(frag) }
+      end
+
+      def converse(system:, messages:, model:, max_tokens:, temperature: 0.0, tools: [], thinking: nil)
+        reasoning = supports_thinking?(model)
+
+        body = { model: model, messages: build_openai_messages(system, messages) }
+        # Reasoning models reject `max_tokens`/`temperature`; everything else needs them.
+        if reasoning
+          body[:max_completion_tokens] = max_tokens
+          body[:reasoning_effort] = reasoning_effort(thinking) if thinking
+        else
+          body[:max_tokens] = max_tokens
+          body[:temperature] = temperature if temperature > 0
+        end
+        if tools.any?
+          body[:tools] = tools.map { |t| { type: "function", function: t } }
+          body[:tool_choice] = "auto"
+        end
+
+        parse_converse(post_json(@endpoint_url, body))
+      rescue Faraday::Error => e
+        Rails.logger.error("[OpenAI adapter] converse HTTP error: #{e.message}")
+        raise
+      end
+
       # text-embedding-3-small rejects inputs over 8191 tokens with a 400. A token
       # is always at least one character, so capping each input at this many chars
       # guarantees we stay under the token limit no matter how the text tokenizes
@@ -80,14 +113,45 @@ module Ai
         result
       end
 
-      def translate_messages(messages)
-        messages.map { |msg| translate_message(msg) }
+      def reasoning_effort(thinking)
+        # Map a token budget onto OpenAI's coarse effort levels.
+        return "high" if thinking.to_i >= 8000
+        return "low" if thinking.to_i.positive? && thinking.to_i < 2000
+        "medium"
       end
 
+      def parse_converse(body)
+        message = body.dig("choices", 0, "message") || {}
+        tool_calls = Array(message["tool_calls"]).map do |tc|
+          fn = tc["function"] || {}
+          args = JSON.parse(fn["arguments"].presence || "{}") rescue {}
+          Ai::ChatResult::ToolCall.new(id: tc["id"], name: fn["name"], arguments: args)
+        end
+        Ai::ChatResult.new(
+          text: message["content"],
+          tool_calls: tool_calls,
+          thinking: message["reasoning_content"],
+          stop_reason: body.dig("choices", 0, "finish_reason"),
+          usage: { input: body.dig("usage", "prompt_tokens"), output: body.dig("usage", "completion_tokens") }
+        )
+      end
+
+      def translate_messages(messages)
+        messages.flat_map { |msg| translate_message(msg) }
+      end
+
+      # Returns either one message hash or (for a tool-result batch) an array.
       def translate_message(msg)
-        if msg[:parts]
-          content = msg[:parts].map { |part| translate_part(part) }
-          { role: msg[:role] || "user", content: content }
+        if msg[:results]
+          msg[:results].map { |r| { role: "tool", tool_call_id: r[:tool_call_id], content: r[:content].to_s } }
+        elsif msg[:tool_calls]&.any?
+          calls = msg[:tool_calls].map do |tc|
+            { id: tc["id"], type: "function",
+              function: { name: tc["name"], arguments: (tc["arguments"] || {}).to_json } }
+          end
+          { role: "assistant", content: msg[:content], tool_calls: calls }
+        elsif msg[:parts]
+          { role: msg[:role] || "user", content: msg[:parts].map { |part| translate_part(part) } }
         else
           { role: msg[:role] || "user", content: msg[:content] }
         end

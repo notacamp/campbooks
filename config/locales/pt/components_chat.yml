@@ -40,6 +40,8 @@ pt:
     chat_message:
       ai_badge: IA
       draft_badge: Rascunho
+      thinking_summary: Raciocínio
+      step_searched: "Pesquisou %{tool}"
       time_ago: há %{time}
     command_palette:
       capture_placeholder: Mover para qual pasta…

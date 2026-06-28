@@ -58,12 +58,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_23_140000) do
     t.jsonb "ai_auto_actions", default: [], null: false
     t.jsonb "ai_prompts", default: [], null: false
     t.jsonb "ai_suggested_actions", default: [], null: false
+    t.text "ai_thinking"
     t.integer "author_type", default: 0, null: false
     t.text "content", null: false
     t.datetime "created_at", null: false
     t.boolean "draft", default: false, null: false
     t.boolean "outdated", default: false, null: false
     t.integer "reply_status"
+    t.jsonb "steps", default: [], null: false
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.index ["agent_thread_id", "created_at"], name: "index_agent_messages_on_agent_thread_id_and_created_at"
