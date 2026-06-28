@@ -6,7 +6,6 @@ require "pagy/extras/countless"
 class EmailMessagesController < ApplicationController
   before_action :require_authentication
   layout :select_layout
-  tracks_section_visit :mail, only: %i[index show]
 
   # Sidebar thread list page size. Sized to roughly fill the first viewport so the
   # initial render stays light; the rest streams in on scroll (infinite scroll).
@@ -133,11 +132,17 @@ class EmailMessagesController < ApplicationController
 
     AuditEvent.log("email_message_read", user: Current.user, request: request, target: @message, via: "web")
 
-    # Mark all messages in thread as read
+    # Opening a thread marks every message read — clears the inbox unread dot/bold,
+    # the "unread" filters, and the unread counts — and stamps viewed_at, which
+    # clears the Mail nav attention dot (Navigation::Attention#new_mail?). The
+    # viewed_at clause also catches messages that synced in already-read but were
+    # never opened here, so the nav dot still clears.
     if @thread
-      unread_ids = @thread.email_messages.where(read: false).pluck(:provider_message_id)
+      messages = @thread.email_messages
+      unread_ids = messages.where(read: false).pluck(:provider_message_id)
+      messages.where(read: false).or(messages.where(viewed_at: nil))
+              .update_all(read: true, viewed_at: Time.current, updated_at: Time.current)
       if unread_ids.any?
-        @thread.email_messages.where(read: false).update_all(read: true, updated_at: Time.current)
         MarkReadJob.perform_later(@message.email_account_id, unread_ids) if @message.email_account_id
         # Live inbox: clear the unread dot on this thread's row in every other open
         # inbox (other tabs/devices, teammates sharing the mailbox).

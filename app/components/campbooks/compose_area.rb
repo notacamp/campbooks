@@ -125,7 +125,7 @@ module Campbooks
 
           # Actions row
           div(id: "compose_actions_#{@email_message.id}", class: "flex items-center gap-2") do
-            button(type: "submit",
+            button(type: "submit", name: "send_action", value: "send_now",
                    class: "inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors") do
               svg(class: "w-3.5 h-3.5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24") do
                 raw(safe('<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>'))
@@ -138,11 +138,47 @@ module Campbooks
               plain t(".discard")
             end
           end
+
+          # Schedule-for-later disclosure (paid feature). A native <details> so the
+          # picker is collapsed by default and needs no JS; the datetime-local +
+          # "Schedule" submit only become reachable once the user expands it.
+          schedule_disclosure if helpers.current_entitlements.feature?(:email_scheduling)
         end
       end
     end
 
     private
+
+    def schedule_disclosure
+      default_at = (Time.current + 1.hour).change(min: (Time.current.min / 30) * 30)
+      field_id = "scheduled_at_#{@email_message.id}"
+
+      details(class: "mt-1") do
+        summary(class: "inline-flex w-fit cursor-pointer select-none items-center gap-1 text-xs text-gray-500 hover:text-gray-700") do
+          clock_glyph
+          plain t(".schedule_for_later")
+        end
+        div(class: "mt-2 flex flex-col gap-2 sm:flex-row sm:items-end") do
+          div(class: "flex flex-col gap-1") do
+            label(class: "text-[10px] font-medium uppercase tracking-wide text-gray-400", for: field_id) { t(".schedule_at_label") }
+            input(type: "datetime-local", id: field_id, name: "scheduled_at",
+                  value: default_at.strftime("%Y-%m-%dT%H:%M"),
+                  class: "text-sm bg-card border border-gray-200 rounded-md px-2.5 py-1 focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500")
+          end
+          button(type: "submit", name: "send_action", value: "schedule",
+                 class: "inline-flex items-center justify-center gap-1 px-3 py-1.5 text-xs font-medium bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition-colors") do
+            clock_glyph
+            plain t(".schedule")
+          end
+        end
+      end
+    end
+
+    def clock_glyph
+      svg(class: "w-3.5 h-3.5", fill: "none", stroke: "currentColor", viewBox: "0 0 24 24") do
+        raw(safe('<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>'))
+      end
+    end
 
     def header_text
       case @mode

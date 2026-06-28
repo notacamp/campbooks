@@ -70,6 +70,11 @@ en:
         all_day: All day
         untitled: "(No title)"
         video_call: Video call
+      snoozed_row:
+        no_subject: "(Snoozed email)"
+        snoozed_from: "Returns — %{account}"
+      scheduled_email_row:
+        to: "To %{address}"
       week_grid:
         add: "+ Add"
         untitled: "(No title)"

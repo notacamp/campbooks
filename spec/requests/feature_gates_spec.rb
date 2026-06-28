@@ -73,4 +73,7 @@ RSpec.describe "Production-readiness feature gates", type: :request do
       end
     end
   end
+
+  # Email scheduling is gated by the billing Entitlements layer, not Features —
+  # its gate is covered in spec/requests/scheduled_emails_spec.rb.
 end

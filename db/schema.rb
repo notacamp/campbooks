@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_27_013613) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_28_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -75,8 +75,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_013613) do
     t.integer "reply_status"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
+    t.datetime "viewed_at"
     t.index ["agent_thread_id", "created_at"], name: "index_agent_messages_on_agent_thread_id_and_created_at"
     t.index ["agent_thread_id"], name: "index_agent_messages_on_agent_thread_id"
+    t.index ["agent_thread_id"], name: "index_agent_messages_on_thread_unviewed", where: "(viewed_at IS NULL)"
     t.index ["user_id", "created_at"], name: "index_agent_messages_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_agent_messages_on_user_id"
   end
@@ -142,6 +144,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_013613) do
     t.index ["target_type", "target_id"], name: "index_audit_events_on_target"
     t.index ["user_id", "created_at"], name: "index_audit_events_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_audit_events_on_user_id"
+  end
+
+  create_table "authored_documents", force: :cascade do |t|
+    t.bigint "author_id"
+    t.datetime "created_at", null: false
+    t.text "html_content"
+    t.string "title", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "workspace_id", null: false
+    t.index ["author_id"], name: "index_authored_documents_on_author_id"
+    t.index ["workspace_id", "created_at"], name: "index_authored_documents_on_workspace_id_and_created_at"
+    t.index ["workspace_id"], name: "index_authored_documents_on_workspace_id"
   end
 
   create_table "beta_codes", force: :cascade do |t|
@@ -402,20 +416,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_013613) do
     t.index ["email_message_id"], name: "index_document_email_messages_on_email_message_id"
   end
 
-  create_table "document_templates", force: :cascade do |t|
-    t.jsonb "ai_provenance", default: {}, null: false
-    t.integer "ai_status", default: 0, null: false
-    t.datetime "created_at", null: false
-    t.text "description"
-    t.text "html_content", default: "", null: false
-    t.string "name", null: false
-    t.datetime "updated_at", null: false
-    t.jsonb "variables_schema", default: [], null: false
-    t.bigint "workspace_id", null: false
-    t.index ["workspace_id", "name"], name: "index_document_templates_on_workspace_id_and_name"
-    t.index ["workspace_id"], name: "index_document_templates_on_workspace_id"
-  end
-
   create_table "document_types", force: :cascade do |t|
     t.boolean "auto_star", default: false, null: false
     t.string "category"
@@ -497,6 +497,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_013613) do
     t.index ["workspace_id", "review_status"], name: "index_documents_on_workspace_id_and_review_status"
     t.index ["workspace_id", "starred"], name: "index_documents_on_workspace_id_and_starred"
     t.index ["workspace_id"], name: "index_documents_on_workspace_id"
+    t.index ["workspace_id"], name: "index_documents_on_workspace_unviewed", where: "(viewed_at IS NULL)"
   end
 
   create_table "drive_folder_mappings", force: :cascade do |t|
@@ -616,12 +617,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_013613) do
     t.text "summary"
     t.string "to_address"
     t.datetime "updated_at", null: false
+    t.datetime "viewed_at"
     t.string "zoho_flag"
     t.index ["ai_analysis_message_id"], name: "index_email_messages_on_ai_analysis_message_id"
     t.index ["category"], name: "index_email_messages_on_category"
     t.index ["contact_id"], name: "index_email_messages_on_contact_id"
     t.index ["email_account_id", "provider_message_id"], name: "index_emails_on_account_and_provider_message", unique: true
     t.index ["email_account_id", "provider_thread_id"], name: "index_email_messages_on_account_and_provider_thread"
+    t.index ["email_account_id"], name: "index_email_messages_on_account_unviewed", where: "(viewed_at IS NULL)"
     t.index ["email_account_id"], name: "index_email_messages_on_email_account_id"
     t.index ["email_scan_log_id"], name: "index_email_messages_on_email_scan_log_id"
     t.index ["email_thread_id"], name: "index_email_messages_on_email_thread_id"
@@ -722,6 +725,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_013613) do
     t.index ["user_id", "dedupe_key"], name: "idx_feed_items_user_dedupe", unique: true
     t.index ["user_id", "score", "sort_at"], name: "idx_feed_items_attention", order: { score: :desc, sort_at: :desc }, where: "((dismissed_at IS NULL) AND (acted_at IS NULL) AND (attention = true))"
     t.index ["user_id", "sort_at"], name: "idx_feed_items_timeline", order: { sort_at: :desc }, where: "((dismissed_at IS NULL) AND (acted_at IS NULL) AND (attention = false))"
+    t.index ["user_id"], name: "index_feed_items_on_user_unseen_active", where: "((seen_at IS NULL) AND (dismissed_at IS NULL) AND (acted_at IS NULL))"
     t.index ["workspace_id"], name: "index_feed_items_on_workspace_id"
   end
 
@@ -749,7 +753,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_013613) do
   end
 
   create_table "google_drive_configs", force: :cascade do |t|
-    t.boolean "auto_push", default: true, null: false
+    t.boolean "auto_push", default: false, null: false
     t.datetime "created_at", null: false
     t.bigint "document_type_id", null: false
     t.string "folder_id"
@@ -1024,6 +1028,31 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_013613) do
     t.index ["source_type", "source_id"], name: "index_reminders_on_source"
     t.index ["workspace_id", "status", "due_at"], name: "index_reminders_on_workspace_status_due"
     t.index ["workspace_id"], name: "index_reminders_on_workspace_id"
+    t.index ["workspace_id"], name: "index_reminders_on_workspace_unviewed", where: "(viewed_at IS NULL)"
+  end
+
+  create_table "scheduled_emails", force: :cascade do |t|
+    t.string "bcc_address"
+    t.text "body", null: false
+    t.string "cc_address"
+    t.datetime "created_at", null: false
+    t.bigint "created_by_id", null: false
+    t.bigint "email_account_id", null: false
+    t.datetime "last_sent_at"
+    t.datetime "next_occurrence_at"
+    t.string "rrule"
+    t.datetime "scheduled_at", null: false
+    t.integer "status", default: 0, null: false
+    t.string "subject", null: false
+    t.string "to_address", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "workspace_id", null: false
+    t.index ["created_by_id"], name: "index_scheduled_emails_on_created_by_id"
+    t.index ["email_account_id"], name: "index_scheduled_emails_on_email_account_id"
+    t.index ["next_occurrence_at"], name: "idx_scheduled_emails_pending_next_occurrence", where: "(status = 0)"
+    t.index ["scheduled_at"], name: "idx_scheduled_emails_pending_scheduled_at", where: "(status = 0)"
+    t.index ["workspace_id", "status"], name: "index_scheduled_emails_on_workspace_id_and_status"
+    t.index ["workspace_id"], name: "index_scheduled_emails_on_workspace_id"
   end
 
   create_table "search_chunks", force: :cascade do |t|
@@ -1447,6 +1476,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_013613) do
   add_foreign_key "ai_configurations", "ai_adapters"
   add_foreign_key "ai_configurations", "workspaces"
   add_foreign_key "audit_events", "users", on_delete: :nullify
+  add_foreign_key "authored_documents", "users", column: "author_id"
+  add_foreign_key "authored_documents", "workspaces"
   add_foreign_key "beta_codes", "users", column: "created_by_id"
   add_foreign_key "beta_codes", "users", column: "redeemed_by_id"
   add_foreign_key "bug_reports", "users"
@@ -1473,7 +1504,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_013613) do
   add_foreign_key "document_drive_uploads", "zoho_drive_accounts"
   add_foreign_key "document_email_messages", "documents"
   add_foreign_key "document_email_messages", "email_messages"
-  add_foreign_key "document_templates", "workspaces"
   add_foreign_key "document_types", "workspaces"
   add_foreign_key "documents", "document_types"
   add_foreign_key "documents", "email_accounts"
@@ -1532,6 +1562,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_013613) do
   add_foreign_key "reminders", "calendar_events"
   add_foreign_key "reminders", "users", column: "confirmed_by_id"
   add_foreign_key "reminders", "workspaces"
+  add_foreign_key "scheduled_emails", "email_accounts"
+  add_foreign_key "scheduled_emails", "users", column: "created_by_id"
+  add_foreign_key "scheduled_emails", "workspaces"
   add_foreign_key "search_chunks", "workspaces"
   add_foreign_key "search_records", "workspaces"
   add_foreign_key "search_tag_embeddings", "tags"

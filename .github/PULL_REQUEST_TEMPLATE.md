@@ -18,8 +18,13 @@
 
 ## How was this tested?
 
-<!-- Tests added/updated, and manual steps. For UI, attach before/after
-     screenshots at BOTH mobile (375px) and desktop width. -->
+<!-- Tests added/updated, and manual steps. -->
+
+## Screenshots
+
+<!-- REQUIRED for any UI change: before/after at BOTH mobile (375px) and desktop
+     width. Embed images here (drag-and-drop, or paste a public URL).
+     Don't commit PNGs to the repo. N/A for non-UI changes. -->
 
 ## Checklist
 

@@ -190,3 +190,14 @@ es:
       text_color: Color del texto
       underline: Subrayado
       undo: Deshacer
+      table: Insertar tabla
+      add_row_before: Añadir fila
+      delete_row: Eliminar fila
+      add_column_before: Añadir columna
+      delete_column: Eliminar columna
+      toggle_header: Alternar encabezado
+      font_family: Fuente
+      default_font: Fuente predeterminada
+      highlight_color: Color de resaltado
+      superscript: Superíndice
+      subscript: Subíndice

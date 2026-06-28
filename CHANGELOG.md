@@ -18,6 +18,18 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Document writing tool** — author formatted documents from scratch at
+  **Documents → Write**. Built on the shared rich-text editor with a
+  document-focused toolbar (tables, font family, text highlight, and
+  super/subscript); the existing email-compose and signature editors are
+  unchanged. Saved documents are listed, viewable, and re-editable, scoped to
+  your workspace.
+- **Email scheduling** — schedule one-time or recurring sends (daily, weekly,
+  every 2 weeks, or monthly), gated by billing entitlements. Schedule a message
+  from the composer's "Schedule for later" picker or the dedicated
+  `/scheduled_emails` page; a per-minute job sends due messages and rolls
+  recurring ones to their next occurrence. Snoozed threads and upcoming scheduled
+  sends also surface on the calendar.
 - **Organizations** — first-class company/employer grouping on top of contacts,
   gated by billing entitlements. People can belong to multiple organizations
   (active or past). Includes scoped filtering for emails and documents, a
@@ -30,6 +42,17 @@ major, minor, or patch change here.
   cloud). PDF rendering uses headless Chromium via Grover — build the image with
   `--build-arg INSTALL_PDF_BROWSER=1` to include it (see `docs/self-hosting.md`);
   without it the feature degrades gracefully instead of erroring.
+- **Sent-email attachments** — files attached to emails you send are now stored
+  locally as documents (the same way received attachments are), and the AI
+  biases their classification toward revenue/outgoing types.
+
+### Changed
+
+- Sidebar navigation attention dots now reflect whether a section still has
+  something for you to look at — unread mail, new feed items, pending reminders,
+  documents awaiting review, or unread Scout replies — and clear when you handle
+  the resource from any surface (home feed, skim, mail, or Scout), rather than
+  being tied to when you last opened that section's page.
 
 ### Fixed
 
