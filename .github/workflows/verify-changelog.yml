@@ -21,8 +21,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          NEW_VERSION=$(tr -d "
-" < VERSION)
+          NEW_VERSION=$(tr -d '\n' < VERSION)
           echo "PR bumps VERSION to: $NEW_VERSION"
 
           # Must have a [X.Y.Z] heading in CHANGELOG.md matching the new version.
