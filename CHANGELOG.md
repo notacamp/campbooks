@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-28
+
 ### Added
 
 - **Document writing tool** — author formatted documents from scratch at
@@ -281,5 +283,8 @@ major, minor, or patch change here.
 
 - Initial public, source-available release of Campbooks.
 
-[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/notacamp/campbooks/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/notacamp/campbooks/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/notacamp/campbooks/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/notacamp/campbooks/releases/tag/v0.1.0
