@@ -1,0 +1,17 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+
+<%= render(Campbooks::Card.new(padding: :lg)) do %>
+  <%= form_with model: @template, url: settings_document_templates_path, class: "space-y-6 max-w-2xl" do |f| %>
+    <% if @template.errors.any? %>
+      <%= render(Campbooks::Alert.new(variant: :error, message: @template.errors.full_messages.to_sentence)) %>
+    <% end %>
+
+    <%= render "form", f: f %>
+
+    <div class="flex items-center gap-3">
+      <%= render(Campbooks::Button.new(variant: :primary, size: :md, type: :submit)) { t(".save") } %>
+      <%= render(Campbooks::Button.new(variant: :ghost, size: :md, href: settings_document_templates_path)) { t(".cancel") } %>
+    </div>
+  <% end %>
+<% end %>

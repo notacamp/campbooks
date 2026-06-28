@@ -39,6 +39,10 @@ module Features
     # OAuth callbacks and the Settings → Security link/unlink. Honors the legacy
     # ENABLE_MICROSOFT_MAILBOX so deployments that already enabled mailbox connect
     # keep working after the flags were unified.
+    def document_templates?
+      flag?("ENABLE_DOCUMENT_TEMPLATES")
+    end
+
     def microsoft?
       flag?("ENABLE_MICROSOFT") || flag?("ENABLE_MICROSOFT_MAILBOX")
     end
