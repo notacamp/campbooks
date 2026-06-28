@@ -9,6 +9,7 @@ class DocumentType < ApplicationRecord
   DEFAULT_CATEGORIES = {
     "expense_invoice"    => "accounting",
     "revenue_invoice"    => "accounting",
+    "credit_note"        => "accounting",
     "bank_statement"     => "accounting",
     "bank_journal_entry" => "accounting",
     "receipt"            => "accounting",

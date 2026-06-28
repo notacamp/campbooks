@@ -1,8 +1,12 @@
 name: Verify changelog
 
-# Gate: when a PR bumps the VERSION file, CHANGELOG.md must also be updated —
-# the [Unreleased] section must be rolled into a matching [X.Y.Z] heading.
-# Runs on every PR that touches VERSION; a no-op skip on PRs that don't.
+# Gate: when a PR bumps the VERSION file, CHANGELOG.md must also be rolled —
+# the [Unreleased] section must be moved into a matching [X.Y.Z] heading.
+#
+# Feature PRs that only add to [Unreleased] (the normal case, no VERSION bump)
+# are a no-op pass: the job still runs and reports green, but the roll check is
+# skipped. The enforcement only fires on PRs that actually change VERSION
+# (i.e. the `chore: release` PRs), which is the intent.
 
 on:
   pull_request:
@@ -16,8 +20,25 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check whether VERSION changed in this PR
+        id: version_changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if git diff --name-only "$BASE_SHA" HEAD | grep -qx 'VERSION'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "VERSION changed in this PR — enforcing the changelog roll."
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "VERSION unchanged — skipping the roll check (feature PRs accumulate under [Unreleased])."
+          fi
 
       - name: Verify changelog was rolled with the version bump
+        if: steps.version_changed.outputs.changed == 'true'
         run: |
           set -euo pipefail
 

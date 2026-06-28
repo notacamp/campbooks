@@ -486,7 +486,34 @@ Rails.application.routes.draw do
           resources :messages, only: [ :index, :create ], controller: "scout_messages"
         end
       end
+
+      # Scheduled (and recurring) email sends. destroy = cancel (status only).
+      resources :scheduled_emails, only: [ :index, :show, :create, :update, :destroy ]
+
+      # Calendar events. Writes ride the same provider write-through job as the web.
+      resources :calendar_events, only: [ :index, :show, :create, :update, :destroy ] do
+        member { post :rsvp }
+      end
+
+      # AI-extracted reminders. Read + state transitions only (no manual create).
+      resources :reminders, only: [ :index, :show ] do
+        member do
+          post :confirm
+          post :dismiss
+          post :snooze
+        end
+      end
+
+      # Custom folders (MailFolder) + filing documents into them. No provider-side
+      # folder create/rename over the API (per-account side effects).
+      resources :folders, only: [ :index, :show ], controller: "folders"
+      resources :folder_memberships, only: [ :create, :destroy ]
     end
+
+    # MCP (Model Context Protocol) JSON-RPC endpoint. Protocol-versioned via the
+    # initialize handshake, not URL-versioned, so it sits beside v1 (and the
+    # /api/oauth token endpoint), not under it. Same bearer-token auth.
+    post "mcp", to: "mcp#create"
   end
 
   namespace :oauth do

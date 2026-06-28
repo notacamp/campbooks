@@ -92,6 +92,25 @@ module Api
         Current.user
       end
 
+      # True if the bearer token was granted `name` (a scope string/symbol). Used
+      # by the MCP endpoint, which gates each tool by its REST twin's scope inside
+      # the action body rather than via a per-action before_action.
+      def token_has_scope?(name)
+        doorkeeper_token&.scopes&.exists?(name.to_s) || false
+      end
+
+      # JSON-API counterpart of the web EntitlementGuard concern: fail closed with
+      # 403 when the acting workspace's plan doesn't include `feature_key`.
+      # BaseController inherits ActionController::Base (not ApplicationController),
+      # so the web concern + current_entitlements helper are unavailable here.
+      def require_entitlement!(feature_key)
+        return if Current.workspace&.entitlements&.feature?(feature_key)
+
+        render_api_error("entitlement_required",
+                         "Your plan does not include this feature.",
+                         status: :forbidden)
+      end
+
       # ---- response helpers -------------------------------------------------
 
       # Single resource: { data: {...} }. `data` is an already-serialized hash.

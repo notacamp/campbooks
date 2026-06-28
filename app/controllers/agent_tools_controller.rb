@@ -7,20 +7,16 @@ class AgentToolsController < ApplicationController
     args = JSON.parse(args) if args.is_a?(String)
     thread = current_user.agent_threads.find_by(id: params[:thread_id]) || AgentThread.default_for(current_user)
 
-    result = case tool
-    when "bulk_archive"
-      Tools::BulkArchive.call(args)
-    when "bulk_tag"
-      Tools::BulkTag.call(args)
-    when "reclassify"
-      Tools::Reclassify.call(args)
-    else
-      nil
-    end
+    # Only confirm-level tools may be executed from a user click; everything
+    # runs through the one registry path (schema-validated, single dispatch),
+    # never the per-tool case ladders the agent loop also uses.
+    tool_def = Scout::ToolRegistry.find(tool)
+    result = tool_def&.confirm? ? Scout::ToolRegistry.run(tool, args) : nil
+    success = result.is_a?(Hash) && result[:error].blank?
 
     respond_to do |format|
       format.turbo_stream do
-        if result
+        if success
           toast_message = case tool
           when "bulk_archive"
             "Archived #{result[:archived_count]} email(s)"
