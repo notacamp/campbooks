@@ -283,6 +283,10 @@ en:
           connected_label: Connected
           disconnect: Disconnect
           disconnect_confirm: Disconnect Google Drive? Document uploads will stop.
+          failed_count:
+            one: One document failed to upload. You can retry it below.
+            other: '%{count} documents failed to upload. You can retry them all below.'
+          retry_all_failed: Retry all failed uploads
           drive_org_desc: Each document type can have its own folder, naming pattern,
             and subfolder structure.
           drive_org_heading: How Drive Organizes Your Files
@@ -298,16 +302,15 @@ en:
           title: Google Drive
       google_drive_configs:
         edit:
-          auto_push_hint: When enabled, approved documents of this type are automatically
-            uploaded to Google Drive.
-          auto_push_label: Auto-push when document is approved
-          folder_id_hint_html: 'Find this in the Google Drive folder URL: %{url}'
-          folder_id_label: Drive Folder ID
-          folder_id_placeholder: e.g. 1a2b3c4d5e...
-          folder_path_hint: A human-readable label shown in the UI. Not used for the
-            actual upload.
-          folder_path_label: Folder Label
-          folder_path_placeholder: e.g. Campbooks / Invoices
+          auto_push_default_note: Auto-push is on by default — approved documents of this
+            type will be uploaded to Drive automatically. Uncheck the box above to pause it.
+          auto_push_hint: When checked, approved documents of this type are automatically
+            uploaded to Google Drive. Uncheck to pause.
+          auto_push_label: Upload automatically when approved
+          browse: Browse
+          folder_from_id: Folder selected
+          folder_label: Destination folder
+          no_folder_selected: No folder selected — pick one below
           naming_pattern_hint: 'Available placeholders: {date}, {entity}, {reference},
             {type}, {vendor}, {id}'
           naming_pattern_label: File Naming Pattern
@@ -318,6 +321,16 @@ en:
             by entity name (vendor or client)."
           subfolder_pattern_label: Subfolder Workspace
           subtitle: Control how documents of this type are pushed to Google Drive.
+        browse_folders:
+          browse_failed: 'Could not list folders: %{message}'
+          create_folder: Create
+          my_drive: My Drive
+          new_folder_placeholder: New folder name
+          no_subfolders: No subfolders here
+          reconnect_needed: Reconnect Google Drive with full access to browse folders.
+          select: Select
+          select_my_drive: Use My Drive root
+          select_this: 'Select "%{name}"'
       index:
         show:
           api_connections_desc: Save outbound API integrations (base URL + auth) once,

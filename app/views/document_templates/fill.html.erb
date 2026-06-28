@@ -1,0 +1,48 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t("document_templates.fill.title", name: @template.name), subtitle: @template.description.presence)) %>
+
+<% type_map = { "date" => :date, "number" => :number, "email" => :email } %>
+
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+  <div class="space-y-6 lg:col-span-2">
+    <%= render(Campbooks::Card.new(padding: :md)) do %>
+      <h2 class="text-base font-semibold text-gray-900 mb-4"><%= t("document_templates.fill.variables_heading") %></h2>
+      <% if @variables.any? %>
+        <%= form_with url: preview_document_template_path(@template), method: :post, class: "space-y-4" do %>
+          <% @variables.each do |variable| %>
+            <%= render(Campbooks::Input.new(
+                  "variables[#{variable["key"]}]",
+                  type: type_map[variable["type"]] || :text,
+                  label: variable["label"].presence || variable["key"],
+                  value: @prefilled[variable["key"]].presence || variable["default"].presence,
+                  required: variable["required"] ? true : false)) %>
+          <% end %>
+          <%= render(Campbooks::Button.new(variant: :primary, size: :md, type: :submit)) { t("document_templates.fill.preview_pdf") } %>
+        <% end %>
+      <% else %>
+        <p class="text-sm text-gray-500"><%= t("document_templates.fill.no_preview_yet") %></p>
+      <% end %>
+    <% end %>
+
+    <%= render(Campbooks::Card.new(padding: :md)) do %>
+      <h2 class="text-base font-semibold text-gray-900 mb-3"><%= t("document_templates.fill.pdf_preview_heading") %></h2>
+      <% if @template.preview_pdf.attached? %>
+        <iframe src="<%= url_for(@template.preview_pdf) %>" class="w-full rounded-lg border border-gray-200" style="height: 600px;" title="<%= t("document_templates.fill.pdf_preview_heading") %>"></iframe>
+      <% else %>
+        <p class="text-sm text-gray-500"><%= t("document_templates.fill.no_preview_yet") %></p>
+      <% end %>
+    <% end %>
+  </div>
+
+  <div class="lg:col-span-1">
+    <%= render(Campbooks::Card.new(padding: :md)) do %>
+      <h2 class="text-base font-semibold text-gray-900 mb-4"><%= t("document_templates.fill.send_heading") %></h2>
+      <%= form_with url: send_email_document_template_path(@template), method: :post, class: "space-y-4" do %>
+        <%= render(Campbooks::Input.new("to_address", type: :email, label: t("document_templates.fill.to_address"), required: true)) %>
+        <%= render(Campbooks::Input.new("subject", label: t("document_templates.fill.subject"), value: @template.name)) %>
+        <%= render(Campbooks::Textarea.new("body", label: t("document_templates.fill.body"), rows: 3)) %>
+        <%= render(Campbooks::Button.new(variant: :primary, size: :md, type: :submit, class: "w-full")) { t("document_templates.fill.send") } %>
+      <% end %>
+    <% end %>
+  </div>
+</div>

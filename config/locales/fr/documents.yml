@@ -76,6 +76,7 @@ fr:
       accepted_formats: PDF, JPG, PNG, WEBP, HEIC
       click_to_upload: Cliquer pour téléverser
       col_date: Date
+      col_drive_title: Google Drive
       col_name: Nom
       col_reference: Référence
       col_source: Source
@@ -118,6 +119,37 @@ fr:
       title: Documents
       upload: Téléverser
       upload_and_process: Téléverser et traiter
+      write: Écrire
+    written:
+      index:
+        title: Documents rédigés
+        back_to_documents: Retour aux Docs
+        new: Nouveau document
+        empty_title: Aucun document rédigé pour l'instant
+        empty_description: Rédigez des documents mis en forme comme des lettres, des rapports et des notes à partir de zéro.
+      new:
+        title: Écrire un document
+        title_placeholder: Titre du document
+        editor_placeholder: Commencez à écrire…
+        save: Enregistrer le document
+        cancel: Annuler
+        back_to_documents: Retour aux Docs
+      create:
+        created: Document enregistré.
+      show:
+        edit: Modifier
+        back_to_documents: Retour aux Docs
+        created_at: "Créé le %{date}"
+        by: par %{name}
+      edit:
+        title: Modifier le document
+        title_placeholder: Titre du document
+        editor_placeholder: Commencez à écrire…
+        save: Enregistrer les modifications
+        cancel: Annuler
+        back_to_document: Retour au document
+      update:
+        updated: Document mis à jour.
     merge:
       keep_this_one: Conserver celui-ci
       label_date: 'Date :'
@@ -176,6 +208,10 @@ fr:
       fullscreen_iframe_title: Aperçu PDF plein écran
     row:
       approve: Approuver
+      drive_failed_retry: 'Échec de l''envoi vers Drive : %{error}. Cliquez pour réessayer.'
+      drive_pushed: Dans Drive depuis %{at}
+      drive_retry: Réessayer
+      in_drive: Dans Drive
       reanalyze: Ré-analyser
       reject: Rejeter
       rename: Renommer

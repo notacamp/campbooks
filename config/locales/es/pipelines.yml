@@ -1,0 +1,42 @@
+---
+es:
+  settings:
+    pipelines:
+      index:
+        heading: Pipelines
+        subtitle: Crea flujos de trabajo personalizados para hacer seguimiento de documentos
+          a través de etapas.
+        new_pipeline: Nuevo pipeline
+        view_board: Ver tablero
+        confirm_delete: "¿Eliminar este pipeline? Se eliminarán todas las asociaciones."
+        empty_title: Sin pipelines aún
+        empty_description: Crea un pipeline para hacer seguimiento de documentos o
+          correos a través de etapas personalizadas, como un tablero kanban.
+        create_first: Crea tu primer pipeline
+      new:
+        heading: Nuevo pipeline
+        subtitle: Define las etapas por las que se moverán tus documentos.
+      edit:
+        heading: Editar pipeline
+        subtitle: Modifica las etapas o la configuración del pipeline.
+      create:
+        created: Pipeline creado.
+      update:
+        updated: Pipeline actualizado.
+      destroy:
+        deleted: Pipeline eliminado.
+      form:
+        name_placeholder: p. ej. Aprobación de facturas
+        description_placeholder: Qué hace seguimiento este pipeline
+        applies_to_options:
+          documents: Documentos
+          emails: Correos
+          both: Ambos
+        stages_heading: Etapas
+        add_stage: Añadir etapa
+        stages_hint: Arrastra para reordenar las etapas. Los elementos en etapas terminales
+          no se pueden mover.
+  navigation:
+    settings:
+      items:
+        pipelines: Pipelines

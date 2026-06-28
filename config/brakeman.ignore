@@ -47,6 +47,18 @@
       "fingerprint": "fdc344e29e32d7fda541b4db0b4db2bed2232b0c771905f4f6000c432d2b3a40",
       "file": "app/services/microsoft/mail_client.rb",
       "note": "False positive: this is a Faraday HTTP connection.delete(url) to an external mail API, not an ActiveRecord SQL call."
+    },
+    {
+      "warning_type": "Cross-Site Scripting",
+      "fingerprint": "95bcbec767afa346d686b5b8dbebfea7e7e70674f32610c315d469722cfd27ad",
+      "file": "app/views/documents/_card.html.erb",
+      "note": "False positive (LinkToHref): Document#google_drive_url returns a hardcoded \"https://drive.google.com/file/d/<id>/view\" URL where <id> is a Drive API file id (never user input), so the href can never carry a javascript:/data: scheme. The value is a plain (non-html_safe) string, escaped normally by Rails."
+    },
+    {
+      "warning_type": "Cross-Site Scripting",
+      "fingerprint": "583275b7a183848bf15a9537f01a87bdb51325ef3e402d87db88293533f2e297",
+      "file": "app/views/documents/_row.html.erb",
+      "note": "False positive (LinkToHref): same as _card — Document#google_drive_url is a hardcoded https://drive.google.com link built from an API-supplied file id, never user input."
     }
   ],
   "brakeman_version": "8.0.5"

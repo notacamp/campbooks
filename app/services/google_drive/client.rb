@@ -1,3 +1,5 @@
+require "ostruct"
+
 module GoogleDrive
   class Client
     BASE_URL = "https://www.googleapis.com/drive/v3"
@@ -96,14 +98,15 @@ module GoogleDrive
       (data["files"] || []).map { |f| OpenStruct.new(id: f["id"], name: f["name"]) }
     end
 
-    # Fetches a single folder's id + name (used to label a pasted/selected folder).
+    # Fetches a single folder's id, name, and parents (the parents let the folder
+    # browser build an "up one level" breadcrumb link).
     def get_folder(folder_id)
       response = json_connection.get("#{BASE_URL}/files/#{folder_id}") do |req|
-        req.params["fields"] = "id,name,mimeType"
+        req.params["fields"] = "id,name,mimeType,parents"
       end
       data = JSON.parse(response.body)
       return nil if data["error"]
-      OpenStruct.new(id: data["id"], name: data["name"])
+      OpenStruct.new(id: data["id"], name: data["name"], parents: data["parents"])
     rescue Faraday::Error
       nil
     end

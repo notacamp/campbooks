@@ -29,6 +29,10 @@ class EmailComposeController < ApplicationController
   end
 
   def send_message
+    if params[:send_action] == "schedule" && current_entitlements.feature?(:email_scheduling)
+      return create_scheduled_email
+    end
+
     args = compose_params
 
     # Append the selected signature (with separation; never doubled). See
@@ -67,6 +71,46 @@ class EmailComposeController < ApplicationController
   end
 
   private
+
+  def create_scheduled_email
+    args = compose_params
+
+    # Bake in the selected signature exactly like an immediate send, so the
+    # queued message goes out identical to what "Send now" would have produced.
+    body = args[:body]
+    if params[:signature_id].present?
+      sig = Current.user.signatures.find_by(id: params[:signature_id])
+      body = Signature.append_to_body(body, sig)
+    end
+
+    scheduled = ScheduledEmail.new(
+      workspace: Current.workspace,
+      email_account_id: params[:email_account_id] || @message&.email_account_id,
+      created_by: Current.user,
+      to_address: args[:to_address],
+      subject: args[:subject],
+      body: body,
+      cc_address: args[:cc_address],
+      bcc_address: args[:bcc_address],
+      scheduled_at: params[:scheduled_at].presence || 1.hour.from_now,
+      rrule: params[:rrule].presence
+    )
+
+    return error_response(t(".schedule_failed")) unless scheduled.save
+
+    next_at = scheduled.rrule.present? ? ScheduleCalculator.next_occurrence(scheduled.scheduled_at, scheduled.rrule) : scheduled.scheduled_at
+    scheduled.update_columns(next_occurrence_at: next_at)
+
+    toast = t(".scheduled", time: l(scheduled.display_time, format: :short))
+    respond_to do |format|
+      format.turbo_stream do
+        streams = [ notify_stream(toast, severity: :success) ]
+        streams << turbo_stream.remove("compose_area_#{@message.id}") if @message
+        render turbo_stream: streams
+      end
+      format.html { redirect_to scheduled_emails_path, notice: toast }
+    end
+  end
 
   # The composer goes to a different target per surface. The bottom-right drawer
   # replaces its OWN slot (a distinct id, because the full page's

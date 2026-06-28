@@ -1,0 +1,31 @@
+---
+pt:
+  components:
+    pipeline:
+      board:
+        add_items: Adicionar itens
+        add_stages: Adicionar fases
+        back: Voltar aos pipelines
+        drag_hint: Arraste cartões entre fases
+        no_stages_description: Adicione fases a este pipeline antes de poder monitorizar
+          itens no quadro.
+        no_stages_title: Sem fases ainda
+      board_card:
+        no_subject: "(sem assunto)"
+        remove: Remover do pipeline
+        remove_confirm: Remover este item do pipeline?
+      board_column:
+        empty: Sem itens ainda
+        more: "+ mais"
+        terminal_hint: Fase terminal — os itens não podem ser arrastados para fora
+      item_picker:
+        add: Adicionar
+        empty: Nada mais para adicionar.
+        no_subject: "(sem assunto)"
+        search_placeholder: Pesquisar documentos e emails…
+        title: "Adicionar a %{pipeline}"
+      stage_row:
+        description_placeholder: Descrição (opcional)
+        name_placeholder: Nome da fase
+        remove_stage: Remover fase
+        terminal: Terminal

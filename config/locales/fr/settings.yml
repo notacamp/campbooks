@@ -298,6 +298,10 @@ fr:
           disconnect: Déconnecter
           disconnect_confirm: Déconnecter Google Drive ? Les uploads de documents
             s'arrêteront.
+          failed_count:
+            one: Un document n'a pas pu être envoyé. Vous pouvez réessayer ci-dessous.
+            other: "%{count} documents n'ont pas pu être envoyés. Vous pouvez tous les réessayer ci-dessous."
+          retry_all_failed: Réessayer tous les envois échoués
           drive_org_desc: Chaque type de document peut avoir son propre dossier, son
             modèle de nommage et sa structure de sous-dossiers.
           drive_org_heading: Comment Drive organise vos fichiers
@@ -314,16 +318,13 @@ fr:
           title: Google Drive
       google_drive_configs:
         edit:
-          auto_push_hint: Lorsque cette option est activée, les documents approuvés
-            de ce type sont automatiquement uploadés vers Google Drive.
-          auto_push_label: Envoi automatique à l'approbation du document
-          folder_id_hint_html: 'Trouvez-le dans l''URL du dossier Google Drive : %{url}'
-          folder_id_label: ID du dossier Drive
-          folder_id_placeholder: ex. 1a2b3c4d5e...
-          folder_path_hint: Un libellé lisible affiché dans l'interface. Non utilisé
-            pour l'upload réel.
-          folder_path_label: Libellé du dossier
-          folder_path_placeholder: ex. Campbooks / Factures
+          auto_push_default_note: L'envoi automatique est activé par défaut — les documents approuvés de ce type seront automatiquement envoyés vers Drive. Décochez la case ci-dessus pour le mettre en pause.
+          auto_push_hint: Lorsque cette option est cochée, les documents approuvés de ce type sont automatiquement envoyés vers Google Drive. Décochez pour mettre en pause.
+          auto_push_label: Envoyer automatiquement à l'approbation
+          browse: Parcourir
+          folder_from_id: Dossier sélectionné
+          folder_label: Dossier de destination
+          no_folder_selected: Aucun dossier sélectionné — choisissez-en un ci-dessous
           naming_pattern_hint: 'Espaces réservés disponibles : {date}, {entity}, {reference},
             {type}, {vendor}, {id}'
           naming_pattern_label: Modèle de nommage des fichiers
@@ -335,6 +336,16 @@ fr:
           subfolder_pattern_label: Structure de sous-dossiers
           subtitle: Contrôlez la façon dont les documents de ce type sont envoyés
             vers Google Drive.
+        browse_folders:
+          browse_failed: 'Impossible de lister les dossiers : %{message}'
+          create_folder: Créer
+          my_drive: Mon Drive
+          new_folder_placeholder: Nom du nouveau dossier
+          no_subfolders: Aucun sous-dossier ici
+          reconnect_needed: Reconnectez Google Drive avec un accès complet pour parcourir les dossiers.
+          select: Sélectionner
+          select_my_drive: Utiliser la racine de Mon Drive
+          select_this: 'Sélectionner « %{name} »'
       index:
         show:
           api_connections_desc: Enregistrez des intégrations API sortantes (URL de

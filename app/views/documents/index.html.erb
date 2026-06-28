@@ -22,6 +22,7 @@
         <%= render Campbooks::Button.new(variant: :outline, size: :sm, type: :submit,
               data: { turbo_confirm: t(".export_confirm") }) { t(".export") } %>
       <% end %>
+      <%= render Campbooks::Button.new(variant: :outline, size: :sm, href: written_documents_path) { t(".write") } %>
       <button type="button" data-action="click->upload#toggle"
           class="inline-flex items-center px-4 py-2 bg-accent-600 text-white text-sm font-medium rounded-md hover:bg-accent-700 cursor-pointer">
         <%= t(".upload") %>
@@ -159,13 +160,16 @@
         <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_reference") %></th>
         <th class="w-[10%] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_status") %></th>
         <th class="w-[8%] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_source") %></th>
+        <th class="w-8 px-3 py-3 text-center text-xs font-medium text-gray-500" title="<%= t('.col_drive_title') %>">
+          <svg class="w-3.5 h-3.5 text-gray-400 inline-block" viewBox="0 0 87.3 78" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6.6 66.85l3.85 6.65c.8 1.35 1.95 1.7 3.05 1.15L42.35 58l-13.5-23.4h.05l-25.15 14.5a3.5 3.5 0 00-1.25 4.75l4.1 7z" fill="#0066DA"/><path d="M56.15 34.6l-13.8-23.9-15.6 27 13.8 23.9h.05l28.6-16.5c.9-.55 1.35-1.65 1.25-2.9l-1.7-26.1-12.6 18.5z" fill="#FFBA00"/><path d="M70.1 30.05L56.15 34.6 68.75 53.1 87.3 42.4a3.5 3.5 0 001.25-4.75l-5.6-9.6c-.8-1.35-2.1-1.8-3.3-1.45l-9.55 1.45z" fill="#2684FC"/><path d="M43.65 78h11.2c1.55 0 2.8-.85 3.35-2.2l11.45-24.1-13.8-23.9L42.35 58l15.6 20-1.05 6.35c-.15.9-1.1 1.5-1.9 1.15l-11.35-7.55z" fill="#00AC47"/></svg>
+        </th>
       </tr>
     </thead>
     <tbody id="documents_tbody" class="bg-card divide-y divide-gray-200">
       <%= render partial: "documents/row", collection: @documents, as: :doc %>
       <% if @documents.empty? %>
         <tr>
-          <td colspan="6" class="px-6 py-8 text-center text-sm text-gray-500"><%= t(".no_documents") %></td>
+          <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500"><%= t(".no_documents") %></td>
         </tr>
       <% end %>
     </tbody>

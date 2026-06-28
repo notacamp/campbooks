@@ -51,13 +51,15 @@ en:
     features:
       ai_model_access: AI models
       email_accounts: Email accounts
+      email_scheduling: Email scheduling
       emails_synced: Emails synced
       managed_ai: Campbooks AI
       notifications: Notifications
+      pipelines: Pipelines
       scout: Scout
       workflow_executions: Workflow runs
-      organizations: Organizations
       workflows: Workflows
+      document_templates: Document templates
   navigation:
     settings:
       items:

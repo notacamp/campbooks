@@ -47,6 +47,9 @@ en:
       placeholder_body: Write your message...
       placeholder_cc: Add CC...
       placeholder_to: Search contacts or type email...
+      schedule: Schedule
+      schedule_at_label: Send at
+      schedule_for_later: Schedule for later
       send: Send
       signature_default: "%{name} (default)"
       signature_preview_label: Signature
@@ -187,3 +190,14 @@ en:
       text_color: Text color
       underline: Underline
       undo: Undo
+      table: Insert table
+      add_row_before: Add row
+      delete_row: Delete row
+      add_column_before: Add column
+      delete_column: Delete column
+      toggle_header: Toggle header
+      font_family: Font
+      default_font: Default font
+      highlight_color: Highlight color
+      superscript: Superscript
+      subscript: Subscript

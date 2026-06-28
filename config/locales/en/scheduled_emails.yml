@@ -1,0 +1,71 @@
+---
+en:
+  scheduled_emails:
+    index:
+      title: Scheduled emails
+      new: New scheduled email
+      empty_title: No scheduled emails
+      empty_description: Schedule an email to be sent later — one time or recurring.
+      to: "To %{address}"
+      scheduled_for: "Scheduled for %{time}"
+      recurring: Recurring
+    new:
+      title: Schedule an email
+    create:
+      created: Email scheduled successfully.
+    edit:
+      title: Edit scheduled email
+    update:
+      updated: Scheduled email updated.
+    destroy:
+      cancelled: Scheduled email cancelled.
+    show:
+      title: Scheduled email
+      back: ← Back to scheduled emails
+      edit: Edit
+      cancel: Cancel schedule
+      confirm_cancel: Cancel this scheduled email?
+      from: From
+      scheduled: Scheduled
+      recurring_label: "Repeats: %{rule}"
+      status: Status
+      preview: Preview
+    form:
+      errors:
+        one: "1 error prevented this scheduled email from being saved:"
+        other: "%{count} errors prevented this scheduled email from being saved:"
+      select_account: Select an email account…
+      body_placeholder: Write your email here.
+      rrule_hint: Choose how often this email repeats. "Does not repeat" sends it once.
+      cancel: Cancel
+    recurrence:
+      none: Does not repeat
+      daily: Daily
+      weekly: Weekly
+      biweekly: Every 2 weeks
+      monthly: Monthly
+      custom: Custom
+  email_compose:
+    send_message:
+      scheduled: "Email scheduled for %{time}. Manage it under Scheduled emails."
+      schedule_failed: Could not schedule the email. Please check the required fields.
+  activerecord:
+    attributes:
+      scheduled_email:
+        to_address: To
+        cc_address: Cc
+        bcc_address: Bcc
+        subject: Subject
+        body: Body
+        scheduled_at: Send at
+        rrule: Recurrence
+        email_account_id: From
+        statuses:
+          pending: Pending
+          sent: Sent
+          cancelled: Cancelled
+          failed: Failed
+    models:
+      scheduled_email:
+        one: Scheduled email
+        other: Scheduled emails
