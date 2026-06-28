@@ -257,6 +257,9 @@ class Document < ApplicationRecord
 
   def google_drive_url
     return nil unless google_drive_file_id.present?
+    # google_drive_file_id is a Drive API file id (never user input), so this is
+    # always a safe https://drive.google.com link. Returned as a plain string —
+    # Rails escapes it normally when it's used as a link href.
     "https://drive.google.com/file/d/#{google_drive_file_id}/view"
   end
 
