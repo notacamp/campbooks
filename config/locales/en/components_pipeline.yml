@@ -1,0 +1,31 @@
+---
+en:
+  components:
+    pipeline:
+      board:
+        add_items: Add items
+        add_stages: Add stages
+        back: Back to pipelines
+        drag_hint: Drag cards between stages
+        no_stages_description: Add stages to this pipeline before you can track items
+          on the board.
+        no_stages_title: No stages yet
+      board_card:
+        no_subject: "(no subject)"
+        remove: Remove from pipeline
+        remove_confirm: Remove this item from the pipeline?
+      board_column:
+        empty: No items yet
+        more: "+ more"
+        terminal_hint: Terminal stage — items can't be dragged out
+      item_picker:
+        add: Add
+        empty: Nothing left to add.
+        no_subject: "(no subject)"
+        search_placeholder: Search documents and emails…
+        title: "Add to %{pipeline}"
+      stage_row:
+        description_placeholder: Description (optional)
+        name_placeholder: Stage name
+        remove_stage: Remove stage
+        terminal: Terminal

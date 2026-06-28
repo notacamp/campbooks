@@ -1,0 +1,31 @@
+---
+es:
+  components:
+    pipeline:
+      board:
+        add_items: Añadir elementos
+        add_stages: Añadir etapas
+        back: Volver a los pipelines
+        drag_hint: Arrastra tarjetas entre etapas
+        no_stages_description: Añade etapas a este pipeline antes de poder hacer seguimiento
+          de elementos en el tablero.
+        no_stages_title: Sin etapas aún
+      board_card:
+        no_subject: "(sin asunto)"
+        remove: Eliminar del pipeline
+        remove_confirm: "¿Eliminar este elemento del pipeline?"
+      board_column:
+        empty: Sin elementos aún
+        more: "+ más"
+        terminal_hint: Etapa terminal — los elementos no pueden arrastrarse fuera
+      item_picker:
+        add: Añadir
+        empty: Nada más que añadir.
+        no_subject: "(sin asunto)"
+        search_placeholder: Buscar documentos y correos…
+        title: "Añadir a %{pipeline}"
+      stage_row:
+        description_placeholder: Descripción (opcional)
+        name_placeholder: Nombre de la etapa
+        remove_stage: Eliminar etapa
+        terminal: Terminal

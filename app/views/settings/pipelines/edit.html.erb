@@ -1,0 +1,5 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+
+<%= render(Campbooks::PageHeader.new(title: t(".heading"), subtitle: t(".subtitle"))) %>
+
+<%= render "form", pipeline: @pipeline %>
