@@ -1,0 +1,4 @@
+<%= turbo_stream.remove dom_id(@type) %>
+<%= turbo_stream.append "action_toasts" do %>
+  <%= render "shared/action_toast", message: t(".success"), variant: :success %>
+<% end %>

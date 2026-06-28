@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_28_030000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_28_040001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -235,6 +235,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_030000) do
     t.text "description"
     t.datetime "end_at"
     t.string "end_time_zone"
+    t.bigint "event_type_id"
     t.string "html_link"
     t.boolean "is_organizer", default: false, null: false
     t.string "location"
@@ -251,9 +252,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_030000) do
     t.string "start_time_zone"
     t.integer "status", default: 0, null: false
     t.string "title"
+    t.integer "type_status", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["calendar_id", "provider_event_id"], name: "index_calendar_events_on_calendar_and_provider_id", unique: true
     t.index ["calendar_id"], name: "index_calendar_events_on_calendar_id"
+    t.index ["event_type_id"], name: "index_calendar_events_on_event_type_id"
     t.index ["recurring_event_provider_id"], name: "index_calendar_events_on_recurring_event_provider_id"
     t.index ["source_email_message_id"], name: "index_calendar_events_on_source_email_message_id"
     t.index ["start_at", "end_at"], name: "index_calendar_events_on_range"
@@ -673,6 +676,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_030000) do
     t.index ["email_account_id"], name: "index_email_threads_on_email_account_id"
     t.index ["follow_up_at"], name: "index_email_threads_on_due_follow_ups", where: "(follow_up_expected AND (follow_up_dismissed_at IS NULL))"
     t.index ["snoozed_until"], name: "index_email_threads_on_snoozed_until_not_null", where: "(snoozed_until IS NOT NULL)"
+  end
+
+  create_table "event_types", force: :cascade do |t|
+    t.string "color", null: false
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "workspace_id", null: false
+    t.index ["workspace_id", "name"], name: "index_event_types_on_workspace_and_name", unique: true
+    t.index ["workspace_id"], name: "index_event_types_on_workspace_id"
   end
 
   create_table "events", force: :cascade do |t|
@@ -1534,6 +1547,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_030000) do
   add_foreign_key "calendar_accounts", "workspaces"
   add_foreign_key "calendar_events", "calendars"
   add_foreign_key "calendar_events", "email_messages", column: "source_email_message_id", on_delete: :nullify
+  add_foreign_key "calendar_events", "event_types"
   add_foreign_key "calendar_sync_logs", "calendar_accounts"
   add_foreign_key "calendar_webhook_channels", "calendars"
   add_foreign_key "calendars", "calendar_accounts"
@@ -1573,6 +1587,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_28_030000) do
   add_foreign_key "email_messages", "email_threads"
   add_foreign_key "email_scan_logs", "email_accounts"
   add_foreign_key "email_threads", "email_accounts"
+  add_foreign_key "event_types", "workspaces"
   add_foreign_key "events", "events", column: "caused_by_event_id"
   add_foreign_key "events", "workspaces"
   add_foreign_key "exports", "workspaces"

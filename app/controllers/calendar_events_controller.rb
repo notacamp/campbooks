@@ -20,9 +20,11 @@ class CalendarEventsController < ApplicationController
     # A temp id satisfies the (calendar_id, provider_event_id) unique index until
     # the provider assigns the real one (EventWriter swaps it in on create).
     @event.assign_attributes(provider_event_id: "local-#{SecureRandom.uuid}", status: :confirmed, outbound_pending: true)
+    apply_type_choice(@event)
 
     if @event.save
       Calendars::EventWriteJob.perform_later(@event.id, "create")
+      enqueue_classification(@event)
       Events.publish("calendar_event.created", subject: @event, workspace: @event.calendar.workspace, payload: { "title" => @event.title, "starts_at" => @event.start_at&.iso8601 })
       respond_to do |format|
         format.turbo_stream { flash[:success] = t(".created"); render_event_saved }
@@ -39,8 +41,11 @@ class CalendarEventsController < ApplicationController
   end
 
   def update
-    if @event.update(event_params.except(:calendar_id).merge(outbound_pending: true))
+    @event.assign_attributes(event_params.except(:calendar_id).merge(outbound_pending: true))
+    apply_type_choice(@event)
+    if @event.save
       Calendars::EventWriteJob.perform_later(@event.id, "update", recurrence_scope)
+      enqueue_classification(@event)
       Events.publish("calendar_event.updated", subject: @event, workspace: @event.calendar.workspace, payload: { "title" => @event.title, "starts_at" => @event.start_at&.iso8601 })
       respond_to do |format|
         format.turbo_stream { flash[:success] = t(".updated"); render_event_saved }
@@ -122,6 +127,29 @@ class CalendarEventsController < ApplicationController
 
   def event_params
     params.require(:calendar_event).permit(:title, :description, :location, :start_at, :end_at, :all_day, :calendar_id, :color)
+  end
+
+  # Translate the form's single "Type" selector into event_type + type_status:
+  #   "auto"/blank → pending (AI classifies + colors it in the background)
+  #   "none"       → manual, untyped (keeps the calendar color)
+  #   "<id>"       → manual, that workspace type (scoped, so no cross-workspace ids)
+  def apply_type_choice(event)
+    case params[:type_choice].to_s
+    when "", "auto"
+      event.event_type = nil
+      event.type_status = :pending
+    when "none"
+      event.event_type = nil
+      event.type_status = :manual
+    else
+      type = Current.workspace.event_types.find_by(id: params[:type_choice])
+      event.event_type = type
+      event.type_status = type ? :manual : :pending
+    end
+  end
+
+  def enqueue_classification(event)
+    EventClassificationJob.set(wait: 10.seconds).perform_later(event.id) if event.type_status_pending?
   end
 
   def recurrence_scope
