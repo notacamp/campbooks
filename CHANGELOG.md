@@ -17,6 +17,17 @@ major, minor, or patch change here.
 ## [Unreleased]
 
 ### Added
+- **Public REST API — new resources** — added endpoints for scheduled emails
+  (`scheduled_emails:read`/`:write`), calendar events (`calendar:read`/`:write`),
+  reminders (`reminders:read`/`:write`), and folders with folder-membership
+  filing (`folders:read`/`:write`). See [`docs/api.md`](docs/api.md) /
+  `openapi.yaml`.
+- **MCP endpoint** (`POST /api/mcp`) — exposes the Campbooks API as a Model
+  Context Protocol (JSON-RPC 2.0) server, authenticated with the same bearer
+  token as the REST API. Tools cover email (list/get/send/reply), documents,
+  contacts, calendar events (list/create), scheduled emails (list/create), and
+  reminders; `tools/list` is filtered per-scope so a token only sees the tools it
+  may call.
 - **Credit Note document type** — "Nota de Crédito" (NC) is now a first-class
   document type instead of being filed under expense invoices. Documents the AI
   recognises as credit notes are classified, labelled (en/pt/es/fr), and filtered
