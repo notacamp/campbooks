@@ -103,14 +103,33 @@ class MigratePrimaryKeysToUuid < ActiveRecord::Migration[8.1]
       refs << Ref.new(from_table: from, column: col, to_table: to, on_delete: nil, constraint_name: nil)
     end
 
-    # Snapshot indexes on every table we touch, so we can restore any dropped
-    # when their underlying FK/polymorphic column is dropped.
+    # Capture every secondary index on the tables we touch as raw DDL
+    # (pg_get_indexdef preserves hnsw/gin opclasses and partial/expression indexes
+    # that Rails can't reintrospect), then drop them up front and rebuild once at
+    # the end. Maintaining them row-by-row through the table rewrites and backfills
+    # is what made this unbearable — pgvector HNSW upkeep alone turned a single
+    # backfill into hours. Excludes primary keys (swapped separately) and
+    # constraint-backed indexes (those can't be dropped with DROP INDEX).
     touched = (tables + refs.map(&:from_table) + poly.map(&:first)).uniq
-    indexes_before = touched.index_with { |t| connection.indexes(t) }
+    index_ddls = touched.empty? ? [] : connection.select_rows(<<~SQL.squish)
+      SELECT ic.relname, pg_get_indexdef(i.indexrelid)
+      FROM pg_index i
+      JOIN pg_class ic ON ic.oid = i.indexrelid
+      JOIN pg_class tc ON tc.oid = i.indrelid
+      JOIN pg_namespace n ON n.oid = tc.relnamespace
+      WHERE n.nspname = 'public'
+        AND tc.relname IN (#{touched.map { |t| connection.quote(t) }.join(", ")})
+        AND NOT i.indisprimary
+        AND NOT EXISTS (SELECT 1 FROM pg_constraint c WHERE c.conindid = i.indexrelid)
+    SQL
 
     # NOT NULL flags to restore on rewritten reference columns.
     ref_not_null  = refs.index_with { |r| column_not_null?(r.from_table, r.column) }
     poly_not_null = poly.index_with { |(t, c)| column_not_null?(t, c) }
+
+    say_with_time "Drop #{index_ddls.size} secondary indexes (rebuilt at the end)" do
+      index_ddls.each { |name, _ddl| execute("DROP INDEX IF EXISTS #{qc name}") }
+    end
 
     say_with_time "Add uuid columns to #{tables.size} domain tables" do
       tables.each do |t|
@@ -134,12 +153,21 @@ class MigratePrimaryKeysToUuid < ActiveRecord::Migration[8.1]
       poly.each do |table, col|
         add_column table, "#{col}_new", :uuid
         type_col = col.sub(/_id\z/, "_type")
-        tables.each do |dt|
+        # Only the types actually stored, not all #{tables.size} domain tables.
+        # With the type index dropped above, an UPDATE per absent type would be a
+        # wasted full scan of a possibly-huge table (search_chunks is 1 GB).
+        present_types = connection.select_values(
+          "SELECT DISTINCT #{qc type_col} FROM #{qt table} WHERE #{qc type_col} IS NOT NULL"
+        )
+        present_types.each do |type|
+          dt = type.tableize
+          next unless domain.include?(dt)
+
           execute(<<~SQL.squish)
             UPDATE #{qt table} AS child
             SET #{qc "#{col}_new"} = parent.id_new
             FROM #{qt dt} AS parent
-            WHERE child.#{qc type_col} = #{connection.quote(dt.classify)}
+            WHERE child.#{qc type_col} = #{connection.quote(type)}
               AND child.#{qc col} = parent.id
           SQL
         end
@@ -175,11 +203,8 @@ class MigratePrimaryKeysToUuid < ActiveRecord::Migration[8.1]
       end
     end
 
-    say_with_time "Restore indexes dropped with their columns" do
-      touched.each do |t|
-        existing = connection.indexes(t).map(&:name).to_set
-        indexes_before[t].each { |idx| recreate_index(t, idx) unless existing.include?(idx.name) }
-      end
+    say_with_time "Rebuild #{index_ddls.size} secondary indexes" do
+      index_ddls.each { |_name, ddl| execute(ddl) }
     end
   end
 
@@ -196,13 +221,5 @@ class MigratePrimaryKeysToUuid < ActiveRecord::Migration[8.1]
   def column_not_null?(table, column)
     col = connection.columns(table).find { |c| c.name == column }
     col && !col.null
-  end
-
-  def recreate_index(table, idx)
-    options = { name: idx.name, unique: idx.unique }
-    options[:where] = idx.where if idx.where
-    options[:using] = idx.using if idx.using
-    options[:order] = idx.orders if idx.orders.present?
-    add_index table, idx.columns, **options
   end
 end
