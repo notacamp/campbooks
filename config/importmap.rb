@@ -16,5 +16,12 @@ pin "@tiptap/extension-text-align", to: "https://esm.sh/@tiptap/extension-text-a
 pin "@tiptap/extension-text-style", to: "https://esm.sh/@tiptap/extension-text-style@2.11.2?deps=@tiptap/core@2.11.2"
 pin "@tiptap/extension-color", to: "https://esm.sh/@tiptap/extension-color@2.11.2?deps=@tiptap/core@2.11.2,@tiptap/extension-text-style@2.11.2"
 pin "@tiptap/extension-highlight", to: "https://esm.sh/@tiptap/extension-highlight@2.11.2?deps=@tiptap/core@2.11.2"
+pin "@tiptap/extension-table", to: "https://esm.sh/@tiptap/extension-table@2.11.2?deps=@tiptap/core@2.11.2"
+pin "@tiptap/extension-table-row", to: "https://esm.sh/@tiptap/extension-table-row@2.11.2?deps=@tiptap/core@2.11.2"
+pin "@tiptap/extension-table-cell", to: "https://esm.sh/@tiptap/extension-table-cell@2.11.2?deps=@tiptap/core@2.11.2"
+pin "@tiptap/extension-table-header", to: "https://esm.sh/@tiptap/extension-table-header@2.11.2?deps=@tiptap/core@2.11.2"
+pin "@tiptap/extension-font-family", to: "https://esm.sh/@tiptap/extension-font-family@2.11.2?deps=@tiptap/core@2.11.2,@tiptap/extension-text-style@2.11.2"
+pin "@tiptap/extension-superscript", to: "https://esm.sh/@tiptap/extension-superscript@2.11.2?deps=@tiptap/core@2.11.2"
+pin "@tiptap/extension-subscript", to: "https://esm.sh/@tiptap/extension-subscript@2.11.2?deps=@tiptap/core@2.11.2"
 pin "marked", to: "https://cdn.jsdelivr.net/npm/marked@15.0.9/lib/marked.esm.js"
 pin "html2canvas-pro", to: "https://esm.sh/html2canvas-pro@1.5.11" # lazy-loaded by the bug-report widget for screenshots (maintained fork; supports Tailwind v4 oklch colors)

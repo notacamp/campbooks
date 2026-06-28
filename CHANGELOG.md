@@ -18,6 +18,12 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Document writing tool** — author formatted documents from scratch at
+  **Documents → Write**. Built on the shared rich-text editor with a
+  document-focused toolbar (tables, font family, text highlight, and
+  super/subscript); the existing email-compose and signature editors are
+  unchanged. Saved documents are listed, viewable, and re-editable, scoped to
+  your workspace.
 - **Email scheduling** — schedule one-time or recurring sends (daily, weekly,
   every 2 weeks, or monthly), gated by billing entitlements. Schedule a message
   from the composer's "Schedule for later" picker or the dedicated

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_27_030000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_28_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -144,6 +144,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_030000) do
     t.index ["target_type", "target_id"], name: "index_audit_events_on_target"
     t.index ["user_id", "created_at"], name: "index_audit_events_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_audit_events_on_user_id"
+  end
+
+  create_table "authored_documents", force: :cascade do |t|
+    t.bigint "author_id"
+    t.datetime "created_at", null: false
+    t.text "html_content"
+    t.string "title", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "workspace_id", null: false
+    t.index ["author_id"], name: "index_authored_documents_on_author_id"
+    t.index ["workspace_id", "created_at"], name: "index_authored_documents_on_workspace_id_and_created_at"
+    t.index ["workspace_id"], name: "index_authored_documents_on_workspace_id"
   end
 
   create_table "beta_codes", force: :cascade do |t|
@@ -1464,6 +1476,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_030000) do
   add_foreign_key "ai_configurations", "ai_adapters"
   add_foreign_key "ai_configurations", "workspaces"
   add_foreign_key "audit_events", "users", on_delete: :nullify
+  add_foreign_key "authored_documents", "users", column: "author_id"
+  add_foreign_key "authored_documents", "workspaces"
   add_foreign_key "beta_codes", "users", column: "created_by_id"
   add_foreign_key "beta_codes", "users", column: "redeemed_by_id"
   add_foreign_key "bug_reports", "users"

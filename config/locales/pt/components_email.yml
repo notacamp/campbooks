@@ -189,3 +189,14 @@ pt:
       text_color: Cor do texto
       underline: Sublinhado
       undo: Anular
+      table: Inserir tabela
+      add_row_before: Adicionar linha
+      delete_row: Remover linha
+      add_column_before: Adicionar coluna
+      delete_column: Remover coluna
+      toggle_header: Alternar cabeçalho
+      font_family: Fonte
+      default_font: Fonte padrão
+      highlight_color: Cor de destaque
+      superscript: Sobrescrito
+      subscript: Subscrito
