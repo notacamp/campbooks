@@ -29,6 +29,8 @@
         <% end %>
       </div>
       <% if @has_calendars %>
+        <%= render(Campbooks::Button.new(variant: :outline, size: :sm,
+              href: event_types_path)) { t(".event_types") } %>
         <%= render(Campbooks::Button.new(variant: :primary, size: :sm,
               href: new_calendar_event_path(view: @view),
               data: { "calendar-event-modal-open": new_calendar_event_path(view: @view) })) { t(".new_event") } %>
