@@ -40,6 +40,8 @@ en:
     chat_message:
       ai_badge: AI
       draft_badge: Draft
+      thinking_summary: Thought process
+      step_searched: "Searched %{tool}"
       time_ago: "%{time} ago"
     command_palette:
       capture_placeholder: Move to which folder…

@@ -27,6 +27,37 @@ major, minor, or patch change here.
 - **Drag events across days in month view** — drag an event from one day to another
   in the calendar's month view to reschedule it; the time of day and duration are
   preserved. Works on touch as well as desktop.
+- **Public REST API — new resources** — added endpoints for scheduled emails
+  (`scheduled_emails:read`/`:write`), calendar events (`calendar:read`/`:write`),
+  reminders (`reminders:read`/`:write`), and folders with folder-membership
+  filing (`folders:read`/`:write`). See [`docs/api.md`](docs/api.md) /
+  `openapi.yaml`.
+- **MCP endpoint** (`POST /api/mcp`) — exposes the Campbooks API as a Model
+  Context Protocol (JSON-RPC 2.0) server, authenticated with the same bearer
+  token as the REST API. Tools cover email (list/get/send/reply), documents,
+  contacts, calendar events (list/create), scheduled emails (list/create), and
+  reminders; `tools/list` is filtered per-scope so a token only sees the tools it
+  may call.
+- **Credit Note document type** — "Nota de Crédito" (NC) is now a first-class
+  document type instead of being filed under expense invoices. Documents the AI
+  recognises as credit notes are classified, labelled (en/pt/es/fr), and filtered
+  under Accounting as their own type, with a dedicated extraction schema
+  (credit-note number, original invoice number, amounts, IVA).
+- **Scout can now think.** The global Scout chat shows a collapsible reasoning
+  trace and the tools it ran ("Searched email → 12 results") above each answer,
+  using the model's native reasoning where the configured model supports it
+  (Claude extended thinking, OpenAI/DeepSeek reasoning) and degrading cleanly
+  otherwise.
+
+### Changed
+
+- **Global Scout rebuilt on native tool calling.** Replaced the hand-rolled
+  "emit JSON in prose" protocol with the providers' native function/tool-calling
+  APIs, a single JSON-Schema tool registry (one source of truth, validated
+  before execution), and a model-driven loop that runs until Scout has a real
+  answer instead of erroring out after a fixed number of tool calls. Destructive
+  actions are never executed from model output — they're surfaced as one-click
+  confirmations.
 
 ## [0.3.0] - 2026-06-28
 

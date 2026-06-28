@@ -69,6 +69,7 @@ es:
           certificate: Certificado
           contract: Contrato
           correspondence: Correspondencia
+          credit_note: Nota de crédito
           expense_invoice: Factura de gasto
           identification: Identificación
           insurance_policy: Póliza de seguro
