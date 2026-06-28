@@ -10,24 +10,16 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_23_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
-
-  create_table "account_exports", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.integer "status", default: 0, null: false
-    t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
-    t.index ["user_id"], name: "index_account_exports_on_user_id"
-  end
 
   create_table "action_text_rich_texts", force: :cascade do |t|
     t.text "body"
     t.datetime "created_at", null: false
     t.string "name", null: false
-    t.uuid "record_id", null: false
+    t.bigint "record_id", null: false
     t.string "record_type", null: false
     t.datetime "updated_at", null: false
     t.index ["record_type", "record_id", "name"], name: "index_action_text_rich_texts_uniqueness", unique: true
@@ -37,7 +29,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.bigint "blob_id", null: false
     t.datetime "created_at", null: false
     t.string "name", null: false
-    t.uuid "record_id", null: false
+    t.bigint "record_id", null: false
     t.string "record_type", null: false
     t.index ["blob_id"], name: "index_active_storage_attachments_on_blob_id"
     t.index ["record_type", "record_id", "name", "blob_id"], name: "index_active_storage_attachments_uniqueness", unique: true
@@ -61,11 +53,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
   end
 
-  create_table "agent_messages", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "agent_thread_id"
+  create_table "agent_messages", force: :cascade do |t|
+    t.bigint "agent_thread_id"
     t.jsonb "ai_auto_actions", default: [], null: false
     t.jsonb "ai_prompts", default: [], null: false
-    t.jsonb "ai_provenance", default: {}, null: false
     t.jsonb "ai_suggested_actions", default: [], null: false
     t.integer "author_type", default: 0, null: false
     t.text "content", null: false
@@ -74,22 +65,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.boolean "outdated", default: false, null: false
     t.integer "reply_status"
     t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
+    t.bigint "user_id", null: false
     t.index ["agent_thread_id", "created_at"], name: "index_agent_messages_on_agent_thread_id_and_created_at"
     t.index ["agent_thread_id"], name: "index_agent_messages_on_agent_thread_id"
     t.index ["user_id", "created_at"], name: "index_agent_messages_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_agent_messages_on_user_id"
   end
 
-  create_table "agent_threads", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "contextable_id"
+  create_table "agent_threads", force: :cascade do |t|
+    t.integer "contextable_id"
     t.string "contextable_type"
     t.datetime "created_at", null: false
     t.integer "purpose", default: 0, null: false
     t.string "title", null: false
     t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
-    t.uuid "workspace_id"
+    t.bigint "user_id", null: false
+    t.bigint "workspace_id"
     t.index ["contextable_type", "contextable_id"], name: "index_agent_threads_on_contextable_type_and_contextable_id"
     t.index ["purpose"], name: "index_agent_threads_on_purpose"
     t.index ["user_id", "created_at"], name: "index_agent_threads_on_user_id_and_created_at"
@@ -97,7 +88,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["workspace_id"], name: "index_agent_threads_on_workspace_id"
   end
 
-  create_table "ai_adapters", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "ai_adapters", force: :cascade do |t|
     t.string "api_key"
     t.datetime "created_at", null: false
     t.boolean "enabled", default: true, null: false
@@ -107,13 +98,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.string "name", null: false
     t.string "provider", null: false
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id", null: false
+    t.bigint "workspace_id", null: false
     t.index ["workspace_id", "name"], name: "index_ai_adapters_on_workspace_id_and_name", unique: true
     t.index ["workspace_id"], name: "index_ai_adapters_on_workspace_id"
   end
 
-  create_table "ai_configurations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "ai_adapter_id"
+  create_table "ai_configurations", force: :cascade do |t|
+    t.bigint "ai_adapter_id"
     t.datetime "created_at", null: false
     t.boolean "enabled", default: true, null: false
     t.integer "max_tokens", default: 4000, null: false
@@ -122,43 +113,42 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.text "system_prompt"
     t.float "temperature", default: 0.0, null: false
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id"
+    t.bigint "workspace_id"
     t.index ["ai_adapter_id"], name: "index_ai_configurations_on_ai_adapter_id"
     t.index ["workspace_id", "purpose"], name: "index_ai_configurations_on_workspace_and_purpose", unique: true
     t.index ["workspace_id"], name: "index_ai_configurations_on_workspace_id"
   end
 
-  create_table "audit_events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "audit_events", force: :cascade do |t|
     t.string "action"
     t.datetime "created_at", null: false
     t.string "ip_address"
     t.jsonb "metadata", default: {}, null: false
-    t.uuid "target_id"
+    t.bigint "target_id"
     t.string "target_type"
     t.datetime "updated_at", null: false
     t.string "user_agent"
-    t.uuid "user_id"
+    t.bigint "user_id"
     t.index ["action"], name: "index_audit_events_on_action"
     t.index ["target_type", "target_id"], name: "index_audit_events_on_target"
-    t.index ["user_id", "created_at"], name: "index_audit_events_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_audit_events_on_user_id"
   end
 
-  create_table "beta_codes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "beta_codes", force: :cascade do |t|
     t.string "code", null: false
     t.datetime "created_at", null: false
-    t.uuid "created_by_id"
+    t.bigint "created_by_id"
     t.datetime "expires_at"
     t.string "label"
     t.datetime "redeemed_at"
-    t.uuid "redeemed_by_id"
+    t.bigint "redeemed_by_id"
     t.datetime "updated_at", null: false
     t.index ["code"], name: "index_beta_codes_on_code", unique: true
     t.index ["created_by_id"], name: "index_beta_codes_on_created_by_id"
     t.index ["redeemed_by_id"], name: "index_beta_codes_on_redeemed_by_id"
   end
 
-  create_table "bug_reports", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "bug_reports", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "description", null: false
     t.integer "github_issue_number"
@@ -168,28 +158,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.integer "status", default: 0, null: false
     t.datetime "updated_at", null: false
     t.string "user_agent"
-    t.uuid "user_id", null: false
-    t.uuid "workspace_id", null: false
+    t.bigint "user_id", null: false
+    t.bigint "workspace_id", null: false
     t.index ["status"], name: "index_bug_reports_on_status"
     t.index ["user_id"], name: "index_bug_reports_on_user_id"
     t.index ["workspace_id", "created_at"], name: "index_bug_reports_on_workspace_id_and_created_at"
   end
 
-  create_table "calendar_account_users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "calendar_account_id", null: false
+  create_table "calendar_account_users", force: :cascade do |t|
+    t.bigint "calendar_account_id", null: false
     t.boolean "can_manage", default: false, null: false
     t.boolean "can_read", default: true, null: false
     t.boolean "can_write", default: false, null: false
     t.datetime "created_at", null: false
     t.boolean "owner", default: false, null: false
     t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
+    t.bigint "user_id", null: false
     t.index ["calendar_account_id", "user_id"], name: "index_calendar_account_users_on_account_and_user", unique: true
     t.index ["calendar_account_id"], name: "index_calendar_account_users_on_calendar_account_id"
     t.index ["user_id"], name: "index_calendar_account_users_on_user_id"
   end
 
-  create_table "calendar_accounts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "calendar_accounts", force: :cascade do |t|
     t.boolean "active", default: true, null: false
     t.string "color", default: "#3b82f6", null: false
     t.datetime "created_at", null: false
@@ -202,17 +192,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.datetime "scan_started_at"
     t.boolean "scanning", default: false, null: false
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id", null: false
+    t.bigint "workspace_id", null: false
     t.index ["active"], name: "index_calendar_accounts_active", where: "(active = true)"
     t.index ["email_address", "provider"], name: "index_calendar_accounts_on_email_and_provider", unique: true
     t.index ["provider"], name: "index_calendar_accounts_on_provider"
     t.index ["workspace_id"], name: "index_calendar_accounts_on_workspace_id"
   end
 
-  create_table "calendar_events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "calendar_events", force: :cascade do |t|
     t.boolean "all_day", default: false, null: false
     t.jsonb "attendees", default: [], null: false
-    t.uuid "calendar_id", null: false
+    t.bigint "calendar_id", null: false
     t.string "color"
     t.string "conference_url"
     t.datetime "created_at", null: false
@@ -230,7 +220,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.string "recurring_event_provider_id"
     t.string "rrule"
     t.integer "rsvp_status"
-    t.uuid "source_email_message_id"
+    t.bigint "source_email_message_id"
     t.datetime "start_at"
     t.string "start_time_zone"
     t.integer "status", default: 0, null: false
@@ -245,8 +235,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["status"], name: "index_calendar_events_on_status"
   end
 
-  create_table "calendar_sync_logs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "calendar_account_id", null: false
+  create_table "calendar_sync_logs", force: :cascade do |t|
+    t.bigint "calendar_account_id", null: false
     t.datetime "completed_at"
     t.datetime "created_at", null: false
     t.jsonb "error_messages", default: []
@@ -259,8 +249,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["calendar_account_id"], name: "index_calendar_sync_logs_on_calendar_account_id"
   end
 
-  create_table "calendar_webhook_channels", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "calendar_id", null: false
+  create_table "calendar_webhook_channels", force: :cascade do |t|
+    t.bigint "calendar_id", null: false
     t.string "channel_token", null: false
     t.datetime "created_at", null: false
     t.datetime "expires_at"
@@ -272,8 +262,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["provider_channel_id"], name: "index_calendar_webhook_channels_on_provider_channel_id", unique: true
   end
 
-  create_table "calendars", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "calendar_account_id", null: false
+  create_table "calendars", force: :cascade do |t|
+    t.bigint "calendar_account_id", null: false
     t.string "color"
     t.datetime "created_at", null: false
     t.text "description"
@@ -293,7 +283,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["syncing"], name: "index_calendars_syncing", where: "(syncing = true)"
   end
 
-  create_table "connections", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "connections", force: :cascade do |t|
     t.string "auth_header_name"
     t.text "auth_secret"
     t.string "auth_type", default: "none", null: false
@@ -302,13 +292,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.datetime "created_at", null: false
     t.string "name", null: false
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id", null: false
+    t.bigint "workspace_id", null: false
     t.index ["workspace_id", "name"], name: "index_connections_on_workspace_id_and_name"
     t.index ["workspace_id"], name: "index_connections_on_workspace_id"
   end
 
-  create_table "contact_email_aliases", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "contact_id", null: false
+  create_table "contact_email_aliases", force: :cascade do |t|
+    t.bigint "contact_id", null: false
     t.datetime "created_at", null: false
     t.string "email", null: false
     t.datetime "updated_at", null: false
@@ -316,43 +306,43 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["email"], name: "index_contact_email_aliases_on_email", unique: true
   end
 
-  create_table "contact_tags", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "contact_tags", force: :cascade do |t|
     t.float "confidence"
-    t.uuid "contact_id", null: false
+    t.bigint "contact_id", null: false
     t.datetime "created_at", null: false
     t.integer "source", default: 0, null: false
-    t.uuid "tag_id", null: false
+    t.bigint "tag_id", null: false
     t.datetime "updated_at", null: false
     t.index ["contact_id", "tag_id"], name: "index_contact_tags_on_contact_id_and_tag_id", unique: true
     t.index ["contact_id"], name: "index_contact_tags_on_contact_id"
     t.index ["tag_id"], name: "index_contact_tags_on_tag_id"
   end
 
-  create_table "contacts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "contacts", force: :cascade do |t|
     t.datetime "analyzed_at"
     t.datetime "auto_tagged_at"
     t.jsonb "communication_patterns", default: {}
     t.text "context_summary"
     t.datetime "created_at", null: false
     t.float "duplicate_confidence"
-    t.uuid "duplicate_of_id"
+    t.bigint "duplicate_of_id"
     t.text "duplicate_reason"
     t.string "email", null: false
-    t.uuid "email_account_id"
+    t.bigint "email_account_id"
     t.integer "email_count", default: 0
     t.datetime "last_email_at"
     t.integer "list_status", default: 0, null: false
     t.string "name"
     t.string "organization"
-    t.uuid "person_id"
+    t.bigint "person_id"
     t.text "raw_analysis"
     t.string "relationship_type"
     t.datetime "starred_at"
     t.float "suggested_confidence"
-    t.uuid "suggested_person_id"
+    t.bigint "suggested_person_id"
     t.text "suggested_reason"
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id"
+    t.bigint "workspace_id"
     t.index ["duplicate_of_id"], name: "index_contacts_on_duplicate_of_id"
     t.index ["email"], name: "index_contacts_on_email", unique: true
     t.index ["email_account_id", "email"], name: "index_contacts_on_email_account_id_and_email", unique: true
@@ -366,57 +356,43 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["workspace_id"], name: "index_contacts_on_workspace_id"
   end
 
-  create_table "devices", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "devices", force: :cascade do |t|
     t.string "app_version"
     t.datetime "created_at", null: false
     t.datetime "last_active_at"
     t.integer "platform", null: false
     t.string "token", null: false
     t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
+    t.bigint "user_id", null: false
     t.index ["token"], name: "index_devices_on_token", unique: true
     t.index ["user_id", "platform"], name: "index_devices_on_user_id_and_platform"
     t.index ["user_id"], name: "index_devices_on_user_id"
   end
 
-  create_table "document_drive_uploads", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "document_drive_uploads", force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.uuid "document_id", null: false
+    t.bigint "document_id", null: false
     t.string "drive_file_id"
     t.text "error_message"
     t.string "status", default: "pending", null: false
     t.datetime "updated_at", null: false
     t.datetime "uploaded_at"
-    t.uuid "zoho_drive_account_id", null: false
+    t.bigint "zoho_drive_account_id", null: false
     t.index ["document_id"], name: "index_document_drive_uploads_on_document_id"
     t.index ["status"], name: "index_document_drive_uploads_on_status"
     t.index ["zoho_drive_account_id"], name: "index_document_drive_uploads_on_zoho_drive_account_id"
   end
 
-  create_table "document_email_messages", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "document_email_messages", force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.uuid "document_id", null: false
-    t.uuid "email_message_id", null: false
+    t.bigint "document_id", null: false
+    t.bigint "email_message_id", null: false
     t.index ["document_id", "email_message_id"], name: "idx_document_email_messages_unique", unique: true
     t.index ["document_id"], name: "index_document_email_messages_on_document_id"
     t.index ["email_message_id"], name: "index_document_email_messages_on_email_message_id"
   end
 
-  create_table "document_templates", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.jsonb "ai_provenance", default: {}, null: false
-    t.integer "ai_status", default: 0, null: false
-    t.datetime "created_at", null: false
-    t.text "description"
-    t.text "html_content", default: "", null: false
-    t.string "name", null: false
-    t.datetime "updated_at", null: false
-    t.jsonb "variables_schema", default: [], null: false
-    t.uuid "workspace_id", null: false
-    t.index ["workspace_id", "name"], name: "index_document_templates_on_workspace_id_and_name"
-    t.index ["workspace_id"], name: "index_document_templates_on_workspace_id"
-  end
-
-  create_table "document_types", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "document_types", force: :cascade do |t|
     t.boolean "auto_star", default: false, null: false
     t.string "category"
     t.string "color", null: false
@@ -424,12 +400,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.jsonb "extraction_schema"
     t.string "name", null: false
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id"
+    t.bigint "workspace_id"
     t.index ["workspace_id", "name"], name: "index_document_types_on_workspace_and_name", unique: true
     t.index ["workspace_id"], name: "index_document_types_on_workspace_id"
   end
 
-  create_table "documents", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "documents", force: :cascade do |t|
     t.string "account_number"
     t.float "ai_confidence_score"
     t.text "ai_error"
@@ -450,9 +426,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.text "description"
     t.date "document_date"
     t.integer "document_type", default: 0, null: false
-    t.uuid "document_type_id"
+    t.bigint "document_type_id"
     t.date "due_date"
-    t.uuid "email_account_id"
+    t.bigint "email_account_id"
     t.string "email_message_id"
     t.integer "expense_category"
     t.string "google_drive_file_id"
@@ -468,7 +444,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.string "receipt_number"
     t.integer "review_status", default: 0, null: false
     t.datetime "reviewed_at"
-    t.uuid "reviewed_by_id"
+    t.bigint "reviewed_by_id"
     t.string "sender_name"
     t.integer "source", default: 0, null: false
     t.boolean "starred", default: false, null: false
@@ -477,8 +453,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.datetime "updated_at", null: false
     t.string "vendor_name"
     t.string "vendor_nif"
-    t.datetime "viewed_at"
-    t.uuid "workspace_id"
+    t.bigint "workspace_id"
     t.index ["ai_status"], name: "index_documents_on_ai_status"
     t.index ["client_nif"], name: "index_documents_on_client_nif"
     t.index ["content_hash"], name: "index_documents_on_content_hash"
@@ -499,44 +474,44 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["workspace_id"], name: "index_documents_on_workspace_id"
   end
 
-  create_table "drive_folder_mappings", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "drive_folder_mappings", force: :cascade do |t|
     t.boolean "auto_sync", default: false, null: false
     t.datetime "created_at", null: false
-    t.uuid "document_type_id"
+    t.bigint "document_type_id"
     t.string "drive_folder_id", null: false
     t.string "drive_folder_path"
     t.datetime "updated_at", null: false
-    t.uuid "zoho_drive_account_id", null: false
+    t.bigint "zoho_drive_account_id", null: false
     t.index ["document_type_id"], name: "index_drive_folder_mappings_on_document_type_id"
     t.index ["zoho_drive_account_id", "document_type_id"], name: "idx_drive_folder_mappings_on_account_and_type", unique: true
     t.index ["zoho_drive_account_id"], name: "index_drive_folder_mappings_on_zoho_drive_account_id"
   end
 
-  create_table "email_account_signatures", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "email_account_signatures", force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.uuid "email_account_id", null: false
-    t.uuid "signature_id", null: false
+    t.bigint "email_account_id", null: false
+    t.bigint "signature_id", null: false
     t.datetime "updated_at", null: false
     t.index ["email_account_id"], name: "index_email_account_signatures_on_email_account_id"
     t.index ["signature_id", "email_account_id"], name: "idx_on_signature_id_email_account_id_7999730e85", unique: true
     t.index ["signature_id"], name: "index_email_account_signatures_on_signature_id"
   end
 
-  create_table "email_account_users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "email_account_users", force: :cascade do |t|
     t.boolean "can_manage", default: false, null: false
     t.boolean "can_read", default: true, null: false
     t.boolean "can_send", default: false, null: false
     t.datetime "created_at", null: false
-    t.uuid "email_account_id", null: false
+    t.bigint "email_account_id", null: false
     t.boolean "owner", default: false, null: false
     t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
+    t.bigint "user_id", null: false
     t.index ["email_account_id", "user_id"], name: "index_email_account_users_on_email_account_id_and_user_id", unique: true
     t.index ["email_account_id"], name: "index_email_account_users_on_email_account_id"
     t.index ["user_id"], name: "index_email_account_users_on_user_id"
   end
 
-  create_table "email_accounts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "email_accounts", force: :cascade do |t|
     t.boolean "active", default: true, null: false
     t.string "color", default: "#3b82f6", null: false
     t.datetime "created_at", null: false
@@ -550,16 +525,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.datetime "scan_started_at"
     t.boolean "scanning", default: false, null: false
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id"
+    t.bigint "workspace_id"
     t.index ["email_address"], name: "index_email_accounts_on_email_address", unique: true
     t.index ["provider"], name: "index_email_accounts_on_provider"
     t.index ["workspace_id"], name: "index_email_accounts_on_workspace_id"
   end
 
-  create_table "email_folders", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "email_folders", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "delta_token"
-    t.uuid "email_account_id", null: false
+    t.bigint "email_account_id", null: false
     t.datetime "last_synced_at"
     t.string "name", null: false
     t.integer "position", default: 0, null: false
@@ -569,22 +544,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["email_account_id"], name: "index_email_folders_on_email_account_id"
   end
 
-  create_table "email_message_tags", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "email_message_tags", force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.uuid "email_message_id", null: false
-    t.uuid "tag_id", null: false
+    t.bigint "email_message_id", null: false
+    t.bigint "tag_id", null: false
     t.datetime "updated_at", null: false
     t.index ["email_message_id", "tag_id"], name: "idx_email_message_tags_unique", unique: true
     t.index ["email_message_id"], name: "index_email_message_tags_on_email_message_id"
     t.index ["tag_id"], name: "index_email_message_tags_on_tag_id"
   end
 
-  create_table "email_messages", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "email_messages", force: :cascade do |t|
     t.text "ai_action_prompt"
-    t.uuid "ai_analysis_message_id"
+    t.bigint "ai_analysis_message_id"
     t.datetime "ai_analyzed_at"
     t.integer "ai_priority", default: 1, null: false
-    t.jsonb "ai_provenance", default: {}, null: false
     t.jsonb "ai_suggested_actions", default: [], null: false
     t.text "ai_summary"
     t.boolean "ai_todo_dismissed", default: false, null: false
@@ -594,11 +568,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.string "category"
     t.float "category_confidence"
     t.text "cc_address"
-    t.uuid "contact_id"
+    t.bigint "contact_id"
     t.datetime "created_at", null: false
-    t.uuid "email_account_id", null: false
-    t.uuid "email_scan_log_id"
-    t.uuid "email_thread_id"
+    t.bigint "email_account_id", null: false
+    t.bigint "email_scan_log_id"
+    t.bigint "email_thread_id"
     t.string "from_address"
     t.boolean "has_attachment"
     t.string "header_auto_submitted", comment: "RFC 3834 Auto-Submitted (anything but 'no' => machine-generated)"
@@ -632,11 +606,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["status"], name: "index_email_messages_on_status"
   end
 
-  create_table "email_scan_logs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "email_scan_logs", force: :cascade do |t|
     t.datetime "completed_at"
     t.datetime "created_at", null: false
     t.integer "documents_created", default: 0
-    t.uuid "email_account_id", null: false
+    t.bigint "email_account_id", null: false
     t.integer "emails_found", default: 0
     t.integer "emails_processed", default: 0
     t.jsonb "error_messages", default: []
@@ -647,14 +621,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["email_account_id"], name: "index_email_scan_logs_on_email_account_id"
   end
 
-  create_table "email_threads", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "email_threads", force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.uuid "email_account_id", null: false
+    t.bigint "email_account_id", null: false
     t.datetime "follow_up_at"
     t.datetime "follow_up_dismissed_at"
     t.boolean "follow_up_expected", default: false, null: false
     t.datetime "follow_up_last_analyzed_at"
-    t.uuid "follow_up_outbound_message_id"
+    t.bigint "follow_up_outbound_message_id"
     t.string "follow_up_reason"
     t.datetime "last_inbound_at"
     t.datetime "last_outbound_at"
@@ -670,19 +644,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["snoozed_until"], name: "index_email_threads_on_snoozed_until_not_null", where: "(snoozed_until IS NOT NULL)"
   end
 
-  create_table "events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "actor_id"
+  create_table "events", force: :cascade do |t|
+    t.bigint "actor_id"
     t.string "actor_type"
-    t.uuid "caused_by_event_id"
+    t.bigint "caused_by_event_id"
     t.datetime "created_at", null: false
     t.integer "depth", default: 0, null: false
     t.string "name", null: false
     t.datetime "occurred_at", null: false
     t.jsonb "payload", default: {}, null: false
-    t.uuid "subject_id"
+    t.bigint "subject_id"
     t.string "subject_type"
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id", null: false
+    t.bigint "workspace_id", null: false
     t.index ["actor_type", "actor_id"], name: "index_events_on_actor"
     t.index ["caused_by_event_id"], name: "index_events_on_caused_by_event_id"
     t.index ["subject_type", "subject_id"], name: "index_events_on_subject"
@@ -691,17 +665,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["workspace_id"], name: "index_events_on_workspace_id"
   end
 
-  create_table "exports", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "exports", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "documents_count"
     t.jsonb "filters"
     t.integer "status"
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id", null: false
+    t.bigint "workspace_id", null: false
     t.index ["workspace_id"], name: "index_exports_on_workspace_id"
   end
 
-  create_table "feed_items", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "feed_items", force: :cascade do |t|
     t.datetime "acted_at"
     t.boolean "attention", default: false, null: false
     t.datetime "created_at", null: false
@@ -713,11 +687,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.integer "score", default: 0, null: false
     t.datetime "seen_at"
     t.datetime "sort_at", null: false
-    t.uuid "subject_id", null: false
+    t.bigint "subject_id", null: false
     t.string "subject_type", null: false
     t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
-    t.uuid "workspace_id", null: false
+    t.bigint "user_id", null: false
+    t.bigint "workspace_id", null: false
     t.index ["subject_type", "subject_id"], name: "idx_feed_items_subject"
     t.index ["user_id", "dedupe_key"], name: "idx_feed_items_user_dedupe", unique: true
     t.index ["user_id", "score", "sort_at"], name: "idx_feed_items_attention", order: { score: :desc, sort_at: :desc }, where: "((dismissed_at IS NULL) AND (acted_at IS NULL) AND (attention = true))"
@@ -725,33 +699,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["workspace_id"], name: "index_feed_items_on_workspace_id"
   end
 
-  create_table "folder_memberships", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.uuid "folderable_id", null: false
-    t.string "folderable_type", null: false
-    t.uuid "mail_folder_id", null: false
-    t.integer "position", default: 0, null: false
-    t.datetime "updated_at", null: false
-    t.index ["folderable_type", "folderable_id"], name: "index_folder_memberships_on_folderable"
-    t.index ["mail_folder_id", "folderable_type", "folderable_id"], name: "index_folder_memberships_unique", unique: true
-    t.index ["mail_folder_id"], name: "index_folder_memberships_on_mail_folder_id"
-  end
-
-  create_table "google_drive_accounts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "google_drive_accounts", force: :cascade do |t|
     t.boolean "connected", default: true, null: false
     t.datetime "created_at", null: false
     t.string "email"
     t.string "refresh_token", null: false
     t.string "scopes"
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id"
+    t.bigint "workspace_id"
     t.index ["workspace_id"], name: "index_google_drive_accounts_on_workspace_id"
   end
 
-  create_table "google_drive_configs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.boolean "auto_push", default: true, null: false
+  create_table "google_drive_configs", force: :cascade do |t|
+    t.boolean "auto_push", default: false, null: false
     t.datetime "created_at", null: false
-    t.uuid "document_type_id", null: false
+    t.bigint "document_type_id", null: false
     t.string "folder_id"
     t.string "folder_path"
     t.string "naming_pattern", default: "{date}_{entity}_{reference}", null: false
@@ -760,29 +722,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["document_type_id"], name: "index_google_drive_configs_on_document_type_id", unique: true
   end
 
-  create_table "identities", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "identities", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "email"
     t.string "provider", null: false
     t.string "uid", null: false
     t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
+    t.bigint "user_id", null: false
     t.index ["provider", "uid"], name: "index_identities_on_provider_and_uid", unique: true
     t.index ["user_id"], name: "index_identities_on_user_id"
   end
 
-  create_table "invitations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "invitations", force: :cascade do |t|
     t.datetime "accepted_at"
-    t.uuid "accepted_by_id"
+    t.bigint "accepted_by_id"
     t.boolean "admin_approved", default: true, null: false
     t.datetime "created_at", null: false
     t.string "email", null: false
     t.datetime "expires_at", null: false
-    t.uuid "invited_by_id", null: false
+    t.bigint "invited_by_id", null: false
     t.integer "status", default: 0, null: false
     t.string "token", null: false
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id", null: false
+    t.bigint "workspace_id", null: false
     t.index ["accepted_by_id"], name: "index_invitations_on_accepted_by_id"
     t.index ["admin_approved"], name: "index_invitations_on_admin_approved"
     t.index ["email", "workspace_id", "status"], name: "idx_invitations_on_email_workspace_status"
@@ -791,40 +753,37 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["workspace_id"], name: "index_invitations_on_workspace_id"
   end
 
-  create_table "mail_folders", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "mail_folders", force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.string "icon"
     t.string "name", null: false
-    t.uuid "parent_id"
     t.integer "position", default: 0, null: false
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id", null: false
+    t.bigint "workspace_id", null: false
     t.index "workspace_id, lower((name)::text)", name: "index_mail_folders_on_workspace_and_lower_name", unique: true
-    t.index ["parent_id"], name: "index_mail_folders_on_parent_id"
     t.index ["workspace_id"], name: "index_mail_folders_on_workspace_id"
   end
 
-  create_table "mfa_email_challenges", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "mfa_email_challenges", force: :cascade do |t|
     t.integer "attempts", default: 0, null: false
     t.string "code_digest", null: false
     t.datetime "created_at", null: false
     t.datetime "expires_at", null: false
     t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
+    t.bigint "user_id", null: false
     t.index ["expires_at"], name: "index_mfa_email_challenges_on_expires_at"
     t.index ["user_id"], name: "index_mfa_email_challenges_on_user_id", unique: true
   end
 
-  create_table "notification_preferences", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "notification_preferences", force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.uuid "document_type_id"
+    t.bigint "document_type_id"
     t.boolean "enabled", default: true, null: false
     t.integer "kind", null: false
     t.boolean "notify_email", default: false, null: false
     t.boolean "notify_in_app", default: true, null: false
-    t.uuid "tag_id"
+    t.bigint "tag_id"
     t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
+    t.bigint "user_id", null: false
     t.index ["document_type_id"], name: "index_notification_preferences_on_document_type_id"
     t.index ["tag_id"], name: "index_notification_preferences_on_tag_id"
     t.index ["user_id", "kind", "document_type_id"], name: "idx_notification_prefs_user_kind_doctype", unique: true, where: "(document_type_id IS NOT NULL)"
@@ -832,7 +791,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["user_id"], name: "index_notification_preferences_on_user_id"
   end
 
-  create_table "notifications", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "notifications", force: :cascade do |t|
     t.datetime "archived_at"
     t.text "body"
     t.integer "category", default: 2, null: false
@@ -840,7 +799,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.datetime "created_at", null: false
     t.string "group_key"
     t.string "link_url"
-    t.uuid "notifiable_id"
+    t.bigint "notifiable_id"
     t.string "notifiable_type"
     t.integer "priority", default: 1, null: false
     t.boolean "read", default: false, null: false
@@ -848,7 +807,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.datetime "resolved_at"
     t.string "title", null: false
     t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
+    t.bigint "user_id", null: false
     t.index ["archived_at"], name: "index_notifications_on_archived_at"
     t.index ["notifiable_type", "notifiable_id"], name: "index_notifications_on_notifiable"
     t.index ["resolved_at"], name: "index_notifications_on_resolved_at"
@@ -858,9 +817,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["user_id"], name: "index_notifications_on_user_id"
   end
 
-  create_table "notion_database_mappings", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "notion_database_mappings", force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.uuid "document_type_id", null: false
+    t.bigint "document_type_id", null: false
     t.jsonb "field_mappings", default: {}
     t.string "notion_database_id", null: false
     t.string "notion_database_name"
@@ -870,28 +829,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["document_type_id"], name: "index_notion_database_mappings_on_document_type_id", unique: true
   end
 
-  create_table "notion_integrations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "notion_integrations", force: :cascade do |t|
     t.text "access_token", null: false
     t.boolean "active", default: true, null: false
-    t.uuid "authorized_by_user_id"
+    t.bigint "authorized_by_user_id"
     t.string "bot_id"
     t.datetime "created_at", null: false
     t.string "notion_workspace_icon"
     t.string "notion_workspace_id"
     t.string "notion_workspace_name"
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id"
+    t.bigint "workspace_id"
     t.index ["authorized_by_user_id"], name: "index_notion_integrations_on_authorized_by_user_id"
     t.index ["workspace_id", "notion_workspace_id"], name: "index_notion_integrations_on_workspace_and_notion_ws", unique: true
     t.index ["workspace_id"], name: "index_notion_integrations_on_workspace_id"
   end
 
-  create_table "notion_pages", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "notion_pages", force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.uuid "document_id", null: false
+    t.bigint "document_id", null: false
     t.text "last_error"
     t.datetime "last_synced_at"
-    t.uuid "notion_database_mapping_id", null: false
+    t.bigint "notion_database_mapping_id", null: false
     t.string "notion_page_id", null: false
     t.integer "sync_status", default: 0, null: false
     t.datetime "updated_at", null: false
@@ -902,11 +861,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
   end
 
   create_table "oauth_access_grants", force: :cascade do |t|
-    t.uuid "application_id", null: false
+    t.bigint "application_id", null: false
     t.datetime "created_at", null: false
     t.integer "expires_in", null: false
     t.text "redirect_uri"
-    t.uuid "resource_owner_id", null: false
+    t.bigint "resource_owner_id", null: false
     t.datetime "revoked_at"
     t.string "scopes", default: "", null: false
     t.string "token", null: false
@@ -916,12 +875,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
   end
 
   create_table "oauth_access_tokens", force: :cascade do |t|
-    t.uuid "application_id", null: false
+    t.bigint "application_id", null: false
     t.datetime "created_at", null: false
     t.integer "expires_in"
     t.string "previous_refresh_token", default: "", null: false
     t.string "refresh_token"
-    t.uuid "resource_owner_id"
+    t.bigint "resource_owner_id"
     t.datetime "revoked_at"
     t.string "scopes"
     t.string "token", null: false
@@ -931,46 +890,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["token"], name: "index_oauth_access_tokens_on_token", unique: true
   end
 
-  create_table "oauth_applications", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "oauth_applications", force: :cascade do |t|
     t.boolean "confidential", default: true, null: false
     t.datetime "created_at", null: false
-    t.uuid "created_by_id", null: false
+    t.bigint "created_by_id", null: false
     t.string "name", null: false
     t.text "redirect_uri"
     t.string "scopes", default: "", null: false
     t.string "secret", null: false
     t.string "uid", null: false
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id", null: false
+    t.bigint "workspace_id", null: false
     t.index ["created_by_id"], name: "index_oauth_applications_on_created_by_id"
     t.index ["uid"], name: "index_oauth_applications_on_uid", unique: true
     t.index ["workspace_id"], name: "index_oauth_applications_on_workspace_id"
   end
 
-  create_table "organization_memberships", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.uuid "organization_id", null: false
-    t.uuid "person_id", null: false
-    t.integer "status", default: 0, null: false
-    t.datetime "updated_at", null: false
-    t.index ["organization_id", "status"], name: "index_organization_memberships_on_organization_id_and_status"
-    t.index ["organization_id"], name: "index_organization_memberships_on_organization_id"
-    t.index ["person_id", "organization_id"], name: "idx_on_person_id_organization_id_a4053ecbba", unique: true
-    t.index ["person_id"], name: "index_organization_memberships_on_person_id"
-  end
-
-  create_table "organizations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.string "domain"
-    t.string "name", null: false
-    t.text "notes"
-    t.datetime "updated_at", null: false
-    t.uuid "workspace_id", null: false
-    t.index ["workspace_id", "name"], name: "index_organizations_on_workspace_id_and_name", unique: true
-    t.index ["workspace_id"], name: "index_organizations_on_workspace_id"
-  end
-
-  create_table "people", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "people", force: :cascade do |t|
     t.datetime "analyzed_at"
     t.jsonb "communication_patterns", default: {}
     t.text "context_summary"
@@ -980,28 +916,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.text "raw_analysis"
     t.string "relationship_type"
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id"
+    t.bigint "workspace_id"
     t.index ["name"], name: "index_people_on_name"
     t.index ["organization"], name: "index_people_on_organization"
     t.index ["relationship_type"], name: "index_people_on_relationship_type"
     t.index ["workspace_id"], name: "index_people_on_workspace_id"
   end
 
-  create_table "recovery_codes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "recovery_codes", force: :cascade do |t|
     t.string "code_digest", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.datetime "used_at"
-    t.uuid "user_id", null: false
+    t.bigint "user_id", null: false
     t.index ["user_id"], name: "index_recovery_codes_on_user_id"
   end
 
-  create_table "reminders", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "reminders", force: :cascade do |t|
     t.boolean "all_day", default: false, null: false
     t.integer "amount_cents"
-    t.uuid "calendar_event_id"
+    t.bigint "calendar_event_id"
     t.float "confidence", default: 0.0, null: false
-    t.uuid "confirmed_by_id"
+    t.bigint "confirmed_by_id"
     t.datetime "created_at", null: false
     t.string "currency"
     t.text "description"
@@ -1011,13 +947,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.text "justification"
     t.integer "reminder_type", null: false
     t.datetime "snoozed_until"
-    t.uuid "source_id", null: false
+    t.bigint "source_id", null: false
     t.string "source_type", null: false
     t.integer "status", default: 0, null: false
     t.string "title", null: false
     t.datetime "updated_at", null: false
-    t.datetime "viewed_at"
-    t.uuid "workspace_id", null: false
+    t.bigint "workspace_id", null: false
     t.index ["calendar_event_id"], name: "index_reminders_on_calendar_event_id"
     t.index ["confirmed_by_id"], name: "index_reminders_on_confirmed_by_id"
     t.index ["extraction_fingerprint"], name: "index_reminders_on_fingerprint", unique: true, where: "(extraction_fingerprint IS NOT NULL)"
@@ -1026,7 +961,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["workspace_id"], name: "index_reminders_on_workspace_id"
   end
 
-  create_table "search_chunks", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "search_chunks", force: :cascade do |t|
     t.string "chunk_type", default: "text", null: false
     t.text "content", null: false
     t.datetime "created_at", null: false
@@ -1034,25 +969,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.string "embedding_model"
     t.jsonb "metadata", default: {}, null: false
     t.integer "position", default: 0, null: false
-    t.uuid "searchable_id", null: false
+    t.bigint "searchable_id", null: false
     t.string "searchable_type", null: false
     t.integer "token_count"
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id", null: false
+    t.bigint "workspace_id", null: false
     t.index ["embedding"], name: "idx_search_chunks_embedding_hnsw", opclass: :vector_cosine_ops, using: :hnsw
     t.index ["metadata"], name: "index_search_chunks_on_metadata", using: :gin
     t.index ["searchable_type", "searchable_id"], name: "index_search_chunks_on_searchable_type_and_searchable_id"
     t.index ["workspace_id"], name: "index_search_chunks_on_workspace_id"
   end
 
-  create_table "search_records", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "search_records", force: :cascade do |t|
     t.vector "content_embedding", limit: 1536
     t.text "content_preview"
     t.datetime "created_at", null: false
     t.string "embedding_model"
     t.jsonb "filter_data", default: {}, null: false
     t.datetime "indexed_at"
-    t.uuid "searchable_id", null: false
+    t.bigint "searchable_id", null: false
     t.string "searchable_type", null: false
     t.datetime "source_created_at"
     t.datetime "source_updated_at"
@@ -1060,7 +995,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.text "title"
     t.vector "title_embedding", limit: 1536
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id", null: false
+    t.bigint "workspace_id", null: false
     t.index ["content_embedding"], name: "idx_search_records_content_hnsw", opclass: :vector_cosine_ops, using: :hnsw
     t.index ["filter_data"], name: "index_search_records_on_filter_data", using: :gin
     t.index ["searchable_type", "searchable_id"], name: "index_search_records_on_searchable_type_and_searchable_id", unique: true
@@ -1070,47 +1005,47 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["workspace_id"], name: "index_search_records_on_workspace_id"
   end
 
-  create_table "search_tag_embeddings", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "search_tag_embeddings", force: :cascade do |t|
     t.string "content_hash"
     t.datetime "created_at", null: false
     t.vector "embedding", limit: 1536, null: false
     t.string "embedding_model"
-    t.uuid "tag_id", null: false
+    t.bigint "tag_id", null: false
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id", null: false
+    t.bigint "workspace_id", null: false
     t.index ["embedding"], name: "idx_search_tag_embeddings_hnsw", opclass: :vector_cosine_ops, using: :hnsw
     t.index ["tag_id"], name: "index_search_tag_embeddings_on_tag_id", unique: true
     t.index ["workspace_id"], name: "index_search_tag_embeddings_on_workspace_id"
   end
 
-  create_table "sessions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "sessions", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "ip_address"
     t.datetime "updated_at", null: false
     t.string "user_agent"
-    t.uuid "user_id", null: false
+    t.bigint "user_id", null: false
     t.index ["user_id"], name: "index_sessions_on_user_id"
   end
 
-  create_table "signatures", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "signatures", force: :cascade do |t|
     t.text "content", null: false
     t.datetime "created_at", null: false
     t.boolean "is_default", default: false, null: false
     t.string "name", null: false
     t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
+    t.bigint "user_id", null: false
     t.index ["user_id", "is_default"], name: "index_signatures_on_user_id_and_is_default"
     t.index ["user_id", "name"], name: "index_signatures_on_user_id_and_name", unique: true
     t.index ["user_id"], name: "index_signatures_on_user_id"
   end
 
-  create_table "signup_requests", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "accepted_by_id"
+  create_table "signup_requests", force: :cascade do |t|
+    t.bigint "accepted_by_id"
     t.datetime "created_at", null: false
     t.string "email", null: false
     t.string "name", null: false
     t.datetime "reviewed_at"
-    t.uuid "reviewed_by_id"
+    t.bigint "reviewed_by_id"
     t.integer "status", default: 0, null: false
     t.string "token", null: false
     t.datetime "updated_at", null: false
@@ -1120,16 +1055,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["token"], name: "index_signup_requests_on_token", unique: true
   end
 
-  create_table "skim_decisions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "skim_decisions", force: :cascade do |t|
     t.string "action", null: false
     t.string "category"
-    t.uuid "contact_id"
+    t.bigint "contact_id"
     t.datetime "created_at", null: false
-    t.uuid "email_message_id"
+    t.bigint "email_message_id"
     t.string "sender_domain"
     t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
-    t.uuid "workspace_id", null: false
+    t.bigint "user_id", null: false
+    t.bigint "workspace_id", null: false
     t.index ["contact_id"], name: "index_skim_decisions_on_contact_id"
     t.index ["user_id", "created_at"], name: "index_skim_decisions_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_skim_decisions_on_user_id"
@@ -1267,27 +1202,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["key"], name: "index_solid_queue_semaphores_on_key", unique: true
   end
 
-  create_table "tags", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "tags", force: :cascade do |t|
     t.string "color"
     t.datetime "created_at", null: false
-    t.uuid "email_account_id"
+    t.bigint "email_account_id"
     t.string "external_label_id"
     t.string "group_name"
     t.string "name"
     t.integer "source", default: 0, null: false
-    t.boolean "system_label", default: false, null: false
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id"
+    t.bigint "workspace_id"
     t.index ["email_account_id", "external_label_id"], name: "idx_tags_on_account_and_external_label_id", unique: true, where: "(external_label_id IS NOT NULL)"
     t.index ["email_account_id", "name"], name: "idx_tags_on_account_and_name", unique: true, where: "(email_account_id IS NOT NULL)"
     t.index ["email_account_id"], name: "index_tags_on_email_account_id"
     t.index ["external_label_id"], name: "index_tags_on_external_label_id"
-    t.index ["system_label"], name: "index_tags_on_system_label", where: "(system_label = true)"
     t.index ["workspace_id", "group_name"], name: "index_tags_on_workspace_id_and_group_name"
     t.index ["workspace_id"], name: "index_tags_on_workspace_id"
   end
 
-  create_table "templates", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "templates", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.jsonb "data", default: {}, null: false
     t.text "description"
@@ -1296,16 +1229,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["name"], name: "index_templates_on_name", unique: true
   end
 
-  create_table "thread_follows", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.uuid "agent_thread_id", null: false
+  create_table "thread_follows", force: :cascade do |t|
+    t.bigint "agent_thread_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
+    t.bigint "user_id", null: false
     t.index ["agent_thread_id"], name: "index_thread_follows_on_agent_thread_id"
     t.index ["user_id", "agent_thread_id"], name: "index_thread_follows_on_user_id_and_agent_thread_id", unique: true
   end
 
-  create_table "users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "users", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.datetime "deletion_requested_at"
     t.jsonb "dismissed_tours", default: [], null: false
@@ -1325,7 +1258,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.text "totp_secret"
     t.datetime "updated_at", null: false
     t.string "webauthn_id"
-    t.uuid "workspace_id"
+    t.bigint "workspace_id"
     t.text "writing_style"
     t.text "writing_style_learned"
     t.datetime "writing_style_updated_at"
@@ -1336,7 +1269,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.index ["workspace_id"], name: "index_users_on_workspace_id"
   end
 
-  create_table "webauthn_credentials", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "webauthn_credentials", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "external_id", null: false
     t.datetime "last_used_at"
@@ -1344,12 +1277,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.text "public_key", null: false
     t.integer "sign_count", default: 0, null: false
     t.datetime "updated_at", null: false
-    t.uuid "user_id", null: false
+    t.bigint "user_id", null: false
     t.index ["external_id"], name: "index_webauthn_credentials_on_external_id", unique: true
     t.index ["user_id"], name: "index_webauthn_credentials_on_user_id"
   end
 
-  create_table "workflow_execution_steps", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "workflow_execution_steps", force: :cascade do |t|
     t.datetime "completed_at"
     t.datetime "created_at", null: false
     t.text "error_message"
@@ -1358,13 +1291,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.datetime "started_at"
     t.integer "status", default: 0, null: false
     t.datetime "updated_at", null: false
-    t.uuid "workflow_execution_id", null: false
-    t.uuid "workflow_step_id", null: false
+    t.bigint "workflow_execution_id", null: false
+    t.bigint "workflow_step_id", null: false
     t.index ["workflow_execution_id"], name: "index_workflow_execution_steps_on_workflow_execution_id"
     t.index ["workflow_step_id"], name: "index_workflow_execution_steps_on_workflow_step_id"
   end
 
-  create_table "workflow_executions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "workflow_executions", force: :cascade do |t|
     t.datetime "completed_at"
     t.datetime "created_at", null: false
     t.text "error_message"
@@ -1372,27 +1305,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.integer "status", default: 0, null: false
     t.jsonb "trigger_data", default: {}
     t.datetime "updated_at", null: false
-    t.uuid "workflow_id", null: false
-    t.uuid "workspace_id", null: false
+    t.bigint "workflow_id", null: false
+    t.bigint "workspace_id", null: false
     t.index ["workflow_id"], name: "index_workflow_executions_on_workflow_id"
     t.index ["workspace_id"], name: "index_workflow_executions_on_workspace_id"
   end
 
-  create_table "workflow_steps", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "workflow_steps", force: :cascade do |t|
     t.string "action_type"
     t.jsonb "config", default: {}
     t.datetime "created_at", null: false
     t.integer "position", null: false
     t.string "step_type", null: false
     t.datetime "updated_at", null: false
-    t.uuid "workflow_id", null: false
+    t.bigint "workflow_id", null: false
     t.index ["workflow_id", "position"], name: "index_workflow_steps_on_workflow_id_and_position"
     t.index ["workflow_id"], name: "index_workflow_steps_on_workflow_id"
   end
 
-  create_table "workflows", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "workflows", force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.uuid "created_by_id"
+    t.bigint "created_by_id"
     t.text "description"
     t.boolean "enabled", default: true, null: false
     t.string "name", null: false
@@ -1400,43 +1333,39 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
     t.string "trigger_type", null: false
     t.datetime "updated_at", null: false
     t.string "webhook_token"
-    t.uuid "workspace_id", null: false
+    t.bigint "workspace_id", null: false
     t.index ["created_by_id"], name: "index_workflows_on_created_by_id"
     t.index ["webhook_token"], name: "index_workflows_on_webhook_token", unique: true
     t.index ["workspace_id"], name: "index_workflows_on_workspace_id"
   end
 
-  create_table "workspaces", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.boolean "ai_processing_enabled", default: true, null: false
+  create_table "workspaces", force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.integer "email_retention_months"
     t.jsonb "entitlement_overrides", default: {}, null: false
     t.string "name", null: false
     t.string "plan", default: "free", null: false
-    t.string "required_data_region"
     t.jsonb "settings", default: {}, null: false
     t.string "slug", null: false
     t.datetime "updated_at", null: false
     t.string "workspace_type", default: "company", null: false
     t.index ["plan"], name: "index_workspaces_on_plan"
     t.index ["slug"], name: "index_workspaces_on_slug", unique: true
-    t.check_constraint "workspace_type::text = ANY (ARRAY['company'::character varying::text, 'individual'::character varying::text])", name: "chk_organizations_workspace_type"
+    t.check_constraint "workspace_type::text = ANY (ARRAY['company'::character varying, 'individual'::character varying]::text[])", name: "chk_organizations_workspace_type"
   end
 
-  create_table "zoho_drive_accounts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+  create_table "zoho_drive_accounts", force: :cascade do |t|
     t.boolean "active", default: true, null: false
     t.datetime "created_at", null: false
     t.string "email_address", null: false
     t.datetime "last_synced_at"
     t.datetime "updated_at", null: false
-    t.uuid "workspace_id"
+    t.bigint "workspace_id"
     t.string "zoho_account_id"
     t.text "zoho_refresh_token", null: false
     t.index ["email_address"], name: "index_zoho_drive_accounts_on_email_address", unique: true
     t.index ["workspace_id"], name: "index_zoho_drive_accounts_on_workspace_id"
   end
 
-  add_foreign_key "account_exports", "users"
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "agent_messages", "agent_threads"
@@ -1473,7 +1402,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
   add_foreign_key "document_drive_uploads", "zoho_drive_accounts"
   add_foreign_key "document_email_messages", "documents"
   add_foreign_key "document_email_messages", "email_messages"
-  add_foreign_key "document_templates", "workspaces"
   add_foreign_key "document_types", "workspaces"
   add_foreign_key "documents", "document_types"
   add_foreign_key "documents", "email_accounts"
@@ -1501,14 +1429,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
   add_foreign_key "exports", "workspaces"
   add_foreign_key "feed_items", "users"
   add_foreign_key "feed_items", "workspaces"
-  add_foreign_key "folder_memberships", "mail_folders"
   add_foreign_key "google_drive_accounts", "workspaces"
   add_foreign_key "google_drive_configs", "document_types"
   add_foreign_key "identities", "users"
   add_foreign_key "invitations", "users", column: "accepted_by_id"
   add_foreign_key "invitations", "users", column: "invited_by_id"
   add_foreign_key "invitations", "workspaces"
-  add_foreign_key "mail_folders", "mail_folders", column: "parent_id"
   add_foreign_key "mail_folders", "workspaces"
   add_foreign_key "mfa_email_challenges", "users"
   add_foreign_key "notification_preferences", "document_types"
@@ -1524,9 +1450,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_020000) do
   add_foreign_key "oauth_access_tokens", "oauth_applications", column: "application_id"
   add_foreign_key "oauth_applications", "users", column: "created_by_id"
   add_foreign_key "oauth_applications", "workspaces"
-  add_foreign_key "organization_memberships", "organizations"
-  add_foreign_key "organization_memberships", "people"
-  add_foreign_key "organizations", "workspaces"
   add_foreign_key "people", "workspaces"
   add_foreign_key "recovery_codes", "users"
   add_foreign_key "reminders", "calendar_events"
