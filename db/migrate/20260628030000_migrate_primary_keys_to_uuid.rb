@@ -24,7 +24,11 @@
 class MigratePrimaryKeysToUuid < ActiveRecord::Migration[8.1]
   # Domain tables whose bigint `id` becomes a uuid. Excludes framework tables
   # (Solid Queue/Cable, Active Storage, Action Text, Doorkeeper token/grant
-  # tables) and tables already on uuid (organizations, organization_memberships).
+  # tables), tables already on uuid (organizations, organization_memberships),
+  # and search_chunks/search_records — large, regenerable pgvector tables that
+  # nothing references by `id`, so their PK stays bigint to avoid a multi-GB
+  # table rewrite. Their `searchable_id`/`workspace_id` columns are still moved
+  # to uuid (via POLYMORPHIC + FK introspection) so lookups keep resolving.
   DOMAIN_TABLES = %w[
     account_exports agent_messages agent_threads ai_adapters ai_configurations
     audit_events authored_documents beta_codes bug_reports calendar_account_users
@@ -38,9 +42,9 @@ class MigratePrimaryKeysToUuid < ActiveRecord::Migration[8.1]
     invitations mail_folders mfa_email_challenges notification_preferences
     notifications notion_database_mappings notion_integrations notion_pages
     oauth_applications people pipeline_memberships pipeline_stages pipelines
-    recovery_codes reminders scheduled_emails search_chunks search_records
-    search_tag_embeddings sessions signatures signup_requests skim_decisions
-    tags templates thread_follows users webauthn_credentials
+    recovery_codes reminders scheduled_emails search_tag_embeddings sessions
+    signatures signup_requests skim_decisions tags templates thread_follows
+    users webauthn_credentials
     workflow_execution_steps workflow_executions workflow_steps workflows
     workspaces zoho_drive_accounts
   ].freeze
