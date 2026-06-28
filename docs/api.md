@@ -77,6 +77,27 @@ curl https://<your-campbooks-host>/api/v1/emails \
 You can revoke a token via `POST /api/oauth/revoke`, or revoke **all** of a
 client's tokens (and rotate its secret) from Settings → API access.
 
+### Browser sign-in (the CLI)
+
+For interactive use there's also the **[Campbooks CLI](cli.md)** — a single
+binary that wraps this API. Instead of pasting a client ID/secret, run
+`campbooks login`: it opens your browser, you sign in with your normal Campbooks
+session, approve the "Campbooks CLI" client, and the CLI receives a token scoped
+to **you** in your workspace. Under the hood that's the OAuth 2.0
+**authorization-code + PKCE** grant against the first-party public client
+`campbooks-cli`, with a loopback redirect (`http://127.0.0.1:<port>/callback`):
+
+1. `GET /api/oauth/authorize?response_type=code&client_id=campbooks-cli&redirect_uri=…&scope=…&code_challenge=…&code_challenge_method=S256`
+   — renders the consent screen (signing the user in first if needed).
+2. On approval the browser is redirected to the loopback URL with `?code=…`.
+3. `POST /api/oauth/token` with `grant_type=authorization_code`, the `code`, and
+   the matching `code_verifier` → an access token **plus a refresh token**, so
+   the CLI stays signed in without re-opening the browser.
+
+This grant is reserved for the first-party CLI (PKCE is mandatory and there's no
+client secret). Build your own integrations on the client-credentials grant
+above.
+
 ## Scopes
 
 | Scope | Grants |

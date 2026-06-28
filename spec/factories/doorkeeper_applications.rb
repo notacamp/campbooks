@@ -10,5 +10,14 @@ FactoryBot.define do
 
     workspace
     created_by { association(:user, workspace: workspace) }
+
+    # A public client (the CLI): no secret, PKCE-only, loopback redirect, and no
+    # workspace/created_by — its identity comes from each token's resource owner.
+    trait :public_client do
+      confidential { false }
+      redirect_uri { "http://127.0.0.1/callback\nurn:ietf:wg:oauth:2.0:oob" }
+      workspace { nil }
+      created_by { nil }
+    end
   end
 end
