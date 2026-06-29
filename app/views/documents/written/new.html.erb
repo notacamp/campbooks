@@ -2,13 +2,13 @@
 
 <%= render Campbooks::PageHeader.new(title: t(".title")) do |header| %>
   <% header.with_actions do %>
-    <%= link_to documents_path, class: "text-sm text-muted-foreground hover:text-foreground transition-colors" do %>
+    <%= link_to files_path, class: "text-sm text-muted-foreground hover:text-foreground transition-colors" do %>
       ← <%= t(".back_to_documents") %>
     <% end %>
   <% end %>
 <% end %>
 
-<%= form_with model: @document, url: written_documents_path, class: "space-y-4" do |f| %>
+<%= form_with model: @document, url: written_files_path, class: "space-y-4" do |f| %>
   <%= f.text_field :title, placeholder: t(".title_placeholder"),
       class: "block w-full text-xl sm:text-2xl font-bold tracking-tight border-0 border-b border-gray-200
               bg-transparent px-0 py-2 focus:ring-0 focus:border-accent-500
@@ -24,7 +24,7 @@
   ) %>
 
   <div class="flex items-center justify-end gap-3 pt-2">
-    <%= render Campbooks::Button.new(variant: :outline, href: documents_path) { t(".cancel") } %>
+    <%= render Campbooks::Button.new(variant: :outline, href: files_path) { t(".cancel") } %>
     <%= render Campbooks::Button.new(variant: :primary, type: :submit) { t(".save") } %>
   </div>
 <% end %>

@@ -19,8 +19,8 @@ en:
       calendar_month: 'Calendar: month view'
       calendar_today: 'Calendar: today'
       calendar_week: 'Calendar: week view'
-      documents: Documents
       email_scans: Email scans
+      files: Files
       inbox: Inbox
       new_calendar_event: New calendar event
       new_email: Start new email

@@ -3,7 +3,9 @@ class EmailMessageTagsController < ApplicationController
   before_action :set_message
 
   def create
-    @tag = Current.workspace.tags.find(params[:tag_id])
+    # `.visible` mirrors the provider-label endpoint: hidden labels are never chips
+    # and can't be assigned from the picker.
+    @tag = Current.workspace.tags.visible.find(params[:tag_id])
     @message.tags << @tag unless @message.tags.include?(@tag)
     dispatch_tag_notification(@tag)
     respond_to(&:turbo_stream)

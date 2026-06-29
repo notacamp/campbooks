@@ -20,6 +20,11 @@ pt:
       col_added: Adicionado
       col_actions: Ações
       empty_folder: Esta pasta está vazia.
+      search_results:
+        zero: "Sem resultados para \"%{q}\""
+        one: "1 resultado para \"%{q}\""
+        other: "%{count} resultados para \"%{q}\""
+      search_empty: Nenhum documento corresponde à pesquisa. Tente outro termo ou limpe os filtros.
       empty_title: Ainda não há ficheiros
       empty_description: Carregue ficheiros para os manter organizados em pastas — faturas, contratos, o que quiser.
       empty_upload: Carregar ficheiros
@@ -29,11 +34,37 @@ pt:
       files_section: Ficheiros
       manage_access: Gerir acesso
       manage_access_locked: "Gerir acesso · Privado"
+      review_n: "Rever %{count}"
+      ai_analyze: Analisar com IA
+      ai_analyze_hint: Extrai e classifica documentos comerciais (faturas, recibos…). Desligue para apenas guardar o ficheiro.
+      filters: Filtros
+      filter_category: Categoria
+      filter_type: Tipo
+      filter_status: Estado
+      filter_month: Mês
+      filter_folder: Pasta
+      filter_all_categories: Todas as categorias
+      filter_all_types: Todos os tipos
+      filter_all_statuses: Todos os estados
+      filter_all_folders: Todas as pastas
+      filter_types_selected: "%{count} selecionado(s)"
+      reanalyze_all: "Reanalisar todos (%{count})"
+      export: Exportar
+      export_confirm: Exportar os documentos que correspondem aos filtros atuais como ZIP?
+      exports_heading: Exportações recentes
+      exports_col_date: Data
+      exports_col_status: Estado
+      exports_col_documents: Documentos
+      exports_col_download: Transferir
+      download_zip: Transferir ZIP
+      export_failed: A exportação falhou
     uploads:
       create:
         no_files: Escolha pelo menos um ficheiro para carregar.
         uploaded_one: Ficheiro carregado.
         uploaded_many: "%{count} ficheiros carregados."
+        analyzed_one: Ficheiro carregado e em fila para análise por IA.
+        analyzed_many: "%{count} ficheiros carregados e em fila para análise por IA."
         failed: "Falha ao carregar: %{message}"
       destroy:
         deleted: Ficheiro eliminado.
@@ -48,6 +79,10 @@ pt:
       body: "Retirei um documento deste email e arquivei-o em Ficheiros: **[%{title}](%{path})**."
   components:
     files:
+      search_bar:
+        placeholder: Pesquisar ficheiros…
+        submit: Pesquisar
+        clear: Limpar pesquisa
       sidebar:
         label: Pastas
         all_files: Todos os ficheiros

@@ -31,7 +31,7 @@ func newEmailsCmd() *cobra.Command {
 func emailsListCmd() *cobra.Command {
 	var (
 		unread, hasAttachment bool
-		accounts              []int
+		accounts              []string
 		category, priority, q string
 		after, before         string
 		page, perPage         int
@@ -54,7 +54,7 @@ func emailsListCmd() *cobra.Command {
 				q2.Set("has_attachment", strconv.FormatBool(hasAttachment))
 			}
 			for _, a := range accounts {
-				q2.Add("account_ids[]", strconv.Itoa(a))
+				q2.Add("account_ids[]", a)
 			}
 			setIf(q2, "category", category)
 			setIf(q2, "priority", priority)
@@ -85,7 +85,7 @@ func emailsListCmd() *cobra.Command {
 	f := cmd.Flags()
 	f.BoolVar(&unread, "unread", false, "only unread emails")
 	f.BoolVar(&hasAttachment, "has-attachment", false, "only emails with attachments")
-	f.IntSliceVar(&accounts, "account", nil, "restrict to email account ID(s)")
+	f.StringSliceVar(&accounts, "account", nil, "restrict to email account ID(s)")
 	f.StringVar(&category, "category", "", "filter by category")
 	f.StringVar(&priority, "priority", "", "filter by priority (low|medium|high)")
 	f.StringVarP(&q, "query", "q", "", "search subject/sender")
@@ -117,7 +117,7 @@ func emailsGetCmd() *cobra.Command {
 
 func emailsSendCmd() *cobra.Command {
 	var (
-		account                     int
+		account                     string
 		to, subject, body, bodyFile string
 		cc, bcc                     string
 	)
@@ -130,7 +130,7 @@ func emailsSendCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if account == 0 || to == "" {
+			if account == "" || to == "" {
 				return fmt.Errorf("--account and --to are required")
 			}
 			b, err := readBody(cmd, body, bodyFile)
@@ -138,7 +138,7 @@ func emailsSendCmd() *cobra.Command {
 				return err
 			}
 			form := url.Values{}
-			form.Set("email_account_id", strconv.Itoa(account))
+			form.Set("email_account_id", account)
 			form.Set("to_address", to)
 			setIf(form, "subject", subject)
 			setIf(form, "body", b)
@@ -152,7 +152,7 @@ func emailsSendCmd() *cobra.Command {
 		},
 	}
 	f := cmd.Flags()
-	f.IntVar(&account, "account", 0, "email account ID to send from (required)")
+	f.StringVar(&account, "account", "", "email account ID to send from (required)")
 	f.StringVar(&to, "to", "", "recipient address (required)")
 	f.StringVar(&subject, "subject", "", "subject")
 	f.StringVar(&body, "body", "", "body (HTML or text)")
@@ -164,7 +164,7 @@ func emailsSendCmd() *cobra.Command {
 
 func emailsReplyCmd() *cobra.Command {
 	var (
-		account        int
+		account        string
 		body, bodyFile string
 		to, cc, bcc    string
 	)
@@ -186,8 +186,8 @@ func emailsReplyCmd() *cobra.Command {
 			}
 			form := url.Values{}
 			form.Set("body", b)
-			if account > 0 {
-				form.Set("email_account_id", strconv.Itoa(account))
+			if account != "" {
+				form.Set("email_account_id", account)
 			}
 			setIf(form, "to_address", to)
 			setIf(form, "cc_address", cc)
@@ -202,7 +202,7 @@ func emailsReplyCmd() *cobra.Command {
 	f := cmd.Flags()
 	f.StringVar(&body, "body", "", "reply body (required)")
 	f.StringVar(&bodyFile, "body-file", "", "read the body from a file (- for stdin)")
-	f.IntVar(&account, "account", 0, "email account ID to send from (defaults to the source account)")
+	f.StringVar(&account, "account", "", "email account ID to send from (defaults to the source account)")
 	f.StringVar(&to, "to", "", "recipient (defaults to the original sender)")
 	f.StringVar(&cc, "cc", "", "cc address")
 	f.StringVar(&bcc, "bcc", "", "bcc address")
@@ -229,7 +229,7 @@ func emailsMarkCmd(use, action, short string) *cobra.Command {
 }
 
 func emailsTagCmd() *cobra.Command {
-	var tagID int
+	var tagID string
 	cmd := &cobra.Command{
 		Use:   "tag <email-id> [tag-name]",
 		Short: "Add an existing workspace tag to an email",
@@ -241,8 +241,8 @@ func emailsTagCmd() *cobra.Command {
 			}
 			form := url.Values{}
 			switch {
-			case tagID > 0:
-				form.Set("tag_id", strconv.Itoa(tagID))
+			case tagID != "":
+				form.Set("tag_id", tagID)
 			case len(args) == 2:
 				form.Set("name", args[1])
 			default:
@@ -255,7 +255,7 @@ func emailsTagCmd() *cobra.Command {
 			return printResult(cmd.OutOrStdout(), data, "Tagged")
 		},
 	}
-	cmd.Flags().IntVar(&tagID, "tag-id", 0, "tag ID (instead of a name)")
+	cmd.Flags().StringVar(&tagID, "tag-id", "", "tag ID (instead of a name)")
 	return cmd
 }
 

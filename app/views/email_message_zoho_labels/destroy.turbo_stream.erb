@@ -1,11 +1,11 @@
-<%= turbo_stream.replace dom_id(@message, :labels) do %>
-  <%= render "email_messages/zoho_labels", message: @message %>
+<%= turbo_stream.replace dom_id(@message, :tags) do %>
+  <%= render "email_messages/tags", message: @message %>
 <% end %>
 
-<%= turbo_stream.replace dom_id(@message, :thread_labels) do %>
-  <%= render "email_messages/thread_zoho_labels", message: @message %>
+<%= turbo_stream.replace dom_id(@message, :thread_tags) do %>
+  <%= render "email_messages/thread_tags", message: @message %>
 <% end %>
 
 <%= turbo_stream.append "action_toasts" do %>
-  <%= render "shared/action_toast", message: t(".label_removed", name: @tag.name), variant: :success %>
+  <%= render "shared/action_toast", message: t(".tag_removed", name: @tag.name), variant: :success %>
 <% end %>

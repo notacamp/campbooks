@@ -1,0 +1,12 @@
+<%# update (not replace) so the #inbox_settings_tags_list wrapper survives repeated toggles %>
+<%= turbo_stream.update "inbox_settings_tags_list" do %>
+  <%= render "inbox_settings/tags/list" %>
+<% end %>
+
+<%= turbo_stream.append "action_toasts" do %>
+  <% if @tag.hidden? %>
+    <%= render "shared/action_toast", message: t("inbox_settings.tags.toggle_hidden.hidden", name: @tag.name), variant: :info %>
+  <% else %>
+    <%= render "shared/action_toast", message: t("inbox_settings.tags.toggle_hidden.shown", name: @tag.name), variant: :success %>
+  <% end %>
+<% end %>

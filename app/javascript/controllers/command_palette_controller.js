@@ -80,7 +80,7 @@ export default class extends Controller {
     return [
       { name: "Inbox", category: "Navigate", icon: "mail", url: "/email_messages" },
       { name: "Scout AI Chat", category: "Navigate", icon: "sparkles", url: "/scout" },
-      { name: "Documents", category: "Navigate", icon: "file-text", url: "/documents" },
+      { name: "Files", category: "Navigate", icon: "folder", url: "/files" },
       { name: "Settings", category: "Navigate", icon: "cog", url: "/settings" },
       { name: "Start new email", category: "Actions", icon: "pen", url: "/email_messages/new" }
     ]

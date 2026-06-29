@@ -3,7 +3,7 @@
 <%= render Campbooks::PageHeader.new(title: @document.title) do |header| %>
   <% header.with_actions do %>
     <%= render Campbooks::Button.new(variant: :outline, size: :sm, href: edit_written_document_path(@document)) { t(".edit") } %>
-    <%= link_to documents_path,
+    <%= link_to files_path,
         class: "text-sm text-muted-foreground hover:text-foreground transition-colors" do %>
       ← <%= t(".back_to_documents") %>
     <% end %>

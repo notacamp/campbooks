@@ -31,14 +31,9 @@ RSpec.describe Tag, type: :model do
       expect(Tag.hidden_labels).to contain_exactly(hidden_tag)
     end
 
-    it "visible_for hides hidden tags by default" do
+    it "visible_for returns only non-hidden tags" do
       expect(Tag.visible_for(workspace)).to include(visible_tag)
       expect(Tag.visible_for(workspace)).not_to include(hidden_tag)
-    end
-
-    it "visible_for shows everything when show_system_labels is set" do
-      workspace.update!(settings: workspace.settings.merge("show_system_labels" => true))
-      expect(Tag.visible_for(workspace)).to include(visible_tag, hidden_tag)
     end
   end
 

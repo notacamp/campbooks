@@ -177,7 +177,6 @@ pt:
       snooze_title: Adiar
     tags:
       add_tag_aria: Adicionar etiqueta
-      remove_tag_title: Remover etiqueta
       search_tags_placeholder: Pesquisar etiquetas...
     thread_list:
       back_to_inbox: "— voltar à caixa de entrada"
@@ -189,10 +188,6 @@ pt:
       senders_more: "%{first}, %{second}, e mais"
       sent_to_prefix: 'Para:'
       unpin_title: Remover prioridade
-    zoho_labels:
-      add_label_aria: Adicionar rótulo
-      remove_label_title: Remover rótulo
-      search_labels_placeholder: Pesquisar rótulos...
   email_scans:
     show:
       account_label: Conta
