@@ -422,6 +422,18 @@ Rails.application.routes.draw do
   # Filing content (documents now) into custom folders — the Stage 3 "filesystem" layer.
   resources :folder_memberships, only: [ :create, :destroy ]
 
+  # Files — the native file area: a unified file manager over uploaded files and
+  # (later) internal documents + emails filed into custom folders (MailFolder).
+  # Folder CRUD + filing reuse mail_folders / folder_memberships above; only the
+  # light-path upload (store without the AI pipeline) is Files-specific.
+  get "files", to: "files#index", as: :files
+  get "files/folders/:id", to: "files#show", as: :files_folder
+  namespace :files do
+    resources :uploads, only: [ :create, :destroy ] do
+      member { post :analyze }
+    end
+  end
+
   get "email_messages/new", to: "email_messages#new", as: :new_email_message
   post "email_messages/compose_chat", to: "email_compose_chat#create"
 

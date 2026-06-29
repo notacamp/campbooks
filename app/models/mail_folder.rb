@@ -15,6 +15,9 @@ class MailFolder < ApplicationRecord
   # polymorphic join. Documents are wired first; emails stay provider-backed for now.
   has_many :folder_memberships, dependent: :destroy
   has_many :documents, through: :folder_memberships, source: :folderable, source_type: "Document"
+  # Files Phase 2 — folders also hold authored (internal) documents and emails.
+  has_many :authored_documents, through: :folder_memberships, source: :folderable, source_type: "AuthoredDocument"
+  has_many :email_messages, through: :folder_memberships, source: :folderable, source_type: "EmailMessage"
 
   # Maps folder id → number of documents filed into it (for the pane badges).
   # One grouped query for the whole set, so the pane stays N+1-free.
@@ -23,6 +26,15 @@ class MailFolder < ApplicationRecord
     return {} if ids.empty?
 
     FolderMembership.where(mail_folder_id: ids, folderable_type: "Document").group(:mail_folder_id).count
+  end
+
+  # Maps folder id → total filed items of every kind (documents + internal docs +
+  # emails) for the Files pane badges. One grouped query; N+1-free.
+  def self.item_counts(folders)
+    ids = Array(folders).map(&:id)
+    return {} if ids.empty?
+
+    FolderMembership.where(mail_folder_id: ids).group(:mail_folder_id).count
   end
 
   # A user-defined folder shown as a chip on top of the inbox. Creating one

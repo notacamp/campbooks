@@ -14,6 +14,7 @@ class Documents::WrittenController < ApplicationController
     @document.author = current_user
 
     if @document.save
+      Events.publish("internal_document.created", subject: @document, payload: { "title" => @document.title })
       redirect_to written_document_path(@document), success: t(".created")
     else
       render :new, status: :unprocessable_entity
@@ -28,6 +29,7 @@ class Documents::WrittenController < ApplicationController
 
   def update
     if @document.update(document_params)
+      Events.publish("internal_document.updated", subject: @document, payload: { "title" => @document.title })
       redirect_to written_document_path(@document), success: t(".updated")
     else
       render :edit, status: :unprocessable_entity

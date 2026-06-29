@@ -18,6 +18,16 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Files** — a native file area in the main nav for keeping your documents and
+  files organized. Upload any file, create folders, browse a folder, and move files
+  between folders. Files uploaded here are stored as-is — they're not run through
+  the document AI analysis (you can still send one through it later from its page) —
+  and because folders are shared with Mail, a folder can hold both files and emails.
+  Uploads, folder changes, and filing all show up in your workspace Activity.
+- **Files — internal documents & emails in folders** — write rich-text **internal
+  documents** right in Files ("New document") and file them into folders, and **file
+  emails into folders** too — so a folder can hold uploaded files, internal documents,
+  and emails side by side. Each is listed in the folder and recorded in Activity.
 - **Tasks** — a new task-management module (opt-in via `ENABLE_TASKS`, gated by the
   `tasks` plan entitlement). Create tasks manually or have Scout extract action items
   from your email and documents (triaged in Skim, with the originating email and
@@ -59,6 +69,7 @@ major, minor, or patch change here.
 
 ### Fixed
 
+- **Activity feed** — the "Pipelines" filter no longer failed to render its label.
 - **Scout no longer doubles up calendar events or reminders from the same email.**
   Creating an event from an email is now idempotent — the reminder card, Scout's
   "Create event" button, and repeated clicks resolve to a single event instead of
