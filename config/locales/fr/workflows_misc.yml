@@ -40,9 +40,9 @@ fr:
       tag_removed: Étiquette « %{name} » supprimée
   email_message_zoho_labels:
     create:
-      label_applied: Libellé « %{name} » appliqué
+      tag_applied: Étiquette « %{name} » appliquée
     destroy:
-      label_removed: Libellé « %{name} » supprimé
+      tag_removed: Étiquette « %{name} » supprimée
   workflow_executions:
     index:
       back_to_workflow: Retour au flux de travail

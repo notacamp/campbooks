@@ -1,22 +1,22 @@
-<% all_tags = (@all_tags || Tag.order(:name)).map { |t| { id: t.id, name: t.name, color: t.color } } %>
+<%# Unified tag picker: shows every visible tag (local + provider labels) in one
+    place. Adding/removing routes to the local tags endpoint or the provider-label
+    endpoint based on each tag's `external` flag, so provider labels still two-way
+    sync while local tags stay local. %>
+<% all_tags = Tag.visible_for(Current.workspace).by_name.map { |t| { id: t.id, name: t.name, color: t.color, external: t.external? } } %>
 
 <div id="<%= dom_id(message, :tags) %>"
      class="relative inline-flex items-center gap-1 flex-wrap"
      data-controller="email-tags"
      data-email-tags-message-id-value="<%= message.id %>"
      data-email-tags-all-tags-value="<%= all_tags.to_json %>"
-     data-email-tags-assigned-ids-value="<%= message.tags.loaded? ? message.tags.map(&:id) : message.tags.pluck(:id) %>">
+     data-email-tags-assigned-ids-value="<%= message.tags.pluck(:id).to_json %>">
 
-  <% message.tags.each do |tag| %>
-    <span class="text-[11px] rounded px-2 py-0.5 font-medium inline-flex items-center gap-1 select-none"
-          style="background-color:<%= tag.color %>20;color:<%= tag.color %>">
-      <%= tag.name %>
-      <button type="button"
-              data-action="email-tags#remove"
-              data-email-tags-tag-id-param="<%= tag.id %>"
-              class="inline-flex items-center justify-center min-w-[24px] min-h-[24px] -my-1 -mr-1.5 ml-0.5 rounded hover:bg-black/10 hover:opacity-70 leading-none text-[13px]"
-              title="<%= t(".remove_tag_title") %>">&times;</button>
-    </span>
+  <% Tag.visible_for(Current.workspace).where(id: message.tags.select(:id)).each do |tag| %>
+    <%= render(Campbooks::TagChip.new(
+          tag: tag, size: :md, removable: true,
+          remove_data: { "action" => "email-tags#remove",
+                         "email-tags-tag-id-param" => tag.id,
+                         "email-tags-external-param" => tag.external?.to_s })) %>
   <% end %>
 
   <%= render(Campbooks::IconButton.new(aria_label: t(".add_tag_aria"), size: :md, class: "hover:text-accent-600", data: { action: "click->email-tags#open" })) do %>
