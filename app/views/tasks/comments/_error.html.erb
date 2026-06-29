@@ -1,0 +1,4 @@
+<%# Shown in place of the typing dots when Scout's reply fails or comes back empty. %>
+<div class="px-4 py-3">
+  <%= render(Campbooks::ChatError.new(retry_content: local_assigns[:retry_content])) %>
+</div>

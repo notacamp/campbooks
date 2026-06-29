@@ -75,6 +75,10 @@ plans:
       type: flag
       allowed: false        # scheduled sending + calendar visibility — paid feature
       enabled: true
+    tasks:
+      type: flag
+      allowed: false        # task management — paid feature
+      enabled: true
     # ── deferred volume limits (enforced once metering exists) ──
     emails_synced:
       type: limit
@@ -136,6 +140,10 @@ plans:
       allowed: true
       enabled: true    
     email_scheduling:
+      type: flag
+      allowed: true
+      enabled: true
+    tasks:
       type: flag
       allowed: true
       enabled: true
@@ -202,6 +210,10 @@ plans:
       type: flag
       allowed: true
       enabled: true
+    tasks:
+      type: flag
+      allowed: true
+      enabled: true
     emails_synced:
       type: limit
       allowed: true
@@ -262,6 +274,10 @@ plans:
       allowed: true
       enabled: true    
     email_scheduling:
+      type: flag
+      allowed: true
+      enabled: true
+    tasks:
       type: flag
       allowed: true
       enabled: true

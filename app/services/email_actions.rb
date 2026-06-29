@@ -229,6 +229,26 @@ class EmailActions
       }
     ),
     Definition.new(
+      id: "create_task_from_email", target: :message, perm: :read, destructive: false,
+      surfaces: %i[single palette scout_suggest workflow],
+      label: ->(a) { a[:title].present? ? "Create task: #{a[:title]}" : "Create task from email" },
+      runner: ->(msg, args) {
+        task = Tools::CreateTaskFromEmail.call(msg, args)
+        task ? { success: true, message: I18n.t("email_actions.create_task_from_email.success", title: task.title), result: { task_id: task.id, title: task.title } }
+             : { success: false, message: I18n.t("email_actions.create_task_from_email.failure"), result: nil }
+      }
+    ),
+    Definition.new(
+      id: "link_task_to_email", target: :message, perm: :read, destructive: false,
+      surfaces: %i[single scout_suggest workflow],
+      label: ->(a) { a[:task_title].present? ? "Link to task: #{a[:task_title]}" : "Link to a task" },
+      runner: ->(msg, args) {
+        task = Tools::LinkTaskToEmail.call(msg, args)
+        task ? { success: true, message: I18n.t("email_actions.link_task_to_email.success", title: task.title), result: { task_id: task.id, title: task.title } }
+             : { success: false, message: I18n.t("email_actions.link_task_to_email.failure"), result: nil }
+      }
+    ),
+    Definition.new(
       id: "upload_attachments_to_drive", target: :message, perm: :read, destructive: false,
       surfaces: %i[palette scout_suggest],
       label: ->(a) { a[:folder_name].present? ? "Upload attachments to Drive: #{a[:folder_name]}" : "Upload attachments to Drive" },

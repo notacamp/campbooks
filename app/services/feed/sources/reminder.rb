@@ -15,9 +15,12 @@ module Feed
         # `::Reminder` — disambiguate the model from this source class.
         # Floor at the start of today so past-due reminders (no longer actionable)
         # never surface; cap at the horizon so the feed isn't crowded by far-future ones.
+        # Task-sourced reminders are excluded: the task has its own feed card, so
+        # surfacing its deadline reminder too would double up.
         base = ::Reminder.accessible_to(user).includes(:source, :calendar_event)
                          .where(confidence: FEED_MIN_CONFIDENCE..)
                          .where(due_at: now.beginning_of_day..(now + HORIZON))
+                         .where.not(source_type: "Task")
         ready = base.pending.or(base.snoozed.where(snoozed_until: ..now))
 
         ready.order(:due_at).map do |reminder|

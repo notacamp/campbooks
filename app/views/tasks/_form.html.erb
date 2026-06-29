@@ -1,0 +1,60 @@
+<%= form_with model: @task, class: "space-y-5" do %>
+  <% if @task.errors.any? %>
+    <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+      <%= @task.errors.full_messages.to_sentence %>
+    </div>
+  <% end %>
+
+  <%= render Campbooks::Input.new("task[title]",
+        label: t("components.tasks.form.title_label"),
+        value: @task.title,
+        placeholder: t("components.tasks.form.title_placeholder"),
+        required: true) %>
+
+  <div>
+    <label class="mb-1.5 block text-sm font-medium text-foreground"><%= t("components.tasks.form.description_label") %></label>
+    <%= render Campbooks::RichTextEditor.new(
+          input_name: "task[description]",
+          content: @task.description.to_s,
+          placeholder: t("components.tasks.form.description_placeholder"),
+          variant: :full) %>
+  </div>
+
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <%= render Campbooks::Input.new("task[due_at]",
+          type: "datetime-local",
+          label: t("components.tasks.form.due_label"),
+          value: @task.due_at&.strftime("%Y-%m-%dT%H:%M")) %>
+    <%= render Campbooks::Select.new("task[priority]",
+          label: t("components.tasks.form.priority_label"),
+          options: Task.priorities.keys.map { |k| [ t("activerecord.attributes.task.priorities.#{k}"), k ] },
+          selected: @task.priority) %>
+    <%= render Campbooks::Select.new("task[status]",
+          label: t("components.tasks.form.status_label"),
+          options: (Task::BOARD_STATUSES + %w[cancelled]).map { |s| [ t("activerecord.attributes.task.statuses.#{s}"), s ] },
+          selected: @task.status == "suggested" ? "todo" : @task.status) %>
+  </div>
+
+  <fieldset>
+    <legend class="mb-1.5 text-sm font-medium text-foreground"><%= t("components.tasks.form.labels_label") %></legend>
+    <% if @labels.any? %>
+      <%= hidden_field_tag "task[tag_ids][]", "" %>
+      <div class="flex flex-wrap gap-x-4 gap-y-2">
+        <% @labels.each do |tag| %>
+          <%= render Campbooks::Checkbox.new("task[tag_ids][]", label: tag.name, value: tag.id, checked: @task.tag_ids.include?(tag.id)) %>
+        <% end %>
+      </div>
+    <% else %>
+      <p class="text-sm text-muted-foreground"><%= t("components.tasks.form.no_labels") %></p>
+    <% end %>
+  </fieldset>
+
+  <div class="flex items-center gap-3 pt-2">
+    <%= render Campbooks::Button.new(type: "submit", variant: :primary) do %>
+      <%= @task.new_record? ? t("components.tasks.form.create") : t("components.tasks.form.save") %>
+    <% end %>
+    <%= link_to t("components.tasks.form.cancel"),
+          (@task.new_record? ? tasks_path : task_path(@task)),
+          class: "text-sm font-medium text-muted-foreground hover:text-foreground" %>
+  </div>
+<% end %>

@@ -18,8 +18,10 @@ fr:
       archive: Archiver
       block_sender: Bloquer l'expéditeur
       create_event: Créer un événement de calendrier
+      create_task: Créer une tâche
       draft_reply: Rédiger une réponse
       forward_to: Transférer à %{address}
+      link_task: Lier à la tâche
       reclassify: Reclassifier
       remove_tag_prefix: 'Supprimer l''étiquette : %{name}'
       remove_with_name: Supprimer %{name}

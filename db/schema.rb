@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_29_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_29_030000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -1392,6 +1392,82 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_000000) do
     t.index ["workspace_id"], name: "index_tags_on_workspace_id"
   end
 
+  create_table "task_assignments", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "assigned_by_id"
+    t.datetime "created_at", null: false
+    t.uuid "task_id", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["assigned_by_id"], name: "index_task_assignments_on_assigned_by_id"
+    t.index ["task_id", "user_id"], name: "index_task_assignments_on_task_id_and_user_id", unique: true
+    t.index ["task_id"], name: "index_task_assignments_on_task_id"
+    t.index ["user_id"], name: "index_task_assignments_on_user_id"
+  end
+
+  create_table "task_documents", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "created_by_id"
+    t.uuid "document_id", null: false
+    t.uuid "task_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_by_id"], name: "index_task_documents_on_created_by_id"
+    t.index ["document_id"], name: "index_task_documents_on_document_id"
+    t.index ["task_id", "document_id"], name: "index_task_documents_on_task_id_and_document_id", unique: true
+    t.index ["task_id"], name: "index_task_documents_on_task_id"
+  end
+
+  create_table "task_email_links", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "created_by_id"
+    t.uuid "email_message_id", null: false
+    t.integer "relationship", default: 0, null: false
+    t.uuid "task_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_by_id"], name: "index_task_email_links_on_created_by_id"
+    t.index ["email_message_id"], name: "index_task_email_links_on_email_message_id"
+    t.index ["task_id", "email_message_id"], name: "index_task_email_links_on_task_id_and_email_message_id", unique: true
+    t.index ["task_id"], name: "index_task_email_links_on_task_id"
+  end
+
+  create_table "task_tags", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "tag_id", null: false
+    t.uuid "task_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["tag_id"], name: "index_task_tags_on_tag_id"
+    t.index ["task_id", "tag_id"], name: "index_task_tags_on_task_id_and_tag_id", unique: true
+    t.index ["task_id"], name: "index_task_tags_on_task_id"
+  end
+
+  create_table "tasks", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.boolean "ai_suggested", default: false, null: false
+    t.boolean "all_day", default: false, null: false
+    t.datetime "archived_at"
+    t.datetime "completed_at"
+    t.float "confidence", default: 0.0, null: false
+    t.datetime "created_at", null: false
+    t.uuid "created_by_id"
+    t.text "description"
+    t.datetime "due_at"
+    t.jsonb "extracted_data", default: {}, null: false
+    t.string "extraction_fingerprint"
+    t.text "justification"
+    t.integer "position", default: 0, null: false
+    t.integer "priority", default: 1, null: false
+    t.uuid "source_id"
+    t.string "source_type"
+    t.integer "status", default: 0, null: false
+    t.string "title", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["created_by_id"], name: "index_tasks_on_created_by_id"
+    t.index ["extraction_fingerprint"], name: "index_tasks_on_fingerprint", unique: true, where: "(extraction_fingerprint IS NOT NULL)"
+    t.index ["source_type", "source_id"], name: "index_tasks_on_source"
+    t.index ["workspace_id", "archived_at"], name: "index_tasks_on_workspace_id_and_archived_at"
+    t.index ["workspace_id", "status", "due_at"], name: "index_tasks_on_workspace_status_due"
+    t.index ["workspace_id"], name: "index_tasks_on_workspace_id"
+  end
+
   create_table "templates", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.jsonb "data", default: {}, null: false
@@ -1666,6 +1742,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_000000) do
   add_foreign_key "solid_queue_recurring_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_scheduled_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "tags", "workspaces"
+  add_foreign_key "task_assignments", "tasks"
+  add_foreign_key "task_assignments", "users"
+  add_foreign_key "task_assignments", "users", column: "assigned_by_id", on_delete: :nullify
+  add_foreign_key "task_documents", "documents"
+  add_foreign_key "task_documents", "tasks"
+  add_foreign_key "task_documents", "users", column: "created_by_id", on_delete: :nullify
+  add_foreign_key "task_email_links", "email_messages"
+  add_foreign_key "task_email_links", "tasks"
+  add_foreign_key "task_email_links", "users", column: "created_by_id", on_delete: :nullify
+  add_foreign_key "task_tags", "tags"
+  add_foreign_key "task_tags", "tasks"
+  add_foreign_key "tasks", "users", column: "created_by_id", on_delete: :nullify
+  add_foreign_key "tasks", "workspaces"
   add_foreign_key "thread_follows", "agent_threads"
   add_foreign_key "thread_follows", "users"
   add_foreign_key "users", "workspaces"

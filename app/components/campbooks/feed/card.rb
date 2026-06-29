@@ -19,7 +19,8 @@ module Campbooks
         "reply_reminder"  => Campbooks::Feed::ReplyReminderCard,
         "follow_up"       => Campbooks::Feed::FollowUpCard,
         "tag_suggestion"  => Campbooks::Feed::TagSuggestionCard,
-        "reminder"        => Campbooks::Feed::ReminderCard
+        "reminder"        => Campbooks::Feed::ReminderCard,
+        "task"            => Campbooks::Feed::TaskCard
       }.freeze
 
       def initialize(item:, subject:)
@@ -68,6 +69,8 @@ module Campbooks
           { left: [ archive_stage ], right: [] }
         when "reminder"
           { left: [ reminder_dismiss_stage ], right: [ reminder_confirm_stage ] }
+        when "task"
+          { left: [ feed_dismiss_stage ], right: [ task_complete_stage ] }
         when "tag_suggestion"
           { left: [ feed_dismiss_stage(t("components.feed.tag_suggestion_card.not_now")) ], right: [ tag_file_stage ] }
         when "follow_up"
@@ -107,6 +110,11 @@ module Campbooks
       def reminder_dismiss_stage
         { key: "dismiss_reminder", label: t("components.feed.reminder_card.dismiss"), icon: :dismiss,
           color: "neutral", endpoint: act_endpoint, params: { "tool" => "dismiss_reminder" } }
+      end
+
+      def task_complete_stage
+        { key: "complete", label: t("components.feed.task_card.complete"), icon: :approve,
+          color: "green", endpoint: act_endpoint, params: { "tool" => "complete" } }
       end
 
       def tag_file_stage

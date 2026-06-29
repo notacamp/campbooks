@@ -16,7 +16,7 @@ class FeedItem < ApplicationRecord
 
   # Item kinds. Deliberately strings, not a DB enum: a new Feed::Source can add
   # a kind without a migration — the source registry owns the list, not the schema.
-  KINDS = %w[calendar_event starred_email email_action reply_reminder tag_suggestion reminder follow_up].freeze
+  KINDS = %w[calendar_event starred_email email_action reply_reminder tag_suggestion reminder follow_up task].freeze
 
   scope :for_user,      ->(user) { where(user: user) }
   scope :active,        -> { where(dismissed_at: nil, acted_at: nil) }

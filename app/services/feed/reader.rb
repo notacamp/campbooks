@@ -88,6 +88,7 @@ module Feed
       when "EmailMessage" then EmailMessage.includes(:email_account, :tags, :email_thread, contact: :sender_tags)
       when "Document"     then Document.includes(:classification)
       when "Reminder"     then ::Reminder.includes(:source, :calendar_event)
+      when "Task"         then ::Task.includes(:assignees, :tags)
       else type.constantize.all
       end
     end

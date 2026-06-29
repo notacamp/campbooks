@@ -14,6 +14,9 @@ class User < ApplicationRecord
 
   has_many :sessions, dependent: :destroy
   has_many :reviewed_documents, class_name: "Document", foreign_key: :reviewed_by_id
+  has_many :created_tasks, class_name: "Task", foreign_key: :created_by_id, dependent: :nullify
+  has_many :task_assignments, dependent: :destroy
+  has_many :assigned_tasks, through: :task_assignments, source: :task
   has_many :notifications, dependent: :destroy
   has_many :notification_preferences, dependent: :destroy
   has_many :devices, dependent: :destroy
