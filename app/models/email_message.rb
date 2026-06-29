@@ -14,6 +14,8 @@ class EmailMessage < ApplicationRecord
   has_many :tags, through: :email_message_tags
   has_many :document_email_messages, dependent: :destroy
   has_many :documents, through: :document_email_messages
+  has_many :task_email_links, dependent: :destroy
+  has_many :linked_tasks, through: :task_email_links, source: :task
 
   belongs_to :contact, optional: true
 

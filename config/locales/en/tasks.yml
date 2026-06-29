@@ -1,0 +1,109 @@
+---
+en:
+  activerecord:
+    attributes:
+      task:
+        all_day: All day
+        description: Description
+        due_at: Due date
+        priorities:
+          high: High
+          low: Low
+          normal: Normal
+          urgent: Urgent
+        priority: Priority
+        status: Status
+        statuses:
+          blocked: Blocked
+          cancelled: Cancelled
+          done: Done
+          in_progress: In progress
+          suggested: Suggested
+          todo: To do
+        title: Title
+      task_email_link:
+        relationships:
+          blocked_by: Blocked by
+          follow_up: Follow-up
+          reference: Reference
+          related: Related
+    models:
+      task:
+        one: Task
+        other: Tasks
+  components:
+    tasks:
+      form:
+        assignees_label: Assignees
+        cancel: Cancel
+        create: Create task
+        description_label: Description
+        description_placeholder: Add details, links, or context…
+        due_label: Due date
+        labels_label: Labels
+        no_labels: No labels in this workspace yet.
+        priority_label: Priority
+        save: Save changes
+        status_label: Status
+        title_label: Title
+        title_placeholder: What needs to be done?
+      row:
+        due_today: Due today
+        due_tomorrow: Due tomorrow
+        in_days:
+          one: Due in %{count} day
+          other: Due in %{count} days
+        no_due_date: No due date
+        overdue: Overdue
+        unassigned: Unassigned
+  tasks:
+    assign:
+      assigned: Assignees updated.
+    complete:
+      completed: Task completed.
+    create:
+      created: Task created.
+    destroy:
+      deleted: Task deleted.
+    edit:
+      title: Edit task
+    index:
+      all: All
+      empty_body: Create a task, or let Scout pull action items out of your email.
+      empty_title: No tasks yet
+      new: New task
+      subtitle: Action items from your email and your own to-dos.
+      title: Tasks
+      triage_banner:
+        one: "%{count} suggested task to review in Skim"
+        other: "%{count} suggested tasks to review in Skim"
+    move:
+      invalid_status: That status doesn't exist.
+      moved: Task moved.
+    new:
+      title: New task
+    show:
+      activity: Activity
+      assignees: Assignees
+      back: All tasks
+      created_by: Created by %{name}
+      created_by_ai: Extracted by Scout
+      delete: Delete
+      delete_confirm: Delete this task? This can't be undone.
+      description: Description
+      edit: Edit
+      labels: Labels
+      linked_emails: Linked emails
+      mark_done: Mark done
+      no_activity: No activity yet.
+      no_assignees: Unassigned
+      no_description: No description yet.
+      no_labels: No labels.
+      no_linked_emails: No linked emails.
+      origin: Created from this email
+      priority: "Priority: %{level}"
+      reopen: Reopen
+      status: Status
+      update: Update
+    update:
+      updated: Task updated.

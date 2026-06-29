@@ -16,6 +16,16 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Tasks** — a new task-management module (opt-in via `ENABLE_TASKS`, gated by the
+  `tasks` plan entitlement). Create tasks manually or have Scout extract action
+  items from your email and documents; move them through a status board; assign
+  multiple workspace members; label them with the same tags as email; set due dates
+  and rich-text descriptions; link tasks to emails; and track every status change in
+  the activity log. Tasks publish domain events (`task.created`, `task.status_changed`,
+  `task.assigned`, `task.completed`) and appear in the navigation, Skim and Feed.
+
 ### Fixed
 
 - `document_templates` was missing from `db/schema.rb`, so fresh installs and CI

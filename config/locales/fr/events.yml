@@ -11,6 +11,7 @@ fr:
       documents: Documents
       email: E-mail
       reminders: Rappels
+      tasks: "Tâches"
     names:
       calendar_event_created: Événement de calendrier créé
       calendar_event_deleted: Événement de calendrier supprimé
@@ -37,5 +38,9 @@ fr:
       reminder_confirmed: Rappel confirmé
       reminder_created: Rappel créé
       reminder_dismissed: Rappel ignoré
+      task_assigned: "Tâche assignée"
+      task_completed: "Tâche terminée"
+      task_created: "Tâche créée"
+      task_status_changed: Statut de la tâche modifié
     system_actor: Système
     time_ago: il y a %{time}

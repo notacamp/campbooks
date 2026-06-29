@@ -20,6 +20,8 @@ class Tag < ApplicationRecord
 
   has_many :email_message_tags, dependent: :destroy
   has_many :email_messages, through: :email_message_tags
+  has_many :task_tags, dependent: :destroy
+  has_many :tasks, through: :task_tags
   has_many :notification_preferences, dependent: :destroy
 
   after_save_commit :enqueue_tag_embedding

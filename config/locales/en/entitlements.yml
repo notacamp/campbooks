@@ -57,6 +57,7 @@ en:
       notifications: Notifications
       pipelines: Pipelines
       scout: Scout
+      tasks: Tasks
       workflow_executions: Workflow runs
       workflows: Workflows
       document_templates: Document templates

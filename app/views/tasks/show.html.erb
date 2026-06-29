@@ -1,0 +1,120 @@
+<div class="mx-auto max-w-3xl px-4 py-6 sm:px-6 lg:px-8">
+  <%= link_to tasks_path, class: "mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground" do %>
+    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+    <%= t(".back") %>
+  <% end %>
+
+  <div class="flex flex-col gap-6 lg:flex-row">
+    <div class="min-w-0 flex-1 space-y-6">
+      <header class="space-y-3">
+        <div class="flex items-start justify-between gap-3">
+          <h1 class="text-xl font-semibold text-foreground"><%= @task.title %></h1>
+          <div class="flex shrink-0 items-center gap-2">
+            <%= link_to t(".edit"), edit_task_path(@task), class: "rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition hover:bg-muted" %>
+            <%= button_to t(".delete"), task_path(@task), method: :delete,
+                  class: "rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40",
+                  form: { data: { turbo_confirm: t(".delete_confirm") } } %>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
+          <%= render Campbooks::Tasks::StatusBadge.new(status: @task.status, size: :md) %>
+          <% if @task.due_at.present? %>
+            <span class="<%= @task.overdue? ? "font-medium text-red-600 dark:text-red-400" : "text-muted-foreground" %>"><%= l(@task.due_at, format: :at) %></span>
+          <% end %>
+          <span class="text-xs text-muted-foreground"><%= @task.created_by ? t(".created_by", name: @task.created_by.name) : t(".created_by_ai") %></span>
+        </div>
+      </header>
+
+      <div class="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3">
+        <%= form_with url: move_task_path(@task), method: :patch, data: { turbo: false }, class: "flex items-center gap-2" do %>
+          <span class="text-sm font-medium text-muted-foreground"><%= t(".status") %></span>
+          <%= render Campbooks::Select.new("status",
+                options: (Task::BOARD_STATUSES + %w[cancelled]).map { |s| [ t("activerecord.attributes.task.statuses.#{s}"), s ] },
+                selected: @task.status) %>
+          <%= render Campbooks::Button.new(type: "submit", variant: :secondary, size: :sm) { t(".update") } %>
+        <% end %>
+        <% unless @task.done? %>
+          <%= button_to t(".mark_done"), complete_task_path(@task), method: :patch, data: { turbo: false },
+                class: "rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-700" %>
+        <% end %>
+      </div>
+
+      <section>
+        <h2 class="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".description") %></h2>
+        <% if @task.description.present? %>
+          <div class="prose prose-sm max-w-none text-foreground"><%= sanitize @task.description %></div>
+        <% else %>
+          <p class="text-sm text-muted-foreground"><%= t(".no_description") %></p>
+        <% end %>
+      </section>
+
+      <section>
+        <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".linked_emails") %></h2>
+        <% if @task.source_email.present? || @task.task_email_links.any? %>
+          <div class="space-y-1.5">
+            <% if @task.source_email.present? %>
+              <%= link_to email_message_path(@task.source_email), class: "flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm transition hover:bg-muted" do %>
+                <span class="shrink-0 rounded bg-accent-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-700 dark:bg-accent-950/50 dark:text-accent-300"><%= t(".origin") %></span>
+                <span class="truncate text-foreground"><%= @task.source_email.subject.presence || @task.source_email.from_address %></span>
+              <% end %>
+            <% end %>
+            <% @task.task_email_links.includes(:email_message).each do |link| %>
+              <%= link_to email_message_path(link.email_message), class: "flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm transition hover:bg-muted" do %>
+                <span class="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"><%= t("activerecord.attributes.task_email_link.relationships.#{link.relationship}") %></span>
+                <span class="truncate text-foreground"><%= link.email_message.subject.presence || link.email_message.from_address %></span>
+              <% end %>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-sm text-muted-foreground"><%= t(".no_linked_emails") %></p>
+        <% end %>
+      </section>
+
+      <section>
+        <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".activity") %></h2>
+        <% if @activity.any? %>
+          <div class="divide-y divide-hair">
+            <% @activity.each do |event| %>
+              <%= render Campbooks::Activity::EventRow.new(event: event) %>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-sm text-muted-foreground"><%= t(".no_activity") %></p>
+        <% end %>
+      </section>
+    </div>
+
+    <aside class="w-full space-y-6 lg:w-60 lg:shrink-0">
+      <section>
+        <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".assignees") %></h2>
+        <%= form_with url: assign_task_path(@task), method: :post, data: { turbo: false }, class: "space-y-2" do %>
+          <% if @members.any? %>
+            <%= hidden_field_tag "assignee_ids[]", "" %>
+            <% @members.each do |member| %>
+              <%= render Campbooks::Checkbox.new("assignee_ids[]", label: member.name, value: member.id, checked: @task.assignee_ids.include?(member.id)) %>
+            <% end %>
+            <%= render Campbooks::Button.new(type: "submit", variant: :secondary, size: :sm) { t(".update") } %>
+          <% else %>
+            <p class="text-sm text-muted-foreground"><%= t(".no_assignees") %></p>
+          <% end %>
+        <% end %>
+      </section>
+
+      <section>
+        <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".labels") %></h2>
+        <% if @task.tags.any? %>
+          <div class="flex flex-wrap gap-1.5">
+            <% @task.tags.each do |tag| %>
+              <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs" style="background-color: <%= tag.color %>1a; color: <%= tag.color %>">
+                <span class="inline-block h-2 w-2 rounded-full" style="background-color: <%= tag.color %>"></span>
+                <%= tag.name %>
+              </span>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-sm text-muted-foreground"><%= t(".no_labels") %></p>
+        <% end %>
+      </section>
+    </aside>
+  </div>
+</div>

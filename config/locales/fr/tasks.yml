@@ -1,0 +1,109 @@
+---
+fr:
+  activerecord:
+    attributes:
+      task:
+        all_day: Toute la journée
+        description: Description
+        due_at: "Date d'échéance"
+        priorities:
+          high: Haute
+          low: Basse
+          normal: Normale
+          urgent: Urgente
+        priority: "Priorité"
+        status: Statut
+        statuses:
+          blocked: "Bloquée"
+          cancelled: "Annulée"
+          done: "Terminée"
+          in_progress: En cours
+          suggested: "Suggérée"
+          todo: "À faire"
+        title: Titre
+      task_email_link:
+        relationships:
+          blocked_by: "Bloquée par"
+          follow_up: Suivi
+          reference: "Référence"
+          related: "Liée"
+    models:
+      task:
+        one: "Tâche"
+        other: "Tâches"
+  components:
+    tasks:
+      form:
+        assignees_label: Responsables
+        cancel: Annuler
+        create: "Créer une tâche"
+        description_label: Description
+        description_placeholder: "Ajoutez des détails, des liens ou du contexte…"
+        due_label: "Date d'échéance"
+        labels_label: "Étiquettes"
+        no_labels: Aucune étiquette dans cet espace de travail.
+        priority_label: "Priorité"
+        save: Enregistrer les modifications
+        status_label: Statut
+        title_label: Titre
+        title_placeholder: Que faut-il faire ?
+      row:
+        due_today: "À rendre aujourd'hui"
+        due_tomorrow: "À rendre demain"
+        in_days:
+          one: "À rendre dans %{count} jour"
+          other: "À rendre dans %{count} jours"
+        no_due_date: "Sans date d'échéance"
+        overdue: En retard
+        unassigned: Non attribuée
+  tasks:
+    assign:
+      assigned: "Responsables mis à jour."
+    complete:
+      completed: "Tâche terminée."
+    create:
+      created: "Tâche créée."
+    destroy:
+      deleted: "Tâche supprimée."
+    edit:
+      title: "Modifier la tâche"
+    index:
+      all: Toutes
+      empty_body: "Créez une tâche, ou laissez Scout extraire des actions de vos e-mails."
+      empty_title: Aucune tâche pour l'instant
+      new: "Nouvelle tâche"
+      subtitle: Actions issues de vos e-mails et vos propres tâches.
+      title: "Tâches"
+      triage_banner:
+        one: "%{count} tâche suggérée à examiner dans Skim"
+        other: "%{count} tâches suggérées à examiner dans Skim"
+    move:
+      invalid_status: Ce statut n'existe pas.
+      moved: "Tâche déplacée."
+    new:
+      title: "Nouvelle tâche"
+    show:
+      activity: "Activité"
+      assignees: Responsables
+      back: "Toutes les tâches"
+      created_by: "Créée par %{name}"
+      created_by_ai: Extraite par Scout
+      delete: Supprimer
+      delete_confirm: "Supprimer cette tâche ? Cette action est irréversible."
+      description: Description
+      edit: Modifier
+      labels: "Étiquettes"
+      linked_emails: "E-mails liés"
+      mark_done: "Marquer comme terminée"
+      no_activity: Aucune activité pour l'instant.
+      no_assignees: Non attribuée
+      no_description: Aucune description pour l'instant.
+      no_labels: Aucune étiquette.
+      no_linked_emails: "Aucun e-mail lié."
+      origin: "Créée depuis cet e-mail"
+      priority: "Priorité : %{level}"
+      reopen: Rouvrir
+      status: Statut
+      update: "Mettre à jour"
+    update:
+      updated: "Tâche mise à jour."

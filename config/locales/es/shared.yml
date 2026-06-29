@@ -36,6 +36,7 @@ es:
       new_items: Nuevo
       scout: Scout
       settings: Configuración
+      tasks: Tareas
       workflows: Flujos
     swipe_dialogs:
       confirm_action: Eliminar

@@ -1,0 +1,109 @@
+---
+pt:
+  activerecord:
+    attributes:
+      task:
+        all_day: O dia todo
+        description: Descrição
+        due_at: Data de entrega
+        priorities:
+          high: Alta
+          low: Baixa
+          normal: Normal
+          urgent: Urgente
+        priority: Prioridade
+        status: Estado
+        statuses:
+          blocked: Bloqueada
+          cancelled: Cancelada
+          done: Concluída
+          in_progress: Em curso
+          suggested: Sugerida
+          todo: A fazer
+        title: Título
+      task_email_link:
+        relationships:
+          blocked_by: Bloqueada por
+          follow_up: Seguimento
+          reference: Referência
+          related: Relacionada
+    models:
+      task:
+        one: Tarefa
+        other: Tarefas
+  components:
+    tasks:
+      form:
+        assignees_label: Responsáveis
+        cancel: Cancelar
+        create: Criar tarefa
+        description_label: Descrição
+        description_placeholder: Adicione detalhes, ligações ou contexto…
+        due_label: Data de entrega
+        labels_label: Etiquetas
+        no_labels: Sem etiquetas nesta área de trabalho.
+        priority_label: Prioridade
+        save: Guardar alterações
+        status_label: Estado
+        title_label: Título
+        title_placeholder: O que precisa de ser feito?
+      row:
+        due_today: Entrega hoje
+        due_tomorrow: Entrega amanhã
+        in_days:
+          one: Entrega em %{count} dia
+          other: Entrega em %{count} dias
+        no_due_date: Sem data de entrega
+        overdue: Em atraso
+        unassigned: Sem responsável
+  tasks:
+    assign:
+      assigned: Responsáveis atualizados.
+    complete:
+      completed: Tarefa concluída.
+    create:
+      created: Tarefa criada.
+    destroy:
+      deleted: Tarefa eliminada.
+    edit:
+      title: Editar tarefa
+    index:
+      all: Todas
+      empty_body: Crie uma tarefa, ou deixe o Scout extrair ações do seu email.
+      empty_title: Ainda sem tarefas
+      new: Nova tarefa
+      subtitle: Ações do seu email e as suas próprias tarefas.
+      title: Tarefas
+      triage_banner:
+        one: "%{count} tarefa sugerida para rever no Skim"
+        other: "%{count} tarefas sugeridas para rever no Skim"
+    move:
+      invalid_status: Esse estado não existe.
+      moved: Tarefa movida.
+    new:
+      title: Nova tarefa
+    show:
+      activity: Atividade
+      assignees: Responsáveis
+      back: Todas as tarefas
+      created_by: Criada por %{name}
+      created_by_ai: Extraída pelo Scout
+      delete: Eliminar
+      delete_confirm: Eliminar esta tarefa? Esta ação não pode ser anulada.
+      description: Descrição
+      edit: Editar
+      labels: Etiquetas
+      linked_emails: Emails associados
+      mark_done: Marcar como concluída
+      no_activity: Ainda sem atividade.
+      no_assignees: Sem responsável
+      no_description: Ainda sem descrição.
+      no_labels: Sem etiquetas.
+      no_linked_emails: Sem emails associados.
+      origin: Criada a partir deste email
+      priority: "Prioridade: %{level}"
+      reopen: Reabrir
+      status: Estado
+      update: Atualizar
+    update:
+      updated: Tarefa atualizada.

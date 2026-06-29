@@ -98,6 +98,18 @@ Rails.application.routes.draw do
     end
   end
 
+  # Tasks — actionable items (manual or AI-extracted) that move through a status
+  # board, carry assignees + labels, and link to emails. Gated by Features.tasks?
+  # and the :tasks entitlement (TasksController). Board + skim + email-linking
+  # routes are added in their respective phases.
+  resources :tasks do
+    member do
+      patch :complete         # mark done (quick action)
+      patch :move             # change status (status control + the board drag)
+      post  :assign           # update assignees
+    end
+  end
+
   # Global search (Cmd+K command palette)
   get "search", to: "search#index"
 
