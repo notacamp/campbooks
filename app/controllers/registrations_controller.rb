@@ -2,6 +2,13 @@ class RegistrationsController < ApplicationController
   layout "onboarding"
   allow_unauthenticated_access
 
+  # The native iOS/Android apps are sign-in-only: self-serve account creation
+  # happens on the web, keeping subscription billing outside Apple/Google in-app
+  # purchase and easing App Review. Invited / approved users may still finish
+  # signing up in-app (their token is already in the session). The in-app
+  # "Create an account" link is hidden in the native shell too.
+  before_action :block_native_self_serve_signup, except: :approved
+
   # Throttle public-facing signup entry points to slow automated account creation
   # and OTP flooding. Keyed by IP (session not yet established at these steps).
   # Multi-action limits use name: to give each its own counter (mirrors
@@ -228,6 +235,16 @@ class RegistrationsController < ApplicationController
   end
 
   private
+
+  # Block self-serve account creation inside the native app shell. Invited /
+  # approved users (token already in the session) are allowed through so they can
+  # finish onboarding; everyone else is sent to sign-in (signup is web-only).
+  def block_native_self_serve_signup
+    return unless hotwire_native_app?
+    return if session[:invitation_token].present? || session[:approval_token].present?
+
+    redirect_to new_session_path, alert: t("registrations.native_signup_unavailable")
+  end
 
   def generate_code
     # SecureRandom (CSPRNG) instead of Kernel#rand to prevent predictable OTPs.
