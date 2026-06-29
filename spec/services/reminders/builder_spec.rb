@@ -60,4 +60,27 @@ RSpec.describe Reminders::Builder do
     build([ item("title" => "AI rewrite") ])
     expect(Reminder.last.title).to eq("Edited")
   end
+
+  describe "cross-source soft-dedup" do
+    it "collapses the same commitment from an email and its attachment into one reminder" do
+      email   = create(:email_message)
+      doc     = create(:document, workspace: workspace)
+      payload = item("amount_cents" => 12_300)
+
+      Reminders::Builder.call(workspace: workspace, source: email, raw_items: [ payload ])
+      expect {
+        Reminders::Builder.call(workspace: workspace, source: doc, raw_items: [ payload ])
+      }.not_to change(Reminder, :count)
+    end
+
+    it "keeps a genuinely different commitment (different amount) from another source" do
+      email = create(:email_message)
+      doc   = create(:document, workspace: workspace)
+
+      Reminders::Builder.call(workspace: workspace, source: email, raw_items: [ item("amount_cents" => 100) ])
+      expect {
+        Reminders::Builder.call(workspace: workspace, source: doc, raw_items: [ item("amount_cents" => 999) ])
+      }.to change(Reminder, :count).by(1)
+    end
+  end
 end

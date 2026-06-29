@@ -43,10 +43,20 @@
       </div>
 
       <% if public_signup_allowed? %>
-        <p class="text-center text-sm mt-6">
-          <%= t(".no_account") %>
-          <%= link_to t(".sign_up"), new_registration_path, class: "text-accent-600 hover:text-accent-700 font-medium" %>
-        </p>
+        <% if hotwire_native_app? %>
+          <%# Native apps are sign-in-only: self-serve account creation happens on
+              the web so subscription billing stays outside Apple/Google in-app
+              purchase (and to ease App Review). RegistrationsController guards this
+              server-side too; invited users can still finish signing up in-app. %>
+          <p class="text-center text-sm mt-6 text-gray-600">
+            <%= t(".signup_on_web_html", link: link_to(t(".signup_on_web_link"), marketing_url("/"), class: "text-accent-600 hover:text-accent-700 font-medium")) %>
+          </p>
+        <% else %>
+          <p class="text-center text-sm mt-6">
+            <%= t(".no_account") %>
+            <%= link_to t(".sign_up"), new_registration_path, class: "text-accent-600 hover:text-accent-700 font-medium" %>
+          </p>
+        <% end %>
       <% end %>
     <% end %>
   </div>

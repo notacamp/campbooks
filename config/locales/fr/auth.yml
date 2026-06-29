@@ -95,5 +95,7 @@ fr:
       password_label: Mot de passe
       password_placeholder: Entrez votre mot de passe
       sign_up: Créer un compte
+      signup_on_web_html: Nouveau sur Campbooks ? %{link}.
+      signup_on_web_link: Créez un compte sur le Web
       submit: Se connecter
       tagline: La boîte de réception qui se range toute seule.
