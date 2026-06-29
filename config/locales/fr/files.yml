@@ -29,11 +29,37 @@ fr:
       files_section: Fichiers
       manage_access: Gérer l'accès
       manage_access_locked: "Gérer l'accès · Privé"
+      review_n: "Examiner %{count}"
+      ai_analyze: Analyser avec l'IA
+      ai_analyze_hint: Extrait et classe les documents commerciaux (factures, reçus…). Désactivez pour simplement stocker le fichier.
+      filters: Filtres
+      filter_category: Catégorie
+      filter_type: Type
+      filter_status: Statut
+      filter_month: Mois
+      filter_folder: Dossier
+      filter_all_categories: Toutes les catégories
+      filter_all_types: Tous les types
+      filter_all_statuses: Tous les statuts
+      filter_all_folders: Tous les dossiers
+      filter_types_selected: "%{count} sélectionné(s)"
+      reanalyze_all: "Tout réanalyser (%{count})"
+      export: Exporter
+      export_confirm: Exporter les documents correspondant aux filtres actuels au format ZIP ?
+      exports_heading: Exports récents
+      exports_col_date: Date
+      exports_col_status: Statut
+      exports_col_documents: Documents
+      exports_col_download: Télécharger
+      download_zip: Télécharger le ZIP
+      export_failed: Échec de l'export
     uploads:
       create:
         no_files: Choisissez au moins un fichier à téléverser.
         uploaded_one: Fichier téléversé.
         uploaded_many: "%{count} fichiers téléversés."
+        analyzed_one: Fichier téléversé et mis en file d'attente pour l'analyse par l'IA.
+        analyzed_many: "%{count} fichiers téléversés et mis en file d'attente pour l'analyse par l'IA."
         failed: "Échec du téléversement : %{message}"
       destroy:
         deleted: Fichier supprimé.

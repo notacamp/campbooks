@@ -2,7 +2,7 @@
 
 <%= render Campbooks::PageHeader.new(title: t(".title")) do |header| %>
   <% header.with_actions do %>
-    <%= link_to documents_path, class: "text-sm text-muted-foreground hover:text-foreground transition-colors" do %>
+    <%= link_to files_path, class: "text-sm text-muted-foreground hover:text-foreground transition-colors" do %>
       ← <%= t(".back_to_documents") %>
     <% end %>
     <%= render Campbooks::Button.new(variant: :primary, size: :sm, href: new_written_document_path) { t(".new") } %>

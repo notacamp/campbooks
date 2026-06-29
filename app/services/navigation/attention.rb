@@ -27,7 +27,7 @@ module Navigation
       when :home      then new_feed?
       when :mail      then new_mail?
       when :calendar  then new_calendar?
-      when :documents then new_documents?
+      when :files     then new_documents?
       when :scout     then new_scout?
       else false
       end
@@ -52,7 +52,7 @@ module Navigation
     end
 
     # Documents needing review that the user hasn't viewed yet. viewed_at is
-    # stamped when documents appear on the Documents index.
+    # stamped when the user visits the Files index (where Skim now lives).
     def new_documents?
       return false unless @user.workspace
 
