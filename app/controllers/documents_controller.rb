@@ -26,10 +26,8 @@ class DocumentsController < ApplicationController
     @has_any_documents = Current.workspace.documents.exists?
     @email_connected = Current.workspace.email_accounts.active.exists?
 
-    # Visiting Documents clears its nav attention dot: stamp viewed_at on the docs
-    # that drive the dot (needs_review), independent of the active filter. Matches
-    # Navigation::Attention#new_documents?.
-    Current.workspace.documents.needs_review.where(viewed_at: nil).update_all(viewed_at: Time.current)
+    # (The nav attention dot is now cleared by FilesController#index — the Documents
+    # index is reached only via a legacy redirect to /files.)
 
     @pagy, @documents = pagy(documents)
 
@@ -43,7 +41,7 @@ class DocumentsController < ApplicationController
     files = Array(params[:files])
 
     if files.empty?
-      redirect_to documents_path, error: t(".no_files")
+      redirect_to files_path, error: t(".no_files")
       return
     end
 
@@ -60,10 +58,10 @@ class DocumentsController < ApplicationController
     if documents.size == 1
       redirect_to document_path(documents.first), success: t(".uploaded_one")
     else
-      redirect_to documents_path, success: t(".uploaded_many", count: documents.size)
+      redirect_to files_path, success: t(".uploaded_many", count: documents.size)
     end
   rescue => e
-    redirect_to documents_path, error: t(".upload_failed", message: e.message)
+    redirect_to files_path, error: t(".upload_failed", message: e.message)
   end
 
   def show
@@ -140,7 +138,7 @@ class DocumentsController < ApplicationController
     Notifier.documents_need_review(@document.workspace, bump: false)
     respond_to do |format|
       format.turbo_stream { render turbo_stream: document_row_streams(@document) }
-      format.html { redirect_to documents_path, success: t(".rejected") }
+      format.html { redirect_to files_path, success: t(".rejected") }
     end
   end
 
@@ -151,7 +149,7 @@ class DocumentsController < ApplicationController
     @document.update!(starred: !@document.starred?)
     respond_to do |format|
       format.turbo_stream { render turbo_stream: document_row_streams(@document) }
-      format.html { redirect_back fallback_location: documents_path }
+      format.html { redirect_back fallback_location: files_path }
     end
   end
 
@@ -226,7 +224,7 @@ class DocumentsController < ApplicationController
       DocumentProcessJob.perform_later(doc.id)
     end
     Notifier.documents_need_review(Current.workspace, bump: false)
-    redirect_to documents_path(type: params[:type], category: params[:category], review_status: params[:review_status], month: params[:month]),
+    redirect_to files_path(type: params[:type], category: params[:category], review_status: params[:review_status], month: params[:month]),
                 success: t(".queued", count: count)
   end
 
@@ -242,7 +240,7 @@ class DocumentsController < ApplicationController
 
     export = Current.workspace.exports.create!(status: :pending, filters: filters)
     ExportJob.perform_later(export.id)
-    redirect_to documents_path(type: params[:type], category: params[:category], review_status: params[:review_status], month: params[:month]),
+    redirect_to files_path(type: params[:type], category: params[:category], review_status: params[:review_status], month: params[:month]),
                 success: t(".generating")
   end
 
@@ -251,7 +249,7 @@ class DocumentsController < ApplicationController
     @docs = Current.workspace.documents.includes(:classification, :email_messages).where(id: ids).order(:id)
 
     if @docs.size < 2
-      redirect_to documents_path, error: t(".too_few")
+      redirect_to files_path, error: t(".too_few")
     end
   end
 
@@ -350,7 +348,7 @@ class DocumentsController < ApplicationController
         priority: :activity, # quiet team-activity tier — no toast
         title: "New document uploaded",
         body: "#{current_user.name} uploaded #{label}",
-        link_url: count == 1 ? document_path(documents.first) : documents_path,
+        link_url: count == 1 ? document_path(documents.first) : files_path,
         group_key: "manual_upload",
         respect_preferences: false
       )

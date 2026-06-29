@@ -20,6 +20,11 @@ es:
       col_added: Añadido
       col_actions: Acciones
       empty_folder: Esta carpeta está vacía.
+      search_results:
+        zero: "Sin resultados para \"%{q}\""
+        one: "1 resultado para \"%{q}\""
+        other: "%{count} resultados para \"%{q}\""
+      search_empty: Ningún documento coincide con tu búsqueda. Prueba otro término o borra los filtros.
       empty_title: Aún no hay archivos
       empty_description: "Sube archivos para mantenerlos organizados en carpetas: facturas, contratos, lo que sea."
       empty_upload: Subir archivos
@@ -29,11 +34,37 @@ es:
       files_section: Archivos
       manage_access: Gestionar acceso
       manage_access_locked: "Gestionar acceso · Privado"
+      review_n: "Revisar %{count}"
+      ai_analyze: Analizar con IA
+      ai_analyze_hint: Extrae y clasifica documentos comerciales (facturas, recibos…). Desactívalo para solo guardar el archivo.
+      filters: Filtros
+      filter_category: Categoría
+      filter_type: Tipo
+      filter_status: Estado
+      filter_month: Mes
+      filter_folder: Carpeta
+      filter_all_categories: Todas las categorías
+      filter_all_types: Todos los tipos
+      filter_all_statuses: Todos los estados
+      filter_all_folders: Todas las carpetas
+      filter_types_selected: "%{count} seleccionado(s)"
+      reanalyze_all: "Reanalizar todos (%{count})"
+      export: Exportar
+      export_confirm: ¿Exportar los documentos que coinciden con los filtros actuales como ZIP?
+      exports_heading: Exportaciones recientes
+      exports_col_date: Fecha
+      exports_col_status: Estado
+      exports_col_documents: Documentos
+      exports_col_download: Descargar
+      download_zip: Descargar ZIP
+      export_failed: La exportación falló
     uploads:
       create:
         no_files: Elige al menos un archivo para subir.
         uploaded_one: Archivo subido.
         uploaded_many: "%{count} archivos subidos."
+        analyzed_one: Archivo subido y en cola para análisis con IA.
+        analyzed_many: "%{count} archivos subidos y en cola para análisis con IA."
         failed: "Error al subir: %{message}"
       destroy:
         deleted: Archivo eliminado.
@@ -48,6 +79,10 @@ es:
       body: "Saqué un documento de este correo y lo archivé en Archivos: **[%{title}](%{path})**."
   components:
     files:
+      search_bar:
+        placeholder: Buscar archivos…
+        submit: Buscar
+        clear: Borrar búsqueda
       sidebar:
         label: Carpetas
         all_files: Todos los archivos

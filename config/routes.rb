@@ -168,6 +168,12 @@ Rails.application.routes.draw do
   get   "documents/write/:id/edit", to: "documents/written#edit", as: :edit_written_document
   patch "documents/write/:id",  to: "documents/written#update"
 
+  # The Documents *index* merged into the Files page. Redirect the old list URL (302,
+  # not a cache-poisoning 301) — the `documents_path` helper and back-links keep
+  # working. Declared BEFORE `resources :documents` so it shadows documents#index;
+  # detail/show, skim, write, exports and the member/collection actions below stay.
+  get "documents", to: redirect("/files", status: 302)
+
   resources :documents, only: [ :index, :show, :update, :create ] do
     member do
       get :file
@@ -355,8 +361,7 @@ Rails.application.routes.draw do
   # Inbox settings — the gear-icon management modal on the email page. Each
   # action renders a panel into the modal's Turbo Frame (inbox_settings_panel).
   namespace :inbox_settings do
-    get "display", to: "display#show",   as: :display
-    patch "display", to: "display#update", as: :display_update
+    get "display", to: "display#show", as: :display
 
     # Inbox filtering strategy (whitelist/blacklist) + blocked/starred/allowed
     # sender management.
@@ -364,7 +369,9 @@ Rails.application.routes.draw do
     patch "filtering",        to: "filtering#update"
     post  "filtering/sender", to: "filtering#set_sender", as: :filtering_sender
 
-    resources :tags, except: [ :show ]
+    resources :tags, except: [ :show ] do
+      member { patch :toggle_hidden }
+    end
     resources :document_types, except: [ :show ]
     resources :signatures, except: [ :show ] do
       member { post :set_default }

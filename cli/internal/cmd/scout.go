@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -76,7 +75,7 @@ func scoutThreadsNewCmd() *cobra.Command {
 }
 
 func scoutMessagesCmd() *cobra.Command {
-	var after int
+	var after string
 	cmd := &cobra.Command{
 		Use:   "messages <thread-id>",
 		Short: "Show a thread's messages",
@@ -87,8 +86,8 @@ func scoutMessagesCmd() *cobra.Command {
 				return err
 			}
 			q := url.Values{}
-			if after > 0 {
-				q.Set("after_message_id", strconv.Itoa(after))
+			if after != "" {
+				q.Set("after_message_id", after)
 			}
 			data, _, err := s.client.Get(cmd.Context(), "/api/v1/scout/threads/"+args[0]+"/messages", q)
 			if err != nil {
@@ -102,13 +101,13 @@ func scoutMessagesCmd() *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().IntVar(&after, "after", 0, "only messages after this message ID")
+	cmd.Flags().StringVar(&after, "after", "", "only messages after this message ID")
 	return cmd
 }
 
 func scoutAskCmd() *cobra.Command {
 	var (
-		thread  int
+		thread  string
 		wait    bool
 		timeout int
 	)
@@ -126,7 +125,7 @@ func scoutAskCmd() *cobra.Command {
 			message := strings.Join(args, " ")
 
 			threadID := thread
-			if threadID == 0 {
+			if threadID == "" {
 				data, err := s.client.Send(ctx, http.MethodPost, "/api/v1/scout/threads", nil, url.Values{})
 				if err != nil {
 					return err
@@ -135,11 +134,11 @@ func scoutAskCmd() *cobra.Command {
 				if err := json.Unmarshal(data, &t); err != nil {
 					return err
 				}
-				threadID = intField(t, "id")
+				threadID = stringField(t, "id")
 			}
 
 			data, err := s.client.Send(ctx, http.MethodPost,
-				fmt.Sprintf("/api/v1/scout/threads/%d/messages", threadID), nil,
+				"/api/v1/scout/threads/"+threadID+"/messages", nil,
 				url.Values{"content": {message}})
 			if err != nil {
 				return err
@@ -148,10 +147,10 @@ func scoutAskCmd() *cobra.Command {
 			if err := json.Unmarshal(data, &userMsg); err != nil {
 				return err
 			}
-			userMsgID := intField(userMsg, "id")
+			userMsgID := stringField(userMsg, "id")
 
 			if !wait {
-				fmt.Fprintf(out, "✓ Sent to thread %d (message %d). Read the reply with:\n  campbooks scout messages %d --after %d\n",
+				fmt.Fprintf(out, "✓ Sent to thread %s (message %s). Read the reply with:\n  campbooks scout messages %s --after %s\n",
 					threadID, userMsgID, threadID, userMsgID)
 				return nil
 			}
@@ -168,17 +167,17 @@ func scoutAskCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().IntVar(&thread, "thread", 0, "existing thread ID (default: start a new thread)")
+	cmd.Flags().StringVar(&thread, "thread", "", "existing thread ID (default: start a new thread)")
 	cmd.Flags().BoolVar(&wait, "wait", false, "wait for and print Scout's reply")
 	cmd.Flags().IntVar(&timeout, "timeout", 120, "seconds to wait for the reply (with --wait)")
 	return cmd
 }
 
-func pollForReply(ctx context.Context, c *client.Client, threadID, afterID int, timeout time.Duration) (map[string]any, error) {
+func pollForReply(ctx context.Context, c *client.Client, threadID, afterID string, timeout time.Duration) (map[string]any, error) {
 	deadline := time.Now().Add(timeout)
 	for {
-		data, _, err := c.Get(ctx, fmt.Sprintf("/api/v1/scout/threads/%d/messages", threadID),
-			url.Values{"after_message_id": {strconv.Itoa(afterID)}})
+		data, _, err := c.Get(ctx, "/api/v1/scout/threads/"+threadID+"/messages",
+			url.Values{"after_message_id": {afterID}})
 		if err != nil {
 			return nil, err
 		}
@@ -198,7 +197,7 @@ func pollForReply(ctx context.Context, c *client.Client, threadID, afterID int, 
 			}
 		}
 		if time.Now().After(deadline) {
-			return nil, fmt.Errorf("timed out waiting for Scout (try `campbooks scout messages %d`)", threadID)
+			return nil, fmt.Errorf("timed out waiting for Scout (try `campbooks scout messages %s`)", threadID)
 		}
 		select {
 		case <-ctx.Done():

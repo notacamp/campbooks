@@ -35,11 +35,8 @@ es:
         labels_option: Etiquetas
         no_accounts: Aún no hay cuentas de correo conectadas.
         show_heading: Mostrar
-        show_system_labels: Mostrar etiquetas del sistema (Principal, Personal, Promociones…)
         subheading: Cómo se ve su bandeja de entrada en este dispositivo. Guardado
           en este navegador.
-        system_labels_heading: Etiquetas del sistema
-        system_labels_hint: Etiquetas de su buzón conectado (Gmail). Ocultas por defecto — actívelas para verlas.
         thread_view_bubbles: Burbujas
         thread_view_classic: Clásica
         thread_view_heading: Vista de conversación
@@ -90,9 +87,21 @@ es:
         no_tags: Aún no hay etiquetas. Añada una para empezar a ordenar su bandeja
           de entrada.
         subheading: Las etiquetas ayudan a Scout a ordenar su bandeja de entrada automáticamente.
+        filtered_group: Ocultadas por IA o por ti
+        hidden_heading: Etiquetas ocultas
+        hidden_hint: sistema y ocultadas por IA
+        system_group: Sistema del proveedor
       tag:
         delete_confirm: "¿Eliminar %{name}?"
         edit: Editar
+        hide: Ocultar
         tagged_messages_title: Mensajes etiquetados
+      hidden_tag:
+        ai_badge: IA
+        show: Mostrar
+        system_badge: Sistema
+      toggle_hidden:
+        hidden: '%{name} ocultada'
+        shown: '%{name} ahora es visible'
       update:
         updated_toast: Etiqueta actualizada.

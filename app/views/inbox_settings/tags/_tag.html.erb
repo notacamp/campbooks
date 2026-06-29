@@ -15,6 +15,8 @@
     </div>
     <span class="text-xs text-muted-foreground tabular-nums flex-shrink-0" title="<%= t(".tagged_messages_title") %>"><%= count %></span>
     <div class="flex items-center gap-1 flex-shrink-0">
+      <%= button_to t(".hide"), toggle_hidden_inbox_settings_tag_path(tag), method: :patch,
+            class: "px-2 py-0.5 text-xs font-medium text-gray-500 hover:bg-gray-100 rounded cursor-pointer transition-colors" %>
       <%= link_to t(".edit"), edit_inbox_settings_tag_path(tag),
             data: { turbo_frame: "inbox_settings_tag_form" },
             class: "px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded cursor-pointer transition-colors" %>

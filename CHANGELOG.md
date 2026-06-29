@@ -31,23 +31,16 @@ major, minor, or patch change here.
   your calendar or wave it off in one tap. The buttons match the home‑feed reminder
   card, and acting on one collapses both into a quiet "added" / "dismissed" note.
 
-- **Files — sharing, public links & Scout updates** — restrict a folder to chosen
-  people with viewer / editor / manager roles from **"Manage access"**; a restricted
-  folder and its contents stay hidden from everyone else, while open folders remain
-  visible to the whole workspace. Create a **revocable public link** to any file and
-  **insert it into an email** from the composer's "Insert file link", or paste one
-  into a discussion comment (bare links are now clickable there). And, opt-in per
-  workspace (Settings → Data & privacy), **Scout posts a link to a document into its
-  email's discussion** once that document is filed.
+- **Smart search on the Files page.** A new search box finds documents by meaning,
+  not just exact words — search the way you'd describe it ("the contract with Acme",
+  "all payment receipts to EDP", "invoice FT 2024/123") and the most relevant files
+  rank first. It blends semantic (vector) matching with exact keyword lookups and
+  recognises document types, company names, and invoice/receipt numbers in English
+  and Portuguese. To power it, the AI now writes a short, search-optimized summary
+  when it analyzes a document. Existing files keep working; self-hosters can re-index
+  them for the richer search with `bin/rails search:reindex_documents`.
 
 ### Changed
-
-- **Email labels are smarter and less noisy.** Labels synced from Gmail/Zoho are
-  now evaluated once on import: built-in provider statuses (Inbox, Unread,
-  Important, Gmail's category tabs like Updates/Promotions) and low-value labels
-  are recognised and kept out of your inbox, while the labels you actually use
-  (Invoices, Clients, …) stay. The decision is remembered per label — provider
-  system/noise labels are no longer attached to every message.
 
 - **A more breathable inbox.** The thread list has more room to breathe — larger,
   more legible type, roomier rows, and clearer (but still calm) hover and selected
@@ -65,6 +58,52 @@ major, minor, or patch change here.
   whole page (the row‑click matcher only recognised numeric ids, so it never matched
   the app's message ids). The standalone inbox also gained the Default / List
   switcher, so the layout applies there too.
+
+## [0.6.0] - 2026-06-29
+
+### Added
+
+- **Files — sharing, public links & Scout updates** — restrict a folder to chosen
+  people with viewer / editor / manager roles from **"Manage access"**; a restricted
+  folder and its contents stay hidden from everyone else, while open folders remain
+  visible to the whole workspace. Create a **revocable public link** to any file and
+  **insert it into an email** from the composer's "Insert file link", or paste one
+  into a discussion comment (bare links are now clickable there). And, opt-in per
+  workspace (Settings → Data & privacy), **Scout posts a link to a document into its
+  email's discussion** once that document is filed.
+
+### Changed
+
+- **Documents and Files are now one page.** The separate "Documents" area has
+  merged into **Files** — the same folder-based file manager now also holds the
+  document review queue (a **"Review N"** button opens Skim right there), the
+  document filters (type, category, status, month; a filter also narrows the
+  internal documents and filed emails shown alongside), and the bulk
+  re-analyze / export. Uploads gained an **"Analyze with AI"** toggle: leave it on
+  to extract and classify a business document, turn it off to just store a file.
+  The old `/documents` address now opens Files.
+- **Email labels are smarter and less noisy.** Labels synced from Gmail/Zoho are
+  now evaluated once on import: built-in provider statuses (Inbox, Unread,
+  Important, Gmail's category tabs like Updates/Promotions) and low-value labels
+  are recognised and kept out of your inbox, while the labels you actually use
+  (Invoices, Clients, …) stay. The decision is remembered per label — provider
+  system/noise labels are no longer attached to every message.
+- **One place for tags.** "Tags" and provider "labels" are now a single concept in
+  the inbox: one Tags row per email and one picker that adds or removes either a
+  Campbooks tag or a Gmail/Zoho label (provider labels still two-way sync). The
+  redundant separate "Labels" section is gone, and hidden provider/system labels
+  never show as chips. Also fixes tag add/remove on installs using UUID message
+  IDs.
+- **Review & override hidden labels.** Settings → Tags now lists the labels that
+  were hidden — provider system statuses and AI-filtered ones — with the reason
+  for each, and a one-click **Show** to bring any back as a tag (or **Hide** a tag
+  you don't want as a chip). This replaces the old global "Show system labels"
+  switch in Display settings.
+
+### Security
+
+- Updated the bundled `msgpack` gem to 1.8.3, fixing CVE-2026-54522 (a
+  use-after-free in the gem's C extension that bundler-audit flagged).
 
 ## [0.5.0] - 2026-06-29
 

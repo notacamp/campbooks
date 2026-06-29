@@ -33,10 +33,7 @@ en:
         labels_option: Labels
         no_accounts: No email accounts connected yet.
         show_heading: Show
-        show_system_labels: Show system labels (Inbox, Personal, Promotions…)
         subheading: How your inbox looks on this device. Saved in this browser.
-        system_labels_heading: System labels
-        system_labels_hint: Labels from your connected mailbox (Gmail). Hidden by default — turn on to see them as tags.
         thread_view_bubbles: Bubbles
         thread_view_classic: Classic
         thread_view_heading: Conversation view
@@ -86,9 +83,21 @@ en:
         heading: Tags
         no_tags: No tags yet. Add one to start sorting your inbox.
         subheading: Tags help Scout sort your inbox automatically.
+        filtered_group: Hidden by AI or you
+        hidden_heading: Hidden labels
+        hidden_hint: system & AI-hidden
+        system_group: Provider system
       tag:
         delete_confirm: Delete %{name}?
         edit: Edit
+        hide: Hide
         tagged_messages_title: Tagged messages
+      hidden_tag:
+        ai_badge: AI
+        show: Show
+        system_badge: System
+      toggle_hidden:
+        hidden: '%{name} hidden'
+        shown: '%{name} is now visible'
       update:
         updated_toast: Tag updated.

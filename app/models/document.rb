@@ -320,31 +320,30 @@ class Document < ApplicationRecord
   def build_search_chunks
     chunks = []
 
-    # Primary description chunk
-    primary = [
-      ("Title: #{display_title}"),
-      ("Type: #{classification&.name || document_type}"),
-      ("Description: #{description}"),
-      ("Vendor: #{vendor_name}"),
-      ("Client: #{client_name}"),
-      ("Invoice: #{invoice_number}")
-    ].compact.join("\n")
+    # Primary "search document": a dense, natural-language rendering of the
+    # document's identity, extracted fields, and the AI summary. The embedding is
+    # built from this text, so we include every signal a user might search by
+    # (type, counterparty, numbers, amounts, dates) and omit blank fields so they
+    # don't dilute the vector. The raw ai_extraction_data JSON is intentionally
+    # NOT embedded — it carries internal bookkeeping (provenance, confidence,
+    # adapter name) that only pollutes semantic matching.
+    type_label = classification&.name || (document_type.presence && document_type.humanize)
+    primary = {
+      "Title" => display_title,
+      "Type" => type_label,
+      "Vendor" => vendor_name,
+      "Client" => client_name,
+      "Invoice" => invoice_number,
+      "Receipt" => receipt_number,
+      "Amount" => amount&.format,
+      "Date" => document_date&.to_s,
+      "Period" => (period_start && period_end ? "#{period_start} to #{period_end}" : nil),
+      "Payment" => payment_method,
+      "Description" => description,
+      "Summary" => ai_summary
+    }.filter_map { |label, value| "#{label}: #{value}" if value.present? }.join("\n")
 
-    chunks << {
-      content: primary,
-      chunk_type: "text",
-      metadata: { field: "primary" }
-    }
-
-    # AI extraction data as separate chunk if present
-    if ai_extraction_data.present?
-      extraction_text = ai_extraction_data.is_a?(Hash) ? ai_extraction_data.to_json : ai_extraction_data.to_s
-      chunks << {
-        content: extraction_text,
-        chunk_type: "text",
-        metadata: { field: "ai_extraction" }
-      }
-    end
+    chunks << { content: primary, chunk_type: "text", metadata: { field: "primary" } } if primary.present?
 
     # Splitting logic for very long descriptions
     expanded = []
@@ -407,7 +406,8 @@ class Document < ApplicationRecord
     saved_change_to_description? || saved_change_to_ai_extraction_data? ||
       saved_change_to_vendor_name? || saved_change_to_client_name? ||
       saved_change_to_document_type? || saved_change_to_document_type_id? ||
-      saved_change_to_review_status? || saved_change_to_ai_status?
+      saved_change_to_review_status? || saved_change_to_ai_status? ||
+      saved_change_to_ai_summary?
   end
 
   private

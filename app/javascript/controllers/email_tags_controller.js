@@ -3,7 +3,7 @@ import { Controller } from "@hotwired/stimulus"
 export default class extends Controller {
   static targets = ["dropdown", "search", "results"]
   static values = {
-    messageId: Number,
+    messageId: String,
     allTags: Array,
     assignedIds: Array
   }
@@ -57,6 +57,7 @@ export default class extends Controller {
       <button type="button"
               data-action="click->email-tags#add mouseenter->email-tags#highlight"
               data-email-tags-tag-id-param="${tag.id}"
+              data-email-tags-external-param="${tag.external === true}"
               data-email-tags-index-param="${index}"
               class="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 flex items-center gap-2">
         <span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color:${tag.color}"></span>
@@ -98,12 +99,19 @@ export default class extends Controller {
     items.forEach((btn, i) => btn.classList.toggle("bg-gray-100", i === this.highlightedIndex))
   }
 
+  // External tags are provider labels (Gmail/Zoho): add/remove must route to the
+  // labels endpoint so the change two-way syncs. Local tags stay local.
+  basePath(target) {
+    const resource = target.dataset.emailTagsExternalParam === "true" ? "labels" : "tags"
+    return `/email_messages/${this.messageIdValue}/${resource}`
+  }
+
   async add(event) {
     const tagId = event.currentTarget.dataset.emailTagsTagIdParam
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
 
     const response = await fetch(
-      `/email_messages/${this.messageIdValue}/tags?tag_id=${tagId}`,
+      `${this.basePath(event.currentTarget)}?tag_id=${tagId}`,
       {
         method: "POST",
         headers: {
@@ -125,7 +133,7 @@ export default class extends Controller {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content
 
     const response = await fetch(
-      `/email_messages/${this.messageIdValue}/tags/${tagId}`,
+      `${this.basePath(event.currentTarget)}/${tagId}`,
       {
         method: "DELETE",
         headers: {
