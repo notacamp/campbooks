@@ -67,6 +67,8 @@ export default class extends Controller {
       default: return // let Escape etc. bubble up to the overlay (close)
     }
     event.preventDefault()
+    // Trap: keep handled keys off the /documents page shortcuts behind the overlay.
+    event.stopPropagation()
   }
 
   // Card buttons (data-doc-skim-action) bubble up to here.

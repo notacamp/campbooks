@@ -13,6 +13,7 @@ en:
       files: Files
       pipelines: Pipelines
       reminders: Reminders
+      tasks: Tasks
     names:
       calendar_event_created: Calendar event created
       calendar_event_deleted: Calendar event deleted
@@ -48,5 +49,11 @@ en:
       reminder_confirmed: Reminder confirmed
       reminder_created: Reminder created
       reminder_dismissed: Reminder dismissed
+      task_archived: Task archived
+      task_assigned: Task assigned
+      task_completed: Task completed
+      task_created: Task created
+      task_status_changed: Task status changed
+      task_unarchived: Task restored
     system_actor: System
     time_ago: "%{time} ago"

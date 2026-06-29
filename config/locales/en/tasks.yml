@@ -1,0 +1,177 @@
+---
+en:
+  activerecord:
+    attributes:
+      task:
+        all_day: All day
+        description: Description
+        due_at: Due date
+        priorities:
+          high: High
+          low: Low
+          normal: Normal
+          urgent: Urgent
+        priority: Priority
+        status: Status
+        statuses:
+          blocked: Blocked
+          cancelled: Cancelled
+          done: Done
+          in_progress: In progress
+          suggested: Suggested
+          todo: To do
+        title: Title
+      task_email_link:
+        relationships:
+          blocked_by: Blocked by
+          follow_up: Follow-up
+          reference: Reference
+          related: Related
+    models:
+      task:
+        one: Task
+        other: Tasks
+  components:
+    tasks:
+      board_card:
+        overdue: Overdue
+        today: Today
+      board_column:
+        empty: Nothing here
+      form:
+        assignees_label: Assignees
+        cancel: Cancel
+        create: Create task
+        description_label: Description
+        description_placeholder: Add details, links, or context…
+        due_label: Due date
+        labels_label: Labels
+        no_labels: No labels in this workspace yet.
+        priority_label: Priority
+        save: Save changes
+        status_label: Status
+        title_label: Title
+        title_placeholder: What needs to be done?
+      row:
+        due_today: Due today
+        due_tomorrow: Due tomorrow
+        in_days:
+          one: Due in %{count} day
+          other: Due in %{count} days
+        no_due_date: No due date
+        overdue: Overdue
+        unassigned: Unassigned
+  tasks:
+    accept:
+      accepted: Task kept.
+    archive:
+      archived: Task archived.
+    assign:
+      assigned: Assignees updated.
+    attach_document:
+      attached: Document attached.
+      not_found: That document couldn't be found.
+    comments:
+      form:
+        placeholder: Add a comment, or @scout for help…
+    complete:
+      completed: Task completed.
+    create:
+      created: Task created.
+    destroy:
+      deleted: Task deleted.
+    detach_document:
+      detached: Document detached.
+    dismiss:
+      dismissed: Suggestion dismissed.
+    document_picker:
+      attach: Attach
+      no_results: No matching documents.
+      search_placeholder: Search your documents…
+    edit:
+      title: Edit task
+    email_picker:
+      link: Link
+      no_results: No matching emails.
+      search_placeholder: Search your email by subject…
+    index:
+      all: All
+      archived: Archived
+      board_view: Board
+      empty_body: Create a task, or let Scout pull action items out of your email.
+      empty_title: No tasks yet
+      list_view: List
+      new: New task
+      subtitle: Action items from your email and your own to-dos.
+      title: Tasks
+      triage_banner:
+        one: "%{count} suggested task to review in Skim"
+        other: "%{count} suggested tasks to review in Skim"
+    link_email:
+      linked: Email linked.
+      not_found: That email couldn't be found.
+    move:
+      invalid_status: That status doesn't exist.
+      moved: Task moved.
+    new:
+      title: New task
+    remind:
+      no_due: Add a due date first to set a reminder.
+      remind_failed: Couldn't set the reminder.
+      reminded: Reminder set — confirm it on the Reminders page to add it to your calendar.
+    show:
+      activity: Activity
+      add_document: Attach a document
+      add_email: Link an email
+      ai_reasoning: "Scout flagged this:"
+      archive: Archive
+      archived_notice: This task is archived. It's hidden from your active lists.
+      assignees: Assignees
+      back: All tasks
+      created_by: Created by %{name}
+      created_by_ai: Extracted by Scout
+      delete: Delete
+      delete_confirm: Delete this task? This can't be undone.
+      description: Description
+      detach: Detach
+      discussion: Discussion
+      discussion_empty: Start the discussion. Tag @scout to bring in the AI.
+      documents: Documents
+      edit: Edit
+      labels: Labels
+      linked_emails: Linked emails
+      mark_done: Mark done
+      no_activity: No activity yet.
+      no_assignees: Unassigned
+      no_description: No description yet.
+      no_documents: No documents attached.
+      no_labels: No labels.
+      no_linked_emails: No linked emails.
+      origin: Created from this email
+      priority: "Priority: %{level}"
+      relationship: Relationship
+      remind: Remind me
+      reminder_set: Reminder set
+      reopen: Reopen
+      status: Status
+      unarchive: Restore
+      unlink: Unlink
+      update: Update
+    skim:
+      accept: Keep
+      all_tasks: All tasks
+      complete: Done
+      dismiss: Dismiss
+      empty_body: Scout hasn't suggested any tasks right now.
+      empty_title: Nothing to review
+      from_document: "From document: %{title}"
+      from_email: "From email: %{subject}"
+      subtitle: Scout pulled these action items out of your email. Keep the ones that matter.
+      title: Suggested tasks
+      why: "Why this is a task:"
+    unarchive:
+      unarchived: Task restored.
+    unlink_email:
+      unlinked: Email unlinked.
+    update:
+      updated: Task updated.

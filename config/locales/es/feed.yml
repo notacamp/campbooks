@@ -44,6 +44,15 @@ es:
         overdue: Vencido
         today: Hoy
         tomorrow: Mañana
+      task_card:
+        complete: Completar
+        dismiss: Descartar
+        in_days:
+          one: Entrega en %{count} día
+          other: Entrega en %{count} días
+        overdue: Atrasada
+        today: Entrega hoy
+        tomorrow: Entrega mañana
       reply_reminder_card:
         aged:
           one: "%{count} día, sin respuesta"
@@ -88,6 +97,7 @@ es:
         para sincronizar automáticamente.
       reminder_dismissed: Recordatorio descartado.
       restored: Restaurado.
+      task_completed: "Tarea completada: %{title}"
       unsupported: Esa acción no es compatible aquí.
   home:
     index:

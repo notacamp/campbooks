@@ -29,6 +29,8 @@ module Api
       "calendar:write"         => "Create, update, RSVP, and delete calendar events",
       "reminders:read"         => "Read AI reminders",
       "reminders:write"        => "Confirm, dismiss, and snooze reminders",
+      "tasks:read"             => "List and read tasks",
+      "tasks:write"            => "Create, update, and complete tasks",
       "folders:read"           => "List folders and their contents",
       "folders:write"          => "File and unfile documents in folders"
     }.freeze

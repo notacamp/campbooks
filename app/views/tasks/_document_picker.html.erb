@@ -1,0 +1,20 @@
+<%= turbo_frame_tag "task_document_picker" do %>
+  <% if candidates.any? %>
+    <ul class="mt-2 divide-y divide-hair overflow-hidden rounded-lg border border-border">
+      <% candidates.each do |document| %>
+        <li class="flex items-center gap-2 px-3 py-2">
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-sm text-foreground"><%= document.display_title %></p>
+            <p class="truncate text-xs text-muted-foreground"><%= human_enum(Document, :document_type, document.document_type) %></p>
+          </div>
+          <%= form_with url: attach_document_task_path(task), method: :post, data: { turbo: false } do %>
+            <%= hidden_field_tag :document_id, document.id %>
+            <%= render Campbooks::Button.new(type: "submit", variant: :outline, size: :sm) { t(".attach") } %>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+  <% elsif query.present? %>
+    <p class="mt-2 text-sm text-muted-foreground"><%= t(".no_results") %></p>
+  <% end %>
+<% end %>

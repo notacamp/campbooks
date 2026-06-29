@@ -1,0 +1,177 @@
+---
+pt:
+  activerecord:
+    attributes:
+      task:
+        all_day: O dia todo
+        description: Descrição
+        due_at: Data de entrega
+        priorities:
+          high: Alta
+          low: Baixa
+          normal: Normal
+          urgent: Urgente
+        priority: Prioridade
+        status: Estado
+        statuses:
+          blocked: Bloqueada
+          cancelled: Cancelada
+          done: Concluída
+          in_progress: Em curso
+          suggested: Sugerida
+          todo: A fazer
+        title: Título
+      task_email_link:
+        relationships:
+          blocked_by: Bloqueada por
+          follow_up: Seguimento
+          reference: Referência
+          related: Relacionada
+    models:
+      task:
+        one: Tarefa
+        other: Tarefas
+  components:
+    tasks:
+      board_card:
+        overdue: Em atraso
+        today: Hoje
+      board_column:
+        empty: Nada aqui
+      form:
+        assignees_label: Responsáveis
+        cancel: Cancelar
+        create: Criar tarefa
+        description_label: Descrição
+        description_placeholder: Adicione detalhes, ligações ou contexto…
+        due_label: Data de entrega
+        labels_label: Etiquetas
+        no_labels: Sem etiquetas nesta área de trabalho.
+        priority_label: Prioridade
+        save: Guardar alterações
+        status_label: Estado
+        title_label: Título
+        title_placeholder: O que precisa de ser feito?
+      row:
+        due_today: Entrega hoje
+        due_tomorrow: Entrega amanhã
+        in_days:
+          one: Entrega em %{count} dia
+          other: Entrega em %{count} dias
+        no_due_date: Sem data de entrega
+        overdue: Em atraso
+        unassigned: Sem responsável
+  tasks:
+    accept:
+      accepted: Tarefa mantida.
+    archive:
+      archived: Tarefa arquivada.
+    assign:
+      assigned: Responsáveis atualizados.
+    attach_document:
+      attached: Documento anexado.
+      not_found: Esse documento não foi encontrado.
+    comments:
+      form:
+        placeholder: Adicione um comentário, ou @scout para ajuda…
+    complete:
+      completed: Tarefa concluída.
+    create:
+      created: Tarefa criada.
+    destroy:
+      deleted: Tarefa eliminada.
+    detach_document:
+      detached: Documento desanexado.
+    dismiss:
+      dismissed: Sugestão dispensada.
+    document_picker:
+      attach: Anexar
+      no_results: Sem documentos correspondentes.
+      search_placeholder: Pesquise os seus documentos…
+    edit:
+      title: Editar tarefa
+    email_picker:
+      link: Associar
+      no_results: Sem emails correspondentes.
+      search_placeholder: Pesquise o seu email por assunto…
+    index:
+      all: Todas
+      archived: Arquivadas
+      board_view: Quadro
+      empty_body: Crie uma tarefa, ou deixe o Scout extrair ações do seu email.
+      empty_title: Ainda sem tarefas
+      list_view: Lista
+      new: Nova tarefa
+      subtitle: Ações do seu email e as suas próprias tarefas.
+      title: Tarefas
+      triage_banner:
+        one: "%{count} tarefa sugerida para rever no Skim"
+        other: "%{count} tarefas sugeridas para rever no Skim"
+    link_email:
+      linked: Email associado.
+      not_found: Esse email não foi encontrado.
+    move:
+      invalid_status: Esse estado não existe.
+      moved: Tarefa movida.
+    new:
+      title: Nova tarefa
+    remind:
+      no_due: Adicione uma data de entrega primeiro para definir um lembrete.
+      remind_failed: Não foi possível definir o lembrete.
+      reminded: Lembrete definido — confirme-o na página de Lembretes para adicionar ao seu calendário.
+    show:
+      activity: Atividade
+      add_document: Anexar um documento
+      add_email: Associar um email
+      ai_reasoning: "O Scout sinalizou isto:"
+      archive: Arquivar
+      archived_notice: Esta tarefa está arquivada. Está oculta nas suas listas ativas.
+      assignees: Responsáveis
+      back: Todas as tarefas
+      created_by: Criada por %{name}
+      created_by_ai: Extraída pelo Scout
+      delete: Eliminar
+      delete_confirm: Eliminar esta tarefa? Esta ação não pode ser anulada.
+      description: Descrição
+      detach: Desanexar
+      discussion: "Discussão"
+      discussion_empty: Inicie a discussão. Mencione @scout para trazer a IA.
+      documents: Documentos
+      edit: Editar
+      labels: Etiquetas
+      linked_emails: Emails associados
+      mark_done: Marcar como concluída
+      no_activity: Ainda sem atividade.
+      no_assignees: Sem responsável
+      no_description: Ainda sem descrição.
+      no_documents: Sem documentos anexados.
+      no_labels: Sem etiquetas.
+      no_linked_emails: Sem emails associados.
+      origin: Criada a partir deste email
+      priority: "Prioridade: %{level}"
+      relationship: Relação
+      remind: Lembrar-me
+      reminder_set: Lembrete definido
+      reopen: Reabrir
+      status: Estado
+      unarchive: Restaurar
+      unlink: Desassociar
+      update: Atualizar
+    skim:
+      accept: Manter
+      all_tasks: Todas as tarefas
+      complete: Concluída
+      dismiss: Dispensar
+      empty_body: O Scout não sugeriu nenhuma tarefa de momento.
+      empty_title: Nada para rever
+      from_document: "Do documento: %{title}"
+      from_email: "Do email: %{subject}"
+      subtitle: O Scout extraiu estas ações do seu email. Mantenha as que importam.
+      title: Tarefas sugeridas
+      why: "Por que isto é uma tarefa:"
+    unarchive:
+      unarchived: Tarefa restaurada.
+    unlink_email:
+      unlinked: Email desassociado.
+    update:
+      updated: Tarefa atualizada.

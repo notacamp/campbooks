@@ -18,6 +18,7 @@ module Feed
       [
         Feed::Sources::CalendarEvent,
         Feed::Sources::Reminder,
+        Feed::Sources::Task,
         Feed::Sources::StarredEmail,
         Feed::Sources::FollowUp,
         Feed::Sources::ReplyReminder,

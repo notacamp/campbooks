@@ -114,6 +114,7 @@ module Ai
 
           **Existing tags in this workspace** — tagging works exactly like the manual UI: you attach a tag that already exists, you cannot invent one. `add_tag`/`remove_tag` may ONLY use a name from this list (copied exactly). If none fit, do not suggest tagging.
           #{tags_text}
+          #{existing_commitments_text}
 
           Available tools (only suggest when directly relevant):
           - `add_tag`: {"tool": "add_tag", "args": {"tag_name": "name"}} — `tag_name` MUST exactly match one of the existing tags listed above.
@@ -125,6 +126,8 @@ module Ai
           - `archive`: {"tool": "archive", "args": {}}
           - `trash`: {"tool": "trash", "args": {}}
           - `create_calendar_event`: {"tool": "create_calendar_event", "args": {"title": "...", "start_time": "ISO8601 (optional)", "end_time": "ISO8601 (optional)"}} — add an event to the user's calendar from this email. Suggest when the email implies a meeting or deadline; omit any time you're unsure of (the user can adjust it).
+          - `create_task_from_email`: {"tool": "create_task_from_email", "args": {"title": "imperative action", "due_at": "ISO8601 (optional)", "priority": "low|normal|high|urgent (optional)"}} — create a to-do task from this email. Suggest when the email asks the reader to DO something (send, review, approve, follow up). The email becomes the task's origin.
+          - `link_task_to_email`: {"tool": "link_task_to_email", "args": {"task_id": "...", "relationship": "related|reference|follow_up|blocked_by (optional)"}} — link this email to an EXISTING task. Only use when you know the task_id (e.g. the user named a task).
           - `star_sender`: {"tool": "star_sender", "args": {}} — promote this sender; their emails get prominence in Skim and the feed and are never grouped with others.
           - `block_sender`: {"tool": "block_sender", "args": {}} — block this sender; their existing and future mail is archived out of the inbox. Reversible with unblock_sender.
           - `allow_sender`: {"tool": "allow_sender", "args": {}} — allow this sender into the inbox (relevant in whitelist mode).
@@ -136,6 +139,27 @@ module Ai
           {"reply": "your reply", "auto_actions": [...], "suggested_actions": [...], "questions": [...]}
         PROMPT
       }
+    end
+
+    # Surface calendar commitments already extracted from this thread so Scout
+    # acknowledges them instead of re-suggesting create_calendar_event on every @scout
+    # (the duplicate it used to produce). "" when there are none — mirrors analysis_text.
+    def existing_commitments_text
+      message_ids = @messages.map(&:id)
+      return "" if message_ids.empty?
+
+      events    = CalendarEvent.where(source_email_message_id: message_ids).where.not(status: :cancelled).order(:start_at)
+      reminders = Reminder.where(source_type: "EmailMessage", source_id: message_ids, status: :pending).order(:due_at)
+      return "" if events.empty? && reminders.empty?
+
+      lines  = events.map { |e| "- Calendar event already created: #{e.title.inspect} (#{commitment_time(e.start_at)})" }
+      lines += reminders.map { |r| "- Pending reminder awaiting the user's confirmation: #{r.title.inspect} (due #{commitment_time(r.due_at)})" }
+
+      "\n\n**Commitments already extracted from this thread** — do NOT suggest create_calendar_event for these again; just acknowledge they're already set. Only suggest a new event if the user explicitly asks for a different, additional one.\n#{lines.join("\n")}"
+    end
+
+    def commitment_time(time)
+      time ? time.strftime("%b %-d, %Y at %H:%M") : "time unspecified"
     end
 
     def truncate_body(body)
