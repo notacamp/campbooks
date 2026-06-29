@@ -35,6 +35,15 @@ major, minor, or patch change here.
   event/reminder, so the discussion is a running record of what Scout did with the
   email. Reminder notes are limited to confident finds to keep the thread quiet.
 
+### Changed
+
+- **Native apps hide desktop-only surfaces** — the iOS/Android shell no longer
+  shows the ⌘K command palette or the keyboard-shortcut help (both keyboard-only),
+  limits the calendar to **Agenda/Day** (the week/month grids are too dense for a
+  phone — a week/month deep link falls back to agenda), and hides developer-only
+  Settings (**API Access** and custom HTTP **Connections**). The web app is
+  unchanged.
+
 ### Fixed
 
 - Documents list **month filter** now works. The month picker submits a single
