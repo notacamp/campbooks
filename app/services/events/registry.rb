@@ -98,6 +98,18 @@ module Events
         description: "A folder was moved to a new parent", subject_type: "MailFolder", payload_keys: %w[name]),
       entry("folder.deleted", "Folder deleted", group: :files, icon: :trash,
         description: "A folder was deleted", payload_keys: %w[name]),
+      entry("internal_document.created", "Internal document created", group: :files, icon: :document,
+        description: "An internal document was created", subject_type: "AuthoredDocument",
+        payload_keys: %w[title]),
+      entry("internal_document.updated", "Internal document updated", group: :files, icon: :document,
+        description: "An internal document was edited", subject_type: "AuthoredDocument",
+        payload_keys: %w[title]),
+      entry("email.filed", "Email filed", group: :files, icon: :inbox,
+        description: "An email was filed into a folder", subject_type: "EmailMessage",
+        payload_keys: %w[subject folder]),
+      entry("email.unfiled", "Email removed from folder", group: :files, icon: :inbox,
+        description: "An email was removed from a folder", subject_type: "EmailMessage",
+        payload_keys: %w[subject folder]),
 
       # --- Pipelines ----------------------------------------------------------
       entry("pipeline.stage_entered", "Stage entered", group: :pipelines, icon: :git_branch,

@@ -36,6 +36,8 @@ en:
       email_snoozed: Email snoozed
       email_tagged: Email tagged
       email_trashed: Email trashed
+      email_filed: Email filed
+      email_unfiled: Email removed from folder
       file_deleted: File deleted
       file_filed: File filed
       file_unfiled: File removed from folder
@@ -44,6 +46,8 @@ en:
       folder_deleted: Folder deleted
       folder_moved: Folder moved
       folder_renamed: Folder renamed
+      internal_document_created: Internal document created
+      internal_document_updated: Internal document updated
       pipeline_stage_entered: Stage entered
       reminder_confirmed: Reminder confirmed
       reminder_created: Reminder created

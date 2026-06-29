@@ -36,6 +36,8 @@ fr:
       email_snoozed: E-mail reporté
       email_tagged: E-mail étiqueté
       email_trashed: E-mail mis à la corbeille
+      email_filed: E-mail classé dans un dossier
+      email_unfiled: E-mail retiré du dossier
       file_deleted: Fichier supprimé
       file_filed: Fichier classé
       file_unfiled: Fichier retiré du dossier
@@ -44,6 +46,8 @@ fr:
       folder_deleted: Dossier supprimé
       folder_moved: Dossier déplacé
       folder_renamed: Dossier renommé
+      internal_document_created: Document interne créé
+      internal_document_updated: Document interne mis à jour
       pipeline_stage_entered: Étape atteinte
       reminder_confirmed: Rappel confirmé
       reminder_created: Rappel créé

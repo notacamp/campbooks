@@ -5,10 +5,14 @@ class FilesController < ApplicationController
   # Both render the same template; @folder distinguishes the two.
   def index
     load_folders
+    # "All files": the workspace's internal documents + uploaded files. Emails only
+    # surface inside a folder they've been filed into (see #show).
+    @internal_docs = Current.workspace.authored_documents.recent.limit(50).to_a
+    @filed_emails = []
     @pagy, @files = pagy(files_scope, items: 30)
     # Show the file-manager layout (sidebar + list) once there's anything to
-    # organize — files OR folders. A brand-new, empty area gets the upload CTA.
-    @has_any_files = @folders.any? || Current.workspace.documents.exists?
+    # organize — files, internal docs, or folders. A brand-new area gets the CTA.
+    @has_any_files = @folders.any? || @internal_docs.any? || Current.workspace.documents.exists?
 
     respond_to do |format|
       format.html
@@ -20,6 +24,8 @@ class FilesController < ApplicationController
     @folder = Current.workspace.mail_folders.find(params[:id])
     @subfolders = @folder.children.to_a
     load_folders
+    @internal_docs = @folder.authored_documents.recent.limit(50).to_a
+    @filed_emails = @folder.email_messages.accessible_to(Current.user).order(received_at: :desc).limit(50).to_a
     @pagy, @files = pagy(files_scope, items: 30)
     @has_any_files = true
 
@@ -33,7 +39,8 @@ class FilesController < ApplicationController
 
   def load_folders
     @folders = Current.workspace.mail_folders.ordered.to_a
-    @folder_counts = MailFolder.document_counts(@folders)
+    # Badge counts every filed item kind (files + internal docs + emails).
+    @folder_counts = MailFolder.item_counts(@folders)
   end
 
   # "All files" by default; a single folder's contents when scoped (via #show, or

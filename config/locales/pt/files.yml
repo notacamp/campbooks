@@ -23,6 +23,10 @@ pt:
       empty_title: Ainda não há ficheiros
       empty_description: Carregue ficheiros para os manter organizados em pastas — faturas, contratos, o que quiser.
       empty_upload: Carregar ficheiros
+      new_internal_document: Novo documento
+      internal_documents: Documentos internos
+      emails: Emails
+      files_section: Ficheiros
     uploads:
       create:
         no_files: Escolha pelo menos um ficheiro para carregar.
@@ -50,3 +54,16 @@ pt:
       file_meta:
         kind_image: Imagem
         kind_file: Ficheiro
+      doc_row:
+        kind: Documento interno
+        updated: Atualizado a %{date}
+        actions: Ações do documento
+        open: Abrir
+        edit: Editar
+        move_to: Mover para
+        remove_from_folder: Remover da pasta
+      email_row:
+        no_subject: (sem assunto)
+        actions: Ações do email
+        open: Abrir no Correio
+        remove_from_folder: Remover da pasta

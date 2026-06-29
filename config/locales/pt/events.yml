@@ -36,6 +36,8 @@ pt:
       email_snoozed: Email adiado
       email_tagged: Email etiquetado
       email_trashed: Email movido para o lixo
+      email_filed: Email guardado em pasta
+      email_unfiled: Email removido da pasta
       file_deleted: Ficheiro eliminado
       file_filed: Ficheiro arquivado
       file_unfiled: Ficheiro removido da pasta
@@ -44,6 +46,8 @@ pt:
       folder_deleted: Pasta eliminada
       folder_moved: Pasta movida
       folder_renamed: Pasta renomeada
+      internal_document_created: Documento interno criado
+      internal_document_updated: Documento interno atualizado
       pipeline_stage_entered: Etapa iniciada
       reminder_confirmed: Lembrete confirmado
       reminder_created: Lembrete criado
