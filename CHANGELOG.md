@@ -16,6 +16,19 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Files** — a native file area in the main nav for keeping your documents and
+  files organized. Upload any file, create folders, browse a folder, and move files
+  between folders. Files uploaded here are stored as-is — they're not run through
+  the document AI analysis (you can still send one through it later from its page) —
+  and because folders are shared with Mail, a folder can hold both files and emails.
+  Uploads, folder changes, and filing all show up in your workspace Activity.
+
+### Fixed
+
+- **Activity feed** — the "Pipelines" filter no longer failed to render its label.
+
 ## [0.4.0] - 2026-06-28
 
 ### Added

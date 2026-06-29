@@ -14,6 +14,7 @@ module NavigationHelper
     home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
     mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
     documents: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+    files: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     workflows: '<circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="12" r="2.4"/><path d="M8 7.4 16 11M8 16.6 16 13"/>',
     calendar: '<rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 3v4M16 3v4"/>',
     organizations: '<path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11m16-11v11M8 14v.01M12 14v.01M16 14v.01M8 18v.01M12 18v.01M16 18v.01"/>',
@@ -51,6 +52,7 @@ module NavigationHelper
       nav_item(:calendar, t("shared.nav.calendar"), calendar_path, badge: nav_attention.dot?(:calendar)),
       nav_item(:scout, t("shared.nav.scout"), scout_path, ember: true, badge: nav_attention.dot?(:scout)),
       nav_item(:documents, t("shared.nav.documents"), documents_path, badge: nav_attention.dot?(:documents)),
+      nav_item(:files, t("shared.nav.files"), files_path),
       # Workflows is gated off by default until it's production-ready (Features.workflows?).
       (nav_item(:workflows, t("shared.nav.workflows"), workflows_path) if Features.workflows?),
       nav_item(:contacts, t("shared.nav.contacts"), contacts_path),

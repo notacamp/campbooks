@@ -10,6 +10,8 @@ fr:
       contacts: Contacts
       documents: Documents
       email: E-mail
+      files: Fichiers
+      pipelines: Pipelines
       reminders: Rappels
     names:
       calendar_event_created: Événement de calendrier créé
@@ -34,6 +36,15 @@ fr:
       email_snoozed: E-mail reporté
       email_tagged: E-mail étiqueté
       email_trashed: E-mail mis à la corbeille
+      file_deleted: Fichier supprimé
+      file_filed: Fichier classé
+      file_unfiled: Fichier retiré du dossier
+      file_uploaded: Fichier téléversé
+      folder_created: Dossier créé
+      folder_deleted: Dossier supprimé
+      folder_moved: Dossier déplacé
+      folder_renamed: Dossier renommé
+      pipeline_stage_entered: Étape atteinte
       reminder_confirmed: Rappel confirmé
       reminder_created: Rappel créé
       reminder_dismissed: Rappel ignoré

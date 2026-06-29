@@ -10,6 +10,8 @@ en:
       contacts: Contacts
       documents: Documents
       email: Email
+      files: Files
+      pipelines: Pipelines
       reminders: Reminders
     names:
       calendar_event_created: Calendar event created
@@ -34,6 +36,15 @@ en:
       email_snoozed: Email snoozed
       email_tagged: Email tagged
       email_trashed: Email trashed
+      file_deleted: File deleted
+      file_filed: File filed
+      file_unfiled: File removed from folder
+      file_uploaded: File uploaded
+      folder_created: Folder created
+      folder_deleted: Folder deleted
+      folder_moved: Folder moved
+      folder_renamed: Folder renamed
+      pipeline_stage_entered: Stage entered
       reminder_confirmed: Reminder confirmed
       reminder_created: Reminder created
       reminder_dismissed: Reminder dismissed

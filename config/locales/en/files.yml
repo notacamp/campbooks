@@ -1,0 +1,52 @@
+---
+en:
+  files:
+    index:
+      title: Files
+      subtitle: Upload, organize, and find your files.
+      new_folder: New folder
+      new_folder_hint: Group your files into a folder.
+      upload: Upload
+      breadcrumb: Breadcrumb
+      all_files: All files
+      click_to_upload: Click to upload
+      drag_and_drop: or drag and drop
+      upload_hint: You can upload any type of file.
+      selected_files: Selected files
+      upload_submit: Upload files
+      col_name: Name
+      col_kind: Type
+      col_size: Size
+      col_added: Added
+      col_actions: Actions
+      empty_folder: This folder is empty.
+      empty_title: No files yet
+      empty_description: Upload files to keep them organized in folders — invoices, contracts, anything.
+      empty_upload: Upload files
+    uploads:
+      create:
+        no_files: Choose at least one file to upload.
+        uploaded_one: File uploaded.
+        uploaded_many: "%{count} files uploaded."
+        failed: "Upload failed: %{message}"
+      destroy:
+        deleted: File deleted.
+      analyze:
+        analyzing: Analyzing this file with AI…
+  components:
+    files:
+      sidebar:
+        label: Folders
+        all_files: All files
+        new_folder: New folder
+      file_actions_menu:
+        actions: File actions
+        open: Open
+        download: Download
+        move_to: Move to
+        remove_from_folder: Remove from folder
+        delete: Delete
+        delete_confirm: "Delete \"%{name}\"? This can't be undone."
+      file_meta:
+        kind_image: Image
+        kind_file: File

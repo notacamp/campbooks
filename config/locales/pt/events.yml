@@ -10,6 +10,8 @@ pt:
       contacts: Contactos
       documents: Documentos
       email: Email
+      files: Ficheiros
+      pipelines: Pipelines
       reminders: Lembretes
     names:
       calendar_event_created: Evento de calendário criado
@@ -34,6 +36,15 @@ pt:
       email_snoozed: Email adiado
       email_tagged: Email etiquetado
       email_trashed: Email movido para o lixo
+      file_deleted: Ficheiro eliminado
+      file_filed: Ficheiro arquivado
+      file_unfiled: Ficheiro removido da pasta
+      file_uploaded: Ficheiro carregado
+      folder_created: Pasta criada
+      folder_deleted: Pasta eliminada
+      folder_moved: Pasta movida
+      folder_renamed: Pasta renomeada
+      pipeline_stage_entered: Etapa iniciada
       reminder_confirmed: Lembrete confirmado
       reminder_created: Lembrete criado
       reminder_dismissed: Lembrete dispensado

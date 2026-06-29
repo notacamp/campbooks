@@ -1,0 +1,52 @@
+---
+fr:
+  files:
+    index:
+      title: Fichiers
+      subtitle: Téléversez, organisez et retrouvez vos fichiers.
+      new_folder: Nouveau dossier
+      new_folder_hint: Regroupez vos fichiers dans un dossier.
+      upload: Téléverser
+      breadcrumb: Fil d'Ariane
+      all_files: Tous les fichiers
+      click_to_upload: Cliquez pour téléverser
+      drag_and_drop: ou glissez-déposez
+      upload_hint: Vous pouvez téléverser tout type de fichier.
+      selected_files: Fichiers sélectionnés
+      upload_submit: Téléverser les fichiers
+      col_name: Nom
+      col_kind: Type
+      col_size: Taille
+      col_added: Ajouté
+      col_actions: Actions
+      empty_folder: Ce dossier est vide.
+      empty_title: Aucun fichier pour l'instant
+      empty_description: Téléversez des fichiers pour les organiser dans des dossiers — factures, contrats, tout ce que vous voulez.
+      empty_upload: Téléverser des fichiers
+    uploads:
+      create:
+        no_files: Choisissez au moins un fichier à téléverser.
+        uploaded_one: Fichier téléversé.
+        uploaded_many: "%{count} fichiers téléversés."
+        failed: "Échec du téléversement : %{message}"
+      destroy:
+        deleted: Fichier supprimé.
+      analyze:
+        analyzing: Analyse de ce fichier par l'IA…
+  components:
+    files:
+      sidebar:
+        label: Dossiers
+        all_files: Tous les fichiers
+        new_folder: Nouveau dossier
+      file_actions_menu:
+        actions: Actions du fichier
+        open: Ouvrir
+        download: Télécharger
+        move_to: Déplacer vers
+        remove_from_folder: Retirer du dossier
+        delete: Supprimer
+        delete_confirm: "Supprimer « %{name} » ? Cette action est irréversible."
+      file_meta:
+        kind_image: Image
+        kind_file: Fichier

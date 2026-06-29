@@ -78,6 +78,27 @@ module Events
         description: "A document was restored to the review queue", subject_type: "Document",
         payload_keys: %w[filename]),
 
+      # --- Files ---------------------------------------------------------------
+      entry("file.uploaded", "File uploaded", group: :files, icon: :document,
+        description: "A file was uploaded to the Files area", subject_type: "Document",
+        payload_keys: %w[filename analyzed]),
+      entry("file.filed", "File filed", group: :files, icon: :document,
+        description: "A file was filed into a folder", subject_type: "Document",
+        payload_keys: %w[filename folder]),
+      entry("file.unfiled", "File removed from folder", group: :files, icon: :document,
+        description: "A file was removed from a folder", subject_type: "Document",
+        payload_keys: %w[filename folder]),
+      entry("file.deleted", "File deleted", group: :files, icon: :trash,
+        description: "A file was deleted", payload_keys: %w[filename]),
+      entry("folder.created", "Folder created", group: :files, icon: :folder,
+        description: "A folder was created", subject_type: "MailFolder", payload_keys: %w[name]),
+      entry("folder.renamed", "Folder renamed", group: :files, icon: :folder,
+        description: "A folder was renamed", subject_type: "MailFolder", payload_keys: %w[name previous_name]),
+      entry("folder.moved", "Folder moved", group: :files, icon: :folder,
+        description: "A folder was moved to a new parent", subject_type: "MailFolder", payload_keys: %w[name]),
+      entry("folder.deleted", "Folder deleted", group: :files, icon: :trash,
+        description: "A folder was deleted", payload_keys: %w[name]),
+
       # --- Pipelines ----------------------------------------------------------
       entry("pipeline.stage_entered", "Stage entered", group: :pipelines, icon: :git_branch,
         description: "A document or email entered a pipeline stage",

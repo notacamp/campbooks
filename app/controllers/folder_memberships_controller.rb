@@ -7,7 +7,11 @@ class FolderMembershipsController < ApplicationController
   def create
     folder = Current.workspace.mail_folders.find(params[:mail_folder_id])
     document = Current.workspace.documents.find(params[:folderable_id])
-    folder.folder_memberships.find_or_create_by!(folderable: document)
+    membership = folder.folder_memberships.find_or_create_by!(folderable: document)
+    if membership.previously_new_record?
+      Events.publish("file.filed", subject: document,
+        payload: { "filename" => document.display_title, "folder" => folder.name })
+    end
 
     respond_to do |format|
       format.turbo_stream { render turbo_stream: folders_stream(document) }
@@ -20,7 +24,10 @@ class FolderMembershipsController < ApplicationController
                                  .where(mail_folders: { workspace_id: Current.workspace.id })
                                  .find(params[:id])
     document = membership.folderable
+    folder_name = membership.mail_folder.name
     membership.destroy
+    Events.publish("file.unfiled", subject: document,
+      payload: { "filename" => document.try(:display_title), "folder" => folder_name })
 
     respond_to do |format|
       format.turbo_stream { render turbo_stream: folders_stream(document) }
