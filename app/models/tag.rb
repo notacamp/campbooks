@@ -43,12 +43,12 @@ class Tag < ApplicationRecord
   # Back-compat: still keyed on the legacy system_label flag. Prefer `visible`.
   scope :excluding_system_labels, -> { where(system_label: false) }
 
-  # The visibility gate used at every render site. Hidden tags (provider system
-  # statuses + AI-judged low-value labels) are filtered out, unless the workspace
-  # opts to see everything via the legacy "show system labels" setting. (That
-  # toggle is superseded by the per-label review in Settings → Tags.)
-  def self.visible_for(workspace)
-    workspace&.setting("show_system_labels") ? all : visible
+  # The visibility gate used at every render site: hidden tags (provider system
+  # statuses + AI-judged low-value labels) never render as chips. The decision is
+  # remembered per label and is overridable in Settings → Tags. (Workspace arg
+  # kept for call-site compatibility.)
+  def self.visible_for(_workspace = nil)
+    visible
   end
 
   validates :name, presence: true

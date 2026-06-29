@@ -39,9 +39,9 @@ en:
       tag_removed: Tag '%{name}' removed
   email_message_zoho_labels:
     create:
-      label_applied: Label '%{name}' applied
+      tag_applied: Tag '%{name}' applied
     destroy:
-      label_removed: Label '%{name}' removed
+      tag_removed: Tag '%{name}' removed
   workflow_executions:
     index:
       back_to_workflow: Back to workflow

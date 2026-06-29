@@ -104,7 +104,6 @@ pt:
           other: " de %{count} mensagens na conversa"
       discussion: Discussão
       forward: Reencaminhar
-      labels_label: Rótulos
       no_content: Sem conteúdo.
       no_subject: "(sem assunto)"
       open_full_view: Abrir em vista completa
@@ -113,6 +112,8 @@ pt:
       selected_badge: Selecionado
       send_to_notion: Guardar no Notion
       tags_label: Etiquetas
+    tag_chip:
+      remove: "Remover %{name}"
     email_filter_panel:
       accounts: Contas
       all_folders: Todas as pastas
