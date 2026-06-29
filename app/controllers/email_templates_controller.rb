@@ -78,10 +78,17 @@ class EmailTemplatesController < ApplicationController
       out["recipient_email"] = contact.email if used.include?("recipient_email")
     elsif params[:to_address].present?
       raw = params[:to_address].to_s.split(",").first.to_s.strip
-      email = raw[/<([^>]+)>/, 1] || raw
-      name = raw[/^([^<]+)</, 1]&.strip
-      out["recipient_email"] = email.strip if email.present? && used.include?("recipient_email")
-      out["recipient_name"] = name if name.present? && used.include?("recipient_name")
+      # Parse "Name <email>" with plain string scans rather than a regex on user
+      # input, so a crafted To value can't trigger ReDoS (rb/polynomial-redos).
+      if (open = raw.index("<")) && (close = raw.index(">", open + 1))
+        email = raw[(open + 1)...close].strip
+        name  = raw[0...open].strip
+      else
+        email = raw
+        name  = nil
+      end
+      out["recipient_email"] = email if email.present? && used.include?("recipient_email")
+      out["recipient_name"]  = name  if name.present? && used.include?("recipient_name")
     end
 
     out["date"] = Date.current.iso8601 if used.include?("date")
