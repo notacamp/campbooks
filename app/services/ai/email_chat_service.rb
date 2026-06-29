@@ -114,6 +114,7 @@ module Ai
 
           **Existing tags in this workspace** — tagging works exactly like the manual UI: you attach a tag that already exists, you cannot invent one. `add_tag`/`remove_tag` may ONLY use a name from this list (copied exactly). If none fit, do not suggest tagging.
           #{tags_text}
+          #{existing_commitments_text}
 
           Available tools (only suggest when directly relevant):
           - `add_tag`: {"tool": "add_tag", "args": {"tag_name": "name"}} — `tag_name` MUST exactly match one of the existing tags listed above.
@@ -138,6 +139,27 @@ module Ai
           {"reply": "your reply", "auto_actions": [...], "suggested_actions": [...], "questions": [...]}
         PROMPT
       }
+    end
+
+    # Surface calendar commitments already extracted from this thread so Scout
+    # acknowledges them instead of re-suggesting create_calendar_event on every @scout
+    # (the duplicate it used to produce). "" when there are none — mirrors analysis_text.
+    def existing_commitments_text
+      message_ids = @messages.map(&:id)
+      return "" if message_ids.empty?
+
+      events    = CalendarEvent.where(source_email_message_id: message_ids).where.not(status: :cancelled).order(:start_at)
+      reminders = Reminder.where(source_type: "EmailMessage", source_id: message_ids, status: :pending).order(:due_at)
+      return "" if events.empty? && reminders.empty?
+
+      lines  = events.map { |e| "- Calendar event already created: #{e.title.inspect} (#{commitment_time(e.start_at)})" }
+      lines += reminders.map { |r| "- Pending reminder awaiting the user's confirmation: #{r.title.inspect} (due #{commitment_time(r.due_at)})" }
+
+      "\n\n**Commitments already extracted from this thread** — do NOT suggest create_calendar_event for these again; just acknowledge they're already set. Only suggest a new event if the user explicitly asks for a different, additional one.\n#{lines.join("\n")}"
+    end
+
+    def commitment_time(time)
+      time ? time.strftime("%b %-d, %Y at %H:%M") : "time unspecified"
     end
 
     def truncate_body(body)

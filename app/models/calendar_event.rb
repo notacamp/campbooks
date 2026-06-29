@@ -26,6 +26,20 @@ class CalendarEvent < ApplicationRecord
   scope :upcoming, -> { visible.where(start_at: Time.current..).order(:start_at) }
   scope :for_series, ->(series_id) { where(recurring_event_provider_id: series_id) }
 
+  # Finds an existing non-cancelled event already sourced from this email. Lets
+  # Tools::CreateCalendarEvent and Reminders::Confirm stay idempotent so Scout, the
+  # feed reminder card, and repeated clicks don't stack duplicates for one email.
+  # With an explicit start_at only a same-day event counts — that still lets one email
+  # spawn two genuinely different events (a meeting plus a later follow-up) while
+  # collapsing repeats; without one (heuristic/unknown time), any non-cancelled event
+  # from the email is the duplicate (conservative, since the bug is over-creation).
+  def self.duplicate_for(email:, start_at: nil)
+    return nil unless email
+    scope = where(source_email_message: email).where.not(status: :cancelled)
+    scope = scope.where("start_at::date = ?::date", start_at) if start_at
+    scope.order(:created_at).first
+  end
+
   validates :provider_event_id, presence: true, uniqueness: { scope: :calendar_id }
 
   delegate :calendar_account, :workspace, to: :calendar
