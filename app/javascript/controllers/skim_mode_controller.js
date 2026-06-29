@@ -49,13 +49,16 @@ export default class extends Controller {
     // (so you can read it and keep archiving/pinning/replying without the mouse).
     if (this.emailOpen) {
       switch (event.key) {
-        case "Escape":      this.closeEmail(); event.stopPropagation(); break
+        case "Escape":      this.closeEmail(); break
         case "e": case "E": this.archiveOpenEmail(); break
         case "p": case "P": this.promoteOpenEmail(); break
         case "r": case "R": this.toggleReply(event); break
         default: return
       }
       event.preventDefault()
+      // Trap: keep these off the inbox shortcuts (window-level) behind the overlay,
+      // and keep Escape from also closing the whole overlay (it just closes the card).
+      event.stopPropagation()
       return
     }
 
@@ -78,6 +81,9 @@ export default class extends Controller {
       default: return // let Escape etc. bubble up to the overlay
     }
     event.preventDefault()
+    // Trap: a handled key is a Skim action — don't let it also reach the inbox
+    // keyboard shortcuts (window-level) acting on the email behind the overlay.
+    event.stopPropagation()
   }
 
   // Apply Scout's learned pick for the current card (the sparkle-marked primary

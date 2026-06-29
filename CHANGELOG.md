@@ -53,6 +53,10 @@ major, minor, or patch change here.
   broke the document-templates feature on a new install when enabled. The table
   is now in the schema (existing/upgraded databases already have it from the
   migration).
+- **Skim keyboard shortcuts no longer leak to the screen behind it.** With a Skim
+  overlay open, pressing a key (e.g. `e` to archive, `c`, or the arrows) also fired
+  the matching inbox/feed shortcut underneath — archiving, composing, or navigating
+  the wrong thing. Skim now keeps the keyboard to itself while it's open.
 
 ## [0.4.0] - 2026-06-28
 
