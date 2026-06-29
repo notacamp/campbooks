@@ -32,7 +32,9 @@ module Api
       "tasks:read"             => "List and read tasks",
       "tasks:write"            => "Create, update, and complete tasks",
       "folders:read"           => "List folders and their contents",
-      "folders:write"          => "File and unfile documents in folders"
+      "folders:write"          => "File and unfile documents in folders",
+      "templates:read"         => "List email templates",
+      "templates:write"        => "Create, update, and delete email templates"
     }.freeze
 
     module_function

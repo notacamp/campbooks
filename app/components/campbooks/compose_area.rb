@@ -123,6 +123,11 @@ module Campbooks
             end
           end
 
+          # Email template picker — surfaces saved templates into the compose form.
+          if helpers.email_templates_enabled? && helpers.current_entitlements.feature?(:email_templates)
+            render(EmailTemplatePicker.new(frame_id: "etp_frame_#{@email_message.id}"))
+          end
+
           # Actions row
           div(id: "compose_actions_#{@email_message.id}", class: "flex items-center gap-2") do
             button(type: "submit", name: "send_action", value: "send_now",

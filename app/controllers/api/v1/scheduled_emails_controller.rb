@@ -84,8 +84,8 @@ module Api
 
       def scheduled_email_params
         params.permit(
-          :email_account_id, :to_address, :cc_address, :bcc_address,
-          :subject, :body, :scheduled_at, :rrule
+          :email_account_id, :email_template_id, :to_address, :cc_address, :bcc_address,
+          :subject, :body, :scheduled_at, :rrule, template_context: {}
         )
       end
     end

@@ -74,10 +74,14 @@ class EmailComposeController < ApplicationController
 
   def create_scheduled_email
     args = compose_params
+    template = scheduled_email_template
 
     # Bake in the selected signature exactly like an immediate send, so the
     # queued message goes out identical to what "Send now" would have produced.
-    body = args[:body]
+    # With a template, schedule its raw subject/body + the picked variables so
+    # each occurrence re-renders fresh (recurring {{ date }} stays current) and
+    # the send job regenerates the document-template PDFs.
+    body = template&.body_html.presence || args[:body]
     if params[:signature_id].present?
       sig = Current.user.signatures.find_by(id: params[:signature_id])
       body = Signature.append_to_body(body, sig)
@@ -87,11 +91,13 @@ class EmailComposeController < ApplicationController
       workspace: Current.workspace,
       email_account_id: params[:email_account_id] || @message&.email_account_id,
       created_by: Current.user,
+      email_template: template,
       to_address: args[:to_address],
-      subject: args[:subject],
+      subject: template&.subject.presence || args[:subject],
       body: body,
       cc_address: args[:cc_address],
       bcc_address: args[:bcc_address],
+      template_context: template ? scheduled_template_context : {},
       scheduled_at: params[:scheduled_at].presence || 1.hour.from_now,
       rrule: params[:rrule].presence
     )
@@ -110,6 +116,27 @@ class EmailComposeController < ApplicationController
       end
       format.html { redirect_to scheduled_emails_path, notice: toast }
     end
+  end
+
+  # The email template a scheduled send was built from (set by the composer's
+  # template picker), scoped to the workspace so a forged id can't be linked.
+  def scheduled_email_template
+    return nil unless current_entitlements.feature?(:email_templates)
+    return nil if params[:email_template_id].blank?
+
+    Current.workspace.email_templates.find_by(id: params[:email_template_id])
+  end
+
+  # The variable values the picker stashed (JSON), used to re-render the template
+  # on every occurrence. Tolerant of malformed input.
+  def scheduled_template_context
+    raw = params[:template_context]
+    return {} if raw.blank?
+
+    parsed = JSON.parse(raw)
+    parsed.is_a?(Hash) ? parsed : {}
+  rescue JSON::ParserError
+    {}
   end
 
   # The composer goes to a different target per surface. The bottom-right drawer

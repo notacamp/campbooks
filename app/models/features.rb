@@ -43,6 +43,13 @@ module Features
       flag?("ENABLE_DOCUMENT_TEMPLATES")
     end
 
+    # AI-drafted, reusable email templates: the Settings → Email templates manager,
+    # the compose-time picker, and the public API. Gated until production-ready;
+    # orthogonal to the per-workspace `:email_templates` billing entitlement.
+    def email_templates?
+      flag?("ENABLE_EMAIL_TEMPLATES")
+    end
+
     def microsoft?
       flag?("ENABLE_MICROSOFT") || flag?("ENABLE_MICROSOFT_MAILBOX")
     end
