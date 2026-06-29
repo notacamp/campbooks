@@ -18,6 +18,15 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Desktop app (macOS, Windows, Linux)** — a native desktop build (Tauri) that wraps
+  the Campbooks web app in an OS window, the desktop twin of the iOS/Android apps. It
+  sends the same `Hotwire Native` signal so the app gets the native treatment, and
+  reuses the existing `campbooks://` OAuth handoff — provider sign-in opens in the
+  system browser and hands back through the existing server callbacks, so no
+  provider-console changes are needed. Lives under `native/desktop/`; cross-platform
+  installers are built by the `desktop-release` workflow on a `desktop-v*` tag. Ships
+  unsigned for now (code signing and auto-update are wired but dormant — see
+  `native/desktop/README.md`).
 - **Tasks** — a new task-management module (opt-in via `ENABLE_TASKS`, gated by the
   `tasks` plan entitlement). Create tasks manually or have Scout extract action items
   from your email and documents (triaged in Skim, with the originating email and
