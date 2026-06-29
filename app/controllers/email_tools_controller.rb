@@ -20,6 +20,11 @@ class EmailToolsController < ApplicationController
                       pin unpin
                       star_sender unstar_sender block_sender unblock_sender allow_sender].freeze
 
+  # Approve / Dismiss on a Scout-suggested reminder, rendered inline as buttons on
+  # the discussion message (see Reminders::EmailExtractionJob). Confirming runs the
+  # same Reminders::Confirm path as the feed card / the /reminders page.
+  REMINDER_TOOLS = %w[confirm_reminder dismiss_reminder].freeze
+
   def create
     email_message = EmailMessage.where(email_account: Current.user.readable_email_accounts)
                                 .find(params[:id])
@@ -56,6 +61,10 @@ class EmailToolsController < ApplicationController
         Tools::DraftReply.call(email_message, args, user: Current.user)
       when "draft_follow_up"
         Tools::DraftFollowUp.call(email_message, args, user: Current.user)
+      when "confirm_reminder"
+        confirm_reminder(args)
+      when "dismiss_reminder"
+        dismiss_reminder(args)
       when "discard_draft"
         discard_draft(email_message)
       when "send_reply"
@@ -74,7 +83,13 @@ class EmailToolsController < ApplicationController
           toast = nil
 
           # Persist completed action on the originating AgentMessage
-          if params[:agent_message_id].present?
+          if params[:agent_message_id].present? && REMINDER_TOOLS.include?(tool)
+            # Approve/Dismiss are a mutually-exclusive pair: acting on one resolves
+            # the whole suggestion, so collapse BOTH buttons into a single outcome pill.
+            outcome = reminder_outcome(tool, result)
+            actions_html = complete_reminder_action(params[:agent_message_id], outcome)
+            streams << turbo_stream.replace("actions_agent_message_#{params[:agent_message_id]}", actions_html) if actions_html
+          elsif params[:agent_message_id].present?
             action_message = case tool
             when "add_tag" then "Tagged as '#{result.dig(:tag, :name)}'"
             when "remove_tag" then "Tag '#{result.dig(:tag, :name)}' removed"
@@ -254,6 +269,12 @@ class EmailToolsController < ApplicationController
           when "create_calendar_event"
             toast = { message: t(".event_created", title: result[:title]), variant: :success }
             []
+          when "confirm_reminder"
+            toast = { message: result[:on_calendar] ? t(".reminder_confirmed", title: result[:title]) : t(".reminder_confirmed_no_calendar"), variant: :success }
+            []
+          when "dismiss_reminder"
+            toast = { message: t(".reminder_dismissed"), variant: :success }
+            []
           when "create_task_from_email", "link_task_to_email"
             toast = { message: @registry_message, variant: :success }
             []
@@ -355,6 +376,74 @@ class EmailToolsController < ApplicationController
     render_to_string(component, layout: false)
   rescue => e
     Rails.logger.error("[EmailToolsController] complete_suggested_action error: #{e.class}: #{e.message}")
+    nil
+  end
+
+  # Confirm a Scout-suggested reminder onto the calendar (same path as the feed
+  # card / /reminders page). Idempotent: a reminder already confirmed elsewhere
+  # just reports its existing state so the buttons still resolve cleanly.
+  def confirm_reminder(args)
+    reminder = Reminder.accessible_to(Current.user).find_by(id: args[:reminder_id])
+    return nil unless reminder
+    return { confirmed: true, on_calendar: reminder.calendar_event_id.present?, title: reminder.title } if reminder.confirmed?
+
+    result = Reminders::Confirm.call(reminder, user: Current.user)
+    return nil unless result.success?
+    { confirmed: true, on_calendar: result.calendar?, title: reminder.title }
+  end
+
+  def dismiss_reminder(args)
+    reminder = Reminder.accessible_to(Current.user).find_by(id: args[:reminder_id])
+    return nil unless reminder
+    unless reminder.dismissed?
+      reminder.dismissed!
+      Events.publish("reminder.dismissed", subject: reminder, payload: { "title" => reminder.title, "due_at" => reminder.due_at&.iso8601 })
+    end
+    { dismissed: true, title: reminder.title }
+  end
+
+  # The pill text + tone shown in place of the Approve/Dismiss buttons once one is
+  # clicked. Dismiss reads neutral (not a green "success"). Absolute keys: this is a
+  # helper, not the action, so a relative `t(".")` would resolve to the wrong scope.
+  def reminder_outcome(tool, result)
+    if tool == "dismiss_reminder"
+      { message: t("email_tools.create.reminder_dismissed"), neutral: true }
+    elsif result[:on_calendar]
+      { message: t("email_tools.create.reminder_confirmed", title: result[:title]), neutral: false }
+    else
+      { message: t("email_tools.create.reminder_confirmed_no_calendar"), neutral: false }
+    end
+  end
+
+  # Sibling of complete_suggested_action, but clears the WHOLE Approve/Dismiss pair
+  # (acting on one resolves the suggestion) and renders a single outcome pill.
+  def complete_reminder_action(agent_message_id, outcome)
+    return nil unless agent_message_id.present?
+
+    msg = AgentMessage.find_by(id: agent_message_id, user: Current.user)
+    return nil unless msg
+
+    suggested = msg.ai_suggested_actions.reject { |a| REMINDER_TOOLS.include?(a["tool"]) }
+    auto = (msg.ai_auto_actions.dup || [])
+    auto << { "tool" => "confirm_reminder", "success" => true, "variant" => (outcome[:neutral] ? "neutral" : nil), "message" => outcome[:message] }.compact
+
+    msg.update!(ai_suggested_actions: suggested, ai_auto_actions: auto)
+
+    router = Rails.application.routes.url_helpers
+    email_id = params[:id]
+    tool_url_builder = ->(t, a) {
+      { url: router.tool_email_message_path(email_id, tool: t, args: a), method: :post }
+    }
+
+    component = Campbooks::ChatActions.new(
+      auto_actions: auto,
+      suggested_actions: suggested,
+      tool_url_builder: tool_url_builder,
+      message_id: msg.id
+    )
+    render_to_string(component, layout: false)
+  rescue => e
+    Rails.logger.error("[EmailToolsController] complete_reminder_action error: #{e.class}: #{e.message}")
     nil
   end
 

@@ -3,10 +3,10 @@ en:
   discussions:
     scout:
       # Posted by Scout into an email's discussion thread when it extracts a
-      # calendar event or reminders from that email. Markdown (rendered with safe
-      # links); %{url} points back to the created record.
+      # calendar event or a reminder from that email. Markdown (rendered with safe
+      # links); %{url} points back to the created record. A reminder posts with
+      # Approve / Dismiss buttons (ai_suggested_actions) so it reads as a suggestion
+      # to confirm, not a done deal.
       calendar_event_created: "📅 I added **[%{title}](%{url})** to your calendar — %{at}."
-      reminders_found:
-        one: "🔔 I spotted a reminder in this email:"
-        other: "🔔 I spotted %{count} reminders in this email:"
-      reminder_line: "- **[%{title}](%{url})** — due %{due}"
+      reminder_found: "🔔 I spotted a potential reminder in this email. Want me to add it to your calendar?"
+      reminder_line: "**[%{title}](%{url})** — due %{due}"

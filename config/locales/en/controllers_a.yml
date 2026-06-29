@@ -178,6 +178,9 @@ en:
       forwarded_to: Forwarded to %{address}
       no_email_selected: No email selected
       no_send_permission: You don't have permission to send from this account.
+      reminder_confirmed: "%{title} added to your calendar."
+      reminder_confirmed_no_calendar: Reminder confirmed. Connect a calendar to sync it automatically.
+      reminder_dismissed: Reminder dismissed.
       reply_sent: Reply sent
       save_draft_html: Draft saved
       tagged: Tagged as '%{name}'

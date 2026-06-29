@@ -36,7 +36,6 @@ module Campbooks
     def drawer_content(&block)
       div(class: "flex flex-col h-full") do
         header_section(&block)
-        sender_section
         tags_section
         attachments_section
         notion_export_section
@@ -55,7 +54,6 @@ module Campbooks
 
     def full_content(&block)
       header_section(&block)
-      sender_section
       tags_section
       attachments_section
       notion_export_section
@@ -88,39 +86,6 @@ module Campbooks
                 render(ColorDot.new(color: @account.color, size: :sm))
                 plain(@account.display_name)
               end
-            end
-          end
-        end
-      end
-    end
-
-    def sender_section
-      div(class: "px-5 py-3 border-b border-gray-100 flex-shrink-0") do
-        div(class: "flex items-center gap-2.5") do
-          is_sent = @message.sent?
-          display_email = is_sent ? @message.to_address.presence : @message.from_address
-
-          render(ContactAvatar.new(
-            email: display_email || "?",
-            sent: is_sent,
-            size: :md,
-            contact_id: @message.contact_id,
-            variant: :accent,
-            show_direction: true
-          ))
-
-          div do
-            if is_sent
-              div(class: "text-[13px] font-medium text-blue-700 dark:text-blue-300 mt-0.5") do
-                plain(clean_email_address(@message.to_address.presence) || @message.to_address || "-")
-              end
-            else
-              div(class: "text-[13px] font-medium text-gray-900 mt-0.5") do
-                plain(@message.from_address || "-")
-              end
-            end
-            div(class: "text-[11px] text-gray-500") do
-              plain(@message.received_at ? l(@message.received_at, format: :at) : "")
             end
           end
         end
@@ -215,51 +180,71 @@ module Campbooks
       latest_msg = messages.first
       expand_default = [ latest_msg, @message ].uniq
 
-      messages.each do |msg|
-        msg_sent = msg.sent?
-        expanded = expand_default.include?(msg)
-        bg = msg_sent ? "bg-blue-50/20 dark:bg-blue-500/10" : "bg-card"
+      # Conversation view: each message is a light chat bubble aligned by direction
+      # (received ← left, sent → right) so a thread reads like a conversation. The
+      # `thread-*` hook classes let the inbox setting flatten these back to a classic
+      # full-width list via CSS ([data-thread-view="classic"]).
+      div(class: "thread-conversation flex flex-col gap-3.5 px-4 py-4 text-left") do
+        messages.each do |msg|
+          render_message_bubble(msg, sent: msg.sent?, expanded: expand_default.include?(msg), show_selected: show_selected)
+        end
+      end
+    end
 
-        details(class: "border-b border-gray-100 #{bg} group", open: expanded) do
-          # Summary row (always visible — click to expand/collapse)
-          summary(class: "flex items-center gap-2.5 px-5 py-3 cursor-pointer select-none list-none hover:bg-gray-50/30") do
-            render(ContactAvatar.new(
-              email: msg_sent ? (msg.to_address.presence || msg.from_address) : msg.from_address || "?",
-              sent: msg_sent,
-              size: :sm,
-              contact_id: msg.contact_id,
-              variant: :neutral,
-              show_direction: true
-            ))
+    CHEVRON_ICON = '<svg class="w-3 h-3 text-gray-400 flex-shrink-0 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>'
 
-            div(class: "flex-1 min-w-0") do
-              div(class: "flex items-center gap-1.5") do
-                if msg_sent
-                  span(class: "text-[12px] font-medium text-blue-700 dark:text-blue-300 truncate") do
-                    plain(clean_email_address(msg.to_address.presence) || msg.to_address || "-")
-                  end
-                else
-                  span(class: "text-[12px] font-medium text-gray-900 truncate") { msg.from_address || "-" }
-                end
-              end
-              div(class: "text-[10px] text-gray-400 mt-0.5") do
+    # One message as a directional chat bubble: avatar on the sender's side, a
+    # rounded bubble with a small tail toward that side. Sent is tinted with the
+    # ink-family accent (never Ember — that's Scout's), received sits on a bordered
+    # card. Still a <details> so long threads stay scannable and wide HTML emails
+    # scroll inside the bubble rather than breaking the layout.
+    def render_message_bubble(msg, sent:, expanded:, show_selected:)
+      bubble = if sent
+        "bg-accent-100 dark:bg-accent-500/15 rounded-br-md"
+      else
+        "bg-card border border-gray-200 dark:border-gray-700 rounded-bl-md"
+      end
+      # Each bubble shows its actual author (from_address) — your address on the
+      # messages you sent, the sender's on theirs — so alignment + author never
+      # disagree. Direction (left/right + tint) carries who-sent-what.
+      name = msg.from_address || "-"
+
+      div(class: "thread-msg flex items-start gap-2 #{'flex-row-reverse' if sent}") do
+        div(class: "flex-shrink-0 mt-0.5") do
+          render(ContactAvatar.new(
+            email: msg.from_address || "?",
+            sent: sent, size: :sm, contact_id: msg.contact_id, variant: :neutral, show_direction: true
+          ))
+        end
+
+        details(class: "thread-bubble group min-w-0 max-w-[85%] rounded-2xl #{bubble}", open: expanded) do
+          # Header row (always visible — click to expand/collapse), plus a one-line
+          # preview that shows only while collapsed so a folded bubble still reads as
+          # a message rather than an empty pill.
+          summary(class: "block px-3.5 py-2 cursor-pointer select-none list-none") do
+            div(class: "flex items-center gap-2") do
+              span(class: "text-[12px] font-semibold text-foreground truncate") { name }
+              span(class: "text-[10px] text-gray-400 flex-shrink-0") do
                 plain(msg.received_at ? l(msg.received_at, format: :at) : "")
               end
+              if show_selected && msg == @message
+                span(class: "text-[9px] text-accent-600 font-medium bg-accent-50 dark:bg-accent-500/15 rounded px-1.5 py-0.5 flex-shrink-0") { t(".selected_badge") }
+              end
+              div(class: "flex-1")
+              raw(safe(CHEVRON_ICON))
             end
-
-            if show_selected && msg == @message
-              span(class: "text-[9px] text-accent-500 font-medium bg-accent-50 rounded px-1.5 py-0.5") { t(".selected_badge") }
+            preview = msg.summary.presence || helpers.strip_tags(msg.body.to_s).squish
+            if preview.present?
+              div(class: "mt-0.5 text-[12px] text-gray-500 dark:text-gray-400 line-clamp-1 group-open:hidden") { plain(preview.truncate(140)) }
             end
-
-            raw(safe('<svg class="w-3 h-3 text-gray-400 flex-shrink-0 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>'))
           end
 
           # Body (hidden when collapsed). overflow-x-auto so wide HTML emails
-          # (fixed-width newsletter tables) scroll within the message instead of
+          # (fixed-width newsletter tables) scroll within the bubble instead of
           # breaking the page layout on mobile.
-          div(class: "px-5 pb-4 overflow-x-auto") do
+          div(class: "px-3.5 pb-3 overflow-x-auto") do
             if msg.body.present?
-              div(class: "text-sm leading-relaxed text-gray-800 text-left", style: "word-wrap:break-word;font-family:system-ui,sans-serif") do
+              div(class: "text-sm leading-relaxed text-gray-800 dark:text-gray-100 text-left", style: "word-wrap:break-word;font-family:system-ui,sans-serif") do
                 # Email bodies are attacker-controlled: sanitise with the full
                 # Loofah :prune safelist (drops <script>, on*= handlers and
                 # javascript: URLs; rewrites inline image URLs through the proxy)
@@ -271,7 +256,7 @@ module Campbooks
                 raw(safe(linkify_mentions(cleaned)))
               end
             elsif msg.summary.present?
-              div(class: "text-sm text-gray-600 whitespace-pre-wrap leading-relaxed") { msg.summary }
+              div(class: "text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed") { msg.summary }
             else
               div(class: "text-sm text-gray-400 italic") { t(".no_content") }
             end

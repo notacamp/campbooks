@@ -35,6 +35,10 @@ pt:
         show_heading: Mostrar
         subheading: Como a sua caixa de entrada aparece neste dispositivo. Guardado
           neste browser.
+        thread_view_bubbles: Balões
+        thread_view_classic: Clássica
+        thread_view_heading: Vista de conversa
+        thread_view_hint: Os balões mostram quem enviou cada mensagem, como num chat.
     filtering:
       show:
         allowed_heading: Remetentes permitidos

@@ -15,13 +15,14 @@ module Discussions
   # nil when it can't post (no email/thread/owner, a blank body, or create_if_missing:
   # false and no discussion exists yet).
   class ScoutAnnouncer
-    def self.announce(email_message:, create_if_missing: true, &body)
-      new(email_message: email_message, create_if_missing: create_if_missing).announce(&body)
+    def self.announce(email_message:, create_if_missing: true, suggested_actions: [], &body)
+      new(email_message: email_message, create_if_missing: create_if_missing, suggested_actions: suggested_actions).announce(&body)
     end
 
-    def initialize(email_message:, create_if_missing: true)
+    def initialize(email_message:, create_if_missing: true, suggested_actions: [])
       @email_message = email_message
       @create_if_missing = create_if_missing
+      @suggested_actions = suggested_actions || []
     end
 
     def announce(&body)
@@ -41,7 +42,9 @@ module Discussions
       return nil if content.blank?
 
       agent_thread ||= create_agent_thread(email_thread, owner)
-      message = agent_thread.agent_messages.create!(content: content, author_type: :ai, user: owner)
+      message = agent_thread.agent_messages.create!(
+        content: content, author_type: :ai, user: owner, ai_suggested_actions: @suggested_actions
+      )
 
       broadcast(email_thread, message)
       message

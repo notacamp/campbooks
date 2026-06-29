@@ -34,6 +34,10 @@ en:
         no_accounts: No email accounts connected yet.
         show_heading: Show
         subheading: How your inbox looks on this device. Saved in this browser.
+        thread_view_bubbles: Bubbles
+        thread_view_classic: Classic
+        thread_view_heading: Conversation view
+        thread_view_hint: Bubbles show who sent each message, like a chat.
     filtering:
       show:
         allowed_heading: Allowed senders

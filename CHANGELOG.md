@@ -18,6 +18,19 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Email threads read like a conversation.** Messages in a thread now render as
+  light, directional chat bubbles — the ones you received on the left, the ones you
+  sent on the right — so it's clear at a glance who said what. Folded messages show
+  a one‑line preview, and long or wide HTML emails still scroll neatly inside their
+  bubble. Prefer the old look? Switch **Conversation view** to **Classic** (a flat
+  list) in **Inbox settings → Display**.
+
+- **Approve or dismiss Scout's reminders right in the thread** — when Scout spots a
+  dated commitment in an email it now surfaces it in the discussion as *a potential
+  reminder* with **Add to calendar** and **Dismiss** buttons, so you confirm it onto
+  your calendar or wave it off in one tap. The buttons match the home‑feed reminder
+  card, and acting on one collapses both into a quiet "added" / "dismissed" note.
+
 - **Smart search on the Files page.** A new search box finds documents by meaning,
   not just exact words — search the way you'd describe it ("the contract with Acme",
   "all payment receipts to EDP", "invoice FT 2024/123") and the most relevant files
@@ -26,6 +39,25 @@ major, minor, or patch change here.
   and Portuguese. To power it, the AI now writes a short, search-optimized summary
   when it analyzes a document. Existing files keep working; self-hosters can re-index
   them for the richer search with `bin/rails search:reindex_documents`.
+
+### Changed
+
+- **A more breathable inbox.** The thread list has more room to breathe — larger,
+  more legible type, roomier rows, and clearer (but still calm) hover and selected
+  states across all three densities. **Compact** mode's text is no longer tiny.
+
+- **Inbox top bar.** The Skim ring tray now spans the full width above the list and
+  reading panes, so the rings breathe instead of scrolling in a narrow column, and
+  the inbox's main actions — **Search** and **Compose** — move up to a top toolbar
+  where primary actions belong.
+
+### Fixed
+
+- **List view opens the reading drawer again.** Clicking an email in the inbox's
+  **List** layout now opens it in the bottom‑right drawer instead of navigating the
+  whole page (the row‑click matcher only recognised numeric ids, so it never matched
+  the app's message ids). The standalone inbox also gained the Default / List
+  switcher, so the layout applies there too.
 
 ## [0.6.0] - 2026-06-29
 

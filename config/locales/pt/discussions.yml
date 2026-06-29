@@ -3,7 +3,5 @@ pt:
   discussions:
     scout:
       calendar_event_created: "📅 Adicionei **[%{title}](%{url})** ao teu calendário — %{at}."
-      reminders_found:
-        one: "🔔 Encontrei um lembrete neste email:"
-        other: "🔔 Encontrei %{count} lembretes neste email:"
-      reminder_line: "- **[%{title}](%{url})** — prazo %{due}"
+      reminder_found: "🔔 Encontrei um possível lembrete neste email. Queres que o adicione ao teu calendário?"
+      reminder_line: "**[%{title}](%{url})** — prazo %{due}"

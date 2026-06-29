@@ -28,8 +28,19 @@ module Campbooks
     CHECK_SVG = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>'.freeze
     CROSS_SVG = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>'.freeze
 
+    # Approve/Dismiss on a Scout reminder render with the feed reminder card's exact
+    # button styling (Campbooks::Button primary/ghost) rather than the inline chip
+    # style, so the two surfaces read identically (see Campbooks::Feed::ReminderCard).
+    REMINDER_TOOLS = %w[confirm_reminder dismiss_reminder].freeze
+
     def render_auto_action(action)
-      if action["success"]
+      # A resolved-but-not-celebratory outcome (e.g. a dismissed reminder): a quiet
+      # neutral pill, so "Dismissed" doesn't read as a green success.
+      if action["variant"] == "neutral"
+        span(class: "inline-flex items-center gap-1 text-[12px] font-medium text-gray-600 bg-gray-100 border border-gray-200 dark:text-gray-300 dark:bg-gray-500/10 dark:border-gray-500/25 rounded-full px-3 py-1") do
+          plain action["message"].to_s
+        end
+      elsif action["success"]
         span(class: "inline-flex items-center gap-1 text-[12px] font-medium text-green-700 bg-green-50 border border-green-200 dark:text-green-300 dark:bg-green-500/10 dark:border-green-500/25 rounded-full px-3 py-1") do
           raw(safe(CHECK_SVG))
           plain action["message"].to_s
@@ -52,7 +63,11 @@ module Campbooks
         url_info = @tool_url_builder.call(tool, args)
         if url_info
           form_data = { turbo_stream: true }.merge(url_info[:data] || {})
-          render_form(url_info[:url], url_info[:method] || :post, form_data, style, tool, label)
+          if REMINDER_TOOLS.include?(tool)
+            render_reminder_form(url_info[:url], form_data, tool, label)
+          else
+            render_form(url_info[:url], url_info[:method] || :post, form_data, style, tool, label)
+          end
           return
         end
       end
@@ -77,6 +92,18 @@ module Campbooks
       end
     end
 
+    # Reminder Approve/Dismiss: the feed reminder card's exact treatment —
+    # confirm = solid-ink primary, dismiss = ghost (see Campbooks::Feed::ReminderCard).
+    def render_reminder_form(url, data, tool, label)
+      form(action: url, method: :post, class: "inline-flex", data: data) do
+        input(type: "hidden", name: "agent_message_id", value: @message_id.to_s) if @message_id
+        input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
+        render(Campbooks::Button.new(
+          variant: tool == "confirm_reminder" ? :primary : :ghost, size: :sm, type: "submit"
+        )) { plain label }
+      end
+    end
+
     def suggested_label(tool, args)
       case tool
       when "bulk_archive", "archive" then t(".archive")
@@ -87,6 +114,8 @@ module Campbooks
       when "draft_reply"       then t(".draft_reply")
       when "forward_email"     then t(".forward_to", address: args["to_address"])
       when "create_calendar_event" then t(".create_event")
+      when "confirm_reminder"  then t(".add_to_calendar")
+      when "dismiss_reminder"  then t(".dismiss")
       when "create_task_from_email" then t(".create_task")
       when "link_task_to_email"    then t(".link_task")
       when "snooze"            then t(".snooze")
