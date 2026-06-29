@@ -105,7 +105,6 @@ fr:
           other: " de %{count} messages dans la conversation"
       discussion: Discussion
       forward: Transférer
-      labels_label: Libellés
       no_content: Aucun contenu.
       no_subject: "(sans objet)"
       open_full_view: Ouvrir en plein écran
@@ -114,6 +113,8 @@ fr:
       selected_badge: Sélectionné
       send_to_notion: Enregistrer dans Notion
       tags_label: Étiquettes
+    tag_chip:
+      remove: "Retirer %{name}"
     email_filter_panel:
       accounts: Comptes
       all_folders: Tous les dossiers

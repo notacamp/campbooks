@@ -35,6 +35,12 @@ major, minor, or patch change here.
   are recognised and kept out of your inbox, while the labels you actually use
   (Invoices, Clients, …) stay. The decision is remembered per label — provider
   system/noise labels are no longer attached to every message.
+- **One place for tags.** "Tags" and provider "labels" are now a single concept in
+  the inbox: one Tags row per email and one picker that adds or removes either a
+  Campbooks tag or a Gmail/Zoho label (provider labels still two-way sync). The
+  redundant separate "Labels" section is gone, and hidden provider/system labels
+  never show as chips. Also fixes tag add/remove on installs using UUID message
+  IDs.
 
 ## [0.5.0] - 2026-06-29
 

@@ -57,7 +57,6 @@ module Campbooks
       header_section(&block)
       sender_section
       tags_section
-      labels_section if @account&.external_tags&.any?
       attachments_section
       notion_export_section
       scout_section
@@ -131,15 +130,8 @@ module Campbooks
     def tags_section
       div(class: "px-5 py-2.5 border-b border-gray-100 flex items-center gap-2 flex-shrink-0") do
         span(class: "text-[11px] font-medium text-gray-400 flex-shrink-0") { t(".tags_label") }
-        # Delegate to the existing tags partial
+        # One unified picker: local tags + provider labels (see _tags partial).
         raw(helpers.render("email_messages/tags", message: @message))
-      end
-    end
-
-    def labels_section
-      div(class: "px-5 py-2.5 border-b border-gray-200 flex items-center gap-2 flex-shrink-0") do
-        span(class: "text-[11px] font-medium text-gray-500 flex-shrink-0") { t(".labels_label") }
-        raw(helpers.render("email_messages/zoho_labels", message: @message))
       end
     end
 

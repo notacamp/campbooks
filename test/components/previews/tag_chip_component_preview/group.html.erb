@@ -1,0 +1,5 @@
+<div class="flex flex-wrap items-center gap-1 max-w-[280px]">
+  <% tags.each do |tag| %>
+    <%= render(Campbooks::TagChip.new(tag: tag, size: :sm)) %>
+  <% end %>
+</div>
