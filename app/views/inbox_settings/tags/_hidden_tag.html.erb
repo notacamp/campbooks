@@ -1,0 +1,22 @@
+<%# locals: tag, count %>
+<%= turbo_frame_tag dom_id(tag, :hidden) do %>
+  <div class="flex items-center gap-3 py-2 px-1 border-b border-border last:border-0 opacity-70">
+    <%= render(Campbooks::ColorDot.new(color: tag.color)) %>
+    <div class="min-w-0 flex-1">
+      <div class="flex items-center gap-2">
+        <span class="text-[13px] font-medium text-foreground truncate"><%= tag.name %></span>
+        <% if tag.system_label? %>
+          <%= render(Campbooks::Badge.new(variant: :neutral, size: :md)) { t("inbox_settings.tags.hidden_tag.system_badge") } %>
+        <% elsif tag.kind_low_value? %>
+          <%= render(Campbooks::Badge.new(variant: :neutral, size: :md)) { t("inbox_settings.tags.hidden_tag.ai_badge") } %>
+        <% end %>
+      </div>
+      <% if tag.classification_reason.present? %>
+        <p class="text-xs text-muted-foreground truncate mt-0.5"><%= tag.classification_reason %></p>
+      <% end %>
+    </div>
+    <span class="text-xs text-muted-foreground tabular-nums flex-shrink-0"><%= count %></span>
+    <%= button_to t("inbox_settings.tags.hidden_tag.show"), toggle_hidden_inbox_settings_tag_path(tag), method: :patch,
+          class: "px-2 py-0.5 text-xs font-medium text-accent-600 hover:bg-accent-50 dark:hover:bg-accent-500/10 rounded cursor-pointer transition-colors flex-shrink-0" %>
+  </div>
+<% end %>

@@ -30,6 +30,11 @@ major, minor, or patch change here.
   redundant separate "Labels" section is gone, and hidden provider/system labels
   never show as chips. Also fixes tag add/remove on installs using UUID message
   IDs.
+- **Review & override hidden labels.** Settings → Tags now lists the labels that
+  were hidden — provider system statuses and AI-filtered ones — with the reason
+  for each, and a one-click **Show** to bring any back as a tag (or **Hide** a tag
+  you don't want as a chip). This replaces the old global "Show system labels"
+  switch in Display settings.
 
 ## [0.5.0] - 2026-06-29
 

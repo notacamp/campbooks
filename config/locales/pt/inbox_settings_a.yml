@@ -33,11 +33,8 @@ pt:
         labels_option: Etiquetas
         no_accounts: Ainda não há contas de email ligadas.
         show_heading: Mostrar
-        show_system_labels: Mostrar etiquetas do sistema (Principal, Pessoal, Promoções…)
         subheading: Como a sua caixa de entrada aparece neste dispositivo. Guardado
           neste browser.
-        system_labels_heading: Etiquetas do sistema
-        system_labels_hint: Etiquetas da sua caixa de correio (Gmail). Ocultas por predefinição — ative para vê-las.
     filtering:
       show:
         allowed_heading: Remetentes permitidos
@@ -85,9 +82,21 @@ pt:
           caixa de entrada.
         subheading: As etiquetas ajudam o Scout a organizar a sua caixa de entrada
           automaticamente.
+        filtered_group: Ocultadas pela IA ou por si
+        hidden_heading: Rótulos ocultos
+        hidden_hint: sistema e ocultados por IA
+        system_group: Sistema do fornecedor
       tag:
         delete_confirm: Eliminar %{name}?
         edit: Editar
+        hide: Ocultar
         tagged_messages_title: Mensagens com etiqueta
+      hidden_tag:
+        ai_badge: IA
+        show: Mostrar
+        system_badge: Sistema
+      toggle_hidden:
+        hidden: '%{name} ocultada'
+        shown: '%{name} agora está visível'
       update:
         updated_toast: Etiqueta actualizada.
