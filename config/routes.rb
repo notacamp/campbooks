@@ -536,6 +536,12 @@ Rails.application.routes.draw do
         end
       end
 
+      # Tasks: list/read, create, update, and complete (status transitions publish
+      # the same domain events as the web UI via Task#move_to_status!).
+      resources :tasks, only: [ :index, :show, :create, :update ] do
+        member { patch :complete }
+      end
+
       # Custom folders (MailFolder) + filing documents into them. No provider-side
       # folder create/rename over the API (per-account side effects).
       resources :folders, only: [ :index, :show ], controller: "folders"

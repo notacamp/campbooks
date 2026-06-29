@@ -95,6 +95,7 @@ Doorkeeper.configure do
                   :"scheduled_emails:read", :"scheduled_emails:write",
                   :"calendar:read", :"calendar:write",
                   :"reminders:read", :"reminders:write",
+                  :"tasks:read", :"tasks:write",
                   :"folders:read", :"folders:write"
   enforce_configured_scopes
 

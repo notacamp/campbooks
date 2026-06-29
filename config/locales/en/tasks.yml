@@ -110,6 +110,7 @@ en:
       activity: Activity
       add_document: Attach a document
       add_email: Link an email
+      ai_reasoning: "Scout flagged this:"
       assignees: Assignees
       back: All tasks
       created_by: Created by %{name}
@@ -149,6 +150,7 @@ en:
       from_email: "From email: %{subject}"
       subtitle: Scout pulled these action items out of your email. Keep the ones that matter.
       title: Suggested tasks
+      why: "Why this is a task:"
     unlink_email:
       unlinked: Email unlinked.
     update:

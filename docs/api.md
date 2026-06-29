@@ -120,6 +120,8 @@ above.
 | `calendar:write` | Create, update, RSVP, and delete calendar events |
 | `reminders:read` | Read AI reminders |
 | `reminders:write` | Confirm, dismiss, and snooze reminders |
+| `tasks:read` | List and read tasks |
+| `tasks:write` | Create, update, and complete tasks |
 | `folders:read` | List folders and their contents |
 | `folders:write` | File and unfile documents in folders |
 
@@ -573,6 +575,56 @@ Marks the reminder dismissed. Returns the updated reminder.
 
 Body: optional `until` (ISO 8601; defaults to one week from now). Returns the
 updated reminder.
+
+## Tasks
+
+Tasks are actionable items — created manually, via this API, or AI-extracted from
+emails and documents (extracted ones arrive in `suggested` status for triage).
+Scoped to the acting user's workspace.
+
+### `GET /api/v1/tasks` — list (scope `tasks:read`)
+
+Filter by `status` (`suggested`/`todo`/`in_progress`/`blocked`/`done`/`cancelled`)
+and `assignee_id`, plus `page`/`per_page`. Ordered by `created_at` descending.
+
+```json
+{
+  "data": [
+    {
+      "id": "bc1d5f02-f40e-4f57-9d61-2914cbe3e4ae",
+      "title": "Send Q3 report to the board",
+      "description": "<p>Pull the numbers and email the deck.</p>",
+      "status": "in_progress", "priority": "high",
+      "due_at": "2026-07-01T09:00:00Z", "all_day": false,
+      "completed_at": null, "ai_suggested": false,
+      "source_type": null, "source_id": null,
+      "created_by_id": "1f2e…", "assignee_ids": ["9a8b…"], "tag_ids": ["3c4d…"],
+      "created_at": "2026-06-29T02:13:00Z", "updated_at": "2026-06-29T02:16:00Z"
+    }
+  ],
+  "meta": { "page": 1, "per_page": 25, "total": 1, "total_pages": 1 }
+}
+```
+
+### `GET /api/v1/tasks/:id` — show (scope `tasks:read`)
+
+Adds `justification`, `confidence`, `linked_emails` (typed email links),
+`document_ids` (attached documents), and `extracted_data`.
+
+### `POST /api/v1/tasks` — create (scope `tasks:write`)
+
+Body: `title` (required), plus optional `description`, `priority`
+(`low`/`normal`/`high`/`urgent`), `due_at` (ISO 8601), `all_day`, `assignee_ids`,
+`tag_ids`, and an initial `status` (defaults to `todo`). Returns the created task (201).
+
+### `PATCH /api/v1/tasks/:id` — update (scope `tasks:write`)
+
+Same fields as create. Passing a new `status` performs a tracked transition
+(publishing `task.status_changed` / `task.completed`).
+
+### `PATCH /api/v1/tasks/:id/complete` — complete (scope `tasks:write`)
+
+Marks the task `done` and stamps `completed_at`. Returns the updated task.
 
 ## Folders
 

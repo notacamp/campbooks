@@ -42,6 +42,13 @@
     <% end %>
   </header>
 
+  <% if @task.ai_suggested? && @task.justification.present? %>
+    <div class="mb-8 flex items-start gap-2 rounded-xl bg-ember/5 px-3.5 py-2.5 text-sm text-foreground/80">
+      <svg class="mt-0.5 h-4 w-4 shrink-0 text-ember" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5l1.7 5.6L19.5 12l-5.8 1.4L12 19l-1.7-5.6L4.5 12l5.8-1.4z"/></svg>
+      <span><span class="font-medium text-foreground"><%= t(".ai_reasoning") %></span> <%= @task.justification %></span>
+    </div>
+  <% end %>
+
   <div class="flex flex-col gap-8 lg:flex-row">
     <div class="min-w-0 flex-1 space-y-8">
       <section>
