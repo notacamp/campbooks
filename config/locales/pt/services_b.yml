@@ -19,8 +19,8 @@ pt:
       calendar_month: 'Calendário: vista de mês'
       calendar_today: 'Calendário: hoje'
       calendar_week: 'Calendário: vista de semana'
-      documents: Documentos
       email_scans: Análises de e-mail
+      files: Ficheiros
       inbox: Caixa de entrada
       new_calendar_event: Novo evento de calendário
       new_email: Novo e-mail
