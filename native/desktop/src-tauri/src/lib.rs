@@ -10,7 +10,9 @@ mod oauth;
 
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_deep_link::DeepLinkExt;
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 use tauri_plugin_opener::OpenerExt;
+use tauri_plugin_updater::UpdaterExt;
 
 pub fn run() {
     tauri::Builder::default()
@@ -25,6 +27,8 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let base = config::app_url();
 
@@ -77,8 +81,46 @@ pub fn run() {
                 let _ = app.deep_link().register_all();
             }
 
+            // Check for a newer signed release in the background and prompt.
+            check_for_updates(app.handle().clone());
+
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running the Campbooks desktop app");
+}
+
+/// Background update check: if a newer signed release exists at the configured
+/// endpoint, prompt natively and — on confirm — download, install, and relaunch.
+/// Runs Rust-side (the webview is the remote app, which knows nothing of Tauri).
+fn check_for_updates(handle: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let Ok(updater) = handle.updater() else {
+            return;
+        };
+        if let Ok(Some(update)) = updater.check().await {
+            let msg = format!(
+                "Campbooks {} is available. Install it now? The app will restart.",
+                update.version
+            );
+            let restart_handle = handle.clone();
+            handle
+                .dialog()
+                .message(msg)
+                .title("Update available")
+                .buttons(MessageDialogButtons::OkCancelCustom(
+                    "Install".to_string(),
+                    "Later".to_string(),
+                ))
+                .show(move |install| {
+                    if install {
+                        tauri::async_runtime::spawn(async move {
+                            if update.download_and_install(|_, _| {}, || {}).await.is_ok() {
+                                restart_handle.restart();
+                            }
+                        });
+                    }
+                });
+        }
+    });
 }

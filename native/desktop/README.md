@@ -102,19 +102,25 @@ build the cross-platform matrix and draft a GitHub Release with the installers.
 > lives in `src-tauri/tauri.conf.json`. Do **not** use a `vX.Y.Z` tag: those
 > drive `publish-image.yml` → a production deploy.
 
-## Auto-update (follow-up — not yet wired)
+## Auto-update
 
-The updater is intentionally dormant so unsigned local builds work. To activate:
+On launch the app checks the updater endpoint and, if a newer **signed** release
+exists, shows a native "Update available → install & restart" prompt
+(`check_for_updates` in `lib.rs` — Rust-side, since the webview is the remote app).
 
-1. `cargo tauri signer generate -w ~/.tauri/campbooks-updater.key` (keep the
-   private key secret; it never gets committed — see `.gitignore`).
-2. Add `tauri-plugin-updater = "2"` to `Cargo.toml` and register it in `lib.rs`
-   (`app.handle().plugin(tauri_plugin_updater::Builder::new().build())?`).
-3. In `tauri.conf.json`, set `bundle.createUpdaterArtifacts: true` and add a
-   `plugins.updater` block with the **public** key and the release endpoint
-   (`https://github.com/notacamp/campbooks/releases/latest/download/latest.json`).
-4. Add the `TAURI_SIGNING_PRIVATE_KEY` (+ password) secrets — the release
-   workflow already passes them through.
+- **Signing:** updates are signed with a minisign keypair. The **public** key is
+  in `tauri.conf.json` (`plugins.updater.pubkey`); the **private** key is the
+  `TAURI_SIGNING_PRIVATE_KEY` repo secret (never committed; regenerate with
+  `tauri signer generate`).
+- **Endpoint:** `plugins.updater.endpoints` → a stable
+  `https://files.not-a-camp.com/desktop/latest.json`. The release workflow builds
+  the updater artifacts (`createUpdaterArtifacts: true`) and attaches `latest.json`
+  to the GitHub release; **after each release, copy that `latest.json` to the files
+  bucket** (`desktop/latest.json`) so installed apps see the new version. (GitHub's
+  repo-wide `releases/latest` can't be used directly — desktop builds are
+  pre-releases sharing the repo with the app's own `vX.Y.Z` releases.)
+- The prompt only fires for a version **newer** than the running one, so it shows
+  up after the *next* release ships.
 
 ## Not done yet (follow-ups)
 
@@ -122,7 +128,6 @@ The updater is intentionally dormant so unsigned local builds work. To activate:
   release workflow is wired for them) and Windows Authenticode / Azure Trusted
   Signing (needs a Windows runner + cert). v1 ships **unsigned** (Gatekeeper /
   SmartScreen friction).
-- **Auto-update** — see above.
 - **App-store submissions** — Mac App Store, Microsoft Store.
 - **Native menu polish** — Tauri provides a default menu (Cmd+Q / copy-paste);
   refine if needed.
