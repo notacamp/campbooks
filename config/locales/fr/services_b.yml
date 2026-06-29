@@ -19,8 +19,8 @@ fr:
       calendar_month: 'Calendrier : vue mois'
       calendar_today: 'Calendrier : aujourd''hui'
       calendar_week: 'Calendrier : vue semaine'
-      documents: Documents
       email_scans: Analyses d'e-mails
+      files: Fichiers
       inbox: Boîte de réception
       new_calendar_event: Nouvel événement d'agenda
       new_email: Rédiger un nouvel e-mail

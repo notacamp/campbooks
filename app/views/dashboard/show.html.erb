@@ -5,7 +5,7 @@
   <div class="mb-6">
     <%= render(Campbooks::Alert.new(variant: :warning)) do %>
       <%= t(".stuck_documents", count: @stuck_documents) %>
-      <%= link_to t(".view"), documents_path(ai_status: :processing), class: "font-medium underline" %>
+      <%= link_to t(".view"), files_path(ai_status: :processing), class: "font-medium underline" %>
     <% end %>
   </div>
 <% end %>

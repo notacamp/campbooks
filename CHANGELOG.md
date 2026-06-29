@@ -29,6 +29,14 @@ major, minor, or patch change here.
 
 ### Changed
 
+- **Documents and Files are now one page.** The separate "Documents" area has
+  merged into **Files** — the same folder-based file manager now also holds the
+  document review queue (a **"Review N"** button opens Skim right there), the
+  document filters (type, category, status, month; a filter also narrows the
+  internal documents and filed emails shown alongside), and the bulk
+  re-analyze / export. Uploads gained an **"Analyze with AI"** toggle: leave it on
+  to extract and classify a business document, turn it off to just store a file.
+  The old `/documents` address now opens Files.
 - **Email labels are smarter and less noisy.** Labels synced from Gmail/Zoho are
   now evaluated once on import: built-in provider statuses (Inbox, Unread,
   Important, Gmail's category tabs like Updates/Promotions) and low-value labels

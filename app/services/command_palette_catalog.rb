@@ -31,7 +31,7 @@ class CommandPaletteCatalog
     [
       cmd("inbox", I18n.t("command_palette.commands.inbox"), I18n.t("command_palette.categories.navigate"), "mail", root_path),
       cmd("scout", I18n.t("command_palette.commands.scout_ai_chat"), I18n.t("command_palette.categories.navigate"), "sparkles", scout_path),
-      cmd("documents", I18n.t("command_palette.commands.documents"), I18n.t("command_palette.categories.navigate"), "file-text", documents_path),
+      cmd("files", I18n.t("command_palette.commands.files"), I18n.t("command_palette.categories.navigate"), "folder", files_path),
       # Workflows is gated off by default until it's production-ready (Features.workflows?).
       *(Features.workflows? ? [ cmd("workflows", I18n.t("command_palette.commands.workflows"), I18n.t("command_palette.categories.navigate"), "workflow", workflows_path) ] : []),
       cmd("email-scans", I18n.t("command_palette.commands.email_scans"), I18n.t("command_palette.categories.navigate"), "search", email_messages_path(inbox_settings: "accounts")),

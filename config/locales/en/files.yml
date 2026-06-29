@@ -29,11 +29,37 @@ en:
       files_section: Files
       manage_access: Manage access
       manage_access_locked: "Manage access · Private"
+      review_n: "Review %{count}"
+      ai_analyze: Analyze with AI
+      ai_analyze_hint: Extract and classify business documents (invoices, receipts…). Turn off to just store the file.
+      filters: Filters
+      filter_category: Category
+      filter_type: Type
+      filter_status: Status
+      filter_month: Month
+      filter_folder: Folder
+      filter_all_categories: All categories
+      filter_all_types: All types
+      filter_all_statuses: All statuses
+      filter_all_folders: All folders
+      filter_types_selected: "%{count} selected"
+      reanalyze_all: "Re-analyze all %{count}"
+      export: Export
+      export_confirm: Export the documents matching the current filters as a ZIP?
+      exports_heading: Recent exports
+      exports_col_date: Date
+      exports_col_status: Status
+      exports_col_documents: Documents
+      exports_col_download: Download
+      download_zip: Download ZIP
+      export_failed: Export failed
     uploads:
       create:
         no_files: Choose at least one file to upload.
         uploaded_one: File uploaded.
         uploaded_many: "%{count} files uploaded."
+        analyzed_one: File uploaded and queued for AI analysis.
+        analyzed_many: "%{count} files uploaded and queued for AI analysis."
         failed: "Upload failed: %{message}"
       destroy:
         deleted: File deleted.
