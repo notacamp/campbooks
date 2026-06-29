@@ -1,0 +1,9 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+<%= form_with model: @template, url: settings_email_templates_path, class: "space-y-6 max-w-2xl" do |f| %>
+  <%= render "form", f: f %>
+  <div class="flex items-center gap-3">
+    <%= f.submit t(".save"), class: "inline-flex items-center px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg shadow-sm cursor-pointer" %>
+    <%= link_to t(".cancel"), settings_email_templates_path, class: "text-sm text-gray-500 hover:text-gray-800" %>
+  </div>
+<% end %>

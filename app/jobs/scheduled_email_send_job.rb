@@ -16,15 +16,28 @@ class ScheduledEmailSendJob < ApplicationJob
 
   private
 
+  # Templated scheduled emails regenerate their document-template PDFs on every
+  # occurrence (so a recurring send always carries fresh attachments). Plain
+  # scheduled emails carry none.
+  def attachments_for(scheduled_email)
+    return [] unless scheduled_email.email_template
+
+    EmailTemplates::Applier.pdf_attachments(
+      template: scheduled_email.email_template,
+      variables: scheduled_email.template_context
+    )
+  end
+
   def process(scheduled_email)
     result = Emails::Sender.call(
       user: scheduled_email.created_by,
       email_account_id: scheduled_email.email_account_id,
       to_address: scheduled_email.to_address,
-      subject: scheduled_email.subject,
-      body: scheduled_email.body,
+      subject: scheduled_email.rendered_subject,
+      body: scheduled_email.rendered_body,
       cc_address: scheduled_email.cc_address.presence,
-      bcc_address: scheduled_email.bcc_address.presence
+      bcc_address: scheduled_email.bcc_address.presence,
+      attachments: attachments_for(scheduled_email)
     )
 
     if result.ok?
