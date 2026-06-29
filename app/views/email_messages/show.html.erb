@@ -6,7 +6,39 @@
 <% content_for :shortcuts_context, "show" %>
 
 <%= turbo_frame_tag "email_detail", class: "block h-full overflow-hidden" do %>
-  <div class="flex h-full" data-controller="scout-mobile email-mobile inbox-layout new-folder" data-email-mobile-breakpoint-value="1024" data-inbox-layout-board-src-value="<%= board_email_messages_path %>">
+  <div class="flex flex-col h-full" data-controller="scout-mobile email-mobile inbox-layout new-folder" data-email-mobile-breakpoint-value="1024" data-inbox-layout-board-src-value="<%= board_email_messages_path %>">
+    <%# Top band — spans the list + reading panes: the Skim ring tray (full width, so
+        the rings breathe instead of scrolling in a 256px column) plus the inbox's main
+        actions, Search and Compose, on the right where primary actions live. On mobile
+        it belongs to the list view (email-mobile `topband` target) so it hides while
+        reading a message. %>
+    <div data-email-mobile-target="topband" class="hidden lg:flex flex-col flex-shrink-0 border-b border-gray-200 bg-card">
+      <div class="flex items-center gap-3 px-4 py-2">
+        <div class="min-w-0 flex-1 max-w-2xl">
+          <%= render(Campbooks::EmailSearchBar.new(search_params: @search_params, folders: @folders || [], accounts: @accounts || [], tags: @all_tags || [])) %>
+        </div>
+        <%= render(Campbooks::Button.new(variant: :primary, size: :sm, href: new_email_message_path, class: "flex-shrink-0", title: t(".compose_label"), data: { turbo_frame: "_top" })) do %>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.931-8.931z"/></svg>
+          <span class="hidden sm:inline"><%= t(".compose_label") %></span>
+          <kbd class="ml-1 hidden sm:inline-flex h-[18px] min-w-[18px] items-center justify-center rounded border border-white/30 px-1 text-[10px] font-semibold leading-none text-white/70" aria-hidden="true">C</kbd>
+        <% end %>
+      </div>
+      <%# Skim ring tray — full width now. turbo_permanent + lazy so it persists across
+          email navigations and never blocks the inbox. %>
+      <%= turbo_frame_tag "skim_tray", src: skim_tray_path, loading: "lazy", class: "skim-compact block", data: { turbo_permanent: true } do %>
+        <div class="flex items-center gap-4 px-4 py-2.5" aria-hidden="true">
+          <% 5.times do %>
+            <div class="flex flex-col items-center gap-1.5">
+              <div class="h-12 w-12 animate-pulse rounded-full bg-gray-100 dark:bg-gray-800"></div>
+              <div class="h-2 w-9 animate-pulse rounded bg-gray-100 dark:bg-gray-800"></div>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+
+    <!-- Panes row: folder rail | thread list | reading pane | board -->
+    <div class="flex flex-1 min-h-0">
     <%# Desktop folder pane (lg+); the mobile chip bar (below) covers < lg. The pane's
         "+" and the chip bar's "+" both open this single shared New Folder dialog. %>
     <%= render(Campbooks::FolderPane.new(system_folders: @common_folders, custom_folders: @mail_folders, current_folder: @current_folder, document_counts: MailFolder.document_counts(@mail_folders))) %>
@@ -41,36 +73,8 @@
       <% unless @search_active || @current_group.present? || params[:folder_id].present? || params[:folder_name].present? %>
         <%= turbo_stream_from "inbox_feed_#{current_user.id}" %>
       <% end %>
-      <%# Skim ring tray — lazily loaded so it never blocks the inbox; preserved
-          across email navigations so it does not re-fetch on every click. %>
-      <%# skim-compact shrinks the rings for the dense inbox (see application.css);
-          home loads the same frame full-size. The visual box (separator + padding
-          + horizontal scroll) is drawn by `.skim-compact #skim_tray_content` ONLY
-          when the tray holds rings, so a tray with nothing to skim collapses to
-          nothing instead of leaving a stray bordered strip. shrink-0 stops the
-          flex-col list pane from squashing the rings out of view when populated. %>
-      <%= turbo_frame_tag "skim_tray", src: skim_tray_path, loading: "lazy", class: "skim-compact block shrink-0", data: { turbo_permanent: true } do %>
-        <div class="flex items-center gap-2.5 border-b border-gray-100 px-3 py-2.5" aria-hidden="true">
-          <% 4.times do %>
-            <div class="flex w-[3.25rem] flex-shrink-0 flex-col items-center gap-1.5">
-              <div class="h-10 w-10 animate-pulse rounded-full bg-gray-100 dark:bg-gray-800"></div>
-              <div class="h-2 w-8 animate-pulse rounded bg-gray-100 dark:bg-gray-800"></div>
-            </div>
-          <% end %>
-        </div>
-      <% end %>
-      <%= render(Campbooks::EmailSearchBar.new(search_params: @search_params, folders: @folders || [], accounts: @accounts || [], tags: @all_tags || [])) %>
-      <%# Compose — the inbox's primary action. A full-width near-black pill so it
-          reads as the clear next step (the Ember gradient stays reserved for Scout).
-          turbo_frame: "_top" breaks out of the email_detail frame to the compose page. %>
-      <div class="px-2.5 py-2 border-b border-gray-100">
-        <%= render(Campbooks::Button.new(variant: :primary, size: :sm, href: new_email_message_path, class: "w-full", title: t(".compose_label"), data: { turbo_frame: "_top" })) do %>
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.931-8.931z"/></svg>
-          <%= t(".compose_label") %>
-          <%# Key hint for the global "c" shortcut (email_shortcuts_controller). %>
-          <kbd class="ml-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded border border-white/30 px-1 text-[10px] font-semibold leading-none text-white/70" aria-hidden="true">C</kbd>
-        <% end %>
-      </div>
+      <%# Skim tray, Search and Compose now live in the content-spanning top band
+          above the panes (see top of this file). %>
       <div class="px-2.5 py-1.5 border-b border-gray-100 relative">
         <div class="flex items-center justify-between gap-1">
           <div class="flex items-center gap-1.5 min-w-0 flex-1">
@@ -385,6 +389,8 @@
         <%= render(Campbooks::Spinner.new(size: :md)) %>
       </div>
     <% end %>
+    </div>
+    <%# /panes row %>
 
 <!-- Scout mobile overlay backdrop -->
 <div data-scout-mobile-target="backdrop" data-action="click->scout-mobile#close"
