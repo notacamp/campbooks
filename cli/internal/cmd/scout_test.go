@@ -27,7 +27,7 @@ func TestPollForReply(t *testing.T) {
 	defer srv.Close()
 
 	c := client.New(srv.URL, &config.Auth{AccessToken: "t"}, nil)
-	reply, err := pollForReply(context.Background(), c, 7, 100, 5*time.Second)
+	reply, err := pollForReply(context.Background(), c, "7", "100", 5*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestPollForReplyFailed(t *testing.T) {
 	defer srv.Close()
 
 	c := client.New(srv.URL, &config.Auth{AccessToken: "t"}, nil)
-	if _, err := pollForReply(context.Background(), c, 7, 100, 5*time.Second); err == nil {
+	if _, err := pollForReply(context.Background(), c, "7", "100", 5*time.Second); err == nil {
 		t.Fatal("expected a failure error")
 	}
 }
@@ -58,7 +58,7 @@ func TestPollForReplyTimeout(t *testing.T) {
 
 	c := client.New(srv.URL, &config.Auth{AccessToken: "t"}, nil)
 	// Zero timeout → the deadline passes on the first empty poll.
-	if _, err := pollForReply(context.Background(), c, 7, 100, 0); err == nil {
+	if _, err := pollForReply(context.Background(), c, "7", "100", 0); err == nil {
 		t.Fatal("expected a timeout error")
 	}
 }

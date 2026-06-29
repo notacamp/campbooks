@@ -93,12 +93,12 @@ func requireSession() (*session, error) {
 // Identity is the GET /api/v1/me payload.
 type Identity struct {
 	User struct {
-		ID    int    `json:"id"`
+		ID    string `json:"id"`
 		Name  string `json:"name"`
 		Email string `json:"email"`
 	} `json:"user"`
 	Workspace struct {
-		ID   int    `json:"id"`
+		ID   string `json:"id"`
 		Name string `json:"name"`
 	} `json:"workspace"`
 	Scopes []string `json:"scopes"`

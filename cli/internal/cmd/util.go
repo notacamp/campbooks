@@ -27,6 +27,14 @@ func intField(m map[string]any, key string) int {
 	return 0
 }
 
+// stringField reads a JSON string field as a string.
+func stringField(m map[string]any, key string) string {
+	if s, ok := m[key].(string); ok {
+		return s
+	}
+	return ""
+}
+
 // readBody resolves a command body from --body or --body-file ("-" = stdin).
 func readBody(cmd *cobra.Command, body, bodyFile string) (string, error) {
 	if bodyFile == "" {
