@@ -36,9 +36,13 @@ jobs:
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
+          # The config uses the Pro-only `monorepo` feature (cli/ tag prefix + dir).
+          distribution: goreleaser-pro
           version: "~> v2"
           args: release --clean -f cli/.goreleaser.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # PAT with contents:write on notacamp/homebrew-tap (for the formula bump).
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          # goreleaser Pro license key (required by distribution: goreleaser-pro).
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
