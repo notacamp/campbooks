@@ -52,6 +52,16 @@ module Reminders
       # Never overwrite a reminder the user already confirmed/dismissed/snoozed.
       return reminder if reminder.persisted? && !reminder.pending?
 
+      # Cross-source soft-dedup: the same commitment arriving as an email body AND its
+      # PDF attachment fingerprints differently (source_id differs), so without this both
+      # would surface a card. Adopt the sibling already staged from the other source.
+      # NOTE: two extraction jobs racing can both pass this guard (no DB constraint) —
+      # accepted until a (workspace, reminder_type, due_at::date, amount_cents) unique
+      # index lands; in practice the document job lags the email job by seconds.
+      if !reminder.persisted? && (sibling = cross_source_sibling(reminder_type, due_at, item))
+        return sibling
+      end
+
       reminder.assign_attributes(
         workspace:     @workspace,
         source:        @source,
@@ -76,6 +86,23 @@ module Reminders
     rescue ActiveRecord::RecordInvalid => e
       Rails.logger.error("[Reminders::Builder] invalid reminder for #{@source.class}##{@source.id}: #{e.message}")
       nil
+    end
+
+    # A reminder for the same commitment already staged from a DIFFERENT source (e.g. the
+    # invoice email vs. its PDF). Same workspace + type + due date, not dismissed; matched
+    # on amount when the AI extracted one, else on the normalized title. nil ⇒ no sibling.
+    def cross_source_sibling(reminder_type, due_at, item)
+      scope = Reminder.where(workspace: @workspace, reminder_type: reminder_type)
+                      .where.not(status: :dismissed)
+                      .where("due_at::date = ?::date", due_at)
+      amount = parse_amount(item["amount_cents"])
+      if amount
+        scope.find_by(amount_cents: amount)
+      else
+        title_key = Emails::SubjectNormalizer.key(item["title"].to_s)
+        return nil if title_key.blank?
+        scope.where(amount_cents: nil).detect { |r| Emails::SubjectNormalizer.key(r.title) == title_key }
+      end
     end
 
     def parse_date(str)

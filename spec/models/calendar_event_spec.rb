@@ -136,4 +136,44 @@ RSpec.describe CalendarEvent, type: :model do
       expect(CalendarEvent.accessible_to(nil)).to be_empty
     end
   end
+
+  describe ".duplicate_for" do
+    let(:calendar) { create(:calendar) }
+    let(:email)    { create(:email_message) }
+
+    it "returns a non-cancelled event sourced from the email" do
+      event = create(:calendar_event, calendar: calendar, source_email_message: email)
+      expect(CalendarEvent.duplicate_for(email: email)).to eq(event)
+    end
+
+    it "ignores cancelled events" do
+      create(:calendar_event, :cancelled, calendar: calendar, source_email_message: email)
+      expect(CalendarEvent.duplicate_for(email: email)).to be_nil
+    end
+
+    it "returns nil for a nil email" do
+      expect(CalendarEvent.duplicate_for(email: nil)).to be_nil
+    end
+
+    it "returns nil when the email has no event" do
+      expect(CalendarEvent.duplicate_for(email: email)).to be_nil
+    end
+
+    it "matches only same-day events when a start_at is given" do
+      day1 = 2.days.from_now.change(hour: 10)
+      same_day = create(:calendar_event, calendar: calendar, source_email_message: email,
+                        start_at: day1, end_at: day1 + 1.hour)
+      other = 9.days.from_now.change(hour: 10)
+      create(:calendar_event, calendar: calendar, source_email_message: email,
+             start_at: other, end_at: other + 1.hour)
+
+      expect(CalendarEvent.duplicate_for(email: email, start_at: day1)).to eq(same_day)
+    end
+
+    it "returns the oldest event when several match" do
+      older = create(:calendar_event, calendar: calendar, source_email_message: email, created_at: 2.days.ago)
+      create(:calendar_event, calendar: calendar, source_email_message: email, created_at: 1.day.ago)
+      expect(CalendarEvent.duplicate_for(email: email)).to eq(older)
+    end
+  end
 end

@@ -32,6 +32,13 @@ major, minor, or patch change here.
 
 ### Fixed
 
+- **Scout no longer doubles up calendar events or reminders from the same email.**
+  Creating an event from an email is now idempotent — the reminder card, Scout's
+  "Create event" button, and repeated clicks resolve to a single event instead of
+  stacking duplicates — and Scout now sees the commitments already extracted from a
+  thread, so it acknowledges them rather than re-suggesting. An invoice that arrives as
+  both an email and its PDF attachment now stages one reminder, not two.
+
 - `document_templates` was missing from `db/schema.rb`, so fresh installs and CI
   databases (built via `schema:load`) never got the table — and because the load
   also marks the migration as applied, `db:migrate` wouldn't re-create it. This
