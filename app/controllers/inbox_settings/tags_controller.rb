@@ -5,8 +5,18 @@ module InboxSettings
     before_action :set_tag, only: [ :edit, :update, :destroy ]
 
     def index
-      @tags = Current.workspace.tags.order(:name).to_a
-      @tag_message_counts = EmailMessageTag.where(tag_id: @tags.map(&:id)).group(:tag_id).count
+      load_tag_groups
+    end
+
+    # Flip a label between visible and hidden. The decision is remembered on the
+    # tag (it survives re-syncs because classified labels are never re-classified),
+    # so this is how a user overrides an AI/provider hide — or hides a tag they
+    # don't want as a chip.
+    def toggle_hidden
+      @tag = Current.workspace.tags.find(params[:id])
+      @tag.update!(hidden: !@tag.hidden?)
+      load_tag_groups
+      # -> toggle_hidden.turbo_stream.erb
     end
 
     def new
@@ -56,6 +66,18 @@ module InboxSettings
 
     def set_tag
       @tag = Current.workspace.tags.find(params[:id])
+    end
+
+    # Visible tags, plus the hidden labels grouped by why they're hidden:
+    # provider system/category statuses vs everything else (AI low-value + any
+    # label the user hid by hand).
+    def load_tag_groups
+      tags = Current.workspace.tags
+      @visible_tags    = tags.visible.order(:name).to_a
+      @hidden_system   = tags.hidden_labels.where(kind: [ :system, :category ]).order(:name).to_a
+      @hidden_filtered = tags.hidden_labels.where.not(kind: [ :system, :category ]).order(:name).to_a
+      ids = (@visible_tags + @hidden_system + @hidden_filtered).map(&:id)
+      @tag_message_counts = EmailMessageTag.where(tag_id: ids).group(:tag_id).count
     end
 
     def tag_params
