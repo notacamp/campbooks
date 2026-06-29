@@ -139,5 +139,7 @@ cd cli
 go build ./... && go vet ./... && go test ./...
 ```
 
-Releases are cut from `cli/vX.Y.Z` tags (GoReleaser → GitHub Release + Homebrew
-tap), separate from the app's `vX.Y.Z` image releases.
+Releases are cut from `cli/vX.Y.Z` tags: the `release-cli` workflow runs
+`cli/scripts/release.sh`, which cross-compiles the binaries, publishes a GitHub
+Release on the tag, and updates the Homebrew tap — separate from the app's
+`vX.Y.Z` image releases.
