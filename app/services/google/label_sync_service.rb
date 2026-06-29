@@ -26,6 +26,7 @@ module Google
         tag.assign_attributes(name: name, color: color, source: :external,
                               workspace: @account.workspace, system_label: sys)
         tag.save!
+        Labels::ClassifyLabelJob.classify(tag)
       end
 
       @account.external_tags.where.not(external_label_id: google_label_ids).destroy_all
@@ -79,12 +80,16 @@ module Google
 
     def reconcile_assignments(tags)
       tags.each do |tag|
+        next if tag.hidden? # don't attach (or rate-limit on) hidden system/low-value labels
+
         reconcile_tag_assignments(tag)
         sleep(0.3)
       end
     end
 
     def reconcile_tag_assignments(tag)
+      return if tag.hidden? # never attach hidden labels to messages
+
       messages = @client.list_messages_by_label(tag.external_label_id, limit: 200)
       return if messages.empty?
 

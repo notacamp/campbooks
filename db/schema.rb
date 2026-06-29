@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_29_040002) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_29_050000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -1402,20 +1402,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_040002) do
   end
 
   create_table "tags", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.float "classification_confidence"
+    t.string "classification_reason", limit: 255
+    t.datetime "classified_at"
     t.string "color"
     t.datetime "created_at", null: false
     t.uuid "email_account_id"
     t.string "external_label_id"
     t.string "group_name"
+    t.boolean "hidden", default: false, null: false
+    t.integer "kind", default: 0, null: false
     t.string "name"
     t.integer "source", default: 0, null: false
     t.boolean "system_label", default: false, null: false
     t.datetime "updated_at", null: false
     t.uuid "workspace_id"
+    t.index ["classified_at"], name: "index_tags_on_unclassified", where: "(classified_at IS NULL)"
     t.index ["email_account_id", "external_label_id"], name: "idx_tags_on_account_and_external_label_id", unique: true, where: "(external_label_id IS NOT NULL)"
     t.index ["email_account_id", "name"], name: "idx_tags_on_account_and_name", unique: true, where: "(email_account_id IS NOT NULL)"
     t.index ["email_account_id"], name: "index_tags_on_email_account_id"
     t.index ["external_label_id"], name: "index_tags_on_external_label_id"
+    t.index ["hidden"], name: "index_tags_on_hidden", where: "(hidden = true)"
     t.index ["system_label"], name: "index_tags_on_system_label", where: "(system_label = true)"
     t.index ["workspace_id", "group_name"], name: "index_tags_on_workspace_id_and_group_name"
     t.index ["workspace_id"], name: "index_tags_on_workspace_id"

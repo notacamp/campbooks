@@ -16,6 +16,15 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Email labels are smarter and less noisy.** Labels synced from Gmail/Zoho are
+  now evaluated once on import: built-in provider statuses (Inbox, Unread,
+  Important, Gmail's category tabs like Updates/Promotions) and low-value labels
+  are recognised and kept out of your inbox, while the labels you actually use
+  (Invoices, Clients, …) stay. The decision is remembered per label — provider
+  system/noise labels are no longer attached to every message.
+
 ## [0.5.0] - 2026-06-29
 
 ### Added
