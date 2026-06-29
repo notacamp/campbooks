@@ -32,6 +32,10 @@ major, minor, or patch change here.
 
 ### Fixed
 
+- Documents list **month filter** now works. The month picker submits a single
+  `YYYY-MM` value, but the list, "Reanalyze all", and export were looking for a
+  separate `year` parameter that no form ever sends — so picking a month had no
+  effect. They now parse the picker value correctly.
 - `document_templates` was missing from `db/schema.rb`, so fresh installs and CI
   databases (built via `schema:load`) never got the table — and because the load
   also marks the migration as applied, `db:migrate` wouldn't re-create it. This
