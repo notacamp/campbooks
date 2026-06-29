@@ -1,0 +1,12 @@
+---
+en:
+  discussions:
+    scout:
+      # Posted by Scout into an email's discussion thread when it extracts a
+      # calendar event or reminders from that email. Markdown (rendered with safe
+      # links); %{url} points back to the created record.
+      calendar_event_created: "📅 I added **[%{title}](%{url})** to your calendar — %{at}."
+      reminders_found:
+        one: "🔔 I spotted a reminder in this email:"
+        other: "🔔 I spotted %{count} reminders in this email:"
+      reminder_line: "- **[%{title}](%{url})** — due %{due}"
