@@ -36,6 +36,18 @@ export function buildSegments(container, total, pos, hue) {
   }
 }
 
+// True while any full-screen Skim overlay (inbox or document) is open. The
+// overlays are plain role="dialog" panels with a toggled `hidden` class — NOT
+// native <dialog open> — so the window/document-level keyboard handlers can't
+// detect them the usual way and would otherwise also fire their shortcuts on the
+// inbox/feed behind the overlay. Those handlers consult this to stay silent while
+// Skim has the keyboard.
+export function skimOverlayOpen() {
+  return !!document.querySelector(
+    '[data-skim-overlay-target="panel"]:not(.hidden), [data-doc-skim-overlay-target="panel"]:not(.hidden)'
+  )
+}
+
 // Tint a full-screen viewer element's background to the current ring hue.
 export function tint(element, hue) {
   element.style.background = isDark()

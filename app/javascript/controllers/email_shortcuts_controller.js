@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { skimOverlayOpen } from "controllers/skim_utils"
 
 const EDITABLE_SELECTOR = "input, textarea, select, [contenteditable], [role=textbox]"
 
@@ -105,6 +106,11 @@ export default class extends Controller {
     // Respect the command palette
     const palette = document.querySelector(".command-palette-dialog[open]")
     if (palette) return true
+
+    // Defer to the Skim overlay: it's a role="dialog" panel (not a native
+    // <dialog open>), so its own shortcuts would otherwise also archive/reply on
+    // the inbox behind it. Stay silent while it has the keyboard.
+    if (skimOverlayOpen()) return true
 
     // Don't intercept typing in editable fields
     const el = document.activeElement
