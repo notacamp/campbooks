@@ -18,6 +18,12 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Email threads read like a conversation.** Messages in a thread now render as
+  light, directional chat bubbles — the ones you received on the left, the ones you
+  sent on the right — so it's clear at a glance who said what. Folded messages show
+  a one‑line preview, and long or wide HTML emails still scroll neatly inside their
+  bubble.
+
 - **Approve or dismiss Scout's reminders right in the thread** — when Scout spots a
   dated commitment in an email it now surfaces it in the discussion as *a potential
   reminder* with **Add to calendar** and **Dismiss** buttons, so you confirm it onto
@@ -45,6 +51,11 @@ major, minor, or patch change here.
 - **A more breathable inbox.** The thread list has more room to breathe — larger,
   more legible type, roomier rows, and clearer (but still calm) hover and selected
   states across all three densities. **Compact** mode's text is no longer tiny.
+
+- **Inbox top bar.** The Skim ring tray now spans the full width above the list and
+  reading panes, so the rings breathe instead of scrolling in a narrow column, and
+  the inbox's main actions — **Search** and **Compose** — move up to a top toolbar
+  where primary actions belong.
 
 ### Fixed
 

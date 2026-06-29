@@ -309,10 +309,10 @@
    a `.skim-compact` wrapper (the inbox's skim_tray frame) so the same tray
    content renders full-size on home and compact in the inbox, even though both
    share one live broadcast. ───────────────────────────────────────────────── */
-.skim-compact .skim-ring { width: 3.25rem; }
-.skim-compact .skim-ring__inner { height: 2.5rem; width: 2.5rem; }
-.skim-compact .skim-ring__icon { height: 1.125rem; width: 1.125rem; }
-.skim-compact .skim-ring__label { font-size: 10px; }
+.skim-compact .skim-ring { width: 4rem; }
+.skim-compact .skim-ring__inner { height: 3rem; width: 3rem; }
+.skim-compact .skim-ring__icon { height: 1.375rem; width: 1.375rem; }
+.skim-compact .skim-ring__label { font-size: 11px; }
 
 /* The inbox tray draws its frame (separator + padding + horizontal scroll) ONLY
    when it actually holds rings. `:has(> *)` is false for the empty
