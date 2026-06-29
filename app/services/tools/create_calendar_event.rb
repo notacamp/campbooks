@@ -42,10 +42,27 @@ module Tools
       # short delay lets the create write swap in the real provider id first, so the
       # type color can sync out. type_status defaults to pending → the job runs.
       EventClassificationJob.set(wait: 10.seconds).perform_later(event.id)
+
+      # Leave a trace in the email's discussion: Scout notes the event it just
+      # created, linking back to it. Best-effort — never blocks event creation.
+      announce_to_discussion(event)
       event
     end
 
     private
+
+    def announce_to_discussion(event)
+      return unless @email
+
+      Discussions::ScoutAnnouncer.announce(email_message: @email) do
+        I18n.t(
+          "discussions.scout.calendar_event_created",
+          title: event.title,
+          url: Rails.application.routes.url_helpers.calendar_event_path(event),
+          at: I18n.l(event.start_at, format: :at_short)
+        )
+      end
+    end
 
     # The user's primary writable calendar (or a specific one if passed), scoped
     # to accounts they can write to. nil ⇒ no calendar to create on.
