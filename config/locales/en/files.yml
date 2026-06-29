@@ -90,3 +90,10 @@ en:
         all_have_access: Everyone in the workspace already has access.
         select_placeholder: Choose a person…
         add_button: Add
+      file_link_picker:
+        button: Insert file link
+        title: Insert a file link
+        hint: Pick a file — a public link is created and inserted into your message.
+        loading: Loading files…
+        empty: No files to link yet.
+        insert: Insert

@@ -90,3 +90,10 @@ pt:
         all_have_access: Todos no espaço de trabalho já têm acesso.
         select_placeholder: Escolha uma pessoa…
         add_button: Adicionar
+      file_link_picker:
+        button: Inserir ligação a ficheiro
+        title: Inserir uma ligação a ficheiro
+        hint: Escolha um ficheiro — é criada e inserida uma ligação pública na sua mensagem.
+        loading: A carregar ficheiros…
+        empty: Ainda não há ficheiros para ligar.
+        insert: Inserir

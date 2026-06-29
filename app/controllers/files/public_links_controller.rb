@@ -25,6 +25,13 @@ module Files
       redirect_back fallback_location: files_path, success: t(".revoked")
     end
 
+    # File list for the composer's "Insert file link" modal (lazy turbo-frame).
+    def picker
+      @documents = Current.workspace.documents.accessible_to(Current.user).recent.limit(40).to_a
+      @authored_documents = Current.workspace.authored_documents.accessible_to(Current.user).recent.limit(40).to_a
+      render layout: false
+    end
+
     private
 
     # Resolve the file to share, scoped to what the user may access.

@@ -64,4 +64,14 @@ RSpec.describe "Public file links", type: :request do
       expect(response.body).to include("Visible body")
     end
   end
+
+  describe "GET /files/public_links/picker (composer file list)" do
+    before { sign_in(user) }
+
+    it "renders the workspace's accessible files" do
+      create(:document, :other, workspace: workspace)
+      get picker_files_public_links_path
+      expect(response).to have_http_status(:ok)
+    end
+  end
 end

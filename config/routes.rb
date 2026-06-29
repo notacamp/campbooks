@@ -426,8 +426,11 @@ Rails.application.routes.draw do
     resources :folders, only: [] do
       resource :share, only: [ :show, :update ], controller: "folder_shares"
     end
-    # Mint / revoke a public link for a file (Phase 3b).
-    resources :public_links, only: [ :create, :destroy ]
+    # Mint / revoke a public link for a file (Phase 3b); :picker lists files for
+    # the composer's "Insert file link" modal.
+    resources :public_links, only: [ :create, :destroy ] do
+      get :picker, on: :collection
+    end
   end
 
   # Public, unauthenticated file link — the unguessable token is the credential, so
