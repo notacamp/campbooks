@@ -18,6 +18,8 @@ class EmailMessage < ApplicationRecord
   # "filesystem" join, recorded on move via Tools::BulkMoveToFolder).
   has_many :folder_memberships, as: :folderable, dependent: :destroy
   has_many :mail_folders, through: :folder_memberships
+  has_many :task_email_links, dependent: :destroy
+  has_many :linked_tasks, through: :task_email_links, source: :task
 
   belongs_to :contact, optional: true
 

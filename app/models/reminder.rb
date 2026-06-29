@@ -38,14 +38,14 @@ class Reminder < ApplicationRecord
   scope :snoozed_due, -> { snoozed.where(snoozed_until: ..Time.current) }
 
   # Permission gate — mirror of EmailMessage.accessible_to / CalendarEvent.accessible_to.
-  # Scope to the user's workspace, then allow every Document-sourced reminder (documents
-  # are workspace-scoped, no finer gate) plus EmailMessage-sourced ones on an account the
-  # user may read. Fails closed: a nil user sees nothing.
+  # Scope to the user's workspace, then allow every Document- and Task-sourced reminder
+  # (both are workspace-scoped, no finer gate) plus EmailMessage-sourced ones on an account
+  # the user may read. Fails closed: a nil user sees nothing.
   scope :accessible_to, ->(user) {
     return none unless user
 
     where(workspace_id: user.workspace_id).where(
-      "reminders.source_type = 'Document' OR " \
+      "reminders.source_type IN ('Document', 'Task') OR " \
       "(reminders.source_type = 'EmailMessage' AND reminders.source_id IN (:email_ids))",
       email_ids: EmailMessage.accessible_to(user).select(:id)
     )

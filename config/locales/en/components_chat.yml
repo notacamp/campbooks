@@ -18,8 +18,10 @@ en:
       archive: Archive
       block_sender: Block sender
       create_event: Create calendar event
+      create_task: Create task
       draft_reply: Draft reply
       forward_to: Forward to %{address}
+      link_task: Link to task
       reclassify: Re-classify
       remove_tag_prefix: 'Remove tag: %{name}'
       remove_with_name: Remove %{name}

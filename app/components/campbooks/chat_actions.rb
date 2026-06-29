@@ -87,6 +87,8 @@ module Campbooks
       when "draft_reply"       then t(".draft_reply")
       when "forward_email"     then t(".forward_to", address: args["to_address"])
       when "create_calendar_event" then t(".create_event")
+      when "create_task_from_email" then t(".create_task")
+      when "link_task_to_email"    then t(".link_task")
       when "snooze"            then t(".snooze")
       when "unsnooze"          then t(".unsnooze")
       when "star_sender"       then t(".star_sender")
@@ -109,7 +111,7 @@ module Campbooks
         "text-gray-600 bg-gray-100 hover:bg-gray-200 border border-gray-300"
       when "reclassify"
         "text-accent-700 bg-accent-50 hover:bg-accent-100 border border-accent-200"
-      when "draft_reply", "forward_email", "create_calendar_event"
+      when "draft_reply", "forward_email", "create_calendar_event", "create_task_from_email", "link_task_to_email"
         "text-accent-700 bg-accent-50 hover:bg-accent-100 border border-accent-200"
       when "snooze"
         "text-yellow-700 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 dark:text-yellow-300 dark:bg-yellow-500/10 dark:border-yellow-500/25"

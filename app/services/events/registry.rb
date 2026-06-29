@@ -146,6 +146,26 @@ module Events
       entry("reminder.dismissed", "Reminder dismissed", group: :reminders, icon: :bell,
         description: "A reminder was dismissed", subject_type: "Reminder", payload_keys: %w[title]),
 
+      # --- Tasks ---------------------------------------------------------------
+      entry("task.created", "Task created", group: :tasks, icon: :check_square,
+        description: "A task was created (manually or extracted from email)", subject_type: "Task",
+        payload_keys: %w[title status ai_suggested]),
+      entry("task.status_changed", "Task status changed", group: :tasks, icon: :clock,
+        description: "A task moved to a new status", subject_type: "Task",
+        payload_keys: %w[title from to]),
+      entry("task.assigned", "Task assigned", group: :tasks, icon: :user,
+        description: "A task was assigned to a member", subject_type: "Task",
+        payload_keys: %w[title assignee_id]),
+      entry("task.completed", "Task completed", group: :tasks, icon: :check,
+        description: "A task was completed", subject_type: "Task",
+        payload_keys: %w[title]),
+      entry("task.archived", "Task archived", group: :tasks, icon: :archive,
+        description: "A task was archived", subject_type: "Task",
+        payload_keys: %w[title]),
+      entry("task.unarchived", "Task restored", group: :tasks, icon: :inbox,
+        description: "An archived task was restored", subject_type: "Task",
+        payload_keys: %w[title]),
+
       # --- Account / integrations ---------------------------------------------
       entry("email_account.connected", "Account connected", group: :account, icon: :plug,
         description: "An email account was connected", subject_type: "EmailAccount",

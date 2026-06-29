@@ -28,10 +28,54 @@ major, minor, or patch change here.
   documents** right in Files ("New document") and file them into folders, and **file
   emails into folders** too — so a folder can hold uploaded files, internal documents,
   and emails side by side. Each is listed in the folder and recorded in Activity.
+- **Tasks** — a new task-management module (opt-in via `ENABLE_TASKS`, gated by the
+  `tasks` plan entitlement). Create tasks manually or have Scout extract action items
+  from your email and documents (triaged in Skim, with the originating email and
+  Scout's reasoning shown). Move tasks through a drag-and-drop status board; assign
+  multiple workspace members; label them with the same tags as email; set due dates,
+  rich-text descriptions, and a linked deadline reminder; link tasks to emails (typed
+  relationships) and attach documents; archive or delete tasks; and discuss them in a
+  thread where Scout joins on `@scout`. Tasks publish domain events (`task.created`,
+  `task.status_changed`, `task.assigned`, `task.completed`, `task.archived`), appear in
+  the navigation, Skim, and Feed, and are exposed over the public REST API
+  (`tasks:read` / `tasks:write`).
+- **Scout notes events & reminders in the email discussion** — when a calendar
+  event is created from an email, or Scout extracts reminders from one, Scout now
+  posts a short message into that email's discussion thread linking back to the new
+  event/reminder, so the discussion is a running record of what Scout did with the
+  email. Reminder notes are limited to confident finds to keep the thread quiet.
+
+### Changed
+
+- **Native apps are sign-in-only** — the iOS/Android apps no longer offer in-app
+  account creation. The sign-in screen points new users to the web instead of the
+  in-app signup, and the registration flow is blocked in the native shell (invited
+  users can still finish onboarding in-app). This keeps web-based subscription
+  billing outside Apple/Google in-app purchase.
 
 ### Fixed
 
 - **Activity feed** — the "Pipelines" filter no longer failed to render its label.
+- **Scout no longer doubles up calendar events or reminders from the same email.**
+  Creating an event from an email is now idempotent — the reminder card, Scout's
+  "Create event" button, and repeated clicks resolve to a single event instead of
+  stacking duplicates — and Scout now sees the commitments already extracted from a
+  thread, so it acknowledges them rather than re-suggesting. An invoice that arrives as
+  both an email and its PDF attachment now stages one reminder, not two.
+- Documents list **month filter** now works. The month picker submits a single
+  `YYYY-MM` value, but the list, "Reanalyze all", and export were looking for a
+  separate `year` parameter that no form ever sends — so picking a month had no
+  effect. They now parse the picker value correctly.
+- `document_templates` was missing from `db/schema.rb`, so fresh installs and CI
+  databases (built via `schema:load`) never got the table — and because the load
+  also marks the migration as applied, `db:migrate` wouldn't re-create it. This
+  broke the document-templates feature on a new install when enabled. The table
+  is now in the schema (existing/upgraded databases already have it from the
+  migration).
+- **Skim keyboard shortcuts no longer leak to the screen behind it.** With a Skim
+  overlay open, pressing a key (e.g. `e` to archive, `c`, or the arrows) also fired
+  the matching inbox/feed shortcut underneath — archiving, composing, or navigating
+  the wrong thing. Skim now keeps the keyboard to itself while it's open.
 
 ## [0.4.0] - 2026-06-28
 

@@ -13,6 +13,7 @@ pt:
       files: Ficheiros
       pipelines: Pipelines
       reminders: Lembretes
+      tasks: Tarefas
     names:
       calendar_event_created: Evento de calendário criado
       calendar_event_deleted: Evento de calendário eliminado
@@ -52,5 +53,11 @@ pt:
       reminder_confirmed: Lembrete confirmado
       reminder_created: Lembrete criado
       reminder_dismissed: Lembrete dispensado
+      task_archived: Tarefa arquivada
+      task_assigned: Tarefa atribuída
+      task_completed: Tarefa concluída
+      task_created: Tarefa criada
+      task_status_changed: Estado da tarefa alterado
+      task_unarchived: Tarefa restaurada
     system_actor: Sistema
     time_ago: há %{time}

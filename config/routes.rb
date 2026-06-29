@@ -98,6 +98,38 @@ Rails.application.routes.draw do
     end
   end
 
+  # Tasks — actionable items (manual or AI-extracted) that move through a status
+  # board, carry assignees + labels, and link to emails. Gated by Features.tasks?
+  # and the :tasks entitlement (TasksController). Board + skim + email-linking
+  # routes are added in their respective phases.
+  resources :tasks do
+    member do
+      patch  :complete        # mark done (quick action)
+      patch  :move            # change status (status control + the board drag)
+      post   :assign          # update assignees
+      get    :email_picker    # search emails to link (turbo-frame)
+      post   :link_email      # link an existing email to this task
+      delete :unlink_email    # remove a task↔email link
+      get    :document_picker # search documents to attach (turbo-frame)
+      post   :attach_document # attach a workspace document
+      delete :detach_document # remove an attached document
+      post   :remind          # create a linked deadline reminder
+      patch  :accept          # suggested → todo (Skim triage)
+      patch  :dismiss         # suggested → cancelled (Skim triage)
+      patch  :archive         # soft-archive (hide without deleting)
+      patch  :unarchive       # restore an archived task
+    end
+    collection do
+      get :skim               # triage AI-suggested tasks
+      get :board              # status kanban
+    end
+
+    # Discussion thread (teammates + Scout on @scout).
+    resources :comments, only: [ :create ], controller: "tasks/comments" do
+      collection { get :poll }
+    end
+  end
+
   # Global search (Cmd+K command palette)
   get "search", to: "search#index"
 
@@ -522,6 +554,12 @@ Rails.application.routes.draw do
           post :dismiss
           post :snooze
         end
+      end
+
+      # Tasks: list/read, create, update, and complete (status transitions publish
+      # the same domain events as the web UI via Task#move_to_status!).
+      resources :tasks, only: [ :index, :show, :create, :update ] do
+        member { patch :complete }
       end
 
       # Custom folders (MailFolder) + filing documents into them. No provider-side

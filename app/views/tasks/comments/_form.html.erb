@@ -1,0 +1,7 @@
+<%= render(Campbooks::ChatForm.new(
+  url: task_comments_path(task),
+  form_id: "comment_form",
+  input_id: "comment_input",
+  placeholder: t(".placeholder"),
+  mention_candidates: mention_candidates_for_composer
+)) %>

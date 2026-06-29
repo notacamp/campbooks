@@ -74,12 +74,18 @@ jobs:
           PRERELEASE="${{ steps.version.outputs.prerelease }}"
           NOTES_FILE="${{ steps.notes.outputs.notes_file }}"
 
-          FLAGS="--target main --title \"v$VERSION\" --notes-file \"$NOTES_FILE\""
-          if [ "$PRERELEASE" = "true" ]; then
-            FLAGS="$FLAGS --prerelease"
-          fi
+          # Pass args directly. Building a flag string with embedded quotes and
+          # expanding it unquoted ($FLAGS) makes the quotes literal, so gh looked
+          # for a file literally named '"/tmp/release-notes.md"' and failed with
+          # "no such file or directory". $prerelease_flag is one word or empty.
+          prerelease_flag=""
+          [ "$PRERELEASE" = "true" ] && prerelease_flag="--prerelease"
 
           echo "Creating release v$VERSION (prerelease=$PRERELEASE)"
-          gh release create "v$VERSION" $FLAGS
+          gh release create "v$VERSION" \
+            --target main \
+            --title "v$VERSION" \
+            --notes-file "$NOTES_FILE" \
+            $prerelease_flag
 
           echo "✅ Release v$VERSION created — publish-image.yml will now build the image"

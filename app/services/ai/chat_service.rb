@@ -24,6 +24,10 @@ module Ai
         Ai::EmailChatService.new(email_thread)
       when :compose_chat
         Ai::ComposeChatService.new(thread)
+      when :task_chat
+        task = thread.contextable
+        return nil unless task.is_a?(Task)
+        Ai::TaskChatService.new(task, thread)
       else
         Ai::GlobalChatService.new(thread)
       end

@@ -93,5 +93,7 @@ es:
       password_label: Contraseña
       password_placeholder: Introduzca su contraseña
       sign_up: Crear una cuenta
+      signup_on_web_html: "¿Es nuevo en Campbooks? %{link}."
+      signup_on_web_link: Cree una cuenta en la web
       submit: Iniciar sesión
       tagline: La bandeja de entrada que se ordena sola.

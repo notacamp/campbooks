@@ -1,0 +1,39 @@
+<div class="mx-auto max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+  <header class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div class="flex flex-col gap-1">
+      <h1 class="text-xl font-semibold text-foreground"><%= t(".title") %></h1>
+      <p class="text-sm text-muted-foreground"><%= t(".subtitle") %></p>
+    </div>
+    <div class="flex items-center gap-2">
+      <%= render "view_toggle", current: :list %>
+      <%= render Campbooks::Button.new(href: new_task_path, variant: :primary, size: :sm) { t(".new") } %>
+    </div>
+  </header>
+
+  <% if @triage_count.positive? %>
+    <%= link_to skim_tasks_path,
+          class: "mb-4 flex items-center gap-2 rounded-lg border border-accent-200 bg-accent-50 px-4 py-2.5 text-sm font-medium text-accent-800 transition hover:bg-accent-100 dark:border-accent-900 dark:bg-accent-950/40 dark:text-accent-200" do %>
+      <%= t(".triage_banner", count: @triage_count) %>
+    <% end %>
+  <% end %>
+
+  <% filters = [ [ "", t(".all") ] ] + (Task::BOARD_STATUSES + %w[cancelled]).map { |s| [ s, t("activerecord.attributes.task.statuses.#{s}") ] } %>
+  <% filters << [ "archived", t(".archived") ] if @archived_count.to_i.positive? %>
+  <div class="mb-4 flex flex-wrap gap-1.5">
+    <% filters.each do |value, label| %>
+      <%= link_to label, tasks_path(status: value.presence),
+            class: class_names("rounded-full px-3 py-1 text-xs font-medium transition",
+              @status.to_s == value ? "bg-foreground text-background" : "bg-muted text-muted-foreground hover:bg-muted/70") %>
+    <% end %>
+  </div>
+
+  <% if @tasks.empty? %>
+    <%= render Campbooks::EmptyState.new(title: t(".empty_title"), description: t(".empty_body")) %>
+  <% else %>
+    <div class="divide-y divide-hair">
+      <% @tasks.each do |task| %>
+        <%= render Campbooks::Tasks::Row.new(task: task) %>
+      <% end %>
+    </div>
+  <% end %>
+</div>

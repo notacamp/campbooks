@@ -1,0 +1,227 @@
+<div class="mx-auto max-w-3xl px-4 py-6 sm:px-6 lg:px-8">
+  <%= link_to tasks_path, class: "mb-5 inline-flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground" do %>
+    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+    <%= t(".back") %>
+  <% end %>
+
+  <header class="mb-8">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div class="min-w-0">
+        <h1 class="text-xl font-semibold tracking-tight text-foreground"><%= @task.title %></h1>
+        <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+          <%= render Campbooks::Tasks::StatusBadge.new(status: @task.status) %>
+          <% if @task.due_at.present? %>
+            <span class="<%= @task.overdue? ? "font-medium text-red-600 dark:text-red-400" : "" %>"><%= l(@task.due_at, format: :at) %></span>
+          <% end %>
+          <span class="text-muted-foreground/70"><%= @task.created_by ? t(".created_by", name: @task.created_by.name) : t(".created_by_ai") %></span>
+        </div>
+      </div>
+
+      <div class="flex shrink-0 items-center gap-1.5">
+        <%= link_to t(".edit"), edit_task_path(@task), class: task_btn(:ghost) %>
+        <% if @task.due_at.present? %>
+          <%= button_to remind_task_path(@task), method: :post, data: { turbo: false }, class: task_btn(:ghost) do %>
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 7 3 9H3c0-2 3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg>
+            <%= @task.reminders.any? ? t(".reminder_set") : t(".remind") %>
+          <% end %>
+        <% end %>
+        <% unless @task.done? %>
+          <%= button_to t(".mark_done"), complete_task_path(@task), method: :patch, data: { turbo: false }, class: task_btn(:primary) %>
+        <% end %>
+      </div>
+    </div>
+
+    <% if @task.archived? %>
+      <div class="mt-4 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground"><%= t(".archived_notice") %></div>
+    <% end %>
+    <div class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+      <span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".status") %></span>
+      <%# Segmented control: clicking a segment submits the status change immediately. %>
+      <%= form_with url: move_task_path(@task), method: :patch, data: { turbo: false }, class: "inline-flex flex-wrap items-center gap-1 rounded-lg bg-muted/60 p-1" do %>
+        <% (Task::BOARD_STATUSES + %w[cancelled]).each do |s| %>
+          <% active = @task.status == s %>
+          <button type="submit" name="status" value="<%= s %>" aria-pressed="<%= active %>"
+                  class="<%= class_names("cursor-pointer rounded-md px-2.5 py-1 text-[13px] font-medium transition", active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground") %>">
+            <%= t("activerecord.attributes.task.statuses.#{s}") %>
+          </button>
+        <% end %>
+      <% end %>
+    </div>
+  </header>
+
+  <% if @task.ai_suggested? && @task.justification.present? %>
+    <div class="mb-8 flex items-start gap-2 rounded-xl bg-ember/5 px-3.5 py-2.5 text-sm text-foreground/80">
+      <svg class="mt-0.5 h-4 w-4 shrink-0 text-ember" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5l1.7 5.6L19.5 12l-5.8 1.4L12 19l-1.7-5.6L4.5 12l5.8-1.4z"/></svg>
+      <span><span class="font-medium text-foreground"><%= t(".ai_reasoning") %></span> <%= @task.justification %></span>
+    </div>
+  <% end %>
+
+  <div class="flex flex-col gap-8 lg:flex-row">
+    <div class="min-w-0 flex-1 space-y-8">
+      <section>
+        <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".description") %></h2>
+        <% if @task.description.present? %>
+          <div class="prose prose-sm max-w-none text-foreground"><%= sanitize @task.description %></div>
+        <% else %>
+          <p class="text-sm text-muted-foreground"><%= t(".no_description") %></p>
+        <% end %>
+      </section>
+
+      <section>
+        <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".linked_emails") %></h2>
+        <% if @task.source_email.present? || @task.task_email_links.any? %>
+          <div class="-mx-3">
+            <% if @task.source_email.present? %>
+              <%= link_to email_message_path(@task.source_email), class: "flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition hover:bg-muted" do %>
+                <span class="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".origin") %></span>
+                <span class="truncate text-foreground"><%= @task.source_email.subject.presence || @task.source_email.from_address %></span>
+              <% end %>
+            <% end %>
+            <% @task.task_email_links.includes(:email_message).each do |link| %>
+              <div class="group flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition hover:bg-muted">
+                <%= link_to email_message_path(link.email_message), class: "flex min-w-0 flex-1 items-center gap-2" do %>
+                  <span class="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"><%= t("activerecord.attributes.task_email_link.relationships.#{link.relationship}") %></span>
+                  <span class="truncate text-foreground"><%= link.email_message.subject.presence || link.email_message.from_address %></span>
+                <% end %>
+                <%= button_to unlink_email_task_path(@task, link_id: link.id), method: :delete, data: { turbo: false },
+                      class: "shrink-0 rounded p-1 text-muted-foreground opacity-0 transition hover:text-red-600 group-hover:opacity-100",
+                      form: { "aria-label": t(".unlink") } do %>
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-sm text-muted-foreground"><%= t(".no_linked_emails") %></p>
+        <% end %>
+
+        <details id="task_link_details" class="mt-2">
+          <summary class="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-medium text-muted-foreground transition hover:text-foreground">
+            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            <%= t(".add_email") %>
+          </summary>
+          <%= form_with url: email_picker_task_path(@task), method: :get, data: { turbo_frame: "task_email_picker" }, class: "mt-2 flex items-center gap-2" do %>
+            <input type="search" name="q" placeholder="<%= t("tasks.email_picker.search_placeholder") %>"
+                   class="h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-foreground focus:outline-none" />
+            <button type="submit" class="<%= task_btn(:outline) %>"><%= t("tasks.email_picker.link") %></button>
+          <% end %>
+          <%= turbo_frame_tag "task_email_picker" %>
+        </details>
+      </section>
+
+      <section>
+        <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".documents") %></h2>
+        <% if @task.task_documents.any? %>
+          <div class="-mx-3">
+            <% @task.task_documents.includes(:document).each do |attachment| %>
+              <div class="group flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition hover:bg-muted">
+                <%= link_to document_path(attachment.document), class: "flex min-w-0 flex-1 items-center gap-2" do %>
+                  <svg class="h-4 w-4 shrink-0 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+                  <span class="truncate text-foreground"><%= attachment.document.display_title %></span>
+                <% end %>
+                <%= button_to detach_document_task_path(@task, link_id: attachment.id), method: :delete, data: { turbo: false },
+                      class: "shrink-0 rounded p-1 text-muted-foreground opacity-0 transition hover:text-red-600 group-hover:opacity-100",
+                      form: { "aria-label": t(".detach") } do %>
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-sm text-muted-foreground"><%= t(".no_documents") %></p>
+        <% end %>
+
+        <details id="task_document_details" class="mt-2">
+          <summary class="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-medium text-muted-foreground transition hover:text-foreground">
+            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            <%= t(".add_document") %>
+          </summary>
+          <%= form_with url: document_picker_task_path(@task), method: :get, data: { turbo_frame: "task_document_picker" }, class: "mt-2 flex items-center gap-2" do %>
+            <input type="search" name="q" placeholder="<%= t("tasks.document_picker.search_placeholder") %>"
+                   class="h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-foreground focus:outline-none" />
+            <button type="submit" class="<%= task_btn(:outline) %>"><%= t("tasks.document_picker.attach") %></button>
+          <% end %>
+          <%= turbo_frame_tag "task_document_picker" %>
+        </details>
+      </section>
+
+      <section>
+        <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".activity") %></h2>
+        <% if @activity.any? %>
+          <div class="-mx-3 divide-y divide-hair">
+            <% @activity.each do |event| %>
+              <div class="px-3"><%= render Campbooks::Activity::EventRow.new(event: event) %></div>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-sm text-muted-foreground"><%= t(".no_activity") %></p>
+        <% end %>
+      </section>
+
+      <div class="flex items-center gap-4 pt-2">
+        <% if @task.archived? %>
+          <%= button_to t(".unarchive"), unarchive_task_path(@task), method: :patch,
+                class: "cursor-pointer text-sm font-medium text-foreground transition hover:underline" %>
+        <% else %>
+          <%= button_to t(".archive"), archive_task_path(@task), method: :patch,
+                class: "cursor-pointer text-sm font-medium text-muted-foreground transition hover:text-foreground" %>
+        <% end %>
+        <%= button_to t(".delete"), task_path(@task), method: :delete,
+              class: "cursor-pointer text-sm font-medium text-red-600 transition hover:text-red-700 dark:text-red-400",
+              form: { data: { turbo_confirm: t(".delete_confirm") } } %>
+      </div>
+    </div>
+
+    <aside class="w-full space-y-6 lg:w-56 lg:shrink-0">
+      <section>
+        <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".assignees") %></h2>
+        <%= form_with url: assign_task_path(@task), method: :post, data: { turbo: false }, class: "space-y-2.5" do %>
+          <% if @members.any? %>
+            <%= hidden_field_tag "assignee_ids[]", "" %>
+            <% @members.each do |member| %>
+              <%= render Campbooks::Checkbox.new("assignee_ids[]", label: member.name, value: member.id, checked: @task.assignee_ids.include?(member.id)) %>
+            <% end %>
+            <button type="submit" class="<%= task_btn(:outline) %>"><%= t(".update") %></button>
+          <% else %>
+            <p class="text-sm text-muted-foreground"><%= t(".no_assignees") %></p>
+          <% end %>
+        <% end %>
+      </section>
+
+      <section>
+        <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".labels") %></h2>
+        <% if @task.tags.any? %>
+          <div class="flex flex-wrap gap-1.5">
+            <% @task.tags.each do |tag| %>
+              <span class="inline-flex items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-xs text-foreground">
+                <span class="inline-block h-2 w-2 rounded-full" style="background-color: <%= tag.color %>"></span>
+                <%= tag.name %>
+              </span>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-sm text-muted-foreground"><%= t(".no_labels") %></p>
+        <% end %>
+      </section>
+    </aside>
+  </div>
+
+  <section class="mt-10" data-controller="chat-input">
+    <%= turbo_stream_from @task %>
+    <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".discussion") %></h2>
+    <% comments = @task.agent_messages.chronological.to_a %>
+    <div class="overflow-hidden rounded-xl border border-border">
+      <div id="comments_list" data-chat-input-target="list" class="divide-y divide-hair">
+        <% comments.each do |comment| %>
+          <%= render "tasks/comments/comment", comment: comment, task: @task %>
+        <% end %>
+        <% if comments.empty? %>
+          <div id="discussion_empty" class="px-4 py-10 text-center text-sm text-muted-foreground"><%= t(".discussion_empty") %></div>
+        <% end %>
+      </div>
+      <div class="border-t border-border p-3">
+        <%= render "tasks/comments/form", task: @task %>
+      </div>
+    </div>
+  </section>
+</div>

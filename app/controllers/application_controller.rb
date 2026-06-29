@@ -16,7 +16,7 @@ class ApplicationController < ActionController::Base
   before_action :redirect_to_onboarding_if_incomplete
 
   helper_method :current_user, :self_hosted?, :signup_mode, :public_signup_allowed?, :beta_code_required?,
-                :workflows_enabled?, :email_board_enabled?, :microsoft_enabled?, :document_templates_enabled?, :ai_provider_available?,
+                :workflows_enabled?, :email_board_enabled?, :microsoft_enabled?, :document_templates_enabled?, :tasks_enabled?, :ai_provider_available?,
                 :show_beta_banner?, :current_entitlements
 
   private
@@ -83,6 +83,10 @@ class ApplicationController < ActionController::Base
     Features.document_templates?
   end
 
+  def tasks_enabled?
+    Features.tasks?
+  end
+
   # 404 a request for a feature gated off by a readiness flag (Features.*). Used
   # as a before_action by the controllers behind one. A 404 (rather than a
   # redirect) keeps a disabled feature from advertising its own existence.
@@ -96,6 +100,10 @@ class ApplicationController < ActionController::Base
 
   def require_document_templates_enabled
     head :not_found unless Features.document_templates?
+  end
+
+  def require_tasks_enabled
+    head :not_found unless Features.tasks?
   end
 
   # ── Signup gating (see config/initializers/registration.rb) ──

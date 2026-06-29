@@ -1,0 +1,11 @@
+<%# Padding here (not the parent loop) so a freshly-appended comment matches the
+    reloaded layout. Task comments have no inline tool actions, so tool_url_builder
+    is nil. %>
+<div class="px-4 py-3">
+  <%= render(Campbooks::ChatMessage.new(
+    message: comment,
+    context: :task_chat,
+    layout: :comments,
+    tool_url_builder: nil
+  )) %>
+</div>

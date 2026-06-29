@@ -44,6 +44,15 @@ pt:
         overdue: Em atraso
         today: Hoje
         tomorrow: Amanhã
+      task_card:
+        complete: Concluir
+        dismiss: Dispensar
+        in_days:
+          one: Entrega em %{count} dia
+          other: Entrega em %{count} dias
+        overdue: Em atraso
+        today: Entrega hoje
+        tomorrow: Entrega amanhã
       reply_reminder_card:
         aged:
           one: "%{count} dia, sem resposta"
@@ -88,6 +97,7 @@ pt:
         sincronizar automaticamente.
       reminder_dismissed: Lembrete dispensado.
       restored: Reposto.
+      task_completed: "Tarefa concluída: %{title}"
       unsupported: Essa ação não é suportada aqui.
   home:
     index:
