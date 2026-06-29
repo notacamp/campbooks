@@ -20,6 +20,15 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Desktop app (macOS, Windows, Linux)** — a native desktop build (Tauri) that wraps
+  the Campbooks web app in an OS window, the desktop twin of the iOS/Android apps. It
+  sends the same `Hotwire Native` signal so the app gets the native treatment, and
+  reuses the existing `campbooks://` OAuth handoff — provider sign-in opens in the
+  system browser and hands back through the existing server callbacks, so no
+  provider-console changes are needed. Lives under `native/desktop/`; cross-platform
+  installers are built by the `desktop-release` workflow on a `desktop-v*` tag. Ships
+  unsigned for now (code signing and auto-update are wired but dormant — see
+  `native/desktop/README.md`).
 - **Files** — a native file area in the main nav for keeping your documents and
   files organized. Upload any file, create folders, browse a folder, and move files
   between folders. Files uploaded here are stored as-is — they're not run through
