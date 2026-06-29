@@ -189,6 +189,8 @@ Rails.application.routes.draw do
 
   resources :zoho_drive_accounts, only: [ :new, :create, :destroy ]
 
+  resources :scheduled_emails
+
   resources :workflows do
     member do
       post :toggle
@@ -262,6 +264,10 @@ Rails.application.routes.draw do
       member { post :regenerate }
     end
 
+    resources :email_templates, except: [ :show ] do
+      member { post :regenerate }
+    end
+
     namespace :integrations do
       root to: "index#show"
       resource :notion, only: [ :show, :update ], controller: "notion"
@@ -279,6 +285,12 @@ Rails.application.routes.draw do
 
   resources :document_templates, only: [] do
     member { get :fill; post :preview; post :send_email }
+  end
+
+  # Composer-facing email-template surface: picker list, variables fill form, and
+  # the JSON apply endpoint the composer folds into the open compose form.
+  resources :email_templates, only: [ :index ] do
+    member { get :fill_form; post :apply }
   end
 
   # Inbox settings — the gear-icon management modal on the email page. Each
@@ -445,7 +457,47 @@ Rails.application.routes.draw do
           resources :messages, only: [ :index, :create ], controller: "scout_messages"
         end
       end
+
+      # Scheduled (and recurring) email sends. destroy = cancel (status only).
+      resources :scheduled_emails, only: [ :index, :show, :create, :update, :destroy ]
+
+      # Calendar events. Writes ride the same provider write-through job as the web.
+      resources :calendar_events, only: [ :index, :show, :create, :update, :destroy ] do
+        member { post :rsvp }
+      end
+
+      # Email templates. `apply` renders subject/body + PDFs to JSON (no send).
+      resources :email_templates, only: [ :index, :show, :create, :update, :destroy ] do
+        member { post :apply }
+      end
+
+      # Document templates. `render_pdf` fills→PDF (streamed); `send_email` mails it.
+      resources :document_templates, only: [ :index, :show, :create, :update, :destroy ] do
+        member do
+          post :render_pdf
+          post :send_email
+        end
+      end
+
+      # AI-extracted reminders. Read + state transitions only (no manual create).
+      resources :reminders, only: [ :index, :show ] do
+        member do
+          post :confirm
+          post :dismiss
+          post :snooze
+        end
+      end
+
+      # Custom folders (MailFolder) + filing documents into them. No provider-side
+      # folder create/rename over the API (per-account side effects).
+      resources :folders, only: [ :index, :show ], controller: "folders"
+      resources :folder_memberships, only: [ :create, :destroy ]
     end
+
+    # MCP (Model Context Protocol) JSON-RPC endpoint. Protocol-versioned via the
+    # `initialize` handshake, not URL-versioned, so it sits beside v1 (and the
+    # /api/oauth token endpoint), not under it. Same bearer-token auth.
+    post "mcp", to: "mcp#create"
   end
 
   namespace :oauth do

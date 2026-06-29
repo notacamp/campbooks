@@ -117,6 +117,12 @@ pt:
           manager: Gestor
           owner: Proprietário
           viewer: Visualizador
+      email_template:
+        ai_statuses:
+          completed: Pronto
+          failed: Falhado
+          pending: Rascunho
+          processing: A gerar
       email_message:
         ai_priorities:
           high: Alta

@@ -14,7 +14,6 @@ class Workspace < ApplicationRecord
   has_many :people, dependent: :restrict_with_error
   has_many :agent_threads, dependent: :destroy
   has_many :exports, dependent: :destroy
-  has_many :document_templates, dependent: :destroy
   has_many :workflows, dependent: :destroy
   has_many :connections, dependent: :destroy
   has_many :feed_items, dependent: :delete_all
@@ -22,6 +21,9 @@ class Workspace < ApplicationRecord
   has_many :bug_reports, dependent: :destroy
   has_many :reminders, dependent: :destroy
   has_many :mail_folders, dependent: :destroy
+  has_many :scheduled_emails, dependent: :restrict_with_error
+  has_many :document_templates, dependent: :destroy
+  has_many :email_templates, dependent: :destroy
 
   has_many :invitations, dependent: :destroy
 

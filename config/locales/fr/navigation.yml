@@ -10,6 +10,7 @@ fr:
         account: Compte
         ai_providers_and_services: Fournisseurs et services IA
         api_access: Accès API
+        email_templates: "Modèles d'e-mail"
         general: Général
         integrations: Intégrations
         members: Membres

@@ -47,6 +47,7 @@ en:
       placeholder_body: Write your message...
       placeholder_cc: Add CC...
       placeholder_to: Search contacts or type email...
+      schedule: Schedule
       send: Send
       signature_default: "%{name} (default)"
       signature_preview_label: Signature
@@ -77,6 +78,12 @@ en:
       never_synced: Not synced yet
       synced_ago: Synced %{time} ago
       syncing: Syncing…
+    email_template_picker:
+      button: Use template
+      button_aria: Insert an email template
+      title: Use an email template
+      subtitle: Pick a template to fill in and insert into your email.
+      close: Close
     email_account_sharing:
       add_button: Add
       add_section_title: Add someone

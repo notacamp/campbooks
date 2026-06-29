@@ -14,8 +14,8 @@ class DocumentsController < ApplicationController
     documents = documents.by_ai_status(params[:ai_status])
     documents = documents.in_folder(params[:folder_id]) if params[:folder_id].present?
 
-    if params[:year].present? && params[:month].present?
-      documents = documents.for_month(params[:year].to_i, params[:month].to_i)
+    if (year_month = month_filter)
+      documents = documents.for_month(*year_month)
     end
 
     @reprocessable_count = documents.rewhere(review_status: :pending, ai_status: [ :pending, :completed, :failed ]).count
@@ -208,8 +208,8 @@ class DocumentsController < ApplicationController
     documents = documents.by_type(params[:type]) if params[:type].present?
     documents = documents.by_category(params[:category]) if params[:category].present?
 
-    if params[:year].present? && params[:month].present?
-      documents = documents.for_month(params[:year].to_i, params[:month].to_i)
+    if (year_month = month_filter)
+      documents = documents.for_month(*year_month)
     end
 
     documents = documents.reprocessable
@@ -227,18 +227,13 @@ class DocumentsController < ApplicationController
   end
 
   def export
-    year, month = nil
-    if params[:month].present?
-      date = Date.parse("#{params[:month]}-01")
-      year = date.year.to_s
-      month = date.month.to_s
-    end
+    year, month = month_filter
 
     filters = {
       "type" => params[:type].presence,
       "category" => params[:category].presence,
-      "year" => year,
-      "month" => month
+      "year" => year&.to_s,
+      "month" => month&.to_s
     }.compact
 
     export = Current.workspace.exports.create!(status: :pending, filters: filters)
@@ -296,6 +291,19 @@ class DocumentsController < ApplicationController
   end
 
   private
+
+  # The month picker (<input type="month">) submits a single "YYYY-MM" value, so
+  # parse it into the [year, month] integer pair `for_month` expects. Returns nil
+  # when absent or unparseable. Shared by the list, the reanalyze-all action and
+  # the export so the month filter behaves identically everywhere.
+  def month_filter
+    return if params[:month].blank?
+
+    date = Date.parse("#{params[:month]}-01")
+    [ date.year, date.month ]
+  rescue ArgumentError
+    nil
+  end
 
   def set_document
     @document = Current.workspace.documents.includes(:classification).find(params[:id])
