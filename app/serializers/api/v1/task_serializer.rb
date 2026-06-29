@@ -21,6 +21,7 @@ module Api
           due_at:        @task.due_at&.iso8601,
           all_day:       @task.all_day,
           completed_at:  @task.completed_at&.iso8601,
+          archived_at:   @task.archived_at&.iso8601,
           ai_suggested:  @task.ai_suggested,
           source_type:   @task.source_type,
           source_id:     @task.source_id,

@@ -116,6 +116,8 @@ Rails.application.routes.draw do
       post   :remind          # create a linked deadline reminder
       patch  :accept          # suggested → todo (Skim triage)
       patch  :dismiss         # suggested → cancelled (Skim triage)
+      patch  :archive         # soft-archive (hide without deleting)
+      patch  :unarchive       # restore an archived task
     end
     collection do
       get :skim               # triage AI-suggested tasks

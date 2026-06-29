@@ -126,6 +126,12 @@ module Events
       entry("task.completed", "Task completed", group: :tasks, icon: :check,
         description: "A task was completed", subject_type: "Task",
         payload_keys: %w[title]),
+      entry("task.archived", "Task archived", group: :tasks, icon: :archive,
+        description: "A task was archived", subject_type: "Task",
+        payload_keys: %w[title]),
+      entry("task.unarchived", "Task restored", group: :tasks, icon: :inbox,
+        description: "An archived task was restored", subject_type: "Task",
+        payload_keys: %w[title]),
 
       # --- Account / integrations ---------------------------------------------
       entry("email_account.connected", "Account connected", group: :account, icon: :plug,

@@ -24,10 +24,11 @@ major, minor, or patch change here.
   Scout's reasoning shown). Move tasks through a drag-and-drop status board; assign
   multiple workspace members; label them with the same tags as email; set due dates,
   rich-text descriptions, and a linked deadline reminder; link tasks to emails (typed
-  relationships) and attach documents; and discuss them in a thread where Scout joins
-  on `@scout`. Tasks publish domain events (`task.created`, `task.status_changed`,
-  `task.assigned`, `task.completed`), appear in the navigation, Skim, and Feed, and are
-  exposed over the public REST API (`tasks:read` / `tasks:write`).
+  relationships) and attach documents; archive or delete tasks; and discuss them in a
+  thread where Scout joins on `@scout`. Tasks publish domain events (`task.created`,
+  `task.status_changed`, `task.assigned`, `task.completed`, `task.archived`), appear in
+  the navigation, Skim, and Feed, and are exposed over the public REST API
+  (`tasks:read` / `tasks:write`).
 
 ### Fixed
 

@@ -7,22 +7,25 @@ class TasksController < ApplicationController
 
   before_action :require_authentication
   before_action :require_tasks_enabled
-  before_action :set_task, only: %i[show edit update destroy complete move assign email_picker link_email unlink_email document_picker attach_document detach_document remind accept dismiss]
+  before_action :set_task, only: %i[show edit update destroy archive unarchive complete move assign email_picker link_email unlink_email document_picker attach_document detach_document remind accept dismiss]
   before_action :load_collections, only: %i[show new create edit update]
 
   # The live work the user cares about: due-date first (nulls last), then most
   # recently touched. AI-suggested tasks are hidden here — they're triaged in Skim.
   def index
     base = Task.accessible_to(current_user)
-    @counts = base.group(:status).count
+    @counts = base.not_archived.group(:status).count
     @triage_count = @counts["suggested"] || 0
+    @archived_count = base.archived.count
 
     @status = params[:status].presence
     scope = base.includes(:assignees, :tags, :created_by)
-    scope = if @status && Task.statuses.key?(@status)
-      scope.where(status: @status)
+    scope = if @status == "archived"
+      scope.archived
+    elsif @status && Task.statuses.key?(@status)
+      scope.not_archived.where(status: @status)
     else
-      scope.where.not(status: :suggested)
+      scope.not_archived.where.not(status: :suggested)
     end
 
     @tasks = scope.order(Arel.sql("due_at ASC NULLS LAST, updated_at DESC"))
@@ -67,6 +70,17 @@ class TasksController < ApplicationController
     redirect_to tasks_path, success: t(".deleted")
   end
 
+  # Soft-archive: hide the task from the active lists/board/feed without deleting it.
+  def archive
+    @task.archive!(by: current_user)
+    redirect_to @task, success: t(".archived")
+  end
+
+  def unarchive
+    @task.unarchive!(by: current_user)
+    redirect_to @task, success: t(".unarchived")
+  end
+
   # Quick "mark done" (feed / skim / index / detail).
   def complete
     @task.move_to_status!(:done, by: current_user)
@@ -102,7 +116,7 @@ class TasksController < ApplicationController
 
   # Status kanban: the board columns with their tasks. Drag-to-move posts to #move.
   def board
-    scope = Task.accessible_to(current_user).where(status: Task::BOARD_STATUSES).includes(:assignees, :tags)
+    scope = Task.accessible_to(current_user).not_archived.where(status: Task::BOARD_STATUSES).includes(:assignees, :tags)
     grouped = scope.group_by(&:status)
     @columns = Task::BOARD_STATUSES.map do |status|
       {

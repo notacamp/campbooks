@@ -64,6 +64,8 @@ es:
   tasks:
     accept:
       accepted: Tarea guardada.
+    archive:
+      archived: Tarea archivada.
     assign:
       assigned: Responsables actualizados.
     attach_document:
@@ -94,6 +96,7 @@ es:
       search_placeholder: Busca tu correo por asunto…
     index:
       all: Todas
+      archived: Archivadas
       board_view: Tablero
       empty_body: Crea una tarea, o deja que Scout extraiga acciones de tu correo.
       empty_title: "Aún sin tareas"
@@ -121,6 +124,8 @@ es:
       add_document: Adjuntar un documento
       add_email: Vincular un correo
       ai_reasoning: "Scout marcó esto:"
+      archive: Archivar
+      archived_notice: Esta tarea está archivada. Está oculta en tus listas activas.
       assignees: Responsables
       back: Todas las tareas
       created_by: Creada por %{name}
@@ -149,6 +154,7 @@ es:
       reminder_set: Recordatorio establecido
       reopen: Reabrir
       status: Estado
+      unarchive: Restaurar
       unlink: Desvincular
       update: Actualizar
     skim:
@@ -163,6 +169,8 @@ es:
       subtitle: Scout extrajo estas acciones de tu correo. Quédate con las que importen.
       title: Tareas sugeridas
       why: "Por qué esto es una tarea:"
+    unarchive:
+      unarchived: Tarea restaurada.
     unlink_email:
       unlinked: Correo desvinculado.
     update:

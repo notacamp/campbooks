@@ -585,7 +585,8 @@ Scoped to the acting user's workspace.
 ### `GET /api/v1/tasks` — list (scope `tasks:read`)
 
 Filter by `status` (`suggested`/`todo`/`in_progress`/`blocked`/`done`/`cancelled`)
-and `assignee_id`, plus `page`/`per_page`. Ordered by `created_at` descending.
+and `assignee_id` (and `archived=true` to list archived tasks instead of active
+ones), plus `page`/`per_page`. Ordered by `created_at` descending.
 
 ```json
 {
@@ -596,7 +597,7 @@ and `assignee_id`, plus `page`/`per_page`. Ordered by `created_at` descending.
       "description": "<p>Pull the numbers and email the deck.</p>",
       "status": "in_progress", "priority": "high",
       "due_at": "2026-07-01T09:00:00Z", "all_day": false,
-      "completed_at": null, "ai_suggested": false,
+      "completed_at": null, "archived_at": null, "ai_suggested": false,
       "source_type": null, "source_id": null,
       "created_by_id": "1f2e…", "assignee_ids": ["9a8b…"], "tag_ids": ["3c4d…"],
       "created_at": "2026-06-29T02:13:00Z", "updated_at": "2026-06-29T02:16:00Z"

@@ -32,7 +32,7 @@ module Feed
       end
 
       def still_valid?(_item, task)
-        task.present? && task.active?
+        task.present? && task.active? && !task.archived?
       end
 
       private

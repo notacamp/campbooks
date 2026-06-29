@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_29_020000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_29_030000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -1442,6 +1442,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_020000) do
   create_table "tasks", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.boolean "ai_suggested", default: false, null: false
     t.boolean "all_day", default: false, null: false
+    t.datetime "archived_at"
     t.datetime "completed_at"
     t.float "confidence", default: 0.0, null: false
     t.datetime "created_at", null: false
@@ -1462,6 +1463,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_020000) do
     t.index ["created_by_id"], name: "index_tasks_on_created_by_id"
     t.index ["extraction_fingerprint"], name: "index_tasks_on_fingerprint", unique: true, where: "(extraction_fingerprint IS NOT NULL)"
     t.index ["source_type", "source_id"], name: "index_tasks_on_source"
+    t.index ["workspace_id", "archived_at"], name: "index_tasks_on_workspace_id_and_archived_at"
     t.index ["workspace_id", "status", "due_at"], name: "index_tasks_on_workspace_status_due"
     t.index ["workspace_id"], name: "index_tasks_on_workspace_id"
   end

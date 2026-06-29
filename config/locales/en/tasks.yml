@@ -64,6 +64,8 @@ en:
   tasks:
     accept:
       accepted: Task kept.
+    archive:
+      archived: Task archived.
     assign:
       assigned: Assignees updated.
     attach_document:
@@ -94,6 +96,7 @@ en:
       search_placeholder: Search your email by subject…
     index:
       all: All
+      archived: Archived
       board_view: Board
       empty_body: Create a task, or let Scout pull action items out of your email.
       empty_title: No tasks yet
@@ -121,6 +124,8 @@ en:
       add_document: Attach a document
       add_email: Link an email
       ai_reasoning: "Scout flagged this:"
+      archive: Archive
+      archived_notice: This task is archived. It's hidden from your active lists.
       assignees: Assignees
       back: All tasks
       created_by: Created by %{name}
@@ -149,6 +154,7 @@ en:
       reminder_set: Reminder set
       reopen: Reopen
       status: Status
+      unarchive: Restore
       unlink: Unlink
       update: Update
     skim:
@@ -163,6 +169,8 @@ en:
       subtitle: Scout pulled these action items out of your email. Keep the ones that matter.
       title: Suggested tasks
       why: "Why this is a task:"
+    unarchive:
+      unarchived: Task restored.
     unlink_email:
       unlinked: Email unlinked.
     update:

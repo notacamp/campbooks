@@ -18,6 +18,7 @@
   <% end %>
 
   <% filters = [ [ "", t(".all") ] ] + (Task::BOARD_STATUSES + %w[cancelled]).map { |s| [ s, t("activerecord.attributes.task.statuses.#{s}") ] } %>
+  <% filters << [ "archived", t(".archived") ] if @archived_count.to_i.positive? %>
   <div class="mb-4 flex flex-wrap gap-1.5">
     <% filters.each do |value, label| %>
       <%= link_to label, tasks_path(status: value.presence),

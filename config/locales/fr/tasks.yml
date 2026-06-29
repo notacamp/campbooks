@@ -64,6 +64,8 @@ fr:
   tasks:
     accept:
       accepted: "Tâche conservée."
+    archive:
+      archived: "Tâche archivée."
     assign:
       assigned: "Responsables mis à jour."
     attach_document:
@@ -94,6 +96,7 @@ fr:
       search_placeholder: "Recherchez vos e-mails par objet…"
     index:
       all: Toutes
+      archived: "Archivées"
       board_view: Tableau
       empty_body: "Créez une tâche, ou laissez Scout extraire des actions de vos e-mails."
       empty_title: Aucune tâche pour l'instant
@@ -121,6 +124,8 @@ fr:
       add_document: Joindre un document
       add_email: Lier un e-mail
       ai_reasoning: "Scout a signalé ceci :"
+      archive: Archiver
+      archived_notice: "Cette tâche est archivée. Elle est masquée de vos listes actives."
       assignees: Responsables
       back: "Toutes les tâches"
       created_by: "Créée par %{name}"
@@ -149,6 +154,7 @@ fr:
       reminder_set: "Rappel défini"
       reopen: Rouvrir
       status: Statut
+      unarchive: Restaurer
       unlink: Dissocier
       update: "Mettre à jour"
     skim:
@@ -163,6 +169,8 @@ fr:
       subtitle: Scout a extrait ces actions de vos e-mails. Gardez celles qui comptent.
       title: "Tâches suggérées"
       why: "Pourquoi c'est une tâche :"
+    unarchive:
+      unarchived: "Tâche restaurée."
     unlink_email:
       unlinked: "E-mail dissocié."
     update:

@@ -31,6 +31,9 @@
       </div>
     </div>
 
+    <% if @task.archived? %>
+      <div class="mt-4 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground"><%= t(".archived_notice") %></div>
+    <% end %>
     <div class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
       <span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".status") %></span>
       <%# Segmented control: clicking a segment submits the status change immediately. %>
@@ -155,7 +158,14 @@
         <% end %>
       </section>
 
-      <div class="pt-2">
+      <div class="flex items-center gap-4 pt-2">
+        <% if @task.archived? %>
+          <%= button_to t(".unarchive"), unarchive_task_path(@task), method: :patch,
+                class: "cursor-pointer text-sm font-medium text-foreground transition hover:underline" %>
+        <% else %>
+          <%= button_to t(".archive"), archive_task_path(@task), method: :patch,
+                class: "cursor-pointer text-sm font-medium text-muted-foreground transition hover:text-foreground" %>
+        <% end %>
         <%= button_to t(".delete"), task_path(@task), method: :delete,
               class: "cursor-pointer text-sm font-medium text-red-600 transition hover:text-red-700 dark:text-red-400",
               form: { data: { turbo_confirm: t(".delete_confirm") } } %>

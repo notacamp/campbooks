@@ -55,9 +55,12 @@ class Task < ApplicationRecord
   # "Accepted and not finished" — the set that counts as live work.
   ACTIVE_STATUSES = %w[todo in_progress blocked].freeze
 
-  scope :triage,   -> { where(status: :suggested) }                 # the Skim queue
-  scope :active,   -> { where(status: ACTIVE_STATUSES) }
-  scope :open,     -> { where.not(status: %i[done cancelled]) }
+  scope :not_archived, -> { where(archived_at: nil) }
+  scope :archived,     -> { where.not(archived_at: nil) }
+
+  scope :triage,   -> { not_archived.where(status: :suggested) }    # the Skim queue
+  scope :active,   -> { not_archived.where(status: ACTIVE_STATUSES) }
+  scope :open,     -> { not_archived.where.not(status: %i[done cancelled]) }
   scope :overdue,  -> { active.where.not(due_at: nil).where(due_at: ...Time.current) }
   scope :due_soon, ->(within = 3.days) { active.where(due_at: Time.current..(Time.current + within)) }
 
@@ -110,6 +113,29 @@ class Task < ApplicationRecord
     active? && due_at.present? && due_at < Time.current
   end
 
+  # Soft-archive: hide from the active lists/board/feed without deleting. Orthogonal
+  # to status (you can archive a done task and keep its "done" state). Delete stays
+  # available for permanent removal.
+  def archive!(by: Current.user)
+    return true if archived?
+
+    update!(archived_at: Time.current)
+    Events.publish("task.archived", subject: self, actor: by, payload: { title: title })
+    true
+  end
+
+  def unarchive!(by: Current.user)
+    return true unless archived?
+
+    update!(archived_at: nil)
+    Events.publish("task.unarchived", subject: self, actor: by, payload: { title: title })
+    true
+  end
+
+  def archived?
+    archived_at.present?
+  end
+
   # Origin email (when extracted/created from a mailbox message), or nil.
   def source_email
     source if source_type == "EmailMessage"
@@ -125,7 +151,7 @@ class Task < ApplicationRecord
   def feed_relevant?
     return false if suggested?
 
-    saved_change_to_id? || saved_change_to_status? || saved_change_to_due_at?
+    saved_change_to_id? || saved_change_to_status? || saved_change_to_due_at? || saved_change_to_archived_at?
   end
 
   def refresh_feed

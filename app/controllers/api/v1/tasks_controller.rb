@@ -12,6 +12,8 @@ module Api
 
       def index
         scope = Task.accessible_to(Current.user).includes(:assignees, :tags)
+        # Archived tasks are excluded unless explicitly requested (mirrors the web).
+        scope = ActiveModel::Type::Boolean.new.cast(params[:archived]) ? scope.archived : scope.not_archived
         scope = scope.where(status: params[:status]) if params[:status].present? && Task.statuses.key?(params[:status])
         if params[:assignee_id].present?
           scope = scope.joins(:task_assignments).where(task_assignments: { user_id: params[:assignee_id] })
