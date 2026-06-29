@@ -1,6 +1,3 @@
-<% message.tags.first(2).each do |tag| %>
-  <span class="flex items-center gap-1 flex-shrink-0" style="font-size:var(--thread-label-size,9px);color:<%= tag.color %>">
-    <%= render(Campbooks::ColorDot.new(color: tag.color, size: :sm)) %>
-    <span class="font-medium"><%= tag.name %></span>
-  </span>
+<% Tag.visible_for(Current.workspace).where(id: message.tags.select(:id)).first(3).each do |tag| %>
+  <%= render(Campbooks::TagChip.new(tag: tag, size: :sm)) %>
 <% end %>
