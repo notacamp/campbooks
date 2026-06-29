@@ -23,6 +23,10 @@ fr:
       empty_title: Aucun fichier pour l'instant
       empty_description: Téléversez des fichiers pour les organiser dans des dossiers — factures, contrats, tout ce que vous voulez.
       empty_upload: Téléverser des fichiers
+      new_internal_document: Nouveau document
+      internal_documents: Documents internes
+      emails: E-mails
+      files_section: Fichiers
     uploads:
       create:
         no_files: Choisissez au moins un fichier à téléverser.
@@ -50,3 +54,16 @@ fr:
       file_meta:
         kind_image: Image
         kind_file: Fichier
+      doc_row:
+        kind: Document interne
+        updated: Mis à jour le %{date}
+        actions: Actions du document
+        open: Ouvrir
+        edit: Modifier
+        move_to: Déplacer vers
+        remove_from_folder: Retirer du dossier
+      email_row:
+        no_subject: (sans objet)
+        actions: Actions de l'e-mail
+        open: Ouvrir dans Courrier
+        remove_from_folder: Retirer du dossier

@@ -23,6 +23,10 @@ es:
       empty_title: Aún no hay archivos
       empty_description: "Sube archivos para mantenerlos organizados en carpetas: facturas, contratos, lo que sea."
       empty_upload: Subir archivos
+      new_internal_document: Nuevo documento
+      internal_documents: Documentos internos
+      emails: Correos
+      files_section: Archivos
     uploads:
       create:
         no_files: Elige al menos un archivo para subir.
@@ -50,3 +54,16 @@ es:
       file_meta:
         kind_image: Imagen
         kind_file: Archivo
+      doc_row:
+        kind: Documento interno
+        updated: Actualizado el %{date}
+        actions: Acciones del documento
+        open: Abrir
+        edit: Editar
+        move_to: Mover a
+        remove_from_folder: Quitar de la carpeta
+      email_row:
+        no_subject: (sin asunto)
+        actions: Acciones del correo
+        open: Abrir en Correo
+        remove_from_folder: Quitar de la carpeta

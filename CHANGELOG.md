@@ -24,6 +24,10 @@ major, minor, or patch change here.
   the document AI analysis (you can still send one through it later from its page) —
   and because folders are shared with Mail, a folder can hold both files and emails.
   Uploads, folder changes, and filing all show up in your workspace Activity.
+- **Files — internal documents & emails in folders** — write rich-text **internal
+  documents** right in Files ("New document") and file them into folders, and **file
+  emails into folders** too — so a folder can hold uploaded files, internal documents,
+  and emails side by side. Each is listed in the folder and recorded in Activity.
 - **Tasks** — a new task-management module (opt-in via `ENABLE_TASKS`, gated by the
   `tasks` plan entitlement). Create tasks manually or have Scout extract action items
   from your email and documents (triaged in Skim, with the originating email and

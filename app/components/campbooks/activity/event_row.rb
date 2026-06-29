@@ -101,6 +101,8 @@ module Campbooks
         when "Document" then helpers.document_path(@event.subject_id)
         when "Contact" then helpers.contact_path(@event.subject_id)
         when "MailFolder" then helpers.files_folder_path(@event.subject_id)
+        when "AuthoredDocument" then helpers.written_document_path(@event.subject_id)
+        when "EmailMessage" then helpers.email_message_path(@event.subject_id)
         end
       end
 

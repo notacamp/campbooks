@@ -23,6 +23,10 @@ en:
       empty_title: No files yet
       empty_description: Upload files to keep them organized in folders — invoices, contracts, anything.
       empty_upload: Upload files
+      new_internal_document: New document
+      internal_documents: Internal documents
+      emails: Emails
+      files_section: Files
     uploads:
       create:
         no_files: Choose at least one file to upload.
@@ -50,3 +54,16 @@ en:
       file_meta:
         kind_image: Image
         kind_file: File
+      doc_row:
+        kind: Internal document
+        updated: Updated %{date}
+        actions: Document actions
+        open: Open
+        edit: Edit
+        move_to: Move to
+        remove_from_folder: Remove from folder
+      email_row:
+        no_subject: (no subject)
+        actions: Email actions
+        open: Open in Mail
+        remove_from_folder: Remove from folder

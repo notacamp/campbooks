@@ -1,6 +1,7 @@
 <div data-controller="upload new-folder">
   <%= render Campbooks::PageHeader.new(title: @folder ? @folder.name : t(".title"), subtitle: @folder ? nil : t(".subtitle")) do |header| %>
     <% header.with_actions do %>
+      <%= render Campbooks::Button.new(variant: :outline, size: :sm, href: new_written_document_path) { t(".new_internal_document") } %>
       <%= render Campbooks::Button.new(variant: :outline, size: :sm, data: { action: "new-folder#open" }) { t(".new_folder") } %>
       <button type="button" data-action="click->upload#toggle"
           class="inline-flex items-center px-4 py-2 bg-accent-600 text-white text-sm font-medium rounded-md hover:bg-accent-700 cursor-pointer">
@@ -72,42 +73,67 @@
           </div>
         <% end %>
 
-        <!-- Files table (md+). overflow-visible (not overflow-x-auto) so the per-row
-             actions dropdown can escape the card; the table is table-fixed and
-             desktop-only, so it never overflows horizontally. -->
-        <div class="hidden md:block bg-card rounded-xl shadow-sm border border-gray-200 overflow-visible dark:border-white/10">
-          <table class="min-w-full table-fixed divide-y divide-gray-200 dark:divide-white/10">
-            <thead class="bg-warm-ash-bg">
-              <tr>
-                <th class="w-5/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_name") %></th>
-                <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_kind") %></th>
-                <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_size") %></th>
-                <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_added") %></th>
-                <th class="w-12 px-3 py-3"><span class="sr-only"><%= t(".col_actions") %></span></th>
-              </tr>
-            </thead>
-            <tbody id="files_tbody" class="bg-card divide-y divide-gray-200 dark:divide-white/10">
-              <% @files.each do |file| %>
-                <%= render Campbooks::Files::FileRow.new(doc: file, folders: @folders, current_folder: @folder) %>
+        <!-- Internal (authored) documents -->
+        <% if @internal_docs.any? %>
+          <section class="mb-6">
+            <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".internal_documents") %></h2>
+            <div class="space-y-2">
+              <% @internal_docs.each do |doc| %>
+                <%= render Campbooks::Files::DocRow.new(doc: doc, folders: @folders, current_folder: @folder) %>
               <% end %>
-              <% if @files.empty? %>
-                <tr><td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500"><%= t(".empty_folder") %></td></tr>
-              <% end %>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Files cards (mobile) -->
-        <div id="files_cards" class="md:hidden space-y-3">
-          <% @files.each do |file| %>
-            <%= render Campbooks::Files::FileCard.new(doc: file, folders: @folders, current_folder: @folder) %>
-          <% end %>
-          <% if @files.empty? %>
-            <div class="bg-card rounded-xl shadow-sm border border-gray-200 px-6 py-8 text-center text-sm text-gray-500 dark:border-white/10">
-              <%= t(".empty_folder") %>
             </div>
+          </section>
+        <% end %>
+
+        <!-- Filed emails (shown inside a folder) -->
+        <% if @filed_emails.any? %>
+          <section class="mb-6">
+            <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".emails") %></h2>
+            <div class="space-y-2">
+              <% @filed_emails.each do |email| %>
+                <%= render Campbooks::Files::EmailRow.new(email: email, current_folder: @folder) %>
+              <% end %>
+            </div>
+          </section>
+        <% end %>
+
+        <% if @files.any? %>
+          <% if @internal_docs.any? || @filed_emails.any? %>
+            <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".files_section") %></h2>
           <% end %>
-        </div>
+          <!-- Files table (md+). overflow-visible (not overflow-x-auto) so the per-row
+               actions dropdown can escape the card; the table is table-fixed and
+               desktop-only, so it never overflows horizontally. -->
+          <div class="hidden md:block bg-card rounded-xl shadow-sm border border-gray-200 overflow-visible dark:border-white/10">
+            <table class="min-w-full table-fixed divide-y divide-gray-200 dark:divide-white/10">
+              <thead class="bg-warm-ash-bg">
+                <tr>
+                  <th class="w-5/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_name") %></th>
+                  <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_kind") %></th>
+                  <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_size") %></th>
+                  <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_added") %></th>
+                  <th class="w-12 px-3 py-3"><span class="sr-only"><%= t(".col_actions") %></span></th>
+                </tr>
+              </thead>
+              <tbody id="files_tbody" class="bg-card divide-y divide-gray-200 dark:divide-white/10">
+                <% @files.each do |file| %>
+                  <%= render Campbooks::Files::FileRow.new(doc: file, folders: @folders, current_folder: @folder) %>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Files cards (mobile) -->
+          <div id="files_cards" class="md:hidden space-y-3">
+            <% @files.each do |file| %>
+              <%= render Campbooks::Files::FileCard.new(doc: file, folders: @folders, current_folder: @folder) %>
+            <% end %>
+          </div>
+        <% elsif @internal_docs.empty? && @filed_emails.empty? %>
+          <div class="bg-card rounded-xl shadow-sm border border-gray-200 px-6 py-8 text-center text-sm text-gray-500 dark:border-white/10">
+            <%= t(".empty_folder") %>
+          </div>
+        <% end %>
 
         <% if @pagy.next %>
           <%= turbo_frame_tag "files_pagination",

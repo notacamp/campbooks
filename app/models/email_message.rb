@@ -14,6 +14,10 @@ class EmailMessage < ApplicationRecord
   has_many :tags, through: :email_message_tags
   has_many :document_email_messages, dependent: :destroy
   has_many :documents, through: :document_email_messages
+  # Files Phase 2 — an email can be filed into a custom folder (the polymorphic
+  # "filesystem" join, recorded on move via Tools::BulkMoveToFolder).
+  has_many :folder_memberships, as: :folderable, dependent: :destroy
+  has_many :mail_folders, through: :folder_memberships
   has_many :task_email_links, dependent: :destroy
   has_many :linked_tasks, through: :task_email_links, source: :task
 
