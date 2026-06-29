@@ -68,11 +68,25 @@ jobs:
       - name: Create GitHub Release
         if: steps.version.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          # A release created with the built-in GITHUB_TOKEN does NOT trigger other
+          # workflows (GitHub's anti-recursion rule), so publish-image.yml's
+          # `on: release` won't fire and the image build has to be kicked off by hand.
+          # Creating the release with a PAT lets the release event cascade normally.
+          # Falls back to GITHUB_TOKEN when RELEASE_PAT is unset, so a missing secret
+          # degrades to "release created, build needs a manual nudge" rather than
+          # failing the release outright.
+          GH_TOKEN: ${{ secrets.RELEASE_PAT || github.token }}
+          HAS_RELEASE_PAT: ${{ secrets.RELEASE_PAT != '' }}
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           PRERELEASE="${{ steps.version.outputs.prerelease }}"
           NOTES_FILE="${{ steps.notes.outputs.notes_file }}"
+
+          # Surface the degraded path in the run log so a maintainer knows why the
+          # build didn't auto-start (rather than silently needing the manual nudge).
+          if [ "$HAS_RELEASE_PAT" != "true" ]; then
+            echo "::warning::RELEASE_PAT is not set — the release is created with GITHUB_TOKEN, which does NOT trigger publish-image.yml. Add a RELEASE_PAT secret (fine-grained PAT with Contents: write on this repo) so releases build automatically; until then, re-publish the release to kick off the build."
+          fi
 
           # Pass args directly. Building a flag string with embedded quotes and
           # expanding it unquoted ($FLAGS) makes the quotes literal, so gh looked
