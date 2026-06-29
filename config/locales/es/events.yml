@@ -10,6 +10,8 @@ es:
       contacts: Contactos
       documents: Documentos
       email: Correo
+      files: Archivos
+      pipelines: Pipelines
       reminders: Recordatorios
       tasks: Tareas
     names:
@@ -35,6 +37,19 @@ es:
       email_snoozed: Correo pospuesto
       email_tagged: Correo etiquetado
       email_trashed: Correo enviado a la papelera
+      email_filed: Correo guardado en carpeta
+      email_unfiled: Correo quitado de la carpeta
+      file_deleted: Archivo eliminado
+      file_filed: Archivo archivado
+      file_unfiled: Archivo quitado de la carpeta
+      file_uploaded: Archivo subido
+      folder_created: Carpeta creada
+      folder_deleted: Carpeta eliminada
+      folder_moved: Carpeta movida
+      folder_renamed: Carpeta renombrada
+      internal_document_created: Documento interno creado
+      internal_document_updated: Documento interno actualizado
+      pipeline_stage_entered: Etapa iniciada
       reminder_confirmed: Recordatorio confirmado
       reminder_created: Recordatorio creado
       reminder_dismissed: Recordatorio descartado

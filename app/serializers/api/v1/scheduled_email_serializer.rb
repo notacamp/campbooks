@@ -24,10 +24,14 @@ module Api
           next_occurrence_at: @scheduled_email.next_occurrence_at&.iso8601,
           last_sent_at: @scheduled_email.last_sent_at&.iso8601,
           account_id: @scheduled_email.email_account_id,
+          email_template_id: @scheduled_email.email_template_id,
           created_at: @scheduled_email.created_at.iso8601
         }
 
-        data[:body] = @scheduled_email.body if @detail
+        if @detail
+          data[:body] = @scheduled_email.body
+          data[:template_context] = @scheduled_email.template_context
+        end
 
         data
       end

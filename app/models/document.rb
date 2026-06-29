@@ -55,7 +55,12 @@ class Document < ApplicationRecord
     pending: 0,
     processing: 1,
     completed: 2,
-    failed: 3
+    failed: 3,
+    # Stored without running the AI pipeline — a plain file uploaded via the Files
+    # area, not a business document to classify. Distinct from `pending` (nothing is
+    # queued) and `completed` (no analysis ran). Opt in later via
+    # Files::UploadsController#analyze, which flips it back to :pending + enqueues.
+    skipped: 4
   }, prefix: :ai
 
   enum :review_status, {

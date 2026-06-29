@@ -86,7 +86,8 @@
     <% end %>
   <% end %>
 
-  <!-- API Connections -->
+  <!-- API Connections (developer-only — hidden in the native app shell) -->
+  <% unless hotwire_native_app? %>
   <%= render(Campbooks::Card.new(padding: :md)) do |card| %>
     <% card.with_header do %>
       <div class="flex items-center justify-between w-full">
@@ -105,5 +106,6 @@
       <p class="text-sm text-gray-500 mb-4"><%= t(".api_connections_desc") %></p>
       <%= render(Campbooks::Button.new(variant: :primary, size: :md, href: settings_integrations_connections_path)) { t(".api_connections_manage") } %>
     <% end %>
+  <% end %>
   <% end %>
 </div>

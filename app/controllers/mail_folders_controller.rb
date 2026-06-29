@@ -12,9 +12,14 @@ class MailFoldersController < ApplicationController
 
     respond_to do |format|
       if @mail_folder.save
-        result = MailFolders::Provisioner.provision_all(@mail_folder, Current.user)
+        result = if provision_provider_folders?
+          MailFolders::Provisioner.provision_all(@mail_folder, Current.user)
+        else
+          { created: [], failed: [] }
+        end
+        Events.publish("folder.created", subject: @mail_folder, payload: { "name" => @mail_folder.name })
         format.turbo_stream { render turbo_stream: created_streams(result) }
-        format.html { redirect_to email_messages_path(folder_name: @mail_folder.name) }
+        format.html { redirect_to params[:return_to] == "files" ? files_path : email_messages_path(folder_name: @mail_folder.name) }
       else
         message = @mail_folder.errors.full_messages.to_sentence
         format.turbo_stream do
@@ -30,7 +35,9 @@ class MailFoldersController < ApplicationController
   # messages — only the app-side custom folder record (data safety).
   def destroy
     @mail_folder = Current.user.workspace.mail_folders.find(params[:id])
+    name = @mail_folder.name
     @mail_folder.destroy
+    Events.publish("folder.deleted", payload: { "name" => name })
 
     respond_to do |format|
       format.turbo_stream do
@@ -40,7 +47,7 @@ class MailFoldersController < ApplicationController
           notify_stream(t(".removed", name: @mail_folder.name), severity: :success)
         ]
       end
-      format.html { redirect_to email_messages_path }
+      format.html { redirect_to params[:return_to] == "files" ? files_path : email_messages_path }
     end
   end
 
@@ -54,9 +61,14 @@ class MailFoldersController < ApplicationController
 
     respond_to do |format|
       if @mail_folder.update(update_params)
-        MailFolders::Provisioner.rename_all(@mail_folder, old_name, Current.user) if @mail_folder.name != old_name
+        if @mail_folder.name != old_name
+          MailFolders::Provisioner.rename_all(@mail_folder, old_name, Current.user)
+          Events.publish("folder.renamed", subject: @mail_folder,
+            payload: { "name" => @mail_folder.name, "previous_name" => old_name })
+        end
+        Events.publish("folder.moved", subject: @mail_folder, payload: { "name" => @mail_folder.name }) if @mail_folder.saved_change_to_parent_id?
         format.turbo_stream { render turbo_stream: updated_streams }
-        format.html { redirect_to email_messages_path(folder_name: @mail_folder.name) }
+        format.html { redirect_to params[:return_to] == "files" ? files_path : email_messages_path(folder_name: @mail_folder.name) }
       else
         message = @mail_folder.errors.full_messages.to_sentence
         format.turbo_stream do
@@ -88,6 +100,14 @@ class MailFoldersController < ApplicationController
   end
 
   private
+
+  # Files-created folders are file-first and shouldn't spawn a provider folder/label
+  # on every connected mailbox. The Mail pane omits the param (defaults true); the
+  # Files UI passes provision=false. Provider folders are ensured lazily the first
+  # time an email is moved into the folder.
+  def provision_provider_folders?
+    params[:provision].to_s != "false"
+  end
 
   def mail_folder_params
     params.require(:mail_folder).permit(:name, :icon)

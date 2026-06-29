@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_29_030000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_29_040002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -669,6 +669,32 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_030000) do
     t.index ["email_account_id"], name: "index_email_scan_logs_on_email_account_id"
   end
 
+  create_table "email_template_documents", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "document_template_id", null: false
+    t.uuid "email_template_id", null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["document_template_id"], name: "index_email_template_documents_on_document_template_id"
+    t.index ["email_template_id", "document_template_id"], name: "idx_email_template_documents_unique", unique: true
+    t.index ["email_template_id"], name: "index_email_template_documents_on_email_template_id"
+  end
+
+  create_table "email_templates", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.jsonb "ai_provenance", default: {}, null: false
+    t.integer "ai_status", default: 0, null: false
+    t.text "body_html", default: "", null: false
+    t.datetime "created_at", null: false
+    t.text "description"
+    t.string "name", null: false
+    t.string "subject", default: "", null: false
+    t.datetime "updated_at", null: false
+    t.jsonb "variables_schema", default: [], null: false
+    t.uuid "workspace_id", null: false
+    t.index ["workspace_id", "name"], name: "index_email_templates_on_workspace_id_and_name"
+    t.index ["workspace_id"], name: "index_email_templates_on_workspace_id"
+  end
+
   create_table "email_threads", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.uuid "email_account_id", null: false
@@ -1114,17 +1140,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_030000) do
     t.datetime "created_at", null: false
     t.uuid "created_by_id", null: false
     t.uuid "email_account_id", null: false
+    t.uuid "email_template_id"
     t.datetime "last_sent_at"
     t.datetime "next_occurrence_at"
     t.string "rrule"
     t.datetime "scheduled_at", null: false
     t.integer "status", default: 0, null: false
     t.string "subject", null: false
+    t.jsonb "template_context", default: {}, null: false
     t.string "to_address", null: false
     t.datetime "updated_at", null: false
     t.uuid "workspace_id", null: false
     t.index ["created_by_id"], name: "index_scheduled_emails_on_created_by_id"
     t.index ["email_account_id"], name: "index_scheduled_emails_on_email_account_id"
+    t.index ["email_template_id"], name: "index_scheduled_emails_on_email_template_id"
     t.index ["next_occurrence_at"], name: "idx_scheduled_emails_pending_next_occurrence", where: "(status = 0)"
     t.index ["scheduled_at"], name: "idx_scheduled_emails_pending_scheduled_at", where: "(status = 0)"
     t.index ["workspace_id", "status"], name: "index_scheduled_emails_on_workspace_id_and_status"
@@ -1679,6 +1708,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_030000) do
   add_foreign_key "email_messages", "email_scan_logs"
   add_foreign_key "email_messages", "email_threads"
   add_foreign_key "email_scan_logs", "email_accounts"
+  add_foreign_key "email_template_documents", "document_templates"
+  add_foreign_key "email_template_documents", "email_templates"
+  add_foreign_key "email_templates", "workspaces"
   add_foreign_key "email_threads", "email_accounts"
   add_foreign_key "event_types", "workspaces"
   add_foreign_key "events", "events", column: "caused_by_event_id"
@@ -1722,6 +1754,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_030000) do
   add_foreign_key "reminders", "users", column: "confirmed_by_id"
   add_foreign_key "reminders", "workspaces"
   add_foreign_key "scheduled_emails", "email_accounts"
+  add_foreign_key "scheduled_emails", "email_templates"
   add_foreign_key "scheduled_emails", "users", column: "created_by_id"
   add_foreign_key "scheduled_emails", "workspaces"
   add_foreign_key "search_chunks", "workspaces"

@@ -66,6 +66,8 @@ module Mcp
         update_calendar_event, delete_calendar_event, rsvp_calendar_event,
         # reminders
         list_reminders, get_reminder, confirm_reminder, dismiss_reminder, snooze_reminder,
+        # email templates
+        list_email_templates,
         # folders
         list_folders, get_folder, file_document, unfile_document
       ]
@@ -958,6 +960,21 @@ module Mcp
         reminder = Reminder.accessible_to(Current.user).find(args["id"])
         reminder.update!(status: :snoozed, snoozed_until: parse_time(args["until"]) || 1.week.from_now)
         { reminder: Api::V1::ReminderSerializer.new(reminder, detail: true).as_json }
+      end
+    end
+
+    # ---- email templates --------------------------------------------------
+
+    def list_email_templates
+      build(
+        name: "list_email_templates",
+        description: "List the workspace's reusable email templates.",
+        scope: "templates:read",
+        enabled: -> { Features.email_templates? },
+        input_schema: object_schema(properties: { limit: limit_property })
+      ) do |args|
+        scope = Current.workspace.email_templates.recent
+        { email_templates: scope.limit(clamp_limit(args["limit"])).map { |t| Api::V1::EmailTemplateSerializer.new(t).as_json } }
       end
     end
 

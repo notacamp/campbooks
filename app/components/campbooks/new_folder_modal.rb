@@ -15,9 +15,18 @@ module Campbooks
 
     # @param open [Boolean] render the dialog already open (Lookbook preview only).
     # @param error [String, nil] preset validation error (preview only).
-    def initialize(open: false, error: nil)
+    # @param action [String, nil] form target (defaults to mail_folders_path).
+    # @param turbo [Boolean] when false the form submits non-Turbo (full redirect) —
+    #   the Files area uses this so MailFoldersController's mail-targeted Turbo
+    #   streams are skipped and the html branch redirects back to /files.
+    # @param hidden_fields [Hash] extra hidden inputs (e.g. provision:, return_to:).
+    def initialize(open: false, error: nil, action: nil, turbo: true, hidden_fields: {}, subtitle: nil)
       @open = open
       @error = error
+      @action = action
+      @turbo = turbo
+      @hidden_fields = hidden_fields || {}
+      @subtitle = subtitle
     end
 
     def view_template
@@ -33,12 +42,15 @@ module Campbooks
         }
       ) do
         form(
-          action: helpers.mail_folders_path,
+          action: @action || helpers.mail_folders_path,
           method: "post",
           accept_charset: "UTF-8",
-          data: { new_folder_target: "form", action: "turbo:submit-end->new-folder#submitEnd" }
+          data: form_data
         ) do
           input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
+          @hidden_fields.each do |name, value|
+            input(type: "hidden", name: name.to_s, value: value.to_s)
+          end
           header
           body
           footer
@@ -48,11 +60,21 @@ module Campbooks
 
     private
 
+    def form_data
+      data = { new_folder_target: "form" }
+      if @turbo
+        data[:action] = "turbo:submit-end->new-folder#submitEnd"
+      else
+        data[:turbo] = "false"
+      end
+      data
+    end
+
     def header
       div(class: "flex items-start justify-between gap-3 border-b border-border px-5 py-4") do
         div do
           h2(class: "text-base font-semibold text-foreground") { t(".title") }
-          p(class: "mt-0.5 text-xs text-muted-foreground") { t(".subtitle") }
+          p(class: "mt-0.5 text-xs text-muted-foreground") { @subtitle || t(".subtitle") }
         end
         button(
           type: "button",
