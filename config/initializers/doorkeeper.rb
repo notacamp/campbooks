@@ -96,7 +96,8 @@ Doorkeeper.configure do
                   :"calendar:read", :"calendar:write",
                   :"reminders:read", :"reminders:write",
                   :"tasks:read", :"tasks:write",
-                  :"folders:read", :"folders:write"
+                  :"folders:read", :"folders:write",
+                  :"templates:read", :"templates:write"
   enforce_configured_scopes
 
   # Raise on auth failures so Api::V1::BaseController's rescue_from renders our

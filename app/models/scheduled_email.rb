@@ -8,6 +8,7 @@ class ScheduledEmail < ApplicationRecord
   belongs_to :workspace
   belongs_to :email_account
   belongs_to :created_by, class_name: "User"
+  belongs_to :email_template, optional: true
 
   enum :status, { pending: 0, sent: 1, cancelled: 2, failed: 3 }, default: :pending
 
@@ -50,5 +51,26 @@ class ScheduledEmail < ApplicationRecord
   # items, otherwise the one-time scheduled_at.
   def display_time
     next_occurrence_at || scheduled_at
+  end
+
+  # Subject/body rendered through Liquid against the stored template_context, so a
+  # templated (and especially recurring) send re-resolves variables like
+  # {{ date }} fresh on every occurrence. Plain sends carry an empty context, so
+  # this is a no-op for them.
+  def rendered_subject
+    render_liquid(subject)
+  end
+
+  def rendered_body
+    render_liquid(body)
+  end
+
+  private
+
+  def render_liquid(template)
+    Workflows::LiquidRenderer.render(template, template_context)
+  rescue Workflows::LiquidRenderer::Error => e
+    Rails.logger.warn("[ScheduledEmail##{id}] Liquid render error: #{e.message}")
+    template
   end
 end
