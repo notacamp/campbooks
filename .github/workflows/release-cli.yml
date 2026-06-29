@@ -1,9 +1,14 @@
 name: Release CLI
 
-# Build the campbooks CLI binaries and update the Homebrew formula on a CLI
-# release tag (cli/vX.Y.Z) — independent of the app's vX.Y.Z image releases.
-# publish-image.yml is guarded against `cli/` tags, so this never touches the
-# app deploy. Tag a release with, e.g.:  git tag cli/v0.1.0 && git push --tags
+# Build the campbooks CLI and publish its GitHub release + Homebrew formula on a
+# CLI release tag (cli/vX.Y.Z) — independent of the app's vX.Y.Z image releases.
+# publish-image.yml is guarded against `cli/` tags, so this never touches the app
+# deploy. Tag a release with, e.g.:  git tag cli/v0.1.0 && git push --tags
+#
+# The release logic lives in cli/scripts/release.sh (cross-compile -> GitHub
+# release on the prefixed tag -> regenerate + push the Homebrew formula). We do
+# it by hand rather than via GoReleaser because GoReleaser only supports a
+# tag-prefixed monorepo release under its Pro license.
 on:
   push:
     tags:
@@ -33,12 +38,9 @@ jobs:
           go vet ./...
           go test ./...
 
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          version: "~> v2"
-          args: release --clean -f cli/.goreleaser.yaml
+      - name: Build, release, and update the Homebrew formula
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # PAT with contents:write on notacamp/homebrew-tap (for the formula bump).
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PAT with contents:write on notacamp/homebrew-tap (for the formula push).
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: bash cli/scripts/release.sh
