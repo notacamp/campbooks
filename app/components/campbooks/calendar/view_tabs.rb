@@ -26,7 +26,10 @@ module Campbooks
       private
 
       def calendar_tabs
-        %w[agenda day week month].map do |view|
+        # Native apps get agenda + day only — the week/month grids are too dense for
+        # a phone (CalendarController coerces a week/month deep link back to agenda).
+        views = helpers.hotwire_native_app? ? %w[agenda day] : %w[agenda day week month]
+        views.map do |view|
           [ view, t("calendar.index.view_#{view}"), helpers.calendar_path(view: view, date: @date.iso8601) ]
         end
       end
