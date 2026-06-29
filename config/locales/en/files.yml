@@ -20,6 +20,11 @@ en:
       col_added: Added
       col_actions: Actions
       empty_folder: This folder is empty.
+      search_results:
+        zero: "No results for \"%{q}\""
+        one: "1 result for \"%{q}\""
+        other: "%{count} results for \"%{q}\""
+      search_empty: No documents matched your search. Try a different term or clear your filters.
       empty_title: No files yet
       empty_description: Upload files to keep them organized in folders — invoices, contracts, anything.
       empty_upload: Upload files
@@ -74,6 +79,10 @@ en:
       body: "I pulled a document out of this email and filed it in Files: **[%{title}](%{path})**."
   components:
     files:
+      search_bar:
+        placeholder: Search files…
+        submit: Search
+        clear: Clear search
       sidebar:
         label: Folders
         all_files: All files

@@ -102,4 +102,26 @@ namespace :search do
 
     puts "=== Done. #{updated} refreshed, #{orphaned} orphaned records skipped. ==="
   end
+
+  desc "Re-embed Document search records to pick up the enriched search chunk + AI " \
+       "summary (embeddings only — NO AI vision re-run). Run after deploying smart " \
+       "Files search. WORKSPACE_ID=<id> scopes to one workspace; LIMIT=<n> caps how " \
+       "many are enqueued per run — batch large workspaces to respect the embeddings " \
+       "rate limit (reindex_search! bypasses the 5-min debounce, so every doc enqueues)."
+  task reindex_documents: :environment do
+    scope = Document.where(ai_status: :completed)
+    scope = scope.where(workspace_id: ENV["WORKSPACE_ID"]) if ENV["WORKSPACE_ID"].present?
+    limit = ENV["LIMIT"].presence&.to_i
+    total = limit ? [ scope.count, limit ].min : scope.count
+
+    puts "=== Re-embedding #{total} documents (no AI re-run) ==="
+    processed = 0
+    scope.find_each do |doc|
+      break if limit && processed >= limit
+      doc.reindex_search!
+      processed += 1
+      puts "  [#{processed}/#{total}] Document ##{doc.id}: #{doc.display_title.truncate(60)}" if processed == 1 || (processed % 100).zero?
+    end
+    puts "=== Done. #{processed} documents enqueued. Run bin/rails solid_queue:start to process. ==="
+  end
 end

@@ -5,6 +5,8 @@ class FilesController < ApplicationController
   # Both render the same template; @folder distinguishes the two.
   def index
     load_folders
+    return if render_search
+
     load_filter_data
     # "All files": the workspace's internal documents + uploaded files. Emails only
     # surface inside a folder they've been filed into (see #show). The filter strip
@@ -43,6 +45,8 @@ class FilesController < ApplicationController
 
     @subfolders = @folder.children.to_a
     load_folders
+    return if render_search
+
     load_filter_data
     @internal_docs = filtered_internal_docs(@folder.authored_documents)
     @filed_emails = filtered_filed_emails(@folder.email_messages.accessible_to(Current.user))
@@ -58,6 +62,37 @@ class FilesController < ApplicationController
   end
 
   private
+
+  # When the search box carries a query, swap the structural browse for a ranked
+  # Documents::Search result set (documents/files only — internal docs and filed
+  # emails keep their own surfaces). Returns true once it has rendered, so the
+  # action returns; false to fall through to the normal browse/filter path. Assumes
+  # @folder and @folders are already loaded by the caller.
+  def render_search
+    return false if params[:q].blank?
+
+    @search_query = params[:q].to_s.strip
+    searcher = Documents::Search.new(
+      user: Current.user, workspace: Current.workspace, params:, folder: @folder
+    )
+    @files = searcher.results
+    @pagy = nil
+    @internal_docs = []
+    @filed_emails = []
+    @subfolders ||= []
+    @needs_review_count = Current.workspace.documents.needs_review.count
+    @reprocessable_count = 0
+    @exports = []
+    @has_any_files = true # never show the first-run CTA mid-search
+
+    load_filter_data # the filter strip still renders alongside the search box
+
+    respond_to do |format|
+      format.html { render :index }
+      format.turbo_stream { render :index }
+    end
+    true
+  end
 
   def load_folders
     @folders = Current.workspace.mail_folders.accessible_to(Current.user).ordered.to_a

@@ -20,6 +20,7 @@ module Ai
         "document_type": "string — pick from the existing types listed below. If none fits, create a NEW English snake_case name",
         "title": "short human-readable title in Portuguese (e.g., 'Fatura EDP — Janeiro 2026', 'Millennium BCP — Pagamento 500€', 'Seguro Auto — Nº 12345'). Keep it under 100 characters",
         "description": "brief description of the document in Portuguese (1-2 sentences)",
+        "summary": "a richer, search-optimized summary (3-5 sentences) in the document's language. State the document type, the vendor/counterparty name(s), what the document is for, key amounts, relevant dates, and any identifiers (invoice / receipt / policy / contract numbers). Write names and numbers VERBATIM so the document can be found by search. Be specific and factual — no filler.",
         "confidence": 0.0 to 1.0,
         "type_prompt": "string or null — only if you created a NEW type: describe what it is and provide a suggested extraction_schema",
         "suggested_filename": "string — short descriptive filename in Portuguese using lowercase_underscores",
@@ -219,6 +220,7 @@ module Ai
         title: data["title"],
         type_prompt: data["type_prompt"],
         description: data["description"],
+        summary: data["summary"],
         confidence: data["confidence"] || 0.0,
         suggested_filename: data["suggested_filename"],
         metadata: data["metadata"] || {}
@@ -295,6 +297,7 @@ module Ai
         payment_method: metadata["payment_method"],
         document_date: parse_date(metadata["document_date"]),
         description: result[:description],
+        ai_summary: result[:summary],
         ai_confidence_score: result[:confidence],
         ai_extraction_data: result,
         ai_processing_attempts: (@document.ai_processing_attempts || 0) + 1,
