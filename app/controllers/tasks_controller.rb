@@ -100,6 +100,19 @@ class TasksController < ApplicationController
     respond_with_change(t(".moved"))
   end
 
+  # Status kanban: the board columns with their tasks. Drag-to-move posts to #move.
+  def board
+    scope = Task.accessible_to(current_user).where(status: Task::BOARD_STATUSES).includes(:assignees, :tags)
+    grouped = scope.group_by(&:status)
+    @columns = Task::BOARD_STATUSES.map do |status|
+      {
+        key:   status,
+        label: t("activerecord.attributes.task.statuses.#{status}"),
+        tasks: (grouped[status] || []).sort_by { |t| [ t.position, t.created_at ] }
+      }
+    end
+  end
+
   # Replace the task's assignees with the posted set (workspace members only),
   # recording who made each new assignment and publishing task.assigned for them.
   def assign
@@ -215,6 +228,7 @@ class TasksController < ApplicationController
     respond_to do |format|
       format.turbo_stream { render turbo_stream: notify_stream(message) }
       format.html { redirect_to @task, success: message }
+      format.json { head :ok }
     end
   end
 
@@ -222,6 +236,7 @@ class TasksController < ApplicationController
     respond_to do |format|
       format.turbo_stream { render turbo_stream: notify_stream(message, severity: :error), status: :unprocessable_entity }
       format.html { redirect_to @task, error: message }
+      format.json { head :unprocessable_entity }
     end
   end
 end

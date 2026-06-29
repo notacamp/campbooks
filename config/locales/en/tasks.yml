@@ -33,6 +33,11 @@ en:
         other: Tasks
   components:
     tasks:
+      board_card:
+        overdue: Overdue
+        today: Today
+      board_column:
+        empty: Nothing here
       form:
         assignees_label: Assignees
         cancel: Cancel
@@ -86,8 +91,10 @@ en:
       search_placeholder: Search your email by subject…
     index:
       all: All
+      board_view: Board
       empty_body: Create a task, or let Scout pull action items out of your email.
       empty_title: No tasks yet
+      list_view: List
       new: New task
       subtitle: Action items from your email and your own to-dos.
       title: Tasks

@@ -119,6 +119,7 @@ Rails.application.routes.draw do
     end
     collection do
       get :skim               # triage AI-suggested tasks
+      get :board              # status kanban
     end
   end
 

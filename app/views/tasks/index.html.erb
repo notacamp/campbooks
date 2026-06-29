@@ -4,7 +4,10 @@
       <h1 class="text-xl font-semibold text-foreground"><%= t(".title") %></h1>
       <p class="text-sm text-muted-foreground"><%= t(".subtitle") %></p>
     </div>
-    <%= render Campbooks::Button.new(href: new_task_path, variant: :primary, size: :sm) { t(".new") } %>
+    <div class="flex items-center gap-2">
+      <%= render "view_toggle", current: :list %>
+      <%= render Campbooks::Button.new(href: new_task_path, variant: :primary, size: :sm) { t(".new") } %>
+    </div>
   </header>
 
   <% if @triage_count.positive? %>
