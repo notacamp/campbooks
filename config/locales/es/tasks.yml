@@ -57,14 +57,27 @@ es:
         overdue: Atrasada
         unassigned: Sin asignar
   tasks:
+    accept:
+      accepted: Tarea guardada.
     assign:
       assigned: Responsables actualizados.
+    attach_document:
+      attached: Documento adjuntado.
+      not_found: No se encontró ese documento.
     complete:
       completed: Tarea completada.
     create:
       created: Tarea creada.
     destroy:
       deleted: Tarea eliminada.
+    detach_document:
+      detached: Documento desvinculado.
+    dismiss:
+      dismissed: Sugerencia descartada.
+    document_picker:
+      attach: Adjuntar
+      no_results: Sin documentos coincidentes.
+      search_placeholder: Busca tus documentos…
     edit:
       title: Editar tarea
     email_picker:
@@ -89,8 +102,13 @@ es:
       moved: Tarea movida.
     new:
       title: Nueva tarea
+    remind:
+      no_due: "Añade una fecha de entrega primero para establecer un recordatorio."
+      remind_failed: No se pudo establecer el recordatorio.
+      reminded: Recordatorio establecido — confírmalo en la página de Recordatorios para añadirlo a tu calendario.
     show:
       activity: Actividad
+      add_document: Adjuntar un documento
       add_email: Vincular un correo
       assignees: Responsables
       back: Todas las tareas
@@ -99,6 +117,8 @@ es:
       delete: Eliminar
       delete_confirm: "¿Eliminar esta tarea? Esta acción no se puede deshacer."
       description: Descripción
+      detach: Desadjuntar
+      documents: Documentos
       edit: Editar
       labels: Etiquetas
       linked_emails: Correos vinculados
@@ -106,15 +126,29 @@ es:
       no_activity: "Aún sin actividad."
       no_assignees: Sin asignar
       no_description: "Aún sin descripción."
+      no_documents: Sin documentos adjuntos.
       no_labels: Sin etiquetas.
       no_linked_emails: Sin correos vinculados.
       origin: Creada desde este correo
       priority: "Prioridad: %{level}"
       relationship: "Relación"
+      remind: "Recuérdamelo"
+      reminder_set: Recordatorio establecido
       reopen: Reabrir
       status: Estado
       unlink: Desvincular
       update: Actualizar
+    skim:
+      accept: Guardar
+      all_tasks: Todas las tareas
+      complete: Hecha
+      dismiss: Descartar
+      empty_body: Scout no ha sugerido ninguna tarea por ahora.
+      empty_title: Nada que revisar
+      from_document: "Del documento: %{title}"
+      from_email: "Del correo: %{subject}"
+      subtitle: Scout extrajo estas acciones de tu correo. Quédate con las que importen.
+      title: Tareas sugeridas
     unlink_email:
       unlinked: Correo desvinculado.
     update:

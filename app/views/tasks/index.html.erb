@@ -8,7 +8,7 @@
   </header>
 
   <% if @triage_count.positive? %>
-    <%= link_to tasks_path(status: "suggested"),
+    <%= link_to skim_tasks_path,
           class: "mb-4 flex items-center gap-2 rounded-lg border border-accent-200 bg-accent-50 px-4 py-2.5 text-sm font-medium text-accent-800 transition hover:bg-accent-100 dark:border-accent-900 dark:bg-accent-950/40 dark:text-accent-200" do %>
       <%= t(".triage_banner", count: @triage_count) %>
     <% end %>

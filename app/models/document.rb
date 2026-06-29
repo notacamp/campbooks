@@ -16,6 +16,8 @@ class Document < ApplicationRecord
   has_many :document_email_messages, dependent: :destroy
   has_many :email_messages, through: :document_email_messages
   has_many :email_threads, through: :email_messages
+  has_many :task_documents, dependent: :destroy
+  has_many :tasks, through: :task_documents
 
   # Stage 3 "filesystem" layer — folders this document is filed into (its *place*,
   # orthogonal to its DocumentType *kind*).

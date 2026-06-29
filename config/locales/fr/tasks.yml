@@ -57,14 +57,27 @@ fr:
         overdue: En retard
         unassigned: Non attribuée
   tasks:
+    accept:
+      accepted: "Tâche conservée."
     assign:
       assigned: "Responsables mis à jour."
+    attach_document:
+      attached: Document joint.
+      not_found: Ce document est introuvable.
     complete:
       completed: "Tâche terminée."
     create:
       created: "Tâche créée."
     destroy:
       deleted: "Tâche supprimée."
+    detach_document:
+      detached: "Document détaché."
+    dismiss:
+      dismissed: "Suggestion ignorée."
+    document_picker:
+      attach: Joindre
+      no_results: Aucun document correspondant.
+      search_placeholder: "Recherchez vos documents…"
     edit:
       title: "Modifier la tâche"
     email_picker:
@@ -89,8 +102,13 @@ fr:
       moved: "Tâche déplacée."
     new:
       title: "Nouvelle tâche"
+    remind:
+      no_due: "Ajoutez d'abord une date d'échéance pour définir un rappel."
+      remind_failed: Impossible de définir le rappel.
+      reminded: "Rappel défini — confirmez-le sur la page Rappels pour l'ajouter à votre calendrier."
     show:
       activity: "Activité"
+      add_document: Joindre un document
       add_email: Lier un e-mail
       assignees: Responsables
       back: "Toutes les tâches"
@@ -99,6 +117,8 @@ fr:
       delete: Supprimer
       delete_confirm: "Supprimer cette tâche ? Cette action est irréversible."
       description: Description
+      detach: "Détacher"
+      documents: Documents
       edit: Modifier
       labels: "Étiquettes"
       linked_emails: "E-mails liés"
@@ -106,15 +126,29 @@ fr:
       no_activity: Aucune activité pour l'instant.
       no_assignees: Non attribuée
       no_description: Aucune description pour l'instant.
+      no_documents: Aucun document joint.
       no_labels: Aucune étiquette.
       no_linked_emails: "Aucun e-mail lié."
       origin: "Créée depuis cet e-mail"
       priority: "Priorité : %{level}"
       relationship: Relation
+      remind: Me rappeler
+      reminder_set: "Rappel défini"
       reopen: Rouvrir
       status: Statut
       unlink: Dissocier
       update: "Mettre à jour"
+    skim:
+      accept: Garder
+      all_tasks: "Toutes les tâches"
+      complete: "Terminée"
+      dismiss: Ignorer
+      empty_body: "Scout n'a suggéré aucune tâche pour l'instant."
+      empty_title: "Rien à examiner"
+      from_document: "Du document : %{title}"
+      from_email: "De l'e-mail : %{subject}"
+      subtitle: Scout a extrait ces actions de vos e-mails. Gardez celles qui comptent.
+      title: "Tâches suggérées"
     unlink_email:
       unlinked: "E-mail dissocié."
     update:

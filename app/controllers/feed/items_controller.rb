@@ -81,6 +81,7 @@ module Feed
       case @item.subject_type
       when "EmailMessage" then run_email_action(subject)
       when "Reminder"     then run_reminder_action(subject)
+      when "Task"         then run_task_action(subject)
       else failure(t("feed.items.unsupported"))
       end
     end
@@ -101,6 +102,20 @@ module Feed
       when "dismiss_reminder"
         reminder.dismissed!
         { success: true, message: t("feed.items.reminder_dismissed") }
+      else
+        failure(t("feed.items.unsupported"))
+      end
+    end
+
+    # Complete a task from the feed. The dismiss button clears the card without
+    # changing the task (the generic feed-dismiss path), so only "complete" is here.
+    def run_task_action(task)
+      return failure(t("feed.items.gone")) unless task.workspace_id == current_user.workspace_id
+
+      case params[:tool].to_s
+      when "complete"
+        task.move_to_status!(:done, by: current_user)
+        { success: true, message: t("feed.items.task_completed", title: task.title) }
       else
         failure(t("feed.items.unsupported"))
       end

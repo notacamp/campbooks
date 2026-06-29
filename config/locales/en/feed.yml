@@ -44,6 +44,15 @@ en:
         overdue: Overdue
         today: Today
         tomorrow: Tomorrow
+      task_card:
+        complete: Complete
+        dismiss: Dismiss
+        in_days:
+          one: Due in %{count} day
+          other: Due in %{count} days
+        overdue: Overdue
+        today: Due today
+        tomorrow: Due tomorrow
       reply_reminder_card:
         aged:
           one: "%{count} day, no reply"
@@ -87,6 +96,7 @@ en:
       reminder_confirmed_no_calendar: Reminder confirmed. Connect a calendar to sync
         it automatically.
       reminder_dismissed: Reminder dismissed.
+      task_completed: "Task completed: %{title}"
       restored: Restored.
       unsupported: That action is not supported here.
   home:

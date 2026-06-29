@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_29_010000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_29_020000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -1404,6 +1404,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_010000) do
     t.index ["user_id"], name: "index_task_assignments_on_user_id"
   end
 
+  create_table "task_documents", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "created_by_id"
+    t.uuid "document_id", null: false
+    t.uuid "task_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_by_id"], name: "index_task_documents_on_created_by_id"
+    t.index ["document_id"], name: "index_task_documents_on_document_id"
+    t.index ["task_id", "document_id"], name: "index_task_documents_on_task_id_and_document_id", unique: true
+    t.index ["task_id"], name: "index_task_documents_on_task_id"
+  end
+
   create_table "task_email_links", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.uuid "created_by_id"
@@ -1731,6 +1743,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_010000) do
   add_foreign_key "task_assignments", "tasks"
   add_foreign_key "task_assignments", "users"
   add_foreign_key "task_assignments", "users", column: "assigned_by_id", on_delete: :nullify
+  add_foreign_key "task_documents", "documents"
+  add_foreign_key "task_documents", "tasks"
+  add_foreign_key "task_documents", "users", column: "created_by_id", on_delete: :nullify
   add_foreign_key "task_email_links", "email_messages"
   add_foreign_key "task_email_links", "tasks"
   add_foreign_key "task_email_links", "users", column: "created_by_id", on_delete: :nullify

@@ -57,14 +57,27 @@ en:
         overdue: Overdue
         unassigned: Unassigned
   tasks:
+    accept:
+      accepted: Task kept.
     assign:
       assigned: Assignees updated.
+    attach_document:
+      attached: Document attached.
+      not_found: That document couldn't be found.
     complete:
       completed: Task completed.
     create:
       created: Task created.
     destroy:
       deleted: Task deleted.
+    detach_document:
+      detached: Document detached.
+    dismiss:
+      dismissed: Suggestion dismissed.
+    document_picker:
+      attach: Attach
+      no_results: No matching documents.
+      search_placeholder: Search your documents…
     edit:
       title: Edit task
     email_picker:
@@ -89,8 +102,13 @@ en:
       moved: Task moved.
     new:
       title: New task
+    remind:
+      no_due: Add a due date first to set a reminder.
+      remind_failed: Couldn't set the reminder.
+      reminded: Reminder set — confirm it on the Reminders page to add it to your calendar.
     show:
       activity: Activity
+      add_document: Attach a document
       add_email: Link an email
       assignees: Assignees
       back: All tasks
@@ -99,6 +117,8 @@ en:
       delete: Delete
       delete_confirm: Delete this task? This can't be undone.
       description: Description
+      detach: Detach
+      documents: Documents
       edit: Edit
       labels: Labels
       linked_emails: Linked emails
@@ -106,15 +126,29 @@ en:
       no_activity: No activity yet.
       no_assignees: Unassigned
       no_description: No description yet.
+      no_documents: No documents attached.
       no_labels: No labels.
       no_linked_emails: No linked emails.
       origin: Created from this email
       priority: "Priority: %{level}"
       relationship: Relationship
+      remind: Remind me
+      reminder_set: Reminder set
       reopen: Reopen
       status: Status
       unlink: Unlink
       update: Update
+    skim:
+      accept: Keep
+      all_tasks: All tasks
+      complete: Done
+      dismiss: Dismiss
+      empty_body: Scout hasn't suggested any tasks right now.
+      empty_title: Nothing to review
+      from_document: "From document: %{title}"
+      from_email: "From email: %{subject}"
+      subtitle: Scout pulled these action items out of your email. Keep the ones that matter.
+      title: Suggested tasks
     unlink_email:
       unlinked: Email unlinked.
     update:

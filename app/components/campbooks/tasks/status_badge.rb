@@ -6,10 +6,12 @@ module Campbooks
     # detail header. Maps each status onto the shared Badge vocabulary so the
     # whole app speaks one color language.
     class StatusBadge < Campbooks::Base
+      # Task status is STATE, so it speaks the functional status palette only —
+      # never Ember/accent (reserved for Scout / live / win per DESIGN.md).
       VARIANTS = {
         "suggested"   => :neutral,
-        "todo"        => :info,
-        "in_progress" => :accent,
+        "todo"        => :neutral,
+        "in_progress" => :info,
         "blocked"     => :warning,
         "done"        => :success,
         "cancelled"   => :neutral

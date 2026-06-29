@@ -12,7 +12,7 @@
             <%= render Campbooks::Select.new("relationship",
                   options: TaskEmailLink.relationships.keys.map { |r| [ t("activerecord.attributes.task_email_link.relationships.#{r}"), r ] },
                   selected: "related") %>
-            <%= render Campbooks::Button.new(type: "submit", variant: :secondary, size: :sm) { t(".link") } %>
+            <%= render Campbooks::Button.new(type: "submit", variant: :outline, size: :sm) { t(".link") } %>
           <% end %>
         </li>
       <% end %>

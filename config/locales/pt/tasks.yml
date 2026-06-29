@@ -57,14 +57,27 @@ pt:
         overdue: Em atraso
         unassigned: Sem responsável
   tasks:
+    accept:
+      accepted: Tarefa mantida.
     assign:
       assigned: Responsáveis atualizados.
+    attach_document:
+      attached: Documento anexado.
+      not_found: Esse documento não foi encontrado.
     complete:
       completed: Tarefa concluída.
     create:
       created: Tarefa criada.
     destroy:
       deleted: Tarefa eliminada.
+    detach_document:
+      detached: Documento desanexado.
+    dismiss:
+      dismissed: Sugestão dispensada.
+    document_picker:
+      attach: Anexar
+      no_results: Sem documentos correspondentes.
+      search_placeholder: Pesquise os seus documentos…
     edit:
       title: Editar tarefa
     email_picker:
@@ -89,8 +102,13 @@ pt:
       moved: Tarefa movida.
     new:
       title: Nova tarefa
+    remind:
+      no_due: Adicione uma data de entrega primeiro para definir um lembrete.
+      remind_failed: Não foi possível definir o lembrete.
+      reminded: Lembrete definido — confirme-o na página de Lembretes para adicionar ao seu calendário.
     show:
       activity: Atividade
+      add_document: Anexar um documento
       add_email: Associar um email
       assignees: Responsáveis
       back: Todas as tarefas
@@ -99,6 +117,8 @@ pt:
       delete: Eliminar
       delete_confirm: Eliminar esta tarefa? Esta ação não pode ser anulada.
       description: Descrição
+      detach: Desanexar
+      documents: Documentos
       edit: Editar
       labels: Etiquetas
       linked_emails: Emails associados
@@ -106,15 +126,29 @@ pt:
       no_activity: Ainda sem atividade.
       no_assignees: Sem responsável
       no_description: Ainda sem descrição.
+      no_documents: Sem documentos anexados.
       no_labels: Sem etiquetas.
       no_linked_emails: Sem emails associados.
       origin: Criada a partir deste email
       priority: "Prioridade: %{level}"
       relationship: Relação
+      remind: Lembrar-me
+      reminder_set: Lembrete definido
       reopen: Reabrir
       status: Estado
       unlink: Desassociar
       update: Atualizar
+    skim:
+      accept: Manter
+      all_tasks: Todas as tarefas
+      complete: Concluída
+      dismiss: Dispensar
+      empty_body: O Scout não sugeriu nenhuma tarefa de momento.
+      empty_title: Nada para rever
+      from_document: "Do documento: %{title}"
+      from_email: "Do email: %{subject}"
+      subtitle: O Scout extraiu estas ações do seu email. Mantenha as que importam.
+      title: Tarefas sugeridas
     unlink_email:
       unlinked: Email desassociado.
     update:

@@ -16,6 +16,9 @@ class Task < ApplicationRecord
   has_many :task_email_links, dependent: :destroy
   has_many :linked_emails, through: :task_email_links, source: :email_message
 
+  has_many :task_documents, dependent: :destroy
+  has_many :documents, through: :task_documents
+
   has_many :task_tags, dependent: :destroy
   has_many :tags, through: :task_tags
 
@@ -64,6 +67,10 @@ class Task < ApplicationRecord
   }
 
   after_create_commit :publish_created
+  # Keep the home feed in sync when a feed-relevant facet changes (a new active
+  # task, a status move, or a due-date change). Suggested tasks live in Skim, not
+  # the feed, so they never trigger a refresh.
+  after_save_commit :refresh_feed, if: :feed_relevant?
 
   # Idempotency for AI extraction: same source + normalized title → same row, so
   # re-extracting an email never duplicates it. (A task rarely carries a stable
@@ -88,7 +95,6 @@ class Task < ApplicationRecord
                    payload: { title: title, from: previous, to: new_status })
     Events.publish("task.completed", subject: self, actor: by, payload: { title: title }) if done?
 
-    refresh_feed
     true
   end
 
@@ -110,6 +116,12 @@ class Task < ApplicationRecord
   def publish_created
     Events.publish("task.created", subject: self, actor: created_by,
                    payload: { title: title, status: status, ai_suggested: ai_suggested })
+  end
+
+  def feed_relevant?
+    return false if suggested?
+
+    saved_change_to_id? || saved_change_to_status? || saved_change_to_due_at?
   end
 
   def refresh_feed

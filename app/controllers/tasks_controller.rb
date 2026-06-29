@@ -7,7 +7,7 @@ class TasksController < ApplicationController
 
   before_action :require_authentication
   before_action :require_tasks_enabled
-  before_action :set_task, only: %i[show edit update destroy complete move assign email_picker link_email unlink_email]
+  before_action :set_task, only: %i[show edit update destroy complete move assign email_picker link_email unlink_email document_picker attach_document detach_document remind accept dismiss]
   before_action :load_collections, only: %i[show new create edit update]
 
   # The live work the user cares about: due-date first (nulls last), then most
@@ -73,6 +73,23 @@ class TasksController < ApplicationController
     respond_with_change(t(".completed"))
   end
 
+  # Triage queue for AI-suggested tasks: review them one by one and accept,
+  # complete, or dismiss. (The full swipe-gesture deck is a planned follow-up.)
+  def skim
+    @tasks = Task.accessible_to(current_user).triage
+                 .includes(:tags, :source).order(created_at: :desc)
+  end
+
+  def accept
+    @task.move_to_status!(:todo, by: current_user)
+    redirect_to skim_tasks_path, success: t(".accepted")
+  end
+
+  def dismiss
+    @task.move_to_status!(:cancelled, by: current_user)
+    redirect_to skim_tasks_path, success: t(".dismissed")
+  end
+
   # Arbitrary status change — the detail status control and the board drag.
   def move
     target = params[:status].to_s
@@ -128,6 +145,48 @@ class TasksController < ApplicationController
   def unlink_email
     @task.task_email_links.find_by(id: params[:link_id])&.destroy
     redirect_to @task, success: t(".unlinked")
+  end
+
+  # Turbo-frame search over the workspace's documents, to attach one to this task.
+  def document_picker
+    @query = params[:q].to_s.strip
+    scope = Current.workspace.documents.order(created_at: :desc)
+    scope = scope.where("documents.metadata->>'title' ILIKE :q OR documents.description ILIKE :q", q: "%#{@query}%") if @query.present?
+    @candidates = scope.limit(15)
+    render partial: "tasks/document_picker", locals: { task: @task, candidates: @candidates, query: @query }
+  end
+
+  def attach_document
+    document = Current.workspace.documents.find_by(id: params[:document_id])
+    return redirect_to(@task, error: t(".not_found")) unless document
+
+    link = @task.task_documents.find_or_initialize_by(document: document)
+    link.created_by = current_user
+    link.save
+    redirect_to @task, success: t(".attached")
+  end
+
+  def detach_document
+    @task.task_documents.find_by(id: params[:link_id])&.destroy
+    redirect_to @task, success: t(".detached")
+  end
+
+  # Promote the task's deadline into a first-class Reminder (source: task), which
+  # surfaces on /reminders + the calendar and can be confirmed into a CalendarEvent.
+  # One deadline reminder per task; re-running syncs its due date.
+  def remind
+    return redirect_to(@task, error: t(".no_due")) if @task.due_at.blank?
+
+    reminder = @task.reminders.find_or_initialize_by(reminder_type: :deadline)
+    reminder.assign_attributes(
+      workspace: @task.workspace, title: @task.title.to_s.first(255),
+      due_at: @task.due_at, all_day: @task.all_day, confidence: 1.0
+    )
+    reminder.status = :pending if reminder.new_record?
+    reminder.save!
+    redirect_to @task, success: t(".reminded")
+  rescue ActiveRecord::RecordInvalid
+    redirect_to @task, error: t(".remind_failed")
   end
 
   private

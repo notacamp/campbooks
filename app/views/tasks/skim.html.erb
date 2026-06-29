@@ -1,0 +1,40 @@
+<div class="mx-auto max-w-2xl px-4 py-6 sm:px-6 lg:px-8">
+  <header class="mb-6 flex items-start justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-semibold tracking-tight text-foreground"><%= t(".title") %></h1>
+      <p class="mt-1 text-sm text-muted-foreground"><%= t(".subtitle") %></p>
+    </div>
+    <%= link_to t(".all_tasks"), tasks_path, class: "shrink-0 text-sm font-medium text-muted-foreground transition hover:text-foreground" %>
+  </header>
+
+  <% if @tasks.empty? %>
+    <%= render Campbooks::EmptyState.new(title: t(".empty_title"), description: t(".empty_body")) %>
+  <% else %>
+    <div class="divide-y divide-hair">
+      <% @tasks.each do |task| %>
+        <article class="py-5 first:pt-0">
+          <div class="flex items-start justify-between gap-3">
+            <%= link_to task.title, task_path(task), class: "text-sm font-semibold text-foreground transition hover:text-foreground/70" %>
+            <% if task.due_at %>
+              <span class="shrink-0 text-xs <%= task.due_at < Time.current ? "font-medium text-red-600 dark:text-red-400" : "text-muted-foreground" %>"><%= l(task.due_at, format: :at) %></span>
+            <% end %>
+          </div>
+          <% if task.justification.present? %>
+            <p class="mt-1.5 text-[13px] leading-relaxed text-muted-foreground"><%= task.justification %></p>
+          <% end %>
+          <% if task.source.present? %>
+            <p class="mt-1.5 truncate text-xs text-muted-foreground/70">
+              <% if task.source_type == "EmailMessage" %><%= t(".from_email", subject: task.source.subject.presence || task.source.from_address) %>
+              <% elsif task.source_type == "Document" %><%= t(".from_document", title: task.source.display_title) %><% end %>
+            </p>
+          <% end %>
+          <div class="mt-3.5 flex flex-wrap items-center gap-2">
+            <%= button_to t(".accept"), accept_task_path(task), method: :patch, data: { turbo: false }, class: task_btn(:primary) %>
+            <%= button_to t(".complete"), complete_task_path(task), method: :patch, data: { turbo: false }, class: task_btn(:outline) %>
+            <%= button_to t(".dismiss"), dismiss_task_path(task), method: :patch, data: { turbo: false }, class: task_btn(:ghost) %>
+          </div>
+        </article>
+      <% end %>
+    </div>
+  <% end %>
+</div>

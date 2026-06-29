@@ -110,6 +110,15 @@ Rails.application.routes.draw do
       get    :email_picker    # search emails to link (turbo-frame)
       post   :link_email      # link an existing email to this task
       delete :unlink_email    # remove a task↔email link
+      get    :document_picker # search documents to attach (turbo-frame)
+      post   :attach_document # attach a workspace document
+      delete :detach_document # remove an attached document
+      post   :remind          # create a linked deadline reminder
+      patch  :accept          # suggested → todo (Skim triage)
+      patch  :dismiss         # suggested → cancelled (Skim triage)
+    end
+    collection do
+      get :skim               # triage AI-suggested tasks
     end
   end
 
