@@ -15,5 +15,9 @@ android/.idea/
 android/captures/
 *.iml
 
+# Tauri / desktop
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+
 # macOS
 .DS_Store

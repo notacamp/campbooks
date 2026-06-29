@@ -1,0 +1,24 @@
+# Rust / Cargo + Tauri generated output
+src-tauri/target/
+src-tauri/gen/
+
+# Build artifacts (installers are published to GitHub Releases, never committed)
+*.dmg
+*.app
+*.msi
+*.exe
+*.deb
+*.AppImage
+*.rpm
+
+# Signing secrets — NEVER commit
+signing.env
+*.p12
+*.pfx
+*.pem
+*.p8
+
+# Tauri updater private key — NEVER commit (public key goes in tauri.conf.json)
+*.key
+
+.DS_Store
