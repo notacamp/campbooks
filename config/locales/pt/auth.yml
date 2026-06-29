@@ -94,5 +94,7 @@ pt:
       password_label: Palavra-passe
       password_placeholder: Introduza a sua palavra-passe
       sign_up: Criar uma conta
+      signup_on_web_html: Novo no Campbooks? %{link}.
+      signup_on_web_link: Crie uma conta na Web
       submit: Iniciar sessão
       tagline: A caixa de entrada que se organiza sozinha.
