@@ -60,7 +60,10 @@ export default class extends Controller {
     const url = link.getAttribute("href")
     if (!url) return
 
-    const match = url.match(/\/email_messages\/(\d+)(\?.*)?$/)
+    // Email message ids are UUIDs (the app uses uuid primary keys), so match a
+    // UUID or a numeric id — a `\d+`-only pattern never matched, so List/Board
+    // row clicks always fell through to full-page navigation instead of the drawer.
+    const match = url.match(/\/email_messages\/([0-9a-f-]{8,}|\d+)(\?.*)?$/i)
     if (!match) return
 
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return

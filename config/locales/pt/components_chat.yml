@@ -14,11 +14,13 @@ pt:
       suggested_heading: Sugestões de %{kind}
       tags_label: etiquetas
     chat_actions:
+      add_to_calendar: Adicionar ao calendário
       allow_sender: Permitir remetente
       archive: Arquivar
       block_sender: Bloquear remetente
       create_event: Criar evento de calendário
       create_task: Criar tarefa
+      dismiss: Dispensar
       draft_reply: Rascunho de resposta
       forward_to: Reencaminhar para %{address}
       link_task: Associar a tarefa

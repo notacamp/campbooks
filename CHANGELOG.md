@@ -18,6 +18,12 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Approve or dismiss Scout's reminders right in the thread** — when Scout spots a
+  dated commitment in an email it now surfaces it in the discussion as *a potential
+  reminder* with **Add to calendar** and **Dismiss** buttons, so you confirm it onto
+  your calendar or wave it off in one tap. The buttons match the home‑feed reminder
+  card, and acting on one collapses both into a quiet "added" / "dismissed" note.
+
 - **Files — sharing, public links & Scout updates** — restrict a folder to chosen
   people with viewer / editor / manager roles from **"Manage access"**; a restricted
   folder and its contents stay hidden from everyone else, while open folders remain
@@ -35,6 +41,18 @@ major, minor, or patch change here.
   are recognised and kept out of your inbox, while the labels you actually use
   (Invoices, Clients, …) stay. The decision is remembered per label — provider
   system/noise labels are no longer attached to every message.
+
+- **A more breathable inbox.** The thread list has more room to breathe — larger,
+  more legible type, roomier rows, and clearer (but still calm) hover and selected
+  states across all three densities. **Compact** mode's text is no longer tiny.
+
+### Fixed
+
+- **List view opens the reading drawer again.** Clicking an email in the inbox's
+  **List** layout now opens it in the bottom‑right drawer instead of navigating the
+  whole page (the row‑click matcher only recognised numeric ids, so it never matched
+  the app's message ids). The standalone inbox also gained the Default / List
+  switcher, so the layout applies there too.
 
 ## [0.5.0] - 2026-06-29
 

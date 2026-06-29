@@ -49,6 +49,11 @@
   --muted: oklch(96.6% 0.002 60);
   --muted-foreground: oklch(50% 0.008 60);
 
+  /* One step past --muted: a calm, *visible* fill for a selected/active list row
+     (the near-white neutral ramp is too compressed for hover and active to read
+     apart otherwise). Ink-family, never Ember — selection isn't Scout/live/win. */
+  --subtle: oklch(93.5% 0.003 60);
+
   /* shadcn "accent" role = subtle neutral hover tint */
   --accent: oklch(96.6% 0.002 60);
   --accent-foreground: oklch(24% 0.006 60);
@@ -117,6 +122,7 @@
 
   --muted: oklch(22% 0.007 60);
   --muted-foreground: oklch(68% 0.009 60);
+  --subtle: oklch(27% 0.008 60);
 
   --accent: oklch(25% 0.008 60);
   --accent-foreground: oklch(94% 0.005 60);
@@ -201,6 +207,7 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-subtle: var(--subtle);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
@@ -900,21 +907,21 @@ dialog[open] {
 
 /* ── Thread list view modes ──────────────────────────── */
 #email_threads {
-  --thread-py: 0.625rem;
-  --thread-gap: 0.75rem;
+  --thread-py: 0.8125rem;
+  --thread-gap: 0.875rem;
   --thread-avatar-size: 2rem;
   --thread-avatar-font: 12px;
-  --thread-subject-size: 11px;
-  --thread-meta-size: 10px;
-  --thread-label-size: 9px;
+  --thread-subject-size: 13px;
+  --thread-meta-size: 11px;
+  --thread-label-size: 10px;
 }
 
 #email_threads[data-inbox-view-mode="compact"] {
-  --thread-py: 0.375rem;
-  --thread-gap: 0.5rem;
-  --thread-subject-size: 10px;
-  --thread-meta-size: 9px;
-  --thread-label-size: 8px;
+  --thread-py: 0.4375rem;
+  --thread-gap: 0.5625rem;
+  --thread-subject-size: 12px;
+  --thread-meta-size: 10px;
+  --thread-label-size: 9px;
 }
 
 #email_threads[data-inbox-view-mode="compact"] .js-inbox-labels {
@@ -923,9 +930,9 @@ dialog[open] {
 
 /* Compact avatar: override ContactAvatar w-8 h-8 (size :lg) */
 #email_threads[data-inbox-view-mode="compact"] .relative.flex-shrink-0 > .w-8.h-8 {
-  width: 1.25rem;
-  height: 1.25rem;
-  font-size: 9px;
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 10px;
 }
 
 /* Compact direction indicator: override w-3.5 h-3.5 */
@@ -937,10 +944,10 @@ dialog[open] {
 }
 
 #email_threads[data-inbox-view-mode="breathable"] {
-  --thread-py: 1rem;
-  --thread-gap: 1rem;
-  --thread-subject-size: 13px;
-  --thread-meta-size: 11px;
+  --thread-py: 1.125rem;
+  --thread-gap: 1.125rem;
+  --thread-subject-size: 14px;
+  --thread-meta-size: 12px;
   --thread-label-size: 10px;
 }
 

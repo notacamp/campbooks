@@ -22,19 +22,25 @@ module Reminders
       )
     end
 
-    test "posts one summary message linking each confident, newly-created reminder" do
+    test "posts one approvable suggestion message per confident, newly-created reminder" do
       r1 = build_reminder(title: "Pay invoice 1234", confidence: 0.9)
       r2 = build_reminder(title: "Renew the plan", confidence: 0.7, type: :renewal)
 
-      assert_difference -> { AgentMessage.count }, 1 do
+      # One card each, so every reminder can be approved or dismissed on its own.
+      assert_difference -> { AgentMessage.count }, 2 do
         run_announce([ r1, r2 ])
       end
 
-      content = @thread.reload.agent_thread.agent_messages.last.content
-      assert_includes content, "2 reminders"
-      assert_includes content, "Pay invoice 1234"
-      assert_includes content, "/reminders#reminder_#{r1.id}"
-      assert_includes content, "/reminders#reminder_#{r2.id}"
+      messages = @thread.reload.agent_thread.agent_messages.order(:created_at).to_a
+      contents = messages.map(&:content)
+      assert contents.all? { |c| c.include?("potential reminder") }
+      assert contents.any? { |c| c.include?("Pay invoice 1234") && c.include?("/reminders#reminder_#{r1.id}") }
+      assert contents.any? { |c| c.include?("Renew the plan") && c.include?("/reminders#reminder_#{r2.id}") }
+
+      # Each card carries inline Approve/Dismiss actions targeting its own reminder.
+      card = messages.find { |m| m.content.include?("Pay invoice 1234") }
+      assert_equal %w[confirm_reminder dismiss_reminder], card.ai_suggested_actions.map { |a| a["tool"] }.sort
+      assert card.ai_suggested_actions.all? { |a| a["args"]["reminder_id"] == r1.id }
     end
 
     test "skips reminders below the confidence floor" do

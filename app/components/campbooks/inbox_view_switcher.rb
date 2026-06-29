@@ -20,7 +20,11 @@ module Campbooks
       board: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3.75 5.25h4.5v13.5h-4.5zM9.75 5.25h4.5v13.5h-4.5zM15.75 5.25h4.5v13.5h-4.5z"/>'
     }.freeze
 
-    def initialize(**attrs)
+    # board: false drops the Board segment regardless of the feature flag — used on
+    # the standalone inbox index, which has no board pane to switch into (a stale
+    # saved "board" then falls back to Default via the Stimulus controller).
+    def initialize(board: true, **attrs)
+      @board = board
       @attrs = attrs
     end
 
@@ -48,7 +52,7 @@ module Campbooks
     # buttons, so dropping the segment here is enough — a stale saved "board"
     # falls back to Default.
     def enabled_layouts
-      Features.email_board? ? LAYOUTS : LAYOUTS - %i[board]
+      (@board && Features.email_board?) ? LAYOUTS : LAYOUTS - %i[board]
     end
 
     def segment(layout)
