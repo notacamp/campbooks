@@ -31,15 +31,19 @@
       </div>
     </div>
 
-    <%= form_with url: move_task_path(@task), method: :patch, data: { turbo: false }, class: "mt-4 flex items-center gap-2" do %>
+    <div class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
       <span class="text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".status") %></span>
-      <select name="status" class="h-9 rounded-md border border-border bg-background px-2.5 text-sm text-foreground transition focus:border-foreground focus:outline-none">
+      <%# Segmented control: clicking a segment submits the status change immediately. %>
+      <%= form_with url: move_task_path(@task), method: :patch, data: { turbo: false }, class: "inline-flex flex-wrap items-center gap-1 rounded-lg bg-muted/60 p-1" do %>
         <% (Task::BOARD_STATUSES + %w[cancelled]).each do |s| %>
-          <option value="<%= s %>" <%= "selected" if @task.status == s %>><%= t("activerecord.attributes.task.statuses.#{s}") %></option>
+          <% active = @task.status == s %>
+          <button type="submit" name="status" value="<%= s %>" aria-pressed="<%= active %>"
+                  class="<%= class_names("cursor-pointer rounded-md px-2.5 py-1 text-[13px] font-medium transition", active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground") %>">
+            <%= t("activerecord.attributes.task.statuses.#{s}") %>
+          </button>
         <% end %>
-      </select>
-      <button type="submit" class="<%= task_btn(:outline) %>"><%= t(".update") %></button>
-    <% end %>
+      <% end %>
+    </div>
   </header>
 
   <% if @task.ai_suggested? && @task.justification.present? %>

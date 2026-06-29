@@ -33,6 +33,11 @@ es:
         other: Tareas
   components:
     tasks:
+      board_card:
+        overdue: Atrasada
+        today: Hoy
+      board_column:
+        empty: "Nada aqui"
       form:
         assignees_label: Responsables
         cancel: Cancelar
@@ -64,6 +69,9 @@ es:
     attach_document:
       attached: Documento adjuntado.
       not_found: No se encontró ese documento.
+    comments:
+      form:
+        placeholder: "Añade un comentario, o @scout para ayuda…"
     complete:
       completed: Tarea completada.
     create:
@@ -86,8 +94,10 @@ es:
       search_placeholder: Busca tu correo por asunto…
     index:
       all: Todas
+      board_view: Tablero
       empty_body: Crea una tarea, o deja que Scout extraiga acciones de tu correo.
       empty_title: "Aún sin tareas"
+      list_view: Lista
       new: Nueva tarea
       subtitle: Acciones de tu correo y tus propias tareas.
       title: Tareas
@@ -110,6 +120,7 @@ es:
       activity: Actividad
       add_document: Adjuntar un documento
       add_email: Vincular un correo
+      ai_reasoning: "Scout marcó esto:"
       assignees: Responsables
       back: Todas las tareas
       created_by: Creada por %{name}
@@ -118,6 +129,8 @@ es:
       delete_confirm: "¿Eliminar esta tarea? Esta acción no se puede deshacer."
       description: Descripción
       detach: Desadjuntar
+      discussion: "Discusión"
+      discussion_empty: Inicia la discusión. Menciona @scout para traer la IA.
       documents: Documentos
       edit: Editar
       labels: Etiquetas
@@ -149,6 +162,7 @@ es:
       from_email: "Del correo: %{subject}"
       subtitle: Scout extrajo estas acciones de tu correo. Quédate con las que importen.
       title: Tareas sugeridas
+      why: "Por qué esto es una tarea:"
     unlink_email:
       unlinked: Correo desvinculado.
     update:

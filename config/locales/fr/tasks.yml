@@ -33,6 +33,11 @@ fr:
         other: "Tâches"
   components:
     tasks:
+      board_card:
+        overdue: En retard
+        today: "Aujourd'hui"
+      board_column:
+        empty: Rien ici
       form:
         assignees_label: Responsables
         cancel: Annuler
@@ -64,6 +69,9 @@ fr:
     attach_document:
       attached: Document joint.
       not_found: Ce document est introuvable.
+    comments:
+      form:
+        placeholder: "Ajoutez un commentaire, ou @scout pour de l'aide…"
     complete:
       completed: "Tâche terminée."
     create:
@@ -86,8 +94,10 @@ fr:
       search_placeholder: "Recherchez vos e-mails par objet…"
     index:
       all: Toutes
+      board_view: Tableau
       empty_body: "Créez une tâche, ou laissez Scout extraire des actions de vos e-mails."
       empty_title: Aucune tâche pour l'instant
+      list_view: Liste
       new: "Nouvelle tâche"
       subtitle: Actions issues de vos e-mails et vos propres tâches.
       title: "Tâches"
@@ -110,6 +120,7 @@ fr:
       activity: "Activité"
       add_document: Joindre un document
       add_email: Lier un e-mail
+      ai_reasoning: "Scout a signalé ceci :"
       assignees: Responsables
       back: "Toutes les tâches"
       created_by: "Créée par %{name}"
@@ -118,6 +129,8 @@ fr:
       delete_confirm: "Supprimer cette tâche ? Cette action est irréversible."
       description: Description
       detach: "Détacher"
+      discussion: Discussion
+      discussion_empty: Lancez la discussion. Mentionnez @scout pour faire intervenir l'IA.
       documents: Documents
       edit: Modifier
       labels: "Étiquettes"
@@ -149,6 +162,7 @@ fr:
       from_email: "De l'e-mail : %{subject}"
       subtitle: Scout a extrait ces actions de vos e-mails. Gardez celles qui comptent.
       title: "Tâches suggérées"
+      why: "Pourquoi c'est une tâche :"
     unlink_email:
       unlinked: "E-mail dissocié."
     update:
