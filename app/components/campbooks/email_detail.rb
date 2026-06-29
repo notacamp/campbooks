@@ -189,8 +189,10 @@ module Campbooks
       expand_default = [ latest_msg, @message ].uniq
 
       # Conversation view: each message is a light chat bubble aligned by direction
-      # (received ← left, sent → right) so a thread reads like a conversation.
-      div(class: "flex flex-col gap-3.5 px-4 py-4 text-left") do
+      # (received ← left, sent → right) so a thread reads like a conversation. The
+      # `thread-*` hook classes let the inbox setting flatten these back to a classic
+      # full-width list via CSS ([data-thread-view="classic"]).
+      div(class: "thread-conversation flex flex-col gap-3.5 px-4 py-4 text-left") do
         messages.each do |msg|
           render_message_bubble(msg, sent: msg.sent?, expanded: expand_default.include?(msg), show_selected: show_selected)
         end
@@ -215,7 +217,7 @@ module Campbooks
       # disagree. Direction (left/right + tint) carries who-sent-what.
       name = msg.from_address || "-"
 
-      div(class: "flex items-start gap-2 #{'flex-row-reverse' if sent}") do
+      div(class: "thread-msg flex items-start gap-2 #{'flex-row-reverse' if sent}") do
         div(class: "flex-shrink-0 mt-0.5") do
           render(ContactAvatar.new(
             email: msg.from_address || "?",
@@ -223,7 +225,7 @@ module Campbooks
           ))
         end
 
-        details(class: "group min-w-0 max-w-[85%] rounded-2xl #{bubble}", open: expanded) do
+        details(class: "thread-bubble group min-w-0 max-w-[85%] rounded-2xl #{bubble}", open: expanded) do
           # Header row (always visible — click to expand/collapse), plus a one-line
           # preview that shows only while collapsed so a folded bubble still reads as
           # a message rather than an empty pill.

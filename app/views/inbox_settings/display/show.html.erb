@@ -83,6 +83,22 @@
           <% end %>
         </div>
       </section>
+
+      <!-- Conversation view — how a thread renders in the reading pane -->
+      <section>
+        <h4 class="text-xs font-semibold text-foreground mb-3"><%= t(".thread_view_heading") %></h4>
+        <div class="grid grid-cols-2 gap-2">
+          <% %w[bubbles classic].each do |view| %>
+            <button type="button"
+                    data-action="click->inbox-settings-modal#setThreadView"
+                    data-thread-view="<%= view %>"
+                    class="text-[13px] text-gray-600 bg-gray-100 rounded-lg px-3 py-2 text-center cursor-pointer border-0 hover:bg-gray-200 transition-colors">
+              <%= t(".thread_view_#{view}") %>
+            </button>
+          <% end %>
+        </div>
+        <p class="text-xs text-muted-foreground mt-2"><%= t(".thread_view_hint") %></p>
+      </section>
     </div>
   </div>
 <% end %>

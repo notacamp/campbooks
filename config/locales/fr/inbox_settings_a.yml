@@ -40,6 +40,10 @@ fr:
           dans ce navigateur.
         system_labels_heading: Étiquettes système
         system_labels_hint: Étiquettes de votre messagerie (Gmail). Masquées par défaut — activez pour les voir.
+        thread_view_bubbles: Bulles
+        thread_view_classic: Classique
+        thread_view_heading: Vue conversation
+        thread_view_hint: Les bulles montrent qui a envoyé chaque message, comme un chat.
     filtering:
       show:
         allowed_heading: Expéditeurs autorisés
