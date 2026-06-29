@@ -44,6 +44,8 @@ es:
         created: Enlace público listo.
       destroy:
         revoked: Enlace público revocado.
+    scout_thread_linker:
+      body: "Saqué un documento de este correo y lo archivé en Archivos: **[%{title}](%{path})**."
   components:
     files:
       sidebar:

@@ -28,6 +28,14 @@ major, minor, or patch change here.
   documents** right in Files ("New document") and file them into folders, and **file
   emails into folders** too — so a folder can hold uploaded files, internal documents,
   and emails side by side. Each is listed in the folder and recorded in Activity.
+- **Files — sharing, public links & Scout updates** — restrict a folder to chosen
+  people with viewer / editor / manager roles from **"Manage access"**; a restricted
+  folder and its contents stay hidden from everyone else, while open folders remain
+  visible to the whole workspace. Create a **revocable public link** to any file and
+  **insert it into an email** from the composer's "Insert file link", or paste one
+  into a discussion comment (bare links are now clickable there). And, opt-in per
+  workspace (Settings → Data & privacy), **Scout posts a link to a document into its
+  email's discussion** once that document is filed.
 - **Tasks** — a new task-management module (opt-in via `ENABLE_TASKS`, gated by the
   `tasks` plan entitlement). Create tasks manually or have Scout extract action items
   from your email and documents (triaged in Skim, with the originating email and

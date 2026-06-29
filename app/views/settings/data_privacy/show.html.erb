@@ -26,6 +26,25 @@
     <% end %>
   </div>
 
+  <%# ── Scout thread updates (Files Phase 3c opt-in) ─────────────────────── %>
+  <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-6">
+    <div class="flex items-start justify-between gap-4">
+      <div class="min-w-0">
+        <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".scout_posts_heading") %></h2>
+        <p class="text-sm text-gray-500"><%= t(".scout_posts_desc") %></p>
+      </div>
+      <%= form_with url: settings_data_privacy_path, method: :patch, class: "shrink-0 pt-1",
+            data: { controller: "auto-submit", action: "change->auto-submit#submit" } do %>
+        <%= hidden_field_tag :scout_thread_posts, "0" %>
+        <%= render(Campbooks::Toggle.new(
+              name: "scout_thread_posts",
+              checked: @org.scout_thread_posts?,
+              value: "1"
+            )) %>
+      <% end %>
+    </div>
+  </div>
+
   <%# ── Which AI sees your data (read-only; edit in Settings → AI) ───────── %>
   <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-6">
     <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".ai_providers_heading") %></h2>

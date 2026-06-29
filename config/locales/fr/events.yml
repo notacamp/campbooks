@@ -23,6 +23,7 @@ fr:
       contact_unblocked: Contact débloqué
       contact_unstarred: Contact retiré des favoris
       document_approved: Document approuvé
+      document_linked_to_thread: Document lié au fil
       document_processed: Document traité
       document_rejected: Document rejeté
       document_restored: Document restauré

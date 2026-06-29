@@ -124,6 +124,8 @@ module Events
         description: "A file's public link was revoked", subject_type: "Document", payload_keys: %w[name]),
       entry("file.public_link_viewed", "Public link viewed", group: :files, icon: :document,
         description: "A file was opened via its public link", subject_type: "Document", payload_keys: %w[type]),
+      entry("document.linked_to_thread", "Document linked in thread", group: :files, icon: :document,
+        description: "Scout posted a link to a document into its email thread", subject_type: "Document", payload_keys: %w[title]),
 
       # --- Pipelines ----------------------------------------------------------
       entry("pipeline.stage_entered", "Stage entered", group: :pipelines, icon: :git_branch,

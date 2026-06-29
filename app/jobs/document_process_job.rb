@@ -24,6 +24,9 @@ class DocumentProcessJob < ApplicationJob
 
     # Best-effort: extract action items (tasks) a document implies (sign/review/return).
     Tasks::DocumentExtractionJob.perform_later(document.id) if Features.tasks? && document.ai_completed?
+
+    # Best-effort: Scout posts a link to the filed document into its email thread (opt-in).
+    Files::ScoutThreadLinker.call(document) if document.ai_completed?
   ensure
     Current.workspace = nil
   end

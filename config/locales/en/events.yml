@@ -23,6 +23,7 @@ en:
       contact_unblocked: Contact unblocked
       contact_unstarred: Contact unstarred
       document_approved: Document approved
+      document_linked_to_thread: Document linked in thread
       document_processed: Document processed
       document_rejected: Document rejected
       document_restored: Document restored

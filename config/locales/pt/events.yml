@@ -23,6 +23,7 @@ pt:
       contact_unblocked: Contacto desbloqueado
       contact_unstarred: Contacto sem destaque
       document_approved: Documento aprovado
+      document_linked_to_thread: Documento ligado na conversa
       document_processed: Documento processado
       document_rejected: Documento rejeitado
       document_restored: Documento restaurado

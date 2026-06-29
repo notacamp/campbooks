@@ -44,6 +44,8 @@ en:
         created: Public link ready.
       destroy:
         revoked: Public link revoked.
+    scout_thread_linker:
+      body: "I pulled a document out of this email and filed it in Files: **[%{title}](%{path})**."
   components:
     files:
       sidebar:

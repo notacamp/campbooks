@@ -44,6 +44,8 @@ pt:
         created: Link público pronto.
       destroy:
         revoked: Link público revogado.
+    scout_thread_linker:
+      body: "Retirei um documento deste email e arquivei-o em Ficheiros: **[%{title}](%{path})**."
   components:
     files:
       sidebar:

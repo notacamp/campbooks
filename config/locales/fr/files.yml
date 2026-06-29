@@ -44,6 +44,8 @@ fr:
         created: Lien public prêt.
       destroy:
         revoked: Lien public révoqué.
+    scout_thread_linker:
+      body: "J'ai extrait un document de cet e-mail et l'ai classé dans Fichiers : **[%{title}](%{path})**."
   components:
     files:
       sidebar:
