@@ -29,6 +29,11 @@ major, minor, or patch change here.
   `task.status_changed`, `task.assigned`, `task.completed`, `task.archived`), appear in
   the navigation, Skim, and Feed, and are exposed over the public REST API
   (`tasks:read` / `tasks:write`).
+- **Scout notes events & reminders in the email discussion** — when a calendar
+  event is created from an email, or Scout extracts reminders from one, Scout now
+  posts a short message into that email's discussion thread linking back to the new
+  event/reminder, so the discussion is a running record of what Scout did with the
+  email. Reminder notes are limited to confident finds to keep the thread quiet.
 
 ### Fixed
 
@@ -38,7 +43,10 @@ major, minor, or patch change here.
   stacking duplicates — and Scout now sees the commitments already extracted from a
   thread, so it acknowledges them rather than re-suggesting. An invoice that arrives as
   both an email and its PDF attachment now stages one reminder, not two.
-
+- Documents list **month filter** now works. The month picker submits a single
+  `YYYY-MM` value, but the list, "Reanalyze all", and export were looking for a
+  separate `year` parameter that no form ever sends — so picking a month had no
+  effect. They now parse the picker value correctly.
 - `document_templates` was missing from `db/schema.rb`, so fresh installs and CI
   databases (built via `schema:load`) never got the table — and because the load
   also marks the migration as applied, `db:migrate` wouldn't re-create it. This

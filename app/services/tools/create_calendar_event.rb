@@ -54,6 +54,9 @@ module Tools
       # type color can sync out. type_status defaults to pending → the job runs.
       EventClassificationJob.set(wait: 10.seconds).perform_later(event.id)
       cross_link_reminders(event)
+      # Leave a trace in the email's discussion: Scout notes the event it just
+      # created, linking back to it. Best-effort — never blocks event creation.
+      announce_to_discussion(event)
       event
     end
 
@@ -64,12 +67,26 @@ module Tools
     # leave a now-redundant reminder behind. Mirrors Reminders::Confirm's confirm effects.
     def cross_link_reminders(event)
       return unless event.start_at
+
       Reminder.where(source_type: "EmailMessage", source_id: @email.id, status: :pending)
               .where("due_at::date = ?::date", event.start_at)
               .find_each do |reminder|
         reminder.update!(calendar_event: event, status: :confirmed, confirmed_by: @user)
         Events.publish("reminder.confirmed", subject: reminder,
                        payload: { "title" => reminder.title, "due_at" => reminder.due_at&.iso8601 })
+      end
+    end
+
+    def announce_to_discussion(event)
+      return unless @email
+
+      Discussions::ScoutAnnouncer.announce(email_message: @email) do
+        I18n.t(
+          "discussions.scout.calendar_event_created",
+          title: event.title,
+          url: Rails.application.routes.url_helpers.calendar_event_path(event),
+          at: I18n.l(event.start_at, format: :at_short)
+        )
       end
     end
 
