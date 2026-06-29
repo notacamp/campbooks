@@ -11,6 +11,7 @@ es:
       documents: Documentos
       email: Correo
       reminders: Recordatorios
+      tasks: Tareas
     names:
       calendar_event_created: Evento de calendario creado
       calendar_event_deleted: Evento de calendario eliminado
@@ -37,5 +38,11 @@ es:
       reminder_confirmed: Recordatorio confirmado
       reminder_created: Recordatorio creado
       reminder_dismissed: Recordatorio descartado
+      task_archived: Tarea archivada
+      task_assigned: Tarea asignada
+      task_completed: Tarea completada
+      task_created: Tarea creada
+      task_status_changed: Estado de la tarea cambiado
+      task_unarchived: Tarea restaurada
     system_actor: Sistema
     time_ago: hace %{time}

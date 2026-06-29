@@ -47,6 +47,14 @@ module Features
       flag?("ENABLE_MICROSOFT") || flag?("ENABLE_MICROSOFT_MAILBOX")
     end
 
+    # The Tasks module: AI task extraction, the task board/skim/feed surfaces,
+    # Scout + Cmd+K email linking, and the public API. Gated end-to-end (nav, web,
+    # API, extraction jobs) until production-ready. Orthogonal to the per-workspace
+    # `:tasks` billing entitlement — both must pass.
+    def tasks?
+      flag?("ENABLE_TASKS")
+    end
+
     private
 
     def flag?(name)

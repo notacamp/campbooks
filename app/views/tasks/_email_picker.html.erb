@@ -1,0 +1,23 @@
+<%= turbo_frame_tag "task_email_picker" do %>
+  <% if candidates.any? %>
+    <ul class="mt-2 divide-y divide-hair overflow-hidden rounded-lg border border-border">
+      <% candidates.each do |email| %>
+        <li class="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center">
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-sm text-foreground"><%= email.subject.presence || email.from_address %></p>
+            <p class="truncate text-xs text-muted-foreground"><%= email.from_address %></p>
+          </div>
+          <%= form_with url: link_email_task_path(task), method: :post, data: { turbo: false }, class: "flex items-center gap-1.5" do %>
+            <%= hidden_field_tag :email_id, email.id %>
+            <%= render Campbooks::Select.new("relationship",
+                  options: TaskEmailLink.relationships.keys.map { |r| [ t("activerecord.attributes.task_email_link.relationships.#{r}"), r ] },
+                  selected: "related") %>
+            <%= render Campbooks::Button.new(type: "submit", variant: :outline, size: :sm) { t(".link") } %>
+          <% end %>
+        </li>
+      <% end %>
+    </ul>
+  <% elsif query.present? %>
+    <p class="mt-2 text-sm text-muted-foreground"><%= t(".no_results") %></p>
+  <% end %>
+<% end %>

@@ -59,6 +59,7 @@ es:
       notifications: Notificaciones
       pipelines: Pipelines
       scout: Scout
+      tasks: Tareas
       workflow_executions: Ejecuciones de flujo
       workflows: Flujos de trabajo
   navigation:

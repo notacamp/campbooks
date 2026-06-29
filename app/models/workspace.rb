@@ -25,6 +25,7 @@ class Workspace < ApplicationRecord
   has_many :events, dependent: :delete_all
   has_many :bug_reports, dependent: :destroy
   has_many :reminders, dependent: :destroy
+  has_many :tasks, dependent: :destroy
   has_many :mail_folders, dependent: :destroy
   has_many :scheduled_emails, dependent: :restrict_with_error
 

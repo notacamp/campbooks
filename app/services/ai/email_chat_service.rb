@@ -125,6 +125,8 @@ module Ai
           - `archive`: {"tool": "archive", "args": {}}
           - `trash`: {"tool": "trash", "args": {}}
           - `create_calendar_event`: {"tool": "create_calendar_event", "args": {"title": "...", "start_time": "ISO8601 (optional)", "end_time": "ISO8601 (optional)"}} — add an event to the user's calendar from this email. Suggest when the email implies a meeting or deadline; omit any time you're unsure of (the user can adjust it).
+          - `create_task_from_email`: {"tool": "create_task_from_email", "args": {"title": "imperative action", "due_at": "ISO8601 (optional)", "priority": "low|normal|high|urgent (optional)"}} — create a to-do task from this email. Suggest when the email asks the reader to DO something (send, review, approve, follow up). The email becomes the task's origin.
+          - `link_task_to_email`: {"tool": "link_task_to_email", "args": {"task_id": "...", "relationship": "related|reference|follow_up|blocked_by (optional)"}} — link this email to an EXISTING task. Only use when you know the task_id (e.g. the user named a task).
           - `star_sender`: {"tool": "star_sender", "args": {}} — promote this sender; their emails get prominence in Skim and the feed and are never grouped with others.
           - `block_sender`: {"tool": "block_sender", "args": {}} — block this sender; their existing and future mail is archived out of the inbox. Reversible with unblock_sender.
           - `allow_sender`: {"tool": "allow_sender", "args": {}} — allow this sender into the inbox (relevant in whitelist mode).

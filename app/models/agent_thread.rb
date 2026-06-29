@@ -6,7 +6,7 @@ class AgentThread < ApplicationRecord
   has_many :thread_follows, dependent: :destroy
   has_many :followers, through: :thread_follows, source: :user
 
-  enum :purpose, { global: 0, email_chat: 1, compose_chat: 2, setup_chat: 3 }, default: :global
+  enum :purpose, { global: 0, email_chat: 1, compose_chat: 2, setup_chat: 3, task_chat: 4 }, default: :global
 
   scope :recent, -> { order(created_at: :desc) }
   scope :with_messages, -> { joins(:agent_messages).group("agent_threads.id").having("COUNT(agent_messages.id) > 0") }
@@ -27,6 +27,7 @@ class AgentThread < ApplicationRecord
     case purpose.to_sym
     when :email_chat then "Email thread"
     when :compose_chat then "Compose"
+    when :task_chat then "Task"
     else nil
     end
   end
@@ -34,6 +35,8 @@ class AgentThread < ApplicationRecord
   def context_url
     if email_chat? && contextable && contextable.respond_to?(:latest_message)
       Rails.application.routes.url_helpers.email_message_path(contextable.latest_message)
+    elsif task_chat? && contextable
+      Rails.application.routes.url_helpers.task_path(contextable)
     end
   end
 end

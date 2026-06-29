@@ -1,0 +1,6 @@
+<div class="inline-flex rounded-lg border border-border p-0.5 text-sm">
+  <%= link_to t("tasks.index.list_view"), tasks_path,
+        class: class_names("rounded-md px-2.5 py-1 font-medium transition", current == :list ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground") %>
+  <%= link_to t("tasks.index.board_view"), board_tasks_path,
+        class: class_names("rounded-md px-2.5 py-1 font-medium transition", current == :board ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground") %>
+</div>

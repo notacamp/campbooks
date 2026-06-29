@@ -27,6 +27,12 @@ fr:
     create_calendar_event:
       no_calendar: Connectez d'abord un calendrier pour ajouter des événements.
       success: Événement '%{title}' ajouté à votre calendrier
+    create_task_from_email:
+      failure: Impossible de créer la tâche.
+      success: "Tâche créée : %{title}"
+    link_task_to_email:
+      failure: "Impossible d'associer l'e-mail à cette tâche."
+      success: "Associé à la tâche : %{title}"
     forward_email:
       failure: Impossible de transférer à %{to_address}
       success: Transféré à %{to_address}

@@ -60,6 +60,7 @@ fr:
       notifications: Notifications
       pipelines: Pipelines
       scout: Scout
+      tasks: "Tâches"
       workflow_executions: Exécutions de workflow
       workflows: Workflows
   navigation:
