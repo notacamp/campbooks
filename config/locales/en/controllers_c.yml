@@ -139,6 +139,7 @@ en:
       terms_required: Please accept the Terms of Service and Privacy Policy to continue.
     ensure_step_order:
       verify_email_first: Please verify your email first.
+    native_signup_unavailable: Create your account on the web, then sign in here.
     resend_code:
       sent: A new code was sent to %{email}.
   sessions:
