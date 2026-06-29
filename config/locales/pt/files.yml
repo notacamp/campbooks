@@ -27,6 +27,8 @@ pt:
       internal_documents: Documentos internos
       emails: Emails
       files_section: Ficheiros
+      manage_access: Gerir acesso
+      manage_access_locked: "Gerir acesso · Privado"
     uploads:
       create:
         no_files: Escolha pelo menos um ficheiro para carregar.
@@ -67,3 +69,19 @@ pt:
         actions: Ações do email
         open: Abrir no Correio
         remove_from_folder: Remover da pasta
+      folder_sharing:
+        open_hint: Esta pasta está aberta a todos no seu espaço de trabalho. Restrinja-a para escolher quem tem acesso.
+        restrict_label: Restringir acesso
+        restrict_hint: Só as pessoas que adicionar (e os administradores) podem ver esta pasta e o seu conteúdo.
+        you_badge: Você
+        owner_badge: Proprietário
+        role_aria: Nível de acesso
+        role_viewer: Pode ver
+        role_editor: Pode editar
+        role_manager: Gestor
+        remove_confirm: "Remover %{name} desta pasta?"
+        remove_aria: Remover acesso
+        add_title: Adicionar pessoas
+        all_have_access: Todos no espaço de trabalho já têm acesso.
+        select_placeholder: Escolha uma pessoa…
+        add_button: Adicionar

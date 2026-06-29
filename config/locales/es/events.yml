@@ -47,6 +47,10 @@ es:
       folder_deleted: Carpeta eliminada
       folder_moved: Carpeta movida
       folder_renamed: Carpeta renombrada
+      folder_restricted: Carpeta restringida
+      folder_shared: Carpeta compartida
+      folder_unrestricted: Carpeta abierta
+      folder_unshared: Acceso a la carpeta eliminado
       internal_document_created: Documento interno creado
       internal_document_updated: Documento interno actualizado
       pipeline_stage_entered: Etapa iniciada

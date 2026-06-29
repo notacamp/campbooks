@@ -47,6 +47,10 @@ pt:
       folder_deleted: Pasta eliminada
       folder_moved: Pasta movida
       folder_renamed: Pasta renomeada
+      folder_restricted: Pasta restringida
+      folder_shared: Pasta partilhada
+      folder_unrestricted: Pasta aberta
+      folder_unshared: Acesso à pasta removido
       internal_document_created: Documento interno criado
       internal_document_updated: Documento interno atualizado
       pipeline_stage_entered: Etapa iniciada

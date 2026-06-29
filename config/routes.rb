@@ -422,6 +422,10 @@ Rails.application.routes.draw do
     resources :uploads, only: [ :create, :destroy ] do
       member { post :analyze }
     end
+    # Per-folder sharing (Phase 3): restrict a folder + manage members.
+    resources :folders, only: [] do
+      resource :share, only: [ :show, :update ], controller: "folder_shares"
+    end
   end
 
   get "email_messages/new", to: "email_messages#new", as: :new_email_message

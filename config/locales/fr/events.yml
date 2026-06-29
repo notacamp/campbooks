@@ -47,6 +47,10 @@ fr:
       folder_deleted: Dossier supprimé
       folder_moved: Dossier déplacé
       folder_renamed: Dossier renommé
+      folder_restricted: Dossier restreint
+      folder_shared: Dossier partagé
+      folder_unrestricted: Dossier ouvert
+      folder_unshared: Accès au dossier retiré
       internal_document_created: Document interne créé
       internal_document_updated: Document interne mis à jour
       pipeline_stage_entered: Étape atteinte

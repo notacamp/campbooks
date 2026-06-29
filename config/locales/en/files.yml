@@ -27,6 +27,8 @@ en:
       internal_documents: Internal documents
       emails: Emails
       files_section: Files
+      manage_access: Manage access
+      manage_access_locked: "Manage access · Private"
     uploads:
       create:
         no_files: Choose at least one file to upload.
@@ -67,3 +69,19 @@ en:
         actions: Email actions
         open: Open in Mail
         remove_from_folder: Remove from folder
+      folder_sharing:
+        open_hint: This folder is open to everyone in your workspace. Restrict it to choose who has access.
+        restrict_label: Restrict access
+        restrict_hint: Only people you add (and admins) can see this folder and its contents.
+        you_badge: You
+        owner_badge: Owner
+        role_aria: Access level
+        role_viewer: Can view
+        role_editor: Can edit
+        role_manager: Manager
+        remove_confirm: "Remove %{name} from this folder?"
+        remove_aria: Remove access
+        add_title: Add people
+        all_have_access: Everyone in the workspace already has access.
+        select_placeholder: Choose a person…
+        add_button: Add

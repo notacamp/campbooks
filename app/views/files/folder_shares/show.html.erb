@@ -1,0 +1,9 @@
+<%# Loaded into the "Manage access" dialog's turbo-frame on the folder page; every
+    control PATCHes back here, so the frame re-renders with the updated panel. %>
+<%= turbo_frame_tag dom_id(@folder, :share) do %>
+  <%= render Campbooks::Files::FolderSharing.new(
+        folder: @folder,
+        members: @members,
+        addable_users: @addable_users,
+        current_user: Current.user) %>
+<% end %>

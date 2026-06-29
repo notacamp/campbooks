@@ -110,6 +110,14 @@ module Events
       entry("email.unfiled", "Email removed from folder", group: :files, icon: :inbox,
         description: "An email was removed from a folder", subject_type: "EmailMessage",
         payload_keys: %w[subject folder]),
+      entry("folder.restricted", "Folder restricted", group: :files, icon: :folder,
+        description: "A folder was made private", subject_type: "MailFolder", payload_keys: %w[name]),
+      entry("folder.unrestricted", "Folder opened", group: :files, icon: :folder,
+        description: "A folder was opened to the whole workspace", subject_type: "MailFolder", payload_keys: %w[name]),
+      entry("folder.shared", "Folder shared", group: :files, icon: :user,
+        description: "Someone was given access to a folder", subject_type: "MailFolder", payload_keys: %w[name member]),
+      entry("folder.unshared", "Folder access removed", group: :files, icon: :user,
+        description: "Someone's access to a folder was removed", subject_type: "MailFolder", payload_keys: %w[name member]),
 
       # --- Pipelines ----------------------------------------------------------
       entry("pipeline.stage_entered", "Stage entered", group: :pipelines, icon: :git_branch,

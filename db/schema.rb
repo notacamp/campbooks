@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_29_030000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_29_100001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -824,12 +824,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_030000) do
     t.index ["workspace_id"], name: "index_invitations_on_workspace_id"
   end
 
+  create_table "mail_folder_users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.boolean "can_manage", default: false, null: false
+    t.boolean "can_read", default: true, null: false
+    t.boolean "can_write", default: false, null: false
+    t.datetime "created_at", null: false
+    t.uuid "mail_folder_id", null: false
+    t.boolean "owner", default: false, null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["mail_folder_id", "user_id"], name: "index_mail_folder_users_on_mail_folder_id_and_user_id", unique: true
+    t.index ["mail_folder_id"], name: "index_mail_folder_users_on_mail_folder_id"
+    t.index ["user_id"], name: "index_mail_folder_users_on_user_id"
+  end
+
   create_table "mail_folders", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "icon"
     t.string "name", null: false
     t.uuid "parent_id"
     t.integer "position", default: 0, null: false
+    t.boolean "restricted", default: false, null: false
     t.datetime "updated_at", null: false
     t.uuid "workspace_id", null: false
     t.index "workspace_id, lower((name)::text)", name: "index_mail_folders_on_workspace_and_lower_name", unique: true
@@ -1693,6 +1708,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_030000) do
   add_foreign_key "invitations", "users", column: "accepted_by_id"
   add_foreign_key "invitations", "users", column: "invited_by_id"
   add_foreign_key "invitations", "workspaces"
+  add_foreign_key "mail_folder_users", "mail_folders"
+  add_foreign_key "mail_folder_users", "users"
   add_foreign_key "mail_folders", "mail_folders", column: "parent_id"
   add_foreign_key "mail_folders", "workspaces"
   add_foreign_key "mfa_email_challenges", "users"

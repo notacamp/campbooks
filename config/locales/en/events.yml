@@ -47,6 +47,10 @@ en:
       folder_deleted: Folder deleted
       folder_moved: Folder moved
       folder_renamed: Folder renamed
+      folder_restricted: Folder restricted
+      folder_shared: Folder shared
+      folder_unrestricted: Folder opened
+      folder_unshared: Folder access removed
       internal_document_created: Internal document created
       internal_document_updated: Internal document updated
       pipeline_stage_entered: Stage entered
