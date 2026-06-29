@@ -20,6 +20,11 @@ es:
       col_added: Añadido
       col_actions: Acciones
       empty_folder: Esta carpeta está vacía.
+      search_results:
+        zero: "Sin resultados para \"%{q}\""
+        one: "1 resultado para \"%{q}\""
+        other: "%{count} resultados para \"%{q}\""
+      search_empty: Ningún documento coincide con tu búsqueda. Prueba otro término o borra los filtros.
       empty_title: Aún no hay archivos
       empty_description: "Sube archivos para mantenerlos organizados en carpetas: facturas, contratos, lo que sea."
       empty_upload: Subir archivos
@@ -74,6 +79,10 @@ es:
       body: "Saqué un documento de este correo y lo archivé en Archivos: **[%{title}](%{path})**."
   components:
     files:
+      search_bar:
+        placeholder: Buscar archivos…
+        submit: Buscar
+        clear: Borrar búsqueda
       sidebar:
         label: Carpetas
         all_files: Todos los archivos

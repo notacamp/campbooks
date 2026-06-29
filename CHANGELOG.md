@@ -16,6 +16,17 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Smart search on the Files page.** A new search box finds documents by meaning,
+  not just exact words — search the way you'd describe it ("the contract with Acme",
+  "all payment receipts to EDP", "invoice FT 2024/123") and the most relevant files
+  rank first. It blends semantic (vector) matching with exact keyword lookups and
+  recognises document types, company names, and invoice/receipt numbers in English
+  and Portuguese. To power it, the AI now writes a short, search-optimized summary
+  when it analyzes a document. Existing files keep working; self-hosters can re-index
+  them for the richer search with `bin/rails search:reindex_documents`.
+
 ## [0.6.0] - 2026-06-29
 
 ### Added
