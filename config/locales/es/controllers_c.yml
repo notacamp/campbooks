@@ -142,6 +142,7 @@ es:
         para continuar.
     ensure_step_order:
       verify_email_first: Verifique su correo primero.
+    native_signup_unavailable: Cree su cuenta en la web y luego inicie sesión aquí.
     resend_code:
       sent: Se ha enviado un nuevo código a %{email}.
   sessions:

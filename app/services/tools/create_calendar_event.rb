@@ -19,8 +19,19 @@ module Tools
       calendar = target_calendar
       return nil unless calendar
 
+      explicit_start = parse_time(@args[:start_time])
+
+      # Idempotent: if Scout, the feed reminder card, or a previous click already
+      # created an event for this email, return that one instead of stacking a
+      # duplicate. The only case that still creates a second event is an explicit
+      # start time on a different calendar day (a genuinely distinct commitment).
+      if (existing = CalendarEvent.duplicate_for(email: @email, start_at: explicit_start))
+        cross_link_reminders(existing)
+        return existing
+      end
+
       details = Ai::EventExtractor.new(@email).extract
-      start_at = parse_time(@args[:start_time]) || details.start_at
+      start_at = explicit_start || details.start_at
       end_at   = parse_time(@args[:end_time]) || details.end_at || (start_at + 3600)
 
       event = calendar.calendar_events.new(
@@ -42,7 +53,7 @@ module Tools
       # short delay lets the create write swap in the real provider id first, so the
       # type color can sync out. type_status defaults to pending → the job runs.
       EventClassificationJob.set(wait: 10.seconds).perform_later(event.id)
-
+      cross_link_reminders(event)
       # Leave a trace in the email's discussion: Scout notes the event it just
       # created, linking back to it. Best-effort — never blocks event creation.
       announce_to_discussion(event)
@@ -50,6 +61,21 @@ module Tools
     end
 
     private
+
+    # Confirm and link any same-day pending reminder staged from this same email, so a
+    # meeting that surfaced both a Reminder card and a Scout "Create event" button doesn't
+    # leave a now-redundant reminder behind. Mirrors Reminders::Confirm's confirm effects.
+    def cross_link_reminders(event)
+      return unless event.start_at
+
+      Reminder.where(source_type: "EmailMessage", source_id: @email.id, status: :pending)
+              .where("due_at::date = ?::date", event.start_at)
+              .find_each do |reminder|
+        reminder.update!(calendar_event: event, status: :confirmed, confirmed_by: @user)
+        Events.publish("reminder.confirmed", subject: reminder,
+                       payload: { "title" => reminder.title, "due_at" => reminder.due_at&.iso8601 })
+      end
+    end
 
     def announce_to_discussion(event)
       return unless @email

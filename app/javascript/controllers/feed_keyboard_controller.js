@@ -1,4 +1,5 @@
 import { Controller } from "@hotwired/stimulus"
+import { skimOverlayOpen } from "controllers/skim_utils"
 
 // Keyboard control for the home feed, acting on the card the reader is looking at
 // — the one feed-focus highlights as nearest the viewport centre ([data-focused]).
@@ -33,6 +34,9 @@ export default class extends Controller {
     const target = event.target
     if (target instanceof Element && target.closest("input, textarea, select, [contenteditable='true']")) return
     if (document.querySelector("dialog[open]")) return
+    // The Skim overlay is a role="dialog" panel, not a native <dialog open>, so
+    // guard it explicitly — otherwise feed shortcuts also fire on the cards behind it.
+    if (skimOverlayOpen()) return
     if (this.units().length === 0) return
 
     switch (event.key) {

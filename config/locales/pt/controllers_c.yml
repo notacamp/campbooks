@@ -141,6 +141,7 @@ pt:
         continuar.
     ensure_step_order:
       verify_email_first: Por favor, verifique primeiro o seu e-mail.
+    native_signup_unavailable: Crie a sua conta na Web e depois inicie sessão aqui.
     resend_code:
       sent: Um novo código foi enviado para %{email}.
   sessions:
