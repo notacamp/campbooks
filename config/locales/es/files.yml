@@ -1,0 +1,69 @@
+---
+es:
+  files:
+    index:
+      title: Archivos
+      subtitle: Sube, organiza y encuentra tus archivos.
+      new_folder: Nueva carpeta
+      new_folder_hint: Agrupa tus archivos en una carpeta.
+      upload: Subir
+      breadcrumb: Ruta de navegación
+      all_files: Todos los archivos
+      click_to_upload: Haz clic para subir
+      drag_and_drop: o arrastra y suelta
+      upload_hint: Puedes subir cualquier tipo de archivo.
+      selected_files: Archivos seleccionados
+      upload_submit: Subir archivos
+      col_name: Nombre
+      col_kind: Tipo
+      col_size: Tamaño
+      col_added: Añadido
+      col_actions: Acciones
+      empty_folder: Esta carpeta está vacía.
+      empty_title: Aún no hay archivos
+      empty_description: "Sube archivos para mantenerlos organizados en carpetas: facturas, contratos, lo que sea."
+      empty_upload: Subir archivos
+      new_internal_document: Nuevo documento
+      internal_documents: Documentos internos
+      emails: Correos
+      files_section: Archivos
+    uploads:
+      create:
+        no_files: Elige al menos un archivo para subir.
+        uploaded_one: Archivo subido.
+        uploaded_many: "%{count} archivos subidos."
+        failed: "Error al subir: %{message}"
+      destroy:
+        deleted: Archivo eliminado.
+      analyze:
+        analyzing: Analizando este archivo con IA…
+  components:
+    files:
+      sidebar:
+        label: Carpetas
+        all_files: Todos los archivos
+        new_folder: Nueva carpeta
+      file_actions_menu:
+        actions: Acciones del archivo
+        open: Abrir
+        download: Descargar
+        move_to: Mover a
+        remove_from_folder: Quitar de la carpeta
+        delete: Eliminar
+        delete_confirm: "¿Eliminar \"%{name}\"? Esta acción no se puede deshacer."
+      file_meta:
+        kind_image: Imagen
+        kind_file: Archivo
+      doc_row:
+        kind: Documento interno
+        updated: Actualizado el %{date}
+        actions: Acciones del documento
+        open: Abrir
+        edit: Editar
+        move_to: Mover a
+        remove_from_folder: Quitar de la carpeta
+      email_row:
+        no_subject: (sin asunto)
+        actions: Acciones del correo
+        open: Abrir en Correo
+        remove_from_folder: Quitar de la carpeta

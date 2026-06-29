@@ -11,6 +11,7 @@ en:
         ai_providers_and_services: AI providers & services
         api_access: API access
         document_templates: Document templates
+        email_templates: Email templates
         general: General
         integrations: Integrations
         members: Members

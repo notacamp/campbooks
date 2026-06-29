@@ -1,0 +1,69 @@
+---
+pt:
+  files:
+    index:
+      title: Ficheiros
+      subtitle: Carregue, organize e encontre os seus ficheiros.
+      new_folder: Nova pasta
+      new_folder_hint: Agrupe os seus ficheiros numa pasta.
+      upload: Carregar
+      breadcrumb: Navegação estrutural
+      all_files: Todos os ficheiros
+      click_to_upload: Clique para carregar
+      drag_and_drop: ou arraste e largue
+      upload_hint: Pode carregar qualquer tipo de ficheiro.
+      selected_files: Ficheiros selecionados
+      upload_submit: Carregar ficheiros
+      col_name: Nome
+      col_kind: Tipo
+      col_size: Tamanho
+      col_added: Adicionado
+      col_actions: Ações
+      empty_folder: Esta pasta está vazia.
+      empty_title: Ainda não há ficheiros
+      empty_description: Carregue ficheiros para os manter organizados em pastas — faturas, contratos, o que quiser.
+      empty_upload: Carregar ficheiros
+      new_internal_document: Novo documento
+      internal_documents: Documentos internos
+      emails: Emails
+      files_section: Ficheiros
+    uploads:
+      create:
+        no_files: Escolha pelo menos um ficheiro para carregar.
+        uploaded_one: Ficheiro carregado.
+        uploaded_many: "%{count} ficheiros carregados."
+        failed: "Falha ao carregar: %{message}"
+      destroy:
+        deleted: Ficheiro eliminado.
+      analyze:
+        analyzing: A analisar este ficheiro com IA…
+  components:
+    files:
+      sidebar:
+        label: Pastas
+        all_files: Todos os ficheiros
+        new_folder: Nova pasta
+      file_actions_menu:
+        actions: Ações do ficheiro
+        open: Abrir
+        download: Transferir
+        move_to: Mover para
+        remove_from_folder: Remover da pasta
+        delete: Eliminar
+        delete_confirm: "Eliminar \"%{name}\"? Esta ação não pode ser anulada."
+      file_meta:
+        kind_image: Imagem
+        kind_file: Ficheiro
+      doc_row:
+        kind: Documento interno
+        updated: Atualizado a %{date}
+        actions: Ações do documento
+        open: Abrir
+        edit: Editar
+        move_to: Mover para
+        remove_from_folder: Remover da pasta
+      email_row:
+        no_subject: (sem assunto)
+        actions: Ações do email
+        open: Abrir no Correio
+        remove_from_folder: Remover da pasta

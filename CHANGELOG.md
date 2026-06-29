@@ -27,6 +27,16 @@ major, minor, or patch change here.
   installers are built by the `desktop-release` workflow on a `desktop-v*` tag. Ships
   unsigned for now (code signing and auto-update are wired but dormant — see
   `native/desktop/README.md`).
+- **Files** — a native file area in the main nav for keeping your documents and
+  files organized. Upload any file, create folders, browse a folder, and move files
+  between folders. Files uploaded here are stored as-is — they're not run through
+  the document AI analysis (you can still send one through it later from its page) —
+  and because folders are shared with Mail, a folder can hold both files and emails.
+  Uploads, folder changes, and filing all show up in your workspace Activity.
+- **Files — internal documents & emails in folders** — write rich-text **internal
+  documents** right in Files ("New document") and file them into folders, and **file
+  emails into folders** too — so a folder can hold uploaded files, internal documents,
+  and emails side by side. Each is listed in the folder and recorded in Activity.
 - **Tasks** — a new task-management module (opt-in via `ENABLE_TASKS`, gated by the
   `tasks` plan entitlement). Create tasks manually or have Scout extract action items
   from your email and documents (triaged in Skim, with the originating email and
@@ -43,9 +53,23 @@ major, minor, or patch change here.
   posts a short message into that email's discussion thread linking back to the new
   event/reminder, so the discussion is a running record of what Scout did with the
   email. Reminder notes are limited to confident finds to keep the thread quiet.
+- **Email templates** — reusable, AI-draftable email templates (opt-in via
+  `ENABLE_EMAIL_TEMPLATES`, gated by the `email_templates` plan entitlement).
+  Manage them at Settings → Email templates (subject, rich-text body, and attached
+  document templates that render to PDFs), generate a first draft with AI, then pull
+  a template into the composer through a variable-fill picker. A template can also
+  back a scheduled send — its subject/body re-render their Liquid variables and the
+  attached PDFs regenerate on every occurrence. Exposed over the public REST API
+  (`templates:read` / `templates:write`) and to Scout/MCP (`list_email_templates`).
 
 ### Changed
 
+- **Native apps hide desktop-only surfaces** — the iOS/Android shell no longer
+  shows the ⌘K command palette or the keyboard-shortcut help (both keyboard-only),
+  limits the calendar to **Agenda/Day** (the week/month grids are too dense for a
+  phone — a week/month deep link falls back to agenda), and hides developer-only
+  Settings (**API Access** and custom HTTP **Connections**). The web app is
+  unchanged.
 - **Native apps are sign-in-only** — the iOS/Android apps no longer offer in-app
   account creation. The sign-in screen points new users to the web instead of the
   in-app signup, and the registration flow is blocked in the native shell (invited
@@ -54,6 +78,7 @@ major, minor, or patch change here.
 
 ### Fixed
 
+- **Activity feed** — the "Pipelines" filter no longer failed to render its label.
 - **Scout no longer doubles up calendar events or reminders from the same email.**
   Creating an event from an email is now idempotent — the reminder card, Scout's
   "Create event" button, and repeated clicks resolve to a single event instead of

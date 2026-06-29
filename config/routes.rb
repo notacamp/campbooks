@@ -309,6 +309,10 @@ Rails.application.routes.draw do
       member { post :regenerate }
     end
 
+    resources :email_templates, except: [ :show ] do
+      member { post :regenerate }
+    end
+
     namespace :integrations do
       root to: "index#show"
       resource :notion, only: [ :show, :update ], controller: "notion"
@@ -340,6 +344,12 @@ Rails.application.routes.draw do
 
   resources :document_templates, only: [] do
     member { get :fill; post :preview; post :send_email }
+  end
+
+  # Composer-facing email-template surface: picker list, variables fill form, and
+  # the JSON apply endpoint the composer folds into the open compose form.
+  resources :email_templates, only: [ :index ] do
+    member { get :fill_form; post :apply }
   end
 
   # Inbox settings — the gear-icon management modal on the email page. Each
@@ -411,6 +421,18 @@ Rails.application.routes.draw do
 
   # Filing content (documents now) into custom folders — the Stage 3 "filesystem" layer.
   resources :folder_memberships, only: [ :create, :destroy ]
+
+  # Files — the native file area: a unified file manager over uploaded files and
+  # (later) internal documents + emails filed into custom folders (MailFolder).
+  # Folder CRUD + filing reuse mail_folders / folder_memberships above; only the
+  # light-path upload (store without the AI pipeline) is Files-specific.
+  get "files", to: "files#index", as: :files
+  get "files/folders/:id", to: "files#show", as: :files_folder
+  namespace :files do
+    resources :uploads, only: [ :create, :destroy ] do
+      member { post :analyze }
+    end
+  end
 
   get "email_messages/new", to: "email_messages#new", as: :new_email_message
   post "email_messages/compose_chat", to: "email_compose_chat#create"
@@ -529,6 +551,11 @@ Rails.application.routes.draw do
 
       # Scheduled (and recurring) email sends. destroy = cancel (status only).
       resources :scheduled_emails, only: [ :index, :show, :create, :update, :destroy ]
+
+      # Email templates. `apply` renders subject/body + PDFs to JSON (no send).
+      resources :email_templates, only: [ :index, :show, :create, :update, :destroy ] do
+        member { post :apply }
+      end
 
       # Calendar events. Writes ride the same provider write-through job as the web.
       resources :calendar_events, only: [ :index, :show, :create, :update, :destroy ] do
