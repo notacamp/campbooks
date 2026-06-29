@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-29
+
 ### Added
 
 - **Files — sharing, public links & Scout updates** — restrict a folder to chosen
@@ -54,6 +56,11 @@ major, minor, or patch change here.
   for each, and a one-click **Show** to bring any back as a tag (or **Hide** a tag
   you don't want as a chip). This replaces the old global "Show system labels"
   switch in Display settings.
+
+### Security
+
+- Updated the bundled `msgpack` gem to 1.8.3, fixing CVE-2026-54522 (a
+  use-after-free in the gem's C extension that bundler-audit flagged).
 
 ## [0.5.0] - 2026-06-29
 
