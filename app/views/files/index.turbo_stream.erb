@@ -1,0 +1,25 @@
+<%= turbo_stream.append "files_tbody" do %>
+  <% @files.each do |file| %>
+    <%= render Campbooks::Files::FileRow.new(doc: file, folders: @folders, current_folder: @folder) %>
+  <% end %>
+<% end %>
+
+<%= turbo_stream.append "files_cards" do %>
+  <% @files.each do |file| %>
+    <%= render Campbooks::Files::FileCard.new(doc: file, folders: @folders, current_folder: @folder) %>
+  <% end %>
+<% end %>
+
+<% if @pagy.next %>
+  <%= turbo_stream.replace "files_pagination" do %>
+    <%= turbo_frame_tag "files_pagination",
+          src: (@folder ? files_folder_path(@folder, page: @pagy.next, format: :turbo_stream) : files_path(page: @pagy.next, folder_id: params[:folder_id], format: :turbo_stream)),
+          loading: :lazy do %>
+      <div class="flex items-center justify-center py-6">
+        <%= render Campbooks::Spinner.new(size: :md) %>
+      </div>
+    <% end %>
+  <% end %>
+<% else %>
+  <%= turbo_stream.remove "files_pagination" %>
+<% end %>

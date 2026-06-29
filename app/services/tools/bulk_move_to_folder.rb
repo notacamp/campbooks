@@ -48,7 +48,12 @@ module Tools
       folder = Current.user&.workspace&.mail_folders&.find_by("LOWER(name) = ?", folder_name.downcase)
       return unless folder
 
-      messages.each { |message| folder.folder_memberships.find_or_create_by!(folderable: message) }
+      messages.each do |message|
+        membership = folder.folder_memberships.find_or_create_by!(folderable: message)
+        if membership.previously_new_record?
+          Events.publish("email.filed", subject: message, payload: { "subject" => message.subject, "folder" => folder.name })
+        end
+      end
     rescue => e
       Rails.logger.warn("[BulkMoveToFolder] folder membership recording failed: #{e.message}")
     end
