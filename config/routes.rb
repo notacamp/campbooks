@@ -121,6 +121,11 @@ Rails.application.routes.draw do
       get :skim               # triage AI-suggested tasks
       get :board              # status kanban
     end
+
+    # Discussion thread (teammates + Scout on @scout).
+    resources :comments, only: [ :create ], controller: "tasks/comments" do
+      collection { get :poll }
+    end
   end
 
   # Global search (Cmd+K command palette)

@@ -27,6 +27,10 @@ class Task < ApplicationRecord
   # confirm-to-calendar machinery instead of duplicating it.
   has_many :reminders, as: :source, dependent: :destroy
 
+  # A discussion thread (teammates + Scout on @scout), mirroring email threads.
+  has_one :agent_thread, as: :contextable, dependent: :destroy
+  has_many :agent_messages, through: :agent_thread
+
   # Lifecycle / board stages. `suggested` = AI-proposed, lives only in the Skim
   # triage queue; the board shows todo/in_progress/blocked/done; `cancelled` is a
   # terminal escape. Integer-backed — APPEND new values, never reorder existing.

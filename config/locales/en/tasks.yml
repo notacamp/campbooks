@@ -69,6 +69,9 @@ en:
     attach_document:
       attached: Document attached.
       not_found: That document couldn't be found.
+    comments:
+      form:
+        placeholder: Add a comment, or @scout for help…
     complete:
       completed: Task completed.
     create:
@@ -126,6 +129,8 @@ en:
       delete_confirm: Delete this task? This can't be undone.
       description: Description
       detach: Detach
+      discussion: Discussion
+      discussion_empty: Start the discussion. Tag @scout to bring in the AI.
       documents: Documents
       edit: Edit
       labels: Labels

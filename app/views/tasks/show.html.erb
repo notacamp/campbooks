@@ -191,4 +191,23 @@
       </section>
     </aside>
   </div>
+
+  <section class="mt-10" data-controller="chat-input">
+    <%= turbo_stream_from @task %>
+    <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".discussion") %></h2>
+    <% comments = @task.agent_messages.chronological.to_a %>
+    <div class="overflow-hidden rounded-xl border border-border">
+      <div id="comments_list" data-chat-input-target="list" class="divide-y divide-hair">
+        <% comments.each do |comment| %>
+          <%= render "tasks/comments/comment", comment: comment, task: @task %>
+        <% end %>
+        <% if comments.empty? %>
+          <div id="discussion_empty" class="px-4 py-10 text-center text-sm text-muted-foreground"><%= t(".discussion_empty") %></div>
+        <% end %>
+      </div>
+      <div class="border-t border-border p-3">
+        <%= render "tasks/comments/form", task: @task %>
+      </div>
+    </div>
+  </section>
 </div>
