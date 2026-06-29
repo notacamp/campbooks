@@ -1,0 +1,44 @@
+name: Release CLI
+
+# Build the campbooks CLI binaries and update the Homebrew formula on a CLI
+# release tag (cli/vX.Y.Z) — independent of the app's vX.Y.Z image releases.
+# publish-image.yml is guarded against `cli/` tags, so this never touches the
+# app deploy. Tag a release with, e.g.:  git tag cli/v0.1.0 && git push --tags
+on:
+  push:
+    tags:
+      - "cli/v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: cli/go.sum
+
+      - name: Vet and test
+        working-directory: cli
+        run: |
+          go vet ./...
+          go test ./...
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean -f cli/.goreleaser.yaml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PAT with contents:write on notacamp/homebrew-tap (for the formula bump).
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
