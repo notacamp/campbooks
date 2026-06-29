@@ -26,9 +26,11 @@ module Api
       end
 
       def create
-        return unless ensure_sendable_account(params[:email_account_id])
+        account = sendable_account(params[:email_account_id])
+        return unless account
 
         scheduled_email = ScheduledEmail.new(scheduled_email_params)
+        scheduled_email.email_account = account
         scheduled_email.workspace  = Current.workspace
         scheduled_email.created_by = Current.user
         scheduled_email.save!
@@ -38,7 +40,12 @@ module Api
       end
 
       def update
-        return if params.key?(:email_account_id) && !ensure_sendable_account(params[:email_account_id])
+        if params.key?(:email_account_id)
+          account = sendable_account(params[:email_account_id])
+          return unless account
+
+          @scheduled_email.email_account = account
+        end
 
         @scheduled_email.update!(scheduled_email_params)
         recalculate_next_occurrence(@scheduled_email)
@@ -68,14 +75,18 @@ module Api
         record.update_columns(next_occurrence_at: next_at)
       end
 
-      # True if the acting user may send from `account_id`; otherwise renders 403
-      # and returns false (so callers can `return unless ensure_sendable_account`).
-      def ensure_sendable_account(account_id)
-        return true if account_id.present? && Current.user.sendable_email_accounts.exists?(id: account_id)
+      # Resolve `account_id` to an account the acting user may send from, or
+      # render 403 and return nil (so callers can `return unless`). Callers
+      # assign the returned record to email_account explicitly rather than
+      # mass-assigning email_account_id, so a token can't schedule a send from
+      # an account in another workspace.
+      def sendable_account(account_id)
+        account = Current.user.sendable_email_accounts.find_by(id: account_id) if account_id.present?
+        return account if account
 
         render_api_error("no_sendable_account",
                          "You can't send from that email account.", status: :forbidden)
-        false
+        nil
       end
 
       def valid_status?(value)
@@ -84,7 +95,7 @@ module Api
 
       def scheduled_email_params
         params.permit(
-          :email_account_id, :email_template_id, :to_address, :cc_address, :bcc_address,
+          :email_template_id, :to_address, :cc_address, :bcc_address,
           :subject, :body, :scheduled_at, :rrule, template_context: {}
         )
       end

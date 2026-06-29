@@ -93,6 +93,17 @@ major, minor, or patch change here.
   the matching inbox/feed shortcut underneath — archiving, composing, or navigating
   the wrong thing. Skim now keeps the keyboard to itself while it's open.
 
+### Security
+
+- **Scheduled emails** now resolve the "from" account against the accounts you're
+  actually allowed to send from — on both the web form and the REST API — and assign
+  it explicitly instead of accepting it through mass assignment. A tampered request can
+  no longer attach a schedule to an email account in another workspace, and the web
+  form rejects a disallowed account immediately rather than letting it fail later at
+  send time.
+- Hardened the onboarding wizard's step dispatch so the step name can only ever come
+  from the fixed list of steps (defense-in-depth around dynamic method dispatch).
+
 ## [0.4.0] - 2026-06-28
 
 ### Added

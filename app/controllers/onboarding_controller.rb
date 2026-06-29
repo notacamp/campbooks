@@ -103,13 +103,20 @@ class OnboardingController < ApplicationController
   end
 
   def set_step
-    @step = params[:step] || STEPS.first
+    # Resolve to an element of the STEPS constant rather than assigning the raw
+    # param. @step feeds dynamic dispatch (send(:"prepare_#{@step}")), so the
+    # value must originate from the allowlist — params[:step] is only ever used
+    # in a comparison here, never carried through to @step.
+    @step = STEPS.find { |step| step == params[:step] } || STEPS.first
   end
 
   def ensure_valid_step!
-    unless STEPS.include?(@step)
-      redirect_to onboarding_path(step: STEPS.first)
-    end
+    # set_step already coerced @step to a known value for safe dispatch; this
+    # just bounces a typed-in unknown ?step= to the canonical first-step URL so
+    # the address bar matches the step actually shown.
+    return if params[:step].blank? || STEPS.include?(params[:step])
+
+    redirect_to onboarding_path(step: STEPS.first)
   end
 
   def set_previous_step
