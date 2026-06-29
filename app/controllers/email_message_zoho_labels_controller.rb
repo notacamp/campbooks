@@ -3,7 +3,9 @@ class EmailMessageZohoLabelsController < ApplicationController
   before_action :set_message
 
   def create
-    @tag = Current.workspace.tags.external.find(params[:tag_id])
+    # `.visible` guards against assigning a hidden system/low-value label (404 if
+    # a stale UI or a crafted request sends one) — hidden labels are never chips.
+    @tag = Current.workspace.tags.external.visible.find(params[:tag_id])
 
     begin
       label_assignment_service.new.apply(message: @message, tag: @tag)
