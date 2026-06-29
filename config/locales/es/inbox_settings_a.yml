@@ -37,6 +37,10 @@ es:
         show_heading: Mostrar
         subheading: Cómo se ve su bandeja de entrada en este dispositivo. Guardado
           en este navegador.
+        thread_view_bubbles: Burbujas
+        thread_view_classic: Clásica
+        thread_view_heading: Vista de conversación
+        thread_view_hint: Las burbujas muestran quién envió cada mensaje, como un chat.
     filtering:
       show:
         allowed_heading: Remitentes permitidos

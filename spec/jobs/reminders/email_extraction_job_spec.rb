@@ -15,9 +15,12 @@ RSpec.describe Reminders::EmailExtractionJob do
     allow(Reminders::ExtractionGate).to receive(:email_allows?).and_return(true)
     allow_any_instance_of(Ai::ReminderExtractor).to receive(:extract).and_return([ { "reminder_type" => "deadline" } ])
 
+    # previously_new_record? false ⇒ the announcement step skips it, keeping this
+    # example focused on the extract/build pipeline (announcement is covered by the
+    # job's own unit test).
     expect(Reminders::Builder).to receive(:call)
       .with(hash_including(source: email))
-      .and_return([ instance_double(Reminder) ])
+      .and_return([ instance_double(Reminder, previously_new_record?: false) ])
 
     described_class.new.perform(email.id)
   end

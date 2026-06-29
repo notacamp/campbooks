@@ -6,7 +6,10 @@ import { Controller } from "@hotwired/stimulus"
 // message); the in-detail back button calls showList(). Desktop is never touched —
 // the toggle buttons are sm:hidden, and any inline overrides are cleared at >=sm.
 export default class extends Controller {
-  static targets = ["list", "detail"]
+  // `topband` is the content-spanning skim + search + compose strip. On mobile it
+  // belongs to the list view (hidden while reading a message); on desktop it always
+  // shows (CSS `lg:flex`, and #onResize clears the inline override at the breakpoint).
+  static targets = ["list", "detail", "topband"]
   // Width (px) at/above which both panes show side by side and inline overrides
   // should be cleared. Email = 1024 (lg), Scout chat = 640 (sm, the default).
   static values = { breakpoint: { type: Number, default: 640 } }
@@ -23,6 +26,7 @@ export default class extends Controller {
   showList() {
     if (this.hasListTarget) this.listTarget.style.display = "flex"
     if (this.hasDetailTarget) this.detailTarget.style.display = "none"
+    if (this.hasTopbandTarget) this.topbandTarget.style.display = "flex"
   }
 
   showDetail() {
@@ -32,6 +36,9 @@ export default class extends Controller {
   #reset() {
     if (this.hasListTarget) this.listTarget.style.display = ""
     if (this.hasDetailTarget) this.detailTarget.style.display = ""
+    // Clear the inline override so the band reverts to its class state
+    // (hidden on mobile detail, lg:flex on desktop).
+    if (this.hasTopbandTarget) this.topbandTarget.style.display = ""
   }
 
   #onResize() {

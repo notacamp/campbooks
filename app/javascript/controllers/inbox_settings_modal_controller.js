@@ -121,11 +121,32 @@ export default class extends Controller {
     })
   }
 
+  // Conversation view (how the reading pane renders a thread): bubbles | classic.
+  setThreadView(event) {
+    const view = event.currentTarget.dataset.threadView
+    localStorage.setItem("inbox_thread_view", view)
+    this.apply("thread_view", view)
+    this.syncThreadViewButtons()
+  }
+
+  syncThreadViewButtons() {
+    const current = localStorage.getItem("inbox_thread_view") || "bubbles"
+    this._scope().querySelectorAll("[data-thread-view]").forEach((btn) => {
+      const active = btn.dataset.threadView === current
+      btn.classList.toggle("ring-2", active)
+      btn.classList.toggle("ring-accent-500", active)
+      btn.classList.toggle("bg-accent-50", active)
+      btn.classList.toggle("bg-gray-100", !active)
+      btn.classList.toggle("text-gray-600", !active)
+    })
+  }
+
   restore() {
     this.apply("labels", localStorage.getItem("inbox_labels") !== "false")
     this.apply("attachments", localStorage.getItem("inbox_attachments") !== "false")
     this.apply("chat", localStorage.getItem("inbox_chat") !== "false")
     this.apply("view_mode", localStorage.getItem("inbox_view_mode") || "breathable")
+    this.apply("thread_view", localStorage.getItem("inbox_thread_view") || "bubbles")
 
     // Account visibility straight from localStorage, so hidden accounts stay
     // hidden across inbox re-renders even when the Display panel isn't open.
@@ -141,6 +162,7 @@ export default class extends Controller {
       cb.checked = localStorage.getItem(`inbox_${cb.dataset.setting}`) !== "false"
     })
     this.syncViewModeButtons()
+    this.syncThreadViewButtons()
   }
 
   apply(key, value) {
@@ -170,6 +192,15 @@ export default class extends Controller {
             el.removeAttribute("data-inbox-view-mode")
           }
         })
+        break
+      case "thread_view":
+        // Global flag (the reading pane + drawer both render bubbles); CSS flattens
+        // them to the classic list. "bubbles" (default) = no attribute.
+        if (value === "classic") {
+          document.documentElement.setAttribute("data-thread-view", "classic")
+        } else {
+          document.documentElement.removeAttribute("data-thread-view")
+        }
         break
     }
   }

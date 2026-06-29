@@ -37,6 +37,10 @@ fr:
         show_heading: Afficher
         subheading: L'apparence de votre boîte de réception sur cet appareil. Enregistré
           dans ce navigateur.
+        thread_view_bubbles: Bulles
+        thread_view_classic: Classique
+        thread_view_heading: Vue conversation
+        thread_view_hint: Les bulles montrent qui a envoyé chaque message, comme un chat.
     filtering:
       show:
         allowed_heading: Expéditeurs autorisés

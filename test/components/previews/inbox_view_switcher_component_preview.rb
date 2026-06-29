@@ -14,4 +14,10 @@ class InboxViewSwitcherComponentPreview < ViewComponent::Preview
     switcher = render(Campbooks::InboxViewSwitcher.new)
     %(<div data-controller="inbox-layout" class="p-6">#{switcher}</div>).html_safe
   end
+
+  # board: false — Default + List only, used on the standalone inbox index (which
+  # has no Board pane to switch into).
+  def without_board
+    render(Campbooks::InboxViewSwitcher.new(board: false))
+  end
 end

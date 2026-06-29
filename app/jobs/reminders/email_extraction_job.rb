@@ -43,25 +43,38 @@ module Reminders
 
     private
 
-    # Post one Scout message into the email's discussion summarizing the reminders
-    # just extracted, each linking to its row on /reminders. Only newly-created,
-    # confident reminders count — `previously_new_record?` excludes rows the Builder
-    # merely re-touched on a re-run, and the confidence floor keeps it low-noise.
+    # Post one Scout message per reminder into the email's discussion, each phrased
+    # as a *suggestion* (a potential reminder) with Approve / Dismiss buttons so the
+    # user confirms it onto the calendar or waves it off — rather than a done deal.
+    # Only newly-created, confident reminders count — `previously_new_record?`
+    # excludes rows the Builder merely re-touched on a re-run, and the confidence
+    # floor keeps it low-noise. One card each (vs one combined message) keeps every
+    # reminder independently approvable.
     def announce_in_discussion(email, reminders)
       posted = reminders.select { |r| r.previously_new_record? && r.confidence.to_f >= ANNOUNCE_MIN_CONFIDENCE }
       return if posted.empty?
 
-      Discussions::ScoutAnnouncer.announce(email_message: email) do
-        intro = I18n.t("discussions.scout.reminders_found", count: posted.size)
-        lines = posted.map do |reminder|
-          I18n.t(
-            "discussions.scout.reminder_line",
-            title: reminder.title,
-            url: Rails.application.routes.url_helpers.reminders_path(anchor: "reminder_#{reminder.id}"),
-            due: I18n.l(reminder.due_at.to_date, format: :full)
-          )
-        end
-        "#{intro}\n\n#{lines.join("\n")}"
+      posted.each { |reminder| announce_reminder(email, reminder) }
+    end
+
+    def announce_reminder(email, reminder)
+      Discussions::ScoutAnnouncer.announce(
+        email_message: email,
+        # Dismiss (ghost) then Confirm (primary) — primary on the right, mirroring
+        # the feed reminder card's action bar.
+        suggested_actions: [
+          { "tool" => "dismiss_reminder", "args" => { "reminder_id" => reminder.id } },
+          { "tool" => "confirm_reminder", "args" => { "reminder_id" => reminder.id } }
+        ]
+      ) do
+        intro = I18n.t("discussions.scout.reminder_found")
+        line  = I18n.t(
+          "discussions.scout.reminder_line",
+          title: reminder.title,
+          url: Rails.application.routes.url_helpers.reminders_path(anchor: "reminder_#{reminder.id}"),
+          due: I18n.l(reminder.due_at.to_date, format: :full)
+        )
+        "#{intro}\n\n#{line}"
       end
     end
   end
