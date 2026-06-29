@@ -27,6 +27,12 @@ pt:
     create_calendar_event:
       no_calendar: Ligue primeiro um calendário para adicionar eventos.
       success: Evento '%{title}' adicionado ao seu calendário
+    create_task_from_email:
+      failure: Não foi possível criar a tarefa.
+      success: "Tarefa criada: %{title}"
+    link_task_to_email:
+      failure: Não foi possível associar o email a essa tarefa.
+      success: "Associado à tarefa: %{title}"
     forward_email:
       failure: Não foi possível reencaminhar para %{to_address}
       success: Reencaminhado para %{to_address}

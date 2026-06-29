@@ -16,6 +16,7 @@ class EmailToolsController < ApplicationController
   # draft/send cluster stays inline below (UI-only, with bespoke rendering).
   REGISTRY_TOOLS = %w[add_tag remove_tag archive unarchive trash snooze unsnooze forward_email
                       create_calendar_event
+                      create_task_from_email link_task_to_email
                       pin unpin
                       star_sender unstar_sender block_sender unblock_sender allow_sender].freeze
 
@@ -84,6 +85,7 @@ class EmailToolsController < ApplicationController
             when "snooze" then "Snoozed"
             when "unsnooze" then "Unsnoozed"
             when "star_sender", "unstar_sender", "block_sender", "unblock_sender", "allow_sender" then @registry_message
+            when "create_task_from_email", "link_task_to_email" then @registry_message
             end
             if action_message
               actions_html = complete_suggested_action(params[:agent_message_id], tool, action_message)
@@ -251,6 +253,9 @@ class EmailToolsController < ApplicationController
             []
           when "create_calendar_event"
             toast = { message: t(".event_created", title: result[:title]), variant: :success }
+            []
+          when "create_task_from_email", "link_task_to_email"
+            toast = { message: @registry_message, variant: :success }
             []
           when "pin", "unpin"
             # Re-render the row in place so its star + action (and pinned state)

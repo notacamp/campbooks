@@ -104,9 +104,12 @@ Rails.application.routes.draw do
   # routes are added in their respective phases.
   resources :tasks do
     member do
-      patch :complete         # mark done (quick action)
-      patch :move             # change status (status control + the board drag)
-      post  :assign           # update assignees
+      patch  :complete        # mark done (quick action)
+      patch  :move            # change status (status control + the board drag)
+      post   :assign          # update assignees
+      get    :email_picker    # search emails to link (turbo-frame)
+      post   :link_email      # link an existing email to this task
+      delete :unlink_email    # remove a task↔email link
     end
   end
 

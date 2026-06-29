@@ -152,6 +152,7 @@ export default class extends Controller {
     add("Reply all", "reply-all", () => this._post(`/email_messages/${id}/compose`, { mode: "reply_all" }))
     add("Forward", "forward", () => this._post(`/email_messages/${id}/compose`, { mode: "forward" }))
     add("Create calendar event", "calendar", () => this._post(`/email_messages/${id}/tool`, { tool: "create_calendar_event" }), subject)
+    add("Create task from email", "check", () => this._post(`/email_messages/${id}/tool`, { tool: "create_task_from_email" }), subject)
     add("Dismiss AI todo", "check", () => this._post(`/email_messages/${id}/dismiss_todo`, { _method: "patch" }))
     add("Star sender", "star", () => this._post(`/email_messages/${id}/tool`, { tool: "star_sender" }), subject)
     add("Block sender", "ban", () => this._post(`/email_messages/${id}/tool`, { tool: "block_sender" }), subject)

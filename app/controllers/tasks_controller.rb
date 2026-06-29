@@ -7,7 +7,7 @@ class TasksController < ApplicationController
 
   before_action :require_authentication
   before_action :require_tasks_enabled
-  before_action :set_task, only: %i[show edit update destroy complete move assign]
+  before_action :set_task, only: %i[show edit update destroy complete move assign email_picker link_email unlink_email]
   before_action :load_collections, only: %i[show new create edit update]
 
   # The live work the user cares about: due-date first (nulls last), then most
@@ -98,6 +98,36 @@ class TasksController < ApplicationController
     end
 
     respond_with_change(t(".assigned"))
+  end
+
+  # Turbo-frame search over the user's readable emails, to link one to this task
+  # (the reverse direction: linking from a task instead of from an email).
+  def email_picker
+    @query = params[:q].to_s.strip
+    @candidates = if @query.present?
+      EmailMessage.accessible_to(current_user)
+                  .where("subject ILIKE ?", "%#{@query}%")
+                  .order(received_at: :desc).limit(10)
+    else
+      EmailMessage.none
+    end
+    render partial: "tasks/email_picker", locals: { task: @task, candidates: @candidates, query: @query }
+  end
+
+  def link_email
+    email = EmailMessage.accessible_to(current_user).find_by(id: params[:email_id])
+    return redirect_to(@task, error: t(".not_found")) unless email
+
+    link = @task.task_email_links.find_or_initialize_by(email_message: email)
+    link.relationship = TaskEmailLink.relationships.key?(params[:relationship].to_s) ? params[:relationship] : "related"
+    link.created_by = current_user
+    link.save
+    redirect_to @task, success: t(".linked")
+  end
+
+  def unlink_email
+    @task.task_email_links.find_by(id: params[:link_id])&.destroy
+    redirect_to @task, success: t(".unlinked")
   end
 
   private

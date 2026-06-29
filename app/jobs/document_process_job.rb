@@ -21,6 +21,9 @@ class DocumentProcessJob < ApplicationJob
 
     # Best-effort: extract reminders (e.g. invoice due dates) from the analyzed document.
     Reminders::DocumentExtractionJob.perform_later(document.id) if document.ai_completed?
+
+    # Best-effort: extract action items (tasks) a document implies (sign/review/return).
+    Tasks::DocumentExtractionJob.perform_later(document.id) if Features.tasks? && document.ai_completed?
   ensure
     Current.workspace = nil
   end

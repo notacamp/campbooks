@@ -67,6 +67,10 @@ en:
       deleted: Task deleted.
     edit:
       title: Edit task
+    email_picker:
+      link: Link
+      no_results: No matching emails.
+      search_placeholder: Search your email by subject…
     index:
       all: All
       empty_body: Create a task, or let Scout pull action items out of your email.
@@ -77,6 +81,9 @@ en:
       triage_banner:
         one: "%{count} suggested task to review in Skim"
         other: "%{count} suggested tasks to review in Skim"
+    link_email:
+      linked: Email linked.
+      not_found: That email couldn't be found.
     move:
       invalid_status: That status doesn't exist.
       moved: Task moved.
@@ -84,6 +91,7 @@ en:
       title: New task
     show:
       activity: Activity
+      add_email: Link an email
       assignees: Assignees
       back: All tasks
       created_by: Created by %{name}
@@ -102,8 +110,12 @@ en:
       no_linked_emails: No linked emails.
       origin: Created from this email
       priority: "Priority: %{level}"
+      relationship: Relationship
       reopen: Reopen
       status: Status
+      unlink: Unlink
       update: Update
+    unlink_email:
+      unlinked: Email unlinked.
     update:
       updated: Task updated.

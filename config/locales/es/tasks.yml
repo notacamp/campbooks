@@ -67,6 +67,10 @@ es:
       deleted: Tarea eliminada.
     edit:
       title: Editar tarea
+    email_picker:
+      link: Vincular
+      no_results: Sin correos coincidentes.
+      search_placeholder: Busca tu correo por asunto…
     index:
       all: Todas
       empty_body: Crea una tarea, o deja que Scout extraiga acciones de tu correo.
@@ -77,6 +81,9 @@ es:
       triage_banner:
         one: "%{count} tarea sugerida para revisar en Skim"
         other: "%{count} tareas sugeridas para revisar en Skim"
+    link_email:
+      linked: Correo vinculado.
+      not_found: No se encontró ese correo.
     move:
       invalid_status: Ese estado no existe.
       moved: Tarea movida.
@@ -84,6 +91,7 @@ es:
       title: Nueva tarea
     show:
       activity: Actividad
+      add_email: Vincular un correo
       assignees: Responsables
       back: Todas las tareas
       created_by: Creada por %{name}
@@ -102,8 +110,12 @@ es:
       no_linked_emails: Sin correos vinculados.
       origin: Creada desde este correo
       priority: "Prioridad: %{level}"
+      relationship: "Relación"
       reopen: Reabrir
       status: Estado
+      unlink: Desvincular
       update: Actualizar
+    unlink_email:
+      unlinked: Correo desvinculado.
     update:
       updated: Tarea actualizada.

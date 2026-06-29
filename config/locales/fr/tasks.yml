@@ -67,6 +67,10 @@ fr:
       deleted: "Tâche supprimée."
     edit:
       title: "Modifier la tâche"
+    email_picker:
+      link: Lier
+      no_results: Aucun e-mail correspondant.
+      search_placeholder: "Recherchez vos e-mails par objet…"
     index:
       all: Toutes
       empty_body: "Créez une tâche, ou laissez Scout extraire des actions de vos e-mails."
@@ -77,6 +81,9 @@ fr:
       triage_banner:
         one: "%{count} tâche suggérée à examiner dans Skim"
         other: "%{count} tâches suggérées à examiner dans Skim"
+    link_email:
+      linked: "E-mail lié."
+      not_found: Cet e-mail est introuvable.
     move:
       invalid_status: Ce statut n'existe pas.
       moved: "Tâche déplacée."
@@ -84,6 +91,7 @@ fr:
       title: "Nouvelle tâche"
     show:
       activity: "Activité"
+      add_email: Lier un e-mail
       assignees: Responsables
       back: "Toutes les tâches"
       created_by: "Créée par %{name}"
@@ -102,8 +110,12 @@ fr:
       no_linked_emails: "Aucun e-mail lié."
       origin: "Créée depuis cet e-mail"
       priority: "Priorité : %{level}"
+      relationship: Relation
       reopen: Rouvrir
       status: Statut
+      unlink: Dissocier
       update: "Mettre à jour"
+    unlink_email:
+      unlinked: "E-mail dissocié."
     update:
       updated: "Tâche mise à jour."
