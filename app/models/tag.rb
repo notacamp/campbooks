@@ -28,13 +28,27 @@ class Tag < ApplicationRecord
 
   enum :source, { local: 0, external: 1 }
 
-  # Exclude system labels (INBOX, CATEGORY_PERSONAL, …) unless the workspace has
-  # opted in via Settings → Inbox → "Show system labels". User-created and local
-  # tags are always visible.
+  # Why a tag is/isn't shown as a chip — decided once per provider label and then
+  # remembered (see classified_at). Provider system statuses (INBOX, read, …) and
+  # AI-judged low-value labels (e.g. Gmail's CATEGORY_UPDATES) are hidden; genuine
+  # user labels stay visible. User-created/local tags are always :user.
+  enum :kind, { user: 0, system: 1, category: 2, low_value: 3 }, default: :user, prefix: :kind
+
+  # The single visibility gate used at every render site. `hidden` is the source
+  # of truth (a provider system status, or an AI/user decision); it is overridable
+  # per-label in Settings → Tags.
+  scope :visible, -> { where(hidden: false) }
+  scope :hidden_labels, -> { where(hidden: true) }
+
+  # Back-compat: still keyed on the legacy system_label flag. Prefer `visible`.
   scope :excluding_system_labels, -> { where(system_label: false) }
 
+  # The visibility gate used at every render site. Hidden tags (provider system
+  # statuses + AI-judged low-value labels) are filtered out, unless the workspace
+  # opts to see everything via the legacy "show system labels" setting. (That
+  # toggle is superseded by the per-label review in Settings → Tags.)
   def self.visible_for(workspace)
-    workspace&.setting("show_system_labels") ? all : excluding_system_labels
+    workspace&.setting("show_system_labels") ? all : visible
   end
 
   validates :name, presence: true
@@ -49,6 +63,19 @@ class Tag < ApplicationRecord
 
   def self.group_names(workspace)
     where(workspace: workspace).grouped.pluck(:group_name).uniq.sort
+  end
+
+  # Persist a classification decision (see Labels::Classifier / AiClassifier)
+  # without firing the embedding callback — classification metadata isn't part of
+  # the embedding content, so update_columns is the right tool here.
+  def apply_classification!(kind:, hidden:, confidence: nil, reason: nil)
+    update_columns(
+      kind: self.class.kinds.fetch(kind.to_s),
+      hidden: hidden,
+      classified_at: Time.current,
+      classification_confidence: confidence,
+      classification_reason: reason
+    )
   end
 
   private

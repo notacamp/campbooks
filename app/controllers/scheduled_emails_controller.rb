@@ -29,6 +29,7 @@ class ScheduledEmailsController < ApplicationController
 
   def create
     @scheduled_email = ScheduledEmail.new(scheduled_email_params)
+    @scheduled_email.email_account = sendable_account
     @scheduled_email.workspace = Current.workspace
     @scheduled_email.created_by = Current.user
 
@@ -46,7 +47,10 @@ class ScheduledEmailsController < ApplicationController
   end
 
   def update
-    if @scheduled_email.update(scheduled_email_params)
+    @scheduled_email.assign_attributes(scheduled_email_params)
+    @scheduled_email.email_account = sendable_account if params.dig(:scheduled_email, :email_account_id).present?
+
+    if @scheduled_email.save
       recalculate_next_occurrence
       redirect_to @scheduled_email, notice: t(".updated")
     else
@@ -68,9 +72,21 @@ class ScheduledEmailsController < ApplicationController
 
   def scheduled_email_params
     params.require(:scheduled_email).permit(
-      :email_account_id, :to_address, :cc_address, :bcc_address,
-      :subject, :body, :scheduled_at, :rrule
+      :email_template_id, :to_address, :cc_address, :bcc_address,
+      :subject, :body, :scheduled_at, :rrule,
+      template_context: {}
     )
+  end
+
+  # Resolve the submitted email_account_id to an account the current user is
+  # actually allowed to send from (nil otherwise). Assigning the association
+  # explicitly — rather than permitting email_account_id for mass assignment —
+  # stops a tampered request from attaching a schedule to an account in another
+  # workspace, and surfaces an immediate validation error instead of a silent
+  # send-time failure.
+  def sendable_account
+    id = params.dig(:scheduled_email, :email_account_id)
+    id.present? ? Current.user.sendable_email_accounts.find_by(id: id) : nil
   end
 
   def recalculate_next_occurrence

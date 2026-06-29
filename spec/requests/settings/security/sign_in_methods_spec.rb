@@ -17,7 +17,7 @@ RSpec.describe "Settings::Security::SignInMethods", type: :request do
 
       post settings_security_sign_in_methods_path(provider: "google")
 
-      expect(response.location).to match(%r{accounts\.google\.com})
+      expect(response.location).to match(%r{\Ahttps://accounts\.google\.com/})
       expect(state_from(response.location)).to include(
         "flow" => "add_sign_in", "user_id" => user.id, "verified" => true
       )

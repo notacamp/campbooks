@@ -18,6 +18,28 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Files — sharing, public links & Scout updates** — restrict a folder to chosen
+  people with viewer / editor / manager roles from **"Manage access"**; a restricted
+  folder and its contents stay hidden from everyone else, while open folders remain
+  visible to the whole workspace. Create a **revocable public link** to any file and
+  **insert it into an email** from the composer's "Insert file link", or paste one
+  into a discussion comment (bare links are now clickable there). And, opt-in per
+  workspace (Settings → Data & privacy), **Scout posts a link to a document into its
+  email's discussion** once that document is filed.
+
+### Changed
+
+- **Email labels are smarter and less noisy.** Labels synced from Gmail/Zoho are
+  now evaluated once on import: built-in provider statuses (Inbox, Unread,
+  Important, Gmail's category tabs like Updates/Promotions) and low-value labels
+  are recognised and kept out of your inbox, while the labels you actually use
+  (Invoices, Clients, …) stay. The decision is remembered per label — provider
+  system/noise labels are no longer attached to every message.
+
+## [0.5.0] - 2026-06-29
+
+### Added
+
 - **Files** — a native file area in the main nav for keeping your documents and
   files organized. Upload any file, create folders, browse a folder, and move files
   between folders. Files uploaded here are stored as-is — they're not run through
@@ -28,14 +50,6 @@ major, minor, or patch change here.
   documents** right in Files ("New document") and file them into folders, and **file
   emails into folders** too — so a folder can hold uploaded files, internal documents,
   and emails side by side. Each is listed in the folder and recorded in Activity.
-- **Files — sharing, public links & Scout updates** — restrict a folder to chosen
-  people with viewer / editor / manager roles from **"Manage access"**; a restricted
-  folder and its contents stay hidden from everyone else, while open folders remain
-  visible to the whole workspace. Create a **revocable public link** to any file and
-  **insert it into an email** from the composer's "Insert file link", or paste one
-  into a discussion comment (bare links are now clickable there). And, opt-in per
-  workspace (Settings → Data & privacy), **Scout posts a link to a document into its
-  email's discussion** once that document is filed.
 - **Tasks** — a new task-management module (opt-in via `ENABLE_TASKS`, gated by the
   `tasks` plan entitlement). Create tasks manually or have Scout extract action items
   from your email and documents (triaged in Skim, with the originating email and
@@ -52,9 +66,23 @@ major, minor, or patch change here.
   posts a short message into that email's discussion thread linking back to the new
   event/reminder, so the discussion is a running record of what Scout did with the
   email. Reminder notes are limited to confident finds to keep the thread quiet.
+- **Email templates** — reusable, AI-draftable email templates (opt-in via
+  `ENABLE_EMAIL_TEMPLATES`, gated by the `email_templates` plan entitlement).
+  Manage them at Settings → Email templates (subject, rich-text body, and attached
+  document templates that render to PDFs), generate a first draft with AI, then pull
+  a template into the composer through a variable-fill picker. A template can also
+  back a scheduled send — its subject/body re-render their Liquid variables and the
+  attached PDFs regenerate on every occurrence. Exposed over the public REST API
+  (`templates:read` / `templates:write`) and to Scout/MCP (`list_email_templates`).
 
 ### Changed
 
+- **Native apps hide desktop-only surfaces** — the iOS/Android shell no longer
+  shows the ⌘K command palette or the keyboard-shortcut help (both keyboard-only),
+  limits the calendar to **Agenda/Day** (the week/month grids are too dense for a
+  phone — a week/month deep link falls back to agenda), and hides developer-only
+  Settings (**API Access** and custom HTTP **Connections**). The web app is
+  unchanged.
 - **Native apps are sign-in-only** — the iOS/Android apps no longer offer in-app
   account creation. The sign-in screen points new users to the web instead of the
   in-app signup, and the registration flow is blocked in the native shell (invited
@@ -84,6 +112,17 @@ major, minor, or patch change here.
   overlay open, pressing a key (e.g. `e` to archive, `c`, or the arrows) also fired
   the matching inbox/feed shortcut underneath — archiving, composing, or navigating
   the wrong thing. Skim now keeps the keyboard to itself while it's open.
+
+### Security
+
+- **Scheduled emails** now resolve the "from" account against the accounts you're
+  actually allowed to send from — on both the web form and the REST API — and assign
+  it explicitly instead of accepting it through mass assignment. A tampered request can
+  no longer attach a schedule to an email account in another workspace, and the web
+  form rejects a disallowed account immediately rather than letting it fail later at
+  send time.
+- Hardened the onboarding wizard's step dispatch so the step name can only ever come
+  from the fixed list of steps (defense-in-depth around dynamic method dispatch).
 
 ## [0.4.0] - 2026-06-28
 
@@ -421,7 +460,9 @@ major, minor, or patch change here.
 
 - Initial public, source-available release of Campbooks.
 
-[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/notacamp/campbooks/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/notacamp/campbooks/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/notacamp/campbooks/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/notacamp/campbooks/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/notacamp/campbooks/compare/v0.1.0...v0.2.0

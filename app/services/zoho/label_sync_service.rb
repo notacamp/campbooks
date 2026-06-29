@@ -16,13 +16,18 @@ module Zoho
         external_id = zl["labelId"] || zl["tagId"]
         name = zl["displayName"]
         color = zl["color"] || "#ffd700"
+        # Zoho exposes no system flag on /labels, so detect its built-in folders
+        # by name (Inbox, Sent, …) — mirrors Gmail's system_label handling.
+        sys = Labels::Classifier::ZOHO_SYSTEM_NAMES.include?(name.to_s.strip.downcase)
 
         tag = Tag.find_or_initialize_by(
           email_account_id: @account.id,
           external_label_id: external_id
         )
-        tag.assign_attributes(name: name, color: color, source: :external, workspace: @account.workspace)
+        tag.assign_attributes(name: name, color: color, source: :external,
+                              workspace: @account.workspace, system_label: sys)
         tag.save!
+        Labels::ClassifyLabelJob.classify(tag)
       end
 
       # Destroy tags for labels deleted in Zoho
@@ -38,12 +43,16 @@ module Zoho
 
     def reconcile_assignments(tags)
       tags.each do |tag|
+        next if tag.hidden? # don't attach (or rate-limit on) hidden system/low-value labels
+
         reconcile_tag_assignments(tag)
         sleep(0.3) # Rate limit courtesy
       end
     end
 
     def reconcile_tag_assignments(tag)
+      return if tag.hidden? # never attach hidden labels to messages
+
       # Zoho returns newest first — first page covers recent changes
       messages = @client.list_messages_by_label(tag.external_label_id, limit: 200)
       return if messages.empty?
