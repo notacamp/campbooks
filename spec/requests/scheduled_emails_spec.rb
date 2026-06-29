@@ -60,6 +60,14 @@ RSpec.describe "Scheduled emails", type: :request do
         expect(se.next_occurrence_at).to be_present
         expect(response).to redirect_to(scheduled_email_path(se))
       end
+
+      it "refuses an account the user can't send from and persists nothing" do
+        foreign = create(:email_account, workspace: create(:workspace))
+
+        expect { post scheduled_emails_path, params: { scheduled_email: valid_params.merge(email_account_id: foreign.id) } }
+          .not_to change(ScheduledEmail, :count)
+        expect(response).to have_http_status(:unprocessable_entity)
+      end
     end
   end
 
