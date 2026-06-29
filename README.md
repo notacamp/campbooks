@@ -59,6 +59,8 @@ The login form is at `/session/new`.
 - **Architecture & conventions:** [`CLAUDE.md`](CLAUDE.md)
 - **Domain glossary:** [`CONTEXT.md`](CONTEXT.md)
 - **Product vision:** [`PRODUCT.md`](PRODUCT.md), [`DESIGN.md`](DESIGN.md)
+- **Developer CLI:** [`docs/cli.md`](docs/cli.md) — `brew install notacamp/tap/campbooks`, then `campbooks login`
+- **REST API:** [`docs/api.md`](docs/api.md) ([`openapi.yaml`](openapi.yaml))
 - **Feature & deployment guides:** [`docs/`](docs/)
 
 ## Contributing
