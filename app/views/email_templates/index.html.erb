@@ -1,0 +1,24 @@
+<%# Picker list, loaded into the picker's turbo-frame (id echoed from the request). %>
+<% frame_id = request.headers["Turbo-Frame"].presence || "email_template_picker_frame" %>
+<%= turbo_frame_tag frame_id do %>
+  <% if @templates.any? %>
+    <div class="space-y-1.5">
+      <% @templates.each do |t| %>
+        <%= link_to fill_form_email_template_path(t, to_address: params[:to_address]),
+              class: "block rounded-lg border border-gray-200 p-3 hover:border-accent-400 hover:bg-accent-50/40 transition-colors" do %>
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-sm font-medium text-gray-900 truncate"><%= t.name %></span>
+            <span class="text-xs text-accent-600 font-medium flex-shrink-0"><%= t(".use") %> →</span>
+          </div>
+          <% if t.description.present? %><p class="text-xs text-gray-500 truncate mt-0.5"><%= truncate(t.description, length: 100) %></p><% end %>
+          <div class="flex items-center gap-3 mt-1">
+            <% if t.variable_definitions.any? %><span class="text-[11px] text-gray-400"><%= t(".variables", count: t.variable_definitions.size) %></span><% end %>
+            <% if t.document_templates.any? %><span class="text-[11px] text-gray-400"><%= t(".documents", count: t.document_templates.size) %></span><% end %>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+  <% else %>
+    <p class="text-sm text-gray-500 text-center py-10"><%= t(".empty") %></p>
+  <% end %>
+<% end %>

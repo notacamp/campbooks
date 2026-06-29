@@ -34,6 +34,14 @@ major, minor, or patch change here.
   posts a short message into that email's discussion thread linking back to the new
   event/reminder, so the discussion is a running record of what Scout did with the
   email. Reminder notes are limited to confident finds to keep the thread quiet.
+- **Email templates** — reusable, AI-draftable email templates (opt-in via
+  `ENABLE_EMAIL_TEMPLATES`, gated by the `email_templates` plan entitlement).
+  Manage them at Settings → Email templates (subject, rich-text body, and attached
+  document templates that render to PDFs), generate a first draft with AI, then pull
+  a template into the composer through a variable-fill picker. A template can also
+  back a scheduled send — its subject/body re-render their Liquid variables and the
+  attached PDFs regenerate on every occurrence. Exposed over the public REST API
+  (`templates:read` / `templates:write`) and to Scout/MCP (`list_email_templates`).
 
 ### Changed
 

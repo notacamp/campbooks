@@ -11,6 +11,7 @@ pt:
         ai_providers_and_services: Fornecedores e serviços de IA
         api_access: Acesso à API
         document_templates: Modelos de documentos
+        email_templates: Modelos de email
         general: Geral
         integrations: Integrações
         members: Membros

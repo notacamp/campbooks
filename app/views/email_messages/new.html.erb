@@ -224,7 +224,10 @@
             </div>
 
             <!-- Actions -->
-            <div class="px-5 py-3 border-t border-gray-200 flex-shrink-0 flex items-center gap-2">
+            <div class="px-5 py-3 border-t border-gray-200 flex-shrink-0 flex items-center gap-2 flex-wrap">
+              <% if email_templates_enabled? && current_entitlements.feature?(:email_templates) %>
+                <%= render Campbooks::EmailTemplatePicker.new(frame_id: "etp_frame_new") %>
+              <% end %>
               <button type="submit" class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-accent-600 text-white rounded-lg hover:bg-accent-700 transition-colors">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
                 <%= t("shared.actions.send") %>

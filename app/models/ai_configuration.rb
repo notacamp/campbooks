@@ -23,6 +23,7 @@ class AiConfiguration < ApplicationRecord
     email_analysis
     reminder_extraction
     document_template_generation
+    email_template_generation
     email_chat
     draft_reply
     global_chat
@@ -39,6 +40,7 @@ class AiConfiguration < ApplicationRecord
     email_chat
     compose_chat
     document_template_generation
+    email_template_generation
     email_analysis
     email_classification
     draft_reply
