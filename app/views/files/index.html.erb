@@ -1,8 +1,14 @@
-<div data-controller="upload new-folder">
+<div data-controller="upload new-folder folder-edit">
   <%= render Campbooks::PageHeader.new(title: @folder ? @folder.name : t(".title"), subtitle: @folder ? nil : t(".subtitle")) do |header| %>
     <% header.with_actions do %>
       <%= render Campbooks::Button.new(variant: :outline, size: :sm, href: new_written_document_path) { t(".new_internal_document") } %>
       <%= render Campbooks::Button.new(variant: :outline, size: :sm, data: { action: "new-folder#open" }) { t(".new_folder") } %>
+      <% if @folder&.manageable_by?(Current.user) %>
+        <%= render Campbooks::Button.new(variant: :outline, size: :sm,
+              data: { action: "folder-edit#open", folder_edit_dialog_param: "folder-share-dialog" }) do %>
+          <%= @folder.restricted? ? t(".manage_access_locked") : t(".manage_access") %>
+        <% end %>
+      <% end %>
       <button type="button" data-action="click->upload#toggle"
           class="inline-flex items-center px-4 py-2 bg-accent-600 text-white text-sm font-medium rounded-md hover:bg-accent-700 cursor-pointer">
         <%= t(".upload") %>
@@ -169,4 +175,27 @@
       back to /files (its Turbo streams target the mail pane), and provision=false so
       no provider folder/label is created for a file-only folder. %>
   <%= render Campbooks::NewFolderModal.new(turbo: false, subtitle: t(".new_folder_hint"), hidden_fields: { provision: false, return_to: "files" }) %>
+
+  <%# "Manage access" dialog — lazy-loads the sharing panel (Files::FolderSharesController). %>
+  <% if @folder&.manageable_by?(Current.user) %>
+    <dialog id="folder-share-dialog"
+        class="m-auto w-[calc(100vw-2rem)] max-w-md overflow-hidden rounded-2xl border border-border bg-card p-0 text-card-foreground shadow-2xl backdrop:bg-black/40"
+        data-action="click->folder-edit#backdropClose">
+      <div class="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+        <div>
+          <h2 class="text-base font-semibold text-foreground"><%= t(".manage_access") %></h2>
+          <p class="mt-0.5 text-xs text-muted-foreground"><%= @folder.name %></p>
+        </div>
+        <button type="button" data-action="folder-edit#close" aria-label="<%= t('shared.actions.close') %>"
+            class="-mr-1 cursor-pointer rounded border-0 bg-transparent p-1 text-gray-400 hover:bg-gray-200/70 hover:text-gray-600 dark:hover:bg-white/10">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="px-5 py-5">
+        <%= turbo_frame_tag dom_id(@folder, :share), src: files_folder_share_path(@folder), loading: :lazy do %>
+          <div class="py-6 text-center"><%= render Campbooks::Spinner.new(size: :md) %></div>
+        <% end %>
+      </div>
+    </dialog>
+  <% end %>
 </div>

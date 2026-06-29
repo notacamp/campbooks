@@ -432,7 +432,20 @@ Rails.application.routes.draw do
     resources :uploads, only: [ :create, :destroy ] do
       member { post :analyze }
     end
+    # Per-folder sharing (Phase 3): restrict a folder + manage members.
+    resources :folders, only: [] do
+      resource :share, only: [ :show, :update ], controller: "folder_shares"
+    end
+    # Mint / revoke a public link for a file (Phase 3b); :picker lists files for
+    # the composer's "Insert file link" modal.
+    resources :public_links, only: [ :create, :destroy ] do
+      get :picker, on: :collection
+    end
   end
+
+  # Public, unauthenticated file link — the unguessable token is the credential, so
+  # an external email recipient can open a shared file (Phase 3b).
+  get "f/:token", to: "public_files#show", as: :public_file
 
   get "email_messages/new", to: "email_messages#new", as: :new_email_message
   post "email_messages/compose_chat", to: "email_compose_chat#create"

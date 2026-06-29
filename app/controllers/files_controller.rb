@@ -7,7 +7,7 @@ class FilesController < ApplicationController
     load_folders
     # "All files": the workspace's internal documents + uploaded files. Emails only
     # surface inside a folder they've been filed into (see #show).
-    @internal_docs = Current.workspace.authored_documents.recent.limit(50).to_a
+    @internal_docs = Current.workspace.authored_documents.accessible_to(Current.user).recent.limit(50).to_a
     @filed_emails = []
     @pagy, @files = pagy(files_scope, items: 30)
     # Show the file-manager layout (sidebar + list) once there's anything to
@@ -22,6 +22,9 @@ class FilesController < ApplicationController
 
   def show
     @folder = Current.workspace.mail_folders.find(params[:id])
+    # 404 (not 403) for a restricted folder the user can't read — don't leak existence.
+    return head :not_found unless @folder.readable_by?(Current.user)
+
     @subfolders = @folder.children.to_a
     load_folders
     @internal_docs = @folder.authored_documents.recent.limit(50).to_a
@@ -38,7 +41,7 @@ class FilesController < ApplicationController
   private
 
   def load_folders
-    @folders = Current.workspace.mail_folders.ordered.to_a
+    @folders = Current.workspace.mail_folders.accessible_to(Current.user).ordered.to_a
     # Badge counts every filed item kind (files + internal docs + emails).
     @folder_counts = MailFolder.item_counts(@folders)
   end
@@ -50,9 +53,9 @@ class FilesController < ApplicationController
     scope = if @folder
       @folder.documents
     elsif params[:folder_id].present?
-      Current.workspace.documents.in_folder(params[:folder_id])
+      Current.workspace.documents.accessible_to(Current.user).in_folder(params[:folder_id])
     else
-      Current.workspace.documents
+      Current.workspace.documents.accessible_to(Current.user)
     end
     scope.includes(:classification).with_attached_original_file.starred_first.recent
   end

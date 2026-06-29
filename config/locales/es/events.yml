@@ -23,6 +23,7 @@ es:
       contact_unblocked: Contacto desbloqueado
       contact_unstarred: Contacto sin destacar
       document_approved: Documento aprobado
+      document_linked_to_thread: Documento enlazado en el hilo
       document_processed: Documento procesado
       document_rejected: Documento rechazado
       document_restored: Documento restaurado
@@ -41,12 +42,19 @@ es:
       email_unfiled: Correo quitado de la carpeta
       file_deleted: Archivo eliminado
       file_filed: Archivo archivado
+      file_made_private: Enlace público revocado
+      file_made_public: Archivo compartido públicamente
+      file_public_link_viewed: Enlace público visto
       file_unfiled: Archivo quitado de la carpeta
       file_uploaded: Archivo subido
       folder_created: Carpeta creada
       folder_deleted: Carpeta eliminada
       folder_moved: Carpeta movida
       folder_renamed: Carpeta renombrada
+      folder_restricted: Carpeta restringida
+      folder_shared: Carpeta compartida
+      folder_unrestricted: Carpeta abierta
+      folder_unshared: Acceso a la carpeta eliminado
       internal_document_created: Documento interno creado
       internal_document_updated: Documento interno actualizado
       pipeline_stage_entered: Etapa iniciada

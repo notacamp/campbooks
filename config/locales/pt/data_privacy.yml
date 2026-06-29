@@ -16,6 +16,8 @@ pt:
         subtitle: "Controle como os seus dados são processados e armazenados, e que IA os pode ver."
         ai_toggle_heading: "Processamento de IA"
         ai_toggle_desc: "Quando ativado, o Scout usa IA para processar os seus emails, documentos e contactos. Desative para pausar toda a IA; os resumos e etiquetas existentes são mantidos."
+        scout_posts_heading: Atualizações de conversa do Scout
+        scout_posts_desc: "Quando o Scout arquiva um documento de um email, publicar uma ligação na discussão desse email."
         ai_paused_note: "O processamento de IA está em pausa. O Scout, a etiquetagem automática, os resumos e a análise não serão executados até voltar a ativar."
         ai_providers_heading: "Fornecedores de IA e regiões de dados"
         ai_providers_desc: "Que fornecedor trata de cada tarefa de IA e onde é executada. Verde significa residência de dados na UE."

@@ -27,6 +27,8 @@ fr:
       internal_documents: Documents internes
       emails: E-mails
       files_section: Fichiers
+      manage_access: Gérer l'accès
+      manage_access_locked: "Gérer l'accès · Privé"
     uploads:
       create:
         no_files: Choisissez au moins un fichier à téléverser.
@@ -37,6 +39,13 @@ fr:
         deleted: Fichier supprimé.
       analyze:
         analyzing: Analyse de ce fichier par l'IA…
+    public_links:
+      create:
+        created: Lien public prêt.
+      destroy:
+        revoked: Lien public révoqué.
+    scout_thread_linker:
+      body: "J'ai extrait un document de cet e-mail et l'ai classé dans Fichiers : **[%{title}](%{path})**."
   components:
     files:
       sidebar:
@@ -67,3 +76,26 @@ fr:
         actions: Actions de l'e-mail
         open: Ouvrir dans Courrier
         remove_from_folder: Retirer du dossier
+      folder_sharing:
+        open_hint: Ce dossier est ouvert à tout le monde dans votre espace de travail. Restreignez-le pour choisir qui y a accès.
+        restrict_label: Restreindre l'accès
+        restrict_hint: Seules les personnes que vous ajoutez (et les administrateurs) peuvent voir ce dossier et son contenu.
+        you_badge: Vous
+        owner_badge: Propriétaire
+        role_aria: Niveau d'accès
+        role_viewer: Peut voir
+        role_editor: Peut modifier
+        role_manager: Gestionnaire
+        remove_confirm: "Retirer %{name} de ce dossier ?"
+        remove_aria: Retirer l'accès
+        add_title: Ajouter des personnes
+        all_have_access: Tout le monde dans l'espace de travail a déjà accès.
+        select_placeholder: Choisissez une personne…
+        add_button: Ajouter
+      file_link_picker:
+        button: Insérer un lien de fichier
+        title: Insérer un lien de fichier
+        hint: Choisissez un fichier — un lien public est créé et inséré dans votre message.
+        loading: Chargement des fichiers…
+        empty: Aucun fichier à lier pour l'instant.
+        insert: Insérer

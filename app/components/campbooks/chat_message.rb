@@ -161,7 +161,7 @@ module Campbooks
     # @mentions linkified. Content is escaped first since humans type plain text.
     def comment_body
       div(class: "mt-1 text-[14px] leading-relaxed text-foreground max-w-[42rem] whitespace-pre-wrap break-words agent-message-content") do
-        raw(safe(linkify_mentions(CGI.escapeHTML(@message.content.to_s))))
+        raw(safe(linkify_mentions(autolink_urls(CGI.escapeHTML(@message.content.to_s)))))
       end
     end
 

@@ -1,0 +1,28 @@
+<%= turbo_frame_tag "file_link_picker_list" do %>
+  <% if @documents.empty? && @authored_documents.empty? %>
+    <p class="px-4 py-10 text-center text-sm text-muted-foreground"><%= t("components.files.file_link_picker.empty") %></p>
+  <% else %>
+    <ul class="max-h-80 divide-y divide-border overflow-y-auto">
+      <% @documents.each do |doc| %>
+        <li>
+          <button type="button" class="flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/50"
+              data-action="file-link-picker#pick" data-shareable-type="Document" data-shareable-id="<%= doc.id %>" data-name="<%= doc.display_title %>">
+            <svg class="h-4 w-4 flex-shrink-0 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/></svg>
+            <span class="min-w-0 flex-1 truncate text-sm text-foreground"><%= doc.display_title %></span>
+            <span class="flex-shrink-0 text-xs text-accent-600"><%= t("components.files.file_link_picker.insert") %></span>
+          </button>
+        </li>
+      <% end %>
+      <% @authored_documents.each do |doc| %>
+        <li>
+          <button type="button" class="flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/50"
+              data-action="file-link-picker#pick" data-shareable-type="AuthoredDocument" data-shareable-id="<%= doc.id %>" data-name="<%= doc.title %>">
+            <svg class="h-4 w-4 flex-shrink-0 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 4h14M5 9h14M5 14h9"/></svg>
+            <span class="min-w-0 flex-1 truncate text-sm text-foreground"><%= doc.title %></span>
+            <span class="flex-shrink-0 text-xs text-accent-600"><%= t("components.files.file_link_picker.insert") %></span>
+          </button>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+<% end %>

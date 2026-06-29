@@ -123,6 +123,21 @@ module EmailMessageHelpers
   # Stops at commas, periods, line breaks, etc.
   MENTION_REGEX = /@([\p{L}][\p{L}\p{N}_\'\-\.]*(?:\s+[\p{L}][\p{L}\p{N}_\'\-\.]*){0,3})/u
 
+  # Bare http(s) URLs in user text → clickable links. Runs on the CGI-escaped comment
+  # body before linkify_mentions, so a pasted public file link (/f/:token) is clickable
+  # in a comment. Trailing sentence punctuation is left outside the link.
+  URL_REGEX = %r{https?://[^\s<>"']+}
+
+  def autolink_urls(escaped_html)
+    return escaped_html if escaped_html.blank?
+
+    escaped_html.gsub(URL_REGEX) do |url|
+      trimmed = url.sub(/[.,;:!?)\]]+\z/, "")
+      trailing = url[trimmed.length..] || ""
+      %(<a href="#{trimmed}" target="_blank" rel="noopener noreferrer nofollow" class="text-accent-600 hover:underline">#{trimmed}</a>#{trailing})
+    end
+  end
+
   def linkify_mentions(html)
     return html if html.blank?
 

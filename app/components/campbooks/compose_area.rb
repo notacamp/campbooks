@@ -142,6 +142,9 @@ module Campbooks
                    class: "inline-flex items-center gap-1 px-3 py-1.5 text-xs text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors") do
               plain t(".discard")
             end
+
+            # Insert a public link to one of the workspace's files into the body.
+            render(Campbooks::Files::FileLinkPicker.new)
           end
 
           # Schedule-for-later disclosure (paid feature). A native <details> so the
