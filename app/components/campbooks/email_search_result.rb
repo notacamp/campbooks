@@ -88,7 +88,7 @@ module Campbooks
         # Tags + category
         if tags.any? || category_chip?
           div(class: "mt-1 flex items-center flex-wrap gap-1") do
-            tags.each { |tag| tag_pill(tag) }
+            tags.each { |tag| render(Campbooks::TagChip.new(tag: tag, size: :sm)) }
             if category_chip?
               render(Campbooks::CategoryChip.new(category: @message.category.to_sym, size: :sm, label: false))
             end
@@ -103,13 +103,6 @@ module Campbooks
           raw(safe(ATTACHMENT_ICON))
         end
       end
-    end
-
-    def tag_pill(tag)
-      span(
-        class: "inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium whitespace-nowrap",
-        style: "background-color: #{tag.color}1f; color: #{tag.color}"
-      ) { tag.name }
     end
 
     def avatar_email
@@ -129,7 +122,10 @@ module Campbooks
     end
 
     def tags
-      @tags ||= @message.tags.first(3)
+      # Hide provider system / AI low-value labels. Filtered in Ruby (not via
+      # visible_for's query) so the component's struct-based Lookbook preview,
+      # whose tags don't respond to #hidden?, still renders.
+      @tags ||= @message.tags.to_a.reject { |t| t.try(:hidden?) }.first(3)
     end
 
     def category_chip?

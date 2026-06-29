@@ -105,7 +105,6 @@ en:
           other: " from %{count} messages in thread"
       discussion: Discussion
       forward: Forward
-      labels_label: Labels
       no_content: No content.
       no_subject: "(no subject)"
       open_full_view: Open in full view
@@ -114,6 +113,8 @@ en:
       selected_badge: Selected
       send_to_notion: Save to Notion
       tags_label: Tags
+    tag_chip:
+      remove: "Remove %{name}"
     email_filter_panel:
       accounts: Accounts
       all_folders: All folders

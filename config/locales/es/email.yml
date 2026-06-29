@@ -177,7 +177,6 @@ es:
       snooze_title: Posponer
     tags:
       add_tag_aria: Añadir etiqueta
-      remove_tag_title: Eliminar etiqueta
       search_tags_placeholder: Buscar etiquetas...
     thread_list:
       back_to_inbox: "— volver a la bandeja de entrada"
@@ -189,10 +188,6 @@ es:
       senders_more: "%{first}, %{second} y más"
       sent_to_prefix: 'Para:'
       unpin_title: Quitar prioridad
-    zoho_labels:
-      add_label_aria: Añadir etiqueta
-      remove_label_title: Eliminar etiqueta
-      search_labels_placeholder: Buscar etiquetas...
   email_scans:
     show:
       account_label: Cuenta
