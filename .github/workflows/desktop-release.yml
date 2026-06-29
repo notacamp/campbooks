@@ -56,14 +56,13 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # --- macOS signing + notarization (set these secrets to sign; unset = unsigned) ---
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          # --- Tauri updater signing (set when auto-update is activated) ---
+          # macOS code signing + notarization: add the APPLE_* secrets
+          # (APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
+          # APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID) here once a Developer ID cert
+          # exists — see native/desktop/README.md. Until then macOS ships ad-hoc
+          # signed (unsigned) like Windows/Linux. NOTE: do NOT pass an empty
+          # APPLE_CERTIFICATE — tauri-action then fails the keychain import.
+          # Tauri updater signing (set when auto-update is activated):
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
