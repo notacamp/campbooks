@@ -36,7 +36,7 @@ func newDocumentsCmd() *cobra.Command {
 
 func documentsListCmd() *cobra.Command {
 	var (
-		docType       int
+		docType       string
 		reviewStatus  string
 		aiStatus      string
 		page, perPage int
@@ -52,8 +52,8 @@ func documentsListCmd() *cobra.Command {
 				return err
 			}
 			q := url.Values{}
-			if docType > 0 {
-				q.Set("type", strconv.Itoa(docType))
+			if docType != "" {
+				q.Set("type", docType)
 			}
 			setIf(q, "review_status", reviewStatus)
 			setIf(q, "ai_status", aiStatus)
@@ -78,7 +78,7 @@ func documentsListCmd() *cobra.Command {
 		},
 	}
 	f := cmd.Flags()
-	f.IntVar(&docType, "type", 0, "filter by document type ID")
+	f.StringVar(&docType, "type", "", "filter by document type ID")
 	f.StringVar(&reviewStatus, "review-status", "", "pending|approved|rejected")
 	f.StringVar(&aiStatus, "ai-status", "", "pending|processing|completed|failed")
 	f.IntVar(&page, "page", 0, "page number")
@@ -182,7 +182,8 @@ func documentsUpdateCmd() *cobra.Command {
 	var (
 		vendorName, currency, documentDate, dueDate string
 		invoiceNumber, description                  string
-		amountCents, docType                        int
+		amountCents                                 int
+		docType                                     string
 		sets                                        []string
 	)
 	cmd := &cobra.Command{
@@ -204,8 +205,8 @@ func documentsUpdateCmd() *cobra.Command {
 			if cmd.Flags().Changed("amount-cents") {
 				form.Set("amount_cents", strconv.Itoa(amountCents))
 			}
-			if docType > 0 {
-				form.Set("document_type_id", strconv.Itoa(docType))
+			if docType != "" {
+				form.Set("document_type_id", docType)
 			}
 			for _, kv := range sets {
 				k, v, ok := strings.Cut(kv, "=")
@@ -232,7 +233,7 @@ func documentsUpdateCmd() *cobra.Command {
 	f.StringVar(&dueDate, "due-date", "", "due date (YYYY-MM-DD)")
 	f.StringVar(&invoiceNumber, "invoice-number", "", "invoice number")
 	f.StringVar(&description, "description", "", "description")
-	f.IntVar(&docType, "type", 0, "document type ID")
+	f.StringVar(&docType, "type", "", "document type ID")
 	f.StringArrayVar(&sets, "set", nil, "set any other editable field: --set field=value (repeatable)")
 	return cmd
 }
@@ -257,7 +258,7 @@ func documentsActionCmd(use, action, short, done string) *cobra.Command {
 }
 
 func documentsReclassifyCmd() *cobra.Command {
-	var docType int
+	var docType string
 	cmd := &cobra.Command{
 		Use:   "reclassify <id>",
 		Short: "Change a document's type (also marks it approved)",
@@ -267,10 +268,10 @@ func documentsReclassifyCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if docType == 0 {
+			if docType == "" {
 				return fmt.Errorf("--type is required")
 			}
-			form := url.Values{"document_type_id": {strconv.Itoa(docType)}}
+			form := url.Values{"document_type_id": {docType}}
 			data, err := s.client.Send(cmd.Context(), http.MethodPost, "/api/v1/documents/"+args[0]+"/reclassify", nil, form)
 			if err != nil {
 				return err
@@ -278,7 +279,7 @@ func documentsReclassifyCmd() *cobra.Command {
 			return printResult(cmd.OutOrStdout(), data, "Reclassified")
 		},
 	}
-	cmd.Flags().IntVar(&docType, "type", 0, "new document type ID (required)")
+	cmd.Flags().StringVar(&docType, "type", "", "new document type ID (required)")
 	return cmd
 }
 
