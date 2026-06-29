@@ -35,6 +35,8 @@ export default class extends Controller {
       default: return
     }
     event.preventDefault()
+    // Trap: keep handled keys off the body-level inbox shortcuts behind the page.
+    event.stopPropagation()
   }
 
   // Card action buttons (data-skim-action) bubble up to here.
