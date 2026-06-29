@@ -1,0 +1,9 @@
+---
+fr:
+  discussions:
+    scout:
+      calendar_event_created: "📅 J'ai ajouté **[%{title}](%{url})** à ton calendrier — %{at}."
+      reminders_found:
+        one: "🔔 J'ai repéré un rappel dans cet e-mail :"
+        other: "🔔 J'ai repéré %{count} rappels dans cet e-mail :"
+      reminder_line: "- **[%{title}](%{url})** — échéance %{due}"
