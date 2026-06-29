@@ -181,6 +181,9 @@ fr:
       forwarded_to: Transféré à %{address}
       no_email_selected: Aucun e-mail sélectionné
       no_send_permission: Vous n'avez pas la permission d'envoyer depuis ce compte.
+      reminder_confirmed: "%{title} ajouté à ton calendrier."
+      reminder_confirmed_no_calendar: Rappel confirmé. Connecte un calendrier pour le synchroniser automatiquement.
+      reminder_dismissed: Rappel ignoré.
       reply_sent: Réponse envoyée
       save_draft_html: Brouillon enregistré
       tagged: Étiquette '%{name}' ajoutée

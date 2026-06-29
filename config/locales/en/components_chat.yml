@@ -14,11 +14,13 @@ en:
       suggested_heading: Suggested %{kind}
       tags_label: tags
     chat_actions:
+      add_to_calendar: Add to calendar
       allow_sender: Allow sender
       archive: Archive
       block_sender: Block sender
       create_event: Create calendar event
       create_task: Create task
+      dismiss: Dismiss
       draft_reply: Draft reply
       forward_to: Forward to %{address}
       link_task: Link to task
