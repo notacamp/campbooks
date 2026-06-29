@@ -1,0 +1,34 @@
+<%= form_with model: scheduled_email, class: "space-y-4" do |f| %>
+  <% if scheduled_email.errors.any? %>
+    <div class="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+      <p class="font-medium"><%= t(".errors", count: scheduled_email.errors.count) %></p>
+      <ul class="mt-1 list-disc list-inside"><% scheduled_email.errors.full_messages.each do |msg| %><li><%= msg %></li><% end %></ul>
+    </div>
+  <% end %>
+
+  <div>
+    <%= f.label :email_account_id, class: "block text-sm font-medium text-foreground mb-1" %>
+    <%= f.collection_select :email_account_id, email_accounts, :id, :display_name, { prompt: t(".select_account") }, class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" %>
+  </div>
+
+  <div>
+    <%= f.label :to_address, class: "block text-sm font-medium text-foreground mb-1" %>
+    <%= f.text_field :to_address, class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20", placeholder: "recipient@example.com" %>
+  </div>
+
+  <div class="grid grid-cols-2 gap-3">
+    <div><%= f.label :cc_address, class: "block text-sm font-medium text-foreground mb-1" %><%= f.text_field :cc_address, class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" %></div>
+    <div><%= f.label :bcc_address, class: "block text-sm font-medium text-foreground mb-1" %><%= f.text_field :bcc_address, class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" %></div>
+  </div>
+
+  <div><%= f.label :subject, class: "block text-sm font-medium text-foreground mb-1" %><%= f.text_field :subject, class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" %></div>
+  <div><%= f.label :body, class: "block text-sm font-medium text-foreground mb-1" %><%= f.text_area :body, rows: 8, class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono", placeholder: t(".body_placeholder") %></div>
+  <div><%= f.label :scheduled_at, class: "block text-sm font-medium text-foreground mb-1" %><%= f.datetime_local_field :scheduled_at, class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" %></div>
+  <div><%= f.label :rrule, class: "block text-sm font-medium text-foreground mb-1" %><%= f.text_field :rrule, class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono", placeholder: "FREQ=WEEKLY;INTERVAL=1" %><p class="text-[11px] text-gray-400 mt-1"><%= t(".rrule_hint") %></p></div>
+  <div><label class="block text-sm font-medium text-foreground mb-1"><%= t(".template_context") %></label><p class="text-[11px] text-gray-400 mb-1"><%= t(".template_context_hint") %></p><%= f.text_area :template_context, value: scheduled_email.template_context.to_json, rows: 4, class: "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 font-mono text-[11px]" %></div>
+
+  <div class="flex items-center gap-3 pt-2">
+    <%= f.submit class: "inline-flex items-center rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 cursor-pointer border-0" %>
+    <%= link_to t(".cancel"), scheduled_emails_path, class: "text-sm text-gray-500 hover:text-gray-700 no-underline" %>
+  </div>
+<% end %>

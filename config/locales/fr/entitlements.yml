@@ -51,13 +51,15 @@ fr:
       over_limit: Vous avez atteint la limite de votre forfait pour %{feature}. Améliorez
         votre forfait pour en obtenir plus.
     features:
-      ai_model_access: Modèles d'IA
+      ai_model_access: "Modèles d'IA"
       email_accounts: Comptes e-mail
       emails_synced: E-mails synchronisés
+      email_scheduling: Envoi programmé
+      email_templates: "Modèles d'e-mail"
       managed_ai: Campbooks AI
       notifications: Notifications
       scout: Scout
-      workflow_executions: Exécutions de workflow
+      workflow_executions: "Exécutions de workflow"
       workflows: Workflows
   navigation:
     settings:

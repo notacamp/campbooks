@@ -1,0 +1,71 @@
+---
+es:
+  scheduled_emails:
+    index:
+      title: Correos programados
+      new: Nuevo correo programado
+      empty_title: Sin correos programados
+      empty_description: "Programa un correo para enviarlo más tarde — una vez o de forma recurrente."
+      to: "Para %{address}"
+      scheduled_for: "Programado para %{time}"
+      recurring: Recurrente
+    new:
+      title: Programar correo
+    create:
+      created: Correo programado con éxito.
+    edit:
+      title: Editar correo programado
+    update:
+      updated: Correo programado actualizado.
+    destroy:
+      cancelled: Correo programado cancelado.
+    show:
+      title: Correo programado
+      back: "← Volver a correos programados"
+      edit: Editar
+      cancel: "Cancelar programación"
+      confirm_cancel: "¿Cancelar este correo programado?"
+      from: De
+      scheduled: Programado
+      recurring_label: "Se repite: %{rule}"
+      status: Estado
+      preview: Vista previa
+    form:
+      errors:
+        one: "1 error ha impedido guardar este correo programado:"
+        other: "%{count} errores han impedido guardar este correo programado:"
+      select_account: "Selecciona una cuenta de correo…"
+      body_placeholder: "Escribe el cuerpo de tu correo aquí. Usa {{ contact.first_name }} para variables de plantilla."
+      rrule_hint: "Déjalo vacío para envío único. Ejemplos: FREQ=DAILY, FREQ=WEEKLY;INTERVAL=1, FREQ=MONTHLY;INTERVAL=1"
+      template_context: Variables de plantilla
+      template_context_hint: 'Objeto JSON con variables de plantilla Liquid, p. ej. {"contact": {"first_name": "Juan"}}'
+      cancel: Cancelar
+  email_compose:
+    create:
+      scheduled: "¡Correo programado! Puedes gestionarlo en Correos programados."
+      schedule_failed: No se pudo programar el correo. Revisa los campos requeridos.
+    compose_area:
+      schedule: Programar
+  activerecord:
+    attributes:
+      scheduled_email:
+        to_address: Para
+        cc_address: Cc
+        bcc_address: Cco
+        subject: Asunto
+        body: Cuerpo
+        scheduled_at: Enviar el
+        rrule: Recurrencia
+        email_account_id: De
+    models:
+      scheduled_email:
+        one: Correo programado
+        other: Correos programados
+  activemodel:
+    enums:
+      scheduled_email:
+        statuses:
+          pending: Pendiente
+          sent: Enviado
+          cancelled: Cancelado
+          failed: Fallido

@@ -48,6 +48,7 @@ fr:
       placeholder_body: Rédigez votre message...
       placeholder_cc: Ajouter en Cc...
       placeholder_to: Rechercher des contacts ou saisir un e-mail...
+      schedule: Programmer
       send: Envoyer
       signature_default: "%{name} (par défaut)"
       signature_preview_label: Signature
@@ -78,6 +79,12 @@ fr:
       never_synced: Pas encore synchronisé
       synced_ago: Synchronisé il y a %{time}
       syncing: Synchronisation…
+    email_template_picker:
+      button: Utiliser un modèle
+      button_aria: "Insérer un modèle d'e-mail"
+      title: "Utiliser un modèle d'e-mail"
+      subtitle: "Choisissez un modèle à remplir et à insérer dans votre e-mail."
+      close: Fermer
     email_account_sharing:
       add_button: Ajouter
       add_section_title: Ajouter une personne

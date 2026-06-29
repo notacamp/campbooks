@@ -1,0 +1,71 @@
+---
+fr:
+  scheduled_emails:
+    index:
+      title: "E-mails programmés"
+      new: "Nouvel e-mail programmé"
+      empty_title: "Aucun e-mail programmé"
+      empty_description: "Programmez un e-mail pour l'envoyer plus tard — une fois ou de manière récurrente."
+      to: "À %{address}"
+      scheduled_for: "Programmé pour %{time}"
+      recurring: "Récurrent"
+    new:
+      title: "Programmer un e-mail"
+    create:
+      created: "E-mail programmé avec succès."
+    edit:
+      title: "Modifier l'e-mail programmé"
+    update:
+      updated: "E-mail programmé mis à jour."
+    destroy:
+      cancelled: "E-mail programmé annulé."
+    show:
+      title: "E-mail programmé"
+      back: "← Retour aux e-mails programmés"
+      edit: Modifier
+      cancel: "Annuler la programmation"
+      confirm_cancel: "Annuler cet e-mail programmé ?"
+      from: De
+      scheduled: "Programmé"
+      recurring_label: "Se répète : %{rule}"
+      status: Statut
+      preview: "Aperçu"
+    form:
+      errors:
+        one: "1 erreur a empêché l'enregistrement de cet e-mail programmé :"
+        other: "%{count} erreurs ont empêché l'enregistrement de cet e-mail programmé :"
+      select_account: "Sélectionnez un compte e-mail…"
+      body_placeholder: "Rédigez le corps de votre e-mail ici. Utilisez {{ contact.first_name }} pour les variables de modèle."
+      rrule_hint: "Laissez vide pour un envoi unique. Exemples : FREQ=DAILY, FREQ=WEEKLY;INTERVAL=1, FREQ=MONTHLY;INTERVAL=1"
+      template_context: "Variables de modèle"
+      template_context_hint: 'Objet JSON avec variables de modèle Liquid, ex. {"contact": {"first_name": "Jean"}}'
+      cancel: Annuler
+  email_compose:
+    create:
+      scheduled: "E-mail programmé ! Vous pouvez le gérer dans E-mails programmés."
+      schedule_failed: "Impossible de programmer l'e-mail. Vérifiez les champs requis."
+    compose_area:
+      schedule: Programmer
+  activerecord:
+    attributes:
+      scheduled_email:
+        to_address: "À"
+        cc_address: Cc
+        bcc_address: Cci
+        subject: Objet
+        body: Corps
+        scheduled_at: Envoyer le
+        rrule: "Récurrence"
+        email_account_id: De
+    models:
+      scheduled_email:
+        one: "E-mail programmé"
+        other: "E-mails programmés"
+  activemodel:
+    enums:
+      scheduled_email:
+        statuses:
+          pending: En attente
+          sent: "Envoyé"
+          cancelled: "Annulé"
+          failed: "Échoué"

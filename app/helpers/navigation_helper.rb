@@ -108,9 +108,10 @@ module NavigationHelper
         [ settings_data_privacy_path, %w[data_privacy], t("navigation.settings.items.data_privacy"), "M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" ]
       ] ],
       [ t("navigation.settings.groups.ai_and_automation"), [
-        [ settings_document_templates_path, %w[document_templates], t("navigation.settings.items.document_templates"), "M4.5 3.75h15a2.25 2.25 0 012.25 2.25v10.5A2.25 2.25 0 0119.5 18.75h-15a2.25 2.25 0 01-2.25-2.25V6A2.25 2.25 0 014.5 3.75z" ],
+        ([ settings_document_templates_path, %w[document_templates], t("navigation.settings.items.document_templates"), "M4.5 3.75h15a2.25 2.25 0 012.25 2.25v10.5A2.25 2.25 0 0119.5 18.75h-15a2.25 2.25 0 01-2.25-2.25V6A2.25 2.25 0 014.5 3.75z" ] if Features.document_templates?),
+        ([ settings_email_templates_path, %w[email_templates], t("navigation.settings.items.email_templates"), "M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" ] if Features.email_templates?),
         [ settings_ai_path, %w[ai], t("navigation.settings.items.ai_providers_and_services"), "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.456-2.456L14.25 6l1.035-.259a3.375 3.375 0 002.456-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" ]
-      ] ],
+      ].compact ],
       [ t("navigation.settings.groups.your_account"), [
         [ settings_account_path, %w[account], t("navigation.settings.items.account"), "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" ],
         [ settings_security_path, %w[security totp passkeys recovery_codes email_otp audit_log], t("navigation.settings.items.security"), "M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" ],

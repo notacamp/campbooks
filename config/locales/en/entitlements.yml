@@ -58,6 +58,8 @@ en:
       workflow_executions: Workflow runs
       workflows: Workflows
       document_templates: Document templates
+      email_scheduling: Email scheduling
+      email_templates: Email templates
   navigation:
     settings:
       items:

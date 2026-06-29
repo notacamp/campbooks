@@ -103,6 +103,12 @@ en:
           failed: Failed
           pending: Draft
           processing: Generating
+      email_template:
+        ai_statuses:
+          completed: Ready
+          failed: Failed
+          pending: Draft
+          processing: Generating
       document_type:
         categories:
           accounting: Accounting

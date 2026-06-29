@@ -53,6 +53,8 @@ pt:
       ai_model_access: Modelos de IA
       email_accounts: Contas de email
       emails_synced: Emails sincronizados
+      email_scheduling: Agendamento de email
+      email_templates: Modelos de email
       managed_ai: Campbooks AI
       notifications: Notificações
       scout: Scout

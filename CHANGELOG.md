@@ -16,8 +16,35 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Email templates** — reusable emails (subject + body with `{{ variables }}`,
+  written by hand or drafted by AI) created in Settings → Email templates and
+  inserted from the composer via a "Use template" picker: fill in the variables
+  and the rendered subject/body drop into your draft. An email template can carry
+  attached **document templates**, which are filled with the same variables,
+  rendered to PDFs, and attached automatically. Templated emails can also be
+  scheduled — each occurrence re-renders the subject/body and regenerates the PDF
+  attachments, so recurring sends stay current. Entitlement- and readiness-gated
+  (`ENABLE_EMAIL_TEMPLATES`).
+- **Public REST API -- new resources** -- added endpoints for scheduled emails
+  (`scheduled_emails:read`/`:write`), calendar events (`calendar:read`/`:write`),
+  email templates (`templates:read`/`:write`), document templates
+  (`templates:read`/`:write`), reminders (`reminders:read`/`:write`), and folders
+  with folder-membership filing (`folders:read`/`:write`).
+- **MCP endpoint** (`POST /api/mcp`) -- exposes the Campbooks API as a
+  Model Context Protocol (JSON-RPC 2.0) server, authenticated with the same
+  bearer token as the REST API. Tools: list/get/send/reply email, list documents
+  and contacts, list and create calendar events, list and create scheduled emails,
+  list reminders, and list email templates. Tool visibility is gated per-scope so
+  `tools/list` only returns tools the token's scopes allow.
+
 ### Fixed
 
+- Documents list **month filter** now works. The month picker submits a single
+  `YYYY-MM` value, but the list, "Reanalyze all", and export were looking for a
+  separate `year` parameter that no form ever sends — so picking a month had no
+  effect. They now parse the picker value correctly.
 - Avatar stacks (facepiles) in the email list and board view now show the
   account-color ring, consistent with single-sender avatars and search results.
 

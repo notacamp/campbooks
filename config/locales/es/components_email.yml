@@ -48,6 +48,7 @@ es:
       placeholder_body: Escriba su mensaje...
       placeholder_cc: Añadir CC...
       placeholder_to: Buscar contactos o escribir correo...
+      schedule: Programar
       send: Enviar
       signature_default: "%{name} (predeterminada)"
       signature_preview_label: Firma
@@ -78,6 +79,12 @@ es:
       never_synced: Aún no sincronizada
       synced_ago: Sincronizada hace %{time}
       syncing: Sincronizando…
+    email_template_picker:
+      button: Usar plantilla
+      button_aria: Insertar una plantilla de correo
+      title: Usar una plantilla de correo
+      subtitle: Elige una plantilla para rellenar e insertar en tu correo.
+      close: Cerrar
     email_account_sharing:
       add_button: Añadir
       add_section_title: Añadir persona

@@ -29,6 +29,10 @@ class EmailComposeController < ApplicationController
   end
 
   def send_message
+    if params[:send_action] == "schedule" && current_entitlements.feature?(:email_scheduling)
+      return create_scheduled_email
+    end
+
     args = compose_params
 
     # Append the selected signature (with separation; never doubled). See
@@ -66,6 +70,45 @@ class EmailComposeController < ApplicationController
   end
 
   private
+
+  def create_scheduled_email
+    args = compose_params
+    template = scheduled_email_template
+    # With a template, schedule its RAW subject/body + the variables so each
+    # occurrence re-renders fresh (recurring {{ date }} stays current) and the
+    # send job regenerates the document-template PDFs. Otherwise schedule the
+    # composed content as-is.
+    context = template ? scheduled_template_context : {}
+    scheduled = ScheduledEmail.new(
+      workspace: Current.workspace,
+      email_account_id: params[:email_account_id] || @message&.email_account_id,
+      created_by: Current.user,
+      email_template: template,
+      to_address: args[:to_address],
+      subject: template&.subject.presence || args[:subject],
+      body: template&.body_html.presence || args[:body],
+      cc_address: args[:cc_address],
+      bcc_address: args[:bcc_address],
+      template_context: context,
+      scheduled_at: params[:scheduled_at].presence || 1.hour.from_now,
+      rrule: params[:rrule].presence
+    )
+
+    if scheduled.save
+      next_at = scheduled.rrule.present? ? ScheduleCalculator.next_occurrence(scheduled.scheduled_at, scheduled.rrule) : scheduled.scheduled_at
+      scheduled.update_columns(next_occurrence_at: next_at)
+
+      respond_to do |format|
+        format.turbo_stream do
+          stream = @message ? turbo_stream.remove("compose_area_#{@message.id}") : sent_redirect
+          render turbo_stream: [ notify_stream(t("email_compose.create.scheduled"), severity: :success), stream ].flatten.compact
+        end
+        format.html { redirect_to scheduled_emails_path, notice: t("email_compose.create.scheduled") }
+      end
+    else
+      error_response(t("email_compose.create.schedule_failed"))
+    end
+  end
 
   # The composer goes to a different target per surface. The bottom-right drawer
   # replaces its OWN slot (a distinct id, because the full page's
@@ -148,6 +191,27 @@ class EmailComposeController < ApplicationController
       cc_address: params[:cc_address].presence,
       bcc_address: params[:bcc_address].presence
     }
+  end
+
+  # The email template a scheduled send was built from (set by the composer's
+  # template picker), scoped to the workspace so a forged id can't be linked.
+  def scheduled_email_template
+    return nil unless current_entitlements.feature?(:email_templates)
+    return nil if params[:email_template_id].blank?
+
+    Current.workspace.email_templates.find_by(id: params[:email_template_id])
+  end
+
+  # The variable values the picker stashed (JSON), used to re-render the template
+  # on every occurrence. Tolerant of malformed input.
+  def scheduled_template_context
+    raw = params[:template_context]
+    return {} if raw.blank?
+
+    parsed = JSON.parse(raw)
+    parsed.is_a?(Hash) ? parsed : {}
+  rescue JSON::ParserError
+    {}
   end
 
   # Resolve the signed blob ids submitted by the attachment tray into the

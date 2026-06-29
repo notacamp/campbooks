@@ -117,6 +117,12 @@ es:
           manager: Gestor
           owner: Propietario
           viewer: Lector
+      email_template:
+        ai_statuses:
+          completed: Listo
+          failed: Fallido
+          pending: Borrador
+          processing: Generando
       email_message:
         ai_priorities:
           high: Alta

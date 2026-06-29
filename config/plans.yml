@@ -59,9 +59,17 @@ plans:
       enabled: true
       config:
         tier: basic
+    email_scheduling:
+      type: flag
+      allowed: false        # scheduled sending + calendar visibility — paid feature
+      enabled: true
     document_templates:
       type: flag
-      allowed: false
+      allowed: false        # AI document templates — paid feature
+      enabled: true
+    email_templates:
+      type: flag
+      allowed: false        # reusable email templates — paid feature
       enabled: true
     # ── deferred volume limits (enforced once metering exists) ──
     emails_synced:
@@ -110,7 +118,15 @@ plans:
       enabled: true
       config:
         tier: standard
+    email_scheduling:
+      type: flag
+      allowed: true
+      enabled: true
     document_templates:
+      type: flag
+      allowed: true
+      enabled: true
+    email_templates:
       type: flag
       allowed: true
       enabled: true
@@ -137,6 +153,18 @@ plans:
       allowed: true
       enabled: true
       limit: null           # unlimited
+    email_scheduling:
+      type: flag
+      allowed: true
+      enabled: true
+    document_templates:
+      type: flag
+      allowed: true
+      enabled: true
+    email_templates:
+      type: flag
+      allowed: true
+      enabled: true
     workflows:
       type: limit
       allowed: true
@@ -160,10 +188,6 @@ plans:
       enabled: true
       config:
         tier: premium
-    document_templates:
-      type: flag
-      allowed: true
-      enabled: true
     emails_synced:
       type: limit
       allowed: true
@@ -187,6 +211,18 @@ plans:
       allowed: true
       enabled: true
       limit: null
+    email_scheduling:
+      type: flag
+      allowed: true
+      enabled: true
+    document_templates:
+      type: flag
+      allowed: true
+      enabled: true
+    email_templates:
+      type: flag
+      allowed: true
+      enabled: true
     workflows:
       type: limit
       allowed: true
@@ -210,10 +246,6 @@ plans:
       enabled: true
       config:
         tier: premium
-    document_templates:
-      type: flag
-      allowed: true
-      enabled: true
     emails_synced:
       type: limit
       allowed: true

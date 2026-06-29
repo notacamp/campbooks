@@ -39,12 +39,21 @@ module Features
     # OAuth callbacks and the Settings → Security link/unlink. Honors the legacy
     # ENABLE_MICROSOFT_MAILBOX so deployments that already enabled mailbox connect
     # keep working after the flags were unified.
+    def microsoft?
+      flag?("ENABLE_MICROSOFT") || flag?("ENABLE_MICROSOFT_MAILBOX")
+    end
+
+    # AI-generated, fill-in-the-blank document templates that render to PDF (the
+    # settings CRUD plus the fill/preview/send flow). See DocumentTemplate.
     def document_templates?
       flag?("ENABLE_DOCUMENT_TEMPLATES")
     end
 
-    def microsoft?
-      flag?("ENABLE_MICROSOFT") || flag?("ENABLE_MICROSOFT_MAILBOX")
+    # Reusable email templates (subject + HTML body with {{ variables }}) used
+    # from the composer, optionally carrying attached document templates that
+    # render to PDF attachments. See EmailTemplate.
+    def email_templates?
+      flag?("ENABLE_EMAIL_TEMPLATES")
     end
 
     private

@@ -1,0 +1,71 @@
+---
+pt:
+  scheduled_emails:
+    index:
+      title: Emails Agendados
+      new: Novo email agendado
+      empty_title: Sem emails agendados
+      empty_description: Agende um email para enviar mais tarde — uma vez ou de forma recorrente.
+      to: "Para %{address}"
+      scheduled_for: "Agendado para %{time}"
+      recurring: Recorrente
+    new:
+      title: Agendar Email
+    create:
+      created: Email agendado com sucesso.
+    edit:
+      title: Editar Email Agendado
+    update:
+      updated: Email agendado atualizado.
+    destroy:
+      cancelled: Email agendado cancelado.
+    show:
+      title: Email Agendado
+      back: "← Voltar aos emails agendados"
+      edit: Editar
+      cancel: Cancelar agendamento
+      confirm_cancel: Cancelar este email agendado?
+      from: De
+      scheduled: Agendado
+      recurring_label: "Repete: %{rule}"
+      status: Estado
+      preview: "Pré-visualização"
+    form:
+      errors:
+        one: "1 erro impediu que este email agendado fosse guardado:"
+        other: "%{count} erros impediram que este email agendado fosse guardado:"
+      select_account: "Selecione uma conta de email…"
+      body_placeholder: "Escreva o corpo do seu email aqui. Use {{ contact.first_name }} para variáveis de modelo."
+      rrule_hint: "Deixe em branco para envio único. Exemplos: FREQ=DAILY, FREQ=WEEKLY;INTERVAL=1, FREQ=MONTHLY;INTERVAL=1"
+      template_context: "Variáveis de modelo"
+      template_context_hint: 'Objeto JSON com variáveis de modelo Liquid, ex. {"contact": {"first_name": "João"}}'
+      cancel: Cancelar
+  email_compose:
+    create:
+      scheduled: "Email agendado! Pode geri-lo em Emails Agendados."
+      schedule_failed: "Não foi possível agendar o email. Verifique os campos obrigatórios."
+    compose_area:
+      schedule: Agendar
+  activerecord:
+    attributes:
+      scheduled_email:
+        to_address: Para
+        cc_address: Cc
+        bcc_address: Bcc
+        subject: Assunto
+        body: Corpo
+        scheduled_at: Enviar em
+        rrule: "Recorrência"
+        email_account_id: De
+    models:
+      scheduled_email:
+        one: Email Agendado
+        other: Emails Agendados
+  activemodel:
+    enums:
+      scheduled_email:
+        statuses:
+          pending: Pendente
+          sent: Enviado
+          cancelled: Cancelado
+          failed: Falhado

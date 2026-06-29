@@ -1,8 +1,9 @@
 # Campbooks Public REST API
 
 The public API lets customers reach their own Campbooks data — email,
-documents, contacts, tags, document types, and Scout chat — from
-their own apps and scripts. It is authenticated with **OAuth 2.0 client
+documents, contacts, tags, document types, Scout chat, calendar events,
+scheduled emails, email and document templates, reminders, and folders —
+from their own apps and scripts. It is authenticated with **OAuth 2.0 client
 credentials** via [Doorkeeper](https://github.com/doorkeeper-gem/doorkeeper).
 
 > **Machine-readable spec:** a full [OpenAPI 3.0 description](../openapi.yaml)
@@ -92,6 +93,16 @@ client's tokens (and rotate its secret) from Settings → API access.
 | `document_types:read` | List the workspace's document types |
 | `scout:read` | Read Scout chat threads and messages |
 | `scout:write` | Create Scout threads and send messages |
+| `scheduled_emails:read` | List and read scheduled emails |
+| `scheduled_emails:write` | Schedule, update, and cancel emails |
+| `calendar:read` | Read calendar events |
+| `calendar:write` | Create, update, RSVP, and delete calendar events |
+| `templates:read` | List and read email and document templates |
+| `templates:write` | Create, update, and apply email and document templates |
+| `reminders:read` | Read AI reminders |
+| `reminders:write` | Confirm, dismiss, and snooze reminders |
+| `folders:read` | List folders and their contents |
+| `folders:write` | File and unfile documents in folders |
 
 <!-- The `workflows:read` / `workflows:trigger` scopes are omitted while the Workflows feature is disabled by default (ENABLE_WORKFLOWS). Restore both rows above when it ships. -->
 
@@ -129,6 +140,13 @@ Every error response is `{ "error": { "code": "…", "message": "…" } }`.
 | 422 | `validation_failed` | The payload was rejected (`error.details`) |
 | 422 | `invalid_state` | `POST /contacts/:id/state`: `state` wasn't a valid value |
 | 429 | `rate_limit_exceeded` | Too many requests |
+| 403 | `entitlement_required` | The workspace plan does not include this feature |
+| 403 | `calendar_not_writable` | `POST /calendar_events`: the calendar is not writable or does not exist |
+| 403 | `event_not_writable` | Mutating a calendar event whose calendar is not writable by the user |
+| 422 | `invalid_rsvp_status` | `POST /calendar_events/:id/rsvp`: unrecognized `rsvp_status` value |
+| 422 | `render_failed` | `POST /document_templates/:id/render_pdf`: template could not be rendered |
+| 422 | `send_failed` | `POST /document_templates/:id/send_email`: email could not be sent |
+| 422 | `confirm_failed` | `POST /reminders/:id/confirm`: reminder confirmation failed |
 | 503 | `ai_provider_unconfigured` | Scout: the workspace has no AI provider for chat |
 
 > 404 (not 403) is returned for resources you can't see, so the API never
@@ -383,6 +401,433 @@ curl "https://<your-campbooks-host>/api/v1/scout/threads/7/messages?after_messag
 
 > Sending a message returns `503 ai_provider_unconfigured` if the workspace has
 > no AI provider set up for chat.
+
+## Scheduled Emails
+
+Scheduled emails are workspace-scoped. Writes (create/update/cancel) require the
+`:email_scheduling` entitlement; the workspace plan must include email scheduling
+or the API returns `403 entitlement_required`. Creating or updating to an account
+the acting user cannot send from returns `403 no_sendable_account`.
+
+### `GET /api/v1/scheduled_emails` — list (scope `scheduled_emails:read`)
+
+Filter by `status` (`pending`/`sent`/`cancelled`/`failed`), plus `page`/`per_page`.
+Ordered by soonest next occurrence.
+
+```json
+{
+  "data": [
+    {
+      "id": 11, "to": "client@acme.com", "cc": null, "bcc": null,
+      "subject": "Monthly report", "status": "pending",
+      "recurring": true, "rrule": "FREQ=MONTHLY;BYMONTHDAY=1",
+      "scheduled_at": "2026-07-01T09:00:00Z",
+      "next_occurrence_at": "2026-07-01T09:00:00Z",
+      "last_sent_at": null,
+      "account_id": 3, "email_template_id": 7,
+      "created_at": "2026-06-28T10:00:00Z"
+    }
+  ],
+  "meta": { "page": 1, "per_page": 25, "total": 1, "total_pages": 1 }
+}
+```
+
+### `GET /api/v1/scheduled_emails/:id` — show (scope `scheduled_emails:read`)
+
+Adds `body` (HTML) and `template_context` (the key/value hash used to fill the template).
+
+### `POST /api/v1/scheduled_emails` — create (scope `scheduled_emails:write`)
+
+Body: `email_account_id` (required), `to_address` (required), `subject`, `body`,
+`cc_address`, `bcc_address`, `scheduled_at`, `rrule` (iCal RRULE string, e.g.
+`FREQ=WEEKLY;INTERVAL=1`), `email_template_id`, `template_context` (key/value hash).
+Returns `201`.
+
+### `PATCH /api/v1/scheduled_emails/:id` — update (scope `scheduled_emails:write`)
+
+Same fields as create; only the fields you send change.
+
+### `DELETE /api/v1/scheduled_emails/:id` — cancel (scope `scheduled_emails:write`)
+
+Soft-cancels the scheduled email (`status: "cancelled"`). Returns the updated record.
+
+## Calendar Events
+
+Calendar events are scoped to events the acting user may see via their connected
+calendar accounts. Writes require the target calendar to be writable and enabled
+for sync (`403 calendar_not_writable`); modifying an event on a non-writable
+calendar returns `403 event_not_writable`.
+
+### `GET /api/v1/calendar_events` — list (scope `calendar:read`)
+
+Filters: `start_after`, `start_before` (ISO 8601), `calendar_id`, plus
+`page`/`per_page`. Ordered by start time ascending.
+
+```json
+{
+  "data": [
+    {
+      "id": 55, "title": "Team sync", "location": "Google Meet",
+      "start_at": "2026-07-01T10:00:00Z", "end_at": "2026-07-01T11:00:00Z",
+      "all_day": false, "status": "confirmed", "rsvp_status": "accepted",
+      "color": "#4285f4", "calendar_id": 2,
+      "conference_url": "https://meet.google.com/abc-def-ghi",
+      "html_link": "https://calendar.google.com/event?eid=...",
+      "is_organizer": true, "recurring": false,
+      "source_email_message_id": null,
+      "created_at": "2026-06-23T09:00:00Z"
+    }
+  ],
+  "meta": { "page": 1, "per_page": 25, "total": 1, "total_pages": 1 }
+}
+```
+
+### `GET /api/v1/calendar_events/:id` — show (scope `calendar:read`)
+
+Adds `description`, `attendees` (array), and `rrule`.
+
+### `POST /api/v1/calendar_events` — create (scope `calendar:write`)
+
+Body: `calendar_id` (required, must be a writable calendar the user can access),
+`title` (required), `start_at` (required, ISO 8601), `end_at`, `description`,
+`location`, `all_day`, `color` (hex). Returns `201`. Returns `403
+calendar_not_writable` if the calendar is not writable or does not exist.
+
+### `PATCH /api/v1/calendar_events/:id` — update (scope `calendar:write`)
+
+Body: `title`, `start_at`, `end_at`, `description`, `location`, `all_day`, `color`.
+Queues an async provider update. Returns `403 event_not_writable` when the event's
+calendar is not writable.
+
+### `DELETE /api/v1/calendar_events/:id` — delete (scope `calendar:write`)
+
+Provider deletion is asynchronous. Returns **`202 Accepted`** with the current
+event state. The local record is tombstoned (`status: "cancelled"`) once the
+provider confirms.
+
+### `POST /api/v1/calendar_events/:id/rsvp` — RSVP (scope `calendar:write`)
+
+Body: `rsvp_status` — one of `needs_action`, `accepted`, `declined`,
+`tentative`. Returns `422 invalid_rsvp_status` for unrecognized values.
+
+## Email Templates
+
+Email templates are workspace-scoped. The entire resource returns `404` when the
+`email_templates` feature is not enabled (`ENABLE_EMAIL_TEMPLATES`). Writes and
+`apply` also require the `:email_templates` entitlement (`403 entitlement_required`).
+
+### `GET /api/v1/email_templates` — list (scope `templates:read`)
+
+```json
+{
+  "data": [
+    {
+      "id": 7, "name": "Monthly report", "description": "...",
+      "subject": "Report for {{ month }}", "ai_status": "completed",
+      "document_template_ids": [3, 5],
+      "created_at": "2026-06-01T09:00:00Z",
+      "updated_at": "2026-06-20T10:00:00Z"
+    }
+  ],
+  "meta": { "page": 1, "per_page": 25, "total": 1, "total_pages": 1 }
+}
+```
+
+### `GET /api/v1/email_templates/:id` — show (scope `templates:read`)
+
+Adds `body_html` (the Liquid template HTML) and `variables_schema` (array of
+variable definitions).
+
+### `POST /api/v1/email_templates` — create (scope `templates:write`)
+
+Body: `name` (required), `description`, `subject`, `body_html`,
+`document_template_ids[]`. Returns `201`.
+
+### `PATCH /api/v1/email_templates/:id` — update (scope `templates:write`)
+
+Same body as create; only the fields you send change.
+
+### `DELETE /api/v1/email_templates/:id` — delete (scope `templates:write`)
+
+Returns `204 No Content`.
+
+### `POST /api/v1/email_templates/:id/apply` — apply (scope `templates:write`)
+
+Renders the template with the supplied variables; does **not** send email. Body:
+`variables` (key/value hash). Returns the rendered `subject`, `body_html`, the
+`variables` used, and an `attachments` array describing any attached document
+template PDFs.
+
+## Document Templates
+
+Document templates are workspace-scoped. The entire resource returns `404` when
+the `document_templates` feature is not enabled. Writes require the
+`:document_templates` entitlement (`403 entitlement_required`).
+
+### `GET /api/v1/document_templates` — list (scope `templates:read`)
+
+```json
+{
+  "data": [
+    {
+      "id": 3, "name": "Invoice template", "description": "...",
+      "ai_status": "completed",
+      "created_at": "2026-06-01T09:00:00Z",
+      "updated_at": "2026-06-20T10:00:00Z"
+    }
+  ],
+  "meta": { "page": 1, "per_page": 25, "total": 1, "total_pages": 1 }
+}
+```
+
+### `GET /api/v1/document_templates/:id` — show (scope `templates:read`)
+
+Adds `html_content` (the template HTML) and `variables_schema` (the variable
+definitions object).
+
+### `POST /api/v1/document_templates` — create (scope `templates:write`)
+
+Body: `name` (required), `description`, `html_content`. Returns `201`.
+
+### `PATCH /api/v1/document_templates/:id` — update (scope `templates:write`)
+
+Body: `name`, `description`, `html_content`. Only the fields you send change.
+
+### `DELETE /api/v1/document_templates/:id` — delete (scope `templates:write`)
+
+Returns `204 No Content`.
+
+### `POST /api/v1/document_templates/:id/render_pdf` — render PDF (scope `templates:write`)
+
+Fills the template with `variables` (key/value hash) and returns the rendered PDF
+as `application/pdf` binary (attachment). Returns `422 render_failed` if the
+template could not be rendered.
+
+### `POST /api/v1/document_templates/:id/send_email` — send by email (scope `templates:write`)
+
+Fills the template, renders a PDF attachment, and emails it. Body: `to_address`
+(required), `email_account_id` (required), `variables` (hash), `subject`, `body`.
+Returns `201` with `{ "data": { "ok": true, "email_message_id": ... } }`. Returns
+`403 no_sendable_account` if the user cannot send from that account.
+
+## Reminders
+
+Reminders are AI-extracted automatically from emails and documents — there is
+**no create endpoint**. They are scoped to the acting user.
+
+### `GET /api/v1/reminders` — list (scope `reminders:read`)
+
+Filter by `status` (`pending`/`confirmed`/`dismissed`/`snoozed`), plus
+`page`/`per_page`. Ordered by `due_at` ascending.
+
+```json
+{
+  "data": [
+    {
+      "id": 9, "title": "Submit VAT return",
+      "description": "VAT return due by end of month",
+      "due_at": "2026-07-31T23:59:00Z", "all_day": true,
+      "reminder_type": "deadline", "status": "pending",
+      "confidence": 0.92, "amount_cents": null, "currency": null,
+      "snoozed_until": null, "source_type": "EmailMessage",
+      "source_id": 42, "calendar_event_id": null,
+      "created_at": "2026-06-23T09:00:00Z"
+    }
+  ],
+  "meta": { "page": 1, "per_page": 25, "total": 1, "total_pages": 1 }
+}
+```
+
+### `GET /api/v1/reminders/:id` — show (scope `reminders:read`)
+
+Adds `justification` (AI reasoning text) and `extracted_data` (raw extraction hash).
+
+### `POST /api/v1/reminders/:id/confirm` — confirm (scope `reminders:write`)
+
+Marks the reminder confirmed and creates a calendar event (if a writable calendar
+is available). Optional body: `due_at` (ISO 8601) to override the extracted due
+date. Returns the reminder plus `calendar_event_id` of the newly created event
+(or `null` if no writable calendar).
+
+### `POST /api/v1/reminders/:id/dismiss` — dismiss (scope `reminders:write`)
+
+Marks the reminder dismissed. Returns the updated reminder.
+
+### `POST /api/v1/reminders/:id/snooze` — snooze (scope `reminders:write`)
+
+Body: optional `until` (ISO 8601; defaults to one week from now). Returns the
+updated reminder.
+
+## Folders
+
+Folders are workspace-scoped custom mail folders. The list is returned
+**unpaginated** (no `meta`). Folder create/rename/delete have provider side-effects
+and are not exposed here.
+
+### `GET /api/v1/folders` — list (scope `folders:read`)
+
+```json
+{
+  "data": [
+    {
+      "id": 1, "name": "Clients", "icon": "folder",
+      "parent_id": null, "position": 0,
+      "document_count": 14, "created_at": "2026-05-01T09:00:00Z"
+    }
+  ]
+}
+```
+
+### `GET /api/v1/folders/:id` — show (scope `folders:read`)
+
+Adds `documents` (array) — the full document list for documents filed in this
+folder, newest first.
+
+### `POST /api/v1/folder_memberships` — file a document (scope `folders:write`)
+
+Body: `mail_folder_id` (required), `document_id` (required). Files the document
+into the folder. Idempotent — filing the same document twice returns the same
+membership. Returns `201` with
+`{ "data": { "id": ..., "folder_id": ..., "document_id": ... } }`.
+
+### `DELETE /api/v1/folder_memberships/:id` — unfile a document (scope `folders:write`)
+
+Removes the document from the folder. Returns `204 No Content`.
+
+## MCP endpoint
+
+`POST /api/mcp` exposes the same data as the REST API as a **JSON-RPC 2.0
+(Model Context Protocol)** server, so MCP-capable AI clients (LLM agents, IDEs,
+Claude Desktop, etc.) can call Campbooks tools directly.
+
+Authentication is the **same Doorkeeper bearer token** as the REST API:
+
+```
+Authorization: Bearer YOUR_ACCESS_TOKEN
+```
+
+Configure an MCP client to point at `https://<your-campbooks-host>/api/mcp`
+with that header. OAuth 2.1 dynamic registration and SSE streaming are **not**
+yet supported.
+
+Protocol version: `2025-03-26`.
+
+### Initialize
+
+Request:
+```json
+{
+  "jsonrpc": "2.0", "id": 1, "method": "initialize",
+  "params": {
+    "protocolVersion": "2025-03-26",
+    "capabilities": {},
+    "clientInfo": { "name": "my-agent", "version": "1.0" }
+  }
+}
+```
+
+Response:
+```json
+{
+  "jsonrpc": "2.0", "id": 1,
+  "result": {
+    "protocolVersion": "2025-03-26",
+    "capabilities": { "tools": {} },
+    "serverInfo": { "name": "campbooks", "version": "0.2.1" }
+  }
+}
+```
+
+### tools/list
+
+Only tools whose required scope the token holds are included. Send a
+`notifications/initialized` notification after `initialize` to complete the
+handshake.
+
+Request:
+```json
+{ "jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {} }
+```
+
+Response (excerpt):
+```json
+{
+  "jsonrpc": "2.0", "id": 2,
+  "result": {
+    "tools": [
+      {
+        "name": "list_emails",
+        "description": "List the most recent emails...",
+        "inputSchema": { "type": "object", "properties": { "limit": { "type": "integer" } } }
+      }
+    ]
+  }
+}
+```
+
+### tools/call
+
+Content is an array of `{ "type": "text", "text": "..." }` items. Tool failures
+set `isError: true` instead of using a JSON-RPC error code.
+
+Request:
+```json
+{
+  "jsonrpc": "2.0", "id": 3, "method": "tools/call",
+  "params": { "name": "list_emails", "arguments": { "unread": true, "limit": 5 } }
+}
+```
+
+Response:
+```json
+{
+  "jsonrpc": "2.0", "id": 3,
+  "result": {
+    "content": [{ "type": "text", "text": "{\"emails\":[...]}" }]
+  }
+}
+```
+
+Tool error (tool was called successfully but the tool itself reports an error):
+```json
+{
+  "jsonrpc": "2.0", "id": 3,
+  "result": {
+    "content": [{ "type": "text", "text": "Not found." }],
+    "isError": true
+  }
+}
+```
+
+### Protocol error codes
+
+| Code | When |
+|------|------|
+| `-32700` | Parse error -- request body was not valid JSON |
+| `-32600` | Invalid Request -- missing `jsonrpc`/`method` fields |
+| `-32601` | Method not found -- unrecognized method name |
+| `-32602` | Invalid params -- a required tool argument was missing |
+| `-32000` | Insufficient scope -- the token lacks the scope required by the tool |
+
+### Available tools
+
+| Tool | Required scope | Description |
+|------|---------------|-------------|
+| `list_emails` | `emails:read` | List recent emails, filtered by unread/query |
+| `get_email` | `emails:read` | Fetch a single email by ID including its body |
+| `send_email` | `emails:send` | Send a new email from a connected account |
+| `reply_email` | `emails:send` | Reply to an existing email |
+| `list_documents` | `documents:read` | List workspace documents, filtered by type/status |
+| `list_contacts` | `contacts:read` | List workspace contacts, filtered by name/email |
+| `list_calendar_events` | `calendar:read` | List calendar events with optional time bounds |
+| `create_calendar_event` | `calendar:write` | Create an event on a writable calendar |
+| `list_scheduled_emails` | `scheduled_emails:read` | List scheduled/recurring emails |
+| `create_scheduled_email` | `scheduled_emails:write` | Schedule an email (optionally recurring via RRULE) |
+| `list_reminders` | `reminders:read` | List AI-extracted reminders |
+| `list_email_templates` | `templates:read` | List workspace email templates (feature-gated) |
+
+Tools with a feature gate (`list_email_templates`) are hidden from `tools/list`
+when the corresponding feature flag is disabled server-side.
 
 ## Code samples
 
