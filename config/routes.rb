@@ -168,6 +168,12 @@ Rails.application.routes.draw do
   get   "documents/write/:id/edit", to: "documents/written#edit", as: :edit_written_document
   patch "documents/write/:id",  to: "documents/written#update"
 
+  # The Documents *index* merged into the Files page. Redirect the old list URL (302,
+  # not a cache-poisoning 301) — the `documents_path` helper and back-links keep
+  # working. Declared BEFORE `resources :documents` so it shadows documents#index;
+  # detail/show, skim, write, exports and the member/collection actions below stay.
+  get "documents", to: redirect("/files", status: 302)
+
   resources :documents, only: [ :index, :show, :update, :create ] do
     member do
       get :file

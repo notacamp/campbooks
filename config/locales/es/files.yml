@@ -29,11 +29,37 @@ es:
       files_section: Archivos
       manage_access: Gestionar acceso
       manage_access_locked: "Gestionar acceso · Privado"
+      review_n: "Revisar %{count}"
+      ai_analyze: Analizar con IA
+      ai_analyze_hint: Extrae y clasifica documentos comerciales (facturas, recibos…). Desactívalo para solo guardar el archivo.
+      filters: Filtros
+      filter_category: Categoría
+      filter_type: Tipo
+      filter_status: Estado
+      filter_month: Mes
+      filter_folder: Carpeta
+      filter_all_categories: Todas las categorías
+      filter_all_types: Todos los tipos
+      filter_all_statuses: Todos los estados
+      filter_all_folders: Todas las carpetas
+      filter_types_selected: "%{count} seleccionado(s)"
+      reanalyze_all: "Reanalizar todos (%{count})"
+      export: Exportar
+      export_confirm: ¿Exportar los documentos que coinciden con los filtros actuales como ZIP?
+      exports_heading: Exportaciones recientes
+      exports_col_date: Fecha
+      exports_col_status: Estado
+      exports_col_documents: Documentos
+      exports_col_download: Descargar
+      download_zip: Descargar ZIP
+      export_failed: La exportación falló
     uploads:
       create:
         no_files: Elige al menos un archivo para subir.
         uploaded_one: Archivo subido.
         uploaded_many: "%{count} archivos subidos."
+        analyzed_one: Archivo subido y en cola para análisis con IA.
+        analyzed_many: "%{count} archivos subidos y en cola para análisis con IA."
         failed: "Error al subir: %{message}"
       destroy:
         deleted: Archivo eliminado.

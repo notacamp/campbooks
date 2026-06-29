@@ -13,7 +13,7 @@
       <p class="mt-3 text-lg font-semibold text-foreground"><%= t(".no_documents_title") %></p>
       <p class="mt-1 text-sm text-muted-foreground"><%= t(".no_documents_body") %></p>
       <% if @standalone %>
-        <a href="/documents" data-controller="history-back" data-action="click->history-back#back" class="mt-5 text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"><%= t(".back_to_documents") %></a>
+        <a href="/files" data-controller="history-back" data-action="click->history-back#back" class="mt-5 text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"><%= t(".back_to_documents") %></a>
       <% else %>
         <button type="button" data-action="click->doc-skim-overlay#close" class="mt-5 text-xs font-medium text-muted-foreground underline-offset-2 hover:underline"><%= t(".close") %></button>
       <% end %>

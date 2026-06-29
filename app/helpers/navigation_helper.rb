@@ -52,8 +52,7 @@ module NavigationHelper
       nav_item(:mail, t("shared.nav.mail"), email_messages_path, badge: nav_attention.dot?(:mail)),
       nav_item(:calendar, t("shared.nav.calendar"), calendar_path, badge: nav_attention.dot?(:calendar)),
       nav_item(:scout, t("shared.nav.scout"), scout_path, ember: true, badge: nav_attention.dot?(:scout)),
-      nav_item(:documents, t("shared.nav.documents"), documents_path, badge: nav_attention.dot?(:documents)),
-      nav_item(:files, t("shared.nav.files"), files_path),
+      nav_item(:files, t("shared.nav.files"), files_path, badge: nav_attention.dot?(:files)),
       # Tasks is gated off by default until it's production-ready (Features.tasks?).
       (nav_item(:tasks, t("shared.nav.tasks"), tasks_path) if Features.tasks?),
       # Workflows is gated off by default until it's production-ready (Features.workflows?).
