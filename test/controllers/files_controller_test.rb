@@ -70,4 +70,33 @@ class FilesControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", document_path(pending)
     assert_select "a[href=?]", document_path(approved), count: 0
   end
+
+  test "a search query returns matching documents and ranks out the rest" do
+    match = build_doc(ai_status: :completed, review_status: :approved, vendor_name: "Searchable Vendor")
+    miss  = build_doc(ai_status: :completed, review_status: :approved, vendor_name: "Unrelated")
+
+    get files_path(q: "Searchable Vendor")
+
+    assert_response :success
+    assert_select "a[href=?]", document_path(match)
+    assert_select "a[href=?]", document_path(miss), count: 0
+  end
+
+  test "a search with no matches renders the search empty state" do
+    build_doc(ai_status: :completed, review_status: :approved, vendor_name: "Something")
+
+    get files_path(q: "zzz-nothing-matches-xyzzy")
+
+    assert_response :success
+    assert_includes response.body, I18n.t("files.index.search_empty")
+  end
+
+  test "browse mode (no query) still lists files" do
+    doc = build_doc(ai_status: :completed, review_status: :pending)
+
+    get files_path
+
+    assert_response :success
+    assert_select "a[href=?]", document_path(doc)
+  end
 end

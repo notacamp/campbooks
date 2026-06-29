@@ -20,6 +20,11 @@ fr:
       col_added: Ajouté
       col_actions: Actions
       empty_folder: Ce dossier est vide.
+      search_results:
+        zero: "Aucun résultat pour « %{q} »"
+        one: "1 résultat pour « %{q} »"
+        other: "%{count} résultats pour « %{q} »"
+      search_empty: Aucun document ne correspond à votre recherche. Essayez un autre terme ou effacez les filtres.
       empty_title: Aucun fichier pour l'instant
       empty_description: Téléversez des fichiers pour les organiser dans des dossiers — factures, contrats, tout ce que vous voulez.
       empty_upload: Téléverser des fichiers
@@ -74,6 +79,10 @@ fr:
       body: "J'ai extrait un document de cet e-mail et l'ai classé dans Fichiers : **[%{title}](%{path})**."
   components:
     files:
+      search_bar:
+        placeholder: Rechercher des fichiers…
+        submit: Rechercher
+        clear: Effacer la recherche
       sidebar:
         label: Dossiers
         all_files: Tous les fichiers

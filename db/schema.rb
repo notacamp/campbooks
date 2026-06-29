@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_29_110000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_29_223054) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -455,6 +455,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_110000) do
     t.jsonb "ai_extraction_data", default: {}
     t.integer "ai_processing_attempts", default: 0
     t.integer "ai_status", default: 0, null: false
+    t.text "ai_summary"
     t.integer "amount_cents"
     t.string "bank_name"
     t.string "buyer_nif"

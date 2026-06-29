@@ -89,6 +89,17 @@
       </aside>
 
       <div class="min-w-0 flex-1">
+        <%= render Campbooks::Files::SearchBar.new(
+              q: @search_query.presence || params[:q],
+              folder: @folder,
+              filter_params: params.permit(:category, :review_status, :ai_status, :month, :folder_id, type: []).to_h) %>
+
+        <% if @search_query.present? %>
+          <p class="mb-4 text-sm text-muted-foreground" role="status">
+            <%= t(".search_results", count: @files.size, q: @search_query) %>
+          </p>
+        <% end %>
+
         <%# Filters (collapsed by default; auto-open when a filter is active) — carried
             over from the old Documents page, kept secondary so the file manager leads.
             Plain <details> (no .filters-disclosure class) → native collapse at all widths. %>
@@ -106,6 +117,7 @@
           </summary>
           <div class="px-4 pb-4 pt-0">
             <%= form_tag (@folder ? files_folder_path(@folder) : files_path), method: :get, class: "flex flex-wrap gap-4 items-end" do %>
+              <% if @search_query.present? %><%= hidden_field_tag :q, @search_query %><% end %>
               <div class="w-full sm:w-auto">
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-200"><%= t(".filter_category") %></label>
                 <%= select_tag :category,
@@ -252,13 +264,17 @@
               <%= render Campbooks::Files::FileCard.new(doc: file, folders: @folders, current_folder: @folder) %>
             <% end %>
           </div>
+        <% elsif @search_query.present? %>
+          <div class="bg-card rounded-xl shadow-sm border border-gray-200 px-6 py-10 text-center text-sm text-gray-500 dark:border-white/10">
+            <%= t(".search_empty") %>
+          </div>
         <% elsif @internal_docs.empty? && @filed_emails.empty? %>
           <div class="bg-card rounded-xl shadow-sm border border-gray-200 px-6 py-8 text-center text-sm text-gray-500 dark:border-white/10">
             <%= t(".empty_folder") %>
           </div>
         <% end %>
 
-        <% if @pagy.next %>
+        <% if @pagy&.next %>
           <%= turbo_frame_tag "files_pagination",
                 src: (@folder ? files_folder_path(@folder, page: @pagy.next, format: :turbo_stream, type: params[:type], category: params[:category], review_status: params[:review_status], month: params[:month]) : files_path(page: @pagy.next, folder_id: params[:folder_id], format: :turbo_stream, type: params[:type], category: params[:category], review_status: params[:review_status], month: params[:month])),
                 loading: :lazy do %>
@@ -268,7 +284,7 @@
           <% end %>
         <% end %>
         <noscript>
-          <% if @pagy.pages > 1 %>
+          <% if @pagy&.pages.to_i > 1 %>
             <div class="mt-4"><%== pagy_nav(@pagy) %></div>
           <% end %>
         </noscript>
