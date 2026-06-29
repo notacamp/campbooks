@@ -1,0 +1,10 @@
+<% content_for :title, doc.title %>
+<article class="doc">
+  <h1><%= doc.title %></h1>
+  <%# Author-written rich text; sanitize to a safe tag/attribute allowlist (strips
+      script/style) so a public viewer can never be served injected markup. %>
+  <%= sanitize doc.html_content,
+        tags: %w[p br h1 h2 h3 strong b em i u s a ul ol li blockquote pre code img table thead tbody tr td th hr span sub sup],
+        attributes: %w[href src alt title colspan rowspan] %>
+</article>
+<footer>Shared with Campbooks</footer>

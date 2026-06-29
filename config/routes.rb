@@ -426,7 +426,13 @@ Rails.application.routes.draw do
     resources :folders, only: [] do
       resource :share, only: [ :show, :update ], controller: "folder_shares"
     end
+    # Mint / revoke a public link for a file (Phase 3b).
+    resources :public_links, only: [ :create, :destroy ]
   end
+
+  # Public, unauthenticated file link — the unguessable token is the credential, so
+  # an external email recipient can open a shared file (Phase 3b).
+  get "f/:token", to: "public_files#show", as: :public_file
 
   get "email_messages/new", to: "email_messages#new", as: :new_email_message
   post "email_messages/compose_chat", to: "email_compose_chat#create"

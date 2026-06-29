@@ -41,6 +41,9 @@ pt:
       email_unfiled: Email removido da pasta
       file_deleted: Ficheiro eliminado
       file_filed: Ficheiro arquivado
+      file_made_private: Link público revogado
+      file_made_public: Ficheiro partilhado publicamente
+      file_public_link_viewed: Link público visualizado
       file_unfiled: Ficheiro removido da pasta
       file_uploaded: Ficheiro carregado
       folder_created: Pasta criada

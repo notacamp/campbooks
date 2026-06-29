@@ -39,6 +39,11 @@ en:
         deleted: File deleted.
       analyze:
         analyzing: Analyzing this file with AI…
+    public_links:
+      create:
+        created: Public link ready.
+      destroy:
+        revoked: Public link revoked.
   components:
     files:
       sidebar:

@@ -41,6 +41,9 @@ en:
       email_unfiled: Email removed from folder
       file_deleted: File deleted
       file_filed: File filed
+      file_made_private: Public link revoked
+      file_made_public: File shared publicly
+      file_public_link_viewed: Public link viewed
       file_unfiled: File removed from folder
       file_uploaded: File uploaded
       folder_created: Folder created

@@ -39,6 +39,11 @@ pt:
         deleted: Ficheiro eliminado.
       analyze:
         analyzing: A analisar este ficheiro com IA…
+    public_links:
+      create:
+        created: Link público pronto.
+      destroy:
+        revoked: Link público revogado.
   components:
     files:
       sidebar:

@@ -118,6 +118,12 @@ module Events
         description: "Someone was given access to a folder", subject_type: "MailFolder", payload_keys: %w[name member]),
       entry("folder.unshared", "Folder access removed", group: :files, icon: :user,
         description: "Someone's access to a folder was removed", subject_type: "MailFolder", payload_keys: %w[name member]),
+      entry("file.made_public", "File shared publicly", group: :files, icon: :document,
+        description: "A public link was created for a file", subject_type: "Document", payload_keys: %w[name]),
+      entry("file.made_private", "Public link revoked", group: :files, icon: :document,
+        description: "A file's public link was revoked", subject_type: "Document", payload_keys: %w[name]),
+      entry("file.public_link_viewed", "Public link viewed", group: :files, icon: :document,
+        description: "A file was opened via its public link", subject_type: "Document", payload_keys: %w[type]),
 
       # --- Pipelines ----------------------------------------------------------
       entry("pipeline.stage_entered", "Stage entered", group: :pipelines, icon: :git_branch,

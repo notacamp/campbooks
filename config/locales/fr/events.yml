@@ -41,6 +41,9 @@ fr:
       email_unfiled: E-mail retiré du dossier
       file_deleted: Fichier supprimé
       file_filed: Fichier classé
+      file_made_private: Lien public révoqué
+      file_made_public: Fichier partagé publiquement
+      file_public_link_viewed: Lien public consulté
       file_unfiled: Fichier retiré du dossier
       file_uploaded: Fichier téléversé
       folder_created: Dossier créé

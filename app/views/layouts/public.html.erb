@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="<%= I18n.locale %>">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title><%= [content_for(:title).presence, "Campbooks"].compact.join(" · ") %></title>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1c1c1c; background: #f7f7f5; margin: 0; }
+      main { max-width: 720px; margin: 0 auto; padding: 48px 20px; }
+      .doc { background: #fff; border: 1px solid #e6e6e3; border-radius: 16px; padding: 40px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+      .doc h1 { font-size: 1.6rem; margin: 0 0 1.25rem; line-height: 1.25; }
+      .doc :where(p, ul, ol, blockquote) { line-height: 1.65; }
+      .doc img { max-width: 100%; height: auto; }
+      .doc table { border-collapse: collapse; }
+      .doc td, .doc th { border: 1px solid #e0e0e0; padding: 6px 10px; }
+      footer { text-align: center; color: #9b9b9b; font-size: .8rem; margin-top: 22px; }
+    </style>
+  </head>
+  <body>
+    <main><%= yield %></main>
+  </body>
+</html>

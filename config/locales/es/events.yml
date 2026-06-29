@@ -41,6 +41,9 @@ es:
       email_unfiled: Correo quitado de la carpeta
       file_deleted: Archivo eliminado
       file_filed: Archivo archivado
+      file_made_private: Enlace público revocado
+      file_made_public: Archivo compartido públicamente
+      file_public_link_viewed: Enlace público visto
       file_unfiled: Archivo quitado de la carpeta
       file_uploaded: Archivo subido
       folder_created: Carpeta creada

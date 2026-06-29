@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_29_100001) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_29_100003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -484,6 +484,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_100001) do
     t.string "payment_method"
     t.date "period_end"
     t.date "period_start"
+    t.datetime "posted_to_thread_at"
     t.string "receipt_number"
     t.integer "review_status", default: 0, null: false
     t.datetime "reviewed_at"
@@ -756,6 +757,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_100001) do
     t.index ["user_id", "sort_at"], name: "idx_feed_items_timeline", order: { sort_at: :desc }, where: "((dismissed_at IS NULL) AND (acted_at IS NULL) AND (attention = false))"
     t.index ["user_id"], name: "index_feed_items_on_user_unseen_active", where: "((seen_at IS NULL) AND (dismissed_at IS NULL) AND (acted_at IS NULL))"
     t.index ["workspace_id"], name: "index_feed_items_on_workspace_id"
+  end
+
+  create_table "file_share_links", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "created_by_id"
+    t.datetime "expires_at"
+    t.datetime "last_viewed_at"
+    t.datetime "revoked_at"
+    t.uuid "shareable_id", null: false
+    t.string "shareable_type", null: false
+    t.string "token", null: false
+    t.datetime "updated_at", null: false
+    t.integer "view_count", default: 0, null: false
+    t.uuid "workspace_id", null: false
+    t.index ["created_by_id"], name: "index_file_share_links_on_created_by_id"
+    t.index ["shareable_type", "shareable_id"], name: "index_file_share_links_on_shareable_type_and_shareable_id"
+    t.index ["token"], name: "index_file_share_links_on_token", unique: true
+    t.index ["workspace_id"], name: "index_file_share_links_on_workspace_id"
   end
 
   create_table "folder_memberships", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1610,6 +1629,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_100001) do
     t.string "name", null: false
     t.string "plan", default: "free", null: false
     t.string "required_data_region"
+    t.boolean "scout_thread_posts", default: false, null: false
     t.jsonb "settings", default: {}, null: false
     t.string "slug", null: false
     t.datetime "updated_at", null: false
@@ -1701,6 +1721,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_100001) do
   add_foreign_key "exports", "workspaces"
   add_foreign_key "feed_items", "users"
   add_foreign_key "feed_items", "workspaces"
+  add_foreign_key "file_share_links", "users", column: "created_by_id"
+  add_foreign_key "file_share_links", "workspaces"
   add_foreign_key "folder_memberships", "mail_folders"
   add_foreign_key "google_drive_accounts", "workspaces"
   add_foreign_key "google_drive_configs", "document_types"
