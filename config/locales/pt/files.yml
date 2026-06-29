@@ -20,6 +20,11 @@ pt:
       col_added: Adicionado
       col_actions: Ações
       empty_folder: Esta pasta está vazia.
+      search_results:
+        zero: "Sem resultados para \"%{q}\""
+        one: "1 resultado para \"%{q}\""
+        other: "%{count} resultados para \"%{q}\""
+      search_empty: Nenhum documento corresponde à pesquisa. Tente outro termo ou limpe os filtros.
       empty_title: Ainda não há ficheiros
       empty_description: Carregue ficheiros para os manter organizados em pastas — faturas, contratos, o que quiser.
       empty_upload: Carregar ficheiros
@@ -74,6 +79,10 @@ pt:
       body: "Retirei um documento deste email e arquivei-o em Ficheiros: **[%{title}](%{path})**."
   components:
     files:
+      search_bar:
+        placeholder: Pesquisar ficheiros…
+        submit: Pesquisar
+        clear: Limpar pesquisa
       sidebar:
         label: Pastas
         all_files: Todos os ficheiros
