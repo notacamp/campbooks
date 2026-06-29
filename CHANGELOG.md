@@ -37,6 +37,12 @@ major, minor, or patch change here.
 
 ### Changed
 
+- **Native apps hide desktop-only surfaces** — the iOS/Android shell no longer
+  shows the ⌘K command palette or the keyboard-shortcut help (both keyboard-only),
+  limits the calendar to **Agenda/Day** (the week/month grids are too dense for a
+  phone — a week/month deep link falls back to agenda), and hides developer-only
+  Settings (**API Access** and custom HTTP **Connections**). The web app is
+  unchanged.
 - **Native apps are sign-in-only** — the iOS/Android apps no longer offer in-app
   account creation. The sign-in screen points new users to the web instead of the
   in-app signup, and the registration flow is blocked in the native shell (invited

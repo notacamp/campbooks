@@ -9,6 +9,9 @@ class CalendarController < ApplicationController
 
   def index
     @view = VIEWS.include?(params[:view]) ? params[:view] : "agenda"
+    # Native apps only offer agenda/day (the week/month grids are too dense for a
+    # phone — see Calendar::ViewTabs); coerce a week/month deep link back to agenda.
+    @view = "agenda" if hotwire_native_app? && %w[week month].include?(@view)
     @date = parse_date(params[:date]) || Date.current
     @has_calendars = Current.user.readable_calendar_accounts.active.exists?
     @range = range_for(@view, @date)
