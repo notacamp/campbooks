@@ -1,6 +1,6 @@
 [package]
 name = "campbooks-desktop"
-version = "0.1.0"
+version = "0.1.1"
 description = "Campbooks desktop app"
 authors = ["Not A Camp"]
 edition = "2021"
