@@ -75,4 +75,29 @@ RSpec.describe Reminders::Confirm do
       expect(reminder.reload.calendar_event.calendar).to eq(src_cal)
     end
   end
+
+  context "when an event already exists for the reminder's source email" do
+    it "adopts it instead of creating a second event" do
+      email    = create(:email_message)
+      due      = 3.days.from_now.change(hour: 9)
+      existing = create(:calendar_event, source_email_message: email, start_at: due, end_at: due + 1.hour)
+      reminder = create(:reminder, workspace: workspace, source: email, due_at: due)
+
+      result = nil
+      expect { result = described_class.call(reminder, user: user) }.not_to change(CalendarEvent, :count)
+
+      expect(result.calendar_event).to eq(existing)
+      expect(reminder.reload).to be_confirmed
+      expect(reminder.calendar_event).to eq(existing)
+    end
+
+    it "does not enqueue a provider push when adopting" do
+      email = create(:email_message)
+      due   = 3.days.from_now.change(hour: 9)
+      create(:calendar_event, source_email_message: email, start_at: due, end_at: due + 1.hour)
+      reminder = create(:reminder, workspace: workspace, source: email, due_at: due)
+
+      expect { described_class.call(reminder, user: user) }.not_to have_enqueued_job(Calendars::EventWriteJob)
+    end
+  end
 end

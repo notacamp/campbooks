@@ -22,6 +22,16 @@ module Reminders
     end
 
     def call
+      # Adopt an event already created from the same email (e.g. Scout's
+      # create_calendar_event ran first) rather than creating a second one. Keyed on the
+      # reminder's structured due_at, so only a same-day event counts as the match.
+      email = email_source
+      if email && (existing = CalendarEvent.duplicate_for(email: email, start_at: @reminder.due_at))
+        @reminder.update!(status: :confirmed, calendar_event: existing, confirmed_by: @user)
+        Events.publish("reminder.confirmed", subject: @reminder, payload: { "title" => @reminder.title, "due_at" => @reminder.due_at&.iso8601 })
+        return Result.new(success: true, calendar_event: existing, error: nil)
+      end
+
       calendar = target_calendar
 
       unless calendar
