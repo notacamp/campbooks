@@ -1,4 +1,6 @@
 class AuthoredDocument < ApplicationRecord
+  include FolderAccessible
+
   belongs_to :workspace
   belongs_to :author, class_name: "User", optional: true
 

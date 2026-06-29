@@ -16,6 +16,8 @@ en:
         subtitle: "Control how your data is processed and stored, and which AI can see it."
         ai_toggle_heading: "AI processing"
         ai_toggle_desc: "When on, Scout uses AI to process your emails, documents, and contacts. Turn it off to pause all AI; your existing summaries and tags are kept."
+        scout_posts_heading: Scout thread updates
+        scout_posts_desc: "When Scout files a document from an email, post a link to it in that email's discussion."
         ai_paused_note: "AI processing is paused. Scout, automatic tagging, summaries, and analysis won't run until you turn it back on."
         ai_providers_heading: "AI providers & data regions"
         ai_providers_desc: "Which provider handles each AI task, and where it runs. Green means EU data residency."

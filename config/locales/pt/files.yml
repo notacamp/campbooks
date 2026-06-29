@@ -27,6 +27,8 @@ pt:
       internal_documents: Documentos internos
       emails: Emails
       files_section: Ficheiros
+      manage_access: Gerir acesso
+      manage_access_locked: "Gerir acesso · Privado"
     uploads:
       create:
         no_files: Escolha pelo menos um ficheiro para carregar.
@@ -37,6 +39,13 @@ pt:
         deleted: Ficheiro eliminado.
       analyze:
         analyzing: A analisar este ficheiro com IA…
+    public_links:
+      create:
+        created: Link público pronto.
+      destroy:
+        revoked: Link público revogado.
+    scout_thread_linker:
+      body: "Retirei um documento deste email e arquivei-o em Ficheiros: **[%{title}](%{path})**."
   components:
     files:
       sidebar:
@@ -67,3 +76,26 @@ pt:
         actions: Ações do email
         open: Abrir no Correio
         remove_from_folder: Remover da pasta
+      folder_sharing:
+        open_hint: Esta pasta está aberta a todos no seu espaço de trabalho. Restrinja-a para escolher quem tem acesso.
+        restrict_label: Restringir acesso
+        restrict_hint: Só as pessoas que adicionar (e os administradores) podem ver esta pasta e o seu conteúdo.
+        you_badge: Você
+        owner_badge: Proprietário
+        role_aria: Nível de acesso
+        role_viewer: Pode ver
+        role_editor: Pode editar
+        role_manager: Gestor
+        remove_confirm: "Remover %{name} desta pasta?"
+        remove_aria: Remover acesso
+        add_title: Adicionar pessoas
+        all_have_access: Todos no espaço de trabalho já têm acesso.
+        select_placeholder: Escolha uma pessoa…
+        add_button: Adicionar
+      file_link_picker:
+        button: Inserir ligação a ficheiro
+        title: Inserir uma ligação a ficheiro
+        hint: Escolha um ficheiro — é criada e inserida uma ligação pública na sua mensagem.
+        loading: A carregar ficheiros…
+        empty: Ainda não há ficheiros para ligar.
+        insert: Inserir

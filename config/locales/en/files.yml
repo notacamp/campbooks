@@ -27,6 +27,8 @@ en:
       internal_documents: Internal documents
       emails: Emails
       files_section: Files
+      manage_access: Manage access
+      manage_access_locked: "Manage access · Private"
     uploads:
       create:
         no_files: Choose at least one file to upload.
@@ -37,6 +39,13 @@ en:
         deleted: File deleted.
       analyze:
         analyzing: Analyzing this file with AI…
+    public_links:
+      create:
+        created: Public link ready.
+      destroy:
+        revoked: Public link revoked.
+    scout_thread_linker:
+      body: "I pulled a document out of this email and filed it in Files: **[%{title}](%{path})**."
   components:
     files:
       sidebar:
@@ -67,3 +76,26 @@ en:
         actions: Email actions
         open: Open in Mail
         remove_from_folder: Remove from folder
+      folder_sharing:
+        open_hint: This folder is open to everyone in your workspace. Restrict it to choose who has access.
+        restrict_label: Restrict access
+        restrict_hint: Only people you add (and admins) can see this folder and its contents.
+        you_badge: You
+        owner_badge: Owner
+        role_aria: Access level
+        role_viewer: Can view
+        role_editor: Can edit
+        role_manager: Manager
+        remove_confirm: "Remove %{name} from this folder?"
+        remove_aria: Remove access
+        add_title: Add people
+        all_have_access: Everyone in the workspace already has access.
+        select_placeholder: Choose a person…
+        add_button: Add
+      file_link_picker:
+        button: Insert file link
+        title: Insert a file link
+        hint: Pick a file — a public link is created and inserted into your message.
+        loading: Loading files…
+        empty: No files to link yet.
+        insert: Insert

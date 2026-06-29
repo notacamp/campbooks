@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_29_050000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_29_100003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -484,6 +484,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_050000) do
     t.string "payment_method"
     t.date "period_end"
     t.date "period_start"
+    t.datetime "posted_to_thread_at"
     t.string "receipt_number"
     t.integer "review_status", default: 0, null: false
     t.datetime "reviewed_at"
@@ -784,6 +785,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_050000) do
     t.index ["workspace_id"], name: "index_feed_items_on_workspace_id"
   end
 
+  create_table "file_share_links", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "created_by_id"
+    t.datetime "expires_at"
+    t.datetime "last_viewed_at"
+    t.datetime "revoked_at"
+    t.uuid "shareable_id", null: false
+    t.string "shareable_type", null: false
+    t.string "token", null: false
+    t.datetime "updated_at", null: false
+    t.integer "view_count", default: 0, null: false
+    t.uuid "workspace_id", null: false
+    t.index ["created_by_id"], name: "index_file_share_links_on_created_by_id"
+    t.index ["shareable_type", "shareable_id"], name: "index_file_share_links_on_shareable_type_and_shareable_id"
+    t.index ["token"], name: "index_file_share_links_on_token", unique: true
+    t.index ["workspace_id"], name: "index_file_share_links_on_workspace_id"
+  end
+
   create_table "folder_memberships", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.uuid "folderable_id", null: false
@@ -850,12 +869,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_050000) do
     t.index ["workspace_id"], name: "index_invitations_on_workspace_id"
   end
 
+  create_table "mail_folder_users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.boolean "can_manage", default: false, null: false
+    t.boolean "can_read", default: true, null: false
+    t.boolean "can_write", default: false, null: false
+    t.datetime "created_at", null: false
+    t.uuid "mail_folder_id", null: false
+    t.boolean "owner", default: false, null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.index ["mail_folder_id", "user_id"], name: "index_mail_folder_users_on_mail_folder_id_and_user_id", unique: true
+    t.index ["mail_folder_id"], name: "index_mail_folder_users_on_mail_folder_id"
+    t.index ["user_id"], name: "index_mail_folder_users_on_user_id"
+  end
+
   create_table "mail_folders", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "icon"
     t.string "name", null: false
     t.uuid "parent_id"
     t.integer "position", default: 0, null: false
+    t.boolean "restricted", default: false, null: false
     t.datetime "updated_at", null: false
     t.uuid "workspace_id", null: false
     t.index "workspace_id, lower((name)::text)", name: "index_mail_folders_on_workspace_and_lower_name", unique: true
@@ -1631,6 +1665,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_050000) do
     t.string "name", null: false
     t.string "plan", default: "free", null: false
     t.string "required_data_region"
+    t.boolean "scout_thread_posts", default: false, null: false
     t.jsonb "settings", default: {}, null: false
     t.string "slug", null: false
     t.datetime "updated_at", null: false
@@ -1725,6 +1760,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_050000) do
   add_foreign_key "exports", "workspaces"
   add_foreign_key "feed_items", "users"
   add_foreign_key "feed_items", "workspaces"
+  add_foreign_key "file_share_links", "users", column: "created_by_id"
+  add_foreign_key "file_share_links", "workspaces"
   add_foreign_key "folder_memberships", "mail_folders"
   add_foreign_key "google_drive_accounts", "workspaces"
   add_foreign_key "google_drive_configs", "document_types"
@@ -1732,6 +1769,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_29_050000) do
   add_foreign_key "invitations", "users", column: "accepted_by_id"
   add_foreign_key "invitations", "users", column: "invited_by_id"
   add_foreign_key "invitations", "workspaces"
+  add_foreign_key "mail_folder_users", "mail_folders"
+  add_foreign_key "mail_folder_users", "users"
   add_foreign_key "mail_folders", "mail_folders", column: "parent_id"
   add_foreign_key "mail_folders", "workspaces"
   add_foreign_key "mfa_email_challenges", "users"

@@ -27,6 +27,8 @@ es:
       internal_documents: Documentos internos
       emails: Correos
       files_section: Archivos
+      manage_access: Gestionar acceso
+      manage_access_locked: "Gestionar acceso · Privado"
     uploads:
       create:
         no_files: Elige al menos un archivo para subir.
@@ -37,6 +39,13 @@ es:
         deleted: Archivo eliminado.
       analyze:
         analyzing: Analizando este archivo con IA…
+    public_links:
+      create:
+        created: Enlace público listo.
+      destroy:
+        revoked: Enlace público revocado.
+    scout_thread_linker:
+      body: "Saqué un documento de este correo y lo archivé en Archivos: **[%{title}](%{path})**."
   components:
     files:
       sidebar:
@@ -67,3 +76,26 @@ es:
         actions: Acciones del correo
         open: Abrir en Correo
         remove_from_folder: Quitar de la carpeta
+      folder_sharing:
+        open_hint: Esta carpeta está abierta a todos en tu espacio de trabajo. Restríngela para elegir quién tiene acceso.
+        restrict_label: Restringir acceso
+        restrict_hint: Solo las personas que añadas (y los administradores) pueden ver esta carpeta y su contenido.
+        you_badge: Tú
+        owner_badge: Propietario
+        role_aria: Nivel de acceso
+        role_viewer: Puede ver
+        role_editor: Puede editar
+        role_manager: Gestor
+        remove_confirm: "¿Quitar a %{name} de esta carpeta?"
+        remove_aria: Quitar acceso
+        add_title: Añadir personas
+        all_have_access: Todos en el espacio de trabajo ya tienen acceso.
+        select_placeholder: Elige una persona…
+        add_button: Añadir
+      file_link_picker:
+        button: Insertar enlace a archivo
+        title: Insertar un enlace a archivo
+        hint: "Elige un archivo: se crea e inserta un enlace público en tu mensaje."
+        loading: Cargando archivos…
+        empty: Aún no hay archivos para enlazar.
+        insert: Insertar

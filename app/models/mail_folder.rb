@@ -37,6 +37,36 @@ class MailFolder < ApplicationRecord
     FolderMembership.where(mail_folder_id: ids).group(:mail_folder_id).count
   end
 
+  # --- Files Phase 3: per-folder sharing -----------------------------------
+  has_many :mail_folder_users, dependent: :destroy
+  has_many :members, through: :mail_folder_users, source: :user
+
+  # Open folders (the default) are visible to the whole workspace; restricted
+  # folders only to their members + workspace admins.
+  scope :accessible_to, ->(user) {
+    next none unless user
+    next all if user.admin?
+
+    where(restricted: false).or(where(id: MailFolderUser.where(user: user, can_read: true).select(:mail_folder_id)))
+  }
+
+  def readable_by?(user)
+    return false unless user
+    return true if !restricted? || user.admin?
+
+    mail_folder_users.where(user: user, can_read: true).exists?
+  end
+
+  def manageable_by?(user)
+    return false unless user
+    # Admins manage anything; open folders are workspace-global, so any member may
+    # restrict/share them. Once restricted, only managers/owners (+ admins) manage.
+    return true if user.admin? || !restricted?
+
+    mail_folder_users.where(user: user, can_manage: true).exists? ||
+      mail_folder_users.where(user: user, owner: true).exists?
+  end
+
   # A user-defined folder shown as a chip on top of the inbox. Creating one
   # provisions a real provider folder (or Gmail label) on every connected
   # account — see MailFolders::Provisioner. This record is the canonical,

@@ -6,7 +6,7 @@ class DocumentsController < ApplicationController
     @categories = DocumentType::CATEGORIES
     @mail_folders = Current.workspace.mail_folders.ordered
 
-    documents = Current.workspace.documents.includes(:classification).with_attached_original_file.starred_first.recent
+    documents = Current.workspace.documents.accessible_to(Current.user).includes(:classification).with_attached_original_file.starred_first.recent
     documents = documents.by_type(params[:type]) if params[:type].present?
     documents = documents.by_category(params[:category]) if params[:category].present?
     documents = documents.by_review_status(params[:review_status])

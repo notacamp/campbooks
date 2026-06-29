@@ -16,6 +16,8 @@ fr:
         subtitle: "Contrôlez la façon dont vos données sont traitées et stockées, et quelle IA peut les voir."
         ai_toggle_heading: "Traitement par IA"
         ai_toggle_desc: "Lorsque cette option est activée, Scout utilise l'IA pour traiter vos e-mails, documents et contacts. Désactivez-la pour suspendre toute l'IA ; vos résumés et étiquettes existants sont conservés."
+        scout_posts_heading: Mises à jour de fil de Scout
+        scout_posts_desc: "Quand Scout classe un document d'un e-mail, publier un lien dans la discussion de cet e-mail."
         ai_paused_note: "Le traitement par IA est en pause. Scout, l'étiquetage automatique, les résumés et l'analyse ne s'exécuteront pas tant que vous ne l'aurez pas réactivé."
         ai_providers_heading: "Fournisseurs d'IA et régions de données"
         ai_providers_desc: "Quel fournisseur gère chaque tâche d'IA et où elle s'exécute. Le vert indique une résidence des données dans l'UE."

@@ -23,6 +23,7 @@ en:
       contact_unblocked: Contact unblocked
       contact_unstarred: Contact unstarred
       document_approved: Document approved
+      document_linked_to_thread: Document linked in thread
       document_processed: Document processed
       document_rejected: Document rejected
       document_restored: Document restored
@@ -41,12 +42,19 @@ en:
       email_unfiled: Email removed from folder
       file_deleted: File deleted
       file_filed: File filed
+      file_made_private: Public link revoked
+      file_made_public: File shared publicly
+      file_public_link_viewed: Public link viewed
       file_unfiled: File removed from folder
       file_uploaded: File uploaded
       folder_created: Folder created
       folder_deleted: Folder deleted
       folder_moved: Folder moved
       folder_renamed: Folder renamed
+      folder_restricted: Folder restricted
+      folder_shared: Folder shared
+      folder_unrestricted: Folder opened
+      folder_unshared: Folder access removed
       internal_document_created: Internal document created
       internal_document_updated: Internal document updated
       pipeline_stage_entered: Stage entered
