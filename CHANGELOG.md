@@ -29,6 +29,11 @@ major, minor, or patch change here.
   `task.status_changed`, `task.assigned`, `task.completed`, `task.archived`), appear in
   the navigation, Skim, and Feed, and are exposed over the public REST API
   (`tasks:read` / `tasks:write`).
+- **Scout notes events & reminders in the email discussion** — when a calendar
+  event is created from an email, or Scout extracts reminders from one, Scout now
+  posts a short message into that email's discussion thread linking back to the new
+  event/reminder, so the discussion is a running record of what Scout did with the
+  email. Reminder notes are limited to confident finds to keep the thread quiet.
 
 ### Fixed
 
