@@ -19,22 +19,10 @@
       "note": "Accepted: renders the user's OWN email signature (a plain HTML column) as HTML by design, in their own composer preview. Self-authored content, self-rendered = self-XSS only, low risk."
     },
     {
-      "warning_type": "Dynamic Render Path",
-      "fingerprint": "6051863db80d84cec3caea715b409e08fabe053959685699c689103fc220d3f8",
-      "file": "app/controllers/onboarding_controller.rb",
-      "note": "False positive: @step is allowlisted against OnboardingController::STEPS by the ensure_valid_step! before_action (redirects on any other value) before this render."
-    },
-    {
       "warning_type": "SQL Injection",
       "fingerprint": "6803e797caa696be639cb6b7bba104dd9711ff5206ac305a45da96d91eed97b2",
       "file": "app/services/google/mail_client.rb",
       "note": "False positive: this is a Faraday HTTP connection.delete(url) to an external mail API, not an ActiveRecord SQL call."
-    },
-    {
-      "warning_type": "Dynamic Render Path",
-      "fingerprint": "d3b419cdadc03366fc5f790a0db758a54a1aad6b5c4ef50fe63693bf0f39c57d",
-      "file": "app/controllers/onboarding_controller.rb",
-      "note": "False positive: @step is allowlisted against OnboardingController::STEPS by the ensure_valid_step! before_action (redirects on any other value) before this render."
     },
     {
       "warning_type": "Unmaintained Dependency",
