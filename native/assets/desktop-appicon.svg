@@ -1,0 +1,73 @@
+<svg viewBox="0 0 1024 1024" width="1024" height="1024" xmlns="http://www.w3.org/2000/svg" fill="none" role="img" aria-label="Campbooks">
+  <defs>
+    <!-- Ember base gradient (matches the brand mark) -->
+    <linearGradient id="ember" x1="120" y1="96" x2="912" y2="936" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E52C8F"/>
+      <stop offset="0.52" stop-color="#FC4E57"/>
+      <stop offset="1" stop-color="#FD9320"/>
+    </linearGradient>
+    <!-- glossy top sheen -->
+    <linearGradient id="gloss" x1="0" y1="100" x2="0" y2="650" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="0.16" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="0.46" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <!-- depth: darken toward the bottom -->
+    <linearGradient id="depth" x1="0" y1="924" x2="0" y2="430" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5e0a2e" stop-opacity="0.40"/>
+      <stop offset="1" stop-color="#5e0a2e" stop-opacity="0"/>
+    </linearGradient>
+    <!-- specular reflection blob -->
+    <radialGradient id="spec" cx="0.34" cy="0.2" r="0.62">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="0.55" stop-color="#ffffff" stop-opacity="0.06"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="blurShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+    <filter id="blurSpec" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="26"/>
+    </filter>
+    <filter id="markShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="10"/>
+    </filter>
+    <clipPath id="squircle">
+      <rect x="100" y="100" width="824" height="824" rx="185" ry="185"/>
+    </clipPath>
+  </defs>
+
+  <!-- contact shadow -->
+  <rect x="100" y="118" width="824" height="824" rx="185" fill="#3a0620" fill-opacity="0.30" filter="url(#blurShadow)"/>
+
+  <!-- base tile -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#ember)"/>
+
+  <g clip-path="url(#squircle)">
+    <!-- bottom depth -->
+    <rect x="100" y="100" width="824" height="824" fill="url(#depth)"/>
+    <!-- specular highlight -->
+    <ellipse cx="372" cy="266" rx="430" ry="300" fill="url(#spec)" filter="url(#blurSpec)"/>
+    <!-- top gloss -->
+    <rect x="100" y="100" width="824" height="824" fill="url(#gloss)"/>
+
+    <!-- the double-C mark, centered + scaled, with a soft shadow for depth -->
+    <g transform="translate(512 512) scale(36) translate(-15.15 -16)">
+      <g transform="translate(2 2)" stroke-linecap="round" fill="none">
+        <!-- shadow pass -->
+        <g stroke="#4a0822" stroke-opacity="0.30" filter="url(#markShadow)" transform="translate(0 0.32)">
+          <path d="M20.65 17.46 A7.5 7.5 0 1 1 20.65 10.54" stroke-width="2.5"/>
+          <path d="M18.1 16.1 A4.6 4.6 0 1 1 18.1 11.9" stroke-width="2.2"/>
+        </g>
+        <!-- white mark -->
+        <g stroke="#ffffff">
+          <path d="M20.65 17.46 A7.5 7.5 0 1 1 20.65 10.54" stroke-width="2.5"/>
+          <path d="M18.1 16.1 A4.6 4.6 0 1 1 18.1 11.9" stroke-width="2.2" opacity="0.6"/>
+        </g>
+      </g>
+    </g>
+  </g>
+
+  <!-- glass rim: bright top-left edge -->
+  <rect x="102" y="102" width="820" height="820" rx="183" fill="none" stroke="#ffffff" stroke-opacity="0.45" stroke-width="2.5"/>
+</svg>

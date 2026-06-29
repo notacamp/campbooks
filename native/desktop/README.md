@@ -88,8 +88,10 @@ cargo tauri build                # → target/release/bundle/{dmg,macos,…}
 
 `cargo tauri build` only emits installers for the **host** OS — Windows and Linux
 artifacts are produced by CI (`.github/workflows/desktop-release.yml`, a
-macОS/Windows/Linux matrix). To regenerate the icon set from the brand mark:
-`cargo tauri icon ../../assets/out/icon_1024.png`.
+macОS/Windows/Linux matrix). The icon is a glassy rounded squircle (desktop is
+the only platform that doesn't round/mask the icon itself) sourced from
+`native/assets/desktop-appicon.svg`; to regenerate the set:
+`rsvg-convert -w 1024 -h 1024 ../../assets/desktop-appicon.svg -o ../../assets/desktop-icon-1024.png && cargo tauri icon ../../assets/desktop-icon-1024.png` (then delete the `icons/android` + `icons/ios` subdirs it also emits).
 
 ## Releasing
 
