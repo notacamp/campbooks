@@ -13,16 +13,8 @@
     <div class="px-6 py-5">
       <%= turbo_frame_tag "inbox_settings_tag_form" %>
 
-      <div id="inbox_settings_tags_rows">
-        <% if @tags.any? %>
-          <% @tags.each do |tag| %>
-            <%= render "inbox_settings/tags/tag", tag: tag, count: @tag_message_counts[tag.id] || 0 %>
-          <% end %>
-        <% else %>
-          <p id="inbox_settings_tags_empty" class="text-[13px] text-muted-foreground py-8 text-center">
-            <%= t(".no_tags") %>
-          </p>
-        <% end %>
+      <div id="inbox_settings_tags_list">
+        <%= render "inbox_settings/tags/list" %>
       </div>
     </div>
   </div>

@@ -35,11 +35,8 @@ fr:
         labels_option: Étiquettes
         no_accounts: Aucun compte e-mail connecté pour l'instant.
         show_heading: Afficher
-        show_system_labels: Afficher les étiquettes système (Boîte de réception, Personnel, Promotions…)
         subheading: L'apparence de votre boîte de réception sur cet appareil. Enregistré
           dans ce navigateur.
-        system_labels_heading: Étiquettes système
-        system_labels_hint: Étiquettes de votre messagerie (Gmail). Masquées par défaut — activez pour les voir.
     filtering:
       show:
         allowed_heading: Expéditeurs autorisés
@@ -87,9 +84,21 @@ fr:
         no_tags: Aucune étiquette pour l'instant. Ajoutez-en une pour commencer à
           trier votre boîte de réception.
         subheading: Les étiquettes aident Scout à trier votre boîte de réception automatiquement.
+        filtered_group: Masquées par l'IA ou par vous
+        hidden_heading: Libellés masqués
+        hidden_hint: système et masqués par IA
+        system_group: Système du fournisseur
       tag:
         delete_confirm: Supprimer %{name} ?
         edit: Modifier
+        hide: Masquer
         tagged_messages_title: Messages étiquetés
+      hidden_tag:
+        ai_badge: IA
+        show: Afficher
+        system_badge: Système
+      toggle_hidden:
+        hidden: '%{name} masqué'
+        shown: '%{name} est maintenant visible'
       update:
         updated_toast: Étiquette mise à jour.
