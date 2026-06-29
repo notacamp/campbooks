@@ -87,5 +87,7 @@ en:
       password_label: Password
       password_placeholder: Enter your password
       sign_up: Create an account
+      signup_on_web_html: New to Campbooks? %{link}.
+      signup_on_web_link: Create an account on the web
       submit: Sign in
       tagline: The inbox that sorts itself.

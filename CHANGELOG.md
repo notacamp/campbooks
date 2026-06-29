@@ -35,6 +35,14 @@ major, minor, or patch change here.
   event/reminder, so the discussion is a running record of what Scout did with the
   email. Reminder notes are limited to confident finds to keep the thread quiet.
 
+### Changed
+
+- **Native apps are sign-in-only** — the iOS/Android apps no longer offer in-app
+  account creation. The sign-in screen points new users to the web instead of the
+  in-app signup, and the registration flow is blocked in the native shell (invited
+  users can still finish onboarding in-app). This keeps web-based subscription
+  billing outside Apple/Google in-app purchase.
+
 ### Fixed
 
 - Documents list **month filter** now works. The month picker submits a single
