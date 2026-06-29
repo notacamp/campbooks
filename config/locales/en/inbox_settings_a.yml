@@ -37,6 +37,10 @@ en:
         subheading: How your inbox looks on this device. Saved in this browser.
         system_labels_heading: System labels
         system_labels_hint: Labels from your connected mailbox (Gmail). Hidden by default — turn on to see them as tags.
+        thread_view_bubbles: Bubbles
+        thread_view_classic: Classic
+        thread_view_heading: Conversation view
+        thread_view_hint: Bubbles show who sent each message, like a chat.
     filtering:
       show:
         allowed_heading: Allowed senders

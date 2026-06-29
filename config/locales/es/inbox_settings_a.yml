@@ -40,6 +40,10 @@ es:
           en este navegador.
         system_labels_heading: Etiquetas del sistema
         system_labels_hint: Etiquetas de su buzón conectado (Gmail). Ocultas por defecto — actívelas para verlas.
+        thread_view_bubbles: Burbujas
+        thread_view_classic: Clásica
+        thread_view_heading: Vista de conversación
+        thread_view_hint: Las burbujas muestran quién envió cada mensaje, como un chat.
     filtering:
       show:
         allowed_heading: Remitentes permitidos

@@ -1008,6 +1008,32 @@ dialog[open] {
   display: flex !important;
 }
 
+/* ── Conversation view: Classic ──────────────────────────────────────────────
+   The reading pane renders each message as a directional chat bubble by default
+   (Campbooks::EmailDetail). The inbox setting "Conversation view → Classic" sets
+   [data-thread-view="classic"] on <html>, which flattens those bubbles back to a
+   plain full-width list: avatars all on the left, no tint/border/radius, hairline
+   dividers. Higher-specificity than the Tailwind utilities, so no !important. */
+[data-thread-view="classic"] .thread-conversation { gap: 0; padding: 0; }
+[data-thread-view="classic"] .thread-msg {
+  flex-direction: row;
+  gap: 0.625rem;
+  padding: 0.625rem 1.25rem;
+  border-bottom: 1px solid var(--color-gray-100);
+}
+[data-thread-view="classic"] .thread-bubble {
+  max-width: none;
+  flex: 1 1 auto;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+[data-thread-view="classic"] .thread-bubble > summary,
+[data-thread-view="classic"] .thread-bubble > div {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 /* ── Documents filters disclosure ────────────────────────────────────────────
    The /documents filters live in a <details> that's collapsed on mobile but meant
    to be always-open on desktop (its content is force-shown with `md:block`).

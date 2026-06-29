@@ -22,7 +22,8 @@ major, minor, or patch change here.
   light, directional chat bubbles — the ones you received on the left, the ones you
   sent on the right — so it's clear at a glance who said what. Folded messages show
   a one‑line preview, and long or wide HTML emails still scroll neatly inside their
-  bubble.
+  bubble. Prefer the old look? Switch **Conversation view** to **Classic** (a flat
+  list) in **Inbox settings → Display**.
 
 - **Approve or dismiss Scout's reminders right in the thread** — when Scout spots a
   dated commitment in an email it now surfaces it in the discussion as *a potential
