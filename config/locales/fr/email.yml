@@ -177,7 +177,6 @@ fr:
       snooze_title: Reporter
     tags:
       add_tag_aria: Ajouter une étiquette
-      remove_tag_title: Retirer l'étiquette
       search_tags_placeholder: Rechercher des étiquettes...
     thread_list:
       back_to_inbox: "— retour à la boîte de réception"
@@ -189,10 +188,6 @@ fr:
       senders_more: "%{first}, %{second}, et d'autres"
       sent_to_prefix: 'À :'
       unpin_title: Retirer la priorité
-    zoho_labels:
-      add_label_aria: Ajouter un libellé
-      remove_label_title: Retirer le libellé
-      search_labels_placeholder: Rechercher des libellés...
   email_scans:
     show:
       account_label: Compte
