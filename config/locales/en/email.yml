@@ -175,7 +175,6 @@ en:
       snooze_title: Snooze
     tags:
       add_tag_aria: Add tag
-      remove_tag_title: Remove tag
       search_tags_placeholder: Search tags...
     thread_list:
       back_to_inbox: "— back to inbox"
@@ -187,10 +186,6 @@ en:
       senders_more: "%{first}, %{second}, and more"
       sent_to_prefix: 'To:'
       unpin_title: Remove priority
-    zoho_labels:
-      add_label_aria: Add label
-      remove_label_title: Remove label
-      search_labels_placeholder: Search labels...
   email_scans:
     show:
       account_label: Account

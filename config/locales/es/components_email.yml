@@ -105,7 +105,6 @@ es:
           other: " de %{count} mensajes en la conversación"
       discussion: Conversación
       forward: Reenviar
-      labels_label: Etiquetas
       no_content: Sin contenido.
       no_subject: "(sin asunto)"
       open_full_view: Abrir en vista completa
@@ -114,6 +113,8 @@ es:
       selected_badge: Seleccionado
       send_to_notion: Guardar en Notion
       tags_label: Etiquetas
+    tag_chip:
+      remove: "Eliminar %{name}"
     email_filter_panel:
       accounts: Cuentas
       all_folders: Todas las carpetas
