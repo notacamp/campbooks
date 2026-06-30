@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-30
+
 ### Added
 
 - **Email threads read like a conversation.** Messages in a thread now render as
