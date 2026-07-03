@@ -1,5 +1,37 @@
 ---
 en:
+  setup_status:
+    items:
+      ai_configuration:
+        cta: Set up AI
+        description: 'Self-hosted setups bring their own model: add one key and Scout
+          starts reading, sorting, and drafting.'
+        message: Add an AI key so Scout can read
+      document_provider:
+        cta: Add document AI
+        description: A vision-capable key lets Scout read PDFs, scans, and photos
+          too. Optional, and easy to add later.
+        message: Add document AI (optional)
+      document_types:
+        cta: Draft with Scout
+        description: 'Invoices, contracts, receipts: Scout can propose a starting
+          set for your kind of work, ready to edit.'
+        message: Let Scout draft your document types
+      email_account:
+        cta: Connect an inbox
+        description: 'Scout sorts as mail lands: what needs you, deadlines, and the
+          documents hiding in attachments.'
+        message: Connect your inbox
+      tags:
+        cta: Suggest with Scout
+        description: Tags teach Scout how you think about mail. Start from suggestions
+          and change anything.
+        message: Let Scout suggest email tags
+      workspace:
+        cta: Introduce yourself
+        description: A sentence about what you do helps Scout sort and draft the way
+          you would.
+        message: Introduce your workspace
   onboarding:
     steps:
       welcome:

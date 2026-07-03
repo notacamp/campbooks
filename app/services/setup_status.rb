@@ -1,22 +1,14 @@
 class SetupStatus
+  # Setup tasks in priority order: the inbox is the gateway to everything, AI
+  # lets Scout read it, taxonomy tunes the sorting, the workspace intro adds
+  # context, document AI is a bonus. Metadata only — the user-facing strings
+  # resolve through #localized at read time so they follow the request locale
+  # (config/locales/<locale>/onboarding.yml, under setup_status.items).
   ITEMS = [
-    {
-      key: :workspace,
-      severity: :critical,
-      page_context: :global,
-      message: "Tell Scout about your workspace",
-      description: "Scout needs to know your workspace name, country, and what you do to give relevant recommendations when analyzing documents and emails.",
-      cta_text: "Complete your profile",
-      cta_modal: true,
-      cta_path: "/setup/workspace"
-    },
     {
       key: :email_account,
       severity: :critical,
       page_context: :emails,
-      message: "Connect an email account to get started",
-      description: "Campbooks works by scanning your inbox. Connect an email account to automatically process incoming documents, classify messages, and build contact profiles.",
-      cta_text: "Connect an email account",
       cta_modal: false,
       cta_path: "/email_messages?inbox_settings=accounts"
     },
@@ -24,29 +16,13 @@ class SetupStatus
       key: :ai_configuration,
       severity: :warning,
       page_context: :scout,
-      message: "Connect AI to read your email",
-      description: "Campbooks uses AI to triage your inbox, draft replies, classify messages, and power Scout. Add a text provider — a free DeepSeek key works, or any OpenAI-compatible service.",
-      cta_text: "Set up AI",
       cta_modal: true,
       cta_path: "/setup/ai_configuration"
-    },
-    {
-      key: :document_provider,
-      severity: :info,
-      page_context: :documents,
-      message: "Add AI for documents & images (optional)",
-      description: "To analyze PDFs, scans, and image attachments, add a vision-capable provider like OpenAI. You can skip this and add it anytime.",
-      cta_text: "Add document AI",
-      cta_modal: true,
-      cta_path: "/setup/document_provider"
     },
     {
       key: :document_types,
       severity: :warning,
       page_context: :documents,
-      message: "Define your document types first",
-      description: "Tell Scout what kinds of documents you handle — invoices, contracts, bank statements, receipts. This determines what data Scout extracts and how documents are organized.",
-      cta_text: "Add document types",
       cta_modal: true,
       cta_path: "/setup/document_types"
     },
@@ -54,11 +30,22 @@ class SetupStatus
       key: :tags,
       severity: :info,
       page_context: :documents,
-      message: "Create tags to organize emails",
-      description: "Tags help you categorize emails by topic, project, or priority. Scout uses tag descriptions to automatically classify incoming messages — the clearer your tags, the better the classification.",
-      cta_text: "Create email tags",
       cta_modal: true,
       cta_path: "/setup/tags"
+    },
+    {
+      key: :workspace,
+      severity: :warning,
+      page_context: :global,
+      cta_modal: true,
+      cta_path: "/setup/workspace"
+    },
+    {
+      key: :document_provider,
+      severity: :info,
+      page_context: :documents,
+      cta_modal: true,
+      cta_path: "/setup/document_provider"
     }
   ].freeze
 
@@ -78,8 +65,14 @@ class SetupStatus
     incomplete_items.select { |item| item[:page_context] == page_key.to_sym }
   end
 
+  # Every task with its strings resolved — what the setup hub renders.
+  def all_items
+    ITEMS.map { |item| localized(item) }
+  end
+
   def incomplete_items
     @incomplete_items ||= ITEMS.reject { |item| send(:"#{item[:key]}_complete?") }
+                              .map { |item| localized(item) }
   end
 
   def first_incomplete_step
@@ -105,6 +98,14 @@ class SetupStatus
   end
 
   private
+
+  def localized(item)
+    item.merge(
+      message: I18n.t("setup_status.items.#{item[:key]}.message"),
+      description: I18n.t("setup_status.items.#{item[:key]}.description"),
+      cta_text: I18n.t("setup_status.items.#{item[:key]}.cta")
+    )
+  end
 
   def workspace_complete?
     @workspace.name != "My Organization" &&
