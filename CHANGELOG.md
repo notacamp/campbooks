@@ -17,17 +17,40 @@ major, minor, or patch change here.
 ## [Unreleased]
 
 ### Added
-
 - **See how soon things are on the calendar.** The Agenda view now shows a small
   countdown next to each event and reminder — "In 20 min", "In 3 h", "Tomorrow",
   "In 4 days" — so you can tell at a glance what's imminent. Anything happening
   now, within the hour, or today is highlighted.
+- **Suggested tasks now appear on the home feed.** When Scout extracts an action
+  item from an email, it shows up as a "Suggested task" card with one-tap
+  **Add to tasks** / **Dismiss** — no more suggestions piling up unseen in the
+  tasks triage queue. Accepted tasks keep surfacing later when they become due,
+  blocked, or assigned to you.
+- `tasks:backfill_extraction` rake task to re-run task extraction over recent
+  mail (e.g. after enabling the Tasks module), gated and idempotent.  
 
 ### Changed
-
 - **The calendar opens on the Month view by default** (was Agenda), giving you the
   whole month at a glance when you land on the page. You can still switch views
   from the tabs, and any bookmarked `?view=…` link is unchanged.
+
+### Fixed
+- **Task extraction now targets mail from people, in your language.**
+  Extraction skips automated senders and machine mail (notification digests,
+  code-review bots, no-reply security alerts, marketplace CTAs) — previously
+  these produced streams of nonsense tasks — and the pre-filter recognises
+  action requests in Portuguese, Spanish and French, not just English, so real
+  asks from real people no longer slip through unextracted. Suggestions already
+  minted from machine mail are dismissed automatically on upgrade.
+- The same ask repeated across an email conversation now yields **one** task:
+  replies are analysed quote-stripped, extraction dedupes per thread (not per
+  message), and the model is shown the conversation's already-tracked tasks.
+- Task and reminder extraction no longer silently lose an email's results when
+  the AI provider rate-limits or errors transiently — the job now retries.
+- Sent mail no longer generates tasks for you from requests **you** made of
+  someone else.
+- AI extraction (tasks and reminders) no longer wastes its reading window on
+  raw `<style>` CSS from HTML email — extractors now see clean message text.
 
 ## [0.7.0] - 2026-06-30
 

@@ -3,8 +3,12 @@ module Ai
   # using a text LLM. Distinct from Ai::ReminderExtractor (dated commitments) and
   # Ai::EventExtractor (appointments): a task is an action the recipient owns, and
   # may or may not carry a deadline. Pure read — returns raw item hashes for
-  # Tasks::Builder. Never raises: tasks are a best-effort enhancement and must
-  # never poison the email/document pipeline.
+  # Tasks::Builder.
+  #
+  # Failure contract: transient provider errors (rate limits, 5xx, network) are
+  # RE-RAISED so the calling job's retry_on gets its turn — swallowing them here
+  # silently loses the email's tasks forever, since extraction runs once per
+  # ingest. Everything else (unparseable output, bad config) degrades to [].
   #
   # Routing mirrors ReminderExtractor: prefers a dedicated `task_extraction` AI
   # config, falling back to the workspace's email text model, so it works on any
@@ -14,16 +18,18 @@ module Ai
     MAX_TOKENS = 1500
     MIN_CONFIDENCE = 0.5    # drop low-confidence noise here (Builder re-checks)
     MAX_CONTENT = 8000      # chars of source text sent to the model
+    MAX_KNOWN_TASKS = 20    # exclusion-list entries shown to the model
 
-    def initialize(source:, content:, anchor_date: nil, time_zone: nil, workspace: Current.workspace)
+    def initialize(source:, content:, anchor_date: nil, time_zone: nil, workspace: Current.workspace, known_tasks: [])
       @source = source
       @content = content.to_s[0, MAX_CONTENT].to_s
       @anchor_date = anchor_date || Date.current
       @time_zone = time_zone || Time.zone
       @workspace = workspace
+      @known_tasks = Array(known_tasks).compact_blank.first(MAX_KNOWN_TASKS)
     end
 
-    # → Array<Hash> (string keys matching the schema), or [] on any failure.
+    # → Array<Hash> (string keys matching the schema), or [] on non-retryable failure.
     def extract
       return [] if @content.strip.blank?
 
@@ -44,6 +50,8 @@ module Ai
       return [] unless items.is_a?(Array)
 
       items.select { |item| valid?(item) }
+    rescue *Ai::Adapters::Base::TRANSIENT_ERRORS
+      raise
     rescue => e
       Rails.logger.error("[Ai::TaskExtractor] #{@source.class}##{@source.try(:id)} failed: #{e.message}")
       []
@@ -75,6 +83,16 @@ module Ai
           - calendar appointments or meetings themselves (those are events) — only a
             preparatory action the reader must take before one.
           - marketing or promotional calls-to-action ("buy now", "claim your offer").
+          - calls-to-action from automated systems: notification digests, code-review or
+            CI bots, order/shipping/receipt notices, feedback or rating requests
+            ("leave feedback", "rate your purchase"). A task comes from a person (or a
+            document) that expects THIS reader to act — not from a product nudging its
+            users.
+          - account-security boilerplate: verification codes, sign-in alerts, password
+            resets — including conditional instructions ("if this wasn't you, change
+            your password").
+          - anything already covered by <already_tracked_tasks> in the input (the same
+            underlying action counts as covered even when worded differently).
 
         For each task:
           - title: a short imperative summary of the action (<= 80 chars), e.g. "Send the
@@ -88,6 +106,9 @@ module Ai
           - priority: one of low, normal, high, urgent — infer from urgency language ("ASAP",
             "urgent", "end of day" -> high/urgent; routine -> normal).
           - confidence: 0.0–1.0 certainty this is a real action the reader must take.
+            Reserve 0.9+ for an explicit, direct request or commitment involving the
+            reader personally; score implied or inferred actions lower.
+          - Write title and description in the language of the source message.
           - justification: one sentence quoting the wording that signals the action.
 
         Extract at most 5 tasks; prefer the clearest, highest-value actions. If nothing
@@ -107,11 +128,25 @@ module Ai
         <source_metadata>
         #{source_metadata}
         </source_metadata>
-
+        #{known_tasks_block}
         <content>
         #{@content}
         </content>
       MSG
+    end
+
+    # Tasks already tracked from this conversation — shown to the model as an
+    # exclusion list so a reply quoting (or restating) an earlier ask doesn't mint
+    # the same task under new wording.
+    def known_tasks_block
+      return "" if @known_tasks.empty?
+
+      <<~BLOCK
+
+        <already_tracked_tasks>
+        #{@known_tasks.map { |t| "- #{t}" }.join("\n")}
+        </already_tracked_tasks>
+      BLOCK
     end
 
     def source_metadata

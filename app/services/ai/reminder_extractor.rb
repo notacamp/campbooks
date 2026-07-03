@@ -1,8 +1,12 @@
 module Ai
   # Extracts calendar-worthy reminders (any concrete dated commitment) from an
   # email or document using a text LLM. Pure read: returns an array of raw item
-  # hashes; Reminders::Builder materializes them. Never raises — reminders are a
-  # best-effort enhancement and must never poison the email/document pipeline.
+  # hashes; Reminders::Builder materializes them.
+  #
+  # Failure contract: transient provider errors (rate limits, 5xx, network) are
+  # RE-RAISED so the calling job's retry_on gets its turn — swallowing them here
+  # silently loses the email's reminders forever, since extraction runs once per
+  # ingest. Everything else (unparseable output, bad config) degrades to [].
   #
   # Routing: prefers a dedicated `reminder_extraction` AI config, but falls back to
   # the workspace's `email_analysis`/`email_classification` text model so it works
@@ -42,6 +46,8 @@ module Ai
       return [] unless items.is_a?(Array)
 
       items.select { |item| valid?(item) }
+    rescue *Ai::Adapters::Base::TRANSIENT_ERRORS
+      raise
     rescue => e
       Rails.logger.error("[Ai::ReminderExtractor] #{@source.class}##{@source.try(:id)} failed: #{e.message}")
       []

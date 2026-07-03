@@ -107,8 +107,9 @@ module Feed
       end
     end
 
-    # Complete a task from the feed. The dismiss button clears the card without
-    # changing the task (the generic feed-dismiss path), so only "complete" is here.
+    # Act on a task from the feed: complete an active one, or triage an
+    # AI-suggested one (accept → todo, dismiss_task → cancelled — the suggestion
+    # itself is resolved, unlike the generic card-hiding feed dismiss).
     def run_task_action(task)
       return failure(t("feed.items.gone")) unless task.workspace_id == current_user.workspace_id
 
@@ -116,6 +117,12 @@ module Feed
       when "complete"
         task.move_to_status!(:done, by: current_user)
         { success: true, message: t("feed.items.task_completed", title: task.title) }
+      when "accept"
+        task.move_to_status!(:todo, by: current_user)
+        { success: true, message: t("feed.items.task_accepted", title: task.title) }
+      when "dismiss_task"
+        task.move_to_status!(:cancelled, by: current_user)
+        { success: true, message: t("feed.items.task_dismissed") }
       else
         failure(t("feed.items.unsupported"))
       end
