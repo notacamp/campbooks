@@ -13,12 +13,15 @@
     <%= javascript_importmap_tags %>
   </head>
 
-  <body class="h-full" data-controller="theme">
-    <main class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8" tabindex="-1">
+  <body class="h-full" data-controller="theme product-tour">
+    <main class="<%= content_for(:main_class) || "max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8" %>" tabindex="-1">
       <%= render "shared/flash_inline" %>
 
       <%= yield %>
     </main>
+    <%# The guided demo is reachable pre-connect ("See it in action" on the
+        welcome screen); never auto-opened here — home owns the autostart. %>
+    <%= render(Campbooks::ProductTour.new(autostart: false)) if authenticated? %>
     <%= render "shared/flash_toast_region" %>
   </body>
 </html>

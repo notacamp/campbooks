@@ -2,6 +2,26 @@
 en:
   onboarding:
     steps:
+      welcome:
+        ai_key_body: Self-hosted setups bring their own model. Two minutes, one key.
+        ai_key_title: Add an AI key so Scout can read
+        connected_title:
+          one: Inbox connected
+          other: "%{count} inboxes connected"
+        continue_home: Take me to my inbox
+        greeting: Hi %{name}, I'm Scout.
+        greeting_anonymous: Hi, I'm Scout.
+        more_setup: More setup options
+        pitch: 'I read what lands in your inbox, sort it, and surface only what needs
+          you: replies, deadlines, documents. Connect your inbox and I''ll get started.'
+        privacy_note: Campbooks reads your inbox to sort it and pull out documents
+          and deadlines. Your mail stays private, and you can disconnect anytime in
+          Settings.
+        see_demo: See it in action first
+        skip: Skip for now and explore the app
+        type_company: Work
+        type_personal: Personal
+        type_question: Will you mostly use this for work or personal mail?
       ai_configuration:
         alert_html: "<strong>Two providers, two jobs.</strong> A text model (DeepSeek
           by default) handles email and chat; a vision model (OpenAI by default) reads

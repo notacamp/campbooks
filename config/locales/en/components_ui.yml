@@ -1,6 +1,16 @@
 ---
 en:
   components:
+    connect_provider_card:
+      google:
+        description: Gmail and Google Workspace
+        label: Google
+      microsoft:
+        description: Outlook and Microsoft 365
+        label: Microsoft 365
+      zoho:
+        description: Zoho Mail inboxes
+        label: Zoho Mail
     action_toast:
       undo: Undo
     ai_setup_prompt:
