@@ -82,36 +82,17 @@ en:
       all: All
       new_folder: New folder
     new:
-      all_folder_label: All
-      bcc_label: 'Bcc:'
-      bcc_placeholder: Add BCC...
-      bcc_toggle_label: Bcc
-      cc_label: 'Cc:'
-      cc_placeholder: Add CC...
       close_scout_aria: Close Scout
-      collapse_sidebar_aria: Collapse sidebar
-      expand_sidebar_aria: Expand sidebar
-      folders_heading: Folders
-      from_label: 'From:'
-      inbox_heading: Inbox
-      inbox_settings_aria: Inbox settings
-      new_message_heading: New Message
-      no_emails_yet: No emails yet.
+      heading_forward: Forward
+      heading_new_message: New message
+      heading_reply: Reply
+      heading_reply_all: Reply to all
       no_sendable_accounts_description: You need an email account with send permission
         to compose new messages.
       no_sendable_accounts_title: No sendable accounts
-      no_signature_option: No signature
       scout_keyboard_hint: Cmd+Shift+E for manual
       scout_label: Scout
-      signature_default_suffix: "(default)"
-      signature_label: 'Sig:'
-      signature_preview_heading: Signature
-      subject_label: 'Subj:'
-      subject_placeholder: Subject
-      to_label: 'To:'
-      to_placeholder: Search contacts or type email...
       toggle_chat_aria: Toggle chat
-      write_message_placeholder: Write your message...
     reply_actions:
       forward_title: Forward
       reply_all_title: Reply All

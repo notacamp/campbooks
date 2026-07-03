@@ -44,7 +44,10 @@ module Campbooks
                action: "submit->compose-engine#validate submit->compose-autosave#suspend " \
                        "input->compose-autosave#changed input->compose-engine#changedAnywhere " \
                        "keydown->compose-engine#keydown turbo:submit-end->compose-engine#restoreButton",
-               turbo: "true",
+               # The Dock stays on the page (Turbo Stream clears it); the Desk
+               # leaves the page after send, and a Turbo submit would swallow
+               # the cross-layout redirect (known gotcha) — full request there.
+               turbo: dock? ? "true" : "false",
                compose_autosave_url_value: helpers.draft_emails_path,
                compose_autosave_draft_id_value: @draft&.id.to_s,
                compose_autosave_mode_value: @mode.to_s,
@@ -138,7 +141,8 @@ module Campbooks
         field_row do
           field_label(t(".label_from"))
           select(name: "email_account_id",
-                 class: "flex-1 min-w-0 text-sm bg-transparent border-none focus:outline-none text-gray-800 py-0.5") do
+                 data: { action: "change->compose-chat#onFromAccountChange" },
+                 class: "flex-1 min-w-0 text-sm bg-transparent border-none focus:outline-none focus:shadow-none px-0 py-0.5 text-gray-800") do
             @accounts.each do |acct|
               attrs = { value: acct.id }
               attrs[:selected] = "selected" if acct == (@account || @accounts.first)
@@ -193,7 +197,7 @@ module Campbooks
                 placeholder: t(".placeholder_subject"),
                 data: { compose_engine_target: "subjectInput" },
                 class: class_names(
-                  "flex-1 min-w-0 bg-transparent border-none focus:outline-none placeholder:text-gray-300 text-gray-900",
+                  "flex-1 min-w-0 bg-transparent border-none focus:outline-none focus:shadow-none px-0 placeholder:text-gray-300 text-gray-900",
                   dock? ? "text-sm font-medium py-0.5" : "text-[19px] font-semibold tracking-tight py-1"
                 ))
           if dock?
@@ -275,12 +279,15 @@ module Campbooks
       end
 
       def signature_chip
+        # The data attrs keep Scout's compose-chat integration working on the
+        # Desk (account-filtered signatures, "use my signature" tool).
         select(name: "signature_id",
                aria_label: t(".label_signature"),
+               data: { compose_chat_target: "signatureSelect" },
                class: "text-xs text-gray-500 bg-transparent border border-gray-200 rounded-lg px-2 py-1.5 max-w-[10rem] focus:outline-none hover:border-gray-300 transition-colors") do
           option(value: "") { t(".no_signature") }
           @signatures.each do |sig|
-            attrs = { value: sig.id }
+            attrs = { value: sig.id, data: { account_ids: sig.email_account_ids.join(","), default: sig.is_default? } }
             attrs[:selected] = "selected" if sig.id == @signature_id
             option(**attrs) { sig.is_default? ? t(".signature_default", name: sig.name) : sig.name }
           end

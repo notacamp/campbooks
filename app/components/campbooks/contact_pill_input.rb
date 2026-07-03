@@ -42,7 +42,9 @@ module Campbooks
               action: "input->contact-pill-input#search keydown->contact-pill-input#handleKeydown paste->contact-pill-input#handlePaste"
             },
             placeholder: @placeholder,
-            class: "flex-1 min-w-[120px] text-sm border-none outline-none bg-transparent px-1 py-0.5"
+            # focus:shadow-none beats the global [type=text]:focus ring — inside
+            # a pill container the wrapper (or hairline row) carries focus.
+            class: "flex-1 min-w-[120px] text-sm border-none outline-none bg-transparent px-1 py-0.5 focus:shadow-none"
           )
         end
 

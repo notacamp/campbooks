@@ -11,10 +11,11 @@ class EmailComposeController < ApplicationController
     end
 
     @mode = mode
-    @to_address = build_to_address(mode)
-    @cc_address = build_cc_address(mode)
-    @subject = build_subject(mode)
-    @quoted_body = build_quoted_body(mode)
+    prefill = Emails::ComposePrefill.for(message: @message, mode: mode)
+    @to_address = prefill.to
+    @cc_address = prefill.cc
+    @subject = prefill.subject
+    @quoted_body = prefill.quoted_body
     # When opened from a Scout draft ("Edit in composer") or a mode switch, the
     # carried body — which may already hold the signature — pre-fills the
     # editor. Skip the default signature so it isn't appended twice.
@@ -175,11 +176,9 @@ class EmailComposeController < ApplicationController
   # signed ids resolve at send; ownership check accepts the source message's
   # own blobs — see collected_attachments).
   def forward_attachment_entries
-    return [] unless @mode == "forward" && @message&.files&.attached?
+    return [] unless @mode == "forward"
 
-    @message.files.blobs.map do |blob|
-      { "signed_id" => blob.signed_id, "filename" => blob.filename.to_s, "byte_size" => blob.byte_size }
-    end
+    Emails::ComposePrefill.forward_attachment_entries(@message)
   end
 
   # A successful send (or schedule) consumes the autosaved draft it was written
@@ -344,88 +343,4 @@ class EmailComposeController < ApplicationController
     end
   end
 
-  def build_to_address(mode)
-    case mode
-    when "reply" then @message.from_address.to_s
-    when "reply_all"
-      recipients = []
-      recipients << @message.from_address.to_s if @message.from_address.present?
-      recipients.concat(parse_addresses(@message.to_address))
-      recipients.reject! { |a| own_address?(a) }
-      recipients.uniq.join(", ")
-    when "forward", "new_message" then ""
-    end
-  end
-
-  def build_cc_address(mode)
-    case mode
-    when "reply_all"
-      cc_list = parse_addresses(@message.cc_address || "")
-      cc_list.reject! { |a| own_address?(a) }
-      cc_list.uniq.join(", ")
-    when "reply", "forward", "new_message" then ""
-    end
-  end
-
-  def build_subject(mode)
-    case mode
-    when "new_message" then ""
-    when "forward"
-      subject = @message.subject.to_s
-      subject.match?(/^Fwd:\s*/i) ? subject : "Fwd: #{subject}"
-    else
-      subject = @message.subject.to_s
-      subject.match?(/^Re:\s*/i) ? subject : "Re: #{subject}"
-    end
-  end
-
-  def build_quoted_body(mode)
-    return "" if mode == "new_message"
-
-    from = @message.from_address || "Unknown"
-    date = @message.received_at&.strftime("%b %d, %Y at %H:%M") || "Unknown date"
-    body_html = @message.body.presence || @message.summary.presence || "(no content)"
-
-    if mode == "forward"
-      <<~HTML
-        <br><br>
-        <p style="font-size: 12px; color: #9ca3af;">
-          ---------- Forwarded message ----------<br>
-          <b>From:</b> #{ERB::Util.html_escape(from)}<br>
-          <b>Date:</b> #{date}<br>
-          <b>Subject:</b> #{ERB::Util.html_escape(@message.subject || "")}<br>
-          <b>To:</b> #{ERB::Util.html_escape(@message.to_address || "")}
-        </p>
-        <br>
-        #{body_html}
-      HTML
-    else
-      <<~HTML
-        <br><br>
-        <blockquote style="border-left: 2px solid #d1d5db; padding-left: 8px; margin-left: 0; color: #6b7280;">
-          <p style="font-size: 12px; color: #9ca3af;">
-            On #{date}, #{ERB::Util.html_escape(from)} wrote:
-          </p>
-          #{body_html}
-        </blockquote>
-      HTML
-    end
-  end
-
-  def parse_addresses(str)
-    return [] if str.blank?
-    str.split(",").map(&:strip).select(&:present?)
-  end
-
-  # An address belongs to the sending account when its email part matches the
-  # account address. Compare the bare email so a "Display Name <addr>" form still
-  # gets dropped from reply-all — otherwise the user ends up emailing themselves.
-  def own_address?(addr)
-    bare_email(addr) == bare_email(@message.email_account.email_address)
-  end
-
-  def bare_email(addr)
-    str = addr.to_s
-    (str[/<([^>]+)>/, 1] || str).strip.downcase
-  end
 end
