@@ -20,7 +20,9 @@ module Reminders
 
       Current.workspace = workspace
 
-      body = ActionController::Base.helpers.strip_tags(email.body.to_s)
+      # Quote-stripped text (see Emails::PlainText): analyse what the sender just
+      # wrote, and keep <style> CSS out of the model's context window.
+      body = Emails::PlainText.of(email.body)
       content = [ email.subject, email.ai_summary, body ].compact_blank.join("\n\n")
 
       items = Ai::ReminderExtractor.new(
