@@ -167,6 +167,8 @@ fr:
         unsnoozed:
           one: Report annulé pour %{count} conversation
           other: Report annulé pour %{count} conversations
+    dismiss_follow_up:
+      dismissed: Relance ignorée
     dismiss_todo:
       dismissed: Tâche ignorée
   email_threads:

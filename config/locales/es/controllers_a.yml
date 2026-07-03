@@ -169,6 +169,8 @@ es:
         unsnoozed:
           one: Posposición cancelada en %{count} conversación
           other: Posposición cancelada en %{count} conversaciones
+    dismiss_follow_up:
+      dismissed: Seguimiento descartado
     dismiss_todo:
       dismissed: Tarea descartada
   email_threads:

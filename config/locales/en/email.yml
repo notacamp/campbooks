@@ -6,6 +6,9 @@ en:
         heading: Board
     empty:
       add_account_button: Add email account
+      all_sorted_description: Everything left is low-priority mail, sorted into the
+        groups below. Tap one to review or clear it.
+      all_sorted_title: Your inbox is sorted
       connect_email_description: Link an email account to start receiving and processing
         emails automatically.
       connect_email_title: Connect your email
@@ -158,8 +161,12 @@ en:
       add_tag_aria: Add tag
       search_tags_placeholder: Search tags...
     thread_list:
+      archive_all: Archive all
       back_to_inbox: "— back to inbox"
+      dismiss_follow_up: Dismiss follow-up
+      draft_follow_up: Draft follow-up
       drag_to_folder: Drag to a folder
+      mark_all_read: Mark all read
       no_subject: "(no subject)"
       pin_title: Make priority
       priority_section: Priority
@@ -167,6 +174,11 @@ en:
       senders_more: "%{first}, %{second}, and more"
       sent_to_prefix: 'To:'
       unpin_title: Remove priority
+      waiting_days:
+        one: Waiting %{count} day
+        other: Waiting %{count} days
+      waiting_recent: Waiting on their reply
+      waiting_section: Waiting on replies
   email_scans:
     show:
       account_label: Account

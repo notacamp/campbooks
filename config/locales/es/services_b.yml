@@ -63,6 +63,9 @@ es:
         unread:
           label: Sin leer
           prompt: Resume mis correos sin leer
+        waiting_on_reply:
+          label: Esperando respuesta
+          prompt: ¿De qué sigo esperando respuesta?
       subtitle:
         all_caught_up: Está al día. Pregúnteme sobre sus correos, documentos o contactos
           cuando lo necesite.

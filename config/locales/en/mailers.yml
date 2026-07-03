@@ -1,5 +1,23 @@
 ---
 en:
+  digest_mailer:
+    waiting_on_replies:
+      and_more: and %{count} more
+      cta: Open your inbox
+      footer_html: You're getting this because your waiting-on-replies digest is on. Manage it in your %{settings_link}.
+      footer_text: You're getting this because your waiting-on-replies digest is on. Manage it at %{settings_url}
+      greeting: Hi %{name},
+      intro:
+        one: You're still waiting to hear back on one conversation. Want to nudge them?
+        other: You're still waiting to hear back on %{count} conversations. Want to nudge them?
+      settings_link: notification settings
+      subject:
+        one: 1 reply you're still waiting on
+        other: "%{count} replies you're still waiting on"
+      waiting_days:
+        one: Waiting %{count} day
+        other: Waiting %{count} days
+      waiting_recent: Waiting on their reply
   invitation_mailer:
     invitation:
       accept_button: Accept invitation

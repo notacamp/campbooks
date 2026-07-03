@@ -21,6 +21,11 @@
     already loaded above, so participant_senders adds no query). %>
 <% participants = thread.participant_senders(limit: 4) %>
 <% multi_sender = participants.size > 1 %>
+<%# Waiting-on-reply variant: rendered inside the inbox "Waiting on replies" band.
+    Adds a "waiting Nd" note (+ the AI reason when present) and swaps the star for
+    Draft-follow-up / Dismiss actions. Pure-data — waiting_days needs no AI. %>
+<% waiting_reply = local_assigns[:section_key] == "waiting_replies" %>
+<% waiting_days = (waiting_reply && thread.last_outbound_at) ? ((Time.current - thread.last_outbound_at) / 86_400).floor : nil %>
 
 <%= render(Campbooks::Swipeable.new(
       id: dom_id(thread, :thread_item),
@@ -128,23 +133,59 @@
         <div class="mt-0.5 flex items-center gap-1.5 flex-wrap js-inbox-labels" id="<%= dom_id(latest, :thread_tags) %>">
           <%= render "email_messages/thread_tags", message: latest %>
         </div>
+        <% if waiting_reply %>
+          <div class="mt-0.5 flex items-center gap-1.5 min-w-0">
+            <span class="inline-flex items-center gap-1 flex-shrink-0 text-amber-600 dark:text-amber-400 font-medium" style="font-size:var(--thread-label-size,9px)">
+              <svg class="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 7.5V12l3 2"/></svg>
+              <%= waiting_days && waiting_days.positive? ? t("email_messages.thread_list.waiting_days", count: waiting_days) : t("email_messages.thread_list.waiting_recent") %>
+            </span>
+            <% if thread.follow_up_reason.present? %>
+              <span class="text-gray-400 truncate" style="font-size:var(--thread-meta-size,10px)"><%= thread.follow_up_reason %></span>
+            <% end %>
+          </div>
+        <% end %>
       </div>
     <% end %>
 
-    <%# Star toggle — pins this thread into the "Priority" section at the top of the
-        inbox (same pinned_at as Skim's "Make priority"). Subtle until hovered on
-        desktop; always visible (and gold) once pinned, so mobile can unpin too.
-        data-no-swipe stops a tap here from starting a row swipe. %>
-    <% pin_label = pinned ? t("email_messages.thread_list.unpin_title") : t("email_messages.thread_list.pin_title") %>
-    <%= button_to tool_email_message_path(latest, tool: (pinned ? "unpin" : "pin"), folder_id: params[:folder_id].presence, group: params[:group].presence),
-          method: :post,
-          form: { class: "flex-shrink-0 self-stretch flex items-center", data: { no_swipe: true, turbo: true } },
-          class: "flex items-center justify-center w-7 self-stretch cursor-pointer border-0 bg-transparent transition-colors #{pinned ? 'text-amber-500 hover:text-amber-600' : 'text-gray-300 hover:text-amber-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100'}",
-          data: { no_swipe: true },
-          title: pin_label,
-          "aria-label": pin_label,
-          "aria-pressed": pinned.to_s do %>
-      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="<%= pinned ? "currentColor" : "none" %>" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.5a.56.56 0 011.04 0l2.12 4.92 5.34.46c.49.04.69.66.31.98l-4.05 3.5 1.21 5.22c.11.48-.41.86-.83.6L12 17.27l-4.63 2.91c-.42.26-.94-.12-.83-.6l1.21-5.22-4.05-3.5c-.38-.32-.18-.94.31-.98l5.34-.46 2.12-4.92z"/></svg>
+    <% if waiting_reply %>
+      <%# Waiting-row actions: one-tap Draft follow-up (opens the thread and auto-fires
+          the AI draft via ?compose=follow_up) + Dismiss (mark the nudge handled, so
+          EmailThread.awaiting_reply drops the thread). data-no-swipe so a tap here
+          doesn't start a row swipe. %>
+      <div class="flex items-center flex-shrink-0 self-stretch" data-no-swipe="true">
+        <%= link_to email_message_path(latest, compose: "follow_up", folder_id: params[:folder_id].presence, group: params[:group].presence),
+              class: "flex items-center justify-center w-7 self-stretch text-gray-300 hover:text-accent-600 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100",
+              data: { turbo_frame: "_top", no_swipe: true },
+              title: t("email_messages.thread_list.draft_follow_up"),
+              "aria-label": t("email_messages.thread_list.draft_follow_up") do %>
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        <% end %>
+        <%= button_to dismiss_follow_up_email_message_path(latest, folder_id: params[:folder_id].presence, group: params[:group].presence),
+              method: :post,
+              form: { class: "flex-shrink-0 self-stretch flex items-center", data: { no_swipe: true, turbo: true } },
+              class: "flex items-center justify-center w-7 self-stretch cursor-pointer border-0 bg-transparent text-gray-300 hover:text-gray-600 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100",
+              data: { no_swipe: true },
+              title: t("email_messages.thread_list.dismiss_follow_up"),
+              "aria-label": t("email_messages.thread_list.dismiss_follow_up") do %>
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18"/></svg>
+        <% end %>
+      </div>
+    <% else %>
+      <%# Star toggle — pins this thread into the "Priority" section at the top of the
+          inbox (same pinned_at as Skim's "Make priority"). Subtle until hovered on
+          desktop; always visible (and gold) once pinned, so mobile can unpin too.
+          data-no-swipe stops a tap here from starting a row swipe. %>
+      <% pin_label = pinned ? t("email_messages.thread_list.unpin_title") : t("email_messages.thread_list.pin_title") %>
+      <%= button_to tool_email_message_path(latest, tool: (pinned ? "unpin" : "pin"), folder_id: params[:folder_id].presence, group: params[:group].presence),
+            method: :post,
+            form: { class: "flex-shrink-0 self-stretch flex items-center", data: { no_swipe: true, turbo: true } },
+            class: "flex items-center justify-center w-7 self-stretch cursor-pointer border-0 bg-transparent transition-colors #{pinned ? 'text-amber-500 hover:text-amber-600' : 'text-gray-300 hover:text-amber-500 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100'}",
+            data: { no_swipe: true },
+            title: pin_label,
+            "aria-label": pin_label,
+            "aria-pressed": pinned.to_s do %>
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="<%= pinned ? "currentColor" : "none" %>" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11.48 3.5a.56.56 0 011.04 0l2.12 4.92 5.34.46c.49.04.69.66.31.98l-4.05 3.5 1.21 5.22c.11.48-.41.86-.83.6L12 17.27l-4.63 2.91c-.42.26-.94-.12-.83-.6l1.21-5.22-4.05-3.5c-.38-.32-.18-.94.31-.98l5.34-.46 2.12-4.92z"/></svg>
+      <% end %>
     <% end %>
   </div>
 <% end %>

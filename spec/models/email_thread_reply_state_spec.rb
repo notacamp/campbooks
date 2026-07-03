@@ -48,4 +48,29 @@ RSpec.describe EmailThread, "reply state" do
       expect(EmailThread.follow_up_due).not_to include(thread)
     end
   end
+
+  describe ".holds_last_word (scope)" do
+    it "matches threads the owner sent last (incl. cold sends), not those the other party answered" do
+      held   = create(:email_thread, email_account: account, last_outbound_at: 1.hour.ago, last_inbound_at: 2.hours.ago)
+      cold   = create(:email_thread, email_account: account, last_outbound_at: 1.hour.ago, last_inbound_at: nil)
+      theirs = create(:email_thread, email_account: account, last_outbound_at: 2.hours.ago, last_inbound_at: 1.hour.ago)
+      never  = create(:email_thread, email_account: account, last_outbound_at: nil, last_inbound_at: 1.hour.ago)
+
+      result = EmailThread.holds_last_word
+      expect(result).to include(held, cold)
+      expect(result).not_to include(theirs, never)
+    end
+  end
+
+  describe ".awaiting_reply (scope)" do
+    it "matches held threads past the grace window, excluding dismissed and too-recent sends" do
+      due       = create(:email_thread, email_account: account, last_outbound_at: 1.day.ago, last_inbound_at: 2.days.ago)
+      recent    = create(:email_thread, email_account: account, last_outbound_at: 1.hour.ago, last_inbound_at: 2.hours.ago)
+      dismissed = create(:email_thread, email_account: account, last_outbound_at: 1.day.ago, last_inbound_at: 2.days.ago, follow_up_dismissed_at: Time.current)
+
+      result = EmailThread.awaiting_reply
+      expect(result).to include(due)
+      expect(result).not_to include(recent, dismissed)
+    end
+  end
 end

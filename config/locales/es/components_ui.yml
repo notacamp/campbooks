@@ -119,6 +119,7 @@ es:
         filtering: Filtrado
         labels: Etiquetas
         signatures: Firmas
+        smart_groups: Grupos inteligentes
         tags: Etiquetas
       settings_sections_label: Secciones de configuración
       title: Configuración de la bandeja de entrada

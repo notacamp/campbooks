@@ -55,4 +55,13 @@ RSpec.describe Emails::SkimDeck do
 
     expect(all_email_ids(rings)).to include(msg.id)
   end
+
+  it "surfaces a silent thread with no AI verdict once past the heuristic threshold (de-gated)" do
+    thread = create(:email_thread, email_account: account, last_outbound_at: 4.days.ago, last_inbound_at: 5.days.ago)
+    msg = inbox_email(thread, from: "dana@acme.com", at: 5.days.ago)
+
+    result = rings
+    expect(result.first[:theme]).to eq(:follow_ups)
+    expect(all_email_ids(result)).to include(msg.id)
+  end
 end

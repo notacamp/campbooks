@@ -28,6 +28,10 @@ major, minor, or patch change here.
   Campbooks calendar, and imported events sync out to Google/Zoho just like
   ones you create here. Re-importing the same file skips duplicates; recurring
   events are skipped (and counted) for now.
+- **A daily nudge that reaches your inbox, not just the app.** With it on (the
+  default), Campbooks emails you a short morning digest of the conversations you're
+  still waiting to hear back on — so a dropped thread catches your eye even when
+  you're nowhere near Campbooks. Turn it off anytime in Settings → Notifications.
 
 ### Changed
 
@@ -40,6 +44,43 @@ major, minor, or patch change here.
   no longer accepted on event create/update.
 - Events from calendars that are switched off no longer linger on the calendar
   page — off means off.
+
+## [0.9.0] - 2026-07-03
+
+### Added
+
+- **Low-priority mail now folds itself out of your way.** The inbox bundles
+  Notifications, Newsletters & promos, Social, and Updates threads into
+  collapsed **smart group** rows — stacked sender avatars, a count, one tap to
+  review the bucket, and **Archive all** / **Mark all read** to clear it in one
+  go. On by default with per-bucket toggles in the inbox gear menu → Smart
+  groups. Personal, important, and uncategorized mail always stays in the list,
+  and threads you replied to, pinned threads, or starred senders are never
+  grouped. Custom tag groups render alongside (and their rows are actually
+  back — a regression had kept them from appearing at all).
+- **Campbooks now keeps track of the replies you're still waiting on.** Answer
+  someone and hear nothing back, and that thread rises into a new **Waiting on
+  replies** band at the top of your inbox — showing how long it's been quiet, with
+  a one-tap draft to nudge them — instead of sinking down the list. Scout counts
+  them in its briefing too, so "what am I still waiting to hear back on?" always
+  has an answer. It runs on the plain fact that you sent last, so it works even
+  before you've set up an AI provider; the AI only sharpens the timing and writes
+  the nudge once it's connected.
+
+### Changed
+
+- **A roomier, calmer calendar.** The month and week views now stretch to fill the
+  whole page instead of floating in a short, narrow box, so far more of your schedule
+  is visible at a glance. The week and day views open on your working hours (no more
+  staring at an empty pre‑dawn grid) and their day header stays pinned as a frosted
+  glass bar while the hours scroll underneath. Hovering a day in the month grid, or
+  an empty slot in the week/day grid, now shows a clear "click to add" cue, and
+  timed events read as a tidy time + title line rather than a wall of colored bars.
+  Today is gently highlighted throughout.
+
+- The follow-up nudges on the home feed and in Skim's Follow-ups ring now draw on
+  that same signal, so they keep surfacing the threads you're waiting on even when
+  no AI provider is configured.
 
 ## [0.8.0] - 2026-07-03
 
@@ -689,7 +730,8 @@ major, minor, or patch change here.
 
 - Initial public, source-available release of Campbooks.
 
-[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/notacamp/campbooks/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/notacamp/campbooks/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/notacamp/campbooks/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/notacamp/campbooks/compare/v0.5.0...v0.6.0

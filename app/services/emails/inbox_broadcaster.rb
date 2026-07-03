@@ -78,6 +78,11 @@ module Emails
       # — a sent-only or still-archived thread is never injected (a reload wouldn't
       # show it there either).
       return unless inbox_thread?
+      # A smart-bundled thread (all-noise categories, never replied/starred/
+      # pinned) lives in a collapsed group row, not the main list — don't float
+      # it in. Assumes the default all-buckets-on prefs: for a user who disabled
+      # a bucket the new thread just doesn't live-prepend (it appears on reload).
+      return if bundled_thread?
 
       each_user do |user|
         # A single prepend is the idempotent "float to top, or insert". Turbo's
@@ -106,8 +111,22 @@ module Emails
 
       @thread = EmailThread.includes(
         :email_account,
-        email_messages: [ :tags, :files_attachments, :email_account ]
+        email_messages: [ :tags, :files_attachments, :email_account, :contact ]
       ).find_by(id: @thread.id) || @thread
+    end
+
+    # Mirrors Emails::SmartGroups' bundling predicate on the already-loaded
+    # thread: every message in a noise bucket, no reply from the user, no
+    # starred sender, not pinned.
+    def bundled_thread?
+      messages = @thread.email_messages.to_a
+      return false if messages.empty?
+      return false unless messages.all? { |m| User::SMART_GROUP_BUCKETS.include?(m.category.to_s) }
+      return false if @thread.last_outbound_at.present?
+      return false if messages.any? { |m| m.pinned_at.present? }
+      return false if messages.any? { |m| m.contact&.starred? }
+
+      true
     end
 
     # Every user allowed to READ the mailbox — owner + shared viewers/editors — i.e.

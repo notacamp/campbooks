@@ -120,6 +120,7 @@ fr:
         filtering: Filtrage
         labels: Labels
         signatures: Signatures
+        smart_groups: Groupes intelligents
         tags: Étiquettes
       settings_sections_label: Sections des paramètres
       title: Paramètres de la boîte de réception
