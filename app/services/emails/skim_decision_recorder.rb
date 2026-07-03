@@ -1,11 +1,12 @@
 # frozen_string_literal: true
 
 module Emails
-  # Records ONE SkimDecision for a cluster the user just acted on, so
-  # Emails::SkimActionMemory can learn their habits. Derives the learning signature
-  # — sender Contact, sender domain, category — server-side from a representative
-  # email (never trusting the client), scoped to the user's own readable mail so a
-  # forged id can't write a decision against someone else's sender.
+  # Records ONE learning decision (a LearningDecision under the "email_skim" domain)
+  # for a cluster the user just acted on, so Emails::SkimActionMemory can learn their
+  # habits. Derives the learning signature — sender Contact, sender domain, category —
+  # server-side from a representative email (never trusting the client), scoped to the
+  # user's own readable mail so a forged id can't write a decision against someone
+  # else's sender. SkimDecision::ACTIONS remains the taxonomy of learnable verbs.
   #
   # Best-effort and non-fatal: a triage action must never fail because we couldn't
   # log it, so any error is swallowed (logged) and the archive / keep / pin stands.
@@ -25,14 +26,15 @@ module Emails
       email = representative
       return unless email
 
-      decision = SkimDecision.create!(
+      decision = LearningDecision.create!(
+        domain: "email_skim",
         user: @user,
         workspace_id: @user.workspace_id,
         contact_id: email.contact_id,
         sender_domain: Emails::SenderDomain.for(email.from_address),
         category: Emails::Categorizer.new(email).call.category.to_s,
-        email_message_id: email.id,
-        action: @action
+        subject: email,
+        label: @action
       )
 
       Events.publish(
