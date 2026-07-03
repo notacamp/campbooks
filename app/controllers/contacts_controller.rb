@@ -11,6 +11,11 @@ class ContactsController < ApplicationController
   before_action :set_contact, only: [ :show, :update, :analyze, :resolve_duplicate, :set_state ]
 
   def index
+    # Self-heal: enqueue analysis for any contact with enough history that was never
+    # analyzed (e.g. mail ingested before a text-AI provider was configured), so the
+    # directory — and Person#organization behind it — fills in over repeat visits.
+    Contacts::PendingAnalysisCatchUp.run(Current.workspace)
+
     @searching = params[:q].present?
     contacts = Current.workspace.contacts
 

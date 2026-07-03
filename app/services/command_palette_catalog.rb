@@ -61,7 +61,12 @@ class CommandPaletteCatalog
 
   def actions
     [
-      cmd("new-email", I18n.t("command_palette.commands.new_email"), I18n.t("command_palette.categories.actions"), "pen", new_email_message_path),
+      # Honors the user's compose_default: Desk navigates, Dock POSTs a sheet.
+      (if Current.user&.composes_in_dock?
+         cmd("new-email", I18n.t("command_palette.commands.new_email"), I18n.t("command_palette.categories.actions"), "pen", compose_new_email_messages_path(mode: "new_message"), method: "post")
+       else
+         cmd("new-email", I18n.t("command_palette.commands.new_email"), I18n.t("command_palette.categories.actions"), "pen", new_email_message_path)
+       end),
       # Workflows is gated off by default until it's production-ready (Features.workflows?).
       *(Features.workflows? ? [ cmd("new-workflow", I18n.t("command_palette.commands.new_workflow"), I18n.t("command_palette.categories.actions"), "plus", new_workflow_path) ] : []),
       cmd("new-calendar-event", I18n.t("command_palette.commands.new_calendar_event"), I18n.t("command_palette.categories.actions"), "calendar", calendar_path(new_event: "1")),

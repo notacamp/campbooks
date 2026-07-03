@@ -62,6 +62,7 @@ en:
       toolbar_undo: Undo
     compose_attachments:
       attach: Attach files
+      remove: Remove attachment
       upload_failed: Upload failed
     contact_avatar:
       received_indicator: "↓"

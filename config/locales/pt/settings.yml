@@ -5,6 +5,9 @@ pt:
       analyze_writing_style:
         queued: O Scout está a analisar os seus e-mails enviados — o seu perfil de
           estilo aparecerá aqui em breve.
+      compose_preference:
+        failed: Não foi possível atualizar a preferência de composição. Tente novamente.
+        updated: Preferência de composição atualizada.
       delete:
         cancel: Cancelar
         confirm_email_label: Escreva o seu endereço de e-mail para confirmar
@@ -35,6 +38,11 @@ pt:
         updated: Idioma atualizado.
       show:
         change_password: Alterar palavra-passe
+        compose_desk: Página inteira — a escrita ocupa o ecrã todo
+        compose_dock: Painel inferior — componha sobre a caixa de entrada
+        compose_subtitle: Onde abre um novo email (atalho C, botão Compor e paleta
+          de comandos).
+        compose_title: Novos emails abrem em
         confirm_password: Confirmar nova palavra-passe
         current_password: Palavra-passe atual
         danger_zone_desc: Eliminar a sua conta é permanente e não pode ser desfeito.
@@ -49,6 +57,7 @@ pt:
         language_title: Idioma
         new_password: Nova palavra-passe
         privacy_policy: Política de Privacidade
+        save_compose: Guardar
         save_language: Guardar
         subtitle: Gira a sua palavra-passe e as preferências da conta.
         terms_of_service: Termos de Serviço

@@ -1,0 +1,14 @@
+<%# The Dock — the bottom-sheet compose surface. The #compose_dock slot is
+    filled by a Turbo Stream (EmailComposeController#create / DraftEmails#show)
+    with Campbooks::Compose::Dock; the controller on the root survives those
+    swaps and drives open/minimize/expand. The parked-draft pill re-appears
+    server-side on any page when an unsent draft exists. %>
+<div id="compose_dock_root"
+     data-controller="compose-dock"
+     data-action="keydown.esc@document->compose-dock#minimize compose-engine:closed->compose-dock#clear">
+  <div id="compose_dock"></div>
+  <%# Skip the pill when the Desk is already editing that same draft. %>
+  <% if (parked_draft = DraftEmail.resumable_for(Current.user)) && params[:draft_id].to_s != parked_draft.id.to_s %>
+    <%= render(Campbooks::Compose::Pill.new(draft: parked_draft)) %>
+  <% end %>
+</div>

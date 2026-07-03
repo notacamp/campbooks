@@ -40,36 +40,17 @@ pt:
       all: Todos
       new_folder: Nova pasta
     new:
-      all_folder_label: Todos
-      bcc_label: 'Bcc:'
-      bcc_placeholder: Adicionar BCC...
-      bcc_toggle_label: Bcc
-      cc_label: 'Cc:'
-      cc_placeholder: Adicionar CC...
       close_scout_aria: Fechar Scout
-      collapse_sidebar_aria: Recolher barra lateral
-      expand_sidebar_aria: Expandir barra lateral
-      folders_heading: Pastas
-      from_label: 'De:'
-      inbox_heading: Caixa de entrada
-      inbox_settings_aria: Definições da caixa de entrada
-      new_message_heading: Nova Mensagem
-      no_emails_yet: Ainda não há emails.
+      heading_forward: Reencaminhar
+      heading_new_message: Nova mensagem
+      heading_reply: Responder
+      heading_reply_all: Responder a todos
       no_sendable_accounts_description: É necessária uma conta de email com permissão
         de envio para redigir novas mensagens.
       no_sendable_accounts_title: Sem contas para envio
-      no_signature_option: Sem assinatura
       scout_keyboard_hint: Cmd+Shift+E para manual
       scout_label: Scout
-      signature_default_suffix: "(predefinição)"
-      signature_label: 'Assin.:'
-      signature_preview_heading: Assinatura
-      subject_label: 'Assunto:'
-      subject_placeholder: Assunto
-      to_label: 'Para:'
-      to_placeholder: Pesquisar contactos ou escrever email...
       toggle_chat_aria: Alternar chat
-      write_message_placeholder: Escreva a sua mensagem...
     notion_exports:
       create:
         created: Guardado no Notion.

@@ -5,6 +5,9 @@ en:
       analyze_writing_style:
         queued: Scout is analyzing your sent email — your style profile will appear
           here shortly.
+      compose_preference:
+        failed: Could not update your compose preference. Please try again.
+        updated: Compose preference updated.
       delete:
         cancel: Cancel
         confirm_email_label: Type your email address to confirm
@@ -34,6 +37,11 @@ en:
         updated: Language updated.
       show:
         change_password: Change Password
+        compose_desk: Full page — writing gets the whole screen
+        compose_dock: Bottom sheet — compose over the inbox
+        compose_subtitle: Where a brand-new email opens (the C shortcut, the Compose
+          button, and the command palette).
+        compose_title: New email opens in
         confirm_password: Confirm New Password
         current_password: Current Password
         danger_zone_desc: Deleting your account is permanent and cannot be undone.
@@ -48,6 +56,7 @@ en:
         language_title: Language
         new_password: New Password
         privacy_policy: Privacy Policy
+        save_compose: Save
         save_language: Save
         subtitle: Manage your password and account preferences.
         terms_of_service: Terms of Service

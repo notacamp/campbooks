@@ -23,6 +23,51 @@ major, minor, or patch change here.
   first scan reads and sorts mail (found · sorted · needs you), then one tap drops you
   into the sorted feed. The first scan also starts immediately on connect instead of
   waiting for the next polling cycle.
+- **Composing is its own room now.** Replying pulls up the **Dock** — a bottom
+  sheet over your inbox — instead of a form wedged into the thread. Recipients
+  and subject collapse to one line when they're already right, the quoted
+  thread tucks behind a small pill until you need it, and formatting appears
+  when you select text instead of a toolbar you never asked for. Reply,
+  reply-all and forward are one switcher — flip modes without losing what you
+  typed, and forwards carry the original attachments as removable chips.
+- **A new email gets the whole screen.** The compose page (the **Desk**) drops
+  the folder rail and message list for one centered writing surface — subject
+  set like a title, an open canvas, and Scout waiting in a side rail. Pick
+  where new emails open (full page or bottom sheet) in **Settings → Account**.
+- **Drafts save themselves.** Everything you type autosaves; minimize the
+  composer to a small pill that survives navigating anywhere in the app, and
+  resume exactly where you left off — or expand a reply from the sheet to the
+  full page with everything carried over. Sending or discarding cleans the
+  draft up.
+- **Replies can start answered.** When Scout has already suggested a reply for
+  a thread, the composer opens with that draft as a glass "ghost" block — use
+  it as-is, ask for a shorter/warmer/firmer take, or start blank. The spark
+  button asks Scout on demand.
+
+- **Reminders, to‑dos, and filing suggestions learn from your choices.** When Scout
+  proposes a reminder, a task, or a tag to file an email under, it now watches how you
+  respond. If you keep dismissing a kind of reminder from a particular sender, Scout
+  stops surfacing it; a tag you keep rejecting for a sender won't be suggested again;
+  and one you always accept floats to the top. It only ever backs off after a clear,
+  repeated pattern from that same sender — and it only quiets a suggestion, never an
+  actual email or document.
+- **See how soon things are on the calendar.** The Agenda view now shows a small
+  countdown next to each event and reminder — "In 20 min", "In 3 h", "Tomorrow",
+  "In 4 days" — so you can tell at a glance what's imminent. Anything happening
+  now, within the hour, or today is highlighted.
+- **Suggested tasks now appear on the home feed.** When Scout extracts an action
+  item from an email, it shows up as a "Suggested task" card with one-tap
+  **Add to tasks** / **Dismiss** — no more suggestions piling up unseen in the
+  tasks triage queue. Accepted tasks keep surfacing later when they become due,
+  blocked, or assigned to you.
+- `tasks:backfill_extraction` rake task to re-run task extraction over recent
+  mail (e.g. after enabling the Tasks module), gated and idempotent.
+- **Tune how Scout reads your inbox — in plain language.** A new **Settings → AI
+  Prompts** page, plus a **Customize AI** button on the Tasks, Documents, and
+  Reminders pages, lets you add your own guidance for how Scout extracts tasks,
+  analyzes documents, spots reminders, and summarizes and tags email. Your notes
+  are appended to the built‑in instructions — they never replace the output format
+  or safety rules — and clearing the box restores the default.
 
 ### Changed
 
@@ -44,12 +89,27 @@ major, minor, or patch change here.
 - **First-run nudges know their place.** The skim-rings and Scout coachmarks no longer
   fire on a never-connected home, and the greeting no longer claims "all clear" before
   an inbox exists.
+- **The inbox now speaks the app's design language.** The mail view sheds its
+  legacy three-pane, hairline-fenced look: date/priority group bars are now
+  floating frosted pills the list scrolls under, thread rows hover and select as
+  soft rounded fills instead of edge-to-edge blocks, the unread dot is the warm
+  Ember signal (matching the nav-rail attention dot) instead of blue, and the
+  search-and-rings band sits on the open canvas so the work panes read as
+  elevated surfaces in dark mode. Scout's read on an open email is now its full
+  Ember-glass contribution block — avatar, name, AI tag, and suggested actions
+  together — rather than a one-line caption, and floating chrome (bulk-select
+  menus and toolbars, the reading drawer's docked footer) is frosted like the
+  app's toasts and Scout bar.
+- **The calendar opens on the Month view by default** (was Agenda), giving you the
+  whole month at a glance when you land on the page. You can still switch views
+  from the tabs, and any bookmarked `?view=…` link is unchanged.
+- The Skim triage learning that already remembered your keep/archive/promote habits
+  now runs on a shared, reusable foundation (no change to how Skim behaves).
 
 ### Fixed
 
 - **Home no longer crashes for accounts with no starred contacts** (an empty-set
   sentinel in the feed's look-back query assumed uuid primary keys).
-
 - **Keyboard shortcuts no longer scramble the inbox.** After moving between emails
   with the arrow keys, pressing a shortcut (archive, reply, forward…) could leave the
   inbox unstyled — plain text with underlined links — until you reloaded. Shortcuts
@@ -77,59 +137,9 @@ major, minor, or patch change here.
   someone else.
 - AI extraction (tasks and reminders) no longer wastes its reading window on
   raw `<style>` CSS from HTML email — extractors now see clean message text.
-
-### Added
-
-- **Reminders, to‑dos, and filing suggestions learn from your choices.** When Scout
-  proposes a reminder, a task, or a tag to file an email under, it now watches how you
-  respond. If you keep dismissing a kind of reminder from a particular sender, Scout
-  stops surfacing it; a tag you keep rejecting for a sender won't be suggested again;
-  and one you always accept floats to the top. It only ever backs off after a clear,
-  repeated pattern from that same sender — and it only quiets a suggestion, never an
-  actual email or document.
-- **See how soon things are on the calendar.** The Agenda view now shows a small
-  countdown next to each event and reminder — "In 20 min", "In 3 h", "Tomorrow",
-  "In 4 days" — so you can tell at a glance what's imminent. Anything happening
-  now, within the hour, or today is highlighted.
-- **Suggested tasks now appear on the home feed.** When Scout extracts an action
-  item from an email, it shows up as a "Suggested task" card with one-tap
-  **Add to tasks** / **Dismiss** — no more suggestions piling up unseen in the
-  tasks triage queue. Accepted tasks keep surfacing later when they become due,
-  blocked, or assigned to you.
-- `tasks:backfill_extraction` rake task to re-run task extraction over recent
-  mail (e.g. after enabling the Tasks module), gated and idempotent.
-- **Suggested tasks now appear on the home feed.** When Scout extracts an action
-  item from an email, it shows up as a "Suggested task" card with one-tap
-  **Add to tasks** / **Dismiss** — no more suggestions piling up unseen in the
-  tasks triage queue. Accepted tasks keep surfacing later when they become due,
-  blocked, or assigned to you.
-- `tasks:backfill_extraction` rake task to re-run task extraction over recent
-  mail (e.g. after enabling the Tasks module), gated and idempotent.
-- **Tune how Scout reads your inbox — in plain language.** A new **Settings → AI
-  Prompts** page, plus a **Customize AI** button on the Tasks, Documents, and
-  Reminders pages, lets you add your own guidance for how Scout extracts tasks,
-  analyzes documents, spots reminders, and summarizes and tags email. Your notes
-  are appended to the built‑in instructions — they never replace the output format
-  or safety rules — and clearing the box restores the default.
-
-### Changed
-
-- **The inbox now speaks the app's design language.** The mail view sheds its
-  legacy three-pane, hairline-fenced look: date/priority group bars are now
-  floating frosted pills the list scrolls under, thread rows hover and select as
-  soft rounded fills instead of edge-to-edge blocks, the unread dot is the warm
-  Ember signal (matching the nav-rail attention dot) instead of blue, and the
-  search-and-rings band sits on the open canvas so the work panes read as
-  elevated surfaces in dark mode. Scout's read on an open email is now its full
-  Ember-glass contribution block — avatar, name, AI tag, and suggested actions
-  together — rather than a one-line caption, and floating chrome (bulk-select
-  menus and toolbars, the reading drawer's docked footer) is frosted like the
-  app's toasts and Scout bar.
-- **The calendar opens on the Month view by default** (was Agenda), giving you the
-  whole month at a glance when you land on the page. You can still switch views
-  from the tabs, and any bookmarked `?view=…` link is unchanged.
-- The Skim triage learning that already remembered your keep/archive/promote habits
-  now runs on a shared, reusable foundation (no change to how Skim behaves).
+- **Command-palette email actions** (Reply, Archive… from ⌘K on an open
+  email) had the same stale-id truncation bug as the keyboard shortcuts —
+  fixed alongside.
 
 ## [0.7.0] - 2026-06-30
 

@@ -5,6 +5,9 @@ fr:
       analyze_writing_style:
         queued: Scout analyse vos e-mails envoyés — votre profil de style apparaîtra
           ici sous peu.
+      compose_preference:
+        failed: Impossible de mettre à jour la préférence de rédaction. Veuillez réessayer.
+        updated: Préférence de rédaction mise à jour.
       delete:
         cancel: Annuler
         confirm_email_label: Saisissez votre adresse e-mail pour confirmer
@@ -38,6 +41,11 @@ fr:
         updated: Langue mise à jour.
       show:
         change_password: Changer le mot de passe
+        compose_desk: Pleine page — la rédaction occupe tout l'écran
+        compose_dock: Panneau inférieur — rédigez par-dessus la boîte de réception
+        compose_subtitle: Où s'ouvre un nouvel e-mail (raccourci C, bouton Rédiger
+          et palette de commandes).
+        compose_title: Les nouveaux e-mails s'ouvrent dans
         confirm_password: Confirmer le nouveau mot de passe
         current_password: Mot de passe actuel
         danger_zone_desc: Supprimer votre compte est permanent et irréversible.
@@ -52,6 +60,7 @@ fr:
         language_title: Langue
         new_password: Nouveau mot de passe
         privacy_policy: Politique de confidentialité
+        save_compose: Enregistrer
         save_language: Enregistrer
         subtitle: Gérez votre mot de passe et vos préférences de compte.
         terms_of_service: Conditions d'utilisation

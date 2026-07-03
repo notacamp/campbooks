@@ -44,6 +44,23 @@
   </div>
 
   <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-6">
+    <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".compose_title") %></h2>
+    <p class="text-sm text-gray-500 mb-4"><%= t(".compose_subtitle") %></p>
+
+    <%= form_with url: compose_preference_settings_account_path, method: :patch, class: "space-y-4" do |f| %>
+      <div>
+        <%= f.label :compose_default, t(".compose_title"), class: "sr-only" %>
+        <%= f.select :compose_default,
+              options_for_select([ [ t(".compose_desk"), "desk" ], [ t(".compose_dock"), "dock" ] ], current_user.compose_default),
+              {},
+              class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-accent-500 focus:ring-accent-500 sm:text-sm" %>
+      </div>
+
+      <%= render(Campbooks::Button.new(variant: :primary, type: :submit)) { t(".save_compose") } %>
+    <% end %>
+  </div>
+
+  <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-6">
     <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".writing_style_title") %></h2>
     <p class="text-sm text-gray-500 mb-4"><%= t(".writing_style_subtitle") %></p>
 

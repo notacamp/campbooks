@@ -60,6 +60,7 @@ es:
       toolbar_undo: Deshacer
     compose_attachments:
       attach: Adjuntar archivos
+      remove: Quitar adjunto
       upload_failed: Error al subir
     contact_avatar:
       received_indicator: "↓"
