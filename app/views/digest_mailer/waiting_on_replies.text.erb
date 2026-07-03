@@ -1,0 +1,13 @@
+<%= t(".greeting", name: @user.name) %>
+
+<%= t(".intro", count: @count) %>
+
+<% @items.each do |item| %>
+* <%= item[:subject] %> — <%= item[:days].positive? ? t(".waiting_days", count: item[:days]) : t(".waiting_recent") %><% if item[:reason] %> · <%= item[:reason] %><% end %>
+  <%= item[:url] %>
+<% end %><% if @more.positive? %>
+<%= t(".and_more", count: @more) %>
+<% end %>
+<%= t(".cta") %>: <%= @inbox_url %>
+
+<%= t(".footer_text", settings_url: @settings_url) %>

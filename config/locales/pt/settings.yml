@@ -483,13 +483,18 @@ pt:
         title: Membros
         you_badge: você
     notifications:
+      digest_preference:
+        saved: Preferências de notificação guardadas.
       index:
         doc_types_title: Tipos de documentos
+        email_digests_title: Resumos por email
         no_doc_types: Ainda não há tipos de documentos configurados.
         no_tags: Ainda não há etiquetas configuradas.
         subtitle: Escolha como pretende ser notificado sobre nova atividade.
         tags_title: Etiquetas
         title: Preferências de notificação
+        waiting_digest_hint: Um email diário das conversas de que ainda aguarda resposta.
+        waiting_digest_label: Respostas pendentes
       section:
         email_label: E-mail
         in_app_label: Na aplicação

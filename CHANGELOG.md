@@ -27,6 +27,11 @@ major, minor, or patch change here.
   before you've set up an AI provider; the AI only sharpens the timing and writes
   the nudge once it's connected.
 
+- **A daily nudge that reaches your inbox, not just the app.** With it on (the
+  default), Campbooks emails you a short morning digest of the conversations you're
+  still waiting to hear back on — so a dropped thread catches your eye even when
+  you're nowhere near Campbooks. Turn it off anytime in Settings → Notifications.
+
 ### Changed
 
 - **A roomier, calmer calendar.** The month and week views now stretch to fill the

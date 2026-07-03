@@ -472,13 +472,18 @@ en:
         title: Members
         you_badge: you
     notifications:
+      digest_preference:
+        saved: Notification preferences saved.
       index:
         doc_types_title: Document Types
+        email_digests_title: Email digests
         no_doc_types: No document types configured yet.
         no_tags: No tags configured yet.
         subtitle: Choose how you want to be notified about new activity.
         tags_title: Tags
         title: Notification Preferences
+        waiting_digest_hint: A daily email of the conversations you're still waiting to hear back on.
+        waiting_digest_label: Waiting on replies
       section:
         email_label: Email
         in_app_label: In-app
