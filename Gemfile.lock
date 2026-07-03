@@ -249,6 +249,12 @@ GEM
       rainbow (>= 2.2.2, < 4.0)
       ruby-progressbar (~> 1.8, >= 1.8.1)
       terminal-table (>= 1.5.1)
+    icalendar (2.12.3)
+      base64
+      ice_cube (~> 0.16)
+      logger
+      ostruct
+    ice_cube (0.17.0)
     image_processing (1.14.0)
       mini_magick (>= 4.9.5, < 6)
       ruby-vips (>= 2.0.17, < 3)
@@ -538,6 +544,7 @@ GEM
     opentelemetry-semantic_conventions (1.36.0)
       opentelemetry-api (~> 1.0)
     os (1.1.4)
+    ostruct (0.6.3)
     pagy (9.4.0)
     parallel (1.27.0)
     parser (3.3.10.1)
@@ -845,6 +852,7 @@ DEPENDENCIES
   googleauth
   grover (~> 1.1)
   i18n-tasks
+  icalendar
   image_processing (~> 1.2)
   importmap-rails
   json_schemer
