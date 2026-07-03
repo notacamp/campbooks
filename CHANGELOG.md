@@ -16,8 +16,19 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-07-03
+
 ### Added
 
+- **Low-priority mail now folds itself out of your way.** The inbox bundles
+  Notifications, Newsletters & promos, Social, and Updates threads into
+  collapsed **smart group** rows — stacked sender avatars, a count, one tap to
+  review the bucket, and **Archive all** / **Mark all read** to clear it in one
+  go. On by default with per-bucket toggles in the inbox gear menu → Smart
+  groups. Personal, important, and uncategorized mail always stays in the list,
+  and threads you replied to, pinned threads, or starred senders are never
+  grouped. Custom tag groups render alongside (and their rows are actually
+  back — a regression had kept them from appearing at all).
 - **Campbooks now keeps track of the replies you're still waiting on.** Answer
   someone and hear nothing back, and that thread rises into a new **Waiting on
   replies** band at the top of your inbox — showing how long it's been quiet, with
@@ -46,15 +57,6 @@ major, minor, or patch change here.
 
 ### Added
 
-- **Low-priority mail now folds itself out of your way.** The inbox bundles
-  Notifications, Newsletters & promos, Social, and Updates threads into
-  collapsed **smart group** rows — stacked sender avatars, a count, one tap to
-  review the bucket, and **Archive all** / **Mark all read** to clear it in one
-  go. On by default with per-bucket toggles in the inbox gear menu → Smart
-  groups. Personal, important, and uncategorized mail always stays in the list,
-  and threads you replied to, pinned threads, or starred senders are never
-  grouped. Custom tag groups render alongside (and their rows are actually
-  back — a regression had kept them from appearing at all).
 - **Watch Scout sort your inbox the moment you connect it.** A brand-new account now
   lands on a live first-sync stage instead of an empty feed: counters tick up as your
   first scan reads and sorts mail (found · sorted · needs you), then one tap drops you
@@ -699,7 +701,8 @@ major, minor, or patch change here.
 
 - Initial public, source-available release of Campbooks.
 
-[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/notacamp/campbooks/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/notacamp/campbooks/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/notacamp/campbooks/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/notacamp/campbooks/compare/v0.5.0...v0.6.0
