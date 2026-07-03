@@ -28,6 +28,10 @@ development:
     <<: *default
     database: campbooks_development
     migrations_paths: db/cable_migrate
+    # Cable shares the development database. Without this, every schema dump
+    # writes the ENTIRE dev database into db/cable_schema.rb, and the next
+    # db:schema:load replays that stale full dump over the primary schema.
+    schema_dump: false
 
   # The specified database role being used to connect to PostgreSQL.
   # To create additional roles in PostgreSQL see `$ createuser --help`.
