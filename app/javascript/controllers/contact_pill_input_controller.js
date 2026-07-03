@@ -129,6 +129,9 @@ export default class extends Controller {
       emails.push(pill.dataset.email)
     })
     this.hiddenTarget.value = emails.join(", ")
+    // Pills mutate the hidden input programmatically, which fires no native
+    // event — announce it so listeners (draft autosave) see recipient edits.
+    this.hiddenTarget.dispatchEvent(new Event("input", { bubbles: true }))
   }
 
   // --- Keyboard ---

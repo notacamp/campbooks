@@ -59,6 +59,8 @@ class EmailComposeController < ApplicationController
 
     return error_response(error_message_for(result)) unless result.ok?
 
+    consume_draft
+
     if @message
       remove_compose_area
     else
@@ -103,6 +105,8 @@ class EmailComposeController < ApplicationController
     )
 
     return error_response(t(".schedule_failed")) unless scheduled.save
+
+    consume_draft
 
     next_at = scheduled.rrule.present? ? ScheduleCalculator.next_occurrence(scheduled.scheduled_at, scheduled.rrule) : scheduled.scheduled_at
     scheduled.update_columns(next_occurrence_at: next_at)
@@ -167,6 +171,14 @@ class EmailComposeController < ApplicationController
       turbo_stream.prepend("thread_compose_target", partial: "email_compose/compose_area", locals: locals)
     end
     streams
+  end
+
+  # A successful send (or schedule) consumes the autosaved draft it was written
+  # in, so the pill never resurrects an email that already went out.
+  def consume_draft
+    return if params[:draft_email_id].blank?
+
+    Current.user.draft_emails.find_by(id: params[:draft_email_id])&.destroy
   end
 
   # The message's own account — but only when the user may send from it. Read

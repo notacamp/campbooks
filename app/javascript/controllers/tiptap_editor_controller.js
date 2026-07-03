@@ -103,6 +103,9 @@ export default class extends Controller {
 
     this._sync()
     this._refreshToolbar()
+    // Only user edits after this point count as changes (draft autosave keys
+    // off the input event; the initial content sync must not trigger it).
+    this._announceChanges = true
   }
 
   disconnect() {
@@ -271,7 +274,13 @@ export default class extends Controller {
 
   // ── internals ───────────────────────────────────────────────
   _sync() {
-    if (this.hasInputTarget && this.editor) this.inputTarget.value = this.editor.getHTML()
+    if (!this.hasInputTarget || !this.editor) return
+    const html = this.editor.getHTML()
+    const changed = this.inputTarget.value !== html
+    this.inputTarget.value = html
+    if (changed && this._announceChanges) {
+      this.inputTarget.dispatchEvent(new Event("input", { bubbles: true }))
+    }
   }
 
   _refreshToolbar() {
