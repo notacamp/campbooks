@@ -181,7 +181,6 @@ module Google
         start_time_zone: start_tz,
         end_time_zone: end_tz,
         all_day: all_day,
-        color: Calendars::EventColors.hex_for(e["colorId"]), # nil → inherits calendar color
         status: e["status"], # confirmed / tentative / cancelled
         rsvp_status: map_rsvp(self_attendee&.dig("responseStatus")),
         is_organizer: e.dig("organizer", "self") == true,
@@ -240,9 +239,6 @@ module Google
       payload[:summary] = attrs[:title] if attrs.key?(:title)
       payload[:description] = attrs[:description] if attrs.key?(:description)
       payload[:location] = attrs[:location] if attrs.key?(:location)
-      # colorId from the stored hex; nil (no/unknown override) clears it back to the
-      # calendar's default color on a patch.
-      payload[:colorId] = Calendars::EventColors.id_for(attrs[:color]) if attrs.key?(:color)
 
       if attrs[:all_day] && attrs[:start_at]
         payload[:start] = { date: attrs[:start_at].to_date.iso8601 }

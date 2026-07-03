@@ -11,18 +11,19 @@ fr:
       ai_prompt_hint: Ce que l'IA utilise pour reconnaître ce type d'événement. Prend
         en charge le markdown.
       ai_prompt_label: Instruction IA
-      color_label: Couleur
       create_type: Créer le type
+      icon_hint: Affichée sur les événements dans tout le calendrier. Facultatif.
+      icon_label: Icône
       name_label: Nom
     index:
       add_starters: Ajouter des types prédéfinis
       add_type: Ajouter un type
       back: Retour au calendrier
       empty: Aucun type d'événement pour l'instant. Ajoutez-en quelques-uns pour que
-        les nouveaux événements soient colorés automatiquement par type.
+        les nouveaux événements soient étiquetés par type.
       heading: Types d'événement
-      subtitle: Des étiquettes propres au calendrier qui colorent les événements selon
-        leur nature.
+      subtitle: Des étiquettes propres au calendrier dont l'icône marque les événements
+        selon leur nature.
     starters:
       success: Types d'événement prédéfinis ajoutés.
     update:

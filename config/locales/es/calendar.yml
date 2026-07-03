@@ -36,9 +36,6 @@ es:
       all_day_label: Todo el día
       calendar_label: Calendario
       cancel: Cancelar
-      color_default: Color del calendario
-      color_hint: Deja el color del calendario para usar el color del tipo.
-      color_label: Color
       create: Crear evento
       delete: Eliminar evento
       delete_confirm: "¿Eliminar este evento?"

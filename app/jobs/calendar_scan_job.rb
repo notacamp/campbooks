@@ -167,7 +167,6 @@ class CalendarScanJob < ApplicationJob
       start_time_zone: attrs[:start_time_zone],
       end_time_zone: attrs[:end_time_zone],
       all_day: attrs[:all_day] || false,
-      color: attrs[:color],
       status: attrs[:status].to_s.presence_in(%w[confirmed tentative cancelled]) || "confirmed",
       rsvp_status: attrs[:rsvp_status],
       is_organizer: attrs[:is_organizer] || false,
