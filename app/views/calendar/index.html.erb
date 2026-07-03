@@ -1,4 +1,10 @@
 <% content_for :cp_context, "calendar" %>
+<% grid_view = %w[month week day].include?(@view) %>
+<%# Grid views stretch nearly edge-to-edge so the calendar fills the page; the
+    agenda list stays column-width for readability. %>
+<% content_for :main_class, grid_view ?
+     "mx-auto w-full max-w-[100rem] px-4 sm:px-6 lg:px-8 py-5" :
+     "mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-8" %>
 <% period_label =
      case @view
      when "month" then l(@date, format: :section)
@@ -7,20 +13,20 @@
      else t(".upcoming")
      end %>
 
-<div class="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8" data-controller="calendar-nav">
+<div data-controller="calendar-nav">
   <!-- Header: period + navigation -->
-  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
-    <h1 class="text-xl font-semibold text-foreground"><%= period_label %></h1>
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
+    <h1 class="text-xl font-semibold tracking-tight text-foreground"><%= period_label %></h1>
 
     <div class="flex items-center gap-2">
-      <div class="inline-flex items-center rounded-lg border border-border overflow-hidden">
+      <div class="inline-flex items-center overflow-hidden rounded-lg border border-border">
         <%= link_to calendar_path(view: @view, date: @prev_date.iso8601),
               class: "px-2 py-1.5 text-gray-600 hover:bg-muted transition-colors", "aria-label": t(".previous"),
               data: { "calendar-prev": "" } do %>
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
         <% end %>
         <%= link_to t(".today"), calendar_path(view: @view, date: Date.current.iso8601),
-              class: "px-3 py-1.5 text-sm text-gray-700 border-x border-border hover:bg-muted transition-colors",
+              class: "border-x border-border px-3 py-1.5 text-sm text-gray-700 hover:bg-muted transition-colors",
               data: { "calendar-today": "" } %>
         <%= link_to calendar_path(view: @view, date: @next_date.iso8601),
               class: "px-2 py-1.5 text-gray-600 hover:bg-muted transition-colors", "aria-label": t(".next"),
@@ -38,7 +44,7 @@
     </div>
   </div>
 
-  <div class="mb-5"><%= render(Campbooks::Calendar::ViewTabs.new(current: @view, date: @date)) %></div>
+  <div class="mb-4"><%= render(Campbooks::Calendar::ViewTabs.new(current: @view, date: @date)) %></div>
 
   <% if @has_calendars %>
     <% case @view %>

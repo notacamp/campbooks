@@ -17,12 +17,22 @@ export default class extends Controller {
     } else {
       this._onDown = (e) => this._gridDown(e)
       this.element.addEventListener("pointerdown", this._onDown)
+      // A live "click here to add" hint that tracks the cursor over empty time,
+      // so an empty grid reads as tappable rather than inert. Mouse only — touch
+      // has no hover and needs the surface free to scroll.
+      this._onHover = (e) => this._hoverMove(e)
+      this._onHoverLeave = () => this._hoverHide()
+      this.element.addEventListener("pointermove", this._onHover)
+      this.element.addEventListener("pointerleave", this._onHoverLeave)
     }
   }
 
   disconnect() {
     if (this._onClick) this.element.removeEventListener("click", this._onClick)
     if (this._onDown) this.element.removeEventListener("pointerdown", this._onDown)
+    if (this._onHover) this.element.removeEventListener("pointermove", this._onHover)
+    if (this._onHoverLeave) this.element.removeEventListener("pointerleave", this._onHoverLeave)
+    if (this.ghost) { this.ghost.remove(); this.ghost = null }
     this._cleanup()
   }
 
@@ -111,6 +121,47 @@ export default class extends Controller {
     this.box.style.cssText =
       "position:absolute;background:rgba(120,120,120,0.18);border:1px solid rgba(120,120,120,0.45);border-radius:6px;pointer-events:none;z-index:20"
     this.element.appendChild(this.box)
+  }
+
+  // ── Hover affordance (mouse, time-grid) ────────────────────────────────────
+  _hoverMove(e) {
+    if (e.pointerType !== "mouse") return // touch scrolls; no hover cue
+    if (this.sel || this.box) return this._hoverHide() // an active drag owns the surface
+    if (this._onEvent(e.target)) return this._hoverHide() // over an existing event
+    const track = this.element.getBoundingClientRect()
+    const startMin = this._snapHover(e.clientY - track.top)
+    const dayIndex = this._dayAt(e.clientX, track)
+    const dayW = 100 / this.daysValue
+    const g = this._ensureGhost()
+    g.style.top = `${((startMin - this.startHourValue * 60) / 60) * this.hourPxValue}px`
+    g.style.height = `${this.hourPxValue}px`
+    g.style.left = `${(dayIndex * dayW).toFixed(3)}%`
+    g.style.width = `${(dayW - 0.3).toFixed(3)}%`
+    g.style.opacity = "1"
+  }
+
+  _hoverHide() {
+    if (this.ghost) this.ghost.style.opacity = "0"
+  }
+
+  _ensureGhost() {
+    if (this.ghost) return this.ghost
+    const g = document.createElement("div")
+    g.style.cssText =
+      "position:absolute;z-index:15;pointer-events:none;border-radius:8px;opacity:0;" +
+      "background:color-mix(in oklch, var(--muted-foreground) 10%, transparent);" +
+      "border:1px dashed color-mix(in oklch, var(--muted-foreground) 45%, transparent);" +
+      "display:flex;align-items:center;justify-content:center;transition:opacity .12s ease-out;"
+    g.innerHTML =
+      '<span style="font-size:15px;line-height:1;font-weight:600;color:var(--muted-foreground);opacity:.75">+</span>'
+    this.element.appendChild(g)
+    this.ghost = g
+    return g
+  }
+
+  _snapHover(y) {
+    const raw = (y / this.hourPxValue) * 60 + this.startHourValue * 60
+    return Math.max(this.startHourValue * 60, Math.round(raw / 30) * 30)
   }
 
   _dayAt(clientX, track) {
