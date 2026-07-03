@@ -35,16 +35,18 @@ pub fn run() {
             // The single main window. Built here (not in tauri.conf.json) so we
             // can attach the UA override and the navigation interceptor.
             let nav_handle = app.handle().clone();
+            let nav_base = base.clone();
             let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(base.clone()))
                 .title("Campbooks")
                 .inner_size(1200.0, 820.0)
                 .min_inner_size(720.0, 600.0)
                 .user_agent(config::USER_AGENT)
                 .on_navigation(move |url| {
-                    // Hand provider authorize pages to the system browser and
-                    // cancel the in-window navigation; the provider then redirects
-                    // to `campbooks://oauth?…`, caught by the deep-link handler.
-                    if oauth::is_provider_host(url) {
+                    // Any off-origin link (external sites + OAuth provider pages)
+                    // opens in the system browser instead of hijacking the webview.
+                    // For OAuth the provider then redirects to `campbooks://oauth?…`,
+                    // caught by the deep-link handler below.
+                    if oauth::is_external_link(url, &nav_base) {
                         let _ = nav_handle.opener().open_url(url.as_str(), None::<&str>);
                         return false;
                     }

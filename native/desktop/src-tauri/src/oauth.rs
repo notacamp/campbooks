@@ -1,29 +1,28 @@
-//! OAuth handoff — the desktop port of the mobile `OAuthRouteDecisionHandler`
-//! (`native/ios/Campbooks/OAuthRouteDecisionHandler.swift`).
+//! Navigation + OAuth handoff — the desktop port of the mobile
+//! `OAuthRouteDecisionHandler` (`native/ios/Campbooks/OAuthRouteDecisionHandler.swift`).
 //!
 //! Two halves:
-//!   1. [`is_provider_host`] — provider authorize pages must open in the system
-//!      browser, never the embedded webview (Google & co. reject embedded
-//!      webviews with "disallowed_useragent").
-//!   2. [`resolve`] — when the server finishes the dance it redirects to
+//!   1. [`is_external_link`] — any navigation that leaves the app's own origin
+//!      (an external site, or an OAuth provider's authorize page — providers
+//!      reject embedded webviews) must open in the **system browser**, never
+//!      hijack the wrapper's webview.
+//!   2. [`resolve`] — when the server finishes the OAuth dance it redirects to
 //!      `campbooks://oauth?…`; we translate that deep link into the in-window URL
 //!      to navigate to, mirroring the server's `OauthNativeHandoff` contract.
 
 use tauri::Url;
 
-/// Provider hosts that must hand off to the system browser. Kept in sync with
-/// the mobile `Config.oauthProviderHosts`.
-const PROVIDER_HOSTS: &[&str] = &[
-    "accounts.google.com",
-    "login.microsoftonline.com",
-    "accounts.zoho.eu",
-    "accounts.zoho.com",
-];
-
-/// True when `url`'s host is an OAuth provider that rejects embedded webviews.
-pub fn is_provider_host(url: &Url) -> bool {
-    url.host_str()
-        .is_some_and(|host| PROVIDER_HOSTS.contains(&host))
+/// True when navigating to `url` should open the **system browser** rather than
+/// stay in the app's webview: any `http(s)` URL whose host differs from the app's
+/// own (external sites *and* OAuth provider authorize pages), plus `mailto:` /
+/// `tel:` links. Same-origin app pages — and internal schemes like `blob:` /
+/// `data:` / `about:` (used for in-app downloads/previews) — stay in the webview.
+pub fn is_external_link(url: &Url, app: &Url) -> bool {
+    match url.scheme() {
+        "http" | "https" => url.host_str() != app.host_str(),
+        "mailto" | "tel" => true,
+        _ => false,
+    }
 }
 
 /// Map a `campbooks://oauth?…` deep link to the app URL the window should load,
@@ -66,16 +65,19 @@ mod tests {
     }
 
     #[test]
-    fn matches_provider_hosts() {
-        assert!(is_provider_host(
-            &Url::parse("https://accounts.google.com/o/oauth2/auth?x=1").unwrap()
-        ));
-        assert!(is_provider_host(
-            &Url::parse("https://login.microsoftonline.com/common/oauth2/v2.0/authorize").unwrap()
-        ));
-        assert!(!is_provider_host(
-            &Url::parse("https://app.campbooks.not-a-camp.com/email_messages").unwrap()
-        ));
+    fn opens_external_links() {
+        let app = base();
+        // OAuth providers + any other external host → system browser
+        assert!(is_external_link(&Url::parse("https://accounts.google.com/o/oauth2/auth?x=1").unwrap(), &app));
+        assert!(is_external_link(&Url::parse("https://login.microsoftonline.com/common/oauth2/v2.0/authorize").unwrap(), &app));
+        assert!(is_external_link(&Url::parse("https://github.com/notacamp/campbooks").unwrap(), &app));
+        assert!(is_external_link(&Url::parse("https://not-a-camp.com/pricing").unwrap(), &app));
+        assert!(is_external_link(&Url::parse("mailto:hi@example.com").unwrap(), &app));
+        // the app's own pages stay in the webview
+        assert!(!is_external_link(&Url::parse("https://app.campbooks.not-a-camp.com/email_messages").unwrap(), &app));
+        assert!(!is_external_link(&Url::parse("https://app.campbooks.not-a-camp.com/documents?x=1").unwrap(), &app));
+        // internal schemes (in-app downloads/previews) stay in the webview
+        assert!(!is_external_link(&Url::parse("about:blank").unwrap(), &app));
     }
 
     #[test]
