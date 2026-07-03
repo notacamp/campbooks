@@ -129,6 +129,28 @@ class EmailMessage < ApplicationRecord
     ai_summary.presence || body.to_s.truncate(500)
   end
 
+  # Gmail's own category verdicts → triage bucket, deliberately mapping ONLY
+  # the noise categories. Gmail's ML is strong positive evidence that mail is
+  # bulk, but CATEGORY_PERSONAL is just its residual "none of the above" tab
+  # (prod audit: most CATEGORY_PERSONAL mail here is automated) and FORUMS has
+  # no clean bucket — both are ignored so a provider hint can never pull
+  # machine mail inline or override the security paths.
+  GMAIL_NOISE_CATEGORY_HINTS = {
+    "CATEGORY_PROMOTIONS" => :promotions,
+    "CATEGORY_SOCIAL"     => :social,
+    "CATEGORY_UPDATES"    => :updates
+  }.freeze
+
+  # The provider's noise-category verdict for this message, or nil. Reads the
+  # provider_labels captured at ingest; falls back to the synced kind=category
+  # tags for mail ingested before the column existed (that path costs a tags
+  # load — batch callers should preload :tags).
+  def provider_category_hint
+    labels = Array(provider_labels)
+    labels = tags.select(&:kind_category?).map(&:external_label_id) if labels.empty?
+    GMAIL_NOISE_CATEGORY_HINTS.values_at(*labels).compact.first
+  end
+
   def searchable_filter_data
     {
       email_account_id: email_account_id,

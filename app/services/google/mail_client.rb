@@ -497,6 +497,9 @@ module Google
         "messageId" => data["id"],
         "providerThreadId" => thread_id || data["threadId"],
         "folderId" => folder_id,
+        # Raw Gmail label ids — persisted on the message so triage can read
+        # Gmail's category verdicts (EmailMessage#provider_category_hint).
+        "providerLabels" => labels,
         "fromAddress" => headers["From"] || headers["from"],
         "toAddress" => headers["To"] || headers["to"],
         "subject" => headers["Subject"] || headers["subject"],
