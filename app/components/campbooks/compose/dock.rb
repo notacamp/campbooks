@@ -19,7 +19,7 @@ module Campbooks
 
       def initialize(mode:, message: nil, draft: nil, to: "", cc: "", bcc: "", subject: "",
                      body: "", quoted_body: "", signatures: [], signature_id: nil, accounts: [],
-                     attachment_entries: [])
+                     attachment_entries: [], scout_draft: nil)
         @mode = mode.to_sym
         @message = message
         @draft = draft
@@ -33,6 +33,7 @@ module Campbooks
         @signature_id = signature_id
         @accounts = accounts
         @attachment_entries = attachment_entries
+        @scout_draft = scout_draft
       end
 
       def view_template
@@ -55,7 +56,7 @@ module Campbooks
             shell: :dock, mode: @mode, action_url: action_url, message: @message, draft: @draft,
             to: @to, cc: @cc, bcc: @bcc, subject: @subject, body: @body, quoted_body: @quoted_body,
             signatures: @signatures, signature_id: @signature_id, accounts: @accounts,
-            attachment_entries: @attachment_entries
+            attachment_entries: @attachment_entries, scout_draft: @scout_draft
           ))
         end
 

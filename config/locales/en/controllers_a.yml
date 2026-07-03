@@ -171,6 +171,7 @@ en:
       action_failed: Action failed. Please try again.
       conversation_archived: This conversation has been archived.
       conversation_snoozed: This conversation has been snoozed.
+      draft_needs_info: Scout needs more context for this one — ask in the Discussion panel.
       draft_ready: Draft ready
       draft_saved: Draft saved to Gmail
       draft_sent: Draft sent
