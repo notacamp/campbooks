@@ -164,6 +164,8 @@ es:
     thread_list:
       archive_all: Archivar todo
       back_to_inbox: "— volver a la bandeja de entrada"
+      dismiss_follow_up: Descartar seguimiento
+      draft_follow_up: Redactar seguimiento
       drag_to_folder: Arrastra a una carpeta
       mark_all_read: Marcar todo como leído
       no_subject: "(sin asunto)"
@@ -173,6 +175,11 @@ es:
       senders_more: "%{first}, %{second} y más"
       sent_to_prefix: 'Para:'
       unpin_title: Quitar prioridad
+      waiting_days:
+        one: Esperando %{count} día
+        other: Esperando %{count} días
+      waiting_recent: Esperando su respuesta
+      waiting_section: Esperando respuesta
   email_scans:
     show:
       account_label: Cuenta

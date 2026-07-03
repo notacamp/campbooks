@@ -165,6 +165,8 @@ fr:
     thread_list:
       archive_all: Tout archiver
       back_to_inbox: "— retour à la boîte de réception"
+      dismiss_follow_up: Ignorer la relance
+      draft_follow_up: Rédiger une relance
       drag_to_folder: Glisser vers un dossier
       mark_all_read: Tout marquer comme lu
       no_subject: "(sans objet)"
@@ -174,6 +176,11 @@ fr:
       senders_more: "%{first}, %{second}, et d'autres"
       sent_to_prefix: 'À :'
       unpin_title: Retirer la priorité
+      waiting_days:
+        one: En attente depuis %{count} jour
+        other: En attente depuis %{count} jours
+      waiting_recent: En attente de leur réponse
+      waiting_section: En attente de réponse
   email_scans:
     show:
       account_label: Compte

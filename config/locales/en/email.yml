@@ -163,6 +163,8 @@ en:
     thread_list:
       archive_all: Archive all
       back_to_inbox: "— back to inbox"
+      dismiss_follow_up: Dismiss follow-up
+      draft_follow_up: Draft follow-up
       drag_to_folder: Drag to a folder
       mark_all_read: Mark all read
       no_subject: "(no subject)"
@@ -172,6 +174,11 @@ en:
       senders_more: "%{first}, %{second}, and more"
       sent_to_prefix: 'To:'
       unpin_title: Remove priority
+      waiting_days:
+        one: Waiting %{count} day
+        other: Waiting %{count} days
+      waiting_recent: Waiting on their reply
+      waiting_section: Waiting on replies
   email_scans:
     show:
       account_label: Account

@@ -161,6 +161,8 @@ en:
         unsnoozed:
           one: Unsnoozed %{count} thread
           other: Unsnoozed %{count} thread(s)
+    dismiss_follow_up:
+      dismissed: Follow-up dismissed
     dismiss_todo:
       dismissed: Todo dismissed
   email_threads:

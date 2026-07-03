@@ -26,7 +26,7 @@ class EmailMessagesController < ApplicationController
         @current_group = params[:group].presence
         @current_smart_group = valid_smart_group_param
         @pagy, @threads = pagy_countless(
-          build_thread_scope(params[:folder_id], @current_group, folder_name: params[:folder_name].presence, exclude_pinned: true, smart_group: @current_smart_group),
+          build_thread_scope(params[:folder_id], @current_group, folder_name: params[:folder_name].presence, exclude_pinned: true, exclude_waiting_reply: true, smart_group: @current_smart_group),
           limit: THREAD_PAGE_LIMIT
         )
       rescue Pagy::OverflowError
@@ -186,6 +186,7 @@ class EmailMessagesController < ApplicationController
       @group_items = []
       @smart_group_items = []
       @pinned_threads = []
+      @waiting_threads = []
       @threads = []
     else
       # Build tag groups with per-group queries (powers the group chips in the sidebar)
@@ -201,8 +202,13 @@ class EmailMessagesController < ApplicationController
                           .limit(PINNED_LIMIT)
                           .to_a
 
+      # "Waiting on replies" — threads where the owner holds the last word, in their
+      # own sticky section above the date list (like Priority). Excluded from the
+      # paginated stream below (exclude_waiting_reply) so each shows exactly once.
+      @waiting_threads = waiting_thread_scope(params[:folder_id], @current_group, folder_name: params[:folder_name].presence)
+
       @pagy, @threads = pagy_countless(
-        build_thread_scope(params[:folder_id], @current_group, folder_name: params[:folder_name].presence, exclude_pinned: true, smart_group: @current_smart_group),
+        build_thread_scope(params[:folder_id], @current_group, folder_name: params[:folder_name].presence, exclude_pinned: true, exclude_waiting_reply: true, smart_group: @current_smart_group),
         limit: THREAD_PAGE_LIMIT
       )
 
@@ -295,6 +301,30 @@ class EmailMessagesController < ApplicationController
         ]
       end
       format.html { redirect_back fallback_location: root_path, success: t(".dismissed") }
+    end
+  end
+
+  # Dismiss the "waiting on reply" nudge for a thread from the inbox section: mark
+  # it dismissed (EmailThread.awaiting_reply then drops it) and re-render the
+  # Waiting section so the row leaves — and the whole band disappears when it was
+  # the last one.
+  def dismiss_follow_up
+    message = EmailMessage.where(email_account: Current.user.readable_email_accounts).find(params[:id])
+    message.email_thread&.update(follow_up_dismissed_at: Time.current)
+
+    @current_group = params[:group].presence
+    @waiting_threads = waiting_thread_scope(params[:folder_id], @current_group, folder_name: params[:folder_name].presence)
+
+    respond_to do |format|
+      format.turbo_stream do
+        render turbo_stream: [
+          turbo_stream.replace("waiting_replies_section",
+            partial: "email_messages/waiting_section",
+            locals: { waiting_threads: @waiting_threads }),
+          notify_stream(t(".dismissed"), severity: :success)
+        ]
+      end
+      format.html { redirect_back fallback_location: email_messages_path, success: t(".dismissed") }
     end
   end
 
@@ -446,7 +476,7 @@ class EmailMessagesController < ApplicationController
   # paginated `index` turbo stream so every page of the infinite scroll is
   # consistent. Returns a GROUP BY'd relation ordered by latest message — paginate
   # it with `pagy_countless` (a COUNT would return a hash here).
-  def build_thread_scope(folder_id, group, folder_name: nil, exclude_pinned: false, smart_group: nil)
+  def build_thread_scope(folder_id, group, folder_name: nil, exclude_pinned: false, exclude_waiting_reply: false, smart_group: nil)
     scope = EmailThread.where(email_account_id: readable_account_ids)
                        .includes(:email_account, email_messages: [ :email_account, :tags, :files_attachments, { documents: :classification } ])
                        .joins(:email_messages)
@@ -495,7 +525,22 @@ class EmailMessagesController < ApplicationController
     # in the Priority section above it (and on every infinite-scroll page).
     scope = scope.where.not(id: EmailThread.pinned) if exclude_pinned
 
+    # Likewise drops "waiting on reply" threads so they show only once, in the
+    # Waiting section above it (and never on infinite-scroll pages).
+    scope = scope.where.not(id: EmailThread.awaiting_reply) if exclude_waiting_reply
+
     scope
+  end
+
+  # The threads for the inbox "Waiting on replies" section: everything in the
+  # current folder view where the owner holds the last word, minus pinned (which
+  # ride in their own Priority section). Mirrors the @pinned_threads build.
+  def waiting_thread_scope(folder_id, group, folder_name: nil)
+    build_thread_scope(folder_id, group, folder_name: folder_name)
+      .where(id: EmailThread.awaiting_reply)
+      .where.not(id: EmailThread.pinned)
+      .limit(PINNED_LIMIT)
+      .to_a
   end
 
   def build_tag_groups(readable_ids, folder_id)

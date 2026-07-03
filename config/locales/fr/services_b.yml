@@ -63,6 +63,9 @@ fr:
         unread:
           label: Non lus
           prompt: Résumez mes e-mails non lus
+        waiting_on_reply:
+          label: En attente de réponse
+          prompt: De quoi est-ce que j'attends encore une réponse ?
       subtitle:
         all_caught_up: Vous êtes à jour. Interrogez-moi sur vos e-mails, documents
           ou contacts quand vous en avez besoin.
