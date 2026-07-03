@@ -4,7 +4,10 @@
       <h1 class="text-xl font-semibold tracking-tight text-foreground"><%= t("tasks.index.title") %></h1>
       <%= render "view_toggle", current: :board %>
     </div>
-    <%= render Campbooks::Button.new(href: new_task_path, variant: :primary, size: :sm) { t("tasks.index.new") } %>
+    <div class="flex items-center gap-2">
+      <%= render "shared/customize_ai_button", purpose: "task_extraction" %>
+      <%= render Campbooks::Button.new(href: new_task_path, variant: :primary, size: :sm) { t("tasks.index.new") } %>
+    </div>
   </header>
 
   <%= render Campbooks::Tasks::Board.new(columns: @columns) %>

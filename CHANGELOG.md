@@ -64,6 +64,12 @@ major, minor, or patch change here.
   blocked, or assigned to you.
 - `tasks:backfill_extraction` rake task to re-run task extraction over recent
   mail (e.g. after enabling the Tasks module), gated and idempotent.
+- **Tune how Scout reads your inbox — in plain language.** A new **Settings → AI
+  Prompts** page, plus a **Customize AI** button on the Tasks, Documents, and
+  Reminders pages, lets you add your own guidance for how Scout extracts tasks,
+  analyzes documents, spots reminders, and summarizes and tags email. Your notes
+  are appended to the built‑in instructions — they never replace the output format
+  or safety rules — and clearing the box restores the default.
 
 ### Changed
 - **The calendar opens on the Month view by default** (was Agenda), giving you the

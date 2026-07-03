@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_03_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_03_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -130,6 +130,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_120000) do
     t.index ["ai_adapter_id"], name: "index_ai_configurations_on_ai_adapter_id"
     t.index ["workspace_id", "purpose"], name: "index_ai_configurations_on_workspace_and_purpose", unique: true
     t.index ["workspace_id"], name: "index_ai_configurations_on_workspace_id"
+  end
+
+  create_table "ai_prompts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "instructions"
+    t.string "purpose", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["workspace_id", "purpose"], name: "index_ai_prompts_on_workspace_id_and_purpose", unique: true
+    t.index ["workspace_id"], name: "index_ai_prompts_on_workspace_id"
   end
 
   create_table "audit_events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1699,6 +1709,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_120000) do
   add_foreign_key "ai_adapters", "workspaces"
   add_foreign_key "ai_configurations", "ai_adapters"
   add_foreign_key "ai_configurations", "workspaces"
+  add_foreign_key "ai_prompts", "workspaces"
   add_foreign_key "audit_events", "users", on_delete: :nullify
   add_foreign_key "authored_documents", "users", column: "author_id"
   add_foreign_key "authored_documents", "workspaces"
