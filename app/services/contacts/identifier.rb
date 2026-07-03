@@ -91,11 +91,15 @@ module Contacts
     def threshold_reached?(count, analyzed_at)
       return false if count < FIRST_ANALYSIS_THRESHOLD
 
-      if analyzed_at.nil?
-        count == FIRST_ANALYSIS_THRESHOLD
-      else
-        (count - FIRST_ANALYSIS_THRESHOLD) % REANALYSIS_INTERVAL == 0
-      end
+      # Never analyzed yet → analyze as soon as it has enough history, not only at
+      # the exact Nth email: a batch that jumps past the threshold, or an email
+      # processed while the AI provider was momentarily unavailable, must not skip
+      # the contact forever (Contacts::PendingAnalysisCatchUp is the backstop for
+      # any that still slip through).
+      return true if analyzed_at.nil?
+
+      # Re-analysis cadence for an already-profiled contact.
+      (count - FIRST_ANALYSIS_THRESHOLD) % REANALYSIS_INTERVAL == 0
     end
   end
 end
