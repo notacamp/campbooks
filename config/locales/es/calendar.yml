@@ -77,6 +77,26 @@ es:
         all_day: Todo el día
         untitled: "(Sin título)"
         video_call: Videollamada
+      time_until:
+        in_days:
+          one: En %{count} día
+          other: En %{count} días
+        in_hours:
+          one: En %{count} h
+          other: En %{count} h
+        in_minutes:
+          one: En %{count} min
+          other: En %{count} min
+        in_months:
+          one: En %{count} mes
+          other: En %{count} meses
+        in_weeks:
+          one: En %{count} semana
+          other: En %{count} semanas
+        next_week: Próxima semana
+        now: Ahora
+        today: Hoy
+        tomorrow: Mañana
       week_grid:
         add: "+ Añadir"
         untitled: "(Sin título)"
