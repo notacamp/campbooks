@@ -16,25 +16,17 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
-### Added
-- **See how soon things are on the calendar.** The Agenda view now shows a small
-  countdown next to each event and reminder — "In 20 min", "In 3 h", "Tomorrow",
-  "In 4 days" — so you can tell at a glance what's imminent. Anything happening
-  now, within the hour, or today is highlighted.
-- **Suggested tasks now appear on the home feed.** When Scout extracts an action
-  item from an email, it shows up as a "Suggested task" card with one-tap
-  **Add to tasks** / **Dismiss** — no more suggestions piling up unseen in the
-  tasks triage queue. Accepted tasks keep surfacing later when they become due,
-  blocked, or assigned to you.
-- `tasks:backfill_extraction` rake task to re-run task extraction over recent
-  mail (e.g. after enabling the Tasks module), gated and idempotent.  
-
-### Changed
-- **The calendar opens on the Month view by default** (was Agenda), giving you the
-  whole month at a glance when you land on the page. You can still switch views
-  from the tabs, and any bookmarked `?view=…` link is unchanged.
-
 ### Fixed
+
+- **Keyboard shortcuts no longer scramble the inbox.** After moving between emails
+  with the arrow keys, pressing a shortcut (archive, reply, forward…) could leave the
+  inbox unstyled — plain text with underlined links — until you reloaded. Shortcuts
+  now always act on the email you're actually reading.
+- **The Compose button now sits flush right in the inbox toolbar** instead of drifting
+  toward the middle on wide screens.
+- **Emails opened in the bottom-right drawer are now marked as read.** Opening a
+  message in the drawer (the List and Board inbox layouts) clears its unread dot and
+  updates your unread counts, just like opening it in the full reading view.
 - **Task extraction now targets mail from people, in your language.**
   Extraction skips automated senders and machine mail (notification digests,
   code-review bots, no-reply security alerts, marketplace CTAs) — previously
@@ -51,6 +43,32 @@ major, minor, or patch change here.
   someone else.
 - AI extraction (tasks and reminders) no longer wastes its reading window on
   raw `<style>` CSS from HTML email — extractors now see clean message text.
+
+### Added
+
+- **See how soon things are on the calendar.** The Agenda view now shows a small
+  countdown next to each event and reminder — "In 20 min", "In 3 h", "Tomorrow",
+  "In 4 days" — so you can tell at a glance what's imminent. Anything happening
+  now, within the hour, or today is highlighted.
+- **Suggested tasks now appear on the home feed.** When Scout extracts an action
+  item from an email, it shows up as a "Suggested task" card with one-tap
+  **Add to tasks** / **Dismiss** — no more suggestions piling up unseen in the
+  tasks triage queue. Accepted tasks keep surfacing later when they become due,
+  blocked, or assigned to you.
+- `tasks:backfill_extraction` rake task to re-run task extraction over recent
+  mail (e.g. after enabling the Tasks module), gated and idempotent.
+- **Suggested tasks now appear on the home feed.** When Scout extracts an action
+  item from an email, it shows up as a "Suggested task" card with one-tap
+  **Add to tasks** / **Dismiss** — no more suggestions piling up unseen in the
+  tasks triage queue. Accepted tasks keep surfacing later when they become due,
+  blocked, or assigned to you.
+- `tasks:backfill_extraction` rake task to re-run task extraction over recent
+  mail (e.g. after enabling the Tasks module), gated and idempotent.
+
+### Changed
+- **The calendar opens on the Month view by default** (was Agenda), giving you the
+  whole month at a glance when you land on the page. You can still switch views
+  from the tabs, and any bookmarked `?view=…` link is unchanged.
 
 ## [0.7.0] - 2026-06-30
 

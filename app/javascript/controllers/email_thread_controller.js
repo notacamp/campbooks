@@ -4,8 +4,10 @@ export default class extends Controller {
   static targets = ["item"]
 
   connect() {
-    // Restore selection from URL on page load
-    const pathId = window.location.pathname.match(/\/email_messages\/(\d+)/)
+    // Restore selection from URL on page load. Message ids are UUIDs (uuid
+    // primary keys); a `\d+`-only match truncated them, so the URL's row was
+    // never re-selected on load — match a UUID (or numeric id) instead.
+    const pathId = window.location.pathname.match(/\/email_messages\/([0-9a-f-]{8,}|\d+)/i)
     if (pathId) {
       const match = this.itemTargets.find(el => el.href.endsWith(`/${pathId[1]}`))
       if (match) {
