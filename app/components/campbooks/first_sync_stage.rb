@@ -25,8 +25,9 @@ module Campbooks
     end
 
     def view_template
+      custom_class = @attrs.delete(:class)
       div(
-        class: "flex flex-col items-center text-center",
+        class: class_names("flex flex-col items-center text-center", custom_class),
         data: {
           controller: "first-sync",
           first_sync_url_value: @status_url,
