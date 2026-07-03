@@ -41,9 +41,16 @@ module Ai
       nil
     end
 
-    # Returns the user-configured system prompt for a purpose, if any.
+    # Returns the workspace's custom guidance for a purpose, if any.
+    #
+    # Reads the dedicated AiPrompt store (Settings → AI Prompts / the per-resource
+    # "Customize AI" modal), which is decoupled from model/adapter routing — so a
+    # purpose can carry custom instructions (e.g. task_extraction) without having
+    # its own AiConfiguration row. See Ai::PromptCatalog.
     def self.system_prompt_for(purpose)
-      Current.workspace&.ai_configurations&.find_by(purpose: purpose)&.system_prompt.presence
+      return nil unless Current.workspace
+
+      Current.workspace.ai_prompts.find_by(purpose: purpose)&.instructions.presence
     end
 
     # Returns a suffix to append to the system prompt when the user has
