@@ -211,34 +211,51 @@ class EmailMessagesController < ApplicationController
     @all_tags = workspace_tags.uniq(&:name)
   end
 
+  # The Desk: the full-page compose surface. Opens blank (new message), resumes
+  # a parked draft (?draft_id), or expands a Dock reply (?mode&reply_to) — in
+  # the last two cases the envelope, body, quote and attachments carry over.
   def new
-    @mode = "new_message"
     @sendable_accounts = Current.user.sendable_email_accounts
     @account = @sendable_accounts.first
-    @signature = Signature.default_for(Current.user, @account) if @account
     @signatures = Current.user.signatures.ordered.includes(:email_accounts)
+
+    @draft = Current.user.draft_emails.find_by(id: params[:draft_id]) if params[:draft_id].present?
+    @reply_source = @draft&.in_reply_to
+    @mode = @draft&.mode || "new_message"
+
+    if @draft.nil? && params[:reply_to].present? && EmailComposeController::MODES.include?(params[:mode].to_s)
+      @reply_source = EmailMessage.accessible_to(Current.user).find_by(id: params[:reply_to])
+      @mode = params[:mode].to_s if @reply_source
+    end
+
+    if @draft
+      @to = @draft.to_address.to_s
+      @cc = @draft.cc_address.to_s
+      @bcc = @draft.bcc_address.to_s
+      @subject = @draft.subject.to_s
+      @body = @draft.body.to_s
+      @quoted_body = @draft.quoted_body.to_s
+      @attachment_entries = @draft.attachment_entries
+      @signature_id = @draft.signature_id
+    elsif @reply_source
+      prefill = Emails::ComposePrefill.for(message: @reply_source, mode: @mode)
+      @to = prefill.to
+      @cc = prefill.cc
+      @bcc = ""
+      @subject = prefill.subject
+      @body = ""
+      @quoted_body = prefill.quoted_body
+      @attachment_entries = @mode == "forward" ? Emails::ComposePrefill.forward_attachment_entries(@reply_source) : []
+      @signature_id = Signature.default_for(Current.user, @reply_source.email_account)&.id
+    else
+      @to = @cc = @bcc = @subject = @body = @quoted_body = ""
+      @attachment_entries = []
+      @signature_id = (Signature.default_for(Current.user, @account)&.id if @account)
+    end
 
     # Thread created lazily on first message — avoids empty threads in sidebar
     @compose_thread = nil
     @compose_messages = []
-
-    # Load sidebar data — same inbox list as show (first page only; infinite scroll
-    # streams the rest from the index turbo stream).
-    readable_ids = readable_account_ids
-    @pagy, @threads = pagy_countless(build_thread_scope(nil, nil), limit: THREAD_PAGE_LIMIT)
-
-    folder_counts = Rails.cache.fetch("folder_counts/#{readable_ids.sort.join('_')}", expires_in: 1.minute) do
-      EmailMessage.where(email_account_id: readable_ids).group(:provider_folder_id).distinct.count(:email_thread_id)
-    end
-    @folders = folder_mappings[:name_to_ids].map { |name, ids|
-      count = ids.sum { |id| folder_counts[id] || 0 }
-      { id: ids.first, name: name, count: count }
-    }.sort_by { |f| f[:name] == "Inbox" ? "  " : f[:name] }
-    @common_folders = baseline_folders(folder_counts)
-    @mail_folders = custom_folders
-    @accounts = Current.user.readable_email_accounts.ordered
-    @current_folder = nil
-    @all_tags = workspace_tags.uniq(&:name)
   end
 
   def dismiss_todo

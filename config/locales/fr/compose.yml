@@ -1,0 +1,61 @@
+fr:
+  components:
+    compose:
+      dock:
+        dialog_label_forward: Transférer le message
+        dialog_label_new_message: Nouveau message
+        dialog_label_reply: Répondre
+        dialog_label_reply_all: Répondre à tous
+        draft: Brouillon
+        draft_saved: Brouillon enregistré
+        expand_title: Ouvrir en pleine page
+        minimize_title: Réduire
+        mode_forward: Transférer
+        mode_new_message: Nouveau message
+        mode_reply: Répondre
+        mode_reply_all: Répondre à tous
+        restore_aria: Reprendre la rédaction
+        switch_mode: Changer le mode de réponse
+      engine:
+        bcc_button: Cci
+        cc_button: Cc
+        collapse_envelope: Replier les champs de destinataires
+        discard: Abandonner
+        draft_saved: Brouillon enregistré
+        edit_recipients: Modifier les destinataires et l'objet
+        expand_quote_title: Afficher le message cité et le modifier
+        label_bcc: Cci
+        label_cc: Cc
+        label_from: De
+        label_signature: Signature
+        label_subject: Objet
+        label_to: À
+        no_signature: Sans signature
+        placeholder_bcc: Ajouter Cci…
+        placeholder_body: Rédigez votre message…
+        placeholder_cc: Ajouter Cc…
+        placeholder_subject: Objet
+        placeholder_to: Rechercher des contacts ou saisir un e-mail…
+        quoted_from: Le %{date}, %{who} a écrit
+        quoted_from_undated: "%{who} a écrit"
+        quoted_generic: Message cité
+        recipients_more: "%{name} +%{count}"
+        saving: Enregistrement…
+        schedule: Programmer
+        schedule_at_label: Envoyer le
+        schedule_send: Programmer l'envoi
+        scout_draft_title: Rédiger cette réponse avec Scout
+        send: Envoyer
+        signature_default: "%{name} (par défaut)"
+      pill:
+        draft_saved: Brouillon enregistré
+        resume_aria: Reprendre le brouillon
+        untitled: Brouillon
+      scout_draft:
+        ai_tag: IA
+        drafted_label: rédigé à partir de cette conversation
+        start_blank: Partir de zéro
+        tone_firmer: Plus ferme
+        tone_shorter: Plus court
+        tone_warmer: Plus chaleureux
+        use_draft: Utiliser ce brouillon

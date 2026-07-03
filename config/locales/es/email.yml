@@ -84,36 +84,17 @@ es:
       all: Todo
       new_folder: Nueva carpeta
     new:
-      all_folder_label: Todo
-      bcc_label: 'Cco:'
-      bcc_placeholder: Añadir CCO...
-      bcc_toggle_label: Cco
-      cc_label: 'Cc:'
-      cc_placeholder: Añadir CC...
       close_scout_aria: Cerrar Scout
-      collapse_sidebar_aria: Contraer barra lateral
-      expand_sidebar_aria: Expandir barra lateral
-      folders_heading: Carpetas
-      from_label: 'De:'
-      inbox_heading: Bandeja de entrada
-      inbox_settings_aria: Configuración de la bandeja de entrada
-      new_message_heading: Nuevo mensaje
-      no_emails_yet: Aún no hay correos.
+      heading_forward: Reenviar
+      heading_new_message: Mensaje nuevo
+      heading_reply: Responder
+      heading_reply_all: Responder a todos
       no_sendable_accounts_description: Necesita una cuenta de correo con permiso
         de envío para redactar mensajes nuevos.
       no_sendable_accounts_title: Sin cuentas de envío
-      no_signature_option: Sin firma
       scout_keyboard_hint: Cmd+Shift+E para manual
       scout_label: Scout
-      signature_default_suffix: "(predeterminada)"
-      signature_label: 'Firma:'
-      signature_preview_heading: Firma
-      subject_label: 'Asunto:'
-      subject_placeholder: Asunto
-      to_label: 'Para:'
-      to_placeholder: Buscar contactos o escribir correo...
       toggle_chat_aria: Alternar chat
-      write_message_placeholder: Escriba su mensaje...
     reply_actions:
       forward_title: Reenviar
       reply_all_title: Responder a todos

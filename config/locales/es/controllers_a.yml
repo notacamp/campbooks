@@ -176,6 +176,7 @@ es:
       action_failed: La acción ha fallado. Inténtelo de nuevo.
       conversation_archived: Esta conversación ha sido archivada.
       conversation_snoozed: Esta conversación ha sido pospuesta.
+      draft_needs_info: Scout necesita más contexto — pregunta en el panel de Discusión.
       draft_ready: Borrador listo
       draft_saved: Borrador guardado en Gmail
       draft_sent: Borrador enviado

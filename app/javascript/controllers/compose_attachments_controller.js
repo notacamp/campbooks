@@ -17,6 +17,13 @@ export default class extends Controller {
     this.fileInputTarget.click()
   }
 
+  // Server-seeded chips (restored drafts, forwarded originals) bind their
+  // remove button here instead of the addEventListener path used for uploads.
+  removeChip(event) {
+    event.currentTarget.closest(".attachment-chip")?.remove()
+    this._announce()
+  }
+
   async upload(event) {
     const files = Array.from(event.target.files || [])
     event.target.value = ""
@@ -44,6 +51,8 @@ export default class extends Controller {
   _addChip(name, size) {
     const chip = document.createElement("span")
     chip.className = "attachment-chip is-uploading"
+    chip.dataset.filename = name
+    if (size) chip.dataset.byteSize = size
 
     const label = document.createElement("span")
     label.className = "attachment-chip-name"
@@ -53,7 +62,10 @@ export default class extends Controller {
     remove.type = "button"
     remove.setAttribute("aria-label", "Remove")
     remove.textContent = "✕"
-    remove.addEventListener("click", () => chip.remove())
+    remove.addEventListener("click", () => {
+      chip.remove()
+      this._announce()
+    })
 
     chip.append(label, remove)
     this.trayTarget.appendChild(chip)
@@ -67,6 +79,13 @@ export default class extends Controller {
     input.name = this.fieldNameValue
     input.value = signedId
     chip.appendChild(input)
+    this._announce()
+  }
+
+  // Chips change the submitted attachment set without any native form event —
+  // announce it so the draft autosave picks the change up.
+  _announce() {
+    this.element.dispatchEvent(new Event("input", { bubbles: true }))
   }
 
   _failChip(chip, message) {

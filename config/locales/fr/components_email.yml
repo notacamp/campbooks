@@ -60,6 +60,7 @@ fr:
       toolbar_undo: Annuler
     compose_attachments:
       attach: Joindre des fichiers
+      remove: Retirer la pièce jointe
       upload_failed: Échec du téléversement
     contact_avatar:
       received_indicator: "↓"

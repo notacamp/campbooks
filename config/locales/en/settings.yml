@@ -72,11 +72,20 @@ en:
         deletion_scheduled: Your account is being deleted. You have been signed out.
         wrong_email: Email address does not match.
         wrong_password: Current password is incorrect.
+      compose_preference:
+        failed: Could not update your compose preference. Please try again.
+        updated: Compose preference updated.
       language:
         failed: Could not update your language. Please try again.
         updated: Language updated.
       show:
         change_password: Change Password
+        compose_desk: Full page — writing gets the whole screen
+        compose_dock: Bottom sheet — compose over the inbox
+        compose_subtitle: Where a brand-new email opens (the C shortcut, the Compose
+          button, and the command palette).
+        compose_title: New email opens in
+        save_compose: Save
         confirm_password: Confirm New Password
         current_password: Current Password
         danger_zone_desc: Deleting your account is permanent and cannot be undone.
