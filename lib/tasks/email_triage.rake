@@ -1,9 +1,12 @@
 namespace :emails do
-  desc "Backfill EmailMessage#category via the rules categorizer (rung 1). " \
+  desc "Backfill EmailMessage#category via the rules categorizer (rung 1), " \
+       "including the Gmail category-label hint (provider_labels / kind=category tags). " \
        "Read-only by default — pass WRITE=1 to persist. ALL=1 re-categorizes already-categorized mail."
   task categorize: :environment do
     write = ENV["WRITE"] == "1"
-    scope = EmailMessage.all
+    # :tags preloaded for the legacy provider-hint fallback (mail ingested
+    # before provider_labels existed reads its synced CATEGORY_* tags instead).
+    scope = EmailMessage.includes(:tags)
     scope = scope.where(category: nil) unless ENV["ALL"] == "1"
 
     total = scope.count

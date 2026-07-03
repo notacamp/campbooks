@@ -50,6 +50,13 @@ module Emails
         existing.update_columns(zoho_flag: msg["flagid"])
         changed = true
       end
+      # Keep the provider label snapshot fresh (Gmail re-categorizations, user
+      # label moves) — it feeds the triage category hint.
+      labels = provider_labels(msg)
+      if msg.key?("providerLabels") && labels != existing.provider_labels
+        existing.update_columns(provider_labels: labels)
+        changed = true
+      end
       changed ? :reconciled : :unchanged
     end
 
@@ -74,6 +81,9 @@ module Emails
         header_list_unsubscribe: sanitize(msg["header_list_unsubscribe"]).presence,
         header_precedence: sanitize(msg["header_precedence"]).presence,
         header_auto_submitted: sanitize(msg["header_auto_submitted"]).presence,
+        # Raw provider label ids (Gmail labelIds; [] elsewhere) — feeds the
+        # triage category hint.
+        provider_labels: provider_labels(msg),
         status: :fetched
       )
       EmailProcessJob.perform_later(email_message.id)
@@ -89,6 +99,10 @@ module Emails
     # Strip PG-incompatible NUL bytes (mirrors ApplicationJob#sanitize_string).
     def sanitize(value)
       value.to_s.gsub("\u0000", "")
+    end
+
+    def provider_labels(msg)
+      Array(msg["providerLabels"]).map { |label| sanitize(label) }
     end
   end
 end

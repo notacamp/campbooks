@@ -35,6 +35,14 @@ major, minor, or patch change here.
 
 ### Changed
 
+- **Smart sorting now reads Gmail's own verdicts.** When Gmail has already filed
+  a message under Promotions, Social, or Updates and Campbooks' own rules see no
+  bulk signal, the message follows Gmail's verdict into the matching smart group
+  instead of landing in your inbox list — catching newsletters and bulk senders
+  that don't look automated. Gmail's "Personal" tab is deliberately not trusted
+  (it's a catch-all that would pull machine mail back inline), and a provider
+  verdict never overrides a security-flavored subject. Existing mail can be
+  re-sorted with `bin/rails emails:categorize ALL=1 WRITE=1`.
 - **The "Waiting on replies" list now checks with the AI before flagging a thread.**
   If the last message you sent was just an FYI, an acknowledgement, or a sign-off the
   other person isn't expected to answer, it no longer shows up as something you're

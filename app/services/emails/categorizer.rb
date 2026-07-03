@@ -16,10 +16,10 @@ module Emails
   # guess. Most machine notifications and bulk marketing resolve for free and
   # never reach an LLM.
   #
-  # Today it reads only fields we already persist on EmailMessage. As we capture
-  # richer signals at ingest (List-Unsubscribe / Precedence headers, Gmail
-  # category labels) the detectors get sharper without changing this interface —
-  # see #header_category, currently a no-op.
+  # Today it reads only fields we already persist on EmailMessage: the sender,
+  # subject, the RFC bulk/automated headers, and the provider's own category
+  # verdict (Gmail labelIds → #provider_noise_hint, rescue-only — see there for
+  # why Gmail's Personal tab is deliberately ignored).
   #
   # Kept dependency-free (no ActiveSupport) so it can be unit-tested in isolation.
   class Categorizer
@@ -123,10 +123,23 @@ module Emails
       # notification rather than letting it slip through to :personal.
       return result(:notifications, 0.6, [ "corporate sender: #{from_brand}" ]) if NOTIFICATION_BRANDS.include?(from_brand)
 
-      # No machine / bulk / brand / security signal — treat as a human message and
-      # hand it to the cheap embedding rung (not the LLM). NB: contact_id is NOT a
-      # useful importance signal — the app assigns a contact to virtually every
-      # email; a real "VIP" signal should use the contact's relationship_type.
+      # Our rules found no machine / bulk / brand / security signal — before
+      # falling back to :personal, let the provider's own noise verdict rescue
+      # the residual (Gmail's Promotions/Social/Updates tabs are strong "this
+      # is bulk" evidence our sender/subject heuristics can miss). Deliberately
+      # RESCUE-ONLY: a hint never overrides a rule above (Gmail's Personal tab
+      # is just its residual bucket, so trusting it would pull machine mail
+      # inline, and re-bucketing mail the rules already pinned as noise only
+      # shuffles it between groups).
+      if (hint = provider_noise_hint)
+        return result(hint, 0.9, [ "provider category label" ])
+      end
+
+      # No machine / bulk / brand / security / provider signal — treat as a
+      # human message and hand it to the cheap embedding rung (not the LLM).
+      # NB: contact_id is NOT a useful importance signal — the app assigns a
+      # contact to virtually every email; a real "VIP" signal should use the
+      # contact's relationship_type.
       result(:personal, 0.4, [ "no machine / bulk / security signal" ])
     end
 
@@ -144,13 +157,24 @@ module Emails
 
     attr_reader :email
 
-    # Hook for provider-supplied ML verdicts (e.g. Gmail category labels) that
-    # should win outright. The RFC bulk/automated headers we now persist
-    # (List-Unsubscribe / Precedence / Auto-Submitted) are consumed lower down via
-    # #bulk_headers? / #auto_submitted? instead — they say "not a person" without
-    # pinning an exact bucket, so they strengthen the existing rules rather than
-    # short-circuiting them.
+    # Hook for provider verdicts trustworthy enough to win outright over every
+    # rule. Gmail's category labels turned out NOT to qualify — they're strong
+    # only as noise evidence, so they're consumed at the END of the ladder via
+    # #provider_noise_hint (rescue-only) instead. The RFC bulk/automated headers
+    # we persist (List-Unsubscribe / Precedence / Auto-Submitted) are likewise
+    # consumed lower down via #bulk_headers? / #auto_submitted? — they say "not
+    # a person" without pinning an exact bucket.
     def header_category = nil
+
+    # The provider's noise-bucket verdict (EmailMessage#provider_category_hint:
+    # Gmail Promotions/Social/Updates only). Duck-typed + re-whitelisted here so
+    # the class stays dependency-free and safe against a widened hint source.
+    def provider_noise_hint
+      return nil unless email.respond_to?(:provider_category_hint)
+
+      hint = email.provider_category_hint
+      hint if %i[promotions social updates].include?(hint)
+    end
 
     def result(category, confidence, reasons)
       Result.new(category: category, confidence: confidence, reasons: reasons)
