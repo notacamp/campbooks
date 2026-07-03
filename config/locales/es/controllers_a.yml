@@ -185,7 +185,8 @@ es:
       no_email_selected: Ningún correo seleccionado
       no_send_permission: No tiene permiso para enviar desde esta cuenta.
       reminder_confirmed: "%{title} añadido a tu calendario."
-      reminder_confirmed_no_calendar: Recordatorio confirmado. Conecta un calendario para sincronizarlo automáticamente.
+      reminder_confirmed_no_calendar: Recordatorio confirmado. Conecta un calendario
+        para sincronizarlo automáticamente.
       reminder_dismissed: Recordatorio descartado.
       reply_sent: Respuesta enviada
       save_draft_html: Borrador guardado

@@ -1,74 +1,89 @@
 ---
 fr:
   email_templates:
-    index:
-      empty: "Aucun modèle d'e-mail pour l'instant. Créez-en un dans Paramètres → Modèles d'e-mail."
-      use: Utiliser
-      variables:
-        one: "1 variable"
-        other: "%{count} variables"
-      documents:
-        one: "1 document joint"
-        other: "%{count} documents joints"
     fill_form:
-      title: "Remplir : %{name}"
-      subtitle: "Remplissez les champs, puis insérez le modèle dans votre e-mail."
-      no_variables: Ce modèle est prêt à être inséré.
-      insert: "Insérer dans l'e-mail"
-      back: Retour
       attachments_note:
         one: 1 document sera joint en PDF.
         other: "%{count} documents seront joints en PDF."
+      back: Retour
+      insert: Insérer dans l'e-mail
+      no_variables: Ce modèle est prêt à être inséré.
+      subtitle: Remplissez les champs, puis insérez le modèle dans votre e-mail.
+      title: 'Remplir : %{name}'
+    index:
+      documents:
+        one: 1 document joint
+        other: "%{count} documents joints"
+      empty: Aucun modèle d'e-mail pour l'instant. Créez-en un dans Paramètres → Modèles
+        d'e-mail.
+      use: Utiliser
+      variables:
+        one: 1 variable
+        other: "%{count} variables"
   settings:
     email_templates:
-      index:
-        title: "Modèles d'e-mail"
-        subtitle: "Créez des e-mails réutilisables — objet, corps et documents joints — à utiliser depuis l'éditeur."
-        new_template: Nouveau modèle
-        edit: Modifier
-        delete: Supprimer
-        delete_confirm: "Supprimer ce modèle ?"
-        empty_title: Aucun modèle pour l'instant
-        empty_description: "Créez votre premier modèle d'e-mail et réutilisez-le à chaque rédaction."
-        variables_count:
-          one: "1 variable"
-          other: "%{count} variables"
-        documents_count:
-          one: "1 document"
-          other: "%{count} documents"
-      new:
-        title: "Nouveau modèle d'e-mail"
-        subtitle: "Rédigez l'e-mail une fois et réutilisez-le — ou laissez l'IA le rédiger à partir d'une description."
-        save: Créer le modèle
-        cancel: Annuler
+      create:
+        created: Modèle créé.
+      destroy:
+        destroyed: Modèle supprimé.
       edit:
-        title: "Modifier : %{name}"
-        subtitle: "Examinez et affinez le modèle, joignez des documents ou régénérez-le avec l'IA."
-        save: Enregistrer les modifications
         cancel: Retour aux modèles
-        preview_heading: "Aperçu"
+        generate_button: Générer avec l'IA
+        generate_description: Laissez l'IA rédiger l'objet et le corps à partir de
+          votre description.
+        generate_heading: Génération par IA
+        preview_heading: Aperçu
         preview_subject: Objet
-        variables_heading: Variables
-        variable_key: "Clé"
-        variable_label: "Libellé"
-        variable_type: Type
+        save: Enregistrer les modifications
+        subtitle: Examinez et affinez le modèle, joignez des documents ou régénérez-le
+          avec l'IA.
+        title: 'Modifier : %{name}'
+        variable_key: Clé
+        variable_label: Libellé
         variable_required: Obligatoire
-        generate_heading: "Génération par IA"
-        generate_description: "Laissez l'IA rédiger l'objet et le corps à partir de votre description."
-        generate_button: "Générer avec l'IA"
-      create: { created: "Modèle créé." }
-      update: { updated: "Modèle mis à jour." }
-      destroy: { destroyed: "Modèle supprimé." }
-      regenerate: { generating: "Génération par IA lancée." }
+        variable_type: Type
+        variables_heading: Variables
       form:
-        name_placeholder: "ex. : E-mail de bienvenue"
-        description_hint: "Décrivez l'e-mail que vous souhaitez que l'IA rédige (utilisé uniquement pour la génération par IA)."
-        description_placeholder: "ex. : Un e-mail de bienvenue chaleureux pour les nouveaux clients avec les prochaines étapes."
-        subject_hint: "Vous pouvez utiliser {{ variable_name }} pour le contenu dynamique."
-        subject_placeholder: "ex. : Bienvenue sur {{ workspace_name }}, {{ recipient_name }} !"
+        body_hint: Utilisez {{ variable_name }} n'importe où pour le contenu dynamique.
         body_label: Corps
-        body_hint: "Utilisez {{ variable_name }} n'importe où pour le contenu dynamique."
-        body_placeholder: "Rédigez votre e-mail…"
+        body_placeholder: Rédigez votre e-mail…
+        description_hint: Décrivez l'e-mail que vous souhaitez que l'IA rédige (utilisé
+          uniquement pour la génération par IA).
+        description_placeholder: 'ex. : Un e-mail de bienvenue chaleureux pour les
+          nouveaux clients avec les prochaines étapes.'
+        documents_empty: Aucun modèle de document prêt pour l'instant. Créez-en un
+          dans Modèles de document d'abord.
+        documents_hint: Ces modèles de document sont remplis avec les mêmes variables
+          et joints en PDF.
         documents_label: Documents joints
-        documents_hint: Ces modèles de document sont remplis avec les mêmes variables et joints en PDF.
-        documents_empty: "Aucun modèle de document prêt pour l'instant. Créez-en un dans Modèles de document d'abord."
+        name_placeholder: 'ex. : E-mail de bienvenue'
+        subject_hint: Vous pouvez utiliser {{ variable_name }} pour le contenu dynamique.
+        subject_placeholder: 'ex. : Bienvenue sur {{ workspace_name }}, {{ recipient_name
+          }} !'
+      index:
+        delete: Supprimer
+        delete_confirm: Supprimer ce modèle ?
+        documents_count:
+          one: 1 document
+          other: "%{count} documents"
+        edit: Modifier
+        empty_description: Créez votre premier modèle d'e-mail et réutilisez-le à
+          chaque rédaction.
+        empty_title: Aucun modèle pour l'instant
+        new_template: Nouveau modèle
+        subtitle: Créez des e-mails réutilisables — objet, corps et documents joints
+          — à utiliser depuis l'éditeur.
+        title: Modèles d'e-mail
+        variables_count:
+          one: 1 variable
+          other: "%{count} variables"
+      new:
+        cancel: Annuler
+        save: Créer le modèle
+        subtitle: Rédigez l'e-mail une fois et réutilisez-le — ou laissez l'IA le
+          rédiger à partir d'une description.
+        title: Nouveau modèle d'e-mail
+      regenerate:
+        generating: Génération par IA lancée.
+      update:
+        updated: Modèle mis à jour.

@@ -1,12 +1,15 @@
 class OnboardingController < ApplicationController
   layout "onboarding"
 
-  STEPS = %w[workspace email_accounts ai_configuration classification review].freeze
+  # "welcome" is the golden path: one screen — meet Scout, connect an inbox.
+  # The remaining steps are the optional "set up more" wizard, reachable from
+  # the welcome screen and Settings but never forced on a new user.
+  STEPS = %w[welcome workspace email_accounts ai_configuration classification review].freeze
 
-  before_action :load_templates
-  before_action :set_step
-  before_action :ensure_valid_step!
-  before_action :set_previous_step
+  before_action :load_templates, except: :first_sync_status
+  before_action :set_step, except: :first_sync_status
+  before_action :ensure_valid_step!, except: :first_sync_status
+  before_action :set_previous_step, except: :first_sync_status
   before_action :clear_onboarding_snooze, only: [ :update ]
 
   def show
@@ -39,6 +42,11 @@ class OnboardingController < ApplicationController
   def snooze
     session[:onboarding_snoozed] = true
     redirect_to root_path
+  end
+
+  # Polled by the first-sync stage on home while Scout's first scan runs.
+  def first_sync_status
+    render json: Onboarding::FirstSyncStatus.new(Current.user).as_json
   end
 
   # ── AI suggestion endpoints ──────────────────────────────
@@ -150,6 +158,31 @@ class OnboardingController < ApplicationController
       Ai::ProviderSetup.apply_managed_default(new_org)
     end
     Current.workspace
+  end
+
+  # ── Step 0: Welcome (the golden path) ────────────────────
+
+  def prepare_welcome
+    org # ensure org exists
+    @accounts = Current.user.email_accounts.includes(:email_account_users)
+    @workspace_type = org.settings["workspace_type"]
+    @needs_ai_key = self_hosted? && !Ai::ProviderSetup.new(org).text_configured?
+    # After the provider consent, land on home — the first-sync stage takes over.
+    session[:onboarding_return_to] = root_path
+  end
+
+  # The welcome screen has exactly one form: the optional work/personal toggle.
+  # It saves in place and stays on the welcome screen (never advances a wizard).
+  def update_welcome
+    kind = params.dig(:workspace, :workspace_type)
+    if %w[company individual].include?(kind)
+      # Both the column (Workspace#company?) and the settings key (the setup
+      # wizard + modals) are read in the wild — keep the two in step.
+      org.workspace_type = kind
+      org.settings["workspace_type"] = kind
+      org.save!
+    end
+    redirect_to onboarding_path
   end
 
   # ── Step 1: Workspace ────────────────────────────────────

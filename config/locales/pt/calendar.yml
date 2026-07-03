@@ -53,7 +53,8 @@ pt:
       title_label: Título
       title_placeholder: Adicionar um título
       type_auto: Deteção automática (IA)
-      type_hint: A IA escolhe o tipo automaticamente. Escolha um para substituir, ou
+      type_hint: A IA escolhe o tipo automaticamente. Escolha um para substituir,
+        ou
       type_label: Tipo
       type_manage: gerir tipos
       type_none: Nenhum

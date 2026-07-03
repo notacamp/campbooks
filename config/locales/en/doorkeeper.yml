@@ -2,15 +2,15 @@
 en:
   doorkeeper:
     authorizations:
-      new:
-        page_title: "Authorize · Campbooks"
-        title: "Authorize %{client}"
-        signed_in_as_html: "Signed in as %{user} in %{workspace}"
-        able_to: "This will be able to:"
-        authorize: "Authorize"
-        deny: "Cancel"
-        redirect_note: "You'll be returned to %{uri}"
       error:
-        title: "Couldn't authorize"
-        generic: "Something went wrong with this authorization request."
-        retry_hint: "Close this window and run the command again."
+        generic: Something went wrong with this authorization request.
+        retry_hint: Close this window and run the command again.
+        title: Couldn't authorize
+      new:
+        able_to: 'This will be able to:'
+        authorize: Authorize
+        deny: Cancel
+        page_title: Authorize · Campbooks
+        redirect_note: You'll be returned to %{uri}
+        signed_in_as_html: Signed in as %{user} in %{workspace}
+        title: Authorize %{client}

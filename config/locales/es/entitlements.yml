@@ -50,13 +50,13 @@ es:
       over_limit: Has alcanzado el límite de tu plan para %{feature}. Mejora tu plan
         para obtener más.
     features:
-      organizations: Organizaciones
       ai_model_access: Modelos de IA
       document_templates: Plantillas de documentos
       email_accounts: Cuentas de correo
       emails_synced: Correos sincronizados
       managed_ai: Campbooks AI
       notifications: Notificaciones
+      organizations: Organizaciones
       pipelines: Pipelines
       scout: Scout
       tasks: Tareas

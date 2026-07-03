@@ -44,17 +44,6 @@ en:
         overdue: Overdue
         today: Today
         tomorrow: Tomorrow
-      task_card:
-        accept: Add to tasks
-        complete: Complete
-        dismiss: Dismiss
-        in_days:
-          one: Due in %{count} day
-          other: Due in %{count} days
-        overdue: Overdue
-        suggested: Suggested task
-        today: Due today
-        tomorrow: Due tomorrow
       reply_reminder_card:
         aged:
           one: "%{count} day, no reply"
@@ -65,10 +54,10 @@ en:
       shared:
         kbd_navigate: Move
         many_participants: "%{names} & %{count} others"
-        two_participants: "%{first} & %{second}"
         no_subject: "(no subject)"
         priority: Priority
         scout_read: read it just now
+        two_participants: "%{first} & %{second}"
         unknown_sender: Unknown sender
         working: Working…
         yesterday: Yesterday
@@ -83,6 +72,17 @@ en:
         not_now: Not now
         prefix: File
         under: under
+      task_card:
+        accept: Add to tasks
+        complete: Complete
+        dismiss: Dismiss
+        in_days:
+          one: Due in %{count} day
+          other: Due in %{count} days
+        overdue: Overdue
+        suggested: Suggested task
+        today: Due today
+        tomorrow: Due tomorrow
     time_of_day_greeting:
       greeting:
         afternoon: Afternoon, %{name}.
@@ -98,10 +98,10 @@ en:
       reminder_confirmed_no_calendar: Reminder confirmed. Connect a calendar to sync
         it automatically.
       reminder_dismissed: Reminder dismissed.
-      task_accepted: "Added to your tasks: %{title}"
-      task_completed: "Task completed: %{title}"
-      task_dismissed: Suggestion dismissed.
       restored: Restored.
+      task_accepted: 'Added to your tasks: %{title}'
+      task_completed: 'Task completed: %{title}'
+      task_dismissed: Suggestion dismissed.
       unsupported: That action is not supported here.
   home:
     index:
@@ -109,6 +109,7 @@ en:
       connect_body: Scout reads and sorts your email before you arrive. Connect an
         inbox and your feed comes alive.
       connect_cta: Connect an inbox
+      connect_demo: See it in action first
       connect_title: Connect your inbox to begin
       disconnected_body: Scout can't reach your inbox right now — reconnect to bring
         your feed back to life.
@@ -134,6 +135,7 @@ en:
       scout_coach_title: Meet Scout
       subtitle:
         clear: All clear — Scout's on watch so it stays that way.
+        fresh: Connect an inbox below and I'll take the first pass.
         lots: "%{n} things need you. Scout stacked them so you can skim, not slog."
         single: Just one thing needs you — Scout filed the rest.
         some: "%{n} things need you — Scout stacked them. A quick skim and you're

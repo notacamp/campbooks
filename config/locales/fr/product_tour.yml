@@ -2,6 +2,7 @@
 fr:
   components:
     product_tour:
+      ai_tag: IA
       aria_label: Visite guidée
       back: Retour
       next: Suivant
@@ -64,6 +65,5 @@ fr:
       s6_cta_connect: Connecter votre boîte de réception
       s6_cta_explore: Explorer par moi-même
       s6_title: Vous êtes prêt
-      scout_says: Scout
       skip: Passer la visite
       step: "%{current} sur %{total}"

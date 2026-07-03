@@ -24,6 +24,10 @@ es:
         subtitle: Elige dónde poner %{document}.
         title: Enviar a Google Drive
         upload_here: Subir a %{folder}
+    folders:
+      add_prompt: Añadir a carpeta…
+      label: Carpetas
+      remove: Quitar de %{name}
     forms:
       bank_statement:
         account_number: Número de cuenta
@@ -68,10 +72,6 @@ es:
         invoice_number: Número de factura
         tax_amount_cents: Importe del impuesto (céntimos)
         tax_rate: Tipo impositivo (%)
-    folders:
-      add_prompt: Añadir a carpeta…
-      label: Carpetas
-      remove: Quitar de %{name}
     index:
       accepted_formats: PDF, JPG, PNG, WEBP, HEIC
       click_to_upload: Haga clic para subir
@@ -120,36 +120,6 @@ es:
       upload: Subir
       upload_and_process: Subir y procesar
       write: Escribir
-    written:
-      index:
-        title: Documentos escritos
-        back_to_documents: Volver a Docs
-        new: Nuevo documento
-        empty_title: Aún no hay documentos escritos
-        empty_description: Escribe documentos con formato como cartas, informes y notas desde cero.
-      new:
-        title: Escribir documento
-        title_placeholder: Título del documento
-        editor_placeholder: Empieza a escribir…
-        save: Guardar documento
-        cancel: Cancelar
-        back_to_documents: Volver a Docs
-      create:
-        created: Documento guardado.
-      show:
-        edit: Editar
-        back_to_documents: Volver a Docs
-        created_at: "Creado el %{date}"
-        by: por %{name}
-      edit:
-        title: Editar documento
-        title_placeholder: Título del documento
-        editor_placeholder: Empieza a escribir…
-        save: Guardar cambios
-        cancel: Cancelar
-        back_to_document: Volver al documento
-      update:
-        updated: Documento actualizado.
     merge:
       keep_this_one: Conservar este
       label_date: 'Fecha:'
@@ -253,3 +223,34 @@ es:
         ai_unsure: "%{count} sobre los que la IA no estaba segura — revise para confirmar
           o reclasificar"
         needs_review: Necesita revisión
+    written:
+      create:
+        created: Documento guardado.
+      edit:
+        back_to_document: Volver al documento
+        cancel: Cancelar
+        editor_placeholder: Empieza a escribir…
+        save: Guardar cambios
+        title: Editar documento
+        title_placeholder: Título del documento
+      index:
+        back_to_documents: Volver a Docs
+        empty_description: Escribe documentos con formato como cartas, informes y
+          notas desde cero.
+        empty_title: Aún no hay documentos escritos
+        new: Nuevo documento
+        title: Documentos escritos
+      new:
+        back_to_documents: Volver a Docs
+        cancel: Cancelar
+        editor_placeholder: Empieza a escribir…
+        save: Guardar documento
+        title: Escribir documento
+        title_placeholder: Título del documento
+      show:
+        back_to_documents: Volver a Docs
+        by: por %{name}
+        created_at: Creado el %{date}
+        edit: Editar
+      update:
+        updated: Documento actualizado.

@@ -50,6 +50,7 @@ en:
       over_limit: You've reached your plan's limit for %{feature}. Upgrade for more.
     features:
       ai_model_access: AI models
+      document_templates: Document templates
       email_accounts: Email accounts
       email_scheduling: Email scheduling
       emails_synced: Emails synced
@@ -60,7 +61,6 @@ en:
       tasks: Tasks
       workflow_executions: Workflow runs
       workflows: Workflows
-      document_templates: Document templates
   navigation:
     settings:
       items:

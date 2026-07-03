@@ -1,74 +1,87 @@
 ---
 pt:
   email_templates:
-    index:
-      empty: Ainda não há modelos de email. Crie um em Definições → Modelos de email.
-      use: Usar
-      variables:
-        one: "1 variável"
-        other: "%{count} variáveis"
-      documents:
-        one: "1 documento anexado"
-        other: "%{count} documentos anexados"
     fill_form:
-      title: "Preencher: %{name}"
-      subtitle: Preencha os campos e depois insira o modelo no seu email.
-      no_variables: Este modelo está pronto para inserir.
-      insert: Inserir no email
-      back: Voltar
       attachments_note:
         one: 1 documento será anexado em PDF.
         other: "%{count} documentos serão anexados como PDFs."
+      back: Voltar
+      insert: Inserir no email
+      no_variables: Este modelo está pronto para inserir.
+      subtitle: Preencha os campos e depois insira o modelo no seu email.
+      title: 'Preencher: %{name}'
+    index:
+      documents:
+        one: 1 documento anexado
+        other: "%{count} documentos anexados"
+      empty: Ainda não há modelos de email. Crie um em Definições → Modelos de email.
+      use: Usar
+      variables:
+        one: 1 variável
+        other: "%{count} variáveis"
   settings:
     email_templates:
-      index:
-        title: Modelos de email
-        subtitle: Crie emails reutilizáveis — assunto, corpo e documentos anexados — para usar no compositor.
-        new_template: Novo modelo
-        edit: Editar
-        delete: Eliminar
-        delete_confirm: Eliminar este modelo?
-        empty_title: Ainda não há modelos
-        empty_description: Crie o seu primeiro modelo de email e reutilize-o sempre que quiser compor.
-        variables_count:
-          one: "1 variável"
-          other: "%{count} variáveis"
-        documents_count:
-          one: "1 documento"
-          other: "%{count} documentos"
-      new:
-        title: Novo modelo de email
-        subtitle: Escreva o email uma vez e reutilize-o — ou deixe a IA rascunhá-lo a partir de uma descrição.
-        save: Criar modelo
-        cancel: Cancelar
+      create:
+        created: Modelo criado.
+      destroy:
+        destroyed: Modelo eliminado.
       edit:
-        title: "Editar: %{name}"
-        subtitle: Reveja e melhore o modelo, anexe documentos ou regenere-o com IA.
-        save: Guardar alterações
         cancel: Voltar aos modelos
+        generate_button: Gerar com IA
+        generate_description: Deixe a IA rascunhar o assunto e o corpo a partir da
+          sua descrição.
+        generate_heading: Geração com IA
         preview_heading: Pré-visualização
         preview_subject: Assunto
-        variables_heading: Variáveis
+        save: Guardar alterações
+        subtitle: Reveja e melhore o modelo, anexe documentos ou regenere-o com IA.
+        title: 'Editar: %{name}'
         variable_key: Chave
         variable_label: Etiqueta
-        variable_type: Tipo
         variable_required: Obrigatório
-        generate_heading: Geração com IA
-        generate_description: Deixe a IA rascunhar o assunto e o corpo a partir da sua descrição.
-        generate_button: Gerar com IA
-      create: { created: Modelo criado. }
-      update: { updated: Modelo atualizado. }
-      destroy: { destroyed: Modelo eliminado. }
-      regenerate: { generating: Geração com IA iniciada. }
+        variable_type: Tipo
+        variables_heading: Variáveis
       form:
-        name_placeholder: 'ex.: Email de boas-vindas'
-        description_hint: Descreva o email que quer que a IA rascunhe (usado apenas para geração com IA).
-        description_placeholder: 'ex.: Um email de boas-vindas amigável para novos clientes com os próximos passos.'
-        subject_hint: Pode usar {{ variable_name }} para conteúdo dinâmico.
-        subject_placeholder: 'ex.: Bem-vindo ao {{ workspace_name }}, {{ recipient_name }}!'
-        body_label: Corpo
         body_hint: Use {{ variable_name }} em qualquer lugar para conteúdo dinâmico.
+        body_label: Corpo
         body_placeholder: Escreva o seu email…
+        description_hint: Descreva o email que quer que a IA rascunhe (usado apenas
+          para geração com IA).
+        description_placeholder: 'ex.: Um email de boas-vindas amigável para novos
+          clientes com os próximos passos.'
+        documents_empty: Ainda não há modelos de documento prontos. Crie um em Modelos
+          de documento primeiro.
+        documents_hint: Estes modelos de documento são preenchidos com as mesmas variáveis
+          e anexados como PDFs.
         documents_label: Documentos anexados
-        documents_hint: Estes modelos de documento são preenchidos com as mesmas variáveis e anexados como PDFs.
-        documents_empty: Ainda não há modelos de documento prontos. Crie um em Modelos de documento primeiro.
+        name_placeholder: 'ex.: Email de boas-vindas'
+        subject_hint: Pode usar {{ variable_name }} para conteúdo dinâmico.
+        subject_placeholder: 'ex.: Bem-vindo ao {{ workspace_name }}, {{ recipient_name
+          }}!'
+      index:
+        delete: Eliminar
+        delete_confirm: Eliminar este modelo?
+        documents_count:
+          one: 1 documento
+          other: "%{count} documentos"
+        edit: Editar
+        empty_description: Crie o seu primeiro modelo de email e reutilize-o sempre
+          que quiser compor.
+        empty_title: Ainda não há modelos
+        new_template: Novo modelo
+        subtitle: Crie emails reutilizáveis — assunto, corpo e documentos anexados
+          — para usar no compositor.
+        title: Modelos de email
+        variables_count:
+          one: 1 variável
+          other: "%{count} variáveis"
+      new:
+        cancel: Cancelar
+        save: Criar modelo
+        subtitle: Escreva o email uma vez e reutilize-o — ou deixe a IA rascunhá-lo
+          a partir de uma descrição.
+        title: Novo modelo de email
+      regenerate:
+        generating: Geração com IA iniciada.
+      update:
+        updated: Modelo atualizado.

@@ -2,4 +2,4 @@
 en:
   components:
     ai_provenance_note:
-      processed_by: "Processed by %{provider}"
+      processed_by: Processed by %{provider}

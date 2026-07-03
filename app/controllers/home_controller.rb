@@ -23,6 +23,13 @@ class HomeController < ApplicationController
     # rewind page (?rewind=1) routes here instead of re-reading feed_items.
     return render_rewind if rewind_request?
 
+    # A freshly-connected mailbox whose first scan hasn't completed gets the
+    # full-screen "Scout is reading your inbox" stage instead of an empty feed.
+    @first_sync = Onboarding::FirstSyncStatus.new(current_user)
+    if @first_sync.stage?
+      render :first_sync and return
+    end
+
     @attention = @reader.attention
     @pagy, items = pagy_countless(@reader.timeline_scope, limit: PAGE_SIZE)
     @timeline = @reader.present(items)

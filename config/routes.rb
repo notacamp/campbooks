@@ -50,6 +50,7 @@ Rails.application.routes.draw do
       post :snooze
       post :suggest_document_types
       post :suggest_tags
+      get :first_sync_status
     end
   end
 

@@ -64,10 +64,6 @@ es:
       took: tardó %{duration}
       trigger_data: Datos del disparador
   workflows:
-    notion_fields:
-      error: "No se pudieron cargar los campos: %{message}"
-      prompt: Ingrese un ID de base de datos y cargue sus campos.
-      no_fields: Esta base de datos no tiene campos que Campbooks pueda rellenar.
     edit:
       back_to_workflows: Volver a flujos de trabajo
       description_label: Descripción (opcional)
@@ -108,6 +104,10 @@ es:
         other: "%{count} pasos"
       subtitle: Automatice el procesamiento de correos con disparadores y acciones
       trigger_meta: Disparador %{trigger} · %{steps}
+    notion_fields:
+      error: 'No se pudieron cargar los campos: %{message}'
+      no_fields: Esta base de datos no tiene campos que Campbooks pueda rellenar.
+      prompt: Ingrese un ID de base de datos y cargue sus campos.
   zoho_drive_accounts:
     new:
       connect_button: Conectar cuenta de Zoho Drive

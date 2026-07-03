@@ -3,30 +3,31 @@ pt:
   settings:
     security:
       audit_log:
-        link: "Atividade de início de sessão e segurança"
-        link_hint: "Reveja inícios de sessão e alterações de segurança recentes"
-        time_ago: "há %{time}"
-        index:
-          heading: "Atividade de início de sessão e segurança"
-          subheading: "Um registo dos inícios de sessão e das alterações de segurança na sua conta."
-          empty: "Ainda não há atividade de segurança."
         actions:
-          sign_in: "Sessão iniciada"
-          sign_out: "Sessão terminada"
-          mfa_challenge_failed: "Verificação de dois fatores falhou"
-          mfa_challenge_passed: "Verificação de dois fatores aprovada"
-          mfa_recovery_code_used: "Código de recuperação usado"
-          mfa_recovery_codes_generated: "Códigos de recuperação gerados"
-          mfa_disabled: "Autenticação de dois fatores desativada"
-          mfa_totp_enabled: "Aplicação autenticadora ativada"
-          mfa_totp_disabled: "Aplicação autenticadora desativada"
-          mfa_email_otp_enabled: "Código por email ativado"
-          mfa_email_otp_disabled: "Código por email desativado"
-          mfa_passkey_added: "Chave de acesso adicionada"
-          mfa_passkey_removed: "Chave de acesso removida"
-          sign_in_method_added: "Método de início de sessão adicionado"
-          sign_in_method_removed: "Método de início de sessão removido"
-          password_changed: "Palavra-passe alterada"
-          data_exported: "Dados exportados"
-          account_deletion_requested: "Eliminação de conta solicitada"
-          admin_role_changed: "Função de administrador alterada"
+          account_deletion_requested: Eliminação de conta solicitada
+          admin_role_changed: Função de administrador alterada
+          data_exported: Dados exportados
+          mfa_challenge_failed: Verificação de dois fatores falhou
+          mfa_challenge_passed: Verificação de dois fatores aprovada
+          mfa_disabled: Autenticação de dois fatores desativada
+          mfa_email_otp_disabled: Código por email desativado
+          mfa_email_otp_enabled: Código por email ativado
+          mfa_passkey_added: Chave de acesso adicionada
+          mfa_passkey_removed: Chave de acesso removida
+          mfa_recovery_code_used: Código de recuperação usado
+          mfa_recovery_codes_generated: Códigos de recuperação gerados
+          mfa_totp_disabled: Aplicação autenticadora desativada
+          mfa_totp_enabled: Aplicação autenticadora ativada
+          password_changed: Palavra-passe alterada
+          sign_in: Sessão iniciada
+          sign_in_method_added: Método de início de sessão adicionado
+          sign_in_method_removed: Método de início de sessão removido
+          sign_out: Sessão terminada
+        index:
+          empty: Ainda não há atividade de segurança.
+          heading: Atividade de início de sessão e segurança
+          subheading: Um registo dos inícios de sessão e das alterações de segurança
+            na sua conta.
+        link: Atividade de início de sessão e segurança
+        link_hint: Reveja inícios de sessão e alterações de segurança recentes
+        time_ago: há %{time}

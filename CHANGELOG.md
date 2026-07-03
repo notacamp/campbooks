@@ -18,6 +18,11 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Watch Scout sort your inbox the moment you connect it.** A brand-new account now
+  lands on a live first-sync stage instead of an empty feed: counters tick up as your
+  first scan reads and sorts mail (found · sorted · needs you), then one tap drops you
+  into the sorted feed. The first scan also starts immediately on connect instead of
+  waiting for the next polling cycle.
 - **Composing is its own room now.** Replying pulls up the **Dock** — a bottom
   sheet over your inbox — instead of a form wedged into the thread. Recipients
   and subject collapse to one line when they're already right, the quoted
@@ -57,13 +62,6 @@ major, minor, or patch change here.
   blocked, or assigned to you.
 - `tasks:backfill_extraction` rake task to re-run task extraction over recent
   mail (e.g. after enabling the Tasks module), gated and idempotent.
-- **Suggested tasks now appear on the home feed.** When Scout extracts an action
-  item from an email, it shows up as a "Suggested task" card with one-tap
-  **Add to tasks** / **Dismiss** — no more suggestions piling up unseen in the
-  tasks triage queue. Accepted tasks keep surfacing later when they become due,
-  blocked, or assigned to you.
-- `tasks:backfill_extraction` rake task to re-run task extraction over recent
-  mail (e.g. after enabling the Tasks module), gated and idempotent.
 - **Tune how Scout reads your inbox — in plain language.** A new **Settings → AI
   Prompts** page, plus a **Customize AI** button on the Tasks, Documents, and
   Reminders pages, lets you add your own guidance for how Scout extracts tasks,
@@ -73,6 +71,24 @@ major, minor, or patch change here.
 
 ### Changed
 
+- **Onboarding is one screen now, not homework.** After signup you meet Scout, connect
+  an inbox, and that's it — workspace details, tax IDs, document types, and tags no
+  longer stand between you and the product. The full setup wizard survives behind
+  "More setup options" and in Settings.
+- **The getting-started checklist no longer owns your home screen.** It's a quiet
+  "Scout can do more" card riding along in the feed, capped at three next steps, and
+  finished tasks simply leave the list. Document types and tags now lead with Scout
+  drafting them for you.
+- **Sign-in and signup got a face-lift.** Flat, confident screens instead of boxed
+  gray forms — and the email verification step is now a six-box code input that
+  advances, accepts pasting, and submits itself on the last digit.
+- **The product tour reads like a demo, not a slideshow.** Scenes settle in the middle
+  of the screen with staged entrances, progress is six dots, Scout appears as a named
+  presence on its ember note, and the finale actually celebrates. It's offered as
+  "See it in action first" before you connect.
+- **First-run nudges know their place.** The skim-rings and Scout coachmarks no longer
+  fire on a never-connected home, and the greeting no longer claims "all clear" before
+  an inbox exists.
 - **The inbox now speaks the app's design language.** The mail view sheds its
   legacy three-pane, hairline-fenced look: date/priority group bars are now
   floating frosted pills the list scrolls under, thread rows hover and select as
@@ -92,6 +108,8 @@ major, minor, or patch change here.
 
 ### Fixed
 
+- **Home no longer crashes for accounts with no starred contacts** (an empty-set
+  sentinel in the feed's look-back query assumed uuid primary keys).
 - **Keyboard shortcuts no longer scramble the inbox.** After moving between emails
   with the arrow keys, pressing a shortcut (archive, reply, forward…) could leave the
   inbox unstyled — plain text with underlined links — until you reloaded. Shortcuts

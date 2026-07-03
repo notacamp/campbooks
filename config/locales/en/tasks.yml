@@ -118,12 +118,13 @@ en:
     remind:
       no_due: Add a due date first to set a reminder.
       remind_failed: Couldn't set the reminder.
-      reminded: Reminder set — confirm it on the Reminders page to add it to your calendar.
+      reminded: Reminder set — confirm it on the Reminders page to add it to your
+        calendar.
     show:
       activity: Activity
       add_document: Attach a document
       add_email: Link an email
-      ai_reasoning: "Scout flagged this:"
+      ai_reasoning: 'Scout flagged this:'
       archive: Archive
       archived_notice: This task is archived. It's hidden from your active lists.
       assignees: Assignees
@@ -148,7 +149,7 @@ en:
       no_labels: No labels.
       no_linked_emails: No linked emails.
       origin: Created from this email
-      priority: "Priority: %{level}"
+      priority: 'Priority: %{level}'
       relationship: Relationship
       remind: Remind me
       reminder_set: Reminder set
@@ -164,11 +165,12 @@ en:
       dismiss: Dismiss
       empty_body: Scout hasn't suggested any tasks right now.
       empty_title: Nothing to review
-      from_document: "From document: %{title}"
-      from_email: "From email: %{subject}"
-      subtitle: Scout pulled these action items out of your email. Keep the ones that matter.
+      from_document: 'From document: %{title}'
+      from_email: 'From email: %{subject}'
+      subtitle: Scout pulled these action items out of your email. Keep the ones that
+        matter.
       title: Suggested tasks
-      why: "Why this is a task:"
+      why: 'Why this is a task:'
     unarchive:
       unarchived: Task restored.
     unlink_email:

@@ -20,7 +20,9 @@ module Campbooks
   # subjects) stays as realistic fixed strings, like the existing skim demos.
   class ProductTour < Campbooks::Base
     # @param autostart [Boolean] open automatically on connect (first run on home)
-    # @param connect_path [String] where "Connect your inbox" sends the user
+    # @param connect_path [String, nil] where "Connect your inbox" sends the user;
+    #   nil when the connect affordance sits right behind the overlay (the welcome
+    #   screen) — the finish CTA then simply closes the tour.
     def initialize(autostart: false, connect_path: "/email_messages?inbox_settings=accounts", **attrs)
       @autostart = autostart
       @connect_path = connect_path
@@ -45,13 +47,16 @@ module Campbooks
       ) do
         header
         div(class: "relative flex-1 overflow-y-auto") do
-          div(class: "mx-auto w-full max-w-xl px-5 py-8 sm:py-10") do
-            scene_welcome
-            scene_feed
-            scene_skim
-            scene_reminder
-            scene_scout
-            scene_finish
+          # Short scenes settle at the optical middle; tall ones (skim) scroll.
+          div(class: "flex min-h-full flex-col justify-center") do
+            div(class: "mx-auto w-full max-w-xl px-5 py-8 sm:py-10") do
+              scene_welcome
+              scene_feed
+              scene_skim
+              scene_reminder
+              scene_scout
+              scene_finish
+            end
           end
         end
         footer
@@ -63,24 +68,29 @@ module Campbooks
     # ── Chrome ──────────────────────────────────────────────────────────────
 
     def header
-      div(class: "flex items-center gap-4 border-b border-border px-5 py-3.5") do
-        # Step counter + progress track.
-        div(class: "flex min-w-0 flex-1 items-center gap-3") do
-          span(
-            class: "shrink-0 text-xs font-semibold tabular-nums text-muted-foreground",
-            data: { product_tour_target: "stepLabel", tmpl: t(".step", current: "{current}", total: "{total}") }
-          ) { t(".step", current: 1, total: SCENES.size) }
-          div(class: "h-1.5 w-full max-w-[14rem] overflow-hidden rounded-full bg-border") do
-            div(
-              class: "h-full rounded-full bg-ember-gradient transition-[width] duration-500 ease-out",
-              style: "width: #{((1.0 / SCENES.size) * 100).round}%",
-              data: { product_tour_target: "progress" }
+      div(class: "grid grid-cols-[1fr_auto_1fr] items-center gap-4 px-5 py-4") do
+        # Live step announcement for assistive tech; the dots carry it visually.
+        span(
+          class: "sr-only",
+          aria_live: "polite",
+          data: { product_tour_target: "stepLabel", tmpl: t(".step", current: "{current}", total: "{total}") }
+        ) { t(".step", current: 1, total: SCENES.size) }
+        # Scene dots, centered: ember pill = where you are, ember dot = done,
+        # bordered dot = still ahead.
+        div(class: "col-start-2 flex items-center gap-2", aria_hidden: "true") do
+          SCENES.size.times do |i|
+            span(
+              class: class_names(
+                "h-2 rounded-full transition-all duration-300",
+                i.zero? ? "w-5 bg-ember-gradient" : "w-2 border-[1.5px] border-border"
+              ),
+              data: { product_tour_target: "dot" }
             )
           end
         end
         button(
           type: "button",
-          class: "shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+          class: "col-start-3 justify-self-end rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
           data: { action: "click->product-tour#skip" }
         ) { t(".skip") }
       end
@@ -203,15 +213,18 @@ module Campbooks
               span(class: "shrink-0 text-xs text-muted-foreground tabular-nums") { "09:14" }
             end
             p(class: "mt-0.5 truncate text-sm text-muted-foreground") { "Your transfer needs confirmation" }
+            # Scout's note — an entity contributing, with a face and a name,
+            # on the same ember glass it wears across the app.
             div(
               id: "tour-feed-summary",
-              class: "mt-3 hidden rounded-xl bg-muted/60 px-3.5 py-3"
+              class: "scout-glass mt-3 hidden rounded-2xl px-3.5 py-3"
             ) do
-              div(class: "flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground") do
-                raw(safe(spark_svg))
-                span { t(".scout_says") }
+              div(class: "flex items-center gap-2") do
+                render Campbooks::ScoutAvatar.new(size: :xs)
+                span(class: "text-[13px] font-semibold text-foreground") { "Scout" }
+                span(class: "rounded-md border border-border bg-background/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground") { t(".ai_tag") }
               end
-              p(class: "mt-1.5 text-sm leading-relaxed text-foreground") { t(".s2_summary") }
+              p(class: "mt-2 text-sm leading-relaxed text-foreground") { t(".s2_summary") }
             end
           end
           # An ambient, low-priority row Scout kept out of the way — the contrast.
@@ -343,7 +356,7 @@ module Campbooks
         div(class: "mt-5 rounded-2xl border border-border bg-card p-4") do
           # Scout's opener.
           div(class: "flex items-start gap-2.5") do
-            span(class: "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ember-gradient text-white") { raw(safe(spark_svg)) }
+            render Campbooks::ScoutAvatar.new(size: :sm, class: "mt-0.5")
             div(class: "rounded-2xl rounded-tl-sm bg-muted px-3.5 py-2.5 text-sm leading-relaxed text-foreground") { t(".s5_greeting") }
           end
           # The suggested prompt — tapping it "asks" Scout and reveals the reply.
@@ -356,7 +369,7 @@ module Campbooks
           end
           # Scout's scripted answer.
           div(id: "tour-scout-reply", class: "mt-3 hidden items-start gap-2.5", data: { tour_flex: "true" }) do
-            span(class: "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ember-gradient text-white") { raw(safe(spark_svg)) }
+            render Campbooks::ScoutAvatar.new(size: :sm, class: "mt-0.5")
             div(class: "rounded-2xl rounded-tl-sm bg-muted px-3.5 py-2.5 text-sm leading-relaxed text-foreground") do
               p { t(".s5_reply_intro") }
               ul(class: "mt-1.5 space-y-1") do
@@ -379,14 +392,25 @@ module Campbooks
     def scene_finish
       scene(:finish) do
         div(class: "flex flex-col items-center pt-6 text-center") do
-          span(class: "flex h-16 w-16 items-center justify-center rounded-2xl bg-ember-gradient text-white shadow-ember") { raw(safe(spark_svg(size: "h-8 w-8"))) }
-          h2(class: "mt-5 text-3xl font-bold tracking-tight text-foreground text-balance") { t(".s6_title") }
+          # The one indulgent moment: the ember mark pops in under an expanding
+          # glow ring when the scene enters (both are one-shot, reduced-motion safe).
+          div(class: "relative") do
+            span(
+              class: "absolute -inset-3 rounded-full tour-finale-ring",
+              style: "background: var(--ember); filter: blur(16px);",
+              aria_hidden: "true"
+            )
+            span(class: "relative flex h-16 w-16 items-center justify-center rounded-2xl bg-ember-gradient text-white shadow-ember animate-sync-done-pop") do
+              raw(safe(spark_svg(size: "h-8 w-8")))
+            end
+          end
+          h2(class: "mt-6 text-3xl font-bold tracking-tight text-foreground text-balance") { t(".s6_title") }
           p(class: "mt-3 max-w-md text-[15px] leading-relaxed text-muted-foreground") { t(".s6_body") }
           div(class: "mt-8 flex w-full max-w-xs flex-col gap-2.5") do
             button(
               type: "button",
               class: "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-ember-gradient px-5 py-3 text-sm font-semibold text-white shadow-ember transition-transform duration-150 active:scale-[0.98]",
-              data: { action: "click->product-tour#finishConnect", tour_connect_path: @connect_path }
+              data: { action: "click->product-tour#finishConnect", tour_connect_path: @connect_path }.compact
             ) { t(".s6_cta_connect") }
             button(
               type: "button",

@@ -1,50 +1,6 @@
 ---
 pt:
   email_messages:
-    notion_exports:
-      new:
-        title: Guardar no Notion
-        subtitle: "Adicionar este email (%{subject}) ao Notion."
-        no_subject: "(sem assunto)"
-        heading: Para onde deve ir?
-        workspace: Espaço de trabalho
-        workspace_one: "Espaço de trabalho: %{name}"
-        to_database: Adicionar a uma base de dados
-        to_database_desc: Criar um item na base de dados e preencher os seus campos.
-        to_page: Criar uma página
-        to_page_desc: Adicionar uma subpágina sob uma página à sua escolha.
-      databases:
-        search: Pesquisar bases de dados…
-        none: Nenhuma base de dados encontrada. Partilhe uma base de dados com esta
-          integração no Notion.
-        error: "Não foi possível carregar as bases de dados: %{message}"
-      database_form:
-        untitled: Base de dados sem título
-        back: "← Bases de dados"
-        create_item: Criar item no Notion
-        error: "Não foi possível carregar a base de dados: %{message}"
-        attachments_count:
-          one: "%{count} anexo"
-          other: "%{count} anexos"
-      pages:
-        search: Pesquisar páginas…
-        parent_page: Página principal
-        none: Nenhuma página encontrada. Partilhe uma página com esta integração no
-          Notion.
-        page_title: Título da página
-        note: Nota (opcional)
-        attach_files:
-          one: Anexar o anexo do email
-          other: Anexar os %{count} anexos do email
-        create_page: Criar página no Notion
-        error: "Não foi possível carregar as páginas: %{message}"
-      create:
-        pick_destination: Escolha um destino no Notion.
-        created: Guardado no Notion.
-        failed: Não foi possível criar o item no Notion.
-        failed_with: "Exportação para o Notion falhou: %{message}"
-      errors:
-        not_connected: Ligue o Notion primeiro.
     board:
       index:
         heading: Quadro
@@ -95,6 +51,50 @@ pt:
       scout_keyboard_hint: Cmd+Shift+E para manual
       scout_label: Scout
       toggle_chat_aria: Alternar chat
+    notion_exports:
+      create:
+        created: Guardado no Notion.
+        failed: Não foi possível criar o item no Notion.
+        failed_with: 'Exportação para o Notion falhou: %{message}'
+        pick_destination: Escolha um destino no Notion.
+      database_form:
+        attachments_count:
+          one: "%{count} anexo"
+          other: "%{count} anexos"
+        back: "← Bases de dados"
+        create_item: Criar item no Notion
+        error: 'Não foi possível carregar a base de dados: %{message}'
+        untitled: Base de dados sem título
+      databases:
+        error: 'Não foi possível carregar as bases de dados: %{message}'
+        none: Nenhuma base de dados encontrada. Partilhe uma base de dados com esta
+          integração no Notion.
+        search: Pesquisar bases de dados…
+      errors:
+        not_connected: Ligue o Notion primeiro.
+      new:
+        heading: Para onde deve ir?
+        no_subject: "(sem assunto)"
+        subtitle: Adicionar este email (%{subject}) ao Notion.
+        title: Guardar no Notion
+        to_database: Adicionar a uma base de dados
+        to_database_desc: Criar um item na base de dados e preencher os seus campos.
+        to_page: Criar uma página
+        to_page_desc: Adicionar uma subpágina sob uma página à sua escolha.
+        workspace: Espaço de trabalho
+        workspace_one: 'Espaço de trabalho: %{name}'
+      pages:
+        attach_files:
+          one: Anexar o anexo do email
+          other: Anexar os %{count} anexos do email
+        create_page: Criar página no Notion
+        error: 'Não foi possível carregar as páginas: %{message}'
+        none: Nenhuma página encontrada. Partilhe uma página com esta integração no
+          Notion.
+        note: Nota (opcional)
+        page_title: Título da página
+        parent_page: Página principal
+        search: Pesquisar páginas…
     reply_actions:
       forward_title: Reencaminhar
       reply_all_title: Responder a todos
@@ -165,7 +165,7 @@ pt:
       no_subject: "(sem assunto)"
       pin_title: Tornar prioritário
       priority_section: Prioritário
-      select_section: "Selecionar tudo em %{section}"
+      select_section: Selecionar tudo em %{section}
       senders_more: "%{first}, %{second}, e mais"
       sent_to_prefix: 'Para:'
       unpin_title: Remover prioridade

@@ -120,6 +120,26 @@ en:
         type_company: Company
         type_personal: Personal
         workspace_title: Workspace
+      welcome:
+        ai_key_body: Self-hosted setups bring their own model. Two minutes, one key.
+        ai_key_title: Add an AI key so Scout can read
+        connected_title:
+          one: Inbox connected
+          other: "%{count} inboxes connected"
+        continue_home: Take me to my inbox
+        greeting: Hi %{name}, I'm Scout.
+        greeting_anonymous: Hi, I'm Scout.
+        more_setup: More setup options
+        pitch: 'I read what lands in your inbox, sort it, and surface only what needs
+          you: replies, deadlines, documents. Connect your inbox and I''ll get started.'
+        privacy_note: Campbooks reads your inbox to sort it and pull out documents
+          and deadlines. Your mail stays private, and you can disconnect anytime in
+          Settings.
+        see_demo: See it in action first
+        skip: Skip for now and explore the app
+        type_company: Work
+        type_personal: Personal
+        type_question: Will you mostly use this for work or personal mail?
       workspace:
         address_line1_label: Address line 1
         address_line1_placeholder: Street address
@@ -181,3 +201,35 @@ en:
         no_suggestions: No additional suggestions — your template tags cover the common
           cases well.
         save_hint: Check the suggestions you want to add, then save.
+  setup_status:
+    items:
+      ai_configuration:
+        cta: Set up AI
+        description: 'Self-hosted setups bring their own model: add one key and Scout
+          starts reading, sorting, and drafting.'
+        message: Add an AI key so Scout can read
+      document_provider:
+        cta: Add document AI
+        description: A vision-capable key lets Scout read PDFs, scans, and photos
+          too. Optional, and easy to add later.
+        message: Add document AI (optional)
+      document_types:
+        cta: Draft with Scout
+        description: 'Invoices, contracts, receipts: Scout can propose a starting
+          set for your kind of work, ready to edit.'
+        message: Let Scout draft your document types
+      email_account:
+        cta: Connect an inbox
+        description: 'Scout sorts as mail lands: what needs you, deadlines, and the
+          documents hiding in attachments.'
+        message: Connect your inbox
+      tags:
+        cta: Suggest with Scout
+        description: Tags teach Scout how you think about mail. Start from suggestions
+          and change anything.
+        message: Let Scout suggest email tags
+      workspace:
+        cta: Introduce yourself
+        description: A sentence about what you do helps Scout sort and draft the way
+          you would.
+        message: Introduce your workspace

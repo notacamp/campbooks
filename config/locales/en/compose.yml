@@ -1,3 +1,4 @@
+---
 en:
   components:
     compose:
@@ -16,18 +17,6 @@ en:
         mode_reply_all: Reply all
         restore_aria: Resume writing
         switch_mode: Change reply mode
-      pill:
-        draft_saved: Draft saved
-        resume_aria: Resume your draft
-        untitled: Draft
-      scout_draft:
-        ai_tag: AI
-        drafted_label: drafted from this thread
-        start_blank: Start blank
-        tone_firmer: Firmer
-        tone_shorter: Shorter
-        tone_warmer: Warmer
-        use_draft: Use this draft
       engine:
         bcc_button: Bcc
         cc_button: Cc
@@ -54,8 +43,20 @@ en:
         recipients_more: "%{name} +%{count}"
         saving: Saving…
         schedule: Schedule
-        scout_draft_title: Draft this reply with Scout
         schedule_at_label: Send at
         schedule_send: Schedule send
+        scout_draft_title: Draft this reply with Scout
         send: Send
         signature_default: "%{name} (default)"
+      pill:
+        draft_saved: Draft saved
+        resume_aria: Resume your draft
+        untitled: Draft
+      scout_draft:
+        ai_tag: AI
+        drafted_label: drafted from this thread
+        start_blank: Start blank
+        tone_firmer: Firmer
+        tone_shorter: Shorter
+        tone_warmer: Warmer
+        use_draft: Use this draft

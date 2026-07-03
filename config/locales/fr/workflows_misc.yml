@@ -63,10 +63,6 @@ fr:
       took: durée %{duration}
       trigger_data: Données du déclencheur
   workflows:
-    notion_fields:
-      error: "Impossible de charger les champs : %{message}"
-      prompt: "Saisissez un ID de base de données et chargez ses champs."
-      no_fields: "Cette base de données n'a pas de champs que Campbooks peut remplir."
     edit:
       back_to_workflows: Retour aux flux de travail
       description_label: Description (optionnelle)
@@ -109,6 +105,10 @@ fr:
       subtitle: Automatisez le traitement de vos e-mails avec des déclencheurs et
         des actions
       trigger_meta: déclencheur %{trigger} · %{steps}
+    notion_fields:
+      error: 'Impossible de charger les champs : %{message}'
+      no_fields: Cette base de données n'a pas de champs que Campbooks peut remplir.
+      prompt: Saisissez un ID de base de données et chargez ses champs.
   zoho_drive_accounts:
     new:
       connect_button: Connecter un compte Zoho Drive

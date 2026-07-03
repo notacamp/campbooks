@@ -23,7 +23,7 @@ en:
         empty: Nothing left to add.
         no_subject: "(no subject)"
         search_placeholder: Search documents and emails…
-        title: "Add to %{pipeline}"
+        title: Add to %{pipeline}
       stage_row:
         description_placeholder: Description (optional)
         name_placeholder: Stage name
