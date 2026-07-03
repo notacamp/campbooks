@@ -63,6 +63,9 @@ pt:
         unread:
           label: Não lidos
           prompt: Resumir os meus e-mails não lidos
+        waiting_on_reply:
+          label: À espera de resposta
+          prompt: Sobre o que ainda estou à espera de resposta?
       subtitle:
         all_caught_up: Está tudo em dia. Pergunte-me sobre os seus e-mails, documentos
           ou contactos sempre que precisar.

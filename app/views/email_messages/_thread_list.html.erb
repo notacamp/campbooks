@@ -75,6 +75,14 @@
   </div>
 <% end %>
 
+<%# "Waiting on replies" — the durable, AI-free counterpart of the Priority band:
+    threads where the owner sent last and is still waiting. Rendered only on page 1
+    (the caller passes the local); infinite-scroll pages omit it so the sticky band
+    and its stable dom id never repeat, and they exclude these threads entirely. %>
+<% if local_assigns.key?(:waiting_threads) %>
+  <%= render "email_messages/waiting_section", waiting_threads: waiting_threads %>
+<% end %>
+
 <% thread_counter = 0 %>
 <%
   sections = grouped_threads(threads, current_group: current_group, tag_groups: tag_groups)

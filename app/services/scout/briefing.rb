@@ -65,6 +65,9 @@ module Scout
         { key: :unread, value: counts[:unread],
           label: I18n.t("scout.briefing.stats.unread.label"), icon: :inbox,
           tone: :accent, prompt: I18n.t("scout.briefing.stats.unread.prompt"), always: true },
+        { key: :waiting_on_reply, value: counts[:waiting_on_reply],
+          label: I18n.t("scout.briefing.stats.waiting_on_reply.label"), icon: :clock,
+          tone: :amber, prompt: I18n.t("scout.briefing.stats.waiting_on_reply.prompt") },
         { key: :docs_review, value: counts[:docs_review],
           label: I18n.t("scout.briefing.stats.docs_review.label"), icon: :document,
           tone: :default, prompt: I18n.t("scout.briefing.stats.docs_review.prompt") },
@@ -95,7 +98,10 @@ module Scout
         unread: safe { emails.where(read: false).count },
         high_priority: safe { emails.where(ai_priority: :high).count },
         docs_review: safe { documents.needs_review.count },
-        this_week: safe { emails.where("received_at >= ?", 1.week.ago).count }
+        this_week: safe { emails.where("received_at >= ?", 1.week.ago).count },
+        # AI-free: the threads the user sent last and is still waiting to hear back
+        # on (Emails::AwaitingReply). Fail-safe to 0 so the briefing never breaks.
+        waiting_on_reply: safe { Emails::AwaitingReply.new(@user).count }
       }
     end
 

@@ -16,6 +16,17 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Campbooks now keeps track of the replies you're still waiting on.** Answer
+  someone and hear nothing back, and that thread rises into a new **Waiting on
+  replies** band at the top of your inbox — showing how long it's been quiet, with
+  a one-tap draft to nudge them — instead of sinking down the list. Scout counts
+  them in its briefing too, so "what am I still waiting to hear back on?" always
+  has an answer. It runs on the plain fact that you sent last, so it works even
+  before you've set up an AI provider; the AI only sharpens the timing and writes
+  the nudge once it's connected.
+
 ### Changed
 
 - **A roomier, calmer calendar.** The month and week views now stretch to fill the
@@ -26,6 +37,10 @@ major, minor, or patch change here.
   an empty slot in the week/day grid, now shows a clear "click to add" cue, and
   timed events read as a tidy time + title line rather than a wall of colored bars.
   Today is gently highlighted throughout.
+
+- The follow-up nudges on the home feed and in Skim's Follow-ups ring now draw on
+  that same signal, so they keep surfacing the threads you're waiting on even when
+  no AI provider is configured.
 
 ## [0.8.0] - 2026-07-03
 

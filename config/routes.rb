@@ -501,6 +501,8 @@ Rails.application.routes.draw do
       get :folders, to: "email_messages/folders#index"
       post :tool, to: "email_tools#create"
       patch :dismiss_todo
+      # Dismiss the "waiting on reply" nudge for this thread from the inbox section.
+      post :dismiss_follow_up
       post   "follow", to: "thread_follows#create", as: :follow
       delete "follow", to: "thread_follows#destroy"
       post :compose, to: "email_compose#create"
