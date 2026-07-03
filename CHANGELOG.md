@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-03
+
 ### Added
 
 - **Watch Scout sort your inbox the moment you connect it.** A brand-new account now
@@ -110,6 +112,12 @@ major, minor, or patch change here.
 
 - **Home no longer crashes for accounts with no starred contacts** (an empty-set
   sentinel in the feed's look-back query assumed uuid primary keys).
+- **The Organizations directory fills itself in.** *Sync from contacts* could come
+  up empty even for a workspace with thousands of contacts, because a contact only
+  becomes an organization after Scout has analyzed it — and that analysis was never
+  guaranteed to run for a mailbox connected with existing history, or one where AI was
+  turned on after import. A background catch‑up now analyzes those skipped contacts on
+  its own, so the directory populates and keeps up with no action from you.
 - **Keyboard shortcuts no longer scramble the inbox.** After moving between emails
   with the arrow keys, pressing a shortcut (archive, reply, forward…) could leave the
   inbox unstyled — plain text with underlined links — until you reloaded. Shortcuts
@@ -656,7 +664,10 @@ major, minor, or patch change here.
 
 - Initial public, source-available release of Campbooks.
 
-[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/notacamp/campbooks/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/notacamp/campbooks/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/notacamp/campbooks/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/notacamp/campbooks/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/notacamp/campbooks/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/notacamp/campbooks/compare/v0.2.1...v0.3.0
