@@ -6,10 +6,10 @@ class OnboardingController < ApplicationController
   # the welcome screen and Settings but never forced on a new user.
   STEPS = %w[welcome workspace email_accounts ai_configuration classification review].freeze
 
-  before_action :load_templates
-  before_action :set_step
-  before_action :ensure_valid_step!
-  before_action :set_previous_step
+  before_action :load_templates, except: :first_sync_status
+  before_action :set_step, except: :first_sync_status
+  before_action :ensure_valid_step!, except: :first_sync_status
+  before_action :set_previous_step, except: :first_sync_status
   before_action :clear_onboarding_snooze, only: [ :update ]
 
   def show
@@ -42,6 +42,11 @@ class OnboardingController < ApplicationController
   def snooze
     session[:onboarding_snoozed] = true
     redirect_to root_path
+  end
+
+  # Polled by the first-sync stage on home while Scout's first scan runs.
+  def first_sync_status
+    render json: Onboarding::FirstSyncStatus.new(Current.user).as_json
   end
 
   # ── AI suggestion endpoints ──────────────────────────────
