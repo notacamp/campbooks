@@ -58,6 +58,13 @@ production:
     # logs, workflow run-history, and dismissed feed cards. Never user content.
     class: RetentionSweepJob
     schedule: every day at 4am
+  contact_analysis_backfill:
+    # Self-heal: profile contacts that were never AI-analyzed (e.g. mail ingested
+    # before a text-AI provider was configured), so Person#organization — and the
+    # Organizations directory built from it — fills in. Bounded per pass; a no-op
+    # once drained. See Contacts::PendingAnalysisCatchUp.
+    class: ContactAnalysisBackfillJob
+    schedule: every 15 minutes
 
 development:
   email_scan:
@@ -89,4 +96,7 @@ development:
     schedule: every minute
   feed_refresh:
     class: Feed::RefreshAllJob
+    schedule: every 15 minutes
+  contact_analysis_backfill:
+    class: ContactAnalysisBackfillJob
     schedule: every 15 minutes
