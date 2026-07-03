@@ -13,7 +13,9 @@
 <%
   pending = @pending_count.to_i
   greeting_subtitle =
-    if pending.zero?
+    if @inbox_state == :none
+      t(".subtitle.fresh")   # pre-connect: don't claim "all clear" over an unconnected inbox
+    elsif pending.zero?
       t(".subtitle.clear")
     elsif pending == 1
       t(".subtitle.single")
@@ -76,7 +78,9 @@
     waits for the lazy rings, and only appears when there's something to skim).
     Held back until the full product tour has been seen, so the walkthrough owns
     the first run and these stay a lightweight follow-up reminder. %>
-<% if current_user.tour_dismissed?("product_tour") && !current_user.tour_dismissed?("home_rings") %>
+<%# Never pre-connect (@inbox_state :none): the rings strip is empty then, so
+    the nudge would point at nothing. %>
+<% if @inbox_state != :none && current_user.tour_dismissed?("product_tour") && !current_user.tour_dismissed?("home_rings") %>
   <%= render Campbooks::Coachmark.new(
         tour_key: "home_rings",
         anchor: "#home_skim_rings",
@@ -90,7 +94,7 @@
 <%# Once the rings nudge is done, a second one-time nudge introduces Scout. Anchors
     to whichever Scout entry is visible — the composer pill (desktop) or the bottom
     nav tab (mobile); placement: top so the bubble sits above either. %>
-<% if current_user.tour_dismissed?("product_tour") && current_user.tour_dismissed?("home_rings") && !current_user.tour_dismissed?("scout_intro") %>
+<% if @inbox_state != :none && current_user.tour_dismissed?("product_tour") && current_user.tour_dismissed?("home_rings") && !current_user.tour_dismissed?("scout_intro") %>
   <%= render Campbooks::Coachmark.new(
         tour_key: "scout_intro",
         anchor: "[data-scout-coach-anchor]",

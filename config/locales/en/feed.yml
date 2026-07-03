@@ -134,6 +134,7 @@ en:
       scout_coach_cta: Got it
       scout_coach_title: Meet Scout
       subtitle:
+        fresh: Connect an inbox below and I'll take the first pass.
         clear: All clear — Scout's on watch so it stays that way.
         lots: "%{n} things need you. Scout stacked them so you can skim, not slog."
         single: Just one thing needs you — Scout filed the rest.
