@@ -1,0 +1,32 @@
+<% colors = MailerStyleHelper::COLORS %>
+<p style="<%= email_text_greeting %>"><%= t(".greeting", name: @user.name) %></p>
+
+<p style="<%= email_text_body %>"><%= t(".intro", count: @count) %></p>
+
+<table cellpadding="0" cellspacing="0" role="presentation" width="100%" style="margin:0 0 24px; background-color:<%= colors[:page_bg] %>; border-radius:8px;">
+  <tr>
+    <td style="padding:6px 20px;">
+      <% @items.each do |item| %>
+        <table cellpadding="0" cellspacing="0" role="presentation" width="100%" style="margin:10px 0;">
+          <tr>
+            <td>
+              <a href="<%= item[:url] %>" style="text-decoration:none; color:<%= colors[:text_heading] %>; font-size:15px; font-weight:600; line-height:1.3;"><%= item[:subject] %></a>
+              <div style="margin-top:3px; color:<%= colors[:text_secondary] %>; font-size:13px; line-height:1.4;">
+                <span style="color:<%= colors[:accent] %>; font-weight:600;"><%= item[:days].positive? ? t(".waiting_days", count: item[:days]) : t(".waiting_recent") %></span><% if item[:reason] %> · <%= item[:reason] %><% end %>
+              </div>
+            </td>
+          </tr>
+        </table>
+      <% end %>
+      <% if @more.positive? %>
+        <p style="margin:12px 0 4px; color:<%= colors[:text_muted] %>; font-size:13px;"><%= t(".and_more", count: @more) %></p>
+      <% end %>
+    </td>
+  </tr>
+</table>
+
+<%= email_button(@inbox_url, t(".cta")) %>
+
+<p style="<%= email_text_muted %>">
+  <%= t(".footer_html", settings_link: link_to(t(".settings_link"), @settings_url, style: "color:#{colors[:text_secondary]}; text-decoration:underline;")) %>
+</p>

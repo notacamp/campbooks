@@ -1,5 +1,23 @@
 ---
 pt:
+  digest_mailer:
+    waiting_on_replies:
+      and_more: e mais %{count}
+      cta: Abrir a caixa de entrada
+      footer_html: Está a receber isto porque o seu resumo de respostas pendentes está ativo. Faça a gestão nas suas %{settings_link}.
+      footer_text: Está a receber isto porque o seu resumo de respostas pendentes está ativo. Faça a gestão em %{settings_url}
+      greeting: Olá %{name},
+      intro:
+        one: Ainda está à espera de resposta a uma conversa. Quer dar um toque?
+        other: Ainda está à espera de resposta a %{count} conversas. Quer dar um toque?
+      settings_link: definições de notificações
+      subject:
+        one: 1 resposta que ainda aguarda
+        other: "%{count} respostas que ainda aguarda"
+      waiting_days:
+        one: À espera há %{count} dia
+        other: À espera há %{count} dias
+      waiting_recent: À espera de resposta
   invitation_mailer:
     invitation:
       accept_button: Aceitar convite

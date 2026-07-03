@@ -34,4 +34,12 @@ class MailerPreviews < ActionMailer::Preview
       name: "Alex"
     )
   end
+
+  # Renders against live data (dev only): the digest of whatever the seed user is
+  # currently waiting on. Shows the empty (unsent) state when nothing is due.
+  def waiting_on_replies_digest
+    user = User.find_by(email_address: "admin@example.com") || User.first
+    thread_ids = user ? Emails::AwaitingReply.new(user).due.map(&:id) : []
+    DigestMailer.waiting_on_replies(user: user, thread_ids: thread_ids)
+  end
 end
