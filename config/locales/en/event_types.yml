@@ -10,16 +10,17 @@ en:
     form:
       ai_prompt_hint: What the AI uses to recognize this kind of event. Supports markdown.
       ai_prompt_label: AI prompt
-      color_label: Color
       create_type: Create type
+      icon_hint: Shown on the event's chip across the calendar. Optional.
+      icon_label: Icon
       name_label: Name
     index:
       add_starters: Add starter types
       add_type: Add type
       back: Back to calendar
-      empty: No event types yet. Add a few so new events get auto-colored by type.
+      empty: No event types yet. Add a few so new events get tagged by type.
       heading: Event types
-      subtitle: Calendar-only tags that auto-color events by what they are.
+      subtitle: Calendar-only tags whose icon marks events by what they are.
     starters:
       success: Starter event types added.
     update:

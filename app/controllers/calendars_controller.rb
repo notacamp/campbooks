@@ -9,11 +9,12 @@ class CalendarsController < ApplicationController
     calendar = account.calendars.find(params[:id])
 
     unless account.managed_by?(Current.user)
-      return redirect_to settings_integrations_calendars_path, error: t(".not_permitted")
+      return redirect_back_or_to settings_integrations_calendars_path, error: t(".not_permitted")
     end
 
     calendar.update(calendar_params)
-    redirect_to settings_integrations_calendars_path, success: t(".updated", name: calendar.name)
+    # Back to wherever the toggle lives — the calendar sidebar or the settings page.
+    redirect_back_or_to settings_integrations_calendars_path, success: t(".updated", name: calendar.name)
   end
 
   private

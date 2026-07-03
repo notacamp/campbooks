@@ -31,6 +31,9 @@ pt:
       renamed: Nome do calendário atualizado para %{name}.
       role_updated: "%{name} é agora %{role}."
       user_not_found: Utilizador não encontrado.
+    refresh:
+      not_permitted: Não tem permissão para atualizar os calendários desta conta.
+      started: A atualizar a lista de calendários…
   calendars:
     update:
       not_permitted: Não tem permissão para gerir este calendário.

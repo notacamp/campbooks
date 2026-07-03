@@ -4,6 +4,7 @@ module Campbooks
     # Links to the event's edit page (the view+edit surface for v1).
     class EventRow < Campbooks::Base
       include TimeUntil
+      include TypeIcon
 
       def initialize(event:)
         @event = event
@@ -18,7 +19,10 @@ module Campbooks
           span(class: "w-16 shrink-0 text-xs text-muted-foreground tabular-nums") { time_label }
           span(class: "h-2 w-2 shrink-0 rounded-full", style: "background-color: #{@event.display_color}")
           div(class: "min-w-0 flex-1") do
-            span(class: "block text-sm text-foreground truncate") { @event.title.presence || t(".untitled") }
+            span(class: "flex min-w-0 items-center gap-1.5 text-sm text-foreground") do
+              type_icon(@event, "h-3 w-3 flex-shrink-0 text-muted-foreground")
+              span(class: "min-w-0 truncate") { @event.title.presence || t(".untitled") }
+            end
             if (sub = subtitle)
               span(class: "block text-xs text-gray-400 truncate") { sub }
             end

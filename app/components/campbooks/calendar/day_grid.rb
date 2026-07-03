@@ -2,6 +2,7 @@ module Campbooks
   module Calendar
     class DayGrid < Campbooks::Base
       include TimeGrid
+      include TypeIcon
 
       def initialize(date:, events:, reminders: [], snoozed_threads: [], scheduled_emails: [])
         @date = date
@@ -57,8 +58,13 @@ module Campbooks
             all_day.each do |e|
               a(href: helpers.edit_calendar_event_path(e),
                 data: { "calendar-event-modal-open": helpers.edit_calendar_event_path(e) },
-                class: "max-w-full truncate rounded px-2 py-0.5 text-xs font-medium",
-                style: "background-color: #{e.display_color}; color: #{contrast_on(e.display_color)}") { e.title.presence || t("components.calendar.event_row.untitled") }
+                class: "max-w-full rounded px-2 py-0.5 text-xs font-medium",
+                style: "background-color: #{e.display_color}; color: #{contrast_on(e.display_color)}") do
+                span(class: "flex min-w-0 items-center gap-1") do
+                  type_icon(e, "h-3 w-3 flex-shrink-0")
+                  span(class: "min-w-0 truncate") { e.title.presence || t("components.calendar.event_row.untitled") }
+                end
+              end
             end
             @reminders.each { |reminder| render Campbooks::Calendar::ReminderChip.new(reminder: reminder) }
             @snoozed_threads.each { |thread| render Campbooks::Calendar::SnoozedChip.new(thread: thread) }
@@ -91,7 +97,10 @@ module Campbooks
           data: { "calendar-event-modal-open": helpers.edit_calendar_event_path(e) }.merge(drag ? { "calendar-dnd-target": "event", "event-id": e.id } : {}),
           class: class_names("absolute overflow-hidden rounded-lg px-2 py-1 text-xs leading-tight shadow-sm ring-1 ring-black/5", ("cursor-grab" if drag)),
           style: "top:#{box[:top]}px; height:#{box[:height]}px; left:#{box[:left]}%; width:#{box[:width]}%; background-color:#{color}; color:#{contrast_on(color)}") do
-          span(class: "block truncate font-semibold") { e.title.presence || t("components.calendar.event_row.untitled") }
+          span(class: "flex min-w-0 items-center gap-1 font-semibold") do
+            type_icon(e, "h-3 w-3 flex-shrink-0")
+            span(class: "min-w-0 truncate") { e.title.presence || t("components.calendar.event_row.untitled") }
+          end
           span(class: "block truncate opacity-90") { l(e.start_at, format: :clock) }
         end
       end

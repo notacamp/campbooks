@@ -2,6 +2,7 @@
 en:
   calendar:
     index:
+      close_sidebar: Close
       connect_cta: Connect a calendar
       empty_desc: Connect a Google or Zoho calendar to see and manage your events
         here.
@@ -11,8 +12,10 @@ en:
       next: Next
       previous: Previous
       reminders: Reminders
+      sidebar_title: Calendars
       title: Calendar
       today: Today
+      toggle_sidebar: Show or hide the calendar list
       upcoming: Upcoming
       view_agenda: Agenda
       view_day: Day
@@ -33,9 +36,6 @@ en:
       all_day_label: All day
       calendar_label: Calendar
       cancel: Cancel
-      color_default: Calendar color
-      color_hint: Leave on calendar color to use the type's color.
-      color_label: Color
       create: Create event
       delete: Delete event
       delete_confirm: Delete this event?
@@ -64,6 +64,34 @@ en:
       rsvp_saved: Your response was saved.
     update:
       updated: Event updated.
+  calendar_imports:
+    create:
+      imported:
+        one: 1 event imported.
+        other: "%{count} events imported."
+      no_calendar: Pick a calendar to import into.
+      no_file: Choose an .ics file to import.
+      parse_failed: That file couldn't be read as a calendar. Export a fresh .ics and try again.
+      skipped_duplicate:
+        one: 1 duplicate skipped.
+        other: "%{count} duplicates skipped."
+      skipped_malformed:
+        one: 1 unreadable event skipped.
+        other: "%{count} unreadable events skipped."
+      skipped_recurring:
+        one: 1 recurring event skipped (not supported yet).
+        other: "%{count} recurring events skipped (not supported yet)."
+      too_large: That file is too large (2 MB max).
+      truncated: File had more than %{max} events — only the first %{max} were imported.
+      wrong_type: That doesn't look like a calendar file (.ics).
+    new:
+      calendar_label: Import into
+      file_hint: Up to %{max_events} events per file. Recurring events are skipped for now.
+      file_label: Calendar file (.ics)
+      no_writable_calendars: Connect a writable, syncing calendar before importing.
+      submit: Import events
+      subtitle: Bring events over from another calendar app. Imported events sync out to your provider just like ones you create here.
+      title: Import events
   components:
     calendar:
       agenda_list:
@@ -102,6 +130,24 @@ en:
         now: Now
         today: Today
         tomorrow: Tomorrow
+      sidebar:
+        account_color: Account color
+        add: Add
+        add_calendars:
+          one: More calendars (%{count})
+          other: More calendars (%{count})
+        calendar_options: Calendar options
+        color_label: Color
+        connect_account: Connect an account
+        hide_calendar: Hide from my calendar
+        import_ics: Import events (.ics)
+        managers_only: Only calendar managers can enable these.
+        none_synced: No calendars syncing yet.
+        primary: (primary)
+        refresh_list: Refresh calendar list
+        show_calendar: Show on my calendar
+        stop_syncing: Stop syncing for everyone
+        stop_syncing_confirm: Stop syncing %{name}? Its events disappear from the calendar for everyone on this account.
       week_grid:
         add: "+ Add"
         untitled: "(No title)"

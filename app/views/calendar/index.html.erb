@@ -13,59 +13,94 @@
      else t(".upcoming")
      end %>
 
-<div data-controller="calendar-nav">
-  <!-- Header: period + navigation -->
-  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
-    <h1 class="text-xl font-semibold tracking-tight text-foreground"><%= period_label %></h1>
+<div data-controller="calendar-nav calendar-sidebar" data-action="click@window->calendar-sidebar#closeMenus">
+  <div class="flex gap-6">
+    <% if @has_calendars %>
+      <!-- Manage-calendars sidebar (lg+; the header button opens it as a dialog below lg) -->
+      <aside data-calendar-sidebar-target="aside" class="hidden w-60 flex-shrink-0 lg:flex lg:flex-col">
+        <%= render(Campbooks::Calendar::Sidebar.new(accounts: @calendar_accounts, user: Current.user, view: @view, date: @date, managed_account_ids: @managed_calendar_account_ids)) %>
+      </aside>
+    <% end %>
 
-    <div class="flex items-center gap-2">
-      <div class="inline-flex items-center overflow-hidden rounded-lg border border-border">
-        <%= link_to calendar_path(view: @view, date: @prev_date.iso8601),
-              class: "px-2 py-1.5 text-gray-600 hover:bg-muted transition-colors", "aria-label": t(".previous"),
-              data: { "calendar-prev": "" } do %>
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-        <% end %>
-        <%= link_to t(".today"), calendar_path(view: @view, date: Date.current.iso8601),
-              class: "border-x border-border px-3 py-1.5 text-sm text-gray-700 hover:bg-muted transition-colors",
-              data: { "calendar-today": "" } %>
-        <%= link_to calendar_path(view: @view, date: @next_date.iso8601),
-              class: "px-2 py-1.5 text-gray-600 hover:bg-muted transition-colors", "aria-label": t(".next"),
-              data: { "calendar-next": "" } do %>
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-        <% end %>
+    <div class="min-w-0 flex-1">
+      <!-- Header: period + navigation -->
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
+        <div class="flex min-w-0 items-center gap-2">
+          <% if @has_calendars %>
+            <button type="button" data-action="calendar-sidebar#toggle"
+                    title="<%= t(".toggle_sidebar") %>" aria-label="<%= t(".toggle_sidebar") %>"
+                    class="flex h-8 w-8 flex-shrink-0 cursor-pointer items-center justify-center rounded-lg text-gray-600 hover:bg-muted transition-colors">
+              <svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+            </button>
+          <% end %>
+          <h1 class="min-w-0 truncate text-xl font-semibold tracking-tight text-foreground"><%= period_label %></h1>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <div class="inline-flex items-center overflow-hidden rounded-lg border border-border">
+            <%= link_to calendar_path(view: @view, date: @prev_date.iso8601),
+                  class: "px-2 py-1.5 text-gray-600 hover:bg-muted transition-colors", "aria-label": t(".previous"),
+                  data: { "calendar-prev": "" } do %>
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            <% end %>
+            <%= link_to t(".today"), calendar_path(view: @view, date: Date.current.iso8601),
+                  class: "border-x border-border px-3 py-1.5 text-sm text-gray-700 hover:bg-muted transition-colors",
+                  data: { "calendar-today": "" } %>
+            <%= link_to calendar_path(view: @view, date: @next_date.iso8601),
+                  class: "px-2 py-1.5 text-gray-600 hover:bg-muted transition-colors", "aria-label": t(".next"),
+                  data: { "calendar-next": "" } do %>
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+            <% end %>
+          </div>
+          <% if @has_calendars %>
+            <%= render(Campbooks::Button.new(variant: :outline, size: :sm,
+                  href: event_types_path)) { t(".event_types") } %>
+            <%= render(Campbooks::Button.new(variant: :primary, size: :sm,
+                  href: new_calendar_event_path(view: @view),
+                  data: { "calendar-event-modal-open": new_calendar_event_path(view: @view) })) { t(".new_event") } %>
+          <% end %>
+        </div>
       </div>
+
+      <div class="mb-4"><%= render(Campbooks::Calendar::ViewTabs.new(current: @view, date: @date)) %></div>
+
       <% if @has_calendars %>
-        <%= render(Campbooks::Button.new(variant: :outline, size: :sm,
-              href: event_types_path)) { t(".event_types") } %>
-        <%= render(Campbooks::Button.new(variant: :primary, size: :sm,
-              href: new_calendar_event_path(view: @view),
-              data: { "calendar-event-modal-open": new_calendar_event_path(view: @view) })) { t(".new_event") } %>
+        <% case @view %>
+        <% when "month" %>
+          <%= render(Campbooks::Calendar::MonthGrid.new(date: @date, events: @events, reminders: @reminders, snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails)) %>
+        <% when "day" %>
+          <%= render(Campbooks::Calendar::DayGrid.new(date: @date, events: @events, reminders: @reminders, snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails)) %>
+        <% when "week" %>
+          <div class="hidden md:block"><%= render(Campbooks::Calendar::WeekTimeGrid.new(date: @date, events: @events, reminders: @reminders, snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails)) %></div>
+          <div class="md:hidden"><%= render(Campbooks::Calendar::WeekGrid.new(date: @date, events: @events, reminders: @reminders, snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails)) %></div>
+        <% else %>
+          <%= render(Campbooks::Calendar::AgendaList.new(events: @events, reminders: @reminders, snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails)) %>
+        <% end %>
+
+        <%= render(Campbooks::Calendar::EventModal.new) %>
+      <% else %>
+        <%= render(Campbooks::EmptyState.new(variant: :standalone, title: t(".empty_title"), description: t(".empty_desc"))) do |es| %>
+          <% es.with_actions do %>
+            <%= link_to t(".connect_cta"), settings_integrations_calendars_path,
+                  class: "inline-flex items-center rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 no-underline" %>
+          <% end %>
+        <% end %>
       <% end %>
     </div>
   </div>
 
-  <div class="mb-4"><%= render(Campbooks::Calendar::ViewTabs.new(current: @view, date: @date)) %></div>
-
   <% if @has_calendars %>
-    <% case @view %>
-    <% when "month" %>
-      <%= render(Campbooks::Calendar::MonthGrid.new(date: @date, events: @events, reminders: @reminders, snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails)) %>
-    <% when "day" %>
-      <%= render(Campbooks::Calendar::DayGrid.new(date: @date, events: @events, reminders: @reminders, snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails)) %>
-    <% when "week" %>
-      <div class="hidden md:block"><%= render(Campbooks::Calendar::WeekTimeGrid.new(date: @date, events: @events, reminders: @reminders, snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails)) %></div>
-      <div class="md:hidden"><%= render(Campbooks::Calendar::WeekGrid.new(date: @date, events: @events, reminders: @reminders, snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails)) %></div>
-    <% else %>
-      <%= render(Campbooks::Calendar::AgendaList.new(events: @events, reminders: @reminders, snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails)) %>
-    <% end %>
-
-    <%= render(Campbooks::Calendar::EventModal.new) %>
-  <% else %>
-    <%= render(Campbooks::EmptyState.new(variant: :standalone, title: t(".empty_title"), description: t(".empty_desc"))) do |es| %>
-      <% es.with_actions do %>
-        <%= link_to t(".connect_cta"), settings_integrations_calendars_path,
-              class: "inline-flex items-center rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:bg-primary/90 no-underline" %>
-      <% end %>
-    <% end %>
+    <!-- Mobile: the same management pane inside a native dialog -->
+    <dialog data-calendar-sidebar-target="dialog" data-action="click->calendar-sidebar#backdropClose"
+            class="m-auto max-h-[85vh] w-[min(92vw,20rem)] overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-xl backdrop:bg-black/40">
+      <div class="mb-3 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-foreground"><%= t(".sidebar_title") %></h2>
+        <button type="button" data-action="calendar-sidebar#closeDialog" aria-label="<%= t(".close_sidebar") %>"
+                class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted transition-colors">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <%= render(Campbooks::Calendar::Sidebar.new(accounts: @calendar_accounts, user: Current.user, view: @view, date: @date, managed_account_ids: @managed_calendar_account_ids)) %>
+    </dialog>
   <% end %>
 </div>

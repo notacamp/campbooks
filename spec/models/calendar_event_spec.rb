@@ -37,19 +37,20 @@ RSpec.describe CalendarEvent, type: :model do
     let(:account) { create(:calendar_account, color: "#0584da") }
     let(:calendar) { create(:calendar, calendar_account: account, color: nil) }
 
-    it "returns the event's own color when set" do
-      event = build(:calendar_event, calendar: calendar, color: "#dc2127")
+    it "always returns the owning calendar's display color" do
+      event = build(:calendar_event, calendar: calendar)
+      expect(event.display_color).to eq(calendar.display_color)
+    end
+
+    it "reflects the calendar's own color when it has one" do
+      calendar.update!(color: "#dc2127")
+      event = build(:calendar_event, calendar: calendar)
       expect(event.display_color).to eq("#dc2127")
     end
 
-    it "falls back to the calendar's color when unset" do
-      event = build(:calendar_event, calendar: calendar, color: nil)
-      expect(event.display_color).to eq(calendar.display_color)
-    end
-
-    it "treats a blank color as unset" do
-      event = build(:calendar_event, calendar: calendar, color: "")
-      expect(event.display_color).to eq(calendar.display_color)
+    it "falls through to the account color when the calendar has none" do
+      event = build(:calendar_event, calendar: calendar)
+      expect(event.display_color).to eq("#0584da")
     end
   end
 
