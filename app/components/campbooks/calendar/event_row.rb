@@ -3,6 +3,8 @@ module Campbooks
     # A single event line in the agenda view: time · color bar · title/location.
     # Links to the event's edit page (the view+edit surface for v1).
     class EventRow < Campbooks::Base
+      include TimeUntil
+
       def initialize(event:)
         @event = event
       end
@@ -21,11 +23,24 @@ module Campbooks
               span(class: "block text-xs text-gray-400 truncate") { sub }
             end
           end
+          countdown
           raw(safe(recurring_icon)) if @event.recurring?
         end
       end
 
       private
+
+      # A muted "in X days" / "in 3 h" countdown, right-aligned; accented when
+      # the event is now / within the hour / today (see TimeUntil#imminent).
+      def countdown
+        label = time_until_label(@event.start_at, all_day: @event.all_day)
+        return unless label
+
+        span(class: class_names(
+          "shrink-0 whitespace-nowrap text-xs tabular-nums",
+          label.imminent ? "font-medium text-accent-700" : "text-muted-foreground"
+        )) { label.text }
+      end
 
       def time_label
         @event.all_day ? t(".all_day") : l(@event.start_at, format: :clock)
