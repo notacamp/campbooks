@@ -82,6 +82,7 @@ en:
         one: 1 recurring event skipped (not supported yet).
         other: "%{count} recurring events skipped (not supported yet)."
       too_large: That file is too large (2 MB max).
+      truncated: File had more than %{max} events — only the first %{max} were imported.
       wrong_type: That doesn't look like a calendar file (.ics).
     new:
       calendar_label: Import into

@@ -83,6 +83,7 @@ pt:
         one: 1 evento recorrente ignorado (ainda não suportado).
         other: "%{count} eventos recorrentes ignorados (ainda não suportados)."
       too_large: O ficheiro é demasiado grande (máx. 2 MB).
+      truncated: O ficheiro tinha mais de %{max} eventos — só os primeiros %{max} foram importados.
       wrong_type: Isso não parece um ficheiro de calendário (.ics).
     new:
       calendar_label: Importar para

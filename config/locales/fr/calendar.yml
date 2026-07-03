@@ -83,6 +83,7 @@ fr:
         one: 1 événement récurrent ignoré (pas encore pris en charge).
         other: "%{count} événements récurrents ignorés (pas encore pris en charge)."
       too_large: Ce fichier est trop volumineux (2 Mo max).
+      truncated: Le fichier contenait plus de %{max} événements — seuls les %{max} premiers ont été importés.
       wrong_type: Cela ne ressemble pas à un fichier de calendrier (.ics).
     new:
       calendar_label: Importer dans

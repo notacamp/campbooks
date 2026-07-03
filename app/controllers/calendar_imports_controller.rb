@@ -45,12 +45,15 @@ class CalendarImportsController < ApplicationController
       ICS_CONTENT_TYPES.include?(file.content_type.to_s)
   end
 
+  # Absolute keys (not lazy `t(".…")`): this is called from #create, and lazy
+  # lookup inside a helper method trips i18n-tasks' static scan.
   def summary_for(result)
-    parts = [ t(".imported", count: result.imported) ]
-    parts << t(".skipped_recurring", count: result.skipped_recurring) if result.skipped_recurring.positive?
-    parts << t(".skipped_duplicate", count: result.skipped_duplicate) if result.skipped_duplicate.positive?
-    parts << t(".skipped_malformed", count: result.skipped_malformed) if result.skipped_malformed.positive?
-    parts << t(".truncated", max: Calendars::IcsImporter::MAX_EVENTS) if result.truncated
+    scope = "calendar_imports.create"
+    parts = [ t("#{scope}.imported", count: result.imported) ]
+    parts << t("#{scope}.skipped_recurring", count: result.skipped_recurring) if result.skipped_recurring.positive?
+    parts << t("#{scope}.skipped_duplicate", count: result.skipped_duplicate) if result.skipped_duplicate.positive?
+    parts << t("#{scope}.skipped_malformed", count: result.skipped_malformed) if result.skipped_malformed.positive?
+    parts << t("#{scope}.truncated", max: Calendars::IcsImporter::MAX_EVENTS) if result.truncated
     parts.join(" ")
   end
 end
