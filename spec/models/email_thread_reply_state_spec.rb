@@ -72,5 +72,17 @@ RSpec.describe EmailThread, "reply state" do
       expect(result).to include(due)
       expect(result).not_to include(recent, dismissed)
     end
+
+    it "vets with the AI verdict: drops 'no follow-up expected', keeps confirmed and unjudged" do
+      unjudged  = create(:email_thread, email_account: account, last_outbound_at: 1.day.ago, last_inbound_at: 2.days.ago)
+      confirmed = create(:email_thread, email_account: account, last_outbound_at: 1.day.ago, last_inbound_at: 2.days.ago,
+                         follow_up_last_analyzed_at: 1.day.ago, follow_up_expected: true)
+      fyi       = create(:email_thread, email_account: account, last_outbound_at: 1.day.ago, last_inbound_at: 2.days.ago,
+                         follow_up_last_analyzed_at: 1.day.ago, follow_up_expected: false)
+
+      result = EmailThread.awaiting_reply
+      expect(result).to include(unjudged, confirmed)
+      expect(result).not_to include(fyi)
+    end
   end
 end

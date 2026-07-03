@@ -2,17 +2,20 @@
 
 module Emails
   # The threads a user is *waiting on a reply* for — they sent the last message
-  # and the other party has gone quiet. This is the single, AI-free source of
-  # truth behind every "waiting on reply" surface: the inbox section, the Scout
-  # briefing count, the home-feed follow-up card, and Skim's Follow-ups ring — so
-  # those can never drift from one another, and never fall silent just because no
-  # AI provider is configured.
+  # and the other party has gone quiet. This is the single source of truth behind
+  # every "waiting on reply" surface: the inbox section, the Scout briefing count,
+  # the home-feed follow-up card, and Skim's Follow-ups ring — so those can never
+  # drift from one another.
   #
-  # Visibility is pure data (EmailThread.awaiting_reply + still in an inbox folder
-  # + a human, non-no-reply counterparty). The AI (Ai::FollowUpAnalyzer) only
-  # *enriches*: it writes the `follow_up_reason` blurb and a tailored nudge time
-  # (`follow_up_at`). #due — the proactive subset — honours that verdict when the
-  # AI has weighed in, and falls back to a fixed silence threshold when it hasn't.
+  # AI as vetter, never gatekeeper. The set is pure data (EmailThread.awaiting_reply
+  # + still in an inbox folder + a human, non-no-reply counterparty), EXCEPT that
+  # once Ai::FollowUpAnalyzer has judged a reply, a "no follow-up expected" verdict
+  # drops it — an FYI/closing the other party won't answer isn't really "waiting"
+  # (see the scope). Threads it hasn't judged, or when no AI is configured, fall
+  # through on the data, so these surfaces never fall silent for lack of AI. The AI
+  # also enriches: the `follow_up_reason` blurb and a tailored nudge time
+  # (`follow_up_at`) that #due — the proactive subset — honours, falling back to a
+  # fixed silence threshold when it hasn't weighed in.
   class AwaitingReply
     # How long to wait, absent an AI verdict, before a silent thread becomes a
     # proactive nudge.

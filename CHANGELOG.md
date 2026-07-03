@@ -35,6 +35,12 @@ major, minor, or patch change here.
 
 ### Changed
 
+- **The "Waiting on replies" list now checks with the AI before flagging a thread.**
+  If the last message you sent was just an FYI, an acknowledgement, or a sign-off the
+  other person isn't expected to answer, it no longer shows up as something you're
+  waiting on — in the inbox band, the Scout count, the feed, or the digest. When no
+  AI provider is configured the list still works; it just can't vet, so it shows
+  everything you sent last.
 - ⚠️ **Color belongs to the calendar now; event types carry an icon.** Event
   chips are always tinted with the owning calendar's color (pick it in the
   sidebar — your choice survives sync), and each event type marks its events
