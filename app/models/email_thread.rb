@@ -126,13 +126,20 @@ class EmailThread < ApplicationRecord
   AWAITING_REPLY_GRACE = 6.hours
 
   # Threads the owner is waiting on a reply for: they hold the last word, haven't
-  # dismissed the nudge, and sent past the grace window. The AI-free backbone of
-  # the "Waiting on replies" surfaces (inbox section, Scout briefing, feed, Skim)
-  # — see Emails::AwaitingReply. Unlike `follow_up_due` this never depends on an AI
-  # verdict, so those surfaces can't fall silent when no AI provider is configured.
+  # dismissed the nudge, and sent past the grace window. Powers every "Waiting on
+  # replies" surface (inbox section, Scout briefing, feed, Skim) — see
+  # Emails::AwaitingReply.
+  #
+  # AI as vetter, never gatekeeper: once Ai::FollowUpAnalyzer has judged the reply
+  # (follow_up_last_analyzed_at set), a "no follow-up expected" verdict drops the
+  # thread — an FYI / closing / acknowledgement the other party isn't expected to
+  # answer isn't really "waiting". Threads it hasn't judged yet — or that it never
+  # will, because no AI provider is configured — fall through on the pure-data
+  # signal, so these surfaces keep working (just unvetted) without AI.
   scope :awaiting_reply, ->(cutoff = AWAITING_REPLY_GRACE.ago) {
     holds_last_word
       .where(follow_up_dismissed_at: nil)
       .where("last_outbound_at <= ?", cutoff)
+      .where("follow_up_last_analyzed_at IS NULL OR follow_up_expected")
   }
 end

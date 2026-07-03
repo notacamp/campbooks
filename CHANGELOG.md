@@ -23,6 +23,15 @@ major, minor, or patch change here.
   still waiting to hear back on — so a dropped thread catches your eye even when
   you're nowhere near Campbooks. Turn it off anytime in Settings → Notifications.
 
+### Changed
+
+- **The "Waiting on replies" list now checks with the AI before flagging a thread.**
+  If the last message you sent was just an FYI, an acknowledgement, or a sign-off the
+  other person isn't expected to answer, it no longer shows up as something you're
+  waiting on — in the inbox band, the Scout count, the feed, or the digest. When no
+  AI provider is configured the list still works; it just can't vet, so it shows
+  everything you sent last.
+
 ## [0.9.0] - 2026-07-03
 
 ### Added
