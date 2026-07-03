@@ -1,0 +1,28 @@
+<%# One customizable prompt in Settings → AI Prompts. `prompt` may be nil (using
+    the built-in default). Re-rendered in place after a save via Turbo Stream. %>
+<div id="ai_prompt_row_<%= entry.key %>" class="rounded-xl border border-border bg-card p-4">
+  <div class="flex items-start gap-3">
+    <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-50 text-accent-600 dark:bg-accent-500/10 dark:text-accent-300">
+      <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="<%= entry.icon %>"/></svg>
+    </span>
+    <div class="min-w-0 flex-1">
+      <div class="flex flex-wrap items-center gap-2">
+        <h3 class="text-sm font-semibold text-foreground"><%= entry.label %></h3>
+        <% if prompt&.configured? %>
+          <%= render(Campbooks::Badge.new(variant: :accent)) { t("ai_prompts.settings.customized") } %>
+        <% else %>
+          <%= render(Campbooks::Badge.new(variant: :neutral)) { t("ai_prompts.settings.default") } %>
+        <% end %>
+      </div>
+      <p class="mt-0.5 text-sm text-muted-foreground"><%= entry.description %></p>
+      <% if prompt&.configured? %>
+        <p class="mt-2 line-clamp-2 rounded-lg bg-muted/60 px-3 py-2 text-sm text-foreground/80"><%= prompt.instructions %></p>
+      <% end %>
+    </div>
+    <div class="shrink-0">
+      <%= render(Campbooks::Button.new(variant: :outline, size: :sm, data: { setup_modal_open: edit_settings_ai_prompt_path(entry.key) })) do %>
+        <%= prompt&.configured? ? t("ai_prompts.settings.edit") : t("ai_prompts.customize_button") %>
+      <% end %>
+    </div>
+  </div>
+</div>
