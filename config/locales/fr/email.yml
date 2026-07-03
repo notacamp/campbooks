@@ -6,6 +6,8 @@ fr:
         heading: Tableau
     empty:
       add_account_button: Ajouter un compte e-mail
+      all_sorted_description: Il ne reste que du courrier secondaire, classé dans les groupes ci-dessous. Touchez-en un pour le passer en revue ou le vider.
+      all_sorted_title: Votre boîte de réception est rangée
       connect_email_description: Liez un compte e-mail pour commencer à recevoir et
         traiter vos e-mails automatiquement.
       connect_email_title: Connectez votre e-mail
@@ -161,8 +163,10 @@ fr:
       add_tag_aria: Ajouter une étiquette
       search_tags_placeholder: Rechercher des étiquettes...
     thread_list:
+      archive_all: Tout archiver
       back_to_inbox: "— retour à la boîte de réception"
       drag_to_folder: Glisser vers un dossier
+      mark_all_read: Tout marquer comme lu
       no_subject: "(sans objet)"
       pin_title: Rendre prioritaire
       priority_section: Prioritaire

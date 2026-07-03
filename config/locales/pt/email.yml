@@ -6,6 +6,8 @@ pt:
         heading: Quadro
     empty:
       add_account_button: Adicionar conta de email
+      all_sorted_description: O que resta é correio de baixa prioridade, organizado nos grupos abaixo. Toque num deles para o rever ou limpar.
+      all_sorted_title: A sua caixa de entrada está arrumada
       connect_email_description: Ligue uma conta de email para começar a receber e
         processar emails automaticamente.
       connect_email_title: Ligar o seu email
@@ -160,8 +162,10 @@ pt:
       add_tag_aria: Adicionar etiqueta
       search_tags_placeholder: Pesquisar etiquetas...
     thread_list:
+      archive_all: Arquivar tudo
       back_to_inbox: "— voltar à caixa de entrada"
       drag_to_folder: Arrastar para uma pasta
+      mark_all_read: Marcar tudo como lido
       no_subject: "(sem assunto)"
       pin_title: Tornar prioritário
       priority_section: Prioritário

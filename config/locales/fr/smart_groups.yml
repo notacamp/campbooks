@@ -1,0 +1,26 @@
+---
+fr:
+  inbox_settings:
+    smart_groups:
+      panel:
+        buckets_heading: Ce qui est regroupé
+        master_hint: Le courrier secondaire se replie en lignes de groupe pour que
+          la boîte montre ce qui a besoin de vous. Les messages personnels, importants
+          ou non catégorisés restent toujours dans la liste.
+        master_toggle: Regrouper le courrier secondaire
+        never_grouped_hint: Les fils auxquels vous avez répondu, les fils épinglés
+          et le courrier des contacts favoris ne sont jamais regroupés.
+      show:
+        heading: Groupes intelligents
+        subheading: Choisissez quel courrier secondaire se replie en lignes de groupe.
+      update:
+        updated_toast: Groupes intelligents mis à jour
+  smart_groups:
+    archive_all:
+      archived:
+        one: "%{count} e-mail archivé"
+        other: "%{count} e-mails archivés"
+    mark_all_read:
+      marked_read:
+        one: "%{count} e-mail marqué comme lu"
+        other: "%{count} e-mails marqués comme lus"

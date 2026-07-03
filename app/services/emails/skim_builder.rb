@@ -42,7 +42,7 @@ module Emails
       updates:       "Updates",
       notifications: "Notifications",
       social:        "Social",
-      promotions:    "Promotions",
+      promotions:    "Newsletters & promos",
       unknown:       "Other"
     }.freeze
 
