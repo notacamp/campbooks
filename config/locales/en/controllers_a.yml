@@ -31,6 +31,9 @@ en:
       renamed: Calendar name updated to %{name}.
       role_updated: "%{name} is now a %{role}."
       user_not_found: User not found.
+    refresh:
+      not_permitted: You don't have permission to refresh this account's calendars.
+      started: Refreshing the calendar list…
   calendars:
     update:
       not_permitted: You don't have permission to manage this calendar.

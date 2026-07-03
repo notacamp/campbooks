@@ -2,6 +2,7 @@
 fr:
   calendar:
     index:
+      close_sidebar: Fermer
       connect_cta: Connecter un calendrier
       empty_desc: Connectez un calendrier Google ou Zoho pour voir et gérer vos événements
         ici.
@@ -11,8 +12,10 @@ fr:
       next: Suivant
       previous: Précédent
       reminders: Rappels
+      sidebar_title: Calendriers
       title: Calendrier
       today: Aujourd'hui
+      toggle_sidebar: Afficher ou masquer la liste des calendriers
       upcoming: À venir
       view_agenda: Agenda
       view_day: Jour
@@ -98,6 +101,23 @@ fr:
         now: Maintenant
         today: Aujourd'hui
         tomorrow: Demain
+      sidebar:
+        account_color: Couleur du compte
+        add: Ajouter
+        add_calendars:
+          one: Plus de calendriers (%{count})
+          other: Plus de calendriers (%{count})
+        calendar_options: Options du calendrier
+        color_label: Couleur
+        connect_account: Connecter un compte
+        hide_calendar: Masquer de mon calendrier
+        managers_only: Seuls les gestionnaires du calendrier peuvent les activer.
+        none_synced: Aucun calendrier synchronisé pour l'instant.
+        primary: (principal)
+        refresh_list: Actualiser la liste des calendriers
+        show_calendar: Afficher sur mon calendrier
+        stop_syncing: Arrêter la synchronisation pour tous
+        stop_syncing_confirm: Arrêter la synchronisation de %{name} ? Ses événements disparaîtront du calendrier pour tout le monde sur ce compte.
       week_grid:
         add: "+ Ajouter"
         untitled: "(Sans titre)"
