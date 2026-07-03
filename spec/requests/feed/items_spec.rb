@@ -77,6 +77,43 @@ RSpec.describe "Feed::Items", type: :request do
       post undo_feed_item_path(item), params: { tool: "dismiss_card" }, headers: turbo
       expect(item.reload).to be_active
     end
+
+    context "tag-suggestion learning" do
+      let(:contact) { create(:contact, workspace: workspace) }
+
+      def tag_card(tag: "invoices")
+        message = create(:email_message, email_account: account, from_address: "billing@acme.com", contact_id: contact.id)
+        feed_item_for(message, kind: "tag_suggestion", data: { "tag_name" => tag })
+      end
+
+      it "records an accepted decision when a tag suggestion is acted on" do
+        item = tag_card
+        allow(EmailActions).to receive(:run).and_return({ success: true, tool: "add_tag", message: "Filed", result: {} })
+
+        expect {
+          post act_feed_item_path(item), params: { tool: "add_tag", args: { tag_name: "invoices" } }, headers: turbo
+        }.to change { LearningDecision.where(domain: "tag_suggestion", label: "accepted", user: user).count }.by(1)
+
+        decision = LearningDecision.find_by(domain: "tag_suggestion", user: user)
+        expect(decision).to have_attributes(contact_id: contact.id, sender_domain: "acme.com")
+        expect(decision.signals["tag_name"]).to eq("invoices")
+      end
+
+      it "records a rejected decision when a tag suggestion is dismissed" do
+        item = tag_card(tag: "promotions")
+
+        expect {
+          post dismiss_feed_item_path(item), headers: turbo
+        }.to change { LearningDecision.where(domain: "tag_suggestion", label: "rejected", user: user).count }.by(1)
+      end
+
+      it "does not record a decision for a non-tag-suggestion card" do
+        message = create(:email_message, email_account: account, ai_action_prompt: "Reply")
+        item = feed_item_for(message, kind: "email_action")
+
+        expect { post dismiss_feed_item_path(item), headers: turbo }.not_to change(LearningDecision, :count)
+      end
+    end
   end
 
   it "404s an item that belongs to another user (no existence leak)" do

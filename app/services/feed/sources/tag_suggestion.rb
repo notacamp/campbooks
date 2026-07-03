@@ -7,15 +7,22 @@ module Feed
       def self.key = "tag_suggestion"
 
       def candidates
+        mem = tag_memory
         collapse_by_thread(
           base_scope.reorder(:id).find_each.filter_map do |m|
             tag_name = suggested_tag_name(m)
             next if tag_name.blank?
+
+            # Learn from past filing: drop a tag this user keeps rejecting from this
+            # sender, and float an always-accepted one to the top of the row.
+            verdict = learned_verdict(mem, m, tag_name)
+            next if verdict == "rejected"
+
             {
               subject: m,
               dedupe_key: "tag_suggestion:#{m.id}",
               sort_at: m.received_at || m.created_at,
-              score: 0,
+              score: verdict == "accepted" ? 10 : 0,
               attention: false,
               data: { tag_name: tag_name }
             }
@@ -34,13 +41,37 @@ module Feed
 
       private
 
+      # One memory per feed generation (bulk-preloaded), reused across every card.
+      def tag_memory
+        Learning::Memory.new(source: Learning::Sources::TagSuggestions.new(user))
+      rescue => e
+        Rails.logger.warn("[Feed::Sources::TagSuggestion] memory build failed: #{e.message}")
+        nil
+      end
+
+      # The learned verdict ("accepted" / "rejected") for this sender + tag, or nil.
+      # Best-effort: a lookup failure just means no learning influence.
+      def learned_verdict(mem, m, tag_name)
+        return nil unless mem
+
+        mem.suggestion(
+          contact_id: m.contact_id,
+          sender_domain: Emails::SenderDomain.for(m.from_address),
+          tag_name: tag_name
+        )&.label
+      rescue => e
+        Rails.logger.warn("[Feed::Sources::TagSuggestion] learned_verdict failed: #{e.message}")
+        nil
+      end
+
       def base_scope
         in_inbox(admitted(
           EmailMessage.accessible_to(user)
             .where("ai_suggested_actions @> ?", add_tag_json)
             .where.not("ai_suggested_actions @> ?", draft_reply_json)
             .where(ai_todo_dismissed: false, skimmed_at: nil)
-            .select(:id, :received_at, :created_at, :ai_suggested_actions, :email_account_id, :email_thread_id)
+            .select(:id, :received_at, :created_at, :ai_suggested_actions, :email_account_id,
+                    :email_thread_id, :contact_id, :from_address)
         ))
       end
 
