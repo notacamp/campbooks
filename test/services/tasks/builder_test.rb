@@ -48,6 +48,20 @@ module Tasks
       assert_empty Builder.call(workspace: @ws, source: @source, raw_items: items)
     end
 
+    test "fingerprint_source collapses the same title across a thread's messages" do
+      thread = @ws.users.create!(name: "Thread", email_address: "thread-fp@example.com", password: "password123")
+      other_message = @ws.users.create!(name: "Msg2", email_address: "msg2-fp@example.com", password: "password123")
+      items = [ { "title" => "Send the contract", "confidence" => 0.9 } ]
+
+      first = Builder.call(workspace: @ws, source: @source, raw_items: items, fingerprint_source: thread).first
+
+      assert_no_difference -> { Task.count } do
+        Builder.call(workspace: @ws, source: other_message, raw_items: items, fingerprint_source: thread)
+      end
+      # The task still points at the message it came from, not the thread.
+      assert_equal @source, first.source
+    end
+
     test "keeps a past-due date — an overdue action still needs doing" do
       items = [ { "title" => "Overdue thing", "confidence" => 0.9, "due_date" => 3.days.ago.to_date.iso8601 } ]
       task = Builder.call(workspace: @ws, source: @source, raw_items: items).first

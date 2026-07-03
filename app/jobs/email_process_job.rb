@@ -192,14 +192,8 @@ class EmailProcessJob < ApplicationJob
     Emails::Threading.find_or_create(email)
   end
 
-  # The message was sent by the mailbox owner. Substring (not exact) match, so a
-  # provider-synced sent message whose From carries a display name
-  # ("Name <me@x.com>") is still recognised as outbound.
   def is_outbound?(email)
-    addr = email.email_account&.email_address.to_s.downcase
-    return false if addr.blank?
-
-    email.from_address.to_s.downcase.include?(addr)
+    email.outbound?
   end
 
   # Bump the thread's last_outbound_at / last_inbound_at to this message's time.

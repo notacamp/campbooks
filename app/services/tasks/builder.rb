@@ -1,9 +1,11 @@
 module Tasks
   # Materializes raw extractor items into Task rows in the `suggested` state, ready
-  # for the user to triage in Skim. Idempotent: keyed on extraction_fingerprint
-  # (source + normalized title) so re-processing the same source never duplicates,
-  # and a task the user already triaged (anything past `suggested`) is never
-  # overwritten.
+  # for the user to triage. Idempotent: keyed on extraction_fingerprint
+  # (fingerprint_source + normalized title) so re-processing never duplicates, and
+  # a task the user already triaged (anything past `suggested`) is never
+  # overwritten. `fingerprint_source` defaults to the source itself; email
+  # extraction passes the THREAD so the same ask restated across a conversation's
+  # replies collapses into one task instead of one per message.
   #
   # Unlike Reminders::Builder, a past-due date is KEPT — an overdue action still
   # needs doing. The model's after_create_commit publishes task.created.
@@ -11,14 +13,16 @@ module Tasks
     MIN_CONFIDENCE = 0.5    # safety net; the extractor already drops below this
     DEFAULT_HOUR = 9        # tasks with a date but no time get a 9am local slot
 
-    def self.call(workspace:, source:, raw_items:, anchor_tz: Time.zone)
-      new(workspace: workspace, source: source, anchor_tz: anchor_tz).call(raw_items)
+    def self.call(workspace:, source:, raw_items:, anchor_tz: Time.zone, fingerprint_source: nil)
+      new(workspace: workspace, source: source, anchor_tz: anchor_tz,
+          fingerprint_source: fingerprint_source).call(raw_items)
     end
 
-    def initialize(workspace:, source:, anchor_tz: Time.zone)
+    def initialize(workspace:, source:, anchor_tz: Time.zone, fingerprint_source: nil)
       @workspace = workspace
       @source = source
       @anchor_tz = anchor_tz || Time.zone
+      @fingerprint_source = fingerprint_source || source
     end
 
     def call(raw_items)
@@ -34,7 +38,7 @@ module Tasks
 
       title = item["title"].to_s.strip.first(255)
       fingerprint = Task.fingerprint_for(
-        source_type: @source.class.name, source_id: @source.id, title: title
+        source_type: @fingerprint_source.class.name, source_id: @fingerprint_source.id, title: title
       )
 
       task = Task.find_or_initialize_by(extraction_fingerprint: fingerprint)

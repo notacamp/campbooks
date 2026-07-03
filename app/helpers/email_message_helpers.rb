@@ -51,8 +51,7 @@ module EmailMessageHelpers
   def safe_email_body(raw)
     return "".html_safe if raw.blank?
 
-    fragment = Loofah.fragment(raw.to_s)
-    fragment.css("style", "script", "head", "title", "meta", "link").each(&:remove)
+    fragment = Emails::PlainText.clean_fragment(raw)
     sanitize(fragment.to_html, tags: EMAIL_BODY_TAGS, attributes: EMAIL_BODY_ATTRS)
   end
 
@@ -73,12 +72,11 @@ module EmailMessageHelpers
     return "".html_safe if raw.blank?
 
     if raw.match?(/<\w+[^>]*>/)
-      fragment = Loofah.fragment(strip_html_quotes(raw))
-      fragment.css("style", "script", "head", "title", "meta", "link").each(&:remove)
+      fragment = Emails::PlainText.clean_fragment(raw, strip_quotes: true)
       fragment.scrub!(:prune)
       rewrite_email_urls(fragment.to_html, message.email_account_id).html_safe
     else
-      %(<div style="white-space:pre-wrap">#{CGI.escapeHTML(strip_text_quotes(raw))}</div>).html_safe
+      %(<div style="white-space:pre-wrap">#{CGI.escapeHTML(Emails::PlainText.strip_text_quotes(raw))}</div>).html_safe
     end
   end
 
@@ -98,8 +96,7 @@ module EmailMessageHelpers
     return "".html_safe if raw.blank?
 
     if raw.match?(/<\w+[^>]*>/)
-      fragment = Loofah.fragment(raw)
-      fragment.css("style", "script", "head", "title", "meta", "link").each(&:remove)
+      fragment = Emails::PlainText.clean_fragment(raw)
       fragment.scrub!(:prune)
       rewrite_email_urls(fragment.to_html, message.email_account_id).html_safe
     else
@@ -257,57 +254,6 @@ module EmailMessageHelpers
   end
 
   private
-
-  # Opening line of a quoted-reply attribution header, across clients/locales:
-  # "On … wrote:", Apple/Gmail; "Le … a écrit", "El … escribió", "Em … escreveu";
-  # Outlook/Zoho "From:/De:/Von:" header; "---- Original Message ----".
-  ATTRIBUTION_RE = /\A\s*(?:-{2,}\s*)?(?:On\b.{0,200}?\bwrote\b|Le\b.{0,200}?\ba\s+écrit|El\b.{0,200}?\bescribió|Em\b.{0,200}?\bescreveu|(?:From|De|Von):\s|-{2,}\s*Original)/im
-
-  # Remove quoted reply history from an HTML body, keeping only what the sender
-  # actually wrote in the latest message. Drops <blockquote> citations and the
-  # known client quote containers, then walks back from each removed quote to peel
-  # off the attribution header ("From: …/On … wrote:") and blank spacers that
-  # introduced it — without touching the real reply that precedes them.
-  def strip_html_quotes(raw)
-    frag = Loofah.fragment(raw.to_s)
-    frag.css(".gmail_quote", ".gmail_extra", ".moz-cite-prefix",
-             "#divRplyFwdMsg", "#appendonsend").each(&:remove)
-    frag.css("blockquote", '[id*="zmail"]').each do |quote|
-      strip_attribution_before(quote)
-      quote.remove
-    end
-    frag.to_html
-  end
-
-  # Peel off the contiguous run of attribution header / blank-spacer / <hr> nodes
-  # immediately before a quote, stopping at the first node of real reply content.
-  def strip_attribution_before(node)
-    sib = node.previous_sibling
-    while sib
-      text = sib.text.to_s.strip
-      break unless text.empty? || sib.name == "hr" || attribution_header?(text)
-
-      prev = sib.previous_sibling
-      sib.remove
-      sib = prev
-    end
-  end
-
-  # An attribution line, by its opening words or by the Zoho/Outlook header shape
-  # ("Subject:" alongside a From/Sent/Date/To label).
-  def attribution_header?(text)
-    text.match?(ATTRIBUTION_RE) ||
-      (text.match?(/\bSubject:/i) && text.match?(/\b(?:From|Sent|Date|To):/i))
-  end
-
-  # Plain-text reply: drop every line that starts with ">" (the quoted history)
-  # plus a trailing "On … wrote:" / "_____" attribution left with nothing under it.
-  def strip_text_quotes(raw)
-    kept = raw.to_s.split(/\r?\n/).reject { |line| line.lstrip.start_with?(">") }.join("\n")
-    kept.sub(/\n*^On\b.{0,200}?\bwrote:\s*\z/im, "")
-        .sub(/\n*^_{5,}.*\z/m, "")
-        .strip
-  end
 
   def search_param_hash(params)
     raw = params.respond_to?(:to_unsafe_h) ? params.to_unsafe_h : params.to_h
