@@ -100,6 +100,10 @@ gem "redcarpet"
 gem "countries"
 gem "liquid"
 
+# .ics parsing for the calendar import flow (Calendars::IcsImporter) —
+# VTIMEZONE-aware via the tzinfo dependency Rails already carries.
+gem "icalendar"
+
 # JSON Schema validation (Draft 2020-12) — validates per-workspace entitlement
 # overrides against the schema composed from the plan-feature catalog
 # (config/plans.yml). See app/services/entitlements/.

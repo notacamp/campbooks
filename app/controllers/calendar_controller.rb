@@ -14,13 +14,26 @@ class CalendarController < ApplicationController
     # default) back to agenda there.
     @view = "agenda" if hotwire_native_app? && %w[week month].include?(@view)
     @date = parse_date(params[:date]) || Date.current
-    @has_calendars = Current.user.readable_calendar_accounts.active.exists?
+    # Sidebar data: every readable account with its calendars, so the user can
+    # show/hide, recolor, and enable more calendars without leaving the page.
+    @calendar_accounts = Current.user.readable_calendar_accounts.active
+                                .includes(:calendars).order(:created_at)
+    @has_calendars = @calendar_accounts.any?
+    # Which of those the user can manage (sidebar recolor / syncing affordances) —
+    # one query instead of a permission check per account.
+    @managed_calendar_account_ids = Current.user.calendar_account_users
+                                           .where(can_manage: true).pluck(:calendar_account_id)
     @range = range_for(@view, @date)
     @prev_date, @next_date = adjacent_dates(@view, @date)
 
+    # Only calendars that are syncing render (off means off — matching the
+    # sidebar checkboxes), minus the ones this user personally hid.
     scope = CalendarEvent.accessible_to(Current.user).visible
+                         .where(calendars: { syncing: true })
                          .order(:start_at)
-                         .includes(calendar: :calendar_account)
+                         .includes(:event_type, calendar: :calendar_account)
+    hidden_ids = Array(Current.user.hidden_calendar_ids)
+    scope = scope.where.not(calendar_id: hidden_ids) if hidden_ids.any?
 
     # Agenda lists your next events from the anchor date forward (no hard window),
     # so it never reads "nothing coming up" when your next event is just past the

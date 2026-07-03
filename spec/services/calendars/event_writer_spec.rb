@@ -50,10 +50,11 @@ RSpec.describe Calendars::EventWriter do
       expect(event.reload.provider_etag).to eq('"etag_001"')
     end
 
-    it "forwards the event's color to the provider" do
-      event.update_columns(color: "#dc2127")
+    it "sends no color to the provider (color belongs to the calendar, not the event)" do
       described_class.new(event).call(:create)
-      expect(client).to have_received(:create_event).with(calendar, hash_including(color: "#dc2127"))
+      expect(client).to have_received(:create_event) do |_calendar, attrs|
+        expect(attrs).not_to have_key(:color)
+      end
     end
   end
 

@@ -54,6 +54,22 @@ class CalendarPreview < ViewComponent::Preview
     render Campbooks::Calendar::EventRow.new(event: event(id: 3, title: "Weekly standup", start_at: Time.current.change(hour: 9), recurring: true))
   end
 
+  # The calendar-management sidebar: calendars grouped by owning account, with
+  # per-user show/hide checkboxes. The manager variant adds the "⋯" color/sync
+  # menus, the add-calendars disclosure, and the list refresh.
+  def sidebar_as_manager
+    render Campbooks::Calendar::Sidebar.new(
+      accounts: sidebar_accounts, user: sidebar_user, view: "month", date: Date.current,
+      managed_account_ids: [ uuid_for(101) ]
+    )
+  end
+
+  def sidebar_as_viewer
+    render Campbooks::Calendar::Sidebar.new(
+      accounts: sidebar_accounts, user: sidebar_user, view: "month", date: Date.current
+    )
+  end
+
   # Snoozed email threads on the calendar (purple). The chip is the grid cell
   # form; the row is the agenda-list form.
   def snoozed_chip
@@ -108,6 +124,28 @@ class CalendarPreview < ViewComponent::Preview
 
   def uuid_for(n)
     "00000000-0000-4000-8000-#{n.to_s.rjust(12, '0')}"
+  end
+
+  # Two in-memory accounts for the sidebar: a work account with a mix of synced,
+  # unsynced, and (for the sample user) one hidden calendar, plus a personal one.
+  def sidebar_accounts
+    work = CalendarAccount.new(id: uuid_for(101), email_address: "work@example.com", name: "Work", color: "#595dec")
+    personal = CalendarAccount.new(id: uuid_for(102), email_address: "me@example.com", color: "#e76e08")
+    work.calendars = [
+      Calendar.new(id: uuid_for(111), name: "Work calendar", is_primary: true, syncing: true, calendar_account: work),
+      Calendar.new(id: uuid_for(112), name: "Team offsites", color: "#00a8a8", syncing: true, calendar_account: work),
+      Calendar.new(id: uuid_for(113), name: "Deploys", color: "#de3b3d", syncing: true, calendar_account: work),
+      Calendar.new(id: uuid_for(114), name: "Public holidays", color: "#2ea55c", syncing: false, calendar_account: work)
+    ]
+    personal.calendars = [
+      Calendar.new(id: uuid_for(121), name: "Personal", is_primary: true, syncing: true, calendar_account: personal)
+    ]
+    [ work, personal ]
+  end
+
+  # The sample viewer has hidden "Deploys" — its row renders unchecked/muted.
+  def sidebar_user
+    User.new(hidden_calendar_ids: [ uuid_for(113) ])
   end
 
   # Relative to now so the agenda countdown always reads sensibly (In 40 min ·

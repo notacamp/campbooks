@@ -126,7 +126,7 @@ class CalendarEventsController < ApplicationController
   end
 
   def event_params
-    params.require(:calendar_event).permit(:title, :description, :location, :start_at, :end_at, :all_day, :calendar_id, :color)
+    params.require(:calendar_event).permit(:title, :description, :location, :start_at, :end_at, :all_day, :calendar_id)
   end
 
   # Translate the form's single "Type" selector into event_type + type_status:

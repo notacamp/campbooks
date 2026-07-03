@@ -2,15 +2,16 @@
 
 module Campbooks
   # A radio-group of color swatches bound to a form field. The leading option is a
-  # "none / inherit" choice that submits a blank value — the calendar event form
-  # uses it so an event can fall back to its calendar's color (CalendarEvent#display_color).
+  # "none / inherit" choice that submits a blank value — the calendar sidebar's
+  # color picker uses it so a calendar can fall back to its account color
+  # (Calendar#display_color).
   #
   # Swatches are real radio inputs (visually hidden via `sr-only peer`) so the
   # control stays keyboard- and screen-reader-accessible; the checked swatch shows
   # a ring driven by `peer-checked:` (the visible swatch is the input's next
   # sibling, as the `peer` selector requires).
   #
-  # @param name [String] form field name, e.g. "calendar_event[color]"
+  # @param name [String] form field name, e.g. "calendar[color]"
   # @param selected [String, nil] currently-selected hex (blank → the none option)
   # @param colors [Array<Hash>, nil] swatches as { hex:, name: }; defaults to the event palette
   # @param include_none [Boolean] render the leading "none / inherit" option
