@@ -20,8 +20,9 @@
       <%= yield %>
     </main>
     <%# The guided demo is reachable pre-connect ("See it in action" on the
-        welcome screen); never auto-opened here — home owns the autostart. %>
-    <%= render(Campbooks::ProductTour.new(autostart: false)) if authenticated? %>
+        welcome screen); never auto-opened here — home owns the autostart. No
+        connect_path: the finish CTA closes onto the welcome screen's own cards. %>
+    <%= render(Campbooks::ProductTour.new(autostart: false, connect_path: nil)) if authenticated? %>
     <%= render "shared/flash_toast_region" %>
   </body>
 </html>

@@ -13,7 +13,7 @@ import { Controller } from "@hotwired/stimulus"
 const DISMISS_URL = "/tours/product_tour/dismiss"
 
 export default class extends Controller {
-  static targets = ["panel", "scene", "progress", "stepLabel", "back", "next", "footer"]
+  static targets = ["panel", "scene", "dot", "stepLabel", "back", "next", "footer"]
 
   connect() {
     this.index = 0
@@ -63,10 +63,13 @@ export default class extends Controller {
   }
 
   // Finish "Connect your inbox": remember it's seen, then go connect for real.
+  // With no connect path (the welcome screen — the connect cards sit right
+  // behind the overlay) it just closes.
   finishConnect(event) {
     if (event) event.preventDefault()
+    const path = event?.currentTarget?.dataset.tourConnectPath
+    if (!path) { this.skip(); return }
     this.markSeen()
-    const path = event?.currentTarget?.dataset.tourConnectPath || "/"
     window.location.href = path
   }
 
@@ -110,10 +113,28 @@ export default class extends Controller {
   }
 
   render() {
-    this.sceneTargets.forEach((scene, i) => scene.classList.toggle("hidden", i !== this.index))
+    this.sceneTargets.forEach((scene, i) => {
+      const current = i === this.index
+      const entering = current && scene.classList.contains("hidden")
+      scene.classList.toggle("hidden", !current)
+      // Settle the scene's blocks in with a light stagger whenever it appears,
+      // and retrigger its one-shot flourishes (the finale pop + glow ring).
+      if (entering) {
+        this.replay(scene, "tour-scene-enter")
+        scene.querySelectorAll(".tour-finale-ring").forEach((el) => this.replay(el, "tour-finale-ring"))
+        scene.querySelectorAll(".animate-sync-done-pop").forEach((el) => this.replay(el, "animate-sync-done-pop"))
+      }
+    })
 
     const total = this.sceneTargets.length
-    if (this.hasProgressTarget) this.progressTarget.style.width = `${Math.round(((this.index + 1) / total) * 100)}%`
+    this.dotTargets.forEach((dot, i) => {
+      const state = i === this.index ? "current" : (i < this.index ? "done" : "ahead")
+      dot.classList.toggle("w-5", state === "current")
+      dot.classList.toggle("w-2", state !== "current")
+      dot.classList.toggle("bg-ember-gradient", state !== "ahead")
+      dot.classList.toggle("border-[1.5px]", state === "ahead")
+      dot.classList.toggle("border-border", state === "ahead")
+    })
     if (this.hasStepLabelTarget && this.stepLabelTarget.dataset.tmpl) {
       this.stepLabelTarget.textContent = this.stepLabelTarget.dataset.tmpl
         .replace("{current}", this.index + 1).replace("{total}", total)
