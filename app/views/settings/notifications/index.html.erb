@@ -1,6 +1,26 @@
 <% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
   <%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
 
+  <%# Email digests — currently just the daily "waiting on replies" nudge. %>
+  <div class="bg-card shadow-sm rounded-lg border border-gray-200 mb-6">
+    <div class="px-5 py-3.5 border-b border-gray-200">
+      <h2 class="text-sm font-semibold text-gray-900"><%= t(".email_digests_title") %></h2>
+    </div>
+    <div class="px-5 py-4 flex items-start justify-between gap-4">
+      <div class="min-w-0">
+        <p class="text-sm text-gray-800 font-medium"><%= t(".waiting_digest_label") %></p>
+        <p class="text-xs text-gray-500 mt-0.5"><%= t(".waiting_digest_hint") %></p>
+      </div>
+      <%= form_with url: digest_preference_settings_notifications_path, method: :patch, class: "flex-shrink-0" do %>
+        <%= hidden_field_tag :email_on_waiting_on_replies_digest, "0" %>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <%= check_box_tag :email_on_waiting_on_replies_digest, "1", current_user.email_on_waiting_on_replies_digest?, class: "sr-only peer", onchange: "this.form.requestSubmit()" %>
+          <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-600"></div>
+        </label>
+      <% end %>
+    </div>
+  </div>
+
   <% if @tags.any? %>
     <%= render "section", title: t("settings.notifications.index.tags_title"), rows: @tags, kind: :tag, id_method: :id, current_user: current_user %>
   <% else %>

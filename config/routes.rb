@@ -306,7 +306,9 @@ Rails.application.routes.draw do
         post :resend
       end
     end
-    resources :notifications, only: [ :index ]
+    resources :notifications, only: [ :index ] do
+      patch :digest_preference, on: :collection
+    end
 
     # Developer API access — manage OAuth clients (Doorkeeper applications) that
     # call the public REST API. The client secret is shown once at create/rotate.
