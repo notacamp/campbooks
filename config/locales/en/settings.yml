@@ -1,53 +1,13 @@
 ---
 en:
   settings:
-    api_clients:
-      index:
-        title: API access
-        subtitle: Create OAuth clients to reach your Campbooks data from your own apps and scripts.
-        new_client: New client
-        read_docs: Read the API docs
-        col_name: Name
-        col_client_id: Client ID
-        col_scopes: Scopes
-        col_created: Created
-        regenerate: Regenerate secret
-        regenerate_confirm: Regenerate this client's secret? The current secret stops working immediately.
-        revoke: Revoke tokens
-        revoke_confirm: Revoke all active tokens for this client? Apps using it will need a new token.
-        delete: Delete
-        delete_confirm: Delete the client "%{name}"? This can't be undone.
-        no_clients_title: No API clients yet
-        no_clients_desc: Create a client to get a client ID and secret for the Campbooks API.
-      new:
-        title: New API client
-        subtitle: Give your client a name and choose what it can access.
-        name_label: Name
-        name_placeholder: e.g. Billing sync
-        name_hint: A label to help you recognize this client later.
-        scopes_label: Scopes
-        scopes_hint: Grant only the access this client needs.
-        create: Create client
-        cancel: Cancel
-      reveal:
-        title: Client created
-        subtitle: Copy the secret for "%{name}" now.
-        warning: This is the only time the client secret is shown. Store it somewhere safe — you can regenerate it later if you lose it.
-        client_id_label: Client ID
-        client_secret_label: Client secret
-        copy: Copy
-        next_steps_title: Exchange these for an access token
-        done: Done
-      create:
-        scopes_required: Select at least one scope.
-      revoke:
-        revoked: All tokens for "%{name}" were revoked.
-      destroy:
-        deleted: Client "%{name}" was deleted.
     account:
       analyze_writing_style:
         queued: Scout is analyzing your sent email — your style profile will appear
           here shortly.
+      compose_preference:
+        failed: Could not update your compose preference. Please try again.
+        updated: Compose preference updated.
       delete:
         cancel: Cancel
         confirm_email_label: Type your email address to confirm
@@ -72,9 +32,6 @@ en:
         deletion_scheduled: Your account is being deleted. You have been signed out.
         wrong_email: Email address does not match.
         wrong_password: Current password is incorrect.
-      compose_preference:
-        failed: Could not update your compose preference. Please try again.
-        updated: Compose preference updated.
       language:
         failed: Could not update your language. Please try again.
         updated: Language updated.
@@ -85,21 +42,21 @@ en:
         compose_subtitle: Where a brand-new email opens (the C shortcut, the Compose
           button, and the command palette).
         compose_title: New email opens in
-        save_compose: Save
         confirm_password: Confirm New Password
         current_password: Current Password
         danger_zone_desc: Deleting your account is permanent and cannot be undone.
         danger_zone_title: Danger zone
         data_export_button: Request my data
         data_export_desc: Get a complete copy of your personal data — your profile,
-          sessions, AI conversations, plus your email content, attachments, and
-          documents — packaged as a downloadable archive.
+          sessions, AI conversations, plus your email content, attachments, and documents
+          — packaged as a downloadable archive.
         data_export_title: Your data
         delete_account_button: Delete account
         language_subtitle: Choose the language for your Campbooks interface.
         language_title: Language
         new_password: New Password
         privacy_policy: Privacy Policy
+        save_compose: Save
         save_language: Save
         subtitle: Manage your password and account preferences.
         terms_of_service: Terms of Service
@@ -192,6 +149,54 @@ en:
         switched_to_byo: Switched to your own keys. Add a provider below to enable
           AI.
         switched_to_managed: Now using Campbooks AI.
+    api_clients:
+      create:
+        scopes_required: Select at least one scope.
+      destroy:
+        deleted: Client "%{name}" was deleted.
+      index:
+        col_client_id: Client ID
+        col_created: Created
+        col_name: Name
+        col_scopes: Scopes
+        delete: Delete
+        delete_confirm: Delete the client "%{name}"? This can't be undone.
+        new_client: New client
+        no_clients_desc: Create a client to get a client ID and secret for the Campbooks
+          API.
+        no_clients_title: No API clients yet
+        read_docs: Read the API docs
+        regenerate: Regenerate secret
+        regenerate_confirm: Regenerate this client's secret? The current secret stops
+          working immediately.
+        revoke: Revoke tokens
+        revoke_confirm: Revoke all active tokens for this client? Apps using it will
+          need a new token.
+        subtitle: Create OAuth clients to reach your Campbooks data from your own
+          apps and scripts.
+        title: API access
+      new:
+        cancel: Cancel
+        create: Create client
+        name_hint: A label to help you recognize this client later.
+        name_label: Name
+        name_placeholder: e.g. Billing sync
+        scopes_hint: Grant only the access this client needs.
+        scopes_label: Scopes
+        subtitle: Give your client a name and choose what it can access.
+        title: New API client
+      reveal:
+        client_id_label: Client ID
+        client_secret_label: Client secret
+        copy: Copy
+        done: Done
+        next_steps_title: Exchange these for an access token
+        subtitle: Copy the secret for "%{name}" now.
+        title: Client created
+        warning: This is the only time the client secret is shown. Store it somewhere
+          safe — you can regenerate it later if you lose it.
+      revoke:
+        revoked: All tokens for "%{name}" were revoked.
     general:
       show:
         ai_providers_hint: Looking for AI providers and model settings? They now live
@@ -292,44 +297,24 @@ en:
           connected_label: Connected
           disconnect: Disconnect
           disconnect_confirm: Disconnect Google Drive? Document uploads will stop.
-          failed_count:
-            one: One document failed to upload. You can retry it below.
-            other: '%{count} documents failed to upload. You can retry them all below.'
-          retry_all_failed: Retry all failed uploads
           drive_org_desc: Each document type can have its own folder, naming pattern,
             and subfolder structure.
           drive_org_heading: How Drive Organizes Your Files
           edit_config: Edit
+          failed_count:
+            one: One document failed to upload. You can retry it below.
+            other: "%{count} documents failed to upload. You can retry them all below."
           folder_set: Folder set
           off_badge: 'Off'
           on_badge: 'On'
           reconnect_button: Reconnect Google Drive
           reconnect_prompt: Reconnect to grant full Drive access — required to browse
             and pick existing folders when sending files.
+          retry_all_failed: Retry all failed uploads
           subtitle: Push documents to Google Drive with per-type folder and naming
             rules.
           title: Google Drive
       google_drive_configs:
-        edit:
-          auto_push_default_note: Auto-push is on by default — approved documents of this
-            type will be uploaded to Drive automatically. Uncheck the box above to pause it.
-          auto_push_hint: When checked, approved documents of this type are automatically
-            uploaded to Google Drive. Uncheck to pause.
-          auto_push_label: Upload automatically when approved
-          browse: Browse
-          folder_from_id: Folder selected
-          folder_label: Destination folder
-          no_folder_selected: No folder selected — pick one below
-          naming_pattern_hint: 'Available placeholders: {date}, {entity}, {reference},
-            {type}, {vendor}, {id}'
-          naming_pattern_label: File Naming Pattern
-          subfolder_pattern_hint_html: "<strong>Flat</strong>: All files go directly
-            in the target folder.<br><strong>Year</strong>: Organized by year (e.g.
-            /Folder/2026/).<br><strong>Year/Month</strong>: Organized by year and
-            month (e.g. /Folder/2026/05_May/).<br><strong>Entity</strong>: Organized
-            by entity name (vendor or client)."
-          subfolder_pattern_label: Subfolder Workspace
-          subtitle: Control how documents of this type are pushed to Google Drive.
         browse_folders:
           browse_failed: 'Could not list folders: %{message}'
           create_folder: Create
@@ -339,7 +324,28 @@ en:
           reconnect_needed: Reconnect Google Drive with full access to browse folders.
           select: Select
           select_my_drive: Use My Drive root
-          select_this: 'Select "%{name}"'
+          select_this: Select "%{name}"
+        edit:
+          auto_push_default_note: Auto-push is on by default — approved documents
+            of this type will be uploaded to Drive automatically. Uncheck the box
+            above to pause it.
+          auto_push_hint: When checked, approved documents of this type are automatically
+            uploaded to Google Drive. Uncheck to pause.
+          auto_push_label: Upload automatically when approved
+          browse: Browse
+          folder_from_id: Folder selected
+          folder_label: Destination folder
+          naming_pattern_hint: 'Available placeholders: {date}, {entity}, {reference},
+            {type}, {vendor}, {id}'
+          naming_pattern_label: File Naming Pattern
+          no_folder_selected: No folder selected — pick one below
+          subfolder_pattern_hint_html: "<strong>Flat</strong>: All files go directly
+            in the target folder.<br><strong>Year</strong>: Organized by year (e.g.
+            /Folder/2026/).<br><strong>Year/Month</strong>: Organized by year and
+            month (e.g. /Folder/2026/05_May/).<br><strong>Entity</strong>: Organized
+            by entity name (vendor or client)."
+          subfolder_pattern_label: Subfolder Workspace
+          subtitle: Control how documents of this type are pushed to Google Drive.
       index:
         show:
           api_connections_desc: Save outbound API integrations (base URL + auth) once,

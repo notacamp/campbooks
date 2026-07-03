@@ -126,6 +126,29 @@ fr:
         type_company: Entreprise
         type_personal: Personnel
         workspace_title: Espace de travail
+      welcome:
+        ai_key_body: Les installations auto-hébergées apportent leur propre modèle.
+          Deux minutes, une clé.
+        ai_key_title: Ajoutez une clé d'IA pour que Scout puisse lire
+        connected_title:
+          one: Boîte mail connectée
+          other: "%{count} boîtes mail connectées"
+        continue_home: Aller à ma boîte de réception
+        greeting: Bonjour %{name}, je suis Scout.
+        greeting_anonymous: Bonjour, je suis Scout.
+        more_setup: Plus d'options de configuration
+        pitch: 'Je lis ce qui arrive dans votre boîte de réception, je trie tout et
+          je ne fais remonter que ce qui a besoin de vous : réponses, échéances, documents.
+          Connectez votre boîte mail et je m''y mets.'
+        privacy_note: Campbooks lit votre boîte de réception pour la trier et en extraire
+          documents et échéances. Votre courrier reste privé et vous pouvez le déconnecter
+          à tout moment dans les Paramètres.
+        see_demo: Voyez-le d'abord en action
+        skip: Passer pour l'instant et explorer l'application
+        type_company: Travail
+        type_personal: Personnel
+        type_question: Utiliserez-vous ceci surtout pour du courrier professionnel
+          ou personnel ?
       workspace:
         address_line1_label: Adresse ligne 1
         address_line1_placeholder: Rue et numéro
@@ -189,3 +212,35 @@ fr:
         no_suggestions: Aucune suggestion supplémentaire — vos étiquettes de modèle
           couvrent bien les cas courants.
         save_hint: Cochez les suggestions que vous souhaitez ajouter, puis enregistrez.
+  setup_status:
+    items:
+      ai_configuration:
+        cta: Configurer l'IA
+        description: 'Les installations auto-hébergées apportent leur propre modèle
+          : ajoutez une clé et Scout commence à lire, trier et rédiger.'
+        message: Ajoutez une clé d'IA pour que Scout puisse lire
+      document_provider:
+        cta: Ajouter l'IA documents
+        description: Une clé avec vision permet à Scout de lire aussi les PDF, scans
+          et photos. Facultatif et facile à ajouter plus tard.
+        message: Ajoutez l'IA documents (facultatif)
+      document_types:
+        cta: Ébaucher avec Scout
+        description: 'Factures, contrats, reçus : Scout peut proposer un ensemble
+          de départ pour votre activité, prêt à modifier.'
+        message: Laissez Scout ébaucher vos types de documents
+      email_account:
+        cta: Connecter une boîte mail
+        description: 'Scout trie le courrier à mesure qu''il arrive : ce qui a besoin
+          de vous, les échéances et les documents cachés dans les pièces jointes.'
+        message: Connectez votre boîte mail
+      tags:
+        cta: Suggérer avec Scout
+        description: Les étiquettes apprennent à Scout votre façon de voir le courrier.
+          Partez des suggestions et changez ce que vous voulez.
+        message: Laissez Scout suggérer des étiquettes
+      workspace:
+        cta: Présentez-vous
+        description: Une phrase sur ce que vous faites aide Scout à trier et rédiger
+          comme vous le feriez.
+        message: Présentez votre espace de travail

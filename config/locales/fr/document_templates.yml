@@ -2,68 +2,74 @@
 fr:
   document_templates:
     fill:
-      title: "Remplir le modèle : %{name}"
-      variables_heading: Variables
-      pdf_preview_heading: Aperçu PDF
-      no_preview_yet: Remplissez les variables et cliquez sur Aperçu PDF.
-      send_heading: Envoyer par e-mail
-      to_address: E-mail du destinataire
-      subject: Objet
       body: Corps (facultatif)
+      no_preview_yet: Remplissez les variables et cliquez sur Aperçu PDF.
+      pdf_preview_heading: Aperçu PDF
+      preview_failed: Échec de la génération de l'aperçu PDF.
       preview_pdf: Aperçu PDF
-      send: Envoyer
-      sent: Modèle envoyé avec succès.
-      send_failed: "Échec de l'envoi du modèle."
       preview_ready: Aperçu PDF généré.
-      preview_failed: "Échec de la génération de l'aperçu PDF."
+      send: Envoyer
+      send_failed: Échec de l'envoi du modèle.
+      send_heading: Envoyer par e-mail
+      sent: Modèle envoyé avec succès.
+      subject: Objet
+      title: 'Remplir le modèle : %{name}'
+      to_address: E-mail du destinataire
+      variables_heading: Variables
   settings:
     document_templates:
-      index:
-        title: Modèles de documents
-        subtitle: Créez et gérez des modèles de documents réutilisables avec du contenu généré par IA.
-        new_template: Nouveau modèle
-        edit: Modifier
-        fill: Remplir et envoyer
-        delete: Supprimer
-        delete_confirm: "Supprimer ce modèle ?"
-        empty_title: Aucun modèle pour l'instant
-        empty_description: "Créez votre premier modèle de document et laissez l'IA générer le HTML."
-        variables_count:
-          one: "1 variable"
-          other: "%{count} variables"
-      new:
-        title: Nouveau modèle de document
-        subtitle: "Décrivez le type de document souhaité et l'IA générera le HTML."
-        save: Créer le modèle
-        cancel: Annuler
-      edit:
-        title: "Modifier : %{name}"
-        subtitle: "Révisez et affinez le modèle généré par l'IA ou régénérez-le."
-        save: Enregistrer les modifications
-        cancel: Retour aux modèles
-        variables_heading: Variables
-        variable_key: Clé
-        variable_label: Libellé
-        variable_type: Type
-        variable_required: Obligatoire
-        "yes": "Oui"
-        "no": "Non"
-        generate_heading: Génération IA
-        generate_description: "Laissez l'IA générer du HTML à partir de votre description."
-        generate_button: "Générer avec l'IA"
-        preview_send_heading: Aperçu et envoi
-        preview_send_description: "Ouvrez la page de remplissage pour prévisualiser le PDF et l'envoyer par e-mail."
-        open_fill_page: Ouvrir la page de remplissage
       create:
         created: Modèle créé.
-      update:
-        updated: Modèle mis à jour.
       destroy:
         destroyed: Modèle supprimé.
+      edit:
+        cancel: Retour aux modèles
+        generate_button: Générer avec l'IA
+        generate_description: Laissez l'IA générer du HTML à partir de votre description.
+        generate_heading: Génération IA
+        'no': Non
+        open_fill_page: Ouvrir la page de remplissage
+        preview_send_description: Ouvrez la page de remplissage pour prévisualiser
+          le PDF et l'envoyer par e-mail.
+        preview_send_heading: Aperçu et envoi
+        save: Enregistrer les modifications
+        subtitle: Révisez et affinez le modèle généré par l'IA ou régénérez-le.
+        title: 'Modifier : %{name}'
+        variable_key: Clé
+        variable_label: Libellé
+        variable_required: Obligatoire
+        variable_type: Type
+        variables_heading: Variables
+        'yes': Oui
+      form:
+        description_hint: Décrivez le type de document que vous souhaitez que l'IA
+          génère.
+        description_placeholder: 'ex. : Un rappel de facture professionnel pour les
+          clients.'
+        html_content_hint: Modifiez le HTML directement. Utilisez {{ variable_name
+          }} pour le contenu dynamique.
+        name_placeholder: 'ex. : Rappel de facture'
+      index:
+        delete: Supprimer
+        delete_confirm: Supprimer ce modèle ?
+        edit: Modifier
+        empty_description: Créez votre premier modèle de document et laissez l'IA
+          générer le HTML.
+        empty_title: Aucun modèle pour l'instant
+        fill: Remplir et envoyer
+        new_template: Nouveau modèle
+        subtitle: Créez et gérez des modèles de documents réutilisables avec du contenu
+          généré par IA.
+        title: Modèles de documents
+        variables_count:
+          one: 1 variable
+          other: "%{count} variables"
+      new:
+        cancel: Annuler
+        save: Créer le modèle
+        subtitle: Décrivez le type de document souhaité et l'IA générera le HTML.
+        title: Nouveau modèle de document
       regenerate:
         generating: Génération IA démarrée.
-      form:
-        name_placeholder: "ex. : Rappel de facture"
-        description_hint: "Décrivez le type de document que vous souhaitez que l'IA génère."
-        description_placeholder: "ex. : Un rappel de facture professionnel pour les clients."
-        html_content_hint: Modifiez le HTML directement. Utilisez {{ variable_name }} pour le contenu dynamique.
+      update:
+        updated: Modèle mis à jour.

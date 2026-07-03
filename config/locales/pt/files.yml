@@ -1,136 +1,143 @@
 ---
 pt:
+  components:
+    files:
+      doc_row:
+        actions: Ações do documento
+        edit: Editar
+        kind: Documento interno
+        move_to: Mover para
+        open: Abrir
+        remove_from_folder: Remover da pasta
+        updated: Atualizado a %{date}
+      email_row:
+        actions: Ações do email
+        no_subject: "(sem assunto)"
+        open: Abrir no Correio
+        remove_from_folder: Remover da pasta
+      file_actions_menu:
+        actions: Ações do ficheiro
+        delete: Eliminar
+        delete_confirm: Eliminar "%{name}"? Esta ação não pode ser anulada.
+        download: Transferir
+        move_to: Mover para
+        open: Abrir
+        remove_from_folder: Remover da pasta
+      file_link_picker:
+        button: Inserir ligação a ficheiro
+        empty: Ainda não há ficheiros para ligar.
+        hint: Escolha um ficheiro — é criada e inserida uma ligação pública na sua
+          mensagem.
+        insert: Inserir
+        loading: A carregar ficheiros…
+        title: Inserir uma ligação a ficheiro
+      file_meta:
+        kind_file: Ficheiro
+        kind_image: Imagem
+      folder_sharing:
+        add_button: Adicionar
+        add_title: Adicionar pessoas
+        all_have_access: Todos no espaço de trabalho já têm acesso.
+        open_hint: Esta pasta está aberta a todos no seu espaço de trabalho. Restrinja-a
+          para escolher quem tem acesso.
+        owner_badge: Proprietário
+        remove_aria: Remover acesso
+        remove_confirm: Remover %{name} desta pasta?
+        restrict_hint: Só as pessoas que adicionar (e os administradores) podem ver
+          esta pasta e o seu conteúdo.
+        restrict_label: Restringir acesso
+        role_aria: Nível de acesso
+        role_editor: Pode editar
+        role_manager: Gestor
+        role_viewer: Pode ver
+        select_placeholder: Escolha uma pessoa…
+        you_badge: Você
+      search_bar:
+        clear: Limpar pesquisa
+        placeholder: Pesquisar ficheiros…
+        submit: Pesquisar
+      sidebar:
+        all_files: Todos os ficheiros
+        label: Pastas
+        new_folder: Nova pasta
   files:
     index:
-      title: Ficheiros
-      subtitle: Carregue, organize e encontre os seus ficheiros.
-      new_folder: Nova pasta
-      new_folder_hint: Agrupe os seus ficheiros numa pasta.
-      upload: Carregar
-      breadcrumb: Navegação estrutural
-      all_files: Todos os ficheiros
-      click_to_upload: Clique para carregar
-      drag_and_drop: ou arraste e largue
-      upload_hint: Pode carregar qualquer tipo de ficheiro.
-      selected_files: Ficheiros selecionados
-      upload_submit: Carregar ficheiros
-      col_name: Nome
-      col_kind: Tipo
-      col_size: Tamanho
-      col_added: Adicionado
-      col_actions: Ações
-      empty_folder: Esta pasta está vazia.
-      search_results:
-        zero: "Sem resultados para \"%{q}\""
-        one: "1 resultado para \"%{q}\""
-        other: "%{count} resultados para \"%{q}\""
-      search_empty: Nenhum documento corresponde à pesquisa. Tente outro termo ou limpe os filtros.
-      empty_title: Ainda não há ficheiros
-      empty_description: Carregue ficheiros para os manter organizados em pastas — faturas, contratos, o que quiser.
-      empty_upload: Carregar ficheiros
-      new_internal_document: Novo documento
-      internal_documents: Documentos internos
-      emails: Emails
-      files_section: Ficheiros
-      manage_access: Gerir acesso
-      manage_access_locked: "Gerir acesso · Privado"
-      review_n: "Rever %{count}"
       ai_analyze: Analisar com IA
-      ai_analyze_hint: Extrai e classifica documentos comerciais (faturas, recibos…). Desligue para apenas guardar o ficheiro.
-      filters: Filtros
-      filter_category: Categoria
-      filter_type: Tipo
-      filter_status: Estado
-      filter_month: Mês
-      filter_folder: Pasta
-      filter_all_categories: Todas as categorias
-      filter_all_types: Todos os tipos
-      filter_all_statuses: Todos os estados
-      filter_all_folders: Todas as pastas
-      filter_types_selected: "%{count} selecionado(s)"
-      reanalyze_all: "Reanalisar todos (%{count})"
+      ai_analyze_hint: Extrai e classifica documentos comerciais (faturas, recibos…).
+        Desligue para apenas guardar o ficheiro.
+      all_files: Todos os ficheiros
+      breadcrumb: Navegação estrutural
+      click_to_upload: Clique para carregar
+      col_actions: Ações
+      col_added: Adicionado
+      col_kind: Tipo
+      col_name: Nome
+      col_size: Tamanho
+      download_zip: Transferir ZIP
+      drag_and_drop: ou arraste e largue
+      emails: Emails
+      empty_description: Carregue ficheiros para os manter organizados em pastas —
+        faturas, contratos, o que quiser.
+      empty_folder: Esta pasta está vazia.
+      empty_title: Ainda não há ficheiros
+      empty_upload: Carregar ficheiros
       export: Exportar
-      export_confirm: Exportar os documentos que correspondem aos filtros atuais como ZIP?
-      exports_heading: Exportações recentes
+      export_confirm: Exportar os documentos que correspondem aos filtros atuais como
+        ZIP?
+      export_failed: A exportação falhou
       exports_col_date: Data
-      exports_col_status: Estado
       exports_col_documents: Documentos
       exports_col_download: Transferir
-      download_zip: Transferir ZIP
-      export_failed: A exportação falhou
-    uploads:
-      create:
-        no_files: Escolha pelo menos um ficheiro para carregar.
-        uploaded_one: Ficheiro carregado.
-        uploaded_many: "%{count} ficheiros carregados."
-        analyzed_one: Ficheiro carregado e em fila para análise por IA.
-        analyzed_many: "%{count} ficheiros carregados e em fila para análise por IA."
-        failed: "Falha ao carregar: %{message}"
-      destroy:
-        deleted: Ficheiro eliminado.
-      analyze:
-        analyzing: A analisar este ficheiro com IA…
+      exports_col_status: Estado
+      exports_heading: Exportações recentes
+      files_section: Ficheiros
+      filter_all_categories: Todas as categorias
+      filter_all_folders: Todas as pastas
+      filter_all_statuses: Todos os estados
+      filter_all_types: Todos os tipos
+      filter_category: Categoria
+      filter_folder: Pasta
+      filter_month: Mês
+      filter_status: Estado
+      filter_type: Tipo
+      filter_types_selected: "%{count} selecionado(s)"
+      filters: Filtros
+      internal_documents: Documentos internos
+      manage_access: Gerir acesso
+      manage_access_locked: Gerir acesso · Privado
+      new_folder: Nova pasta
+      new_folder_hint: Agrupe os seus ficheiros numa pasta.
+      new_internal_document: Novo documento
+      reanalyze_all: Reanalisar todos (%{count})
+      review_n: Rever %{count}
+      search_empty: Nenhum documento corresponde à pesquisa. Tente outro termo ou
+        limpe os filtros.
+      search_results:
+        one: 1 resultado para "%{q}"
+        other: '%{count} resultados para "%{q}"'
+        zero: Sem resultados para "%{q}"
+      selected_files: Ficheiros selecionados
+      subtitle: Carregue, organize e encontre os seus ficheiros.
+      title: Ficheiros
+      upload: Carregar
+      upload_hint: Pode carregar qualquer tipo de ficheiro.
+      upload_submit: Carregar ficheiros
     public_links:
       create:
         created: Link público pronto.
       destroy:
         revoked: Link público revogado.
     scout_thread_linker:
-      body: "Retirei um documento deste email e arquivei-o em Ficheiros: **[%{title}](%{path})**."
-  components:
-    files:
-      search_bar:
-        placeholder: Pesquisar ficheiros…
-        submit: Pesquisar
-        clear: Limpar pesquisa
-      sidebar:
-        label: Pastas
-        all_files: Todos os ficheiros
-        new_folder: Nova pasta
-      file_actions_menu:
-        actions: Ações do ficheiro
-        open: Abrir
-        download: Transferir
-        move_to: Mover para
-        remove_from_folder: Remover da pasta
-        delete: Eliminar
-        delete_confirm: "Eliminar \"%{name}\"? Esta ação não pode ser anulada."
-      file_meta:
-        kind_image: Imagem
-        kind_file: Ficheiro
-      doc_row:
-        kind: Documento interno
-        updated: Atualizado a %{date}
-        actions: Ações do documento
-        open: Abrir
-        edit: Editar
-        move_to: Mover para
-        remove_from_folder: Remover da pasta
-      email_row:
-        no_subject: (sem assunto)
-        actions: Ações do email
-        open: Abrir no Correio
-        remove_from_folder: Remover da pasta
-      folder_sharing:
-        open_hint: Esta pasta está aberta a todos no seu espaço de trabalho. Restrinja-a para escolher quem tem acesso.
-        restrict_label: Restringir acesso
-        restrict_hint: Só as pessoas que adicionar (e os administradores) podem ver esta pasta e o seu conteúdo.
-        you_badge: Você
-        owner_badge: Proprietário
-        role_aria: Nível de acesso
-        role_viewer: Pode ver
-        role_editor: Pode editar
-        role_manager: Gestor
-        remove_confirm: "Remover %{name} desta pasta?"
-        remove_aria: Remover acesso
-        add_title: Adicionar pessoas
-        all_have_access: Todos no espaço de trabalho já têm acesso.
-        select_placeholder: Escolha uma pessoa…
-        add_button: Adicionar
-      file_link_picker:
-        button: Inserir ligação a ficheiro
-        title: Inserir uma ligação a ficheiro
-        hint: Escolha um ficheiro — é criada e inserida uma ligação pública na sua mensagem.
-        loading: A carregar ficheiros…
-        empty: Ainda não há ficheiros para ligar.
-        insert: Inserir
+      body: 'Retirei um documento deste email e arquivei-o em Ficheiros: **[%{title}](%{path})**.'
+    uploads:
+      analyze:
+        analyzing: A analisar este ficheiro com IA…
+      create:
+        analyzed_many: "%{count} ficheiros carregados e em fila para análise por IA."
+        analyzed_one: Ficheiro carregado e em fila para análise por IA.
+        failed: 'Falha ao carregar: %{message}'
+        no_files: Escolha pelo menos um ficheiro para carregar.
+        uploaded_many: "%{count} ficheiros carregados."
+        uploaded_one: Ficheiro carregado.
+      destroy:
+        deleted: Ficheiro eliminado.

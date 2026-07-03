@@ -113,8 +113,6 @@ pt:
       selected_badge: Selecionado
       send_to_notion: Guardar no Notion
       tags_label: Etiquetas
-    tag_chip:
-      remove: "Remover %{name}"
     email_filter_panel:
       accounts: Contas
       all_folders: Todas as pastas
@@ -161,6 +159,8 @@ pt:
       subtitle: Adicionada a todas as caixas de entrada ligadas.
       title: Nova pasta
     rich_text_editor:
+      add_column_before: Adicionar coluna
+      add_row_before: Adicionar linha
       align_center: Centrar
       align_left: Alinhar à esquerda
       align_right: Alinhar à direita
@@ -170,9 +170,14 @@ pt:
       bullet_list: Lista com marcadores
       clear_formatting: Limpar formatação
       code_block: Bloco de código
+      default_font: Fonte padrão
+      delete_column: Remover coluna
+      delete_row: Remover linha
+      font_family: Fonte
       heading_1: Título 1
       heading_2: Título 2
       heading_3: Título 3
+      highlight_color: Cor de destaque
       horizontal_rule: Separador
       image: Inserir imagem
       image_insert: Inserir
@@ -188,17 +193,12 @@ pt:
       paragraph: Texto normal
       redo: Refazer
       strikethrough: Rasurado
+      subscript: Subscrito
+      superscript: Sobrescrito
+      table: Inserir tabela
       text_color: Cor do texto
+      toggle_header: Alternar cabeçalho
       underline: Sublinhado
       undo: Anular
-      table: Inserir tabela
-      add_row_before: Adicionar linha
-      delete_row: Remover linha
-      add_column_before: Adicionar coluna
-      delete_column: Remover coluna
-      toggle_header: Alternar cabeçalho
-      font_family: Fonte
-      default_font: Fonte padrão
-      highlight_color: Cor de destaque
-      superscript: Sobrescrito
-      subscript: Subscrito
+    tag_chip:
+      remove: Remover %{name}

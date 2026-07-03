@@ -33,11 +33,11 @@ fr:
       home: Accueil
       mail: Courrier
       more: Plus
-      organizations: Organisations
       new_items: Nouveau
+      organizations: Organisations
       scout: Scout
       settings: Paramètres
-      tasks: "Tâches"
+      tasks: Tâches
       workflows: Flux
     swipe_dialogs:
       confirm_action: Supprimer

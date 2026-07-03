@@ -255,6 +255,12 @@
      global reduced-motion guard below stops the loop. */
   --animate-tour-breathe: tour-breathe 2.2s var(--ease-out-quint) infinite;
   --animate-tour-invite: tour-invite-wash 2.2s var(--ease-out-quint) infinite;
+
+  /* Onboarding stage entrances — content settles onto the quiet canvas. `both`
+     keeps the pre-animation state during a per-element animation-delay stagger
+     (set inline via --stage-delay). The reduced-motion guard collapses these. */
+  --animate-stage-in: stage-in 0.55s var(--ease-out-expo) var(--stage-delay, 0s) both;
+  --animate-stage-in-hero: stage-in-hero 0.7s var(--ease-out-expo) var(--stage-delay, 0s) both;
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -417,6 +423,46 @@ html {
   0%, 100% { background-color: transparent; }
   50% { background-color: color-mix(in oklch, var(--ember-solid) 8%, transparent); }
 }
+
+/* Onboarding stage entrances (see --animate-stage-in). The hero variant adds a
+   slight settle-down scale for the one leading element (Scout, a headline). */
+@keyframes stage-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes stage-in-hero {
+  from { opacity: 0; transform: translateY(10px) scale(0.94); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* First-sync stage: the soft ember halo that breathes behind Scout while the
+   first inbox scan runs. Ends with the celebration pop on the done check. */
+@keyframes sync-halo {
+  0%, 100% { transform: scale(1); opacity: 0.45; }
+  50% { transform: scale(1.35); opacity: 0.12; }
+}
+@keyframes sync-done-pop {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-sync-halo { animation: sync-halo 2.6s var(--ease-out-quint) infinite; }
+.animate-sync-done-pop { animation: sync-done-pop 0.6s var(--ease-out-expo) both; }
+
+/* Product-tour scene entrances: when a scene becomes current the controller
+   replays .tour-scene-enter on it — its direct children settle in with a light
+   stagger. The finale ring is the tour's one-shot celebration glow. */
+.tour-scene-enter > * { animation: stage-in 0.5s var(--ease-out-expo) both; }
+.tour-scene-enter > *:nth-child(2) { animation-delay: 0.06s; }
+.tour-scene-enter > *:nth-child(3) { animation-delay: 0.12s; }
+.tour-scene-enter > *:nth-child(n + 4) { animation-delay: 0.18s; }
+
+@keyframes tour-finale-ring {
+  0% { transform: scale(0.4); opacity: 0; }
+  35% { opacity: 0.5; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.tour-finale-ring { animation: tour-finale-ring 1.1s var(--ease-out-expo) both; }
 
 /* Markdown-rendered content in agent chat messages */
 .agent-message-content p {

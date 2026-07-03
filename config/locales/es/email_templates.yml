@@ -1,74 +1,89 @@
 ---
 es:
   email_templates:
-    index:
-      empty: "Aún no hay plantillas de correo. Crea una en Ajustes → Plantillas de correo."
-      use: Usar
-      variables:
-        one: "1 variable"
-        other: "%{count} variables"
-      documents:
-        one: "1 documento adjunto"
-        other: "%{count} documentos adjuntos"
     fill_form:
-      title: "Rellenar: %{name}"
-      subtitle: Rellena los campos y luego inserta la plantilla en tu correo.
-      no_variables: Esta plantilla está lista para insertar.
-      insert: Insertar en el correo
-      back: Volver
       attachments_note:
         one: Se adjuntará 1 documento como PDF.
-        other: "Se adjuntarán %{count} documentos como PDFs."
+        other: Se adjuntarán %{count} documentos como PDFs.
+      back: Volver
+      insert: Insertar en el correo
+      no_variables: Esta plantilla está lista para insertar.
+      subtitle: Rellena los campos y luego inserta la plantilla en tu correo.
+      title: 'Rellenar: %{name}'
+    index:
+      documents:
+        one: 1 documento adjunto
+        other: "%{count} documentos adjuntos"
+      empty: Aún no hay plantillas de correo. Crea una en Ajustes → Plantillas de
+        correo.
+      use: Usar
+      variables:
+        one: 1 variable
+        other: "%{count} variables"
   settings:
     email_templates:
-      index:
-        title: Plantillas de correo
-        subtitle: Crea correos reutilizables — asunto, cuerpo y documentos adjuntos — para usar desde el compositor.
-        new_template: Nueva plantilla
-        edit: Editar
-        delete: Eliminar
-        delete_confirm: "¿Eliminar esta plantilla?"
-        empty_title: "Aún no hay plantillas"
-        empty_description: Crea tu primera plantilla de correo y reutilízala cuando quieras redactar.
-        variables_count:
-          one: "1 variable"
-          other: "%{count} variables"
-        documents_count:
-          one: "1 documento"
-          other: "%{count} documentos"
-      new:
-        title: Nueva plantilla de correo
-        subtitle: Escribe el correo una vez y reutilízalo — o deja que la IA lo redacte a partir de una descripción.
-        save: Crear plantilla
-        cancel: Cancelar
+      create:
+        created: Plantilla creada.
+      destroy:
+        destroyed: Plantilla eliminada.
       edit:
-        title: "Editar: %{name}"
-        subtitle: Revisa y refina la plantilla, adjunta documentos o vuelve a generarla con IA.
-        save: Guardar cambios
         cancel: Volver a plantillas
+        generate_button: Generar con IA
+        generate_description: Deja que la IA redacte el asunto y el cuerpo a partir
+          de tu descripción.
+        generate_heading: Generación con IA
         preview_heading: Vista previa
         preview_subject: Asunto
-        variables_heading: Variables
+        save: Guardar cambios
+        subtitle: Revisa y refina la plantilla, adjunta documentos o vuelve a generarla
+          con IA.
+        title: 'Editar: %{name}'
         variable_key: Clave
         variable_label: Etiqueta
+        variable_required: Obligatorio
         variable_type: Tipo
-        variable_required: "Obligatorio"
-        generate_heading: "Generación con IA"
-        generate_description: Deja que la IA redacte el asunto y el cuerpo a partir de tu descripción.
-        generate_button: Generar con IA
-      create: { created: Plantilla creada. }
-      update: { updated: Plantilla actualizada. }
-      destroy: { destroyed: Plantilla eliminada. }
-      regenerate: { generating: "Generación con IA iniciada." }
+        variables_heading: Variables
       form:
-        name_placeholder: 'p. ej. Correo de bienvenida'
-        description_hint: Describe el correo que quieres que la IA redacte (solo se usa para la generación con IA).
-        description_placeholder: 'p. ej. Un amigable correo de bienvenida para nuevos clientes con los próximos pasos.'
-        subject_hint: Puedes usar {{ variable_name }} para contenido dinámico.
-        subject_placeholder: "p. ej. ¡Bienvenido a {{ workspace_name }}, {{ recipient_name }}!"
-        body_label: Cuerpo
         body_hint: Usa {{ variable_name }} en cualquier lugar para contenido dinámico.
+        body_label: Cuerpo
         body_placeholder: Escribe tu correo…
+        description_hint: Describe el correo que quieres que la IA redacte (solo se
+          usa para la generación con IA).
+        description_placeholder: p. ej. Un amigable correo de bienvenida para nuevos
+          clientes con los próximos pasos.
+        documents_empty: Aún no hay plantillas de documento listas. Crea una en Plantillas
+          de documento primero.
+        documents_hint: Estas plantillas de documento se rellenan con las mismas variables
+          y se adjuntan como PDFs.
         documents_label: Documentos adjuntos
-        documents_hint: Estas plantillas de documento se rellenan con las mismas variables y se adjuntan como PDFs.
-        documents_empty: "Aún no hay plantillas de documento listas. Crea una en Plantillas de documento primero."
+        name_placeholder: p. ej. Correo de bienvenida
+        subject_hint: Puedes usar {{ variable_name }} para contenido dinámico.
+        subject_placeholder: p. ej. ¡Bienvenido a {{ workspace_name }}, {{ recipient_name
+          }}!
+      index:
+        delete: Eliminar
+        delete_confirm: "¿Eliminar esta plantilla?"
+        documents_count:
+          one: 1 documento
+          other: "%{count} documentos"
+        edit: Editar
+        empty_description: Crea tu primera plantilla de correo y reutilízala cuando
+          quieras redactar.
+        empty_title: Aún no hay plantillas
+        new_template: Nueva plantilla
+        subtitle: Crea correos reutilizables — asunto, cuerpo y documentos adjuntos
+          — para usar desde el compositor.
+        title: Plantillas de correo
+        variables_count:
+          one: 1 variable
+          other: "%{count} variables"
+      new:
+        cancel: Cancelar
+        save: Crear plantilla
+        subtitle: Escribe el correo una vez y reutilízalo — o deja que la IA lo redacte
+          a partir de una descripción.
+        title: Nueva plantilla de correo
+      regenerate:
+        generating: Generación con IA iniciada.
+      update:
+        updated: Plantilla actualizada.

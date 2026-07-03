@@ -23,7 +23,7 @@ fr:
         empty: Rien de plus à ajouter.
         no_subject: "(sans objet)"
         search_placeholder: Rechercher des documents et des e-mails…
-        title: "Ajouter à %{pipeline}"
+        title: Ajouter à %{pipeline}
       stage_row:
         description_placeholder: Description (facultative)
         name_placeholder: Nom de l'étape

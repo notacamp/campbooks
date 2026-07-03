@@ -3,30 +3,31 @@ fr:
   settings:
     security:
       audit_log:
-        link: "Activité de connexion et de sécurité"
-        link_hint: "Consultez les connexions et changements de sécurité récents"
-        time_ago: "il y a %{time}"
-        index:
-          heading: "Activité de connexion et de sécurité"
-          subheading: "Un journal des connexions et des changements de sécurité de votre compte."
-          empty: "Aucune activité de sécurité pour le moment."
         actions:
-          sign_in: "Connexion"
-          sign_out: "Déconnexion"
-          mfa_challenge_failed: "Échec de la vérification en deux étapes"
-          mfa_challenge_passed: "Vérification en deux étapes réussie"
-          mfa_recovery_code_used: "Code de récupération utilisé"
-          mfa_recovery_codes_generated: "Codes de récupération générés"
-          mfa_disabled: "Authentification à deux facteurs désactivée"
-          mfa_totp_enabled: "Application d'authentification activée"
-          mfa_totp_disabled: "Application d'authentification désactivée"
-          mfa_email_otp_enabled: "Code par e-mail activé"
-          mfa_email_otp_disabled: "Code par e-mail désactivé"
-          mfa_passkey_added: "Clé d'accès ajoutée"
-          mfa_passkey_removed: "Clé d'accès supprimée"
-          sign_in_method_added: "Méthode de connexion ajoutée"
-          sign_in_method_removed: "Méthode de connexion supprimée"
-          password_changed: "Mot de passe modifié"
-          data_exported: "Données exportées"
-          account_deletion_requested: "Suppression du compte demandée"
-          admin_role_changed: "Rôle d'administrateur modifié"
+          account_deletion_requested: Suppression du compte demandée
+          admin_role_changed: Rôle d'administrateur modifié
+          data_exported: Données exportées
+          mfa_challenge_failed: Échec de la vérification en deux étapes
+          mfa_challenge_passed: Vérification en deux étapes réussie
+          mfa_disabled: Authentification à deux facteurs désactivée
+          mfa_email_otp_disabled: Code par e-mail désactivé
+          mfa_email_otp_enabled: Code par e-mail activé
+          mfa_passkey_added: Clé d'accès ajoutée
+          mfa_passkey_removed: Clé d'accès supprimée
+          mfa_recovery_code_used: Code de récupération utilisé
+          mfa_recovery_codes_generated: Codes de récupération générés
+          mfa_totp_disabled: Application d'authentification désactivée
+          mfa_totp_enabled: Application d'authentification activée
+          password_changed: Mot de passe modifié
+          sign_in: Connexion
+          sign_in_method_added: Méthode de connexion ajoutée
+          sign_in_method_removed: Méthode de connexion supprimée
+          sign_out: Déconnexion
+        index:
+          empty: Aucune activité de sécurité pour le moment.
+          heading: Activité de connexion et de sécurité
+          subheading: Un journal des connexions et des changements de sécurité de
+            votre compte.
+        link: Activité de connexion et de sécurité
+        link_hint: Consultez les connexions et changements de sécurité récents
+        time_ago: il y a %{time}

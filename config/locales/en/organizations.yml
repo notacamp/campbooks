@@ -1,31 +1,32 @@
+---
 en:
+  components:
+    organization_card:
+      members: "%{count} members"
   organizations:
-    index:
-      heading: "Organizations"
-      subheading: "%{count} organizations"
-      sync_from_contacts: "Sync from contacts"
-      empty: "No organizations yet"
-      empty_hint: "Sync from your contacts to build your organization directory."
-    show:
-      back: "Organizations"
-      members_label: "Members"
-      emails_label: "Emails"
-      documents_label: "Documents"
-      members_heading: "Members"
-      no_members: "No members in this organization."
-      recent_emails_heading: "Recent emails"
-      recent_documents_heading: "Recent documents"
-      no_emails: "No emails from this organization yet."
-      no_documents: "No documents from this organization yet."
-      no_subject: "(no subject)"
-    update:
-      saved: "Organization updated."
     backfill:
       backfilled: "%{count} organizations synced from contacts."
     emails:
       no_subject: "(no subject)"
+    index:
+      empty: No organizations yet
+      empty_hint: Sync from your contacts to build your organization directory.
+      heading: Organizations
+      subheading: "%{count} organizations"
+      sync_from_contacts: Sync from contacts
     organization_card:
       members: "%{count} members"
-  components:
-    organization_card:
-      members: "%{count} members"
+    show:
+      back: Organizations
+      documents_label: Documents
+      emails_label: Emails
+      members_heading: Members
+      members_label: Members
+      no_documents: No documents from this organization yet.
+      no_emails: No emails from this organization yet.
+      no_members: No members in this organization.
+      no_subject: "(no subject)"
+      recent_documents_heading: Recent documents
+      recent_emails_heading: Recent emails
+    update:
+      saved: Organization updated.

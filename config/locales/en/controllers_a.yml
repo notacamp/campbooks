@@ -171,7 +171,8 @@ en:
       action_failed: Action failed. Please try again.
       conversation_archived: This conversation has been archived.
       conversation_snoozed: This conversation has been snoozed.
-      draft_needs_info: Scout needs more context for this one — ask in the Discussion panel.
+      draft_needs_info: Scout needs more context for this one — ask in the Discussion
+        panel.
       draft_ready: Draft ready
       draft_saved: Draft saved to Gmail
       draft_sent: Draft sent
@@ -180,7 +181,8 @@ en:
       no_email_selected: No email selected
       no_send_permission: You don't have permission to send from this account.
       reminder_confirmed: "%{title} added to your calendar."
-      reminder_confirmed_no_calendar: Reminder confirmed. Connect a calendar to sync it automatically.
+      reminder_confirmed_no_calendar: Reminder confirmed. Connect a calendar to sync
+        it automatically.
       reminder_dismissed: Reminder dismissed.
       reply_sent: Reply sent
       save_draft_html: Draft saved

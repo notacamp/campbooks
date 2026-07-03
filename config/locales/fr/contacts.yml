@@ -61,11 +61,11 @@ fr:
       emails_exchanged_label: E-mails échangés
       go: OK
       last_contact_ago: il y a %{time}
-      organization_label: Organisation
       last_contact_label: Dernier contact
       name_label: Nom
       no_email_history: Aucun historique d'e-mails disponible.
       no_subject: "(sans objet)"
+      organization_label: Organisation
       re_analyze: Ré-analyser
       relationship_label: Relation
       run_analysis_prompt: Lancez l'analyse pour créer un profil pour ce contact.

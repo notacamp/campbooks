@@ -1,42 +1,42 @@
 ---
 pt:
-  settings:
-    pipelines:
-      index:
-        heading: Pipelines
-        subtitle: Crie fluxos de trabalho personalizados para acompanhar documentos
-          pelas fases.
-        new_pipeline: Novo pipeline
-        view_board: Ver quadro
-        confirm_delete: Eliminar este pipeline? Todas as associações serão removidas.
-        empty_title: Sem pipelines ainda
-        empty_description: Crie um pipeline para acompanhar documentos ou emails pelas
-          fases personalizadas, como um quadro kanban.
-        create_first: Criar o seu primeiro pipeline
-      new:
-        heading: Novo pipeline
-        subtitle: Defina as fases pelas quais os seus documentos irão passar.
-      edit:
-        heading: Editar pipeline
-        subtitle: Modifique as fases ou as definições do pipeline.
-      create:
-        created: Pipeline criado.
-      update:
-        updated: Pipeline atualizado.
-      destroy:
-        deleted: Pipeline eliminado.
-      form:
-        name_placeholder: ex. Aprovação de faturas
-        description_placeholder: O que este pipeline acompanha
-        applies_to_options:
-          documents: Documentos
-          emails: Emails
-          both: Ambos
-        stages_heading: Fases
-        add_stage: Adicionar fase
-        stages_hint: Arraste para reordenar as fases. Os itens nas fases terminais
-          não podem ser movidos.
   navigation:
     settings:
       items:
         pipelines: Pipelines
+  settings:
+    pipelines:
+      create:
+        created: Pipeline criado.
+      destroy:
+        deleted: Pipeline eliminado.
+      edit:
+        heading: Editar pipeline
+        subtitle: Modifique as fases ou as definições do pipeline.
+      form:
+        add_stage: Adicionar fase
+        applies_to_options:
+          both: Ambos
+          documents: Documentos
+          emails: Emails
+        description_placeholder: O que este pipeline acompanha
+        name_placeholder: ex. Aprovação de faturas
+        stages_heading: Fases
+        stages_hint: Arraste para reordenar as fases. Os itens nas fases terminais
+          não podem ser movidos.
+      index:
+        confirm_delete: Eliminar este pipeline? Todas as associações serão removidas.
+        create_first: Criar o seu primeiro pipeline
+        empty_description: Crie um pipeline para acompanhar documentos ou emails pelas
+          fases personalizadas, como um quadro kanban.
+        empty_title: Sem pipelines ainda
+        heading: Pipelines
+        new_pipeline: Novo pipeline
+        subtitle: Crie fluxos de trabalho personalizados para acompanhar documentos
+          pelas fases.
+        view_board: Ver quadro
+      new:
+        heading: Novo pipeline
+        subtitle: Defina as fases pelas quais os seus documentos irão passar.
+      update:
+        updated: Pipeline atualizado.

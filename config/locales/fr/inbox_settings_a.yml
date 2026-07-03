@@ -40,7 +40,8 @@ fr:
         thread_view_bubbles: Bulles
         thread_view_classic: Classique
         thread_view_heading: Vue conversation
-        thread_view_hint: Les bulles montrent qui a envoyé chaque message, comme un chat.
+        thread_view_hint: Les bulles montrent qui a envoyé chaque message, comme un
+          chat.
     filtering:
       show:
         allowed_heading: Expéditeurs autorisés
@@ -82,27 +83,27 @@ fr:
         create_tag: Créer une étiquette
         group_label: Groupe
         group_placeholder: ex. Finance
+      hidden_tag:
+        ai_badge: IA
+        show: Afficher
+        system_badge: Système
       index:
         add_tag: Ajouter une étiquette
+        filtered_group: Masquées par l'IA ou par vous
         heading: Étiquettes
+        hidden_heading: Libellés masqués
+        hidden_hint: système et masqués par IA
         no_tags: Aucune étiquette pour l'instant. Ajoutez-en une pour commencer à
           trier votre boîte de réception.
         subheading: Les étiquettes aident Scout à trier votre boîte de réception automatiquement.
-        filtered_group: Masquées par l'IA ou par vous
-        hidden_heading: Libellés masqués
-        hidden_hint: système et masqués par IA
         system_group: Système du fournisseur
       tag:
         delete_confirm: Supprimer %{name} ?
         edit: Modifier
         hide: Masquer
         tagged_messages_title: Messages étiquetés
-      hidden_tag:
-        ai_badge: IA
-        show: Afficher
-        system_badge: Système
       toggle_hidden:
-        hidden: '%{name} masqué'
-        shown: '%{name} est maintenant visible'
+        hidden: "%{name} masqué"
+        shown: "%{name} est maintenant visible"
       update:
         updated_toast: Étiquette mise à jour.

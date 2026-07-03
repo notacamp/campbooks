@@ -1,53 +1,13 @@
 ---
 fr:
   settings:
-    api_clients:
-      index:
-        title: Accès API
-        subtitle: Créez des clients OAuth pour accéder à vos données Campbooks depuis vos propres applications et scripts.
-        new_client: Nouveau client
-        read_docs: Consulter la documentation de l'API
-        col_name: Nom
-        col_client_id: ID client
-        col_scopes: Autorisations
-        col_created: Créé le
-        regenerate: Régénérer le secret
-        regenerate_confirm: Régénérer le secret de ce client ? Le secret actuel cesse de fonctionner immédiatement.
-        revoke: Révoquer les jetons
-        revoke_confirm: Révoquer tous les jetons actifs de ce client ? Les applications qui l'utilisent devront obtenir un nouveau jeton.
-        delete: Supprimer
-        delete_confirm: Supprimer le client « %{name} » ? Cette action est irréversible.
-        no_clients_title: Aucun client API pour le moment
-        no_clients_desc: Créez un client pour obtenir un ID et un secret pour l'API Campbooks.
-      new:
-        title: Nouveau client API
-        subtitle: Donnez un nom au client et choisissez ce à quoi il peut accéder.
-        name_label: Nom
-        name_placeholder: ex. Synchronisation de facturation
-        name_hint: Une étiquette pour reconnaître ce client plus tard.
-        scopes_label: Autorisations
-        scopes_hint: N'accordez que l'accès dont ce client a besoin.
-        create: Créer le client
-        cancel: Annuler
-      reveal:
-        title: Client créé
-        subtitle: Copiez maintenant le secret de « %{name} ».
-        warning: C'est la seule fois que le secret du client est affiché. Conservez-le en lieu sûr — vous pourrez le régénérer plus tard si vous le perdez.
-        client_id_label: ID client
-        client_secret_label: Secret client
-        copy: Copier
-        next_steps_title: Échangez-les contre un jeton d'accès
-        done: Terminé
-      create:
-        scopes_required: Sélectionnez au moins une autorisation.
-      revoke:
-        revoked: Tous les jetons de « %{name} » ont été révoqués.
-      destroy:
-        deleted: Le client « %{name} » a été supprimé.
     account:
       analyze_writing_style:
         queued: Scout analyse vos e-mails envoyés — votre profil de style apparaîtra
           ici sous peu.
+      compose_preference:
+        failed: Impossible de mettre à jour la préférence de rédaction. Veuillez réessayer.
+        updated: Préférence de rédaction mise à jour.
       delete:
         cancel: Annuler
         confirm_email_label: Saisissez votre adresse e-mail pour confirmer
@@ -76,34 +36,32 @@ fr:
           déconnecté.
         wrong_email: L'adresse e-mail ne correspond pas.
         wrong_password: Le mot de passe actuel est incorrect.
-      compose_preference:
-        failed: Impossible de mettre à jour la préférence de rédaction. Veuillez réessayer.
-        updated: Préférence de rédaction mise à jour.
       language:
         failed: Impossible de mettre à jour votre langue. Veuillez réessayer.
         updated: Langue mise à jour.
       show:
         change_password: Changer le mot de passe
+        compose_desk: Pleine page — la rédaction occupe tout l'écran
+        compose_dock: Panneau inférieur — rédigez par-dessus la boîte de réception
+        compose_subtitle: Où s'ouvre un nouvel e-mail (raccourci C, bouton Rédiger
+          et palette de commandes).
+        compose_title: Les nouveaux e-mails s'ouvrent dans
         confirm_password: Confirmer le nouveau mot de passe
         current_password: Mot de passe actuel
         danger_zone_desc: Supprimer votre compte est permanent et irréversible.
         danger_zone_title: Zone de danger
         data_export_button: Demander mes données
-        data_export_desc: Obtenez une copie complète de vos données personnelles — profil,
-          sessions, conversations IA, ainsi que le contenu de vos e-mails, pièces jointes
-          et documents — dans une archive téléchargeable.
+        data_export_desc: Obtenez une copie complète de vos données personnelles —
+          profil, sessions, conversations IA, ainsi que le contenu de vos e-mails,
+          pièces jointes et documents — dans une archive téléchargeable.
         data_export_title: Vos données
         delete_account_button: Supprimer le compte
         language_subtitle: Choisissez la langue de votre interface Campbooks.
-        compose_desk: Pleine page — la rédaction occupe tout l'écran
-        compose_dock: Panneau inférieur — rédigez par-dessus la boîte de réception
-        compose_subtitle: Où s'ouvre un nouvel e-mail (raccourci C, bouton Rédiger et palette de commandes).
-        compose_title: Les nouveaux e-mails s'ouvrent dans
         language_title: Langue
         new_password: Nouveau mot de passe
         privacy_policy: Politique de confidentialité
-        save_language: Enregistrer
         save_compose: Enregistrer
+        save_language: Enregistrer
         subtitle: Gérez votre mot de passe et vos préférences de compte.
         terms_of_service: Conditions d'utilisation
         title: Paramètres du compte
@@ -199,6 +157,54 @@ fr:
         switched_to_byo: Vous êtes passé à vos propres clés. Ajoutez un fournisseur
           ci-dessous pour activer l'IA.
         switched_to_managed: Campbooks AI est maintenant activé.
+    api_clients:
+      create:
+        scopes_required: Sélectionnez au moins une autorisation.
+      destroy:
+        deleted: Le client « %{name} » a été supprimé.
+      index:
+        col_client_id: ID client
+        col_created: Créé le
+        col_name: Nom
+        col_scopes: Autorisations
+        delete: Supprimer
+        delete_confirm: Supprimer le client « %{name} » ? Cette action est irréversible.
+        new_client: Nouveau client
+        no_clients_desc: Créez un client pour obtenir un ID et un secret pour l'API
+          Campbooks.
+        no_clients_title: Aucun client API pour le moment
+        read_docs: Consulter la documentation de l'API
+        regenerate: Régénérer le secret
+        regenerate_confirm: Régénérer le secret de ce client ? Le secret actuel cesse
+          de fonctionner immédiatement.
+        revoke: Révoquer les jetons
+        revoke_confirm: Révoquer tous les jetons actifs de ce client ? Les applications
+          qui l'utilisent devront obtenir un nouveau jeton.
+        subtitle: Créez des clients OAuth pour accéder à vos données Campbooks depuis
+          vos propres applications et scripts.
+        title: Accès API
+      new:
+        cancel: Annuler
+        create: Créer le client
+        name_hint: Une étiquette pour reconnaître ce client plus tard.
+        name_label: Nom
+        name_placeholder: ex. Synchronisation de facturation
+        scopes_hint: N'accordez que l'accès dont ce client a besoin.
+        scopes_label: Autorisations
+        subtitle: Donnez un nom au client et choisissez ce à quoi il peut accéder.
+        title: Nouveau client API
+      reveal:
+        client_id_label: ID client
+        client_secret_label: Secret client
+        copy: Copier
+        done: Terminé
+        next_steps_title: Échangez-les contre un jeton d'accès
+        subtitle: Copiez maintenant le secret de « %{name} ».
+        title: Client créé
+        warning: C'est la seule fois que le secret du client est affiché. Conservez-le
+          en lieu sûr — vous pourrez le régénérer plus tard si vous le perdez.
+      revoke:
+        revoked: Tous les jetons de « %{name} » ont été révoqués.
     general:
       show:
         ai_providers_hint: Vous cherchez les fournisseurs IA et les paramètres de
@@ -306,14 +312,14 @@ fr:
           disconnect: Déconnecter
           disconnect_confirm: Déconnecter Google Drive ? Les uploads de documents
             s'arrêteront.
-          failed_count:
-            one: Un document n'a pas pu être envoyé. Vous pouvez réessayer ci-dessous.
-            other: "%{count} documents n'ont pas pu être envoyés. Vous pouvez tous les réessayer ci-dessous."
-          retry_all_failed: Réessayer tous les envois échoués
           drive_org_desc: Chaque type de document peut avoir son propre dossier, son
             modèle de nommage et sa structure de sous-dossiers.
           drive_org_heading: Comment Drive organise vos fichiers
           edit_config: Modifier
+          failed_count:
+            one: Un document n'a pas pu être envoyé. Vous pouvez réessayer ci-dessous.
+            other: "%{count} documents n'ont pas pu être envoyés. Vous pouvez tous
+              les réessayer ci-dessous."
           folder_set: Dossier défini
           off_badge: Désactivé
           on_badge: Activé
@@ -321,21 +327,37 @@ fr:
           reconnect_prompt: Reconnectez pour accorder un accès complet à Drive — nécessaire
             pour parcourir et sélectionner des dossiers existants lors de l'envoi
             de fichiers.
+          retry_all_failed: Réessayer tous les envois échoués
           subtitle: Envoyez des documents vers Google Drive avec des règles de dossier
             et de nommage par type.
           title: Google Drive
       google_drive_configs:
+        browse_folders:
+          browse_failed: 'Impossible de lister les dossiers : %{message}'
+          create_folder: Créer
+          my_drive: Mon Drive
+          new_folder_placeholder: Nom du nouveau dossier
+          no_subfolders: Aucun sous-dossier ici
+          reconnect_needed: Reconnectez Google Drive avec un accès complet pour parcourir
+            les dossiers.
+          select: Sélectionner
+          select_my_drive: Utiliser la racine de Mon Drive
+          select_this: Sélectionner « %{name} »
         edit:
-          auto_push_default_note: L'envoi automatique est activé par défaut — les documents approuvés de ce type seront automatiquement envoyés vers Drive. Décochez la case ci-dessus pour le mettre en pause.
-          auto_push_hint: Lorsque cette option est cochée, les documents approuvés de ce type sont automatiquement envoyés vers Google Drive. Décochez pour mettre en pause.
+          auto_push_default_note: L'envoi automatique est activé par défaut — les
+            documents approuvés de ce type seront automatiquement envoyés vers Drive.
+            Décochez la case ci-dessus pour le mettre en pause.
+          auto_push_hint: Lorsque cette option est cochée, les documents approuvés
+            de ce type sont automatiquement envoyés vers Google Drive. Décochez pour
+            mettre en pause.
           auto_push_label: Envoyer automatiquement à l'approbation
           browse: Parcourir
           folder_from_id: Dossier sélectionné
           folder_label: Dossier de destination
-          no_folder_selected: Aucun dossier sélectionné — choisissez-en un ci-dessous
           naming_pattern_hint: 'Espaces réservés disponibles : {date}, {entity}, {reference},
             {type}, {vendor}, {id}'
           naming_pattern_label: Modèle de nommage des fichiers
+          no_folder_selected: Aucun dossier sélectionné — choisissez-en un ci-dessous
           subfolder_pattern_hint_html: "<strong>Plat</strong> : Tous les fichiers
             sont placés directement dans le dossier cible.<br><strong>Année</strong>
             : Organisé par année (ex. /Dossier/2026/).<br><strong>Année/Mois</strong>
@@ -344,16 +366,6 @@ fr:
           subfolder_pattern_label: Structure de sous-dossiers
           subtitle: Contrôlez la façon dont les documents de ce type sont envoyés
             vers Google Drive.
-        browse_folders:
-          browse_failed: 'Impossible de lister les dossiers : %{message}'
-          create_folder: Créer
-          my_drive: Mon Drive
-          new_folder_placeholder: Nom du nouveau dossier
-          no_subfolders: Aucun sous-dossier ici
-          reconnect_needed: Reconnectez Google Drive avec un accès complet pour parcourir les dossiers.
-          select: Sélectionner
-          select_my_drive: Utiliser la racine de Mon Drive
-          select_this: 'Sélectionner « %{name} »'
       index:
         show:
           api_connections_desc: Enregistrez des intégrations API sortantes (URL de

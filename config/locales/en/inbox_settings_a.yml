@@ -78,26 +78,26 @@ en:
         create_tag: Create tag
         group_label: Group
         group_placeholder: e.g. Finance
+      hidden_tag:
+        ai_badge: AI
+        show: Show
+        system_badge: System
       index:
         add_tag: Add tag
-        heading: Tags
-        no_tags: No tags yet. Add one to start sorting your inbox.
-        subheading: Tags help Scout sort your inbox automatically.
         filtered_group: Hidden by AI or you
+        heading: Tags
         hidden_heading: Hidden labels
         hidden_hint: system & AI-hidden
+        no_tags: No tags yet. Add one to start sorting your inbox.
+        subheading: Tags help Scout sort your inbox automatically.
         system_group: Provider system
       tag:
         delete_confirm: Delete %{name}?
         edit: Edit
         hide: Hide
         tagged_messages_title: Tagged messages
-      hidden_tag:
-        ai_badge: AI
-        show: Show
-        system_badge: System
       toggle_hidden:
-        hidden: '%{name} hidden'
-        shown: '%{name} is now visible'
+        hidden: "%{name} hidden"
+        shown: "%{name} is now visible"
       update:
         updated_toast: Tag updated.

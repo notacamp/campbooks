@@ -31,6 +31,7 @@ pt:
       email_account_disconnected: Conta desligada
       email_archived: Email arquivado
       email_bulk_archived: Emails arquivados em massa
+      email_filed: Email guardado em pasta
       email_forwarded: Email reencaminhado
       email_received: Email recebido
       email_sent: Email enviado
@@ -38,7 +39,6 @@ pt:
       email_snoozed: Email adiado
       email_tagged: Email etiquetado
       email_trashed: Email movido para o lixo
-      email_filed: Email guardado em pasta
       email_unfiled: Email removido da pasta
       file_deleted: Ficheiro eliminado
       file_filed: Ficheiro arquivado

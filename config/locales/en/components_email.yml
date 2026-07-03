@@ -114,8 +114,6 @@ en:
       selected_badge: Selected
       send_to_notion: Save to Notion
       tags_label: Tags
-    tag_chip:
-      remove: "Remove %{name}"
     email_filter_panel:
       accounts: Accounts
       all_folders: All folders
@@ -162,6 +160,8 @@ en:
       subtitle: Added to all your connected inboxes.
       title: New folder
     rich_text_editor:
+      add_column_before: Add column
+      add_row_before: Add row
       align_center: Align center
       align_left: Align left
       align_right: Align right
@@ -171,9 +171,14 @@ en:
       bullet_list: Bullet list
       clear_formatting: Clear formatting
       code_block: Code block
+      default_font: Default font
+      delete_column: Delete column
+      delete_row: Delete row
+      font_family: Font
       heading_1: Heading 1
       heading_2: Heading 2
       heading_3: Heading 3
+      highlight_color: Highlight color
       horizontal_rule: Divider
       image: Insert image
       image_insert: Insert
@@ -189,17 +194,12 @@ en:
       paragraph: Normal text
       redo: Redo
       strikethrough: Strikethrough
+      subscript: Subscript
+      superscript: Superscript
+      table: Insert table
       text_color: Text color
+      toggle_header: Toggle header
       underline: Underline
       undo: Undo
-      table: Insert table
-      add_row_before: Add row
-      delete_row: Delete row
-      add_column_before: Add column
-      delete_column: Delete column
-      toggle_header: Toggle header
-      font_family: Font
-      default_font: Default font
-      highlight_color: Highlight color
-      superscript: Superscript
-      subscript: Subscript
+    tag_chip:
+      remove: Remove %{name}

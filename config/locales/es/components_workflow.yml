@@ -20,14 +20,16 @@ es:
         workspace: Espacio de trabajo
     setup_hub:
       add_manually: Añadir manualmente
-      connect_google: Conectar Google
-      connect_microsoft: Conectar Microsoft
-      connect_zoho: Conectar Zoho
       dismiss_title: Descartar esta tarea
-      heading: Termine de configurar Campbooks
+      heading: Scout puede hacer más
       leave_for_now: Dejar por ahora
-      let_ai_help: "✨ Dejar que la IA ayude"
-      progress: "%{completed} de %{total} completados"
+      more_in_settings:
+        one: 1 tarea más está en Configuración.
+        other: "%{count} tareas más están en Configuración."
+      remaining:
+        one: 1 cosa rápida pendiente
+        other: "%{count} cosas rápidas pendientes"
+      settings_hint: Todo esto también está en Configuración.
     step_picker:
       condition_description: Continuar solo si se cumple una regla
       condition_title: Condición
@@ -106,7 +108,7 @@ es:
       headers: Cabeceras
       headers_hint: 'Una por línea como Clave: Valor. Los valores admiten Liquid.'
       integration: Integración
-      load_error: "No se pudieron cargar los campos."
+      load_error: No se pudieron cargar los campos.
       load_fields: Cargar campos
       load_loading: Cargando campos…
       load_prompt: Elija un espacio de trabajo y una base de datos y cargue sus campos.

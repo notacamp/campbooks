@@ -1,0 +1,22 @@
+<%# Shared header for the auth screens (sign in, the three signup steps,
+    pending approval): logo, optional beta badge, a real headline and a
+    supporting line — staged entrances, no boxed card below. Locals:
+    title (required), subtitle (optional). %>
+<div class="flex flex-col items-center text-center">
+  <div class="animate-stage-in-hero">
+    <%= render(Campbooks::Logo.new(size: :lg)) %>
+  </div>
+  <% unless self_hosted? %>
+    <div class="mt-3 animate-stage-in" style="--stage-delay: .04s">
+      <%= render(Campbooks::Badge.new(variant: :accent, size: :md, class: "uppercase tracking-wide")) { t("registrations.new.beta_badge") } %>
+    </div>
+  <% end %>
+  <h1 class="mt-5 text-2xl font-semibold leading-tight tracking-[-0.02em] text-foreground text-balance animate-stage-in" style="--stage-delay: .08s">
+    <%= title %>
+  </h1>
+  <% if local_assigns[:subtitle].present? %>
+    <p class="mt-2 max-w-sm text-[15px] leading-relaxed text-muted-foreground text-pretty animate-stage-in" style="--stage-delay: .12s">
+      <%= subtitle %>
+    </p>
+  <% end %>
+</div>
