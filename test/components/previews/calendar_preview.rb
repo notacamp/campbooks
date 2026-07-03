@@ -5,7 +5,7 @@
 # resolve) stand in for synced events; nothing is persisted.
 class CalendarPreview < ViewComponent::Preview
   def agenda_list
-    render Campbooks::Calendar::AgendaList.new(events: sample_events)
+    render Campbooks::Calendar::AgendaList.new(events: sample_events, reminders: sample_reminders)
   end
 
   def agenda_empty
@@ -97,20 +97,38 @@ class CalendarPreview < ViewComponent::Preview
 
   def event(id:, title:, start_at:, all_day: false, location: nil, recurring: false)
     CalendarEvent.new(
-      id: id, title: title, start_at: start_at, end_at: start_at + 3600,
+      # calendar_events has a uuid primary key; a bare integer casts to nil and
+      # breaks edit_calendar_event_path, so seed a deterministic valid uuid.
+      id: uuid_for(id), title: title, start_at: start_at, end_at: start_at + 3600,
       all_day: all_day, location: location, status: :confirmed,
       recurring_event_provider_id: (recurring ? "series-1" : nil),
       calendar: calendar
     )
   end
 
+  def uuid_for(n)
+    "00000000-0000-4000-8000-#{n.to_s.rjust(12, '0')}"
+  end
+
+  # Relative to now so the agenda countdown always reads sensibly (In 40 min ·
+  # In 3 h · Tomorrow · In 3 days), whatever time of day the preview is opened.
   def sample_events
-    base = Date.current.to_time
+    now = Time.current
     [
-      event(id: 11, title: "Standup", start_at: base.change(hour: 9)),
-      event(id: 12, title: "Design review", start_at: base.change(hour: 14), location: "Room 2"),
-      event(id: 13, title: "1:1 with Sam", start_at: (base + 86_400).change(hour: 11)),
-      event(id: 14, title: "Client call", start_at: (base + 3 * 86_400).change(hour: 16), recurring: true)
+      event(id: 11, title: "Standup", start_at: now + 40.minutes),
+      event(id: 12, title: "Design review", start_at: now + 3.hours, location: "Room 2"),
+      event(id: 13, title: "1:1 with Sam", start_at: (now + 1.day).change(hour: 11)),
+      event(id: 14, title: "Client call", start_at: (now + 3.days).change(hour: 16), recurring: true)
+    ]
+  end
+
+  def sample_reminders
+    now = Time.current
+    [
+      Reminder.new(id: 61, title: "Pay invoice #1042", due_at: (now + 2.days).change(hour: 17),
+                   all_day: false, reminder_type: :payment_due, status: :pending),
+      Reminder.new(id: 62, title: "Passport renewal", due_at: (now + 9.days).beginning_of_day, all_day: true,
+                   reminder_type: :renewal, status: :pending)
     ]
   end
 end
