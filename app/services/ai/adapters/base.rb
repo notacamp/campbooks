@@ -9,6 +9,15 @@ module Ai
         "gemini" => nil  # URL constructed per-model
       }.freeze
 
+      # Provider hiccups a retry can cure (adapters raise plain Faraday errors via
+      # the raise_error middleware). Callers that degrade gracefully on model
+      # failure should still let THESE propagate to their job's retry_on —
+      # swallowing a rate limit turns a moment's backpressure into lost output.
+      TRANSIENT_ERRORS = [
+        Faraday::TooManyRequestsError, Faraday::ServerError,
+        Faraday::ConnectionFailed, Faraday::TimeoutError
+      ].freeze
+
       def self.for(provider, api_key:, endpoint_url: nil)
         url = endpoint_url.presence
         case provider
