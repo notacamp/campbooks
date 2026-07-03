@@ -78,6 +78,26 @@ fr:
         all_day: Toute la journée
         untitled: "(Sans titre)"
         video_call: Appel vidéo
+      time_until:
+        in_days:
+          one: Dans %{count} jour
+          other: Dans %{count} jours
+        in_hours:
+          one: Dans %{count} h
+          other: Dans %{count} h
+        in_minutes:
+          one: Dans %{count} min
+          other: Dans %{count} min
+        in_months:
+          one: Dans %{count} mois
+          other: Dans %{count} mois
+        in_weeks:
+          one: Dans %{count} semaine
+          other: Dans %{count} semaines
+        next_week: Semaine prochaine
+        now: Maintenant
+        today: Aujourd'hui
+        tomorrow: Demain
       week_grid:
         add: "+ Ajouter"
         untitled: "(Sans titre)"

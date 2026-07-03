@@ -16,6 +16,19 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **See how soon things are on the calendar.** The Agenda view now shows a small
+  countdown next to each event and reminder — "In 20 min", "In 3 h", "Tomorrow",
+  "In 4 days" — so you can tell at a glance what's imminent. Anything happening
+  now, within the hour, or today is highlighted.
+
+### Changed
+
+- **The calendar opens on the Month view by default** (was Agenda), giving you the
+  whole month at a glance when you land on the page. You can still switch views
+  from the tabs, and any bookmarked `?view=…` link is unchanged.
+
 ## [0.7.0] - 2026-06-30
 
 ### Added
