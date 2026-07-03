@@ -80,7 +80,7 @@ export default class extends Controller {
       return this.draftIdValue
     }
     const p = this._payload()
-    const bodyText = (p.body || "").replace(/<[^>]+>/g, "").trim()
+    const bodyText = this._textOf(p.body)
     const hasContent = bodyText || p.subject || p.to_address || (p.attachments_json || []).length
     if (!hasContent) return ""
     this._dirty = true
@@ -90,6 +90,14 @@ export default class extends Controller {
   }
 
   // ── internals ─────────────────────────────────────────────────
+  // Plain-text projection of the editor HTML, for emptiness checks only. DOM
+  // parsing (an inert document; scripts never run) rather than a tag-stripping
+  // regex, which chokes on nesting/entities and trips CodeQL.
+  _textOf(html) {
+    if (!html) return ""
+    return new DOMParser().parseFromString(html, "text/html").body.textContent.trim()
+  }
+
   async _save({ keepalive = false } = {}) {
     if (this._suspended || !this._dirty) return
     if (this._creating) { this.changed(); return }

@@ -127,10 +127,17 @@ export default class extends Controller {
     const form = this._form()
     if (!form) return false
     const body = form.querySelector('input[name="body"]')?.value || ""
-    const stripped = body.replace(/<[^>]+>/g, "").trim()
     const subject = form.querySelector('input[name="subject"]')?.value?.trim()
     const to = form.querySelector('input[name="to_address"]')?.value?.trim()
-    return Boolean(stripped || subject || to)
+    return Boolean(this._textOf(body) || subject || to)
+  }
+
+  // Plain-text projection of the editor HTML, for emptiness checks only. DOM
+  // parsing (an inert document; scripts never run) rather than a tag-stripping
+  // regex, which chokes on nesting/entities and trips CodeQL.
+  _textOf(html) {
+    if (!html) return ""
+    return new DOMParser().parseFromString(html, "text/html").body.textContent.trim()
   }
 
   _pillTitle() {
