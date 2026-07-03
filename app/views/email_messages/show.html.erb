@@ -12,7 +12,9 @@
         actions, Search and Compose, on the right where primary actions live. On mobile
         it belongs to the list view (email-mobile `topband` target) so it hides while
         reading a message. %>
-    <div data-email-mobile-target="topband" class="hidden lg:flex flex-col flex-shrink-0 border-b border-gray-200 bg-card">
+    <%# The band sits on the raw canvas (like home) rather than inside a bordered
+        toolbar slab — in dark mode the work panes below read as elevated cards. %>
+    <div data-email-mobile-target="topband" class="hidden lg:flex flex-col flex-shrink-0 border-b border-gray-100 bg-background">
       <div class="flex items-center gap-3 px-4 py-2">
         <div class="min-w-0 flex-1 max-w-2xl">
           <%= render(Campbooks::EmailSearchBar.new(search_params: @search_params, folders: @folders || [], accounts: @accounts || [], tags: @all_tags || [])) %>
@@ -46,7 +48,7 @@
     <!-- Thread list (mobile: shown in list mode; desktop: always shown) -->
     <%# Below lg the whole pane scrolls so the folder bar + search scroll away
         with the list; at lg+ the pane is fixed and only the inner list scrolls. %>
-    <div class="group/select hidden lg:flex w-full lg:w-64 flex-shrink-0 border-r border-gray-200 flex-col bg-card relative overflow-y-auto lg:overflow-visible"
+    <div class="group/select hidden lg:flex w-full lg:w-64 flex-shrink-0 border-r border-gray-100 flex-col bg-card relative overflow-y-auto lg:overflow-visible"
          data-controller="email-selection panel-resize"
          data-email-mobile-target="list"
          data-inbox-pane="list"
@@ -117,7 +119,7 @@
                         class="p-1 rounded hover:bg-gray-100 text-gray-500 transition-colors cursor-pointer border-0 bg-transparent" title="<%= t(".toolbar_tag_title") %>">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
                 </button>
-                <div data-email-selection-target="tagMenu" class="hidden absolute left-0 top-full mt-1 z-30 bg-card border border-gray-200 rounded-lg shadow-lg py-1 min-w-[120px] max-h-40 overflow-y-auto">
+                <div data-email-selection-target="tagMenu" class="hidden absolute left-0 top-full mt-1 z-30 bg-card/90 backdrop-blur-md border border-border rounded-xl shadow-lg py-1 min-w-[120px] max-h-40 overflow-y-auto">
                   <% @all_tags&.each do |tag| %>
                     <button type="button" data-tool="tag" data-tag-name="<%= tag.name %>" data-tag-action="add"
                             data-action="click->email-selection#bulkActionWithArgs"
@@ -143,7 +145,7 @@
                         class="p-1 rounded hover:bg-gray-100 text-gray-500 transition-colors cursor-pointer border-0 bg-transparent" title="<%= t(".toolbar_move_folder_title") %>">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
                 </button>
-                <div data-email-selection-target="folderMenu" class="hidden absolute left-0 top-full mt-1 z-30 bg-card border border-gray-200 rounded-lg shadow-lg py-1 min-w-[140px] max-h-40 overflow-y-auto">
+                <div data-email-selection-target="folderMenu" class="hidden absolute left-0 top-full mt-1 z-30 bg-card/90 backdrop-blur-md border border-border rounded-xl shadow-lg py-1 min-w-[140px] max-h-40 overflow-y-auto">
                   <% @folders&.each do |folder| %>
                     <% next if folder[:id].nil? %>
                     <button type="button" data-tool="move_to_folder" data-folder-id="<%= folder[:id] %>"
@@ -161,7 +163,7 @@
                         class="p-1 rounded hover:bg-yellow-50 dark:hover:bg-yellow-500/10 text-gray-500 hover:text-yellow-600 dark:hover:text-yellow-400 transition-colors cursor-pointer border-0 bg-transparent" title="<%= t(".toolbar_snooze_title") %>">
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </button>
-                <div data-email-selection-target="snoozeMenu" class="hidden absolute left-0 top-full mt-1 z-30 bg-card border border-gray-200 rounded-lg shadow-lg py-1 min-w-[180px]">
+                <div data-email-selection-target="snoozeMenu" class="hidden absolute left-0 top-full mt-1 z-30 bg-card/90 backdrop-blur-md border border-border rounded-xl shadow-lg py-1 min-w-[180px]">
                   <% snooze_presets.each do |_key, label, time| %>
                     <button type="button" data-tool="snooze" data-snoozed-until="<%= time.iso8601 %>"
                             data-action="click->email-selection#bulkActionWithArgs"
@@ -394,7 +396,7 @@
 
 <!-- Scout mobile overlay backdrop -->
 <div data-scout-mobile-target="backdrop" data-action="click->scout-mobile#close"
-     class="hidden lg:hidden fixed inset-0 top-14 z-40 bg-black/40"></div>
+     class="hidden lg:hidden fixed inset-0 top-14 z-40 bg-black/40 backdrop-blur-sm"></div>
 
   </div>
 <% end %>
