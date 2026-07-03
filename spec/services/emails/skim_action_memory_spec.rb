@@ -4,8 +4,9 @@ RSpec.describe Emails::SkimActionMemory do
   let(:user) { create(:user) }
 
   # Create a decision, optionally back-dating it past the timestamps Rails would set.
+  # Skim decisions now live in learning_decisions under the "email_skim" domain.
   def decide(action, at: nil, **attrs)
-    decision = SkimDecision.create!(user: user, workspace: user.workspace, action: action, **attrs)
+    decision = LearningDecision.create!(domain: "email_skim", user: user, workspace: user.workspace, label: action, **attrs)
     decision.update_columns(created_at: at) if at
     decision
   end
@@ -43,7 +44,7 @@ RSpec.describe Emails::SkimActionMemory do
 
     it "learns only from this user's own decisions" do
       other = create(:user)
-      3.times { SkimDecision.create!(user: other, workspace: other.workspace, action: "archive", contact_id: contact.id) }
+      3.times { LearningDecision.create!(domain: "email_skim", user: other, workspace: other.workspace, label: "archive", contact_id: contact.id) }
 
       expect(described_class.new(user).suggestion_for(contact_id: contact.id)).to be_nil
     end
@@ -94,7 +95,7 @@ RSpec.describe Emails::SkimActionMemory do
 
     # Wipe the table: a memory that preloaded once still answers from its in-memory
     # snapshot, proving the deck doesn't re-query per card.
-    SkimDecision.delete_all
+    LearningDecision.delete_all
     expect(memory.suggestion_for(contact_id: contact.id)).to include(action: "archive")
   end
 end

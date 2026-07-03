@@ -14,7 +14,10 @@ module Feed
     # POST /feed/items/:id/act — perform the chosen action on the underlying record.
     def act
       result = perform_action
-      @item.mark_acted! if result[:success]
+      if result[:success]
+        @item.mark_acted!
+        record_tag_suggestion_learning(:accepted) if tag_suggestion_item?
+      end
 
       respond_to do |format|
         format.turbo_stream do
@@ -31,6 +34,7 @@ module Feed
     # POST /feed/items/:id/dismiss — hide just this card; the record is untouched.
     def dismiss
       @item.dismiss!
+      record_tag_suggestion_learning(:rejected) if tag_suggestion_item?
       respond_to do |format|
         format.turbo_stream do
           render turbo_stream: [
@@ -72,6 +76,33 @@ module Feed
       @item = current_user.feed_items.find(params[:id])
     rescue ActiveRecord::RecordNotFound
       head :not_found
+    end
+
+    def tag_suggestion_item?
+      @item.kind == "tag_suggestion" && @item.subject.is_a?(EmailMessage)
+    end
+
+    # Record the accept/reject so Feed::Sources::TagSuggestion learns to stop
+    # resurfacing a tag this user keeps rejecting from a sender. Signals are derived
+    # server-side from the (already user-scoped) email and the card's stored tag_name —
+    # never from request params. Best-effort: never breaks the feed action.
+    def record_tag_suggestion_learning(verdict)
+      email = @item.subject
+      tag_name = @item.data["tag_name"].to_s
+      return if email.nil? || tag_name.blank?
+
+      Learning::Recorder.record(
+        domain: "tag_suggestion",
+        user: current_user,
+        workspace_id: current_user.workspace_id,
+        label: verdict,
+        subject: email,
+        contact_id: email.contact_id,
+        sender_domain: Emails::SenderDomain.for(email.from_address),
+        signals: { "tag_name" => tag_name }
+      )
+    rescue => e
+      Rails.logger.warn("[Feed::ItemsController] tag-suggestion learning failed: #{e.class}: #{e.message}")
     end
 
     def perform_action

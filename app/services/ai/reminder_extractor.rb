@@ -17,12 +17,13 @@ module Ai
     MIN_CONFIDENCE = 0.5    # drop low-confidence noise here (Builder re-checks)
     MAX_CONTENT = 8000      # chars of source text sent to the model
 
-    def initialize(source:, content:, anchor_date: nil, time_zone: nil, workspace: Current.workspace)
+    def initialize(source:, content:, anchor_date: nil, time_zone: nil, workspace: Current.workspace, learning_memory: nil)
       @source = source
       @content = content.to_s[0, MAX_CONTENT].to_s
       @anchor_date = anchor_date || Date.current
       @time_zone = time_zone || Time.zone
       @workspace = workspace
+      @learning_memory = learning_memory
     end
 
     # → Array<Hash> (string keys matching the schema), or [] on any failure.
@@ -106,8 +107,34 @@ module Ai
 
         Respond with valid JSON only, using this schema:
         {"reminders": [{"reminder_type": "<one of the allowed values>", "title": "short label, <= 80 chars", "description": "one sentence of context or null", "due_date": "YYYY-MM-DD", "due_time": "HH:MM (24h) or null", "all_day": true|false, "confidence": 0.0, "amount_cents": integer or null, "currency": "EUR" or null, "justification": "one sentence: why this is a reminder, quoting the source wording"}]}
+        #{learning_hints}
         #{Ai::Configuration.user_prompt_suffix("reminder_extraction")}
       PROMPT
+    end
+
+    # Bias the model away from types of dated commitment the reader keeps dismissing
+    # from senders like this one — the confirm/dismiss twin of the document
+    # classification hint. One warning line per reminder_type with a strong DISMISSED
+    # consensus (confirmed is the safe default and needs no nudge). Best-effort: never
+    # let a learning lookup break extraction.
+    def learning_hints
+      return "" unless @learning_memory
+
+      signals = Learning::EmailSignals.for(@source)
+      lines = Reminder.reminder_types.keys.filter_map do |type|
+        suggestion = @learning_memory.suggestion(
+          contact_id: signals[:contact_id], sender_domain: signals[:sender_domain], reminder_type: type
+        )
+        next unless suggestion&.label == "dismissed"
+
+        "- #{Learning::Strategies::PromptHint.for_reminders(suggestion, reminder_type: type)}"
+      end
+      return "" if lines.empty?
+
+      "Learned from how this workspace has handled similar reminders:\n#{lines.join("\n")}"
+    rescue => e
+      Rails.logger.warn("[Ai::ReminderExtractor] learning_hints failed: #{e.message}")
+      ""
     end
 
     def user_message
