@@ -16,6 +16,13 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **A daily nudge that reaches your inbox, not just the app.** With it on (the
+  default), Campbooks emails you a short morning digest of the conversations you're
+  still waiting to hear back on — so a dropped thread catches your eye even when
+  you're nowhere near Campbooks. Turn it off anytime in Settings → Notifications.
+
 ## [0.9.0] - 2026-07-03
 
 ### Added

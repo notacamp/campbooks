@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_03_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_03_220641) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -1617,6 +1617,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_170000) do
     t.string "email_address", null: false
     t.boolean "email_on_mention", default: true, null: false
     t.boolean "email_on_thread_activity", default: true, null: false
+    t.boolean "email_on_waiting_on_replies_digest", default: true, null: false
     t.datetime "email_otp_enabled_at"
     t.jsonb "inbox_smart_groups", default: {}, null: false
     t.string "locale"
