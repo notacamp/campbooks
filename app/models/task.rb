@@ -74,9 +74,9 @@ class Task < ApplicationRecord
   }
 
   after_create_commit :publish_created
-  # Keep the home feed in sync when a feed-relevant facet changes (a new active
-  # task, a status move, or a due-date change). Suggested tasks live in Skim, not
-  # the feed, so they never trigger a refresh.
+  # Keep the home feed in sync when a feed-relevant facet changes (a new task —
+  # AI suggestions surface on the feed for triage — a status move, or a due-date
+  # change).
   after_save_commit :refresh_feed, if: :feed_relevant?
 
   # Idempotency for AI extraction: same source + normalized title → same row, so
@@ -149,8 +149,6 @@ class Task < ApplicationRecord
   end
 
   def feed_relevant?
-    return false if suggested?
-
     saved_change_to_id? || saved_change_to_status? || saved_change_to_due_at? || saved_change_to_archived_at?
   end
 

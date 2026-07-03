@@ -45,12 +45,14 @@ pt:
         today: Hoje
         tomorrow: Amanhã
       task_card:
+        accept: Adicionar às tarefas
         complete: Concluir
         dismiss: Dispensar
         in_days:
           one: Entrega em %{count} dia
           other: Entrega em %{count} dias
         overdue: Em atraso
+        suggested: Tarefa sugerida
         today: Entrega hoje
         tomorrow: Entrega amanhã
       reply_reminder_card:
@@ -97,7 +99,9 @@ pt:
         sincronizar automaticamente.
       reminder_dismissed: Lembrete dispensado.
       restored: Reposto.
+      task_accepted: "Adicionada às suas tarefas: %{title}"
       task_completed: "Tarefa concluída: %{title}"
+      task_dismissed: Sugestão dispensada.
       unsupported: Essa ação não é suportada aqui.
   home:
     index:

@@ -182,9 +182,16 @@ class EmailMessage < ApplicationRecord
     )
   end
 
+  # The message was sent by the mailbox owner. Substring (not exact) match, so a
+  # provider-synced sent message whose From carries a display name
+  # ("Name <me@x.com>") is still recognised as outbound.
   def sent?
-    from_address.to_s.downcase == email_account&.email_address.to_s.downcase
+    addr = email_account&.email_address.to_s.downcase
+    return false if addr.blank?
+
+    from_address.to_s.downcase.include?(addr)
   end
+  alias outbound? sent?
 
   def external_tags
     tags.external
