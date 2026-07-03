@@ -100,6 +100,14 @@ class EmailThread < ApplicationRecord
     last_outbound_at.present? && (last_inbound_at.nil? || last_outbound_at >= last_inbound_at)
   end
 
+  # The SQL counterpart of #holds_last_word? — the owner sent last and the other
+  # party hasn't replied since. Pure column check, no AI. `Time.at(0)` stands in
+  # for "never replied" so a thread with only outbound mail still qualifies.
+  scope :holds_last_word, -> {
+    where.not(last_outbound_at: nil)
+         .where("last_outbound_at >= COALESCE(last_inbound_at, ?)", Time.at(0))
+  }
+
   # An AI-confirmed follow-up that has come due and the owner hasn't dismissed.
   def follow_up_due?(now = Time.current)
     follow_up_expected? && follow_up_dismissed_at.nil? &&
@@ -111,5 +119,20 @@ class EmailThread < ApplicationRecord
   scope :follow_up_due, ->(now = Time.current) {
     where(follow_up_expected: true, follow_up_dismissed_at: nil)
       .where(follow_up_at: ..now)
+  }
+
+  # Grace window so a reply the owner sent moments ago isn't surfaced as "waiting"
+  # before there's been any realistic chance of a response.
+  AWAITING_REPLY_GRACE = 6.hours
+
+  # Threads the owner is waiting on a reply for: they hold the last word, haven't
+  # dismissed the nudge, and sent past the grace window. The AI-free backbone of
+  # the "Waiting on replies" surfaces (inbox section, Scout briefing, feed, Skim)
+  # — see Emails::AwaitingReply. Unlike `follow_up_due` this never depends on an AI
+  # verdict, so those surfaces can't fall silent when no AI provider is configured.
+  scope :awaiting_reply, ->(cutoff = AWAITING_REPLY_GRACE.ago) {
+    holds_last_word
+      .where(follow_up_dismissed_at: nil)
+      .where("last_outbound_at <= ?", cutoff)
   }
 end
