@@ -91,6 +91,10 @@ module Emails
       @email = email
     end
 
+    # Class-level signal for other pipelines (e.g. the task-extraction gate): an
+    # unattended / automated mailbox can never carry a personal ask.
+    def self.machine_sender?(email) = new(email).machine_sender?
+
     def call
       # Once L0 ingest capture lands, provider-supplied signals win outright.
       header = header_category
@@ -124,6 +128,16 @@ module Emails
       # useful importance signal — the app assigns a contact to virtually every
       # email; a real "VIP" signal should use the contact's relationship_type.
       result(:personal, 0.4, [ "no machine / bulk / security signal" ])
+    end
+
+    # An unattended / automated mailbox: Auto-Submitted, a whole machine local-part
+    # (no-reply@), one of its words (aws-noreply@), or a no-reply phrase glued in
+    # anywhere (noreply-dmarc-support@). Public — see .machine_sender?.
+    def machine_sender?
+      auto_submitted? ||
+        MACHINE_LOCALPARTS.include?(from_localpart) ||
+        (localpart_words & MACHINE_LOCALPARTS).any? ||
+        from_localpart.match?(NOREPLY_LOCALPART)
     end
 
     private
@@ -160,15 +174,6 @@ module Emails
     # "store"/"news") instead of only as an exact whole-string match.
     def localpart_words = from_localpart.split(/[._+-]/).reject(&:empty?)
 
-    # An unattended / automated mailbox: a whole machine local-part (no-reply@),
-    # one of its words (aws-noreply@), or a no-reply phrase glued in anywhere
-    # (noreply-dmarc-support@).
-    def machine_sender?
-      auto_submitted? ||
-        MACHINE_LOCALPARTS.include?(from_localpart) ||
-        (localpart_words & MACHINE_LOCALPARTS).any? ||
-        from_localpart.match?(NOREPLY_LOCALPART)
-    end
 
     # A marketing / newsletter sender, by header signal, whole local-part (store@),
     # or any of its words (store-news@ → "store"/"news").

@@ -63,4 +63,31 @@ RSpec.describe "Opening a thread marks it read and viewed", type: :request do
 
     expect { open_thread(msg) }.not_to have_enqueued_job(MarkReadJob)
   end
+
+  # The bottom-right drawer (List/Board layout) opens an email through
+  # `drawer_content`, not the full-page `show`. It must mark read the same way, or
+  # mail opened in the drawer stays stuck "unread" across the inbox (issue #135).
+  describe "opening in the bottom-right drawer (drawer_content)" do
+    def open_drawer(message)
+      get drawer_content_email_message_path(message)
+    end
+
+    it "marks every unread message in the thread read and stamps viewed_at" do
+      opened  = create(:email_message, email_account: account, email_thread: thread, read: false, viewed_at: nil)
+      sibling = create(:email_message, email_account: account, email_thread: thread, read: false, viewed_at: nil)
+
+      open_drawer(opened)
+
+      expect(opened.reload).to have_attributes(read: true)
+      expect(sibling.reload).to have_attributes(read: true)
+      expect(opened.viewed_at).to be_present
+      expect(sibling.viewed_at).to be_present
+    end
+
+    it "enqueues the provider mark-read for the unread messages" do
+      msg = create(:email_message, email_account: account, email_thread: thread, read: false, viewed_at: nil)
+
+      expect { open_drawer(msg) }.to have_enqueued_job(MarkReadJob)
+    end
+  end
 end

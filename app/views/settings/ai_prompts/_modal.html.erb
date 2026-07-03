@@ -1,0 +1,50 @@
+<%# "Customize AI" modal — loaded into the shared setup-modal turbo-frame from a
+    resource page or the settings list. Edits one AiPrompt's custom guidance,
+    which is APPENDED to the built-in prompt for `entry.key`. %>
+<turbo-frame id="setup_modal_frame">
+  <%= form_with model: prompt, url: settings_ai_prompt_path(entry.key), method: :patch do |f| %>
+    <div class="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+      <div class="flex min-w-0 items-center gap-2.5">
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-50 text-accent-600 dark:bg-accent-500/10 dark:text-accent-300">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="<%= entry.icon %>"/></svg>
+        </span>
+        <h2 class="truncate text-base font-semibold text-foreground"><%= t("ai_prompts.modal.title", name: entry.label) %></h2>
+      </div>
+      <button type="button" data-setup-modal-close aria-label="<%= t("ai_prompts.modal.close") %>"
+              class="shrink-0 cursor-pointer rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <div class="space-y-4 px-5 py-4">
+      <p class="text-sm text-muted-foreground"><%= t("ai_prompts.modal.intro") %></p>
+
+      <% if prompt.errors.any? %>
+        <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
+          <%= prompt.errors.full_messages.to_sentence %>
+        </div>
+      <% end %>
+
+      <div>
+        <label for="ai_prompt_instructions" class="mb-1 block text-sm font-medium text-foreground"><%= t("ai_prompts.modal.label") %></label>
+        <%= f.text_area :instructions, id: "ai_prompt_instructions", rows: 7, maxlength: AiPrompt::MAX_LENGTH,
+              placeholder: entry.placeholder,
+              class: "block w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500" %>
+        <p class="mt-1 text-xs text-muted-foreground"><%= t("ai_prompts.modal.hint") %></p>
+      </div>
+
+      <div class="rounded-lg bg-muted/60 px-3 py-2.5">
+        <p class="text-xs font-medium text-muted-foreground"><%= t("ai_prompts.modal.example_label") %></p>
+        <p class="mt-0.5 text-sm italic text-foreground/80">“<%= entry.example %>”</p>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+      <p class="hidden text-xs text-muted-foreground sm:block"><%= t("ai_prompts.modal.reset_hint") %></p>
+      <div class="flex items-center gap-2">
+        <%= render(Campbooks::Button.new(variant: :ghost, size: :sm, type: :button, data: { setup_modal_close: "" })) { t("ai_prompts.modal.cancel") } %>
+        <%= render(Campbooks::Button.new(variant: :primary, size: :sm, type: :submit)) { t("ai_prompts.modal.save") } %>
+      </div>
+    </div>
+  <% end %>
+</turbo-frame>

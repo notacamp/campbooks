@@ -6,6 +6,7 @@
     </div>
     <div class="flex items-center gap-2">
       <%= render "view_toggle", current: :list %>
+      <%= render "shared/customize_ai_button", purpose: "task_extraction" %>
       <%= render Campbooks::Button.new(href: new_task_path, variant: :primary, size: :sm) { t(".new") } %>
     </div>
   </header>

@@ -1,6 +1,7 @@
 <div data-controller="upload">
   <%= render Campbooks::PageHeader.new(title: t(".title")) do |header| %>
     <% header.with_actions do %>
+      <%= render "shared/customize_ai_button", purpose: "document_analysis" %>
       <% if @reprocessable_count > 0 %>
         <%= form_tag reprocess_all_documents_path, method: :post, id: "reprocess-all-form", class: "hidden" do %>
           <% Array(params[:type]).each do |t| %>

@@ -39,11 +39,89 @@ major, minor, or patch change here.
   it as-is, ask for a shorter/warmer/firmer take, or start blank. The spark
   button asks Scout on demand.
 
+- **Reminders, to‑dos, and filing suggestions learn from your choices.** When Scout
+  proposes a reminder, a task, or a tag to file an email under, it now watches how you
+  respond. If you keep dismissing a kind of reminder from a particular sender, Scout
+  stops surfacing it; a tag you keep rejecting for a sender won't be suggested again;
+  and one you always accept floats to the top. It only ever backs off after a clear,
+  repeated pattern from that same sender — and it only quiets a suggestion, never an
+  actual email or document.
+- **See how soon things are on the calendar.** The Agenda view now shows a small
+  countdown next to each event and reminder — "In 20 min", "In 3 h", "Tomorrow",
+  "In 4 days" — so you can tell at a glance what's imminent. Anything happening
+  now, within the hour, or today is highlighted.
+- **Suggested tasks now appear on the home feed.** When Scout extracts an action
+  item from an email, it shows up as a "Suggested task" card with one-tap
+  **Add to tasks** / **Dismiss** — no more suggestions piling up unseen in the
+  tasks triage queue. Accepted tasks keep surfacing later when they become due,
+  blocked, or assigned to you.
+- `tasks:backfill_extraction` rake task to re-run task extraction over recent
+  mail (e.g. after enabling the Tasks module), gated and idempotent.
+- **Suggested tasks now appear on the home feed.** When Scout extracts an action
+  item from an email, it shows up as a "Suggested task" card with one-tap
+  **Add to tasks** / **Dismiss** — no more suggestions piling up unseen in the
+  tasks triage queue. Accepted tasks keep surfacing later when they become due,
+  blocked, or assigned to you.
+- `tasks:backfill_extraction` rake task to re-run task extraction over recent
+  mail (e.g. after enabling the Tasks module), gated and idempotent.
+- **Tune how Scout reads your inbox — in plain language.** A new **Settings → AI
+  Prompts** page, plus a **Customize AI** button on the Tasks, Documents, and
+  Reminders pages, lets you add your own guidance for how Scout extracts tasks,
+  analyzes documents, spots reminders, and summarizes and tags email. Your notes
+  are appended to the built‑in instructions — they never replace the output format
+  or safety rules — and clearing the box restores the default.
+
+### Changed
+
+- **The inbox now speaks the app's design language.** The mail view sheds its
+  legacy three-pane, hairline-fenced look: date/priority group bars are now
+  floating frosted pills the list scrolls under, thread rows hover and select as
+  soft rounded fills instead of edge-to-edge blocks, the unread dot is the warm
+  Ember signal (matching the nav-rail attention dot) instead of blue, and the
+  search-and-rings band sits on the open canvas so the work panes read as
+  elevated surfaces in dark mode. Scout's read on an open email is now its full
+  Ember-glass contribution block — avatar, name, AI tag, and suggested actions
+  together — rather than a one-line caption, and floating chrome (bulk-select
+  menus and toolbars, the reading drawer's docked footer) is frosted like the
+  app's toasts and Scout bar.
+- **The calendar opens on the Month view by default** (was Agenda), giving you the
+  whole month at a glance when you land on the page. You can still switch views
+  from the tabs, and any bookmarked `?view=…` link is unchanged.
+- The Skim triage learning that already remembered your keep/archive/promote habits
+  now runs on a shared, reusable foundation (no change to how Skim behaves).
+
 ### Fixed
 
-- The **r / a / f keyboard shortcuts and command-palette email actions** were
-  silently broken on message pages (a leftover numeric-id assumption truncated
-  UUID ids); they now target the right email again.
+- **Keyboard shortcuts no longer scramble the inbox.** After moving between emails
+  with the arrow keys, pressing a shortcut (archive, reply, forward…) could leave the
+  inbox unstyled — plain text with underlined links — until you reloaded. Shortcuts
+  now always act on the email you're actually reading.
+- **The Compose button now sits flush right in the inbox toolbar** instead of drifting
+  toward the middle on wide screens.
+- **Emails opened in the bottom-right drawer are now marked as read.** Opening a
+  message in the drawer (the List and Board inbox layouts) clears its unread dot and
+  updates your unread counts, just like opening it in the full reading view.
+- **Email bodies are legible in dark mode again** — message-bubble text could
+  render dark-on-dark in the conversation view; it now uses theme-safe tokens.
+- **Task extraction now targets mail from people, in your language.**
+  Extraction skips automated senders and machine mail (notification digests,
+  code-review bots, no-reply security alerts, marketplace CTAs) — previously
+  these produced streams of nonsense tasks — and the pre-filter recognises
+  action requests in Portuguese, Spanish and French, not just English, so real
+  asks from real people no longer slip through unextracted. Suggestions already
+  minted from machine mail are dismissed automatically on upgrade.
+- The same ask repeated across an email conversation now yields **one** task:
+  replies are analysed quote-stripped, extraction dedupes per thread (not per
+  message), and the model is shown the conversation's already-tracked tasks.
+- Task and reminder extraction no longer silently lose an email's results when
+  the AI provider rate-limits or errors transiently — the job now retries.
+- Sent mail no longer generates tasks for you from requests **you** made of
+  someone else.
+- AI extraction (tasks and reminders) no longer wastes its reading window on
+  raw `<style>` CSS from HTML email — extractors now see clean message text.
+- **Command-palette email actions** (Reply, Archive… from ⌘K on an open
+  email) had the same stale-id truncation bug as the keyboard shortcuts —
+  fixed alongside.
 
 ## [0.7.0] - 2026-06-30
 
