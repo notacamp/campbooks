@@ -53,16 +53,20 @@ en:
       name_placeholder: Your name
       privacy: Privacy Policy
       sign_in: Sign in
+      code_hint: We'll email you a 6-digit code to confirm it's you.
       submit: Send verification code
-      tagline: Create your account
+      subtitle: A couple of quick steps, then Scout gets to work on your inbox.
       terms: Terms of Service
+      title: Create your account
       terms_consent_html: I agree to the %{terms} and %{privacy}.
     password:
+      password_hint: At least 8 characters. A password manager's suggestion is perfect.
       password_label: Password
       password_placeholder: At least 8 characters
       submit: Create account
-      tagline: Set your password
-      verified_prose: verified. Choose a password to finish creating your account.
+      title: Last step, promise
+      verified_prose_html: '%{email} is verified. Choose a password and your account
+        is ready.'
     pending_approval:
       body: Your account request has been submitted for review. You'll receive an
         email when it's approved.
@@ -70,12 +74,12 @@ en:
     resend_code:
       try_later: Too many requests. Please try again later.
     verify:
-      code_label: Verification code
-      code_sent_html: We sent a 6-digit code to %{email}. Enter it below to continue.
+      code_sent_html: We sent a 6-digit code to %{email}. It's valid for 10 minutes.
+      digit_label: Digit %{position} of 6
       resend: Resend code
       start_over: Start over
       submit: Verify
-      tagline: Check your email
+      title: Check your email
   sessions:
     new:
       beta_badge: Closed beta
@@ -91,3 +95,4 @@ en:
       signup_on_web_link: Create an account on the web
       submit: Sign in
       tagline: The inbox that sorts itself.
+      title: Welcome back
