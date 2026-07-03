@@ -1,6 +1,8 @@
 module Campbooks
   module Calendar
     class WeekGrid < Campbooks::Base
+      include TypeIcon
+
       def initialize(date:, events:, reminders: [], snoozed_threads: [], scheduled_emails: [])
         @date = date
         @events = events.to_a
@@ -72,7 +74,10 @@ module Campbooks
           class: "block rounded px-1.5 py-1 text-[11px] leading-tight",
           style: "background-color: #{color}; color: #{contrast_on(color)}",
           title: event.title) do
-          span(class: "block truncate font-medium") { event.title.presence || t(".untitled") }
+          span(class: "flex min-w-0 items-center gap-1 font-medium") do
+            type_icon(event, "h-3 w-3 flex-shrink-0")
+            span(class: "min-w-0 truncate") { event.title.presence || t(".untitled") }
+          end
           span(class: "block opacity-90") { l(event.start_at, format: :clock) } unless event.all_day
         end
       end

@@ -1,6 +1,7 @@
 module Campbooks
   module Calendar
     class MonthGrid < Campbooks::Base
+      include TypeIcon
       MAX_CHIPS = 3
 
       def initialize(date:, events:, reminders: [], snoozed_threads: [], scheduled_emails: [])
@@ -109,10 +110,13 @@ module Campbooks
             "start-at": event.start_at.strftime("%Y-%m-%dT%H:%M"),
             "end-at": (event.end_at || event.start_at).strftime("%Y-%m-%dT%H:%M")
           } : {}),
-          class: "block truncate rounded px-1 py-0.5 text-[10px] sm:text-[11px] leading-tight",
+          class: "block rounded px-1 py-0.5 text-[10px] sm:text-[11px] leading-tight",
           style: "background-color: #{color}; color: #{contrast_on(color)}",
           title: event.title) do
-          event.all_day ? event.title.to_s : "#{l(event.start_at, format: :clock)} #{event.title}"
+          span(class: "flex min-w-0 items-center gap-0.5") do
+            type_icon(event, "h-2.5 w-2.5 flex-shrink-0")
+            span(class: "min-w-0 truncate") { event.all_day ? event.title.to_s : "#{l(event.start_at, format: :clock)} #{event.title}" }
+          end
         end
       end
     end

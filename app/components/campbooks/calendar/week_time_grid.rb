@@ -2,6 +2,7 @@ module Campbooks
   module Calendar
     class WeekTimeGrid < Campbooks::Base
       include TimeGrid
+      include TypeIcon
       DAY_W = 100.0 / 7
 
       def initialize(date:, events:, reminders: [], snoozed_threads: [], scheduled_emails: [])
@@ -70,8 +71,13 @@ module Campbooks
               events_for(day).select(&:all_day).each do |e|
                 a(href: helpers.edit_calendar_event_path(e),
                   data: { "calendar-event-modal-open": helpers.edit_calendar_event_path(e) },
-                  class: "block truncate rounded px-1 text-[10px]",
-                  style: "background-color: #{e.display_color}; color: #{contrast_on(e.display_color)}") { e.title.presence || t("components.calendar.event_row.untitled") }
+                  class: "block rounded px-1 text-[10px]",
+                  style: "background-color: #{e.display_color}; color: #{contrast_on(e.display_color)}") do
+                  span(class: "flex min-w-0 items-center gap-0.5") do
+                    type_icon(e, "h-2.5 w-2.5 flex-shrink-0")
+                    span(class: "min-w-0 truncate") { e.title.presence || t("components.calendar.event_row.untitled") }
+                  end
+                end
               end
               reminders_for(day).each { |reminder| render Campbooks::Calendar::ReminderChip.new(reminder: reminder) }
               snoozed_for(day).each { |thread| render Campbooks::Calendar::SnoozedChip.new(thread: thread) }
@@ -118,7 +124,10 @@ module Campbooks
           data: { "calendar-event-modal-open": helpers.edit_calendar_event_path(e) }.merge(drag ? { "calendar-dnd-target": "event", "event-id": e.id } : {}),
           class: class_names("absolute overflow-hidden rounded px-1 py-0.5 text-[10px] leading-tight ring-1 ring-black/5", ("cursor-grab" if drag)),
           style: "top:#{box[:top]}px; height:#{box[:height]}px; left:#{left.round(3)}%; width:#{width.round(3)}%; background-color:#{color}; color:#{contrast_on(color)}") do
-          span(class: "block truncate font-medium") { e.title.presence || t("components.calendar.event_row.untitled") }
+          span(class: "flex min-w-0 items-center gap-0.5 font-medium") do
+            type_icon(e, "h-2.5 w-2.5 flex-shrink-0")
+            span(class: "min-w-0 truncate") { e.title.presence || t("components.calendar.event_row.untitled") }
+          end
         end
       end
     end

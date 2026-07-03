@@ -1,17 +1,14 @@
 # frozen_string_literal: true
 
 module Calendars
-  # The fixed palette of per-event colors, shared by the picker UI and both
-  # directions of provider sync.
+  # The fixed color palette behind Campbooks::ColorSwatchPicker — today that's
+  # the calendar color picker in the /calendar sidebar (events no longer carry
+  # a color of their own; the calendar is the single color source).
   #
-  # Google Calendar events don't take an arbitrary hex — they carry a `colorId`
-  # (1–11) drawn from a fixed palette. To round-trip faithfully we adopt that same
-  # palette as the canonical set: an event's stored `color` is always one of these
-  # hexes, so it maps cleanly to a Google `colorId` on write and back on read.
-  # Zoho accepts a hex `color` directly, so the same value passes straight through.
-  #
-  # Hex values are the backgrounds Google's `colors.get` API returns for event
-  # colors; `id` is the `colorId` Google expects on write.
+  # The hexes are the backgrounds Google's `colors.get` API returns for event
+  # colors — kept as a pleasant, well-spaced set even though we no longer map
+  # them to Google colorIds (per-event color sync was removed with the
+  # calendar-owned-color model).
   module EventColors
     PALETTE = [
       { id: "1",  hex: "#a4bdfc", name: "Lavender" },
@@ -27,28 +24,11 @@ module Calendars
       { id: "11", hex: "#dc2127", name: "Tomato" }
     ].freeze
 
-    BY_ID  = PALETTE.index_by { |c| c[:id] }.freeze
-    BY_HEX = PALETTE.index_by { |c| c[:hex] }.freeze
-
     module_function
 
     # The ordered palette for the picker. Each entry is { id:, hex:, name: }.
     def palette
       PALETTE
-    end
-
-    # Google colorId (String or Integer) → our hex, or nil for an unknown/blank id
-    # (event has no override → caller falls back to the calendar color).
-    def hex_for(color_id)
-      BY_ID[color_id.to_s]&.fetch(:hex)
-    end
-
-    # Our hex → Google colorId, or nil when the hex isn't in the palette (e.g. a
-    # blank/inherited color). A nil colorId on write resets the event to the
-    # calendar's default color.
-    def id_for(hex)
-      return nil if hex.blank?
-      BY_HEX[hex.to_s.downcase]&.fetch(:id)
     end
   end
 end

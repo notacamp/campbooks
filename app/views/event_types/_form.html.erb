@@ -17,8 +17,9 @@
   </div>
 
   <div>
-    <span class="block text-xs font-medium text-foreground mb-1.5"><%= t(".color_label") %></span>
-    <%= render(Campbooks::ColorSwatchPicker.new(name: "event_type[color]", selected: type.color, include_none: false)) %>
+    <span class="block text-xs font-medium text-foreground mb-1.5"><%= t(".icon_label") %></span>
+    <%= render(Campbooks::IconPicker.new(name: "event_type[icon]", selected: type.icon)) %>
+    <p class="text-xs text-muted-foreground mt-1"><%= t(".icon_hint") %></p>
   </div>
 
   <div>
