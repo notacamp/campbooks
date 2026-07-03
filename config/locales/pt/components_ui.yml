@@ -119,6 +119,7 @@ pt:
         filtering: Filtragem
         labels: Rótulos
         signatures: Assinaturas
+        smart_groups: Grupos inteligentes
         tags: Etiquetas
       settings_sections_label: Secções de definições
       title: Definições da caixa de entrada

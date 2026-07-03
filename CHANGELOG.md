@@ -31,6 +31,15 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Low-priority mail now folds itself out of your way.** The inbox bundles
+  Notifications, Newsletters & promos, Social, and Updates threads into
+  collapsed **smart group** rows — stacked sender avatars, a count, one tap to
+  review the bucket, and **Archive all** / **Mark all read** to clear it in one
+  go. On by default with per-bucket toggles in the inbox gear menu → Smart
+  groups. Personal, important, and uncategorized mail always stays in the list,
+  and threads you replied to, pinned threads, or starred senders are never
+  grouped. Custom tag groups render alongside (and their rows are actually
+  back — a regression had kept them from appearing at all).
 - **Watch Scout sort your inbox the moment you connect it.** A brand-new account now
   lands on a live first-sync stage instead of an empty feed: counters tick up as your
   first scan reads and sorts mail (found · sorted · needs you), then one tap drops you

@@ -7,6 +7,7 @@
         folder_id: params[:folder_id].presence,
         folder_name: params[:folder_name].presence,
         group: params[:group].presence,
+        smart_group: params[:smart_group].presence,
         continue_section: thread_continue_section(threads),
         format: :turbo_stream
       ),

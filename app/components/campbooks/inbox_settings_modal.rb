@@ -26,6 +26,7 @@ module Campbooks
         { key: "tags",           label: t(".nav.tags"),           path: :inbox_settings_tags_path,           icon: :tag },
         { key: "document_types", label: t(".nav.document_types"), path: :inbox_settings_document_types_path,  icon: :doc },
         { key: "filtering",      label: t(".nav.filtering"),      path: :inbox_settings_filtering_path,       icon: :filter },
+        { key: "smart_groups",   label: t(".nav.smart_groups"),   path: :inbox_settings_smart_groups_path,    icon: :stack },
         { key: "labels",         label: t(".nav.labels"),         path: :inbox_settings_external_labels_path, icon: :label },
         { key: "signatures",     label: t(".nav.signatures"),     path: :inbox_settings_signatures_path,      icon: :pen },
         { key: "accounts",       label: t(".nav.accounts"),       path: :inbox_settings_accounts_path,        icon: :at },
@@ -142,7 +143,8 @@ module Campbooks
         pen:     '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>',
         at:      '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.206"/>',
         sliders: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>',
-        filter:  '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M6 12h12M10 18h4"/>'
+        filter:  '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6h18M6 12h12M10 18h4"/>',
+        stack:   '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>'
       }
       %(<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">#{paths[name]}</svg>)
     end
