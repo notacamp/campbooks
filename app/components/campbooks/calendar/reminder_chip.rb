@@ -7,6 +7,8 @@ module Campbooks
     # An Ember dot marks it as a Scout suggestion (vs the solid calendar-colored
     # chips of confirmed events). Links to /reminders to confirm.
     class ReminderChip < Campbooks::Base
+      include TimeUntil
+
       def initialize(reminder:, variant: :chip)
         @reminder = reminder
         @variant = variant
@@ -27,6 +29,7 @@ module Campbooks
             span(class: "block truncate text-sm text-foreground") { @reminder.title }
             span(class: "block text-xs text-gray-400") { t(".suggested") }
           end
+          countdown
           raw safe(bell_icon)
         end
       end
@@ -41,6 +44,17 @@ module Campbooks
 
       def ember_dot(size)
         span(class: "#{size} shrink-0 rounded-full bg-ember-gradient")
+      end
+
+      # Matches EventRow's countdown so reminders read on the same "when" column.
+      def countdown
+        label = time_until_label(@reminder.due_at, all_day: @reminder.all_day?)
+        return unless label
+
+        span(class: class_names(
+          "shrink-0 whitespace-nowrap text-xs tabular-nums",
+          label.imminent ? "font-medium text-accent-700" : "text-muted-foreground"
+        )) { label.text }
       end
 
       def time_label
