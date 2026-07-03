@@ -1,0 +1,27 @@
+---
+pt:
+  inbox_settings:
+    smart_groups:
+      panel:
+        buckets_heading: O que é agrupado
+        master_hint: O correio de baixa prioridade é recolhido em linhas de grupo
+          tocáveis, para que a caixa de entrada mostre o que precisa de si. O correio
+          pessoal, importante e não categorizado fica sempre na lista.
+        master_toggle: Agrupar correio de baixa prioridade
+        never_grouped_hint: As conversas a que respondeu, as conversas afixadas e
+          o correio de contactos com estrela nunca são agrupados.
+      show:
+        heading: Grupos inteligentes
+        subheading: Escolha que correio de baixa prioridade é recolhido em linhas
+          de grupo.
+      update:
+        updated_toast: Grupos inteligentes atualizados
+  smart_groups:
+    archive_all:
+      archived:
+        one: "%{count} email arquivado"
+        other: "%{count} emails arquivados"
+    mark_all_read:
+      marked_read:
+        one: "%{count} email marcado como lido"
+        other: "%{count} emails marcados como lidos"

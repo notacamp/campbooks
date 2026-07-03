@@ -1,0 +1,26 @@
+---
+en:
+  inbox_settings:
+    smart_groups:
+      panel:
+        buckets_heading: What gets grouped
+        master_hint: Low-priority mail collapses into tappable group rows so the
+          inbox shows what needs you. Personal, important, and uncategorized mail
+          always stays in the list.
+        master_toggle: Group low-priority mail
+        never_grouped_hint: Threads you replied to, pinned threads, and mail from
+          starred contacts are never grouped.
+      show:
+        heading: Smart groups
+        subheading: Choose which low-priority mail collapses into group rows.
+      update:
+        updated_toast: Smart groups updated
+  smart_groups:
+    archive_all:
+      archived:
+        one: Archived %{count} email
+        other: Archived %{count} emails
+    mark_all_read:
+      marked_read:
+        one: Marked %{count} email as read
+        other: Marked %{count} emails as read

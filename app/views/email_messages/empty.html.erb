@@ -1,6 +1,22 @@
 <div class="flex flex-col h-full">
   <div class="flex-1 min-h-0 overflow-y-auto">
-<% if @accounts.any? %>
+<% if (@smart_group_items || []).any? %>
+  <%# Every inbox thread is bundled into a smart group — the inbox isn't empty,
+      it's sorted. Offer the group rows instead of "no mail yet". %>
+  <%= render(Campbooks::EmptyState.new(variant: :standalone, title: t(".all_sorted_title"),
+        description: t(".all_sorted_description"))) do |state| %>
+    <% state.with_icon do %>
+      <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 13l4 4L19 7"/>
+      </svg>
+    <% end %>
+  <% end %>
+  <div class="max-w-md mx-auto w-full divide-y divide-gray-100 border-t border-b border-gray-100">
+    <% @smart_group_items.each do |group| %>
+      <%= render "email_messages/group_row", group: group %>
+    <% end %>
+  </div>
+<% elsif @accounts.any? %>
   <%= render(Campbooks::EmptyState.new(variant: :standalone, title: t(".no_mail_yet_title"),
         description: t(".no_mail_yet_description"))) do |state| %>
     <% state.with_icon do %>

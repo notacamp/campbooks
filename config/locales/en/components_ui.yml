@@ -119,6 +119,7 @@ en:
         filtering: Filtering
         labels: Labels
         signatures: Signatures
+        smart_groups: Smart groups
         tags: Tags
       settings_sections_label: Settings sections
       title: Inbox settings
