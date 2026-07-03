@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_03_140100) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_03_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -529,6 +529,30 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_140100) do
     t.index ["workspace_id", "starred"], name: "index_documents_on_workspace_id_and_starred"
     t.index ["workspace_id"], name: "index_documents_on_workspace_id"
     t.index ["workspace_id"], name: "index_documents_on_workspace_unviewed", where: "(viewed_at IS NULL)"
+  end
+
+  create_table "draft_emails", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.jsonb "attachments_json", default: [], null: false
+    t.text "bcc_address"
+    t.text "body"
+    t.text "cc_address"
+    t.datetime "created_at", null: false
+    t.uuid "email_account_id"
+    t.uuid "in_reply_to_id"
+    t.integer "mode", default: 0, null: false
+    t.text "quoted_body"
+    t.uuid "signature_id"
+    t.string "subject"
+    t.text "to_address"
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["email_account_id"], name: "index_draft_emails_on_email_account_id"
+    t.index ["in_reply_to_id"], name: "index_draft_emails_on_in_reply_to_id"
+    t.index ["signature_id"], name: "index_draft_emails_on_signature_id"
+    t.index ["user_id", "updated_at"], name: "index_draft_emails_on_user_id_and_updated_at"
+    t.index ["user_id"], name: "index_draft_emails_on_user_id"
+    t.index ["workspace_id"], name: "index_draft_emails_on_workspace_id"
   end
 
   create_table "drive_folder_mappings", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1586,6 +1610,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_140100) do
   end
 
   create_table "users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.integer "compose_default", default: 0, null: false
     t.datetime "created_at", null: false
     t.datetime "deletion_requested_at"
     t.jsonb "dismissed_tours", default: [], null: false
@@ -1764,6 +1789,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_140100) do
   add_foreign_key "documents", "email_accounts"
   add_foreign_key "documents", "users", column: "reviewed_by_id"
   add_foreign_key "documents", "workspaces"
+  add_foreign_key "draft_emails", "email_accounts"
+  add_foreign_key "draft_emails", "email_messages", column: "in_reply_to_id"
+  add_foreign_key "draft_emails", "signatures"
+  add_foreign_key "draft_emails", "users"
+  add_foreign_key "draft_emails", "workspaces"
   add_foreign_key "drive_folder_mappings", "document_types"
   add_foreign_key "drive_folder_mappings", "zoho_drive_accounts"
   add_foreign_key "email_account_signatures", "email_accounts"

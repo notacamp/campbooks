@@ -16,37 +16,28 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
-### Fixed
-
-- **Keyboard shortcuts no longer scramble the inbox.** After moving between emails
-  with the arrow keys, pressing a shortcut (archive, reply, forward…) could leave the
-  inbox unstyled — plain text with underlined links — until you reloaded. Shortcuts
-  now always act on the email you're actually reading.
-- **The Compose button now sits flush right in the inbox toolbar** instead of drifting
-  toward the middle on wide screens.
-- **Emails opened in the bottom-right drawer are now marked as read.** Opening a
-  message in the drawer (the List and Board inbox layouts) clears its unread dot and
-  updates your unread counts, just like opening it in the full reading view.
-- **Email bodies are legible in dark mode again** — message-bubble text could
-  render dark-on-dark in the conversation view; it now uses theme-safe tokens.
-- **Task extraction now targets mail from people, in your language.**
-  Extraction skips automated senders and machine mail (notification digests,
-  code-review bots, no-reply security alerts, marketplace CTAs) — previously
-  these produced streams of nonsense tasks — and the pre-filter recognises
-  action requests in Portuguese, Spanish and French, not just English, so real
-  asks from real people no longer slip through unextracted. Suggestions already
-  minted from machine mail are dismissed automatically on upgrade.
-- The same ask repeated across an email conversation now yields **one** task:
-  replies are analysed quote-stripped, extraction dedupes per thread (not per
-  message), and the model is shown the conversation's already-tracked tasks.
-- Task and reminder extraction no longer silently lose an email's results when
-  the AI provider rate-limits or errors transiently — the job now retries.
-- Sent mail no longer generates tasks for you from requests **you** made of
-  someone else.
-- AI extraction (tasks and reminders) no longer wastes its reading window on
-  raw `<style>` CSS from HTML email — extractors now see clean message text.
-
 ### Added
+
+- **Composing is its own room now.** Replying pulls up the **Dock** — a bottom
+  sheet over your inbox — instead of a form wedged into the thread. Recipients
+  and subject collapse to one line when they're already right, the quoted
+  thread tucks behind a small pill until you need it, and formatting appears
+  when you select text instead of a toolbar you never asked for. Reply,
+  reply-all and forward are one switcher — flip modes without losing what you
+  typed, and forwards carry the original attachments as removable chips.
+- **A new email gets the whole screen.** The compose page (the **Desk**) drops
+  the folder rail and message list for one centered writing surface — subject
+  set like a title, an open canvas, and Scout waiting in a side rail. Pick
+  where new emails open (full page or bottom sheet) in **Settings → Account**.
+- **Drafts save themselves.** Everything you type autosaves; minimize the
+  composer to a small pill that survives navigating anywhere in the app, and
+  resume exactly where you left off — or expand a reply from the sheet to the
+  full page with everything carried over. Sending or discarding cleans the
+  draft up.
+- **Replies can start answered.** When Scout has already suggested a reply for
+  a thread, the composer opens with that draft as a glass "ghost" block — use
+  it as-is, ask for a shorter/warmer/firmer take, or start blank. The spark
+  button asks Scout on demand.
 
 - **Reminders, to‑dos, and filing suggestions learn from your choices.** When Scout
   proposes a reminder, a task, or a tag to file an email under, it now watches how you
@@ -98,6 +89,39 @@ major, minor, or patch change here.
   from the tabs, and any bookmarked `?view=…` link is unchanged.
 - The Skim triage learning that already remembered your keep/archive/promote habits
   now runs on a shared, reusable foundation (no change to how Skim behaves).
+
+### Fixed
+
+- **Keyboard shortcuts no longer scramble the inbox.** After moving between emails
+  with the arrow keys, pressing a shortcut (archive, reply, forward…) could leave the
+  inbox unstyled — plain text with underlined links — until you reloaded. Shortcuts
+  now always act on the email you're actually reading.
+- **The Compose button now sits flush right in the inbox toolbar** instead of drifting
+  toward the middle on wide screens.
+- **Emails opened in the bottom-right drawer are now marked as read.** Opening a
+  message in the drawer (the List and Board inbox layouts) clears its unread dot and
+  updates your unread counts, just like opening it in the full reading view.
+- **Email bodies are legible in dark mode again** — message-bubble text could
+  render dark-on-dark in the conversation view; it now uses theme-safe tokens.
+- **Task extraction now targets mail from people, in your language.**
+  Extraction skips automated senders and machine mail (notification digests,
+  code-review bots, no-reply security alerts, marketplace CTAs) — previously
+  these produced streams of nonsense tasks — and the pre-filter recognises
+  action requests in Portuguese, Spanish and French, not just English, so real
+  asks from real people no longer slip through unextracted. Suggestions already
+  minted from machine mail are dismissed automatically on upgrade.
+- The same ask repeated across an email conversation now yields **one** task:
+  replies are analysed quote-stripped, extraction dedupes per thread (not per
+  message), and the model is shown the conversation's already-tracked tasks.
+- Task and reminder extraction no longer silently lose an email's results when
+  the AI provider rate-limits or errors transiently — the job now retries.
+- Sent mail no longer generates tasks for you from requests **you** made of
+  someone else.
+- AI extraction (tasks and reminders) no longer wastes its reading window on
+  raw `<style>` CSS from HTML email — extractors now see clean message text.
+- **Command-palette email actions** (Reply, Archive… from ⌘K on an open
+  email) had the same stale-id truncation bug as the keyboard shortcuts —
+  fixed alongside.
 
 ## [0.7.0] - 2026-06-30
 

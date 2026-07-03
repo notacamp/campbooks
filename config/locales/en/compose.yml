@@ -1,0 +1,61 @@
+en:
+  components:
+    compose:
+      dock:
+        dialog_label_forward: Forward message
+        dialog_label_new_message: New message
+        dialog_label_reply: Reply
+        dialog_label_reply_all: Reply to all
+        draft: Draft
+        draft_saved: Draft saved
+        expand_title: Open in full page
+        minimize_title: Minimize
+        mode_forward: Forward
+        mode_new_message: New message
+        mode_reply: Reply
+        mode_reply_all: Reply all
+        restore_aria: Resume writing
+        switch_mode: Change reply mode
+      pill:
+        draft_saved: Draft saved
+        resume_aria: Resume your draft
+        untitled: Draft
+      scout_draft:
+        ai_tag: AI
+        drafted_label: drafted from this thread
+        start_blank: Start blank
+        tone_firmer: Firmer
+        tone_shorter: Shorter
+        tone_warmer: Warmer
+        use_draft: Use this draft
+      engine:
+        bcc_button: Bcc
+        cc_button: Cc
+        collapse_envelope: Collapse recipient fields
+        discard: Discard
+        draft_saved: Draft saved
+        edit_recipients: Edit recipients and subject
+        expand_quote_title: Show the quoted message and edit it
+        label_bcc: Bcc
+        label_cc: Cc
+        label_from: From
+        label_signature: Signature
+        label_subject: Subject
+        label_to: To
+        no_signature: No signature
+        placeholder_bcc: Add Bcc…
+        placeholder_body: Write your message…
+        placeholder_cc: Add Cc…
+        placeholder_subject: Subject
+        placeholder_to: Search contacts or type an email…
+        quoted_from: On %{date}, %{who} wrote
+        quoted_from_undated: "%{who} wrote"
+        quoted_generic: Quoted message
+        recipients_more: "%{name} +%{count}"
+        saving: Saving…
+        schedule: Schedule
+        scout_draft_title: Draft this reply with Scout
+        schedule_at_label: Send at
+        schedule_send: Schedule send
+        send: Send
+        signature_default: "%{name} (default)"

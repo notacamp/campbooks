@@ -277,6 +277,7 @@ Rails.application.routes.draw do
     resource :data_privacy, only: [ :show, :update ], controller: "data_privacy"
     resource :account, only: [ :show, :update, :destroy ], controller: "account" do
       patch :language
+      patch :compose_preference
       patch :writing_style
       post :analyze_writing_style
       get :delete
@@ -468,10 +469,16 @@ Rails.application.routes.draw do
   # blob id the compose form carries; resolved + attached to the mail at send.
   post "compose_attachments", to: "compose_attachments#create", as: :compose_attachments
 
+  # Composer draft autosave (Dock + Desk). JSON create/update/destroy from the
+  # compose-autosave controller; :show re-opens a parked draft in the Dock.
+  resources :draft_emails, only: [ :show, :create, :update, :destroy ]
+
   resources :email_messages, only: [ :index, :show ] do
     collection do
       get :search
       post :send_new, to: "email_compose#send_message"
+      # New message in the Dock (no source message) — the compose_default=dock path.
+      post :compose_new, to: "email_compose#create"
       get :board, to: "email_messages/board#index"
       post :board_move, to: "email_messages/board#move"
     end
