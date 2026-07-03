@@ -57,7 +57,7 @@ export default class extends Controller {
   // message-id value only renders on a full page load — so keep it in sync with
   // the URL, or reply/archive/forward would act on the previously-open email.
   _syncMessageIdFromUrl() {
-    const id = (window.location.pathname.match(/\/email_messages\/(\d+)/) || [])[1]
+    const id = this._messageIdFromPath(window.location.pathname)
     if (id) this.messageIdValue = id
   }
 
@@ -250,7 +250,7 @@ export default class extends Controller {
   _syncActiveRowFromUrl() {
     if (this.contextValue === "drawer") return
 
-    const id = (window.location.pathname.match(/\/email_messages\/(\d+)/) || [])[1]
+    const id = this._messageIdFromPath(window.location.pathname)
     if (!id) return
 
     const rows = Array.from(document.querySelectorAll('[id*="thread_item"]'))
@@ -258,7 +258,7 @@ export default class extends Controller {
 
     const target = rows.find(row => {
       const link = row.querySelector("a[href*='/email_messages/']")
-      const linkId = link && (link.getAttribute("href").match(/\/email_messages\/(\d+)/) || [])[1]
+      const linkId = link && this._messageIdFromPath(link.getAttribute("href"))
       return linkId === id
     })
     if (!target) return
@@ -296,6 +296,25 @@ export default class extends Controller {
 
   // --- Helpers ---
 
+  // Extract an email message id from a path or href. Message ids are UUIDs (the
+  // app uses uuid primary keys); a `\d+`-only match truncated a UUID like
+  // "71f1ae2f-…" to its leading digits ("71"), so every keyboard action then hit
+  // /email_messages/71/… → a 404 whose full HTML error PAGE, fed to
+  // Turbo.renderStreamMessage, wiped the inbox's styles. Match a UUID (or a
+  // numeric id) — mirrors the fix in email_drawer_controller.
+  _messageIdFromPath(path) {
+    return (String(path).match(/\/email_messages\/([0-9a-f-]{8,}|\d+)/i) || [])[1]
+  }
+
+  // Only render responses that are actually Turbo Streams — a successful action
+  // or a handled 422 error-toast. An error PAGE (404/500 → a full HTML document)
+  // must never reach Turbo.renderStreamMessage: it strips the current document's
+  // styles and chrome. Guarding on content-type bounds the blast radius.
+  _renderStreamResponse(response) {
+    if (!(response.headers.get("content-type") || "").includes("turbo-stream")) return
+    return response.text().then(html => { if (html) Turbo.renderStreamMessage(html) })
+  }
+
   _hasMessageId() {
     return this.hasMessageIdValue && this.messageIdValue.length > 0
   }
@@ -323,9 +342,7 @@ export default class extends Controller {
         method: "POST",
         headers: { "X-CSRF-Token": csrfToken, "Accept": "text/vnd.turbo-stream.html" },
         body
-      }).then(r => r.text()).then(html => {
-        if (html) Turbo.renderStreamMessage(html)
-      })
+      }).then(r => this._renderStreamResponse(r))
 
       controller.clear()
     }
@@ -341,9 +358,7 @@ export default class extends Controller {
         "Content-Type": "application/x-www-form-urlencoded"
       },
       body: `tool=${encodeURIComponent(tool)}`
-    }).then(r => r.text()).then(html => {
-      if (html) Turbo.renderStreamMessage(html)
-    })
+    }).then(r => this._renderStreamResponse(r))
   }
 
   _composeAction(mode) {
@@ -356,9 +371,7 @@ export default class extends Controller {
         "Content-Type": "application/x-www-form-urlencoded"
       },
       body: `mode=${encodeURIComponent(mode)}`
-    }).then(r => r.text()).then(html => {
-      if (html) Turbo.renderStreamMessage(html)
-    })
+    }).then(r => this._renderStreamResponse(r))
   }
 
   _selectionController() {

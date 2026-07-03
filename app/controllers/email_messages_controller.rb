@@ -131,24 +131,7 @@ class EmailMessagesController < ApplicationController
     end
 
     AuditEvent.log("email_message_read", user: Current.user, request: request, target: @message, via: "web")
-
-    # Opening a thread marks every message read — clears the inbox unread dot/bold,
-    # the "unread" filters, and the unread counts — and stamps viewed_at, which
-    # clears the Mail nav attention dot (Navigation::Attention#new_mail?). The
-    # viewed_at clause also catches messages that synced in already-read but were
-    # never opened here, so the nav dot still clears.
-    if @thread
-      messages = @thread.email_messages
-      unread_ids = messages.where(read: false).pluck(:provider_message_id)
-      messages.where(read: false).or(messages.where(viewed_at: nil))
-              .update_all(read: true, viewed_at: Time.current, updated_at: Time.current)
-      if unread_ids.any?
-        MarkReadJob.perform_later(@message.email_account_id, unread_ids) if @message.email_account_id
-        # Live inbox: clear the unread dot on this thread's row in every other open
-        # inbox (other tabs/devices, teammates sharing the mailbox).
-        Emails::InboxBroadcaster.replace(@thread)
-      end
-    end
+    mark_thread_read
 
     # Gather attachments from all messages in the thread (or just this message if no thread)
     @thread_messages = @thread ? @thread.email_messages.includes(:files_attachments, :email_account).order(received_at: :desc).to_a : [ @message ]
@@ -295,10 +278,37 @@ class EmailMessagesController < ApplicationController
     agent_thread = @thread&.agent_thread
     @discussion_count = agent_thread ? agent_thread.agent_messages.chronological.reject(&:draft?).size : 0
 
+    # Opening the email in the bottom-right drawer is a read, same as the
+    # full-page view — mark the thread read so the inbox unread dot/bold and
+    # counts clear (issue #135).
+    AuditEvent.log("email_message_read", user: Current.user, request: request, target: @message, via: "web")
+    mark_thread_read
+
     render layout: false
   end
 
   private
+
+  # Opening a thread marks every message read — clears the inbox unread dot/bold,
+  # the "unread" filters, and the unread counts — and stamps viewed_at, which
+  # clears the Mail nav attention dot (Navigation::Attention#new_mail?). The
+  # viewed_at clause also catches messages that synced in already-read but were
+  # never opened here, so the nav dot still clears. Shared by the full-page `show`
+  # and the bottom-right `drawer_content` so opening either surface marks read.
+  def mark_thread_read
+    return unless @thread
+
+    messages = @thread.email_messages
+    unread_ids = messages.where(read: false).pluck(:provider_message_id)
+    messages.where(read: false).or(messages.where(viewed_at: nil))
+            .update_all(read: true, viewed_at: Time.current, updated_at: Time.current)
+    return if unread_ids.empty?
+
+    MarkReadJob.perform_later(@message.email_account_id, unread_ids) if @message.email_account_id
+    # Live inbox: clear the unread dot on this thread's row in every other open
+    # inbox (other tabs/devices, teammates sharing the mailbox).
+    Emails::InboxBroadcaster.replace(@thread)
+  end
 
   def readable_accounts
     @readable_accounts ||= Current.user.readable_email_accounts.ordered.to_a
