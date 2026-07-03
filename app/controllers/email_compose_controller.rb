@@ -15,15 +15,18 @@ class EmailComposeController < ApplicationController
     @cc_address = build_cc_address(mode)
     @subject = build_subject(mode)
     @quoted_body = build_quoted_body(mode)
-    # When opened from a Scout draft ("Edit in composer"), the draft body — which
-    # already carries the signature — pre-fills the editor. Skip the default
-    # signature so it isn't appended twice.
+    # When opened from a Scout draft ("Edit in composer") or a mode switch, the
+    # carried body — which may already hold the signature — pre-fills the
+    # editor. Skip the default signature so it isn't appended twice.
     @prefill_body = params[:prefill_body].presence || params[:body].presence
     @signature = @prefill_body.present? ? nil : Signature.default_for(Current.user, @message.email_account)
     @signatures = Current.user.signatures.ordered.includes(:email_accounts)
+    # A mode switch carries the working draft along so autosave keeps updating
+    # the same row instead of forking a second one.
+    @draft = Current.user.draft_emails.find_by(id: params[:draft_email_id]) if params[:draft_email_id].present?
 
     respond_to do |format|
-      format.turbo_stream { render turbo_stream: compose_area_stream }
+      format.turbo_stream { render turbo_stream: dock_stream }
       format.html { redirect_to email_message_path(@message) }
     end
   end
@@ -143,34 +146,40 @@ class EmailComposeController < ApplicationController
     {}
   end
 
-  # The composer goes to a different target per surface. The bottom-right drawer
-  # replaces its OWN slot (a distinct id, because the full page's
-  # thread_compose_target is also in the DOM in List/Board layout); the full inbox
-  # prepends above the thread as before.
-  def compose_area_stream
-    locals = {
-      email_message: @message,
-      mode: @mode.to_sym,
-      to_address: @to_address,
-      cc_address: @cc_address,
-      subject: @subject,
-      quoted_body: @quoted_body,
-      prefill_body: @prefill_body,
-      signature_content: @signature&.content,
-      current_signature_id: @signature&.id,
-      signatures: @signatures
-    }
-
+  # Every compose entry — reply buttons, r/a/f shortcuts, the drawer, Scout,
+  # mode switches — opens the same Dock (bottom sheet) via the layout's
+  # #compose_dock slot.
+  def dock_stream
     streams = []
-    # "Edit in composer" from a draft that's a sibling of the compose slot
-    # (detail / discussion) passes the card's dom id to clean up.
+    # "Edit in composer" from a Scout draft card passes the card's dom id to clean up.
     streams << turbo_stream.remove(params[:remove_draft]) if params[:remove_draft].present?
-    streams << if params[:compose_target] == "drawer_compose_target"
-      turbo_stream.update("drawer_compose_target", partial: "email_compose/compose_area", locals: locals)
-    else
-      turbo_stream.prepend("thread_compose_target", partial: "email_compose/compose_area", locals: locals)
-    end
+    streams << turbo_stream.update("compose_dock", partial: "email_compose/dock", locals: {
+      mode: @mode.to_sym,
+      message: @message,
+      draft: @draft,
+      to: @to_address.to_s,
+      cc: @cc_address.to_s,
+      bcc: "",
+      subject: @subject.to_s,
+      body: @prefill_body.to_s,
+      quoted_body: @quoted_body.to_s,
+      signatures: @signatures,
+      signature_id: @signature&.id,
+      accounts: [],
+      attachment_entries: forward_attachment_entries
+    })
     streams
+  end
+
+  # Forwarding carries the original files along as removable chips (their
+  # signed ids resolve at send; ownership check accepts the source message's
+  # own blobs — see collected_attachments).
+  def forward_attachment_entries
+    return [] unless @mode == "forward" && @message&.files&.attached?
+
+    @message.files.blobs.map do |blob|
+      { "signed_id" => blob.signed_id, "filename" => blob.filename.to_s, "byte_size" => blob.byte_size }
+    end
   end
 
   # A successful send (or schedule) consumes the autosaved draft it was written
@@ -250,10 +259,10 @@ class EmailComposeController < ApplicationController
     ids = Array(params[:attachments]).reject(&:blank?)
     return [] if ids.empty?
 
-    owned_blob_ids = Current.user.outbound_attachments.blobs.pluck(:id).to_set
+    allowed = allowed_blob_ids
     ids.filter_map do |signed_id|
       blob = ActiveStorage::Blob.find_signed(signed_id)
-      next unless blob && owned_blob_ids.include?(blob.id)
+      next unless blob && allowed.include?(blob.id)
       { filename: blob.filename.to_s, content_type: blob.content_type, data: blob.download }
     end
   rescue => e
@@ -265,14 +274,24 @@ class EmailComposeController < ApplicationController
   def owned_attachment_ids
     ids = Array(params[:attachments]).reject(&:blank?)
     return [] if ids.empty?
-    owned_blob_ids = Current.user.outbound_attachments.blobs.pluck(:id).to_set
+    allowed = allowed_blob_ids
     ids.select do |signed_id|
       blob = ActiveStorage::Blob.find_signed(signed_id)
-      blob and owned_blob_ids.include?(blob.id)
+      blob and allowed.include?(blob.id)
     end
   rescue => e
     Rails.logger.error("[EmailCompose] attachment id resolution failed: " + e.message.to_s)
     []
+  end
+
+  # A submitted signed id must be the user's own upload — or, when replying on
+  # a thread, one of the source message's own files (that's how a forward
+  # carries the originals). @message is permission-checked in load_message, so
+  # this never widens access beyond mail the user can already read.
+  def allowed_blob_ids
+    allowed = Current.user.outbound_attachments.blobs.pluck(:id).to_set
+    allowed.merge(@message.files.blobs.pluck(:id)) if @message&.files&.attached?
+    allowed
   end
 
   def extract_draft_id(result)
@@ -310,10 +329,16 @@ class EmailComposeController < ApplicationController
     end
   end
 
+  # After a successful thread send: drop the Dock and confirm. (Also clears any
+  # legacy inline compose area still in the DOM.)
   def remove_compose_area
     respond_to do |format|
       format.turbo_stream do
-        render turbo_stream: turbo_stream.remove("compose_area_#{@message.id}")
+        render turbo_stream: [
+          turbo_stream.update("compose_dock", ""),
+          turbo_stream.remove("compose_area_#{@message.id}"),
+          notify_stream(t(".sent_toast"), severity: :success)
+        ]
       end
       format.html { redirect_to email_message_path(@message), success: t(".sent") }
     end

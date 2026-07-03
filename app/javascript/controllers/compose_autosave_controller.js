@@ -71,6 +71,24 @@ export default class extends Controller {
     return this.draftIdValue
   }
 
+  // Used by "expand to Desk": guarantee a persisted draft (saving pending
+  // edits first) and hand back its id — or "" when there is nothing to keep.
+  async ensureDraft() {
+    if (this._suspended) return ""
+    if (this.draftIdValue) {
+      if (this._dirty) { clearTimeout(this._timer); await this._save() }
+      return this.draftIdValue
+    }
+    const p = this._payload()
+    const bodyText = (p.body || "").replace(/<[^>]+>/g, "").trim()
+    const hasContent = bodyText || p.subject || p.to_address || (p.attachments_json || []).length
+    if (!hasContent) return ""
+    this._dirty = true
+    clearTimeout(this._timer)
+    await this._save()
+    return this.draftIdValue
+  }
+
   // ── internals ─────────────────────────────────────────────────
   async _save({ keepalive = false } = {}) {
     if (this._suspended || !this._dirty) return

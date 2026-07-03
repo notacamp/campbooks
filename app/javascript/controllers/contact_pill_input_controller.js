@@ -18,10 +18,14 @@ export default class extends Controller {
   loadInitialPills() {
     const raw = this.hiddenTarget.value.trim()
     if (!raw) return
+    // Server-seeded recipients are not user edits — don't announce them, or
+    // opening a prefilled reply would immediately autosave a phantom draft.
+    this._initializing = true
     raw.split(",").forEach(part => {
       const email = part.trim()
       if (email) this.addPill(email, email)
     })
+    this._initializing = false
   }
 
   // --- Search ---
@@ -131,7 +135,9 @@ export default class extends Controller {
     this.hiddenTarget.value = emails.join(", ")
     // Pills mutate the hidden input programmatically, which fires no native
     // event — announce it so listeners (draft autosave) see recipient edits.
-    this.hiddenTarget.dispatchEvent(new Event("input", { bubbles: true }))
+    if (!this._initializing) {
+      this.hiddenTarget.dispatchEvent(new Event("input", { bubbles: true }))
+    }
   }
 
   // --- Keyboard ---

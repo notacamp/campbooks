@@ -1,6 +1,25 @@
 en:
   components:
     compose:
+      dock:
+        dialog_label_forward: Forward message
+        dialog_label_new_message: New message
+        dialog_label_reply: Reply
+        dialog_label_reply_all: Reply to all
+        draft: Draft
+        draft_saved: Draft saved
+        expand_title: Open in full page
+        minimize_title: Minimize
+        mode_forward: Forward
+        mode_new_message: New message
+        mode_reply: Reply
+        mode_reply_all: Reply all
+        restore_aria: Resume writing
+        switch_mode: Change reply mode
+      pill:
+        draft_saved: Draft saved
+        resume_aria: Resume your draft
+        untitled: Draft
       engine:
         bcc_button: Bcc
         cc_button: Cc

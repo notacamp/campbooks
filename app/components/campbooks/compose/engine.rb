@@ -17,7 +17,8 @@ module Campbooks
     class Engine < Campbooks::Base
       def initialize(shell:, mode:, action_url:, message: nil, draft: nil,
                      to: "", cc: "", bcc: "", subject: "", body: "", quoted_body: "",
-                     signatures: [], signature_id: nil, account: nil, accounts: [])
+                     signatures: [], signature_id: nil, account: nil, accounts: [],
+                     attachment_entries: [])
         @shell = shell
         @mode = mode.to_sym
         @action_url = action_url
@@ -33,6 +34,7 @@ module Campbooks
         @signature_id = signature_id
         @account = account
         @accounts = accounts
+        @attachment_entries = attachment_entries
       end
 
       def view_template
@@ -59,7 +61,10 @@ module Campbooks
 
           envelope
           editor_block
-          render(ComposeAttachments.new(upload_url: helpers.compose_attachments_path))
+          div(class: dock? ? "px-5" : nil) do
+            render(ComposeAttachments.new(upload_url: helpers.compose_attachments_path,
+                                          entries: @attachment_entries))
+          end
           footer
         end
       end

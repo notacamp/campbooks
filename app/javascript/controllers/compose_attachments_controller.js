@@ -17,6 +17,13 @@ export default class extends Controller {
     this.fileInputTarget.click()
   }
 
+  // Server-seeded chips (restored drafts, forwarded originals) bind their
+  // remove button here instead of the addEventListener path used for uploads.
+  removeChip(event) {
+    event.currentTarget.closest(".attachment-chip")?.remove()
+    this._announce()
+  }
+
   async upload(event) {
     const files = Array.from(event.target.files || [])
     event.target.value = ""

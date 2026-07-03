@@ -56,12 +56,11 @@ class DraftEmailsControllerTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :created
-    draft = DraftEmail.last
+    draft = created_draft
     assert_equal @user, draft.user
     assert_equal @workspace, draft.workspace
     assert_equal "reply", draft.mode
     assert_equal [ { "signed_id" => "sid", "filename" => "a.pdf", "byte_size" => 12 } ], draft.attachment_entries
-    assert_equal draft.id, JSON.parse(response.body)["id"]
   end
 
   test "create links in_reply_to only when the user can read the message" do
@@ -69,10 +68,16 @@ class DraftEmailsControllerTest < ActionDispatch::IntegrationTest
     foreign = create_message(create_account(create_user("other")))
 
     post draft_emails_path, params: { draft_email: { mode: "reply", in_reply_to_id: readable.id, body: "x" } }, as: :json
-    assert_equal readable, DraftEmail.last.in_reply_to
+    assert_equal readable, created_draft.in_reply_to
 
     post draft_emails_path, params: { draft_email: { mode: "reply", in_reply_to_id: foreign.id, body: "x" } }, as: :json
-    assert_nil DraftEmail.last.in_reply_to, "a message the user can't read must not be linked"
+    assert_nil created_draft.in_reply_to, "a message the user can't read must not be linked"
+  end
+
+  # UUID primary keys make Model.last ordering random — always resolve the
+  # created draft from the response.
+  def created_draft
+    DraftEmail.find(JSON.parse(response.body).fetch("id"))
   end
 
   test "create drops a signature belonging to another user" do

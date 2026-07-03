@@ -26,7 +26,7 @@
       <%= render(Campbooks::NavRail.new) %>
     <% end %>
 
-    <div class="<%= "lg:pl-20 pb-16 lg:pb-0" if authenticated? %>">
+    <div id="app-shell" class="<%= "lg:pl-20 pb-16 lg:pb-0" if authenticated? %>">
       <%# Cloud-only "early beta" stripe. Sits at the top of the content column
           (clear of the fixed left rail); suppressed in native shells, which
           carry their own chrome. %>
@@ -56,6 +56,7 @@
       <%= render(Campbooks::BottomNav.new) %>
 
       <%= render "shared/email_drawer" %>
+      <%= render "shared/compose_dock" %>
 
       <%= render "shared/setup_modal" %>
       <%= render "shared/skim_overlay" %>
