@@ -7,7 +7,8 @@
      data-controller="compose-dock"
      data-action="keydown.esc@document->compose-dock#minimize compose-engine:closed->compose-dock#clear">
   <div id="compose_dock"></div>
-  <% if (parked_draft = DraftEmail.resumable_for(Current.user)) %>
+  <%# Skip the pill when the Desk is already editing that same draft. %>
+  <% if (parked_draft = DraftEmail.resumable_for(Current.user)) && params[:draft_id].to_s != parked_draft.id.to_s %>
     <%= render(Campbooks::Compose::Pill.new(draft: parked_draft)) %>
   <% end %>
 </div>
