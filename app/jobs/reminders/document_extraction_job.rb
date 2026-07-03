@@ -25,16 +25,19 @@ module Reminders
         document.metadata.presence&.to_json
       ].compact_blank.join("\n")
 
+      memory = reminder_learning_memory(workspace)
+
       items = Ai::ReminderExtractor.new(
         source:      document,
         content:     content,
         anchor_date: document.document_date || document.created_at.to_date,
         time_zone:   Time.zone,
-        workspace:   workspace
+        workspace:   workspace,
+        learning_memory: memory
       ).extract
 
       reminders = Reminders::Builder.call(
-        workspace: workspace, source: document, raw_items: items, anchor_tz: Time.zone
+        workspace: workspace, source: document, raw_items: items, anchor_tz: Time.zone, learning_memory: memory
       )
 
       backfill_due_date(document, items)
@@ -45,6 +48,15 @@ module Reminders
     end
 
     private
+
+    # One memory per run, shared by the extractor (soft prompt hint) and the builder
+    # (deterministic suppression). Best-effort: a failure here just means no learning.
+    def reminder_learning_memory(workspace)
+      Learning::Memory.new(source: Learning::Sources::Reminders.new(workspace))
+    rescue => e
+      Rails.logger.warn("[#{self.class.name}] learning_memory failed: #{e.message}")
+      nil
+    end
 
     # Populate the document's structured due_date from the first payment_due reminder,
     # so it shows in the invoice form and document views even before the user confirms.
