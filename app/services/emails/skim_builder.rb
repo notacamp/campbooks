@@ -42,7 +42,7 @@ module Emails
       updates:       "Updates",
       notifications: "Notifications",
       social:        "Social",
-      promotions:    "Promotions",
+      promotions:    "Newsletters & promos",
       unknown:       "Other"
     }.freeze
 
@@ -83,10 +83,11 @@ module Emails
     # #suggestion_for) that turns the user's past decisions into a per-card "you
     # usually archive these" suggestion. Left nil — and thus a no-op — so the builder
     # stays pure and unit-testable without a user / database.
-    # `follow_up_thread_ids` is a Set of EmailThread ids the AI flagged as awaiting a
-    # reply whose follow-up has come due (computed by Emails::SkimDeck — the builder
-    # does no DB work). Their cards lead in a "Follow-ups" ring. `follow_up_meta`
-    # maps thread id → { reason:, at: } for the card's "why / how long" line.
+    # `follow_up_thread_ids` is a Set of EmailThread ids the owner is waiting on a
+    # reply for whose nudge has come due (computed by Emails::SkimDeck via
+    # Emails::AwaitingReply#due — pure data, not AI-gated; the builder does no DB
+    # work). Their cards lead in a "Follow-ups" ring. `follow_up_meta` maps thread
+    # id → { reason:, at: } for the card's "why / how long" line.
     def initialize(emails, now: Time.now, whitelist_mode: false, memory: nil,
                    follow_up_thread_ids: nil, follow_up_meta: nil)
       @emails = emails.to_a

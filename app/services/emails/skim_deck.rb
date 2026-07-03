@@ -13,9 +13,10 @@ module Emails
   #   1. HIDE answered conversations — threads where the owner already had the last
   #      word (they replied, the other party hasn't come back) and no follow-up is
   #      due. This is the core "stop re-showing mail I replied to" fix.
-  #   2. SURFACE follow-ups — threads the AI flagged as awaiting a reply whose
-  #      follow-up time has come. These may sit OUTSIDE Skim's 14-day window, so we
-  #      pull each one's representative inbox message in explicitly.
+  #   2. SURFACE follow-ups — threads the owner is waiting on a reply for whose
+  #      nudge time has come (Emails::AwaitingReply#due; pure data — the AI only
+  #      refines the timing, so this fires even with no AI provider). These may sit
+  #      OUTSIDE Skim's 14-day window, so we pull each representative message in.
   #
   # The builder then routes the follow-up threads into a leading "Follow-ups" ring
   # via the `follow_up_thread_ids` set we pass it (it stays pure — no DB).
@@ -38,7 +39,7 @@ module Emails
       emails = SkimScope.for(@user).to_a
       state  = thread_state(emails)
 
-      due           = EmailThread.follow_up_due(@now).where(email_account: accounts).to_a
+      due           = Emails::AwaitingReply.new(@user, now: @now).due
       follow_up_ids = due.map(&:id).to_set
       follow_up_meta = due.each_with_object({}) do |t, h|
         h[t.id] = { reason: t.follow_up_reason, at: t.follow_up_at }

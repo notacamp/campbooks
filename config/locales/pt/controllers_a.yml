@@ -167,6 +167,8 @@ pt:
         unsnoozed:
           one: Adiamento cancelado em %{count} conversa
           other: Adiamento cancelado em %{count} conversas
+    dismiss_follow_up:
+      dismissed: Seguimento dispensado
     dismiss_todo:
       dismissed: Tarefa ignorada
   email_threads:

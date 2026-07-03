@@ -1,8 +1,10 @@
 module Feed
   module Sources
-    # Conversations the user replied to and is still waiting to hear back on, where
-    # the AI confirmed a follow-up is warranted and its time has come. The home-feed
-    # counterpart of Skim's Follow-ups ring.
+    # Conversations the user replied to and is still waiting to hear back on — the
+    # proactive subset of Emails::AwaitingReply#due. Visibility is pure data (the
+    # user holds the last word); the AI only enriches the timing/wording, so this
+    # fires even when no AI provider is configured. The home-feed counterpart of
+    # Skim's Follow-ups ring.
     #
     # Distinct from ReplyReminder, which nudges mail the user HASN'T replied to (the
     # ball in their own court). Here the ball is in the other party's court, so the
@@ -15,9 +17,7 @@ module Feed
       def self.key = "follow_up"
 
       def candidates
-        threads = EmailThread.follow_up_due(now)
-                             .where(email_account: user.readable_email_accounts)
-                             .includes(:email_messages)
+        threads = Emails::AwaitingReply.new(user, now: now).due
         collapse_by_thread(threads.filter_map { |thread| candidate_for(thread) })
       end
 
@@ -25,7 +25,9 @@ module Feed
         return false if message.nil?
 
         thread = message.email_thread
-        thread&.follow_up_expected? && thread.follow_up_dismissed_at.nil? && in_inbox?(message)
+        return false unless thread
+
+        thread.holds_last_word? && thread.follow_up_dismissed_at.nil? && in_inbox?(message)
       end
 
       private
