@@ -45,12 +45,14 @@ en:
         today: Today
         tomorrow: Tomorrow
       task_card:
+        accept: Add to tasks
         complete: Complete
         dismiss: Dismiss
         in_days:
           one: Due in %{count} day
           other: Due in %{count} days
         overdue: Overdue
+        suggested: Suggested task
         today: Due today
         tomorrow: Due tomorrow
       reply_reminder_card:
@@ -96,7 +98,9 @@ en:
       reminder_confirmed_no_calendar: Reminder confirmed. Connect a calendar to sync
         it automatically.
       reminder_dismissed: Reminder dismissed.
+      task_accepted: "Added to your tasks: %{title}"
       task_completed: "Task completed: %{title}"
+      task_dismissed: Suggestion dismissed.
       restored: Restored.
       unsupported: That action is not supported here.
   home:

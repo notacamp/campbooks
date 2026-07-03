@@ -125,6 +125,27 @@ class FeedTimelineCardPreview < ViewComponent::Preview
     )
   end
 
+  # An active task needing attention: status pill, due text, Complete + dismiss.
+  def task
+    render Campbooks::Feed::Card.new(
+      item: feed_item(id: 12, kind: "task"),
+      subject: task_subject(status: "todo", due_at: 1.day.from_now)
+    )
+  end
+
+  # AI-suggested task awaiting triage: "Suggested task" framing, the extractor's
+  # justification, and Dismiss / Add-to-tasks resolving the suggestion itself.
+  def task_suggested
+    render Campbooks::Feed::Card.new(
+      item: feed_item(id: 13, kind: "task"),
+      subject: task_subject(
+        status: "suggested", due_at: nil,
+        title: "Send the signed 2025 financial statements back to the accountant",
+        justification: "The message asks: “please return the signed statements so we can file them”."
+      )
+    )
+  end
+
   # @label Focused — keyboard shortcut chips
   #
   # The card the reader is on (the scroll-highlight feed-keyboard acts on). On
@@ -151,6 +172,14 @@ class FeedTimelineCardPreview < ViewComponent::Preview
       id: 9300, title: title, reminder_type: reminder_type, due_at: due_at, all_day: true,
       status: "pending", amount_cents: amount_cents, currency: "EUR", source_type: "EmailMessage",
       justification: "The invoice states payment is due within 15 days of issue."
+    )
+  end
+
+  def task_subject(status:, due_at:, title: "Prepare the July invoice batch", justification: nil)
+    Task.new(
+      id: "8f9a1b2c-0000-4000-8000-feed0000cafe", title: title, status: status,
+      due_at: due_at, priority: "normal", confidence: 0.95,
+      ai_suggested: status == "suggested", justification: justification
     )
   end
 
