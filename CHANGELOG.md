@@ -16,6 +16,31 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Manage calendars right on the calendar.** A Google-Calendar-style sidebar
+  lists every calendar grouped by the email account that owns it: tick a
+  calendar to show or hide it **just for you**, recolor it, stop it syncing,
+  enable calendars discovered at your provider that aren't syncing yet, refresh
+  the provider list on demand, and jump to connecting another account. On phones
+  the same pane opens from a button next to the calendar title.
+- **Import events from an `.ics` file.** Export from any calendar app, pick a
+  Campbooks calendar, and imported events sync out to Google/Zoho just like
+  ones you create here. Re-importing the same file skips duplicates; recurring
+  events are skipped (and counted) for now.
+
+### Changed
+
+- ⚠️ **Color belongs to the calendar now; event types carry an icon.** Event
+  chips are always tinted with the owning calendar's color (pick it in the
+  sidebar — your choice survives sync), and each event type marks its events
+  with a small icon from the app's icon set instead of a color. Per-event color
+  overrides and event-type colors are removed, including their columns; the
+  API's `calendar_event.color` now always reflects the calendar and `color` is
+  no longer accepted on event create/update.
+- Events from calendars that are switched off no longer linger on the calendar
+  page — off means off.
+
 ## [0.8.0] - 2026-07-03
 
 ### Added

@@ -82,6 +82,7 @@ es:
         one: 1 evento recurrente omitido (aún no compatible).
         other: "%{count} eventos recurrentes omitidos (aún no compatibles)."
       too_large: El archivo es demasiado grande (máx. 2 MB).
+      truncated: El archivo tenía más de %{max} eventos; solo se importaron los primeros %{max}.
       wrong_type: Eso no parece un archivo de calendario (.ics).
     new:
       calendar_label: Importar en
