@@ -57,7 +57,9 @@ export default class extends Controller {
   // message-id value only renders on a full page load — so keep it in sync with
   // the URL, or reply/archive/forward would act on the previously-open email.
   _syncMessageIdFromUrl() {
-    const id = (window.location.pathname.match(/\/email_messages\/(\d+)/) || [])[1]
+    // Ids are UUIDs (with a digits-only legacy fallback) — a \d+-only match
+    // would truncate "95be…" to "95" and 404 every shortcut action.
+    const id = (window.location.pathname.match(/\/email_messages\/([0-9a-f]{8}-[0-9a-f-]{27}|\d+)(?:$|[/?#])/i) || [])[1]
     if (id) this.messageIdValue = id
   }
 

@@ -28,7 +28,7 @@
     <%# Native shells provide their own top bar, so the web topbar is suppressed. %>
     <%= render "shared/topbar" if authenticated? && !hotwire_native_app? %>
 
-    <main class="<%= "lg:pl-20" if authenticated? %>">
+    <main id="app-shell" class="<%= "lg:pl-20" if authenticated? %>">
       <%= render "shared/flash_inline" %>
       <%# Fixed shell region: the full-viewport multi-pane shells (email + Scout)
           fill this with h-full. Mobile reserves the top bar (3.5rem) + bottom
@@ -53,6 +53,7 @@
     <%= render "shared/setup_modal" if authenticated? %>
     <%= render "shared/skim_overlay" if authenticated? %>
     <%= render "shared/email_drawer" if authenticated? %>
+    <%= render "shared/compose_dock" if authenticated? %>
     <%= render(Campbooks::BugReportTab.new) if authenticated? %>
     <%= render(Campbooks::BugReportModal.new) if authenticated? %>
     <%= render "shared/flash_toast_region" %>

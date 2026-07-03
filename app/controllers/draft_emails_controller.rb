@@ -10,6 +10,35 @@ class DraftEmailsController < ApplicationController
   before_action :require_authentication
   before_action :load_draft, only: [ :update, :destroy ]
 
+  # Re-opens a parked draft in the Dock (the pill's click target). A stale pill
+  # pointing at a consumed draft just removes itself.
+  def show
+    draft = Current.user.draft_emails.find_by(id: params[:id])
+    return stale_pill_response unless draft
+
+    message = draft.in_reply_to
+    respond_to do |format|
+      format.turbo_stream do
+        render turbo_stream: turbo_stream.update("compose_dock", partial: "email_compose/dock", locals: {
+          mode: draft.mode.to_sym,
+          message: message,
+          draft: draft,
+          to: draft.to_address.to_s,
+          cc: draft.cc_address.to_s,
+          bcc: draft.bcc_address.to_s,
+          subject: draft.subject.to_s,
+          body: draft.body.to_s,
+          quoted_body: draft.quoted_body.to_s,
+          signatures: Current.user.signatures.ordered.includes(:email_accounts),
+          signature_id: draft.signature_id,
+          accounts: draft.new_message? ? Current.user.sendable_email_accounts.to_a : [],
+          attachment_entries: draft.attachment_entries
+        })
+      end
+      format.html { redirect_to message ? email_message_path(message) : email_messages_path }
+    end
+  end
+
   def create
     draft = Current.user.draft_emails.new(draft_params)
     draft.workspace = Current.workspace
@@ -41,6 +70,13 @@ class DraftEmailsController < ApplicationController
   end
 
   private
+
+  def stale_pill_response
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: turbo_stream.remove("compose_draft_pill") }
+      format.html { redirect_to email_messages_path }
+    end
+  end
 
   def load_draft
     @draft = Current.user.draft_emails.find(params[:id])

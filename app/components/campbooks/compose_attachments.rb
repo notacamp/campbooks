@@ -8,10 +8,13 @@ module Campbooks
   #
   # @param upload_url [String] endpoint that stores a file and returns { signed_id, filename, size }.
   # @param field_name [String] name for the hidden id inputs (default "attachments[]").
+  # @param entries [Array<Hash>] pre-seeded chips ({ "signed_id", "filename", "byte_size" }) —
+  #   restored draft attachments or the original files carried by a forward.
   class ComposeAttachments < Campbooks::Base
-    def initialize(upload_url:, field_name: "attachments[]")
+    def initialize(upload_url:, field_name: "attachments[]", entries: [])
       @upload_url = upload_url
       @field_name = field_name
+      @entries = entries
     end
 
     def view_template
@@ -40,9 +43,30 @@ module Campbooks
             end
             span { t(".attach") }
           end
-          div(data: { compose_attachments_target: "tray" }, class: "compose-attachments-tray")
+          div(data: { compose_attachments_target: "tray" }, class: "compose-attachments-tray") do
+            @entries.each { |entry| seeded_chip(entry) }
+          end
         end
       end
+    end
+
+    private
+
+    def seeded_chip(entry)
+      span(class: "attachment-chip",
+           data: { filename: entry["filename"], byte_size: entry["byte_size"] }) do
+        span(class: "attachment-chip-name") { chip_label(entry) }
+        button(type: "button", aria_label: t(".remove"),
+               data: { action: "click->compose-attachments#removeChip" }) { "✕" }
+        input(type: "hidden", name: @field_name, value: entry["signed_id"])
+      end
+    end
+
+    def chip_label(entry)
+      size = entry["byte_size"].to_i
+      return entry["filename"].to_s if size.zero?
+
+      "#{entry["filename"]} · #{helpers.number_to_human_size(size)}"
     end
   end
 end
