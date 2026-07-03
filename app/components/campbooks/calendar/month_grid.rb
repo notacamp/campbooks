@@ -1,6 +1,7 @@
 module Campbooks
   module Calendar
     class MonthGrid < Campbooks::Base
+      include TypeIcon
       MAX_CHIPS = 3
 
       def initialize(date:, events:, reminders: [], snoozed_threads: [], scheduled_emails: [])
@@ -153,17 +154,24 @@ module Campbooks
           # All-day: a filled color bar (contrast-picked text), the calendar norm.
           a(href: helpers.edit_calendar_event_path(event),
             data: { "calendar-event-modal-open": helpers.edit_calendar_event_path(event) }.merge(drag_data),
-            class: class_names("block truncate rounded-md px-1.5 py-0.5 text-[11px] font-medium leading-tight", ("cursor-grab" if drag)),
+            class: class_names("block rounded-md px-1.5 py-0.5 text-[11px] font-medium leading-tight", ("cursor-grab" if drag)),
             style: "background-color: #{color}; color: #{contrast_on(color)}",
-            title: title) { title }
+            title: title) do
+            span(class: "flex min-w-0 items-center gap-1") do
+              type_icon(event, "h-3 w-3 flex-shrink-0")
+              span(class: "min-w-0 truncate") { title }
+            end
+          end
         else
           # Timed: a color dot + time + title on a transparent row — lighter and
-          # more scannable than a wall of filled bars, and color still reads.
+          # more scannable than a wall of filled bars, and color still reads. The
+          # event type's icon sits between them, muted (same treatment as EventRow).
           a(href: helpers.edit_calendar_event_path(event),
             data: { "calendar-event-modal-open": helpers.edit_calendar_event_path(event) }.merge(drag_data),
             class: class_names("flex items-center gap-1 rounded-md px-1 py-0.5 text-[11px] leading-tight text-foreground transition-colors hover:bg-muted", ("cursor-grab" if drag)),
             title: title) do
             span(class: "h-1.5 w-1.5 shrink-0 rounded-full", style: "background-color: #{color}")
+            type_icon(event, "h-3 w-3 flex-shrink-0 text-muted-foreground")
             span(class: "truncate") do
               span(class: "font-semibold tabular-nums") { l(event.start_at, format: :clock) }
               whitespace

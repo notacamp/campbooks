@@ -12,6 +12,9 @@ module Campbooks
             div(class: "text-[12.5px] font-medium text-accent-700") { time_until }
             div(class: "mt-1 flex items-center gap-2") do
               span(class: "h-2 w-2 flex-shrink-0 rounded-full", style: "background-color: #{subject.display_color}")
+              if (icon = subject.event_type&.icon.presence)
+                render Campbooks::Icon.new(icon, css_class: "h-3.5 w-3.5 flex-shrink-0 text-muted-foreground")
+              end
               span(class: "min-w-0 truncate text-sm font-semibold leading-snug text-foreground") { subject.title.presence || t(".untitled") }
             end
             if subject.location.present?

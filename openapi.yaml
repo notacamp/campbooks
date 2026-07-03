@@ -2369,7 +2369,7 @@ components:
         color:
           type: string
           nullable: true
-          description: Effective color (event override, else the calendar's color).
+          description: The owning calendar's display color (per-event color overrides no longer exist).
         calendar_id:
           type: integer
         conference_url:
@@ -2428,8 +2428,6 @@ components:
           format: date-time
         all_day:
           type: boolean
-        color:
-          type: string
 
     Reminder:
       type: object

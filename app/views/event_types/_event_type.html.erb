@@ -1,7 +1,13 @@
 <%# locals: type %>
 <%= turbo_frame_tag dom_id(type) do %>
   <div class="flex items-center gap-3 py-2.5 px-1 border-b border-border last:border-0">
-    <%= render(Campbooks::ColorDot.new(color: type.color)) %>
+    <span class="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+      <% if type.icon.present? %>
+        <%= render(Campbooks::Icon.new(type.icon, css_class: "w-4 h-4")) %>
+      <% else %>
+        <span class="h-1.5 w-1.5 rounded-full bg-current opacity-40"></span>
+      <% end %>
+    </span>
     <div class="min-w-0 flex-1">
       <span class="text-[13px] font-medium text-foreground truncate"><%= type.name %></span>
       <% if type.prompt.present? %>

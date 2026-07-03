@@ -1,6 +1,21 @@
 class CalendarAccountsController < ApplicationController
   before_action :require_authentication
-  before_action :set_calendar_account, only: [ :update, :destroy, :sharing ]
+  before_action :set_calendar_account, only: [ :update, :destroy, :sharing, :refresh ]
+
+  # Re-pull the provider's calendar list on demand (the sidebar's "refresh"),
+  # so a calendar created at Google/Zoho shows up without waiting for the
+  # 15-minute sweep. Mirrors InboxSettings::AccountsController#scan_now.
+  def refresh
+    unless @calendar_account.managed_by?(Current.user)
+      return redirect_to calendar_path, error: t(".not_permitted")
+    end
+
+    CalendarScanJob.perform_later(@calendar_account.id, "full")
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: notify_stream(t(".started")) }
+      format.html { redirect_to calendar_path, success: t(".started") }
+    end
+  end
 
   # Owner-only panel listing who has access, with a per-person role selector.
   def sharing
