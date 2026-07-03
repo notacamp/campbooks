@@ -26,6 +26,7 @@ module Campbooks
       ELLIPSIS_SVG = %(<svg viewBox="0 0 24 24" class="h-4 w-4" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg>)
       PLUS_SVG = %(<svg viewBox="0 0 24 24" class="h-3.5 w-3.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>)
       REFRESH_SVG = %(<svg viewBox="0 0 24 24" class="h-3.5 w-3.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>)
+      UPLOAD_SVG = %(<svg viewBox="0 0 24 24" class="h-3.5 w-3.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/></svg>)
 
       def initialize(accounts:, user:, view:, date:, managed_account_ids: [])
         @accounts = accounts
@@ -182,7 +183,12 @@ module Campbooks
       end
 
       def footer_actions
-        div(class: "border-t border-border pt-3") do
+        div(class: "space-y-0.5 border-t border-border pt-3") do
+          a(href: helpers.new_calendar_import_path,
+            class: "flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[13px] text-muted-foreground no-underline transition-colors hover:bg-muted hover:text-foreground") do
+            raw safe(UPLOAD_SVG)
+            span { t(".import_ics") }
+          end
           a(href: helpers.settings_integrations_calendars_path,
             class: "flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[13px] text-muted-foreground no-underline transition-colors hover:bg-muted hover:text-foreground") do
             raw safe(PLUS_SVG)

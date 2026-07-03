@@ -64,6 +64,33 @@ en:
       rsvp_saved: Your response was saved.
     update:
       updated: Event updated.
+  calendar_imports:
+    create:
+      imported:
+        one: 1 event imported.
+        other: "%{count} events imported."
+      no_calendar: Pick a calendar to import into.
+      no_file: Choose an .ics file to import.
+      parse_failed: That file couldn't be read as a calendar. Export a fresh .ics and try again.
+      skipped_duplicate:
+        one: 1 duplicate skipped.
+        other: "%{count} duplicates skipped."
+      skipped_malformed:
+        one: 1 unreadable event skipped.
+        other: "%{count} unreadable events skipped."
+      skipped_recurring:
+        one: 1 recurring event skipped (not supported yet).
+        other: "%{count} recurring events skipped (not supported yet)."
+      too_large: That file is too large (2 MB max).
+      wrong_type: That doesn't look like a calendar file (.ics).
+    new:
+      calendar_label: Import into
+      file_hint: Up to %{max_events} events per file. Recurring events are skipped for now.
+      file_label: Calendar file (.ics)
+      no_writable_calendars: Connect a writable, syncing calendar before importing.
+      submit: Import events
+      subtitle: Bring events over from another calendar app. Imported events sync out to your provider just like ones you create here.
+      title: Import events
   components:
     calendar:
       agenda_list:
@@ -112,6 +139,7 @@ en:
         color_label: Color
         connect_account: Connect an account
         hide_calendar: Hide from my calendar
+        import_ics: Import events (.ics)
         managers_only: Only calendar managers can enable these.
         none_synced: No calendars syncing yet.
         primary: (primary)

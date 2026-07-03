@@ -64,6 +64,33 @@ es:
       rsvp_saved: Tu respuesta ha sido guardada.
     update:
       updated: Evento actualizado.
+  calendar_imports:
+    create:
+      imported:
+        one: 1 evento importado.
+        other: "%{count} eventos importados."
+      no_calendar: Elige un calendario donde importar.
+      no_file: Elige un archivo .ics para importar.
+      parse_failed: No se pudo leer el archivo como calendario. Exporta un .ics nuevo e inténtalo de nuevo.
+      skipped_duplicate:
+        one: 1 duplicado omitido.
+        other: "%{count} duplicados omitidos."
+      skipped_malformed:
+        one: 1 evento ilegible omitido.
+        other: "%{count} eventos ilegibles omitidos."
+      skipped_recurring:
+        one: 1 evento recurrente omitido (aún no compatible).
+        other: "%{count} eventos recurrentes omitidos (aún no compatibles)."
+      too_large: El archivo es demasiado grande (máx. 2 MB).
+      wrong_type: Eso no parece un archivo de calendario (.ics).
+    new:
+      calendar_label: Importar en
+      file_hint: Hasta %{max_events} eventos por archivo. Los eventos recurrentes se omiten por ahora.
+      file_label: Archivo de calendario (.ics)
+      no_writable_calendars: Conecta un calendario sincronizado y con permiso de escritura antes de importar.
+      submit: Importar eventos
+      subtitle: Trae eventos de otra aplicación de calendario. Los eventos importados se sincronizan con tu proveedor igual que los que creas aquí.
+      title: Importar eventos
   components:
     calendar:
       agenda_list:
@@ -107,6 +134,7 @@ es:
         color_label: Color
         connect_account: Conectar una cuenta
         hide_calendar: Ocultar de mi calendario
+        import_ics: Importar eventos (.ics)
         managers_only: Solo los gestores del calendario pueden activarlos.
         none_synced: Aún no se sincroniza ningún calendario.
         primary: (principal)

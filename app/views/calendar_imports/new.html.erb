@@ -1,0 +1,26 @@
+<div class="mx-auto max-w-lg px-4 py-8 sm:px-6">
+  <h1 class="text-xl font-semibold text-foreground"><%= t(".title") %></h1>
+  <p class="mt-1 text-sm text-muted-foreground"><%= t(".subtitle") %></p>
+
+  <%= form_with url: calendar_import_path, method: :post, multipart: true, class: "mt-6 space-y-5" do |f| %>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".file_label") %></label>
+      <%= f.file_field :ics_file, accept: ".ics,text/calendar", required: true,
+            class: "block w-full text-sm text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground hover:file:bg-muted/70 file:cursor-pointer" %>
+      <p class="mt-1 text-xs text-muted-foreground"><%= t(".file_hint", max_events: Calendars::IcsImporter::MAX_EVENTS) %></p>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".calendar_label") %></label>
+      <%= f.select :calendar_id,
+            @calendars.map { |c| [ "#{c.name} (#{c.calendar_account.display_name})", c.id ] },
+            {}, class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+    </div>
+
+    <div class="flex items-center justify-end gap-2 pt-1">
+      <%= link_to t("shared.actions.cancel"), calendar_path,
+            class: "px-3 py-1.5 text-sm font-medium rounded-lg border border-border text-gray-600 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors" %>
+      <%= render(Campbooks::Button.new(variant: :primary, size: :sm, type: :submit)) { t(".submit") } %>
+    </div>
+  <% end %>
+</div>

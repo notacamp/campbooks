@@ -240,6 +240,8 @@ Rails.application.routes.draw do
   # Per-user show/hide of a calendar on /calendar (:id is the calendar's id).
   # Display-only — distinct from the account-wide syncing toggle above.
   resources :calendar_visibilities, only: [ :update ]
+  # One-shot .ics file import into a writable calendar (Calendars::IcsImporter).
+  resource :calendar_import, only: [ :new, :create ]
 
   resources :email_scans, only: [ :show ]
 
