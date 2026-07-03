@@ -7,14 +7,15 @@ module Reminders
     MIN_CONFIDENCE = 0.5    # safety net; the extractor already drops below this
     DEFAULT_HOUR = 9        # all-day reminders get a 9am local slot for the calendar
 
-    def self.call(workspace:, source:, raw_items:, anchor_tz: Time.zone)
-      new(workspace: workspace, source: source, anchor_tz: anchor_tz).call(raw_items)
+    def self.call(workspace:, source:, raw_items:, anchor_tz: Time.zone, learning_memory: nil)
+      new(workspace: workspace, source: source, anchor_tz: anchor_tz, learning_memory: learning_memory).call(raw_items)
     end
 
-    def initialize(workspace:, source:, anchor_tz: Time.zone)
+    def initialize(workspace:, source:, anchor_tz: Time.zone, learning_memory: nil)
       @workspace = workspace
       @source = source
       @anchor_tz = anchor_tz || Time.zone
+      @learning_memory = learning_memory
     end
 
     def call(raw_items)
@@ -29,6 +30,16 @@ module Reminders
 
       reminder_type = item["reminder_type"].to_s
       return nil unless Reminder.reminder_types.key?(reminder_type)
+
+      # Learning ConfidenceGuard: when this workspace strongly and specifically dismisses
+      # this sender's reminders of this type, don't stage another — the confirm/dismiss
+      # history speaks. Sender-specific tiers only (never the broad type/global tier), and
+      # never suppress on error (learning must never poison the pipeline).
+      signal = learning_signal(reminder_type)
+      if suppress?(signal)
+        Rails.logger.info("[Reminders::Builder] learning-guard suppressed #{reminder_type} from #{@source.class}##{@source.id}")
+        return nil
+      end
 
       due_date = parse_date(item["due_date"])
       return nil unless due_date
@@ -61,6 +72,10 @@ module Reminders
       if !reminder.persisted? && (sibling = cross_source_sibling(reminder_type, due_at, item))
         return sibling
       end
+
+      # Provenance: record the matched learning signal alongside the extraction so the
+      # UI can later explain "based on N of M past reminders from this sender".
+      item = item.merge("_learning" => learning_provenance(signal)) if signal
 
       reminder.assign_attributes(
         workspace:     @workspace,
@@ -125,6 +140,37 @@ module Reminders
       Integer(val)
     rescue ArgumentError, TypeError
       nil
+    end
+
+    # The learned confirm/dismiss consensus for this sender + reminder_type, or nil.
+    # Fail-safe: a nil memory or any error means "no signal" (never suppresses).
+    def learning_signal(reminder_type)
+      return nil unless @learning_memory
+
+      @learning_memory.suggestion(
+        contact_id: signals[:contact_id], sender_domain: signals[:sender_domain], reminder_type: reminder_type
+      )
+    rescue => e
+      Rails.logger.warn("[Reminders::Builder] learning_signal failed: #{e.message}")
+      nil
+    end
+
+    # Derived once per source (email/document), reused across its items.
+    def signals
+      @signals ||= Learning::EmailSignals.for(@source)
+    end
+
+    # Suppress only on a strong, SENDER-SPECIFIC dismissed consensus — a broad
+    # type/global "we dismiss these" is too blunt to hard-drop a new sender's reminder.
+    def suppress?(signal)
+      return false unless signal
+
+      signal.label == "dismissed" && %i[contact domain].include?(signal.source)
+    end
+
+    def learning_provenance(signal)
+      { "signal" => signal.source.to_s, "label" => signal.label,
+        "count" => signal.count, "total" => signal.total }
     end
   end
 end

@@ -132,6 +132,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_160000) do
     t.index ["workspace_id"], name: "index_ai_configurations_on_workspace_id"
   end
 
+  create_table "ai_prompts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "instructions"
+    t.string "purpose", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["workspace_id", "purpose"], name: "index_ai_prompts_on_workspace_id_and_purpose", unique: true
+    t.index ["workspace_id"], name: "index_ai_prompts_on_workspace_id"
+  end
+
   create_table "audit_events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "action"
     t.datetime "created_at", null: false
@@ -892,6 +902,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_160000) do
     t.index ["invited_by_id"], name: "index_invitations_on_invited_by_id"
     t.index ["token"], name: "index_invitations_on_token", unique: true
     t.index ["workspace_id"], name: "index_invitations_on_workspace_id"
+  end
+
+  create_table "learning_decisions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "category"
+    t.uuid "contact_id"
+    t.datetime "created_at", null: false
+    t.string "domain", null: false
+    t.string "label", null: false
+    t.string "sender_domain"
+    t.jsonb "signals", default: {}, null: false
+    t.uuid "subject_id"
+    t.string "subject_type"
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["contact_id"], name: "index_learning_decisions_on_contact_id"
+    t.index ["user_id", "domain", "created_at"], name: "index_learning_decisions_on_user_domain_time"
+    t.index ["workspace_id", "domain", "created_at"], name: "index_learning_decisions_on_workspace_domain_time"
   end
 
   create_table "mail_folder_users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1724,6 +1752,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_160000) do
   add_foreign_key "ai_adapters", "workspaces"
   add_foreign_key "ai_configurations", "ai_adapters"
   add_foreign_key "ai_configurations", "workspaces"
+  add_foreign_key "ai_prompts", "workspaces"
   add_foreign_key "audit_events", "users", on_delete: :nullify
   add_foreign_key "authored_documents", "users", column: "author_id"
   add_foreign_key "authored_documents", "workspaces"
@@ -1800,6 +1829,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_160000) do
   add_foreign_key "invitations", "users", column: "accepted_by_id"
   add_foreign_key "invitations", "users", column: "invited_by_id"
   add_foreign_key "invitations", "workspaces"
+  add_foreign_key "learning_decisions", "contacts"
+  add_foreign_key "learning_decisions", "users"
+  add_foreign_key "learning_decisions", "workspaces"
   add_foreign_key "mail_folder_users", "mail_folders"
   add_foreign_key "mail_folder_users", "users"
   add_foreign_key "mail_folders", "mail_folders", column: "parent_id"

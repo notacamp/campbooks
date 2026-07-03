@@ -23,8 +23,8 @@ module Campbooks
       a(
         href: helpers.email_message_path(@message, **link_href_params),
         class: class_names(
-          "flex items-start gap-2.5 px-2.5 py-2 border-l-2 transition-colors",
-          @active ? "bg-accent-50/50 border-accent-500" : "border-transparent hover:bg-gray-50/70",
+          "flex items-start gap-2.5 mx-1.5 rounded-xl px-2.5 py-2 transition-colors",
+          @active ? "bg-subtle" : "hover:bg-muted",
           @attrs.delete(:class)
         ),
         data: { turbo_frame: "_top" },

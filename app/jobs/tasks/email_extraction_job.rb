@@ -19,24 +19,56 @@ module Tasks
 
       Current.workspace = workspace
 
-      body = ActionController::Base.helpers.strip_tags(email.body.to_s)
+      # Quote-stripped text: a reply is analysed for what the sender just wrote,
+      # not for asks buried in the quoted thread (which earlier messages already
+      # produced), and <style> CSS never crowds the model's context window.
+      body = Emails::PlainText.of(email.body)
       content = [ email.subject, email.ai_summary, body ].compact_blank.join("\n\n")
+
+      memory = task_learning_memory(workspace)
 
       items = Ai::TaskExtractor.new(
         source:      email,
         content:     content,
         anchor_date: (email.received_at || Time.current).to_date,
         time_zone:   Time.zone,
-        workspace:   workspace
+        workspace:   workspace,
+        known_tasks: known_thread_titles(email),
+        learning_memory: memory
       ).extract
 
+      # Fingerprint on the THREAD so the same ask restated in a follow-up message
+      # of one conversation dedupes instead of piling up a task per reply.
       tasks = Tasks::Builder.call(
-        workspace: workspace, source: email, raw_items: items, anchor_tz: Time.zone
+        workspace: workspace, source: email, raw_items: items, anchor_tz: Time.zone,
+        fingerprint_source: email.email_thread || email, learning_memory: memory
       )
 
       Feed::RefreshJob.enqueue_for_workspace(workspace) if tasks.any?
     ensure
       Current.workspace = nil
+    end
+
+    private
+
+    # Titles already tracked from this conversation (dismissed ones included, so a
+    # task the user waved off doesn't come back on the next reply) — handed to the
+    # extractor as an exclusion list against paraphrased re-extraction.
+    def known_thread_titles(email)
+      return [] unless email.email_thread_id
+
+      Task.where(source_type: "EmailMessage",
+                 source_id: EmailMessage.where(email_thread_id: email.email_thread_id).select(:id))
+          .order(created_at: :desc).limit(20).pluck(:title)
+    end
+
+    # One memory per run, shared by the extractor (soft prompt hint) and the builder
+    # (deterministic suppression). Best-effort: a failure here just means no learning.
+    def task_learning_memory(workspace)
+      Learning::Memory.new(source: Learning::Sources::Tasks.new(workspace))
+    rescue => e
+      Rails.logger.warn("[#{self.class.name}] learning_memory failed: #{e.message}")
+      nil
     end
   end
 end

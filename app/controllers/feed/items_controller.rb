@@ -14,7 +14,10 @@ module Feed
     # POST /feed/items/:id/act — perform the chosen action on the underlying record.
     def act
       result = perform_action
-      @item.mark_acted! if result[:success]
+      if result[:success]
+        @item.mark_acted!
+        record_tag_suggestion_learning(:accepted) if tag_suggestion_item?
+      end
 
       respond_to do |format|
         format.turbo_stream do
@@ -31,6 +34,7 @@ module Feed
     # POST /feed/items/:id/dismiss — hide just this card; the record is untouched.
     def dismiss
       @item.dismiss!
+      record_tag_suggestion_learning(:rejected) if tag_suggestion_item?
       respond_to do |format|
         format.turbo_stream do
           render turbo_stream: [
@@ -74,6 +78,33 @@ module Feed
       head :not_found
     end
 
+    def tag_suggestion_item?
+      @item.kind == "tag_suggestion" && @item.subject.is_a?(EmailMessage)
+    end
+
+    # Record the accept/reject so Feed::Sources::TagSuggestion learns to stop
+    # resurfacing a tag this user keeps rejecting from a sender. Signals are derived
+    # server-side from the (already user-scoped) email and the card's stored tag_name —
+    # never from request params. Best-effort: never breaks the feed action.
+    def record_tag_suggestion_learning(verdict)
+      email = @item.subject
+      tag_name = @item.data["tag_name"].to_s
+      return if email.nil? || tag_name.blank?
+
+      Learning::Recorder.record(
+        domain: "tag_suggestion",
+        user: current_user,
+        workspace_id: current_user.workspace_id,
+        label: verdict,
+        subject: email,
+        contact_id: email.contact_id,
+        sender_domain: Emails::SenderDomain.for(email.from_address),
+        signals: { "tag_name" => tag_name }
+      )
+    rescue => e
+      Rails.logger.warn("[Feed::ItemsController] tag-suggestion learning failed: #{e.class}: #{e.message}")
+    end
+
     def perform_action
       subject = @item.subject
       return failure(t("feed.items.gone")) if subject.nil?
@@ -107,8 +138,9 @@ module Feed
       end
     end
 
-    # Complete a task from the feed. The dismiss button clears the card without
-    # changing the task (the generic feed-dismiss path), so only "complete" is here.
+    # Act on a task from the feed: complete an active one, or triage an
+    # AI-suggested one (accept → todo, dismiss_task → cancelled — the suggestion
+    # itself is resolved, unlike the generic card-hiding feed dismiss).
     def run_task_action(task)
       return failure(t("feed.items.gone")) unless task.workspace_id == current_user.workspace_id
 
@@ -116,6 +148,12 @@ module Feed
       when "complete"
         task.move_to_status!(:done, by: current_user)
         { success: true, message: t("feed.items.task_completed", title: task.title) }
+      when "accept"
+        task.move_to_status!(:todo, by: current_user)
+        { success: true, message: t("feed.items.task_accepted", title: task.title) }
+      when "dismiss_task"
+        task.move_to_status!(:cancelled, by: current_user)
+        { success: true, message: t("feed.items.task_dismissed") }
       else
         failure(t("feed.items.unsupported"))
       end

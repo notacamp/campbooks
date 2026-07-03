@@ -270,6 +270,10 @@ Rails.application.routes.draw do
     resource :ai, only: [ :show ], controller: "ai" do
       post :switch_mode
     end
+    # Custom AI guidance per feature (task/document/reminder/email extraction).
+    # `edit`/`update` are keyed by the prompt purpose and power both this page and
+    # the per-resource "Customize AI" modal (loaded into the shared setup-modal).
+    resources :ai_prompts, only: [ :index, :edit, :update ], param: :purpose
     resource :data_privacy, only: [ :show, :update ], controller: "data_privacy"
     resource :account, only: [ :show, :update, :destroy ], controller: "account" do
       patch :language

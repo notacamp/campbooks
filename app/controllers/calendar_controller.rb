@@ -8,9 +8,10 @@ class CalendarController < ApplicationController
   AGENDA_LIMIT = 100 # how many upcoming events the agenda lists from the anchor date
 
   def index
-    @view = VIEWS.include?(params[:view]) ? params[:view] : "agenda"
+    @view = VIEWS.include?(params[:view]) ? params[:view] : "month"
     # Native apps only offer agenda/day (the week/month grids are too dense for a
-    # phone — see Calendar::ViewTabs); coerce a week/month deep link back to agenda.
+    # phone — see Calendar::ViewTabs); coerce a week/month deep link (incl. the
+    # default) back to agenda there.
     @view = "agenda" if hotwire_native_app? && %w[week month].include?(@view)
     @date = parse_date(params[:date]) || Date.current
     @has_calendars = Current.user.readable_calendar_accounts.active.exists?

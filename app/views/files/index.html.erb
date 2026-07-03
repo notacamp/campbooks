@@ -1,6 +1,7 @@
 <div data-controller="upload new-folder folder-edit doc-skim-overlay">
   <%= render Campbooks::PageHeader.new(title: @folder ? @folder.name : t(".title"), subtitle: @folder ? nil : t(".subtitle")) do |header| %>
     <% header.with_actions do %>
+      <%= render "shared/customize_ai_button", purpose: "document_analysis" %>
       <% if @needs_review_count.to_i > 0 %>
         <%# Opens the document Skim review queue (folded in from the old Documents page). %>
         <button type="button" data-action="click->doc-skim-overlay#open"
