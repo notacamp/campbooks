@@ -273,6 +273,7 @@ Rails.application.routes.draw do
     resource :data_privacy, only: [ :show, :update ], controller: "data_privacy"
     resource :account, only: [ :show, :update, :destroy ], controller: "account" do
       patch :language
+      patch :compose_preference
       patch :writing_style
       post :analyze_writing_style
       get :delete
@@ -472,6 +473,8 @@ Rails.application.routes.draw do
     collection do
       get :search
       post :send_new, to: "email_compose#send_message"
+      # New message in the Dock (no source message) — the compose_default=dock path.
+      post :compose_new, to: "email_compose#create"
       get :board, to: "email_messages/board#index"
       post :board_move, to: "email_messages/board#move"
     end

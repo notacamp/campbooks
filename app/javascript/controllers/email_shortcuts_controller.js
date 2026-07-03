@@ -199,8 +199,33 @@ export default class extends Controller {
     }
   }
 
+  // Honors the user's compose_default (body[data-compose-default]): the Desk
+  // navigates to the full page; the Dock opens the sheet in place.
   _compose() {
-    window.location = "/email_messages/new"
+    if (document.body.dataset.composeDefault === "dock") {
+      const csrfToken = document.querySelector("meta[name='csrf-token']")?.content
+      fetch("/email_messages/compose_new", {
+        method: "POST",
+        headers: {
+          "X-CSRF-Token": csrfToken,
+          "Accept": "text/vnd.turbo-stream.html",
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: "mode=new_message"
+      }).then(r => r.text()).then(html => {
+        if (html) Turbo.renderStreamMessage(html)
+      })
+    } else {
+      window.location = "/email_messages/new"
+    }
+  }
+
+  // Wired on the topbar Compose button so a click follows the same preference
+  // as the C shortcut.
+  composeClick(event) {
+    if (document.body.dataset.composeDefault !== "dock") return
+    event.preventDefault()
+    this._compose()
   }
 
   _showHelp() {

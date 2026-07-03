@@ -62,6 +62,8 @@ class User < ApplicationRecord
 
   attribute :role, :integer
   enum :role, { member: 0, admin: 1 }
+  # Where a brand-new email opens: the Desk (full page) or the Dock (sheet).
+  enum :compose_default, { desk: 0, dock: 1 }, prefix: :composes_in
 
   normalizes :email_address, with: ->(e) { e.strip.downcase }
 

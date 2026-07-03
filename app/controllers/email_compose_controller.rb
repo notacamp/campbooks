@@ -11,7 +11,7 @@ class EmailComposeController < ApplicationController
     end
 
     @mode = mode
-    prefill = Emails::ComposePrefill.for(message: @message, mode: mode)
+    prefill = @message ? Emails::ComposePrefill.for(message: @message, mode: mode) : blank_prefill
     @to_address = prefill.to
     @cc_address = prefill.cc
     @subject = prefill.subject
@@ -20,18 +20,18 @@ class EmailComposeController < ApplicationController
     # carried body — which may already hold the signature — pre-fills the
     # editor. Skip the default signature so it isn't appended twice.
     @prefill_body = params[:prefill_body].presence || params[:body].presence
-    @signature = @prefill_body.present? ? nil : Signature.default_for(Current.user, @message.email_account)
+    @signature = @prefill_body.present? ? nil : Signature.default_for(Current.user, @message&.email_account)
     @signatures = Current.user.signatures.ordered.includes(:email_accounts)
     # A mode switch carries the working draft along so autosave keeps updating
     # the same row instead of forking a second one.
     @draft = Current.user.draft_emails.find_by(id: params[:draft_email_id]) if params[:draft_email_id].present?
     # Decided behavior: Scout pre-drafts only when a suggestion is already
     # cached on the thread (never a surprise model call on open).
-    @scout_draft = cached_scout_draft if %w[reply reply_all].include?(mode) && @prefill_body.blank?
+    @scout_draft = cached_scout_draft if @message && %w[reply reply_all].include?(mode) && @prefill_body.blank?
 
     respond_to do |format|
       format.turbo_stream { render turbo_stream: dock_stream }
-      format.html { redirect_to email_message_path(@message) }
+      format.html { redirect_to(@message ? email_message_path(@message) : new_email_message_path) }
     end
   end
 
@@ -169,11 +169,15 @@ class EmailComposeController < ApplicationController
       quoted_body: @quoted_body.to_s,
       signatures: @signatures,
       signature_id: @signature&.id,
-      accounts: [],
+      accounts: @message ? [] : Current.user.sendable_email_accounts.to_a,
       attachment_entries: forward_attachment_entries,
       scout_draft: @scout_draft
     })
     streams
+  end
+
+  def blank_prefill
+    Emails::ComposePrefill::Result.new(to: "", cc: "", subject: "", quoted_body: "")
   end
 
   # The freshest non-outdated Scout draft on the thread (created by the
@@ -236,6 +240,9 @@ class EmailComposeController < ApplicationController
   end
 
   def load_message
+    # Collection routes have no source message: send_new (account id in params)
+    # and compose_new (a fresh Dock message via compose_default=dock).
+    return if params[:id].blank? && action_name == "create"
     return if params[:email_account_id].present? && action_name == "send_message"
 
     @message = Current.user.readable_email_accounts
@@ -357,5 +364,4 @@ class EmailComposeController < ApplicationController
       format.html { redirect_to email_message_path(@message), success: t(".sent") }
     end
   end
-
 end

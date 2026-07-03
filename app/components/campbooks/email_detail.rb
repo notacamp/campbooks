@@ -308,10 +308,10 @@ module Campbooks
       end
     end
 
-    # A Gmail-style reply/forward control: a small POST form that asks the compose
-    # controller to inject Campbooks::ComposeArea into the drawer's compose slot.
+    # A reply/forward control: a small POST form that asks the compose
+    # controller to open the Dock (bottom-sheet composer) for this message.
     def compose_button(mode, label, icon_svg, primary:)
-      form(action: helpers.compose_email_message_path(@message, mode: mode, compose_target: "drawer_compose_target"),
+      form(action: helpers.compose_email_message_path(@message, mode: mode),
            method: "post", class: "inline-flex") do
         input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
         button(

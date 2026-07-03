@@ -16,6 +16,35 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Composing is its own room now.** Replying pulls up the **Dock** — a bottom
+  sheet over your inbox — instead of a form wedged into the thread. Recipients
+  and subject collapse to one line when they're already right, the quoted
+  thread tucks behind a small pill until you need it, and formatting appears
+  when you select text instead of a toolbar you never asked for. Reply,
+  reply-all and forward are one switcher — flip modes without losing what you
+  typed, and forwards carry the original attachments as removable chips.
+- **A new email gets the whole screen.** The compose page (the **Desk**) drops
+  the folder rail and message list for one centered writing surface — subject
+  set like a title, an open canvas, and Scout waiting in a side rail. Pick
+  where new emails open (full page or bottom sheet) in **Settings → Account**.
+- **Drafts save themselves.** Everything you type autosaves; minimize the
+  composer to a small pill that survives navigating anywhere in the app, and
+  resume exactly where you left off — or expand a reply from the sheet to the
+  full page with everything carried over. Sending or discarding cleans the
+  draft up.
+- **Replies can start answered.** When Scout has already suggested a reply for
+  a thread, the composer opens with that draft as a glass "ghost" block — use
+  it as-is, ask for a shorter/warmer/firmer take, or start blank. The spark
+  button asks Scout on demand.
+
+### Fixed
+
+- The **r / a / f keyboard shortcuts and command-palette email actions** were
+  silently broken on message pages (a leftover numeric-id assumption truncated
+  UUID ids); they now target the right email again.
+
 ## [0.7.0] - 2026-06-30
 
 ### Added

@@ -84,36 +84,17 @@ fr:
       all: Tous
       new_folder: Nouveau dossier
     new:
-      all_folder_label: Tous
-      bcc_label: 'Cci :'
-      bcc_placeholder: Ajouter en Cci...
-      bcc_toggle_label: Cci
-      cc_label: 'Cc :'
-      cc_placeholder: Ajouter en Cc...
       close_scout_aria: Fermer Scout
-      collapse_sidebar_aria: Réduire la barre latérale
-      expand_sidebar_aria: Développer la barre latérale
-      folders_heading: Dossiers
-      from_label: 'De :'
-      inbox_heading: Boîte de réception
-      inbox_settings_aria: Paramètres de la boîte de réception
-      new_message_heading: Nouveau message
-      no_emails_yet: Aucun e-mail pour l'instant.
+      heading_forward: Transférer
+      heading_new_message: Nouveau message
+      heading_reply: Répondre
+      heading_reply_all: Répondre à tous
       no_sendable_accounts_description: Vous avez besoin d'un compte e-mail avec la
         permission d'envoi pour rédiger de nouveaux messages.
       no_sendable_accounts_title: Aucun compte d'envoi
-      no_signature_option: Sans signature
       scout_keyboard_hint: Cmd+Shift+E pour manuel
       scout_label: Scout
-      signature_default_suffix: "(par défaut)"
-      signature_label: 'Sig. :'
-      signature_preview_heading: Signature
-      subject_label: 'Objet :'
-      subject_placeholder: Objet
-      to_label: 'À :'
-      to_placeholder: Rechercher des contacts ou saisir un e-mail...
       toggle_chat_aria: Afficher/masquer le chat
-      write_message_placeholder: Rédigez votre message...
     reply_actions:
       forward_title: Transférer
       reply_all_title: Répondre à tous

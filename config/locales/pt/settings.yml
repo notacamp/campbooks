@@ -73,6 +73,9 @@ pt:
         deletion_scheduled: A sua conta está a ser eliminada. A sua sessão foi terminada.
         wrong_email: O endereço de e-mail não corresponde.
         wrong_password: A palavra-passe atual está incorreta.
+      compose_preference:
+        failed: Não foi possível atualizar a preferência de composição. Tente novamente.
+        updated: Preferência de composição atualizada.
       language:
         failed: Não foi possível atualizar o idioma. Tente novamente.
         updated: Idioma atualizado.
@@ -89,10 +92,15 @@ pt:
         data_export_title: Os seus dados
         delete_account_button: Eliminar conta
         language_subtitle: Escolha o idioma da interface do Campbooks.
+        compose_desk: Página inteira — a escrita ocupa o ecrã todo
+        compose_dock: Painel inferior — componha sobre a caixa de entrada
+        compose_subtitle: Onde abre um novo email (atalho C, botão Compor e paleta de comandos).
+        compose_title: Novos emails abrem em
         language_title: Idioma
         new_password: Nova palavra-passe
         privacy_policy: Política de Privacidade
         save_language: Guardar
+        save_compose: Guardar
         subtitle: Gira a sua palavra-passe e as preferências da conta.
         terms_of_service: Termos de Serviço
         title: Definições da conta

@@ -20,7 +20,8 @@
         data-command-palette-subject-value="<%= content_for?(:cp_subject) ? yield(:cp_subject) : '' %>"
         data-command-palette-commands-value="<%= command_palette_catalog_json %>"
         data-email-shortcuts-message-id-value="<%= content_for?(:shortcuts_message_id) ? yield(:shortcuts_message_id) : '' %>"
-        data-email-shortcuts-context-value="<%= content_for?(:shortcuts_context) ? yield(:shortcuts_context) : '' %>">
+        data-email-shortcuts-context-value="<%= content_for?(:shortcuts_context) ? yield(:shortcuts_context) : '' %>"
+        data-compose-default="<%= Current.user&.compose_default %>">
     <% if authenticated? %>
       <%= render(Campbooks::NavRail.new) %>
     <% end %>
