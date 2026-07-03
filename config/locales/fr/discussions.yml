@@ -2,6 +2,8 @@
 fr:
   discussions:
     scout:
-      calendar_event_created: "📅 J'ai ajouté **[%{title}](%{url})** à ton calendrier — %{at}."
-      reminder_found: "🔔 J'ai repéré un rappel potentiel dans cet e-mail. Tu veux que je l'ajoute à ton calendrier ?"
+      calendar_event_created: "📅 J'ai ajouté **[%{title}](%{url})** à ton
+        calendrier — %{at}."
+      reminder_found: "🔔 J'ai repéré un rappel potentiel dans cet e-mail.
+        Tu veux que je l'ajoute à ton calendrier ?"
       reminder_line: "**[%{title}](%{url})** — échéance %{due}"

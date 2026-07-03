@@ -2,6 +2,7 @@
 pt:
   components:
     product_tour:
+      ai_tag: IA
       aria_label: Visita guiada
       back: Voltar
       next: Seguinte
@@ -63,6 +64,5 @@ pt:
       s6_cta_connect: Ligar a sua caixa de entrada
       s6_cta_explore: Explorar por minha conta
       s6_title: Está tudo pronto
-      scout_says: Scout
       skip: Ignorar visita
       step: "%{current} de %{total}"

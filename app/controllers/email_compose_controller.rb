@@ -11,20 +11,27 @@ class EmailComposeController < ApplicationController
     end
 
     @mode = mode
-    @to_address = build_to_address(mode)
-    @cc_address = build_cc_address(mode)
-    @subject = build_subject(mode)
-    @quoted_body = build_quoted_body(mode)
-    # When opened from a Scout draft ("Edit in composer"), the draft body — which
-    # already carries the signature — pre-fills the editor. Skip the default
-    # signature so it isn't appended twice.
+    prefill = @message ? Emails::ComposePrefill.for(message: @message, mode: mode) : blank_prefill
+    @to_address = prefill.to
+    @cc_address = prefill.cc
+    @subject = prefill.subject
+    @quoted_body = prefill.quoted_body
+    # When opened from a Scout draft ("Edit in composer") or a mode switch, the
+    # carried body — which may already hold the signature — pre-fills the
+    # editor. Skip the default signature so it isn't appended twice.
     @prefill_body = params[:prefill_body].presence || params[:body].presence
-    @signature = @prefill_body.present? ? nil : Signature.default_for(Current.user, @message.email_account)
+    @signature = @prefill_body.present? ? nil : Signature.default_for(Current.user, @message&.email_account)
     @signatures = Current.user.signatures.ordered.includes(:email_accounts)
+    # A mode switch carries the working draft along so autosave keeps updating
+    # the same row instead of forking a second one.
+    @draft = Current.user.draft_emails.find_by(id: params[:draft_email_id]) if params[:draft_email_id].present?
+    # Decided behavior: Scout pre-drafts only when a suggestion is already
+    # cached on the thread (never a surprise model call on open).
+    @scout_draft = cached_scout_draft if @message && %w[reply reply_all].include?(mode) && @prefill_body.blank?
 
     respond_to do |format|
-      format.turbo_stream { render turbo_stream: compose_area_stream }
-      format.html { redirect_to email_message_path(@message) }
+      format.turbo_stream { render turbo_stream: dock_stream }
+      format.html { redirect_to(@message ? email_message_path(@message) : new_email_message_path) }
     end
   end
 
@@ -58,6 +65,8 @@ class EmailComposeController < ApplicationController
     )
 
     return error_response(error_message_for(result)) unless result.ok?
+
+    consume_draft
 
     if @message
       remove_compose_area
@@ -104,6 +113,8 @@ class EmailComposeController < ApplicationController
 
     return error_response(t(".schedule_failed")) unless scheduled.save
 
+    consume_draft
+
     next_at = scheduled.rrule.present? ? ScheduleCalculator.next_occurrence(scheduled.scheduled_at, scheduled.rrule) : scheduled.scheduled_at
     scheduled.update_columns(next_occurrence_at: next_at)
 
@@ -139,34 +150,62 @@ class EmailComposeController < ApplicationController
     {}
   end
 
-  # The composer goes to a different target per surface. The bottom-right drawer
-  # replaces its OWN slot (a distinct id, because the full page's
-  # thread_compose_target is also in the DOM in List/Board layout); the full inbox
-  # prepends above the thread as before.
-  def compose_area_stream
-    locals = {
-      email_message: @message,
-      mode: @mode.to_sym,
-      to_address: @to_address,
-      cc_address: @cc_address,
-      subject: @subject,
-      quoted_body: @quoted_body,
-      prefill_body: @prefill_body,
-      signature_content: @signature&.content,
-      current_signature_id: @signature&.id,
-      signatures: @signatures
-    }
-
+  # Every compose entry — reply buttons, r/a/f shortcuts, the drawer, Scout,
+  # mode switches — opens the same Dock (bottom sheet) via the layout's
+  # #compose_dock slot.
+  def dock_stream
     streams = []
-    # "Edit in composer" from a draft that's a sibling of the compose slot
-    # (detail / discussion) passes the card's dom id to clean up.
+    # "Edit in composer" from a Scout draft card passes the card's dom id to clean up.
     streams << turbo_stream.remove(params[:remove_draft]) if params[:remove_draft].present?
-    streams << if params[:compose_target] == "drawer_compose_target"
-      turbo_stream.update("drawer_compose_target", partial: "email_compose/compose_area", locals: locals)
-    else
-      turbo_stream.prepend("thread_compose_target", partial: "email_compose/compose_area", locals: locals)
-    end
+    streams << turbo_stream.update("compose_dock", partial: "email_compose/dock", locals: {
+      mode: @mode.to_sym,
+      message: @message,
+      draft: @draft,
+      to: @to_address.to_s,
+      cc: @cc_address.to_s,
+      bcc: "",
+      subject: @subject.to_s,
+      body: @prefill_body.to_s,
+      quoted_body: @quoted_body.to_s,
+      signatures: @signatures,
+      signature_id: @signature&.id,
+      accounts: @message ? [] : Current.user.sendable_email_accounts.to_a,
+      attachment_entries: forward_attachment_entries,
+      scout_draft: @scout_draft
+    })
     streams
+  end
+
+  def blank_prefill
+    Emails::ComposePrefill::Result.new(to: "", cc: "", subject: "", quoted_body: "")
+  end
+
+  # The freshest non-outdated Scout draft on the thread (created by the
+  # suggest-reply tools). Question prompts also live as draft messages but
+  # carry ai_suggested_actions — excluded so they never ghost into the canvas.
+  def cached_scout_draft
+    agent_thread = @message.email_thread&.agent_thread
+    agent_thread&.agent_messages
+                &.where(draft: true, outdated: false, author_type: :ai)
+                &.where("ai_suggested_actions = '[]'::jsonb") # a hash [] compiles to an empty IN, not jsonb equality
+                &.order(created_at: :desc)&.first&.content
+  end
+
+  # Forwarding carries the original files along as removable chips (their
+  # signed ids resolve at send; ownership check accepts the source message's
+  # own blobs — see collected_attachments).
+  def forward_attachment_entries
+    return [] unless @mode == "forward"
+
+    Emails::ComposePrefill.forward_attachment_entries(@message)
+  end
+
+  # A successful send (or schedule) consumes the autosaved draft it was written
+  # in, so the pill never resurrects an email that already went out.
+  def consume_draft
+    return if params[:draft_email_id].blank?
+
+    Current.user.draft_emails.find_by(id: params[:draft_email_id])&.destroy
   end
 
   # The message's own account — but only when the user may send from it. Read
@@ -201,6 +240,9 @@ class EmailComposeController < ApplicationController
   end
 
   def load_message
+    # Collection routes have no source message: send_new (account id in params)
+    # and compose_new (a fresh Dock message via compose_default=dock).
+    return if params[:id].blank? && action_name == "create"
     return if params[:email_account_id].present? && action_name == "send_message"
 
     @message = Current.user.readable_email_accounts
@@ -215,11 +257,19 @@ class EmailComposeController < ApplicationController
   def compose_params
     {
       subject: params[:subject],
-      body: params[:body],
+      body: merged_body,
       to_address: params[:to_address],
       cc_address: params[:cc_address].presence,
       bcc_address: params[:bcc_address].presence
     }
+  end
+
+  # The new composer keeps the quoted thread OUT of the editor (a collapsed
+  # pill + hidden quoted_body field) unless the user expands it. Sends merge it
+  # back in, preserving the classic body-then-quote order; the legacy inline
+  # form simply never posts quoted_body.
+  def merged_body
+    [ params[:body], params[:quoted_body] ].select(&:present?).join
   end
 
   # Resolve the signed blob ids submitted by the attachment tray into the
@@ -230,10 +280,10 @@ class EmailComposeController < ApplicationController
     ids = Array(params[:attachments]).reject(&:blank?)
     return [] if ids.empty?
 
-    owned_blob_ids = Current.user.outbound_attachments.blobs.pluck(:id).to_set
+    allowed = allowed_blob_ids
     ids.filter_map do |signed_id|
       blob = ActiveStorage::Blob.find_signed(signed_id)
-      next unless blob && owned_blob_ids.include?(blob.id)
+      next unless blob && allowed.include?(blob.id)
       { filename: blob.filename.to_s, content_type: blob.content_type, data: blob.download }
     end
   rescue => e
@@ -245,14 +295,24 @@ class EmailComposeController < ApplicationController
   def owned_attachment_ids
     ids = Array(params[:attachments]).reject(&:blank?)
     return [] if ids.empty?
-    owned_blob_ids = Current.user.outbound_attachments.blobs.pluck(:id).to_set
+    allowed = allowed_blob_ids
     ids.select do |signed_id|
       blob = ActiveStorage::Blob.find_signed(signed_id)
-      blob and owned_blob_ids.include?(blob.id)
+      blob and allowed.include?(blob.id)
     end
   rescue => e
     Rails.logger.error("[EmailCompose] attachment id resolution failed: " + e.message.to_s)
     []
+  end
+
+  # A submitted signed id must be the user's own upload — or, when replying on
+  # a thread, one of the source message's own files (that's how a forward
+  # carries the originals). @message is permission-checked in load_message, so
+  # this never widens access beyond mail the user can already read.
+  def allowed_blob_ids
+    allowed = Current.user.outbound_attachments.blobs.pluck(:id).to_set
+    allowed.merge(@message.files.blobs.pluck(:id)) if @message&.files&.attached?
+    allowed
   end
 
   def extract_draft_id(result)
@@ -290,97 +350,18 @@ class EmailComposeController < ApplicationController
     end
   end
 
+  # After a successful thread send: drop the Dock and confirm. (Also clears any
+  # legacy inline compose area still in the DOM.)
   def remove_compose_area
     respond_to do |format|
       format.turbo_stream do
-        render turbo_stream: turbo_stream.remove("compose_area_#{@message.id}")
+        render turbo_stream: [
+          turbo_stream.update("compose_dock", ""),
+          turbo_stream.remove("compose_area_#{@message.id}"),
+          notify_stream(t(".sent_toast"), severity: :success)
+        ]
       end
       format.html { redirect_to email_message_path(@message), success: t(".sent") }
     end
-  end
-
-  def build_to_address(mode)
-    case mode
-    when "reply" then @message.from_address.to_s
-    when "reply_all"
-      recipients = []
-      recipients << @message.from_address.to_s if @message.from_address.present?
-      recipients.concat(parse_addresses(@message.to_address))
-      recipients.reject! { |a| own_address?(a) }
-      recipients.uniq.join(", ")
-    when "forward", "new_message" then ""
-    end
-  end
-
-  def build_cc_address(mode)
-    case mode
-    when "reply_all"
-      cc_list = parse_addresses(@message.cc_address || "")
-      cc_list.reject! { |a| own_address?(a) }
-      cc_list.uniq.join(", ")
-    when "reply", "forward", "new_message" then ""
-    end
-  end
-
-  def build_subject(mode)
-    case mode
-    when "new_message" then ""
-    when "forward"
-      subject = @message.subject.to_s
-      subject.match?(/^Fwd:\s*/i) ? subject : "Fwd: #{subject}"
-    else
-      subject = @message.subject.to_s
-      subject.match?(/^Re:\s*/i) ? subject : "Re: #{subject}"
-    end
-  end
-
-  def build_quoted_body(mode)
-    return "" if mode == "new_message"
-
-    from = @message.from_address || "Unknown"
-    date = @message.received_at&.strftime("%b %d, %Y at %H:%M") || "Unknown date"
-    body_html = @message.body.presence || @message.summary.presence || "(no content)"
-
-    if mode == "forward"
-      <<~HTML
-        <br><br>
-        <p style="font-size: 12px; color: #9ca3af;">
-          ---------- Forwarded message ----------<br>
-          <b>From:</b> #{ERB::Util.html_escape(from)}<br>
-          <b>Date:</b> #{date}<br>
-          <b>Subject:</b> #{ERB::Util.html_escape(@message.subject || "")}<br>
-          <b>To:</b> #{ERB::Util.html_escape(@message.to_address || "")}
-        </p>
-        <br>
-        #{body_html}
-      HTML
-    else
-      <<~HTML
-        <br><br>
-        <blockquote style="border-left: 2px solid #d1d5db; padding-left: 8px; margin-left: 0; color: #6b7280;">
-          <p style="font-size: 12px; color: #9ca3af;">
-            On #{date}, #{ERB::Util.html_escape(from)} wrote:
-          </p>
-          #{body_html}
-        </blockquote>
-      HTML
-    end
-  end
-
-  def parse_addresses(str)
-    return [] if str.blank?
-    str.split(",").map(&:strip).select(&:present?)
-  end
-
-  # An address belongs to the sending account when its email part matches the
-  # account address. Compare the bare email so a "Display Name <addr>" form still
-  # gets dropped from reply-all — otherwise the user ends up emailing themselves.
-  def own_address?(addr)
-    bare_email(addr) == bare_email(@message.email_account.email_address)
-  end
-
-  def bare_email(addr)
-    str = addr.to_s
-    (str[/<([^>]+)>/, 1] || str).strip.downcase
   end
 end

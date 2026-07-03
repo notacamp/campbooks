@@ -1,42 +1,42 @@
 ---
 fr:
-  settings:
-    pipelines:
-      index:
-        heading: Pipelines
-        subtitle: Créez des workflows personnalisés pour suivre des documents à travers
-          des étapes.
-        new_pipeline: Nouveau pipeline
-        view_board: Voir le tableau
-        confirm_delete: Supprimer ce pipeline ? Toutes les associations seront supprimées.
-        empty_title: Aucun pipeline pour l'instant
-        empty_description: Créez un pipeline pour suivre des documents ou des e-mails
-          à travers des étapes personnalisées, comme un tableau kanban.
-        create_first: Créez votre premier pipeline
-      new:
-        heading: Nouveau pipeline
-        subtitle: Définissez les étapes par lesquelles vos documents vont passer.
-      edit:
-        heading: Modifier le pipeline
-        subtitle: Modifiez les étapes ou les paramètres du pipeline.
-      create:
-        created: Pipeline créé.
-      update:
-        updated: Pipeline mis à jour.
-      destroy:
-        deleted: Pipeline supprimé.
-      form:
-        name_placeholder: 'ex. : Validation des factures'
-        description_placeholder: Ce que ce pipeline suit
-        applies_to_options:
-          documents: Documents
-          emails: E-mails
-          both: Les deux
-        stages_heading: Étapes
-        add_stage: Ajouter une étape
-        stages_hint: Faites glisser pour réorganiser les étapes. Les éléments dans
-          les étapes terminales ne peuvent pas être déplacés.
   navigation:
     settings:
       items:
         pipelines: Pipelines
+  settings:
+    pipelines:
+      create:
+        created: Pipeline créé.
+      destroy:
+        deleted: Pipeline supprimé.
+      edit:
+        heading: Modifier le pipeline
+        subtitle: Modifiez les étapes ou les paramètres du pipeline.
+      form:
+        add_stage: Ajouter une étape
+        applies_to_options:
+          both: Les deux
+          documents: Documents
+          emails: E-mails
+        description_placeholder: Ce que ce pipeline suit
+        name_placeholder: 'ex. : Validation des factures'
+        stages_heading: Étapes
+        stages_hint: Faites glisser pour réorganiser les étapes. Les éléments dans
+          les étapes terminales ne peuvent pas être déplacés.
+      index:
+        confirm_delete: Supprimer ce pipeline ? Toutes les associations seront supprimées.
+        create_first: Créez votre premier pipeline
+        empty_description: Créez un pipeline pour suivre des documents ou des e-mails
+          à travers des étapes personnalisées, comme un tableau kanban.
+        empty_title: Aucun pipeline pour l'instant
+        heading: Pipelines
+        new_pipeline: Nouveau pipeline
+        subtitle: Créez des workflows personnalisés pour suivre des documents à travers
+          des étapes.
+        view_board: Voir le tableau
+      new:
+        heading: Nouveau pipeline
+        subtitle: Définissez les étapes par lesquelles vos documents vont passer.
+      update:
+        updated: Pipeline mis à jour.

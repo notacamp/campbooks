@@ -53,18 +53,52 @@ pt:
       more: Ler mais
     code_block:
       empty: "(vazio)"
+    connect_provider_card:
+      google:
+        description: Gmail e Google Workspace
+        label: Google
+      microsoft:
+        description: Outlook e Microsoft 365
+        label: Microsoft 365
+      zoho:
+        description: Caixas Zoho Mail
+        label: Zoho Mail
     email_html_preview:
       frame_title: Pré-visualização do email
+    first_sync_stage:
+      counter_found: encontrados
+      counter_needs_you: precisam de si
+      counter_sorted: organizados
+      cta_done: Mostrar o que importa
+      error_cta: Verificar a ligação da conta
+      error_title: O Scout não conseguiu aceder à sua caixa
+      escape: Ver a caixa de entrada a encher
+      subtitle_done: "%{needs_you} coisas aguardam por si. Todo o resto está organizado
+        e fora do caminho."
+      subtitle_done_calm: Nada aguarda por si neste momento. Está tudo organizado
+        e fora do caminho.
+      subtitle_empty: Esta caixa de correio começa limpa. O novo correio será lido
+        e organizado assim que chegar.
+      subtitle_error: A primeira sincronização não foi concluída. Voltar a ligar a
+        conta costuma resolver.
+      subtitle_scanning: A organizar tudo à medida que chega. Costuma demorar um ou
+        dois minutos.
+      subtitle_waiting: Ligado. A contactar a sua caixa de correio.
+      title_done: A sua caixa de entrada está organizada
+      title_empty: Está a começar do zero
+      title_error: A primeira sincronização teve um percalço
+      title_scanning: O Scout está a ler a sua caixa de entrada
     folder_pane:
       collapse: Recolher
       expand: Expandir
       folders: Pastas
       new_folder: Nova pasta
     folder_pane_custom_folders:
-      delete_confirm: 'Remover a pasta %{name}? Os seus emails e as pastas do fornecedor não são afetados.'
+      delete_confirm: Remover a pasta %{name}? Os seus emails e as pastas do fornecedor
+        não são afetados.
       document_count:
-        one: '%{count} documento'
-        other: '%{count} documentos'
+        one: "%{count} documento"
+        other: "%{count} documentos"
       edit_title: Definições da pasta
       icon_label: Ícone da pasta
       move_label: Mover para

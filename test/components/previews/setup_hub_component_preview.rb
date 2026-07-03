@@ -1,5 +1,12 @@
 class SetupHubComponentPreview < ViewComponent::Preview
-  ITEMS = SetupStatus::ITEMS
+  # Localized-shape items (SetupStatus#all_items) without needing a workspace.
+  ITEMS = SetupStatus::ITEMS.map do |item|
+    item.merge(
+      message: I18n.t("setup_status.items.#{item[:key]}.message"),
+      description: I18n.t("setup_status.items.#{item[:key]}.description"),
+      cta_text: I18n.t("setup_status.items.#{item[:key]}.cta")
+    )
+  end
 
   # Fresh workspace — nothing done yet.
   def all_incomplete
@@ -30,7 +37,7 @@ class SetupHubComponentPreview < ViewComponent::Preview
     )
   end
 
-  # A dismissed task is hidden; completed ones still show as done.
+  # A dismissed task is hidden; completed ones leave the list.
   def with_dismissed
     render Campbooks::SetupHub.new(
       items: ITEMS,

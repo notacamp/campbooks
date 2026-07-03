@@ -9,6 +9,7 @@ class Workspace < ApplicationRecord
   has_many :tags, dependent: :restrict_with_error
   has_many :ai_adapters, dependent: :destroy
   has_many :ai_configurations, dependent: :destroy
+  has_many :ai_prompts, dependent: :destroy
   has_many :notion_integrations, dependent: :destroy
   has_many :google_drive_accounts, dependent: :destroy
   has_many :zoho_drive_accounts, dependent: :destroy
@@ -29,6 +30,7 @@ class Workspace < ApplicationRecord
   has_many :tasks, dependent: :destroy
   has_many :mail_folders, dependent: :destroy
   has_many :scheduled_emails, dependent: :restrict_with_error
+  has_many :draft_emails, dependent: :destroy
 
   has_many :invitations, dependent: :destroy
 

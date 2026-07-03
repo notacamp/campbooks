@@ -6,12 +6,15 @@ es:
   settings:
     data_privacy:
       show:
-        residency_heading: "Residencia de datos"
-        residency_desc: "Restringe en qué región pueden procesar tus datos los proveedores de IA."
-        residency_eu_label: "Exigir residencia de datos en la UE"
-        residency_eu_hint: "Solo se pueden usar proveedores de IA de la región de la UE. La IA
-          de texto permanece en la UE (Mistral). Como todavía no hay un proveedor de la UE para
-          la IA de documentos o la búsqueda semántica, esas funciones se pausan mientras esto esté activado."
-        residency_paused_note: "La residencia de datos en la UE está activada. La IA de documentos
-          y la búsqueda semántica están en pausa porque aún no tienen un proveedor de la UE; la IA de texto continúa en un proveedor de la UE."
-        paused_badge: "En pausa"
+        paused_badge: En pausa
+        residency_desc: Restringe en qué región pueden procesar tus datos los proveedores
+          de IA.
+        residency_eu_hint: Solo se pueden usar proveedores de IA de la región de la
+          UE. La IA de texto permanece en la UE (Mistral). Como todavía no hay un
+          proveedor de la UE para la IA de documentos o la búsqueda semántica, esas
+          funciones se pausan mientras esto esté activado.
+        residency_eu_label: Exigir residencia de datos en la UE
+        residency_heading: Residencia de datos
+        residency_paused_note: La residencia de datos en la UE está activada. La IA
+          de documentos y la búsqueda semántica están en pausa porque aún no tienen
+          un proveedor de la UE; la IA de texto continúa en un proveedor de la UE.

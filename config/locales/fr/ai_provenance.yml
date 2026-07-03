@@ -2,4 +2,4 @@
 fr:
   components:
     ai_provenance_note:
-      processed_by: "Traité par %{provider}"
+      processed_by: Traité par %{provider}

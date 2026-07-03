@@ -50,13 +50,13 @@ pt:
       over_limit: Atingiu o limite do seu plano para %{feature}. Faça upgrade para
         obter mais.
     features:
-      organizations: Organizações
       ai_model_access: Modelos de IA
       document_templates: Modelos de documentos
       email_accounts: Contas de email
       emails_synced: Emails sincronizados
       managed_ai: Campbooks AI
       notifications: Notificações
+      organizations: Organizações
       pipelines: Pipelines
       scout: Scout
       tasks: Tarefas

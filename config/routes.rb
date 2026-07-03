@@ -50,6 +50,7 @@ Rails.application.routes.draw do
       post :snooze
       post :suggest_document_types
       post :suggest_tags
+      get :first_sync_status
     end
   end
 
@@ -270,9 +271,14 @@ Rails.application.routes.draw do
     resource :ai, only: [ :show ], controller: "ai" do
       post :switch_mode
     end
+    # Custom AI guidance per feature (task/document/reminder/email extraction).
+    # `edit`/`update` are keyed by the prompt purpose and power both this page and
+    # the per-resource "Customize AI" modal (loaded into the shared setup-modal).
+    resources :ai_prompts, only: [ :index, :edit, :update ], param: :purpose
     resource :data_privacy, only: [ :show, :update ], controller: "data_privacy"
     resource :account, only: [ :show, :update, :destroy ], controller: "account" do
       patch :language
+      patch :compose_preference
       patch :writing_style
       post :analyze_writing_style
       get :delete
@@ -464,10 +470,16 @@ Rails.application.routes.draw do
   # blob id the compose form carries; resolved + attached to the mail at send.
   post "compose_attachments", to: "compose_attachments#create", as: :compose_attachments
 
+  # Composer draft autosave (Dock + Desk). JSON create/update/destroy from the
+  # compose-autosave controller; :show re-opens a parked draft in the Dock.
+  resources :draft_emails, only: [ :show, :create, :update, :destroy ]
+
   resources :email_messages, only: [ :index, :show ] do
     collection do
       get :search
       post :send_new, to: "email_compose#send_message"
+      # New message in the Dock (no source message) — the compose_default=dock path.
+      post :compose_new, to: "email_compose#create"
       get :board, to: "email_messages/board#index"
       post :board_move, to: "email_messages/board#move"
     end

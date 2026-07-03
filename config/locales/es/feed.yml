@@ -44,15 +44,6 @@ es:
         overdue: Vencido
         today: Hoy
         tomorrow: Mañana
-      task_card:
-        complete: Completar
-        dismiss: Descartar
-        in_days:
-          one: Entrega en %{count} día
-          other: Entrega en %{count} días
-        overdue: Atrasada
-        today: Entrega hoy
-        tomorrow: Entrega mañana
       reply_reminder_card:
         aged:
           one: "%{count} día, sin respuesta"
@@ -63,10 +54,10 @@ es:
       shared:
         kbd_navigate: Navegar
         many_participants: "%{names} y %{count} más"
-        two_participants: "%{first} y %{second}"
         no_subject: "(sin asunto)"
         priority: Prioridad
         scout_read: lo leí hace un momento
+        two_participants: "%{first} y %{second}"
         unknown_sender: Remitente desconocido
         working: Procesando…
         yesterday: Ayer
@@ -81,6 +72,17 @@ es:
         not_now: Ahora no
         prefix: Etiquetar
         under: como
+      task_card:
+        accept: Añadir a tareas
+        complete: Completar
+        dismiss: Descartar
+        in_days:
+          one: Entrega en %{count} día
+          other: Entrega en %{count} días
+        overdue: Atrasada
+        suggested: Tarea sugerida
+        today: Entrega hoy
+        tomorrow: Entrega mañana
     time_of_day_greeting:
       greeting:
         afternoon: Buenas tardes, %{name}.
@@ -97,7 +99,9 @@ es:
         para sincronizar automáticamente.
       reminder_dismissed: Recordatorio descartado.
       restored: Restaurado.
-      task_completed: "Tarea completada: %{title}"
+      task_accepted: 'Añadida a tus tareas: %{title}'
+      task_completed: 'Tarea completada: %{title}'
+      task_dismissed: Sugerencia descartada.
       unsupported: Esa acción no es compatible aquí.
   home:
     index:
@@ -105,6 +109,7 @@ es:
       connect_body: Scout lee y ordena tu correo antes de que llegues. Conecta una
         bandeja y tu feed cobra vida.
       connect_cta: Conectar bandeja
+      connect_demo: Véalo primero en acción
       connect_title: Conecta tu bandeja de entrada para empezar
       disconnected_body: 'Scout no puede acceder a tu bandeja ahora mismo: vuelve
         a conectarla para que tu feed cobre vida de nuevo.'
@@ -130,6 +135,7 @@ es:
       scout_coach_title: Conoce a Scout
       subtitle:
         clear: Todo al día — Scout vigila para que siga así.
+        fresh: Conecte un buzón abajo y haré la primera pasada.
         lots: "%{n} cosas te necesitan. Scout las apiló para que hojees sin agobios."
         single: Solo una cosa te necesita — Scout archivó el resto.
         some: "%{n} cosas te necesitan — Scout las apiló. Un hojeo rápido y listo."

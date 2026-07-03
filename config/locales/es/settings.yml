@@ -1,53 +1,13 @@
 ---
 es:
   settings:
-    api_clients:
-      index:
-        title: Acceso a la API
-        subtitle: Crea clientes OAuth para acceder a tus datos de Campbooks desde tus propias apps y scripts.
-        new_client: Nuevo cliente
-        read_docs: Ver la documentación de la API
-        col_name: Nombre
-        col_client_id: ID de cliente
-        col_scopes: Permisos
-        col_created: Creado
-        regenerate: Regenerar secreto
-        regenerate_confirm: ¿Regenerar el secreto de este cliente? El secreto actual dejará de funcionar de inmediato.
-        revoke: Revocar tokens
-        revoke_confirm: ¿Revocar todos los tokens activos de este cliente? Las apps que lo usan necesitarán un nuevo token.
-        delete: Eliminar
-        delete_confirm: ¿Eliminar el cliente "%{name}"? Esta acción no se puede deshacer.
-        no_clients_title: Aún no hay clientes de API
-        no_clients_desc: Crea un cliente para obtener un ID y un secreto para la API de Campbooks.
-      new:
-        title: Nuevo cliente de API
-        subtitle: Dale un nombre al cliente y elige a qué puede acceder.
-        name_label: Nombre
-        name_placeholder: p. ej. Sincronización de facturación
-        name_hint: Una etiqueta para reconocer este cliente más adelante.
-        scopes_label: Permisos
-        scopes_hint: Concede solo el acceso que este cliente necesita.
-        create: Crear cliente
-        cancel: Cancelar
-      reveal:
-        title: Cliente creado
-        subtitle: Copia ahora el secreto de "%{name}".
-        warning: Esta es la única vez que se muestra el secreto del cliente. Guárdalo en un lugar seguro — puedes regenerarlo más tarde si lo pierdes.
-        client_id_label: ID de cliente
-        client_secret_label: Secreto de cliente
-        copy: Copiar
-        next_steps_title: Intercámbialos por un token de acceso
-        done: Listo
-      create:
-        scopes_required: Selecciona al menos un permiso.
-      revoke:
-        revoked: Se revocaron todos los tokens de "%{name}".
-      destroy:
-        deleted: El cliente "%{name}" fue eliminado.
     account:
       analyze_writing_style:
         queued: Scout está analizando sus correos enviados — su perfil de estilo aparecerá
           aquí en breve.
+      compose_preference:
+        failed: No se pudo actualizar la preferencia de redacción. Inténtelo de nuevo.
+        updated: Preferencia de redacción actualizada.
       delete:
         cancel: Cancelar
         confirm_email_label: Escriba su dirección de correo electrónico para confirmar
@@ -78,6 +38,11 @@ es:
         updated: Idioma actualizado.
       show:
         change_password: Cambiar contraseña
+        compose_desk: Página completa — escribir ocupa toda la pantalla
+        compose_dock: Panel inferior — redacte sobre la bandeja de entrada
+        compose_subtitle: Dónde se abre un correo nuevo (atajo C, botón Redactar y
+          paleta de comandos).
+        compose_title: Los correos nuevos se abren en
         confirm_password: Confirmar nueva contraseña
         current_password: Contraseña actual
         danger_zone_desc: Eliminar su cuenta es permanente y no se puede deshacer.
@@ -92,6 +57,7 @@ es:
         language_title: Idioma
         new_password: Nueva contraseña
         privacy_policy: Política de Privacidad
+        save_compose: Guardar
         save_language: Guardar
         subtitle: Gestione su contraseña y las preferencias de su cuenta.
         terms_of_service: Términos del Servicio
@@ -186,6 +152,54 @@ es:
         switched_to_byo: Has cambiado a tus propias claves. Añade un proveedor abajo
           para activar la IA.
         switched_to_managed: Ahora usando Campbooks AI.
+    api_clients:
+      create:
+        scopes_required: Selecciona al menos un permiso.
+      destroy:
+        deleted: El cliente "%{name}" fue eliminado.
+      index:
+        col_client_id: ID de cliente
+        col_created: Creado
+        col_name: Nombre
+        col_scopes: Permisos
+        delete: Eliminar
+        delete_confirm: ¿Eliminar el cliente "%{name}"? Esta acción no se puede deshacer.
+        new_client: Nuevo cliente
+        no_clients_desc: Crea un cliente para obtener un ID y un secreto para la API
+          de Campbooks.
+        no_clients_title: Aún no hay clientes de API
+        read_docs: Ver la documentación de la API
+        regenerate: Regenerar secreto
+        regenerate_confirm: "¿Regenerar el secreto de este cliente? El secreto actual
+          dejará de funcionar de inmediato."
+        revoke: Revocar tokens
+        revoke_confirm: "¿Revocar todos los tokens activos de este cliente? Las apps
+          que lo usan necesitarán un nuevo token."
+        subtitle: Crea clientes OAuth para acceder a tus datos de Campbooks desde
+          tus propias apps y scripts.
+        title: Acceso a la API
+      new:
+        cancel: Cancelar
+        create: Crear cliente
+        name_hint: Una etiqueta para reconocer este cliente más adelante.
+        name_label: Nombre
+        name_placeholder: p. ej. Sincronización de facturación
+        scopes_hint: Concede solo el acceso que este cliente necesita.
+        scopes_label: Permisos
+        subtitle: Dale un nombre al cliente y elige a qué puede acceder.
+        title: Nuevo cliente de API
+      reveal:
+        client_id_label: ID de cliente
+        client_secret_label: Secreto de cliente
+        copy: Copiar
+        done: Listo
+        next_steps_title: Intercámbialos por un token de acceso
+        subtitle: Copia ahora el secreto de "%{name}".
+        title: Cliente creado
+        warning: Esta es la única vez que se muestra el secreto del cliente. Guárdalo
+          en un lugar seguro — puedes regenerarlo más tarde si lo pierdes.
+      revoke:
+        revoked: Se revocaron todos los tokens de "%{name}".
     general:
       show:
         ai_providers_hint: "¿Busca proveedores de IA y ajustes de modelos? Ahora se
@@ -289,14 +303,14 @@ es:
           disconnect: Desconectar
           disconnect_confirm: "¿Desconectar Google Drive? Se detendrán las subidas
             de documentos."
-          failed_count:
-            one: Un documento falló al subir. Puede reintentarlo a continuación.
-            other: "%{count} documentos fallaron al subir. Puede reintentarlos todos a continuación."
-          retry_all_failed: Reintentar todas las subidas fallidas
           drive_org_desc: Cada tipo de documento puede tener su propia carpeta, patrón
             de nomenclatura y estructura de subcarpetas.
           drive_org_heading: Cómo Drive organiza sus archivos
           edit_config: Editar
+          failed_count:
+            one: Un documento falló al subir. Puede reintentarlo a continuación.
+            other: "%{count} documentos fallaron al subir. Puede reintentarlos todos
+              a continuación."
           folder_set: Carpeta establecida
           off_badge: Desactivado
           on_badge: Activado
@@ -304,21 +318,36 @@ es:
           reconnect_prompt: Vuelve a conectar para conceder acceso completo al Drive
             — necesario para explorar y seleccionar carpetas existentes al enviar
             archivos.
+          retry_all_failed: Reintentar todas las subidas fallidas
           subtitle: Envíe documentos a Google Drive con reglas de carpeta y nomenclatura
             por tipo.
           title: Google Drive
       google_drive_configs:
+        browse_folders:
+          browse_failed: 'No se pudieron listar las carpetas: %{message}'
+          create_folder: Crear
+          my_drive: Mi Drive
+          new_folder_placeholder: Nombre de la nueva carpeta
+          no_subfolders: Sin subcarpetas aquí
+          reconnect_needed: Vuelva a conectar Google Drive con acceso completo para
+            explorar carpetas.
+          select: Seleccionar
+          select_my_drive: Usar la raíz de Mi Drive
+          select_this: Seleccionar "%{name}"
         edit:
-          auto_push_default_note: El envío automático está activado por defecto — los documentos aprobados de este tipo se enviarán automáticamente a Drive. Desmarque la casilla anterior para pausarlo.
-          auto_push_hint: Cuando está marcado, los documentos aprobados de este tipo se envían automáticamente a Google Drive. Desmarque para pausar.
+          auto_push_default_note: El envío automático está activado por defecto —
+            los documentos aprobados de este tipo se enviarán automáticamente a Drive.
+            Desmarque la casilla anterior para pausarlo.
+          auto_push_hint: Cuando está marcado, los documentos aprobados de este tipo
+            se envían automáticamente a Google Drive. Desmarque para pausar.
           auto_push_label: Enviar automáticamente al aprobar
           browse: Explorar
           folder_from_id: Carpeta seleccionada
           folder_label: Carpeta de destino
-          no_folder_selected: Ninguna carpeta seleccionada — elija una a continuación
           naming_pattern_hint: 'Marcadores disponibles: {date}, {entity}, {reference},
             {type}, {vendor}, {id}'
           naming_pattern_label: Patrón de nomenclatura de archivos
+          no_folder_selected: Ninguna carpeta seleccionada — elija una a continuación
           subfolder_pattern_hint_html: "<strong>Plano</strong>: Todos los archivos
             van directamente a la carpeta de destino.<br><strong>Año</strong>: Organizado
             por año (p. ej. /Carpeta/2026/).<br><strong>Año/Mes</strong>: Organizado
@@ -327,16 +356,6 @@ es:
           subfolder_pattern_label: Estructura de subcarpetas
           subtitle: Controle cómo se envían a Google Drive los documentos de este
             tipo.
-        browse_folders:
-          browse_failed: 'No se pudieron listar las carpetas: %{message}'
-          create_folder: Crear
-          my_drive: Mi Drive
-          new_folder_placeholder: Nombre de la nueva carpeta
-          no_subfolders: Sin subcarpetas aquí
-          reconnect_needed: Vuelva a conectar Google Drive con acceso completo para explorar carpetas.
-          select: Seleccionar
-          select_my_drive: Usar la raíz de Mi Drive
-          select_this: 'Seleccionar "%{name}"'
       index:
         show:
           api_connections_desc: Guarde integraciones API de salida (URL base + autenticación)

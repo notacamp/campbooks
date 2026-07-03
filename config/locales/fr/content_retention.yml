@@ -3,12 +3,13 @@ fr:
   settings:
     data_privacy:
       show:
-        retention_heading: "Supprimer automatiquement les anciens e-mails"
-        retention_desc: "Supprime automatiquement la copie stockée par Campbooks des e-mails plus
-          anciens que l'âge choisi. Cela ne supprime que notre copie — l'original reste intact
-          dans votre boîte de réception."
-        retention_off: "Désactivé — tout conserver"
-        retention_months: "Plus de %{count} mois"
-        retention_active_note: "La copie Campbooks des e-mails de plus de %{count} mois est
-          définitivement supprimée lors du prochain nettoyage quotidien. Votre boîte de réception
-          n'est pas affectée — seule notre copie stockée (et son index de recherche et ses pièces jointes) est supprimée."
+        retention_active_note: La copie Campbooks des e-mails de plus de %{count}
+          mois est définitivement supprimée lors du prochain nettoyage quotidien.
+          Votre boîte de réception n'est pas affectée — seule notre copie stockée
+          (et son index de recherche et ses pièces jointes) est supprimée.
+        retention_desc: Supprime automatiquement la copie stockée par Campbooks des
+          e-mails plus anciens que l'âge choisi. Cela ne supprime que notre copie
+          — l'original reste intact dans votre boîte de réception.
+        retention_heading: Supprimer automatiquement les anciens e-mails
+        retention_months: Plus de %{count} mois
+        retention_off: Désactivé — tout conserver

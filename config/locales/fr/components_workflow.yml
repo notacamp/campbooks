@@ -20,14 +20,16 @@ fr:
         workspace: Espace de travail
     setup_hub:
       add_manually: Ajouter manuellement
-      connect_google: Connecter Google
-      connect_microsoft: Connecter Microsoft
-      connect_zoho: Connecter Zoho
       dismiss_title: Ignorer cette tâche
-      heading: Finalisez la configuration de Campbooks
+      heading: Scout peut faire plus
       leave_for_now: Laisser pour l'instant
-      let_ai_help: "✨ Laisser l'IA m'aider"
-      progress: "%{completed} sur %{total} effectué"
+      more_in_settings:
+        one: 1 tâche de plus se trouve dans les Paramètres.
+        other: "%{count} tâches de plus se trouvent dans les Paramètres."
+      remaining:
+        one: 1 petite chose restante
+        other: "%{count} petites choses restantes"
+      settings_hint: Tout ceci se trouve aussi dans les Paramètres.
     step_picker:
       condition_description: Continuer uniquement si une règle correspond
       condition_title: Condition
@@ -109,11 +111,11 @@ fr:
       headers_hint: 'Un par ligne sous la forme Clé: Valeur. Les valeurs prennent
         en charge Liquid.'
       integration: Intégration
-      load_error: "Impossible de charger les champs."
+      load_error: Impossible de charger les champs.
       load_fields: Charger les champs
       load_loading: Chargement des champs…
-      load_prompt: "Choisissez un espace de travail et une base de données, puis chargez\
-        \ ses champs."
+      load_prompt: Choisissez un espace de travail et une base de données, puis chargez
+        ses champs.
       message: Message
       method: Méthode
       no_integrations_link: en ajouter une

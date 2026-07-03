@@ -54,6 +54,16 @@ class Settings::AccountController < Settings::BaseController
     end
   end
 
+  # Where a brand-new email opens (Desk page vs Dock sheet) — a no-password
+  # preference, like #language.
+  def compose_preference
+    if current_user.update(params.permit(:compose_default))
+      redirect_to settings_account_path, success: t(".updated")
+    else
+      redirect_to settings_account_path, alert: t(".failed")
+    end
+  end
+
   # Personal writing style for Scout's reply drafts — a no-password preference,
   # like #language. Stamps writing_style_updated_at so the UI can show freshness.
   def writing_style

@@ -29,21 +29,35 @@ module Tasks
         document.metadata.presence&.to_json
       ].compact_blank.join("\n")
 
+      memory = task_learning_memory(workspace)
+
       items = Ai::TaskExtractor.new(
         source:      document,
         content:     content,
         anchor_date: document.document_date || document.created_at.to_date,
         time_zone:   Time.zone,
-        workspace:   workspace
+        workspace:   workspace,
+        learning_memory: memory
       ).extract
 
       tasks = Tasks::Builder.call(
-        workspace: workspace, source: document, raw_items: items, anchor_tz: Time.zone
+        workspace: workspace, source: document, raw_items: items, anchor_tz: Time.zone, learning_memory: memory
       )
 
       Feed::RefreshJob.enqueue_for_workspace(workspace) if tasks.any?
     ensure
       Current.workspace = nil
+    end
+
+    private
+
+    # One memory per run, shared by the extractor (soft prompt hint) and the builder
+    # (deterministic suppression). Best-effort: a failure here just means no learning.
+    def task_learning_memory(workspace)
+      Learning::Memory.new(source: Learning::Sources::Tasks.new(workspace))
+    rescue => e
+      Rails.logger.warn("[#{self.class.name}] learning_memory failed: #{e.message}")
+      nil
     end
   end
 end

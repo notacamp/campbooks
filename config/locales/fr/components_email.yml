@@ -60,6 +60,7 @@ fr:
       toolbar_undo: Annuler
     compose_attachments:
       attach: Joindre des fichiers
+      remove: Retirer la pièce jointe
       upload_failed: Échec du téléversement
     contact_avatar:
       received_indicator: "↓"
@@ -113,8 +114,6 @@ fr:
       selected_badge: Sélectionné
       send_to_notion: Enregistrer dans Notion
       tags_label: Étiquettes
-    tag_chip:
-      remove: "Retirer %{name}"
     email_filter_panel:
       accounts: Comptes
       all_folders: Tous les dossiers
@@ -161,6 +160,8 @@ fr:
       subtitle: Ajouté à toutes vos boîtes de réception connectées.
       title: Nouveau dossier
     rich_text_editor:
+      add_column_before: Ajouter une colonne
+      add_row_before: Ajouter une ligne
       align_center: Centrer
       align_left: Aligner à gauche
       align_right: Aligner à droite
@@ -170,9 +171,14 @@ fr:
       bullet_list: Liste à puces
       clear_formatting: Effacer la mise en forme
       code_block: Bloc de code
+      default_font: Police par défaut
+      delete_column: Supprimer la colonne
+      delete_row: Supprimer la ligne
+      font_family: Police
       heading_1: Titre 1
       heading_2: Titre 2
       heading_3: Titre 3
+      highlight_color: Couleur de surbrillance
       horizontal_rule: Séparateur
       image: Insérer une image
       image_insert: Insérer
@@ -188,17 +194,12 @@ fr:
       paragraph: Texte normal
       redo: Rétablir
       strikethrough: Barré
+      subscript: Indice
+      superscript: Exposant
+      table: Insérer un tableau
       text_color: Couleur du texte
+      toggle_header: Basculer l'en-tête
       underline: Souligné
       undo: Annuler
-      table: Insérer un tableau
-      add_row_before: Ajouter une ligne
-      delete_row: Supprimer la ligne
-      add_column_before: Ajouter une colonne
-      delete_column: Supprimer la colonne
-      toggle_header: Basculer l'en-tête
-      font_family: Police
-      default_font: Police par défaut
-      highlight_color: Couleur de surbrillance
-      superscript: Exposant
-      subscript: Indice
+    tag_chip:
+      remove: Retirer %{name}

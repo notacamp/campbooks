@@ -211,7 +211,9 @@ class RegistrationsController < ApplicationController
     if invitation
       redirect_to root_path, success: t(".welcome_workspace", workspace: invitation.workspace.name)
     else
-      redirect_to onboarding_path(step: :workspace)
+      # Straight to the welcome screen: meet Scout, connect an inbox. The full
+      # wizard stays reachable from there as "set up more".
+      redirect_to onboarding_path
     end
   rescue ActiveRecord::RecordInvalid => e
     flash.now[:error] = e.message

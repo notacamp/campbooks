@@ -122,6 +122,11 @@ class Oauth::MicrosoftController < ApplicationController
 
     Events.publish("email_account.connected", subject: account, payload: { "email_address" => account.email_address, "provider" => account.provider })
 
+    # Kick the first sync now rather than waiting up to a minute for the poll —
+    # the user is watching the first-sync stage. Slot-lock dedupes any overlap;
+    # a never-baselined account hands itself to the full resync.
+    EmailScanJob.perform_later(account.id, "delta")
+
     complete_oauth_account_link(t(".linked", email: identity[:email]))
   end
 end

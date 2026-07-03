@@ -79,28 +79,28 @@ pt:
         create_tag: Criar etiqueta
         group_label: Grupo
         group_placeholder: ex. Finanças
+      hidden_tag:
+        ai_badge: IA
+        show: Mostrar
+        system_badge: Sistema
       index:
         add_tag: Adicionar etiqueta
+        filtered_group: Ocultadas pela IA ou por si
         heading: Etiquetas
+        hidden_heading: Rótulos ocultos
+        hidden_hint: sistema e ocultados por IA
         no_tags: Ainda não há etiquetas. Adicione uma para começar a organizar a sua
           caixa de entrada.
         subheading: As etiquetas ajudam o Scout a organizar a sua caixa de entrada
           automaticamente.
-        filtered_group: Ocultadas pela IA ou por si
-        hidden_heading: Rótulos ocultos
-        hidden_hint: sistema e ocultados por IA
         system_group: Sistema do fornecedor
       tag:
         delete_confirm: Eliminar %{name}?
         edit: Editar
         hide: Ocultar
         tagged_messages_title: Mensagens com etiqueta
-      hidden_tag:
-        ai_badge: IA
-        show: Mostrar
-        system_badge: Sistema
       toggle_hidden:
-        hidden: '%{name} ocultada'
-        shown: '%{name} agora está visível'
+        hidden: "%{name} ocultada"
+        shown: "%{name} agora está visível"
       update:
         updated_toast: Etiqueta actualizada.

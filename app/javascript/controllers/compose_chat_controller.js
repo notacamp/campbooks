@@ -223,7 +223,7 @@ export default class extends Controller {
     const bodyBtn = this.element.querySelector("button[data-action='click->compose-chat#setBody']")
     if (bodyBtn) bodyBtn.click()
 
-    const form = this.element.querySelector("form[data-controller~='compose-area']")
+    const form = this.element.querySelector("form[data-controller~='compose-engine'], form[data-controller~='compose-area']")
     if (!form) return
 
     // Show sending state on the compose form

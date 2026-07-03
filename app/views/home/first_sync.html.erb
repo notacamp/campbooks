@@ -1,0 +1,11 @@
+<%# The first-run takeover while Scout's first scan runs: nothing competes with
+    the live stage (same centering treatment as the old setup checklist). The
+    nav stays available — the stage occupies home, it doesn't trap the user. %>
+<% content_for :main_class, "mx-auto flex w-full max-w-[600px] flex-col justify-center px-4 min-h-[calc(100svh_-_7.5rem)] lg:min-h-screen pb-[8vh]" %>
+
+<%= render Campbooks::FirstSyncStage.new(
+      status: @first_sync.as_json,
+      status_url: first_sync_status_onboarding_path,
+      inbox_path: email_messages_path,
+      feed_path: root_path
+    ) %>

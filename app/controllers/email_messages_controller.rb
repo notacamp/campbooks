@@ -131,24 +131,7 @@ class EmailMessagesController < ApplicationController
     end
 
     AuditEvent.log("email_message_read", user: Current.user, request: request, target: @message, via: "web")
-
-    # Opening a thread marks every message read — clears the inbox unread dot/bold,
-    # the "unread" filters, and the unread counts — and stamps viewed_at, which
-    # clears the Mail nav attention dot (Navigation::Attention#new_mail?). The
-    # viewed_at clause also catches messages that synced in already-read but were
-    # never opened here, so the nav dot still clears.
-    if @thread
-      messages = @thread.email_messages
-      unread_ids = messages.where(read: false).pluck(:provider_message_id)
-      messages.where(read: false).or(messages.where(viewed_at: nil))
-              .update_all(read: true, viewed_at: Time.current, updated_at: Time.current)
-      if unread_ids.any?
-        MarkReadJob.perform_later(@message.email_account_id, unread_ids) if @message.email_account_id
-        # Live inbox: clear the unread dot on this thread's row in every other open
-        # inbox (other tabs/devices, teammates sharing the mailbox).
-        Emails::InboxBroadcaster.replace(@thread)
-      end
-    end
+    mark_thread_read
 
     # Gather attachments from all messages in the thread (or just this message if no thread)
     @thread_messages = @thread ? @thread.email_messages.includes(:files_attachments, :email_account).order(received_at: :desc).to_a : [ @message ]
@@ -228,34 +211,51 @@ class EmailMessagesController < ApplicationController
     @all_tags = workspace_tags.uniq(&:name)
   end
 
+  # The Desk: the full-page compose surface. Opens blank (new message), resumes
+  # a parked draft (?draft_id), or expands a Dock reply (?mode&reply_to) — in
+  # the last two cases the envelope, body, quote and attachments carry over.
   def new
-    @mode = "new_message"
     @sendable_accounts = Current.user.sendable_email_accounts
     @account = @sendable_accounts.first
-    @signature = Signature.default_for(Current.user, @account) if @account
     @signatures = Current.user.signatures.ordered.includes(:email_accounts)
+
+    @draft = Current.user.draft_emails.find_by(id: params[:draft_id]) if params[:draft_id].present?
+    @reply_source = @draft&.in_reply_to
+    @mode = @draft&.mode || "new_message"
+
+    if @draft.nil? && params[:reply_to].present? && EmailComposeController::MODES.include?(params[:mode].to_s)
+      @reply_source = EmailMessage.accessible_to(Current.user).find_by(id: params[:reply_to])
+      @mode = params[:mode].to_s if @reply_source
+    end
+
+    if @draft
+      @to = @draft.to_address.to_s
+      @cc = @draft.cc_address.to_s
+      @bcc = @draft.bcc_address.to_s
+      @subject = @draft.subject.to_s
+      @body = @draft.body.to_s
+      @quoted_body = @draft.quoted_body.to_s
+      @attachment_entries = @draft.attachment_entries
+      @signature_id = @draft.signature_id
+    elsif @reply_source
+      prefill = Emails::ComposePrefill.for(message: @reply_source, mode: @mode)
+      @to = prefill.to
+      @cc = prefill.cc
+      @bcc = ""
+      @subject = prefill.subject
+      @body = ""
+      @quoted_body = prefill.quoted_body
+      @attachment_entries = @mode == "forward" ? Emails::ComposePrefill.forward_attachment_entries(@reply_source) : []
+      @signature_id = Signature.default_for(Current.user, @reply_source.email_account)&.id
+    else
+      @to = @cc = @bcc = @subject = @body = @quoted_body = ""
+      @attachment_entries = []
+      @signature_id = (Signature.default_for(Current.user, @account)&.id if @account)
+    end
 
     # Thread created lazily on first message — avoids empty threads in sidebar
     @compose_thread = nil
     @compose_messages = []
-
-    # Load sidebar data — same inbox list as show (first page only; infinite scroll
-    # streams the rest from the index turbo stream).
-    readable_ids = readable_account_ids
-    @pagy, @threads = pagy_countless(build_thread_scope(nil, nil), limit: THREAD_PAGE_LIMIT)
-
-    folder_counts = Rails.cache.fetch("folder_counts/#{readable_ids.sort.join('_')}", expires_in: 1.minute) do
-      EmailMessage.where(email_account_id: readable_ids).group(:provider_folder_id).distinct.count(:email_thread_id)
-    end
-    @folders = folder_mappings[:name_to_ids].map { |name, ids|
-      count = ids.sum { |id| folder_counts[id] || 0 }
-      { id: ids.first, name: name, count: count }
-    }.sort_by { |f| f[:name] == "Inbox" ? "  " : f[:name] }
-    @common_folders = baseline_folders(folder_counts)
-    @mail_folders = custom_folders
-    @accounts = Current.user.readable_email_accounts.ordered
-    @current_folder = nil
-    @all_tags = workspace_tags.uniq(&:name)
   end
 
   def dismiss_todo
@@ -295,10 +295,37 @@ class EmailMessagesController < ApplicationController
     agent_thread = @thread&.agent_thread
     @discussion_count = agent_thread ? agent_thread.agent_messages.chronological.reject(&:draft?).size : 0
 
+    # Opening the email in the bottom-right drawer is a read, same as the
+    # full-page view — mark the thread read so the inbox unread dot/bold and
+    # counts clear (issue #135).
+    AuditEvent.log("email_message_read", user: Current.user, request: request, target: @message, via: "web")
+    mark_thread_read
+
     render layout: false
   end
 
   private
+
+  # Opening a thread marks every message read — clears the inbox unread dot/bold,
+  # the "unread" filters, and the unread counts — and stamps viewed_at, which
+  # clears the Mail nav attention dot (Navigation::Attention#new_mail?). The
+  # viewed_at clause also catches messages that synced in already-read but were
+  # never opened here, so the nav dot still clears. Shared by the full-page `show`
+  # and the bottom-right `drawer_content` so opening either surface marks read.
+  def mark_thread_read
+    return unless @thread
+
+    messages = @thread.email_messages
+    unread_ids = messages.where(read: false).pluck(:provider_message_id)
+    messages.where(read: false).or(messages.where(viewed_at: nil))
+            .update_all(read: true, viewed_at: Time.current, updated_at: Time.current)
+    return if unread_ids.empty?
+
+    MarkReadJob.perform_later(@message.email_account_id, unread_ids) if @message.email_account_id
+    # Live inbox: clear the unread dot on this thread's row in every other open
+    # inbox (other tabs/devices, teammates sharing the mailbox).
+    Emails::InboxBroadcaster.replace(@thread)
+  end
 
   def readable_accounts
     @readable_accounts ||= Current.user.readable_email_accounts.ordered.to_a

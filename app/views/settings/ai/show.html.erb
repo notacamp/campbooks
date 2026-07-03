@@ -76,7 +76,11 @@
     <%# ── Service Configuration ───────────────────────────────── %>
     <div>
       <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".services_heading") %></h2>
-      <p class="text-sm text-gray-500 mb-4"><%= t(".services_desc") %></p>
+      <p class="text-sm text-gray-500 mb-1"><%= t(".services_desc") %></p>
+      <p class="mb-4 text-sm text-gray-500">
+        <%= t("ai_prompts.ai_settings_link") %>
+        <%= link_to t("ai_prompts.ai_settings_link_cta"), settings_ai_prompts_path, class: "font-medium text-accent-600 hover:text-accent-700" %>
+      </p>
 
       <% if @adapters.empty? %>
         <%= render(Campbooks::EmptyState.new(variant: :card, title: t(".create_provider_first"), description: t(".create_provider_first_desc"))) %>
@@ -124,30 +128,6 @@
                     <%= f.check_box :enabled, class: "rounded border-gray-300 text-accent-600 focus:ring-accent-500" %>
                     <span class="text-xs text-gray-600"><%= t(".enabled_label") %></span>
                   </label>
-                </div>
-                <div>
-                  <%= f.label :system_prompt, t(".instructions_label"), class: "block text-xs font-medium text-gray-600 mb-1" %>
-                  <p class="text-xs text-gray-400 mb-1"><%= t(".instructions_hint") %></p>
-                  <div data-controller="tiptap-editor"
-                       data-tiptap-editor-content-value="<%= config.system_prompt.presence || '' %>"
-                       data-tiptap-editor-placeholder-value="<%= t(".instructions_placeholder") %>"
-                       data-tiptap-editor-toolbar-value="true"
-                       data-tiptap-editor-heading-value="false"
-                       data-tiptap-editor-code-block-value="false"
-                       class="border border-gray-300 rounded-lg bg-card overflow-hidden focus-within:border-accent-500 focus-within:ring-1 focus-within:ring-accent-500">
-                    <%= f.hidden_field :system_prompt, data: { tiptap_editor_target: "input" } %>
-                    <div data-tiptap-editor-target="toolbar" class="tiptap-toolbar">
-                      <button type="button" data-action="click->tiptap-editor#toggleBold" title="<%= t(".toolbar_bold") %>"><b>B</b></button>
-                      <button type="button" data-action="click->tiptap-editor#toggleItalic" title="<%= t(".toolbar_italic") %>"><i>I</i></button>
-                      <span class="tiptap-divider"></span>
-                      <button type="button" data-action="click->tiptap-editor#toggleBulletList" title="<%= t(".toolbar_bullet") %>">&bull; List</button>
-                      <button type="button" data-action="click->tiptap-editor#toggleOrderedList" title="<%= t(".toolbar_numbered") %>">1. List</button>
-                      <span class="tiptap-divider"></span>
-                      <button type="button" data-action="click->tiptap-editor#undo" title="<%= t(".toolbar_undo") %>">&#8634;</button>
-                      <button type="button" data-action="click->tiptap-editor#redo" title="<%= t(".toolbar_redo") %>">&#8635;</button>
-                    </div>
-                    <div data-tiptap-editor-target="editor" class="tiptap-editor"></div>
-                  </div>
                 </div>
                 <%= render(Campbooks::Button.new(variant: :primary, size: :sm, type: :submit, class: "w-full")) { t(".save_service", name: human_enum(AiConfiguration, :purpose, purpose)) } %>
               <% end %>

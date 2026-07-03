@@ -1,0 +1,76 @@
+---
+fr:
+  ai_prompts:
+    ai_settings_link: Vous voulez changer ce que l'IA extrait ou comment elle classe
+      les éléments ?
+    ai_settings_link_cta: Personnaliser les instructions de l'IA
+    catalog:
+      document_analysis:
+        description: Comment Scout lit et classe les fichiers et pièces jointes que
+          vous recevez.
+        example: Pour les factures, extrais toujours le nom du fournisseur et le total.
+          Traite les documents en portugais comme des pièces fiscales.
+        label: Analyse des documents
+        placeholder: 'ex. : Pour les factures fournisseurs, indique toujours le numéro
+          de commande dans le titre.'
+      email_analysis:
+        description: Comment Scout résume chaque e-mail et décide de ce qui requiert
+          votre attention.
+        example: Limite les résumés à une phrase courte. Traite tout ce qui vient
+          de notre plus gros client comme prioritaire.
+        label: Résumés d'e-mails
+        placeholder: 'ex. : Limite les résumés à une ligne. Signale comme prioritaire
+          tout ce qui concerne une panne.'
+      email_classification:
+        description: Comment Scout classe les e-mails entrants dans vos étiquettes.
+        example: Dirige les e-mails de planification vers l'étiquette Réunions ; place
+          les factures fournisseurs dans Finances.
+        label: Étiquetage des e-mails
+        placeholder: 'ex. : Tout ce qui mentionne une facture ou un reçu va dans Finances.'
+      reminder_extraction:
+        description: 'Comment Scout repère les dates à retenir : échéances, renouvellements,
+          rendez-vous.'
+        example: Signale les dates de renouvellement de contrat et de paiement. Ne
+          crée pas de rappels à partir des offres promotionnelles.
+        label: Extraction des rappels
+        placeholder: 'ex. : Signale toujours les échéances de paiement. Ignore les
+          délais « offre limitée » du marketing.'
+      task_extraction:
+        description: Comment Scout choisit les tâches à extraire de vos e-mails et
+          documents.
+        example: Traite les demandes des clients comme prioritaires et ne crée pas
+          de tâches à partir des newsletters internes.
+        label: Extraction des tâches
+        placeholder: 'ex. : Ne crée des tâches que pour ce qu''un client attend. Ignore
+          ce qui vient de notre équipe.'
+    customize_button: Personnaliser l'IA
+    modal:
+      cancel: Annuler
+      close: Fermer
+      example_label: Par exemple
+      hint: Le langage simple fonctionne mieux. Dites quoi prioriser, ignorer ou comment
+        étiqueter.
+      intro: Ajoutez vos consignes ci-dessous. Elles s'ajoutent aux instructions intégrées
+        de Scout pour cette fonction — le format de sortie et les règles de sécurité
+        restent en place.
+      label: Vos instructions
+      reset_hint: Laissez vide et enregistrez pour rétablir le réglage par défaut.
+      save: Enregistrer les instructions
+      title: 'Personnaliser : %{name}'
+    nav_label: Instructions IA
+    settings:
+      cleared: "%{name} revient aux instructions par défaut."
+      customized: Personnalisé
+      default: Par défaut
+      edit: Modifier
+      help_body: Vos instructions sont ajoutées au prompt intégré de Scout pour chaque
+        fonction, si bien que le format et les règles de sécurité restent en place.
+        Faites-les courtes et précises — dites quoi prioriser, ignorer ou étiqueter.
+        Videz le champ pour revenir au réglage par défaut.
+      help_title: Comment ça marche
+      saved: Instructions enregistrées pour %{name}.
+      subtitle: Donnez à Scout vos propres consignes sur la façon de lire votre boîte
+        de réception, vos documents et plus encore. Vos notes s'ajoutent aux instructions
+        intégrées — elles ne remplacent jamais le format de sortie ni les règles de
+        sécurité.
+      title: Instructions IA

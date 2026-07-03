@@ -40,7 +40,8 @@ es:
         thread_view_bubbles: Burbujas
         thread_view_classic: Clásica
         thread_view_heading: Vista de conversación
-        thread_view_hint: Las burbujas muestran quién envió cada mensaje, como un chat.
+        thread_view_hint: Las burbujas muestran quién envió cada mensaje, como un
+          chat.
     filtering:
       show:
         allowed_heading: Remitentes permitidos
@@ -81,27 +82,27 @@ es:
         create_tag: Crear etiqueta
         group_label: Grupo
         group_placeholder: p. ej. Finanzas
+      hidden_tag:
+        ai_badge: IA
+        show: Mostrar
+        system_badge: Sistema
       index:
         add_tag: Añadir etiqueta
+        filtered_group: Ocultadas por IA o por ti
         heading: Etiquetas
+        hidden_heading: Etiquetas ocultas
+        hidden_hint: sistema y ocultadas por IA
         no_tags: Aún no hay etiquetas. Añada una para empezar a ordenar su bandeja
           de entrada.
         subheading: Las etiquetas ayudan a Scout a ordenar su bandeja de entrada automáticamente.
-        filtered_group: Ocultadas por IA o por ti
-        hidden_heading: Etiquetas ocultas
-        hidden_hint: sistema y ocultadas por IA
         system_group: Sistema del proveedor
       tag:
         delete_confirm: "¿Eliminar %{name}?"
         edit: Editar
         hide: Ocultar
         tagged_messages_title: Mensajes etiquetados
-      hidden_tag:
-        ai_badge: IA
-        show: Mostrar
-        system_badge: Sistema
       toggle_hidden:
-        hidden: '%{name} ocultada'
-        shown: '%{name} ahora es visible'
+        hidden: "%{name} ocultada"
+        shown: "%{name} ahora es visible"
       update:
         updated_toast: Etiqueta actualizada.

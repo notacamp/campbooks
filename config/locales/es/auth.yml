@@ -51,6 +51,8 @@ es:
         que recibió para crear su cuenta.
       beta_code_label: Código de invitación
       beta_code_placeholder: p. ej. ABCD-2345
+      code_hint: Le enviaremos un código de 6 dígitos por correo para confirmar que
+        es usted.
       email_label: Dirección de correo electrónico
       email_placeholder: usted@ejemplo.com
       have_account: "¿Ya tiene una cuenta?"
@@ -59,15 +61,19 @@ es:
       privacy: Política de Privacidad
       sign_in: Iniciar sesión
       submit: Enviar código de verificación
-      tagline: Cree su cuenta
+      subtitle: Un par de pasos rápidos y Scout se pone a trabajar en su bandeja.
       terms: Términos del Servicio
       terms_consent_html: Acepto los %{terms} y la %{privacy}.
+      title: Cree su cuenta
     password:
+      password_hint: Al menos 8 caracteres. La sugerencia de su gestor de contraseñas
+        es perfecta.
       password_label: Contraseña
       password_placeholder: Al menos 8 caracteres
       submit: Crear cuenta
-      tagline: Establezca su contraseña
-      verified_prose: verificado. Elija una contraseña para terminar de crear su cuenta.
+      title: Último paso, prometido
+      verified_prose_html: "%{email} está verificado. Elija una contraseña y su cuenta
+        estará lista."
     pending_approval:
       body: Su solicitud de cuenta ha sido enviada para su revisión. Recibirá un correo
         cuando sea aprobada.
@@ -75,13 +81,13 @@ es:
     resend_code:
       try_later: Demasiadas solicitudes. Por favor, intenelo de nuevo mas tarde.
     verify:
-      code_label: Código de verificación
       code_sent_html: Enviamos un código de 6 dígitos a %{email}. Introdúzcalo a continuación
         para continuar.
+      digit_label: Dígito %{position} de 6
       resend: Reenviar código
       start_over: Empezar de nuevo
       submit: Verificar
-      tagline: Compruebe su correo
+      title: Revise su correo
   sessions:
     new:
       beta_badge: Beta cerrada
@@ -97,3 +103,4 @@ es:
       signup_on_web_link: Cree una cuenta en la web
       submit: Iniciar sesión
       tagline: La bandeja de entrada que se ordena sola.
+      title: Bienvenido de nuevo

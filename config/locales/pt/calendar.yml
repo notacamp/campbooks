@@ -53,7 +53,8 @@ pt:
       title_label: Título
       title_placeholder: Adicionar um título
       type_auto: Deteção automática (IA)
-      type_hint: A IA escolhe o tipo automaticamente. Escolha um para substituir, ou
+      type_hint: A IA escolhe o tipo automaticamente. Escolha um para substituir,
+        ou
       type_label: Tipo
       type_manage: gerir tipos
       type_none: Nenhum
@@ -77,6 +78,26 @@ pt:
         all_day: Dia inteiro
         untitled: "(Sem título)"
         video_call: Videochamada
+      time_until:
+        in_days:
+          one: Em %{count} dia
+          other: Em %{count} dias
+        in_hours:
+          one: Em %{count} h
+          other: Em %{count} h
+        in_minutes:
+          one: Em %{count} min
+          other: Em %{count} min
+        in_months:
+          one: Em %{count} mês
+          other: Em %{count} meses
+        in_weeks:
+          one: Em %{count} semana
+          other: Em %{count} semanas
+        next_week: Próxima semana
+        now: Agora
+        today: Hoje
+        tomorrow: Amanhã
       week_grid:
         add: "+ Adicionar"
         untitled: "(Sem título)"

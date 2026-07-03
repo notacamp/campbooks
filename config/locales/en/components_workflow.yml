@@ -20,14 +20,16 @@ en:
         workspace: Workspace
     setup_hub:
       add_manually: Add manually
-      connect_google: Connect Google
-      connect_microsoft: Connect Microsoft
-      connect_zoho: Connect Zoho
       dismiss_title: Dismiss this task
-      heading: Finish setting up Campbooks
+      heading: Scout can do more
       leave_for_now: Leave for now
-      let_ai_help: "✨ Let AI help"
-      progress: "%{completed} of %{total} done"
+      more_in_settings:
+        one: 1 more task lives in Settings.
+        other: "%{count} more tasks live in Settings."
+      remaining:
+        one: 1 quick thing left
+        other: "%{count} quick things left"
+      settings_hint: Everything here also lives in Settings.
     step_picker:
       condition_description: Only continue if a rule matches
       condition_title: Condition

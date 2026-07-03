@@ -16,7 +16,7 @@
 %>
 <div id="setup_banner" class="mb-6">
   <%= render(Campbooks::SetupHub.new(
-        items: SetupStatus::ITEMS,
+        items: status.all_items,
         incomplete_keys: incomplete,
         dismissed_keys: dismissed,
         return_to: request.path,

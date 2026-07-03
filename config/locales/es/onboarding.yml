@@ -127,6 +127,28 @@ es:
         type_company: Empresa
         type_personal: Personal
         workspace_title: Espacio de trabajo
+      welcome:
+        ai_key_body: Las instalaciones autoalojadas traen su propio modelo. Dos minutos,
+          una clave.
+        ai_key_title: Añada una clave de IA para que Scout pueda leer
+        connected_title:
+          one: Buzón conectado
+          other: "%{count} buzones conectados"
+        continue_home: Ir a mi bandeja de entrada
+        greeting: Hola %{name}, soy Scout.
+        greeting_anonymous: Hola, soy Scout.
+        more_setup: Más opciones de configuración
+        pitch: 'Leo lo que llega a su bandeja de entrada, lo ordeno y muestro solo
+          lo que le necesita: respuestas, plazos, documentos. Conecte su buzón y me
+          pongo en marcha.'
+        privacy_note: Campbooks lee su bandeja de entrada para ordenarla y extraer
+          documentos y plazos. Su correo sigue siendo privado y puede desconectarlo
+          en cualquier momento en Configuración.
+        see_demo: Véalo primero en acción
+        skip: Omitir por ahora y explorar la aplicación
+        type_company: Trabajo
+        type_personal: Personal
+        type_question: "¿Usará esto sobre todo para correo de trabajo o personal?"
       workspace:
         address_line1_label: Dirección línea 1
         address_line1_placeholder: Dirección postal
@@ -189,3 +211,35 @@ es:
         no_suggestions: Sin sugerencias adicionales — sus etiquetas de plantilla cubren
           bien los casos comunes.
         save_hint: Marque las sugerencias que desee añadir y guarde.
+  setup_status:
+    items:
+      ai_configuration:
+        cta: Configurar IA
+        description: 'Las instalaciones autoalojadas traen su propio modelo: añada
+          una clave y Scout empieza a leer, ordenar y redactar.'
+        message: Añada una clave de IA para que Scout pueda leer
+      document_provider:
+        cta: Añadir IA de documentos
+        description: Una clave con capacidad de visión permite a Scout leer también
+          PDF, escaneos y fotos. Opcional y fácil de añadir más tarde.
+        message: Añada IA de documentos (opcional)
+      document_types:
+        cta: Borrador con Scout
+        description: 'Facturas, contratos, recibos: Scout puede proponer un conjunto
+          inicial para su tipo de trabajo, listo para editar.'
+        message: Deje que Scout proponga sus tipos de documento
+      email_account:
+        cta: Conectar un buzón
+        description: 'Scout ordena el correo según llega: lo que le necesita, los
+          plazos y los documentos escondidos en los adjuntos.'
+        message: Conecte su buzón
+      tags:
+        cta: Sugerir con Scout
+        description: Las etiquetas enseñan a Scout cómo piensa usted sobre el correo.
+          Empiece por las sugerencias y cambie lo que quiera.
+        message: Deje que Scout sugiera etiquetas de correo
+      workspace:
+        cta: Preséntese
+        description: Una frase sobre lo que hace ayuda a Scout a ordenar y redactar
+          como lo haría usted.
+        message: Presente su espacio de trabajo

@@ -142,7 +142,7 @@ class ApplicationController < ActionController::Base
     return if is_a?(InvitationsController)
 
     unless Current.workspace
-      redirect_to onboarding_path(step: :workspace)
+      redirect_to onboarding_path
     end
   end
 
