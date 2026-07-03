@@ -19,7 +19,8 @@
         data-command-palette-message-id-value="<%= content_for?(:cp_message_id) ? yield(:cp_message_id) : '' %>"
         data-command-palette-folders-value="<%= content_for?(:cp_folders) ? yield(:cp_folders) : '[]' %>"
         data-command-palette-subject-value="<%= content_for?(:cp_subject) ? yield(:cp_subject) : '' %>"
-        data-command-palette-commands-value="<%= command_palette_catalog_json %>">
+        data-command-palette-commands-value="<%= command_palette_catalog_json %>"
+        data-compose-default="<%= Current.user&.compose_default %>">
     <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-accent-600 focus:text-white focus:rounded-md focus:shadow-lg focus:outline-none">Skip to content</a>
 
     <% if authenticated? %>

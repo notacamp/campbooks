@@ -17,7 +17,7 @@
         <div class="min-w-0 flex-1 max-w-2xl">
           <%= render(Campbooks::EmailSearchBar.new(search_params: @search_params, folders: @folders || [], accounts: @accounts || [], tags: @all_tags || [])) %>
         </div>
-        <%= render(Campbooks::Button.new(variant: :primary, size: :sm, href: new_email_message_path, class: "flex-shrink-0", title: t(".compose_label"), data: { turbo_frame: "_top" })) do %>
+        <%= render(Campbooks::Button.new(variant: :primary, size: :sm, href: new_email_message_path, class: "flex-shrink-0", title: t(".compose_label"), data: { turbo_frame: "_top", action: "click->email-shortcuts#composeClick" })) do %>
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.931-8.931z"/></svg>
           <span class="hidden sm:inline"><%= t(".compose_label") %></span>
           <kbd class="ml-1 hidden sm:inline-flex h-[18px] min-w-[18px] items-center justify-center rounded border border-white/30 px-1 text-[10px] font-semibold leading-none text-white/70" aria-hidden="true">C</kbd>

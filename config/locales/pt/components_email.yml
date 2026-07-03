@@ -60,6 +60,7 @@ pt:
       toolbar_undo: Desfazer
     compose_attachments:
       attach: Anexar ficheiros
+      remove: Remover anexo
       upload_failed: Falha no carregamento
     contact_avatar:
       received_indicator: "↓"
