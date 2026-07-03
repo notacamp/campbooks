@@ -18,16 +18,18 @@ RSpec.describe Emails::SkimDecisionRecorder do
 
     expect do
       described_class.record(user, [ older.id, newer.id ], action: "archive")
-    end.to change(SkimDecision, :count).by(1)
+    end.to change(LearningDecision, :count).by(1)
 
-    decision = SkimDecision.last
+    decision = LearningDecision.last
     expect(decision).to have_attributes(
-      action: "archive",
+      domain: "email_skim",
+      label: "archive",
       user_id: user.id,
       workspace_id: workspace.id,
       contact_id: contact.id,
       sender_domain: "github.com",
-      email_message_id: newer.id
+      subject_type: "EmailMessage",
+      subject_id: newer.id
     )
   end
 
@@ -36,22 +38,22 @@ RSpec.describe Emails::SkimDecisionRecorder do
 
     described_class.record(user, [ email.id ], action: "keep")
 
-    expect(SkimDecision.last.category).to eq("promotions")
+    expect(LearningDecision.last.category).to eq("promotions")
   end
 
   it "ignores actions that aren't learnable triage verbs" do
     email = msg
     expect { described_class.record(user, [ email.id ], action: "block_sender") }
-      .not_to change(SkimDecision, :count)
+      .not_to change(LearningDecision, :count)
   end
 
   it "never records against mail the user cannot read" do
     foreign = create(:email_message, email_account: create(:email_account, workspace: create(:workspace)))
     expect { described_class.record(user, [ foreign.id ], action: "archive") }
-      .not_to change(SkimDecision, :count)
+      .not_to change(LearningDecision, :count)
   end
 
   it "is a no-op when there are no email ids" do
-    expect { described_class.record(user, [], action: "keep") }.not_to change(SkimDecision, :count)
+    expect { described_class.record(user, [], action: "keep") }.not_to change(LearningDecision, :count)
   end
 end

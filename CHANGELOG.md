@@ -48,6 +48,13 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Reminders, to‑dos, and filing suggestions learn from your choices.** When Scout
+  proposes a reminder, a task, or a tag to file an email under, it now watches how you
+  respond. If you keep dismissing a kind of reminder from a particular sender, Scout
+  stops surfacing it; a tag you keep rejecting for a sender won't be suggested again;
+  and one you always accept floats to the top. It only ever backs off after a clear,
+  repeated pattern from that same sender — and it only quiets a suggestion, never an
+  actual email or document.
 - **See how soon things are on the calendar.** The Agenda view now shows a small
   countdown next to each event and reminder — "In 20 min", "In 3 h", "Tomorrow",
   "In 4 days" — so you can tell at a glance what's imminent. Anything happening
@@ -89,6 +96,8 @@ major, minor, or patch change here.
 - **The calendar opens on the Month view by default** (was Agenda), giving you the
   whole month at a glance when you land on the page. You can still switch views
   from the tabs, and any bookmarked `?view=…` link is unchanged.
+- The Skim triage learning that already remembered your keep/archive/promote habits
+  now runs on a shared, reusable foundation (no change to how Skim behaves).
 
 ## [0.7.0] - 2026-06-30
 

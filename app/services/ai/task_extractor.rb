@@ -20,13 +20,14 @@ module Ai
     MAX_CONTENT = 8000      # chars of source text sent to the model
     MAX_KNOWN_TASKS = 20    # exclusion-list entries shown to the model
 
-    def initialize(source:, content:, anchor_date: nil, time_zone: nil, workspace: Current.workspace, known_tasks: [])
+    def initialize(source:, content:, anchor_date: nil, time_zone: nil, workspace: Current.workspace, known_tasks: [], learning_memory: nil)
       @source = source
       @content = content.to_s[0, MAX_CONTENT].to_s
       @anchor_date = anchor_date || Date.current
       @time_zone = time_zone || Time.zone
       @workspace = workspace
       @known_tasks = Array(known_tasks).compact_blank.first(MAX_KNOWN_TASKS)
+      @learning_memory = learning_memory
     end
 
     # → Array<Hash> (string keys matching the schema), or [] on non-retryable failure.
@@ -119,8 +120,27 @@ module Ai
 
         Respond with valid JSON only, using this schema:
         {"tasks": [{"title": "imperative summary, <= 80 chars", "description": "1-2 sentence summary of the task and its context (always present)", "due_date": "YYYY-MM-DD or null", "due_time": "HH:MM (24h) or null", "priority": "low|normal|high|urgent", "confidence": 0.0, "justification": "one sentence on why this is a task for the reader, quoting the source wording"}]}
+        #{learning_hints}
         #{Ai::Configuration.user_prompt_suffix("task_extraction")}
       PROMPT
+    end
+
+    # Bias the model away from suggesting tasks from a sender whose AI-suggested tasks
+    # the reader keeps cancelling. One line, only on a strong DISMISSED consensus
+    # (accepted is the safe default). Best-effort: never let a lookup break extraction.
+    def learning_hints
+      return "" unless @learning_memory
+
+      signals = Learning::EmailSignals.for(@source)
+      suggestion = @learning_memory.suggestion(
+        contact_id: signals[:contact_id], sender_domain: signals[:sender_domain]
+      )
+      return "" unless suggestion&.label == "dismissed"
+
+      Learning::Strategies::PromptHint.for_tasks(suggestion)
+    rescue => e
+      Rails.logger.warn("[Ai::TaskExtractor] learning_hints failed: #{e.message}")
+      ""
     end
 
     def user_message
