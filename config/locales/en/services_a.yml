@@ -28,13 +28,13 @@ en:
       success: Event '%{title}' added to your calendar
     create_task_from_email:
       failure: Could not create the task.
-      success: "Task created: %{title}"
-    link_task_to_email:
-      failure: Could not link the email to that task.
-      success: "Linked to task: %{title}"
+      success: 'Task created: %{title}'
     forward_email:
       failure: Could not forward to %{to_address}
       success: Forwarded to %{to_address}
+    link_task_to_email:
+      failure: Could not link the email to that task.
+      success: 'Linked to task: %{title}'
     pin:
       success: Pinned to the top of your inbox.
     reclassify:

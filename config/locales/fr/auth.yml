@@ -52,6 +52,8 @@ fr:
         que vous avez reçu pour créer votre compte.
       beta_code_label: Code d'invitation
       beta_code_placeholder: ex. ABCD-2345
+      code_hint: Nous vous enverrons un code à 6 chiffres par e-mail pour confirmer
+        que c'est bien vous.
       email_label: Adresse e-mail
       email_placeholder: vous@exemple.com
       have_account: Vous avez déjà un compte ?
@@ -60,16 +62,19 @@ fr:
       privacy: Politique de confidentialité
       sign_in: Se connecter
       submit: Envoyer le code de vérification
-      tagline: Créez votre compte
+      subtitle: Quelques étapes rapides, puis Scout se met au travail sur votre boîte.
       terms: Conditions d'utilisation
       terms_consent_html: J'accepte les %{terms} et la %{privacy}.
+      title: Créez votre compte
     password:
+      password_hint: Au moins 8 caractères. La suggestion de votre gestionnaire de
+        mots de passe est parfaite.
       password_label: Mot de passe
       password_placeholder: Au moins 8 caractères
       submit: Créer le compte
-      tagline: Définissez votre mot de passe
-      verified_prose: vérifié. Choisissez un mot de passe pour terminer la création
-        de votre compte.
+      title: Dernière étape, promis
+      verified_prose_html: "%{email} est vérifié. Choisissez un mot de passe et votre
+        compte est prêt."
     pending_approval:
       body: Votre demande de compte a été soumise pour examen. Vous recevrez un e-mail
         dès qu'elle sera approuvée.
@@ -77,13 +82,13 @@ fr:
     resend_code:
       try_later: Trop de requetes. Veuillez reessayer plus tard.
     verify:
-      code_label: Code de vérification
       code_sent_html: Nous avons envoyé un code à 6 chiffres à %{email}. Saisissez-le
         ci-dessous pour continuer.
+      digit_label: Chiffre %{position} sur 6
       resend: Renvoyer le code
       start_over: Recommencer
       submit: Vérifier
-      tagline: Vérifiez votre e-mail
+      title: Vérifiez votre e-mail
   sessions:
     new:
       beta_badge: Beta fermée
@@ -99,3 +104,4 @@ fr:
       signup_on_web_link: Créez un compte sur le Web
       submit: Se connecter
       tagline: La boîte de réception qui se range toute seule.
+      title: Bon retour

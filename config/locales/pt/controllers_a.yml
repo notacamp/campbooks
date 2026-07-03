@@ -182,7 +182,8 @@ pt:
       no_email_selected: Nenhum e-mail selecionado
       no_send_permission: Não tem permissão para enviar a partir desta conta.
       reminder_confirmed: "%{title} adicionado ao teu calendário."
-      reminder_confirmed_no_calendar: Lembrete confirmado. Liga um calendário para o sincronizar automaticamente.
+      reminder_confirmed_no_calendar: Lembrete confirmado. Liga um calendário para
+        o sincronizar automaticamente.
       reminder_dismissed: Lembrete dispensado.
       reply_sent: Resposta enviada
       save_draft_html: Rascunho guardado

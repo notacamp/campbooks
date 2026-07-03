@@ -2,6 +2,7 @@
 en:
   components:
     product_tour:
+      ai_tag: AI
       aria_label: Product tour
       back: Back
       next: Next
@@ -62,6 +63,5 @@ en:
       s6_cta_connect: Connect your inbox
       s6_cta_explore: Explore on my own
       s6_title: You're ready
-      ai_tag: AI
       skip: Skip tour
       step: "%{current} of %{total}"

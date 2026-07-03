@@ -1,38 +1,40 @@
+---
 en:
-  settings:
-    pipelines:
-      index:
-        heading: Pipelines
-        subtitle: Create custom workflows to track documents through stages.
-        new_pipeline: New pipeline
-        view_board: View board
-        confirm_delete: Delete this pipeline? All memberships will be removed.
-        empty_title: No pipelines yet
-        empty_description: Create a pipeline to track documents or emails through custom stages like a kanban board.
-        create_first: Create your first pipeline
-      new:
-        heading: New pipeline
-        subtitle: Define the stages your documents will move through.
-      edit:
-        heading: Edit pipeline
-        subtitle: Modify stages or pipeline settings.
-      create:
-        created: Pipeline created.
-      update:
-        updated: Pipeline updated.
-      destroy:
-        deleted: Pipeline deleted.
-      form:
-        name_placeholder: e.g. Invoice Approval
-        description_placeholder: What this pipeline tracks
-        applies_to_options:
-          documents: Documents
-          emails: Emails
-          both: Both
-        stages_heading: Stages
-        add_stage: Add stage
-        stages_hint: Drag to reorder stages. Items in terminal stages cannot be moved.
   navigation:
     settings:
       items:
         pipelines: Pipelines
+  settings:
+    pipelines:
+      create:
+        created: Pipeline created.
+      destroy:
+        deleted: Pipeline deleted.
+      edit:
+        heading: Edit pipeline
+        subtitle: Modify stages or pipeline settings.
+      form:
+        add_stage: Add stage
+        applies_to_options:
+          both: Both
+          documents: Documents
+          emails: Emails
+        description_placeholder: What this pipeline tracks
+        name_placeholder: e.g. Invoice Approval
+        stages_heading: Stages
+        stages_hint: Drag to reorder stages. Items in terminal stages cannot be moved.
+      index:
+        confirm_delete: Delete this pipeline? All memberships will be removed.
+        create_first: Create your first pipeline
+        empty_description: Create a pipeline to track documents or emails through
+          custom stages like a kanban board.
+        empty_title: No pipelines yet
+        heading: Pipelines
+        new_pipeline: New pipeline
+        subtitle: Create custom workflows to track documents through stages.
+        view_board: View board
+      new:
+        heading: New pipeline
+        subtitle: Define the stages your documents will move through.
+      update:
+        updated: Pipeline updated.

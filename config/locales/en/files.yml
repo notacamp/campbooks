@@ -1,136 +1,141 @@
 ---
 en:
+  components:
+    files:
+      doc_row:
+        actions: Document actions
+        edit: Edit
+        kind: Internal document
+        move_to: Move to
+        open: Open
+        remove_from_folder: Remove from folder
+        updated: Updated %{date}
+      email_row:
+        actions: Email actions
+        no_subject: "(no subject)"
+        open: Open in Mail
+        remove_from_folder: Remove from folder
+      file_actions_menu:
+        actions: File actions
+        delete: Delete
+        delete_confirm: Delete "%{name}"? This can't be undone.
+        download: Download
+        move_to: Move to
+        open: Open
+        remove_from_folder: Remove from folder
+      file_link_picker:
+        button: Insert file link
+        empty: No files to link yet.
+        hint: Pick a file — a public link is created and inserted into your message.
+        insert: Insert
+        loading: Loading files…
+        title: Insert a file link
+      file_meta:
+        kind_file: File
+        kind_image: Image
+      folder_sharing:
+        add_button: Add
+        add_title: Add people
+        all_have_access: Everyone in the workspace already has access.
+        open_hint: This folder is open to everyone in your workspace. Restrict it
+          to choose who has access.
+        owner_badge: Owner
+        remove_aria: Remove access
+        remove_confirm: Remove %{name} from this folder?
+        restrict_hint: Only people you add (and admins) can see this folder and its
+          contents.
+        restrict_label: Restrict access
+        role_aria: Access level
+        role_editor: Can edit
+        role_manager: Manager
+        role_viewer: Can view
+        select_placeholder: Choose a person…
+        you_badge: You
+      search_bar:
+        clear: Clear search
+        placeholder: Search files…
+        submit: Search
+      sidebar:
+        all_files: All files
+        label: Folders
+        new_folder: New folder
   files:
     index:
-      title: Files
-      subtitle: Upload, organize, and find your files.
-      new_folder: New folder
-      new_folder_hint: Group your files into a folder.
-      upload: Upload
-      breadcrumb: Breadcrumb
-      all_files: All files
-      click_to_upload: Click to upload
-      drag_and_drop: or drag and drop
-      upload_hint: You can upload any type of file.
-      selected_files: Selected files
-      upload_submit: Upload files
-      col_name: Name
-      col_kind: Type
-      col_size: Size
-      col_added: Added
-      col_actions: Actions
-      empty_folder: This folder is empty.
-      search_results:
-        zero: "No results for \"%{q}\""
-        one: "1 result for \"%{q}\""
-        other: "%{count} results for \"%{q}\""
-      search_empty: No documents matched your search. Try a different term or clear your filters.
-      empty_title: No files yet
-      empty_description: Upload files to keep them organized in folders — invoices, contracts, anything.
-      empty_upload: Upload files
-      new_internal_document: New document
-      internal_documents: Internal documents
-      emails: Emails
-      files_section: Files
-      manage_access: Manage access
-      manage_access_locked: "Manage access · Private"
-      review_n: "Review %{count}"
       ai_analyze: Analyze with AI
-      ai_analyze_hint: Extract and classify business documents (invoices, receipts…). Turn off to just store the file.
-      filters: Filters
-      filter_category: Category
-      filter_type: Type
-      filter_status: Status
-      filter_month: Month
-      filter_folder: Folder
-      filter_all_categories: All categories
-      filter_all_types: All types
-      filter_all_statuses: All statuses
-      filter_all_folders: All folders
-      filter_types_selected: "%{count} selected"
-      reanalyze_all: "Re-analyze all %{count}"
+      ai_analyze_hint: Extract and classify business documents (invoices, receipts…).
+        Turn off to just store the file.
+      all_files: All files
+      breadcrumb: Breadcrumb
+      click_to_upload: Click to upload
+      col_actions: Actions
+      col_added: Added
+      col_kind: Type
+      col_name: Name
+      col_size: Size
+      download_zip: Download ZIP
+      drag_and_drop: or drag and drop
+      emails: Emails
+      empty_description: Upload files to keep them organized in folders — invoices,
+        contracts, anything.
+      empty_folder: This folder is empty.
+      empty_title: No files yet
+      empty_upload: Upload files
       export: Export
       export_confirm: Export the documents matching the current filters as a ZIP?
-      exports_heading: Recent exports
+      export_failed: Export failed
       exports_col_date: Date
-      exports_col_status: Status
       exports_col_documents: Documents
       exports_col_download: Download
-      download_zip: Download ZIP
-      export_failed: Export failed
-    uploads:
-      create:
-        no_files: Choose at least one file to upload.
-        uploaded_one: File uploaded.
-        uploaded_many: "%{count} files uploaded."
-        analyzed_one: File uploaded and queued for AI analysis.
-        analyzed_many: "%{count} files uploaded and queued for AI analysis."
-        failed: "Upload failed: %{message}"
-      destroy:
-        deleted: File deleted.
-      analyze:
-        analyzing: Analyzing this file with AI…
+      exports_col_status: Status
+      exports_heading: Recent exports
+      files_section: Files
+      filter_all_categories: All categories
+      filter_all_folders: All folders
+      filter_all_statuses: All statuses
+      filter_all_types: All types
+      filter_category: Category
+      filter_folder: Folder
+      filter_month: Month
+      filter_status: Status
+      filter_type: Type
+      filter_types_selected: "%{count} selected"
+      filters: Filters
+      internal_documents: Internal documents
+      manage_access: Manage access
+      manage_access_locked: Manage access · Private
+      new_folder: New folder
+      new_folder_hint: Group your files into a folder.
+      new_internal_document: New document
+      reanalyze_all: Re-analyze all %{count}
+      review_n: Review %{count}
+      search_empty: No documents matched your search. Try a different term or clear
+        your filters.
+      search_results:
+        one: 1 result for "%{q}"
+        other: '%{count} results for "%{q}"'
+        zero: No results for "%{q}"
+      selected_files: Selected files
+      subtitle: Upload, organize, and find your files.
+      title: Files
+      upload: Upload
+      upload_hint: You can upload any type of file.
+      upload_submit: Upload files
     public_links:
       create:
         created: Public link ready.
       destroy:
         revoked: Public link revoked.
     scout_thread_linker:
-      body: "I pulled a document out of this email and filed it in Files: **[%{title}](%{path})**."
-  components:
-    files:
-      search_bar:
-        placeholder: Search files…
-        submit: Search
-        clear: Clear search
-      sidebar:
-        label: Folders
-        all_files: All files
-        new_folder: New folder
-      file_actions_menu:
-        actions: File actions
-        open: Open
-        download: Download
-        move_to: Move to
-        remove_from_folder: Remove from folder
-        delete: Delete
-        delete_confirm: "Delete \"%{name}\"? This can't be undone."
-      file_meta:
-        kind_image: Image
-        kind_file: File
-      doc_row:
-        kind: Internal document
-        updated: Updated %{date}
-        actions: Document actions
-        open: Open
-        edit: Edit
-        move_to: Move to
-        remove_from_folder: Remove from folder
-      email_row:
-        no_subject: (no subject)
-        actions: Email actions
-        open: Open in Mail
-        remove_from_folder: Remove from folder
-      folder_sharing:
-        open_hint: This folder is open to everyone in your workspace. Restrict it to choose who has access.
-        restrict_label: Restrict access
-        restrict_hint: Only people you add (and admins) can see this folder and its contents.
-        you_badge: You
-        owner_badge: Owner
-        role_aria: Access level
-        role_viewer: Can view
-        role_editor: Can edit
-        role_manager: Manager
-        remove_confirm: "Remove %{name} from this folder?"
-        remove_aria: Remove access
-        add_title: Add people
-        all_have_access: Everyone in the workspace already has access.
-        select_placeholder: Choose a person…
-        add_button: Add
-      file_link_picker:
-        button: Insert file link
-        title: Insert a file link
-        hint: Pick a file — a public link is created and inserted into your message.
-        loading: Loading files…
-        empty: No files to link yet.
-        insert: Insert
+      body: 'I pulled a document out of this email and filed it in Files: **[%{title}](%{path})**.'
+    uploads:
+      analyze:
+        analyzing: Analyzing this file with AI…
+      create:
+        analyzed_many: "%{count} files uploaded and queued for AI analysis."
+        analyzed_one: File uploaded and queued for AI analysis.
+        failed: 'Upload failed: %{message}'
+        no_files: Choose at least one file to upload.
+        uploaded_many: "%{count} files uploaded."
+        uploaded_one: File uploaded.
+      destroy:
+        deleted: File deleted.

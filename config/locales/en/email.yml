@@ -1,48 +1,6 @@
 ---
 en:
   email_messages:
-    notion_exports:
-      new:
-        title: Save to Notion
-        subtitle: "Add this email (%{subject}) to Notion."
-        no_subject: "(no subject)"
-        heading: Where should this go?
-        workspace: Workspace
-        workspace_one: "Workspace: %{name}"
-        to_database: Add to a database
-        to_database_desc: Create a database item and fill in its fields.
-        to_page: Create a page
-        to_page_desc: Add a subpage under a page you choose.
-      databases:
-        search: Search databases…
-        none: No databases found. Share a database with this integration in Notion.
-        error: "Couldn't load databases: %{message}"
-      database_form:
-        untitled: Untitled database
-        back: ← Databases
-        create_item: Create item in Notion
-        error: "Couldn't load the database: %{message}"
-        attachments_count:
-          one: "%{count} attachment"
-          other: "%{count} attachments"
-      pages:
-        search: Search pages…
-        parent_page: Parent page
-        none: No pages found. Share a page with this integration in Notion.
-        page_title: Page title
-        note: Note (optional)
-        attach_files:
-          one: Attach the email's attachment
-          other: Attach the email's %{count} attachments
-        create_page: Create page in Notion
-        error: "Couldn't load pages: %{message}"
-      create:
-        pick_destination: Choose a destination in Notion.
-        created: Saved to Notion.
-        failed: Couldn't create the item in Notion.
-        failed_with: "Notion export failed: %{message}"
-      errors:
-        not_connected: Connect Notion first.
     board:
       index:
         heading: Board
@@ -112,6 +70,48 @@ en:
       to_placeholder: Search contacts or type email...
       toggle_chat_aria: Toggle chat
       write_message_placeholder: Write your message...
+    notion_exports:
+      create:
+        created: Saved to Notion.
+        failed: Couldn't create the item in Notion.
+        failed_with: 'Notion export failed: %{message}'
+        pick_destination: Choose a destination in Notion.
+      database_form:
+        attachments_count:
+          one: "%{count} attachment"
+          other: "%{count} attachments"
+        back: "← Databases"
+        create_item: Create item in Notion
+        error: 'Couldn''t load the database: %{message}'
+        untitled: Untitled database
+      databases:
+        error: 'Couldn''t load databases: %{message}'
+        none: No databases found. Share a database with this integration in Notion.
+        search: Search databases…
+      errors:
+        not_connected: Connect Notion first.
+      new:
+        heading: Where should this go?
+        no_subject: "(no subject)"
+        subtitle: Add this email (%{subject}) to Notion.
+        title: Save to Notion
+        to_database: Add to a database
+        to_database_desc: Create a database item and fill in its fields.
+        to_page: Create a page
+        to_page_desc: Add a subpage under a page you choose.
+        workspace: Workspace
+        workspace_one: 'Workspace: %{name}'
+      pages:
+        attach_files:
+          one: Attach the email's attachment
+          other: Attach the email's %{count} attachments
+        create_page: Create page in Notion
+        error: 'Couldn''t load pages: %{message}'
+        none: No pages found. Share a page with this integration in Notion.
+        note: Note (optional)
+        page_title: Page title
+        parent_page: Parent page
+        search: Search pages…
     reply_actions:
       forward_title: Forward
       reply_all_title: Reply All
@@ -182,7 +182,7 @@ en:
       no_subject: "(no subject)"
       pin_title: Make priority
       priority_section: Priority
-      select_section: "Select all in %{section}"
+      select_section: Select all in %{section}
       senders_more: "%{first}, %{second}, and more"
       sent_to_prefix: 'To:'
       unpin_title: Remove priority

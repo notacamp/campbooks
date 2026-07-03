@@ -1,85 +1,87 @@
 ---
 pt:
-  scheduled_emails:
-    index:
-      title: Emails agendados
-      new: Novo email agendado
-      empty_title: Sem emails agendados
-      empty_description: Agende um email para ser enviado mais tarde — uma vez ou de forma recorrente.
-      to: "Para %{address}"
-      scheduled_for: "Agendado para %{time}"
-      recurring: Recorrente
-    new:
-      title: Agendar um email
-    create:
-      created: Email agendado com sucesso.
-    edit:
-      title: Editar email agendado
-    update:
-      updated: Email agendado atualizado.
-    destroy:
-      cancelled: Email agendado cancelado.
-    show:
-      title: Email agendado
-      back: ← Voltar aos emails agendados
-      edit: Editar
-      cancel: Cancelar agendamento
-      confirm_cancel: Cancelar este email agendado?
-      from: De
-      scheduled: Agendado
-      recurring_label: "Repete: %{rule}"
-      status: Estado
-      preview: Pré-visualização
-    form:
-      errors:
-        one: "1 erro impediu que este email agendado fosse guardado:"
-        other: "%{count} erros impediram que este email agendado fosse guardado:"
-      select_account: Selecione uma conta de email…
-      body_placeholder: Escreva o seu email aqui.
-      rrule_hint: 'Escolha a frequência com que este email se repete. "Não repete" envia apenas uma vez.'
-      cancel: Cancelar
-    recurrence:
-      none: Não repete
-      daily: Diariamente
-      weekly: Semanalmente
-      biweekly: A cada 2 semanas
-      monthly: Mensalmente
-      custom: Personalizado
-  email_compose:
-    send_message:
-      scheduled: "Email agendado para %{time}. Faça a gestão em Emails agendados."
-      schedule_failed: Não foi possível agendar o email. Verifique os campos obrigatórios.
-  entitlements:
-    features:
-      email_scheduling: Agendamento de emails
-  components:
-    compose_area:
-      schedule: Agendar
-      schedule_at_label: Enviar em
-      schedule_for_later: Agendar para mais tarde
-    calendar:
-      snoozed_row:
-        no_subject: "(Email adiado)"
-        snoozed_from: "Regressa — %{account}"
-      scheduled_email_row:
-        to: "Para %{address}"
   activerecord:
     attributes:
       scheduled_email:
-        to_address: Para
-        cc_address: Cc
         bcc_address: Bcc
-        subject: Assunto
         body: Corpo
-        scheduled_at: Enviar em
-        rrule: Recorrência
+        cc_address: Cc
         email_account_id: De
+        rrule: Recorrência
+        scheduled_at: Enviar em
         statuses:
-          pending: Pendente
-          sent: Enviado
           cancelled: Cancelado
           failed: Falhou
+          pending: Pendente
+          sent: Enviado
+        subject: Assunto
+        to_address: Para
     models:
       scheduled_email:
         one: Email agendado
         other: Emails agendados
+  components:
+    calendar:
+      scheduled_email_row:
+        to: Para %{address}
+      snoozed_row:
+        no_subject: "(Email adiado)"
+        snoozed_from: Regressa — %{account}
+    compose_area:
+      schedule: Agendar
+      schedule_at_label: Enviar em
+      schedule_for_later: Agendar para mais tarde
+  email_compose:
+    send_message:
+      schedule_failed: Não foi possível agendar o email. Verifique os campos obrigatórios.
+      scheduled: Email agendado para %{time}. Faça a gestão em Emails agendados.
+  entitlements:
+    features:
+      email_scheduling: Agendamento de emails
+  scheduled_emails:
+    create:
+      created: Email agendado com sucesso.
+    destroy:
+      cancelled: Email agendado cancelado.
+    edit:
+      title: Editar email agendado
+    form:
+      body_placeholder: Escreva o seu email aqui.
+      cancel: Cancelar
+      errors:
+        one: '1 erro impediu que este email agendado fosse guardado:'
+        other: "%{count} erros impediram que este email agendado fosse guardado:"
+      rrule_hint: Escolha a frequência com que este email se repete. "Não repete"
+        envia apenas uma vez.
+      select_account: Selecione uma conta de email…
+    index:
+      empty_description: Agende um email para ser enviado mais tarde — uma vez ou
+        de forma recorrente.
+      empty_title: Sem emails agendados
+      new: Novo email agendado
+      recurring: Recorrente
+      scheduled_for: Agendado para %{time}
+      title: Emails agendados
+      to: Para %{address}
+    new:
+      title: Agendar um email
+    recurrence:
+      biweekly: A cada 2 semanas
+      custom: Personalizado
+      daily: Diariamente
+      monthly: Mensalmente
+      none: Não repete
+      weekly: Semanalmente
+    show:
+      back: "← Voltar aos emails agendados"
+      cancel: Cancelar agendamento
+      confirm_cancel: Cancelar este email agendado?
+      edit: Editar
+      from: De
+      preview: Pré-visualização
+      recurring_label: 'Repete: %{rule}'
+      scheduled: Agendado
+      status: Estado
+      title: Email agendado
+    update:
+      updated: Email agendado atualizado.

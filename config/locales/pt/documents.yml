@@ -23,6 +23,10 @@ pt:
         subtitle: Escolha onde colocar %{document}.
         title: Enviar para o Google Drive
         upload_here: Carregar para %{folder}
+    folders:
+      add_prompt: Adicionar à pasta…
+      label: Pastas
+      remove: Remover de %{name}
     forms:
       bank_statement:
         account_number: Número de Conta
@@ -67,10 +71,6 @@ pt:
         invoice_number: Número de Factura
         tax_amount_cents: Montante de IVA (cêntimos)
         tax_rate: Taxa de IVA (%)
-    folders:
-      add_prompt: Adicionar à pasta…
-      label: Pastas
-      remove: Remover de %{name}
     index:
       accepted_formats: PDF, JPG, PNG, WEBP, HEIC
       click_to_upload: Clique para carregar
@@ -119,36 +119,6 @@ pt:
       upload: Carregar
       upload_and_process: Carregar e Processar
       write: Escrever
-    written:
-      index:
-        title: Documentos escritos
-        back_to_documents: Voltar para Docs
-        new: Novo documento
-        empty_title: Ainda não há documentos escritos
-        empty_description: Escreva documentos formatados como cartas, relatórios e notas a partir do zero.
-      new:
-        title: Escrever documento
-        title_placeholder: Título do documento
-        editor_placeholder: Comece a escrever…
-        save: Guardar documento
-        cancel: Cancelar
-        back_to_documents: Voltar para Docs
-      create:
-        created: Documento guardado.
-      show:
-        edit: Editar
-        back_to_documents: Voltar para Docs
-        created_at: "Criado a %{date}"
-        by: por %{name}
-      edit:
-        title: Editar documento
-        title_placeholder: Título do documento
-        editor_placeholder: Comece a escrever…
-        save: Guardar alterações
-        cancel: Cancelar
-        back_to_document: Voltar ao documento
-      update:
-        updated: Documento atualizado.
     merge:
       keep_this_one: Manter Este
       label_date: 'Data:'
@@ -206,7 +176,8 @@ pt:
       fullscreen_iframe_title: Pré-visualização do PDF em ecrã inteiro
     row:
       approve: Aprovar
-      drive_failed_retry: 'Envio para o Drive falhou: %{error}. Clique para tentar novamente.'
+      drive_failed_retry: 'Envio para o Drive falhou: %{error}. Clique para tentar
+        novamente.'
       drive_pushed: No Drive desde %{at}
       drive_retry: Tentar novamente
       in_drive: No Drive
@@ -252,3 +223,34 @@ pt:
         ai_unsure: "%{count} sobre os quais a IA ficou em dúvida — reveja para confirmar
           ou reclassificar"
         needs_review: Necessita de revisão
+    written:
+      create:
+        created: Documento guardado.
+      edit:
+        back_to_document: Voltar ao documento
+        cancel: Cancelar
+        editor_placeholder: Comece a escrever…
+        save: Guardar alterações
+        title: Editar documento
+        title_placeholder: Título do documento
+      index:
+        back_to_documents: Voltar para Docs
+        empty_description: Escreva documentos formatados como cartas, relatórios e
+          notas a partir do zero.
+        empty_title: Ainda não há documentos escritos
+        new: Novo documento
+        title: Documentos escritos
+      new:
+        back_to_documents: Voltar para Docs
+        cancel: Cancelar
+        editor_placeholder: Comece a escrever…
+        save: Guardar documento
+        title: Escrever documento
+        title_placeholder: Título do documento
+      show:
+        back_to_documents: Voltar para Docs
+        by: por %{name}
+        created_at: Criado a %{date}
+        edit: Editar
+      update:
+        updated: Documento atualizado.

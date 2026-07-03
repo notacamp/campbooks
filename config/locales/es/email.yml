@@ -1,50 +1,6 @@
 ---
 es:
   email_messages:
-    notion_exports:
-      new:
-        title: Guardar en Notion
-        subtitle: "Agregar este correo (%{subject}) a Notion."
-        no_subject: "(sin asunto)"
-        heading: "¿Dónde debe ir esto?"
-        workspace: Espacio de trabajo
-        workspace_one: "Espacio de trabajo: %{name}"
-        to_database: Agregar a una base de datos
-        to_database_desc: Crear un elemento en la base de datos y rellenar sus campos.
-        to_page: Crear una página
-        to_page_desc: Agregar una subpágina bajo una página a su elección.
-      databases:
-        search: Buscar bases de datos…
-        none: No se encontraron bases de datos. Comparta una base de datos con esta
-          integración en Notion.
-        error: "No se pudieron cargar las bases de datos: %{message}"
-      database_form:
-        untitled: Base de datos sin título
-        back: "← Bases de datos"
-        create_item: Crear elemento en Notion
-        error: "No se pudo cargar la base de datos: %{message}"
-        attachments_count:
-          one: "%{count} archivo adjunto"
-          other: "%{count} archivos adjuntos"
-      pages:
-        search: Buscar páginas…
-        parent_page: Página principal
-        none: No se encontraron páginas. Comparta una página con esta integración en
-          Notion.
-        page_title: Título de la página
-        note: Nota (opcional)
-        attach_files:
-          one: Adjuntar el archivo adjunto del correo
-          other: Adjuntar los %{count} archivos adjuntos del correo
-        create_page: Crear página en Notion
-        error: "No se pudieron cargar las páginas: %{message}"
-      create:
-        pick_destination: Elija un destino en Notion.
-        created: Guardado en Notion.
-        failed: No se pudo crear el elemento en Notion.
-        failed_with: "Exportación a Notion fallida: %{message}"
-      errors:
-        not_connected: Conecte Notion primero.
     board:
       index:
         heading: Tablero
@@ -114,6 +70,50 @@ es:
       to_placeholder: Buscar contactos o escribir correo...
       toggle_chat_aria: Alternar chat
       write_message_placeholder: Escriba su mensaje...
+    notion_exports:
+      create:
+        created: Guardado en Notion.
+        failed: No se pudo crear el elemento en Notion.
+        failed_with: 'Exportación a Notion fallida: %{message}'
+        pick_destination: Elija un destino en Notion.
+      database_form:
+        attachments_count:
+          one: "%{count} archivo adjunto"
+          other: "%{count} archivos adjuntos"
+        back: "← Bases de datos"
+        create_item: Crear elemento en Notion
+        error: 'No se pudo cargar la base de datos: %{message}'
+        untitled: Base de datos sin título
+      databases:
+        error: 'No se pudieron cargar las bases de datos: %{message}'
+        none: No se encontraron bases de datos. Comparta una base de datos con esta
+          integración en Notion.
+        search: Buscar bases de datos…
+      errors:
+        not_connected: Conecte Notion primero.
+      new:
+        heading: "¿Dónde debe ir esto?"
+        no_subject: "(sin asunto)"
+        subtitle: Agregar este correo (%{subject}) a Notion.
+        title: Guardar en Notion
+        to_database: Agregar a una base de datos
+        to_database_desc: Crear un elemento en la base de datos y rellenar sus campos.
+        to_page: Crear una página
+        to_page_desc: Agregar una subpágina bajo una página a su elección.
+        workspace: Espacio de trabajo
+        workspace_one: 'Espacio de trabajo: %{name}'
+      pages:
+        attach_files:
+          one: Adjuntar el archivo adjunto del correo
+          other: Adjuntar los %{count} archivos adjuntos del correo
+        create_page: Crear página en Notion
+        error: 'No se pudieron cargar las páginas: %{message}'
+        none: No se encontraron páginas. Comparta una página con esta integración
+          en Notion.
+        note: Nota (opcional)
+        page_title: Título de la página
+        parent_page: Página principal
+        search: Buscar páginas…
     reply_actions:
       forward_title: Reenviar
       reply_all_title: Responder a todos
@@ -184,7 +184,7 @@ es:
       no_subject: "(sin asunto)"
       pin_title: Marcar como prioritario
       priority_section: Prioritario
-      select_section: "Seleccionar todo en %{section}"
+      select_section: Seleccionar todo en %{section}
       senders_more: "%{first}, %{second} y más"
       sent_to_prefix: 'Para:'
       unpin_title: Quitar prioridad

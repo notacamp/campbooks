@@ -1,136 +1,142 @@
 ---
 es:
+  components:
+    files:
+      doc_row:
+        actions: Acciones del documento
+        edit: Editar
+        kind: Documento interno
+        move_to: Mover a
+        open: Abrir
+        remove_from_folder: Quitar de la carpeta
+        updated: Actualizado el %{date}
+      email_row:
+        actions: Acciones del correo
+        no_subject: "(sin asunto)"
+        open: Abrir en Correo
+        remove_from_folder: Quitar de la carpeta
+      file_actions_menu:
+        actions: Acciones del archivo
+        delete: Eliminar
+        delete_confirm: ¿Eliminar "%{name}"? Esta acción no se puede deshacer.
+        download: Descargar
+        move_to: Mover a
+        open: Abrir
+        remove_from_folder: Quitar de la carpeta
+      file_link_picker:
+        button: Insertar enlace a archivo
+        empty: Aún no hay archivos para enlazar.
+        hint: 'Elige un archivo: se crea e inserta un enlace público en tu mensaje.'
+        insert: Insertar
+        loading: Cargando archivos…
+        title: Insertar un enlace a archivo
+      file_meta:
+        kind_file: Archivo
+        kind_image: Imagen
+      folder_sharing:
+        add_button: Añadir
+        add_title: Añadir personas
+        all_have_access: Todos en el espacio de trabajo ya tienen acceso.
+        open_hint: Esta carpeta está abierta a todos en tu espacio de trabajo. Restríngela
+          para elegir quién tiene acceso.
+        owner_badge: Propietario
+        remove_aria: Quitar acceso
+        remove_confirm: "¿Quitar a %{name} de esta carpeta?"
+        restrict_hint: Solo las personas que añadas (y los administradores) pueden
+          ver esta carpeta y su contenido.
+        restrict_label: Restringir acceso
+        role_aria: Nivel de acceso
+        role_editor: Puede editar
+        role_manager: Gestor
+        role_viewer: Puede ver
+        select_placeholder: Elige una persona…
+        you_badge: Tú
+      search_bar:
+        clear: Borrar búsqueda
+        placeholder: Buscar archivos…
+        submit: Buscar
+      sidebar:
+        all_files: Todos los archivos
+        label: Carpetas
+        new_folder: Nueva carpeta
   files:
     index:
-      title: Archivos
-      subtitle: Sube, organiza y encuentra tus archivos.
-      new_folder: Nueva carpeta
-      new_folder_hint: Agrupa tus archivos en una carpeta.
-      upload: Subir
-      breadcrumb: Ruta de navegación
-      all_files: Todos los archivos
-      click_to_upload: Haz clic para subir
-      drag_and_drop: o arrastra y suelta
-      upload_hint: Puedes subir cualquier tipo de archivo.
-      selected_files: Archivos seleccionados
-      upload_submit: Subir archivos
-      col_name: Nombre
-      col_kind: Tipo
-      col_size: Tamaño
-      col_added: Añadido
-      col_actions: Acciones
-      empty_folder: Esta carpeta está vacía.
-      search_results:
-        zero: "Sin resultados para \"%{q}\""
-        one: "1 resultado para \"%{q}\""
-        other: "%{count} resultados para \"%{q}\""
-      search_empty: Ningún documento coincide con tu búsqueda. Prueba otro término o borra los filtros.
-      empty_title: Aún no hay archivos
-      empty_description: "Sube archivos para mantenerlos organizados en carpetas: facturas, contratos, lo que sea."
-      empty_upload: Subir archivos
-      new_internal_document: Nuevo documento
-      internal_documents: Documentos internos
-      emails: Correos
-      files_section: Archivos
-      manage_access: Gestionar acceso
-      manage_access_locked: "Gestionar acceso · Privado"
-      review_n: "Revisar %{count}"
       ai_analyze: Analizar con IA
-      ai_analyze_hint: Extrae y clasifica documentos comerciales (facturas, recibos…). Desactívalo para solo guardar el archivo.
-      filters: Filtros
-      filter_category: Categoría
-      filter_type: Tipo
-      filter_status: Estado
-      filter_month: Mes
-      filter_folder: Carpeta
-      filter_all_categories: Todas las categorías
-      filter_all_types: Todos los tipos
-      filter_all_statuses: Todos los estados
-      filter_all_folders: Todas las carpetas
-      filter_types_selected: "%{count} seleccionado(s)"
-      reanalyze_all: "Reanalizar todos (%{count})"
+      ai_analyze_hint: Extrae y clasifica documentos comerciales (facturas, recibos…).
+        Desactívalo para solo guardar el archivo.
+      all_files: Todos los archivos
+      breadcrumb: Ruta de navegación
+      click_to_upload: Haz clic para subir
+      col_actions: Acciones
+      col_added: Añadido
+      col_kind: Tipo
+      col_name: Nombre
+      col_size: Tamaño
+      download_zip: Descargar ZIP
+      drag_and_drop: o arrastra y suelta
+      emails: Correos
+      empty_description: 'Sube archivos para mantenerlos organizados en carpetas:
+        facturas, contratos, lo que sea.'
+      empty_folder: Esta carpeta está vacía.
+      empty_title: Aún no hay archivos
+      empty_upload: Subir archivos
       export: Exportar
-      export_confirm: ¿Exportar los documentos que coinciden con los filtros actuales como ZIP?
-      exports_heading: Exportaciones recientes
+      export_confirm: "¿Exportar los documentos que coinciden con los filtros actuales
+        como ZIP?"
+      export_failed: La exportación falló
       exports_col_date: Fecha
-      exports_col_status: Estado
       exports_col_documents: Documentos
       exports_col_download: Descargar
-      download_zip: Descargar ZIP
-      export_failed: La exportación falló
-    uploads:
-      create:
-        no_files: Elige al menos un archivo para subir.
-        uploaded_one: Archivo subido.
-        uploaded_many: "%{count} archivos subidos."
-        analyzed_one: Archivo subido y en cola para análisis con IA.
-        analyzed_many: "%{count} archivos subidos y en cola para análisis con IA."
-        failed: "Error al subir: %{message}"
-      destroy:
-        deleted: Archivo eliminado.
-      analyze:
-        analyzing: Analizando este archivo con IA…
+      exports_col_status: Estado
+      exports_heading: Exportaciones recientes
+      files_section: Archivos
+      filter_all_categories: Todas las categorías
+      filter_all_folders: Todas las carpetas
+      filter_all_statuses: Todos los estados
+      filter_all_types: Todos los tipos
+      filter_category: Categoría
+      filter_folder: Carpeta
+      filter_month: Mes
+      filter_status: Estado
+      filter_type: Tipo
+      filter_types_selected: "%{count} seleccionado(s)"
+      filters: Filtros
+      internal_documents: Documentos internos
+      manage_access: Gestionar acceso
+      manage_access_locked: Gestionar acceso · Privado
+      new_folder: Nueva carpeta
+      new_folder_hint: Agrupa tus archivos en una carpeta.
+      new_internal_document: Nuevo documento
+      reanalyze_all: Reanalizar todos (%{count})
+      review_n: Revisar %{count}
+      search_empty: Ningún documento coincide con tu búsqueda. Prueba otro término
+        o borra los filtros.
+      search_results:
+        one: 1 resultado para "%{q}"
+        other: '%{count} resultados para "%{q}"'
+        zero: Sin resultados para "%{q}"
+      selected_files: Archivos seleccionados
+      subtitle: Sube, organiza y encuentra tus archivos.
+      title: Archivos
+      upload: Subir
+      upload_hint: Puedes subir cualquier tipo de archivo.
+      upload_submit: Subir archivos
     public_links:
       create:
         created: Enlace público listo.
       destroy:
         revoked: Enlace público revocado.
     scout_thread_linker:
-      body: "Saqué un documento de este correo y lo archivé en Archivos: **[%{title}](%{path})**."
-  components:
-    files:
-      search_bar:
-        placeholder: Buscar archivos…
-        submit: Buscar
-        clear: Borrar búsqueda
-      sidebar:
-        label: Carpetas
-        all_files: Todos los archivos
-        new_folder: Nueva carpeta
-      file_actions_menu:
-        actions: Acciones del archivo
-        open: Abrir
-        download: Descargar
-        move_to: Mover a
-        remove_from_folder: Quitar de la carpeta
-        delete: Eliminar
-        delete_confirm: "¿Eliminar \"%{name}\"? Esta acción no se puede deshacer."
-      file_meta:
-        kind_image: Imagen
-        kind_file: Archivo
-      doc_row:
-        kind: Documento interno
-        updated: Actualizado el %{date}
-        actions: Acciones del documento
-        open: Abrir
-        edit: Editar
-        move_to: Mover a
-        remove_from_folder: Quitar de la carpeta
-      email_row:
-        no_subject: (sin asunto)
-        actions: Acciones del correo
-        open: Abrir en Correo
-        remove_from_folder: Quitar de la carpeta
-      folder_sharing:
-        open_hint: Esta carpeta está abierta a todos en tu espacio de trabajo. Restríngela para elegir quién tiene acceso.
-        restrict_label: Restringir acceso
-        restrict_hint: Solo las personas que añadas (y los administradores) pueden ver esta carpeta y su contenido.
-        you_badge: Tú
-        owner_badge: Propietario
-        role_aria: Nivel de acceso
-        role_viewer: Puede ver
-        role_editor: Puede editar
-        role_manager: Gestor
-        remove_confirm: "¿Quitar a %{name} de esta carpeta?"
-        remove_aria: Quitar acceso
-        add_title: Añadir personas
-        all_have_access: Todos en el espacio de trabajo ya tienen acceso.
-        select_placeholder: Elige una persona…
-        add_button: Añadir
-      file_link_picker:
-        button: Insertar enlace a archivo
-        title: Insertar un enlace a archivo
-        hint: "Elige un archivo: se crea e inserta un enlace público en tu mensaje."
-        loading: Cargando archivos…
-        empty: Aún no hay archivos para enlazar.
-        insert: Insertar
+      body: 'Saqué un documento de este correo y lo archivé en Archivos: **[%{title}](%{path})**.'
+    uploads:
+      analyze:
+        analyzing: Analizando este archivo con IA…
+      create:
+        analyzed_many: "%{count} archivos subidos y en cola para análisis con IA."
+        analyzed_one: Archivo subido y en cola para análisis con IA.
+        failed: 'Error al subir: %{message}'
+        no_files: Elige al menos un archivo para subir.
+        uploaded_many: "%{count} archivos subidos."
+        uploaded_one: Archivo subido.
+      destroy:
+        deleted: Archivo eliminado.

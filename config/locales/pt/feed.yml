@@ -44,17 +44,6 @@ pt:
         overdue: Em atraso
         today: Hoje
         tomorrow: Amanhã
-      task_card:
-        accept: Adicionar às tarefas
-        complete: Concluir
-        dismiss: Dispensar
-        in_days:
-          one: Entrega em %{count} dia
-          other: Entrega em %{count} dias
-        overdue: Em atraso
-        suggested: Tarefa sugerida
-        today: Entrega hoje
-        tomorrow: Entrega amanhã
       reply_reminder_card:
         aged:
           one: "%{count} dia, sem resposta"
@@ -65,10 +54,10 @@ pt:
       shared:
         kbd_navigate: Navegar
         many_participants: "%{names} e mais %{count}"
-        two_participants: "%{first} e %{second}"
         no_subject: "(sem assunto)"
         priority: Prioridade
         scout_read: li agora mesmo
+        two_participants: "%{first} e %{second}"
         unknown_sender: Remetente desconhecido
         working: A processar…
         yesterday: Ontem
@@ -83,6 +72,17 @@ pt:
         not_now: Agora não
         prefix: Etiquetar
         under: como
+      task_card:
+        accept: Adicionar às tarefas
+        complete: Concluir
+        dismiss: Dispensar
+        in_days:
+          one: Entrega em %{count} dia
+          other: Entrega em %{count} dias
+        overdue: Em atraso
+        suggested: Tarefa sugerida
+        today: Entrega hoje
+        tomorrow: Entrega amanhã
     time_of_day_greeting:
       greeting:
         afternoon: Boa tarde, %{name}.
@@ -99,8 +99,8 @@ pt:
         sincronizar automaticamente.
       reminder_dismissed: Lembrete dispensado.
       restored: Reposto.
-      task_accepted: "Adicionada às suas tarefas: %{title}"
-      task_completed: "Tarefa concluída: %{title}"
+      task_accepted: 'Adicionada às suas tarefas: %{title}'
+      task_completed: 'Tarefa concluída: %{title}'
       task_dismissed: Sugestão dispensada.
       unsupported: Essa ação não é suportada aqui.
   home:
@@ -109,6 +109,7 @@ pt:
       connect_body: O Scout lê e organiza o seu email antes de chegar. Ligue uma caixa
         de entrada e o seu feed ganha vida.
       connect_cta: Ligar caixa de entrada
+      connect_demo: Veja primeiro como funciona
       connect_title: Ligue a sua caixa de entrada para começar
       disconnected_body: O Scout não consegue aceder à sua caixa de entrada neste
         momento — volte a ligá-la para o seu feed ganhar vida outra vez.
@@ -135,6 +136,7 @@ pt:
       scout_coach_title: Conheça o Scout
       subtitle:
         clear: Tudo em dia — o Scout está de vigia para que assim continue.
+        fresh: Ligue uma caixa de correio abaixo e eu faço a primeira passagem.
         lots: "%{n} coisas precisam de si. O Scout empilhou-as para folhear sem sofrer."
         single: Só uma coisa precisa de si — o Scout arquivou o resto.
         some: "%{n} coisas precisam de si — o Scout empilhou-as. Uma folheada rápida

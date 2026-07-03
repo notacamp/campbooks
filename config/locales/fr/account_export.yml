@@ -1,18 +1,21 @@
 ---
 fr:
+  notifier:
+    account_export_failed:
+      body: Une erreur s'est produite lors de la préparation de votre export. Veuillez
+        réessayer.
+      title: Échec de l'export de données
+    account_export_ready:
+      body: L'export de vos données est prêt à télécharger dans Paramètres → Compte.
+      title: Export de données prêt
   settings:
     account:
-      show:
-        data_export_download: Télécharger
-        data_export_preparing: "Préparation de votre export — nous vous préviendrons dès qu'il sera prêt."
-      export:
-        export_queued: "Nous préparons l'export de vos données. Nous vous préviendrons dès qu'il sera prêt."
       download_export:
         export_not_ready: Votre export n'est pas encore prêt.
-  notifier:
-    account_export_ready:
-      title: Export de données prêt
-      body: "L'export de vos données est prêt à télécharger dans Paramètres → Compte."
-    account_export_failed:
-      title: Échec de l'export de données
-      body: Une erreur s'est produite lors de la préparation de votre export. Veuillez réessayer.
+      export:
+        export_queued: Nous préparons l'export de vos données. Nous vous préviendrons
+          dès qu'il sera prêt.
+      show:
+        data_export_download: Télécharger
+        data_export_preparing: Préparation de votre export — nous vous préviendrons
+          dès qu'il sera prêt.

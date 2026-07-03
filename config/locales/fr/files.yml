@@ -1,136 +1,146 @@
 ---
 fr:
+  components:
+    files:
+      doc_row:
+        actions: Actions du document
+        edit: Modifier
+        kind: Document interne
+        move_to: Déplacer vers
+        open: Ouvrir
+        remove_from_folder: Retirer du dossier
+        updated: Mis à jour le %{date}
+      email_row:
+        actions: Actions de l'e-mail
+        no_subject: "(sans objet)"
+        open: Ouvrir dans Courrier
+        remove_from_folder: Retirer du dossier
+      file_actions_menu:
+        actions: Actions du fichier
+        delete: Supprimer
+        delete_confirm: Supprimer « %{name} » ? Cette action est irréversible.
+        download: Télécharger
+        move_to: Déplacer vers
+        open: Ouvrir
+        remove_from_folder: Retirer du dossier
+      file_link_picker:
+        button: Insérer un lien de fichier
+        empty: Aucun fichier à lier pour l'instant.
+        hint: Choisissez un fichier — un lien public est créé et inséré dans votre
+          message.
+        insert: Insérer
+        loading: Chargement des fichiers…
+        title: Insérer un lien de fichier
+      file_meta:
+        kind_file: Fichier
+        kind_image: Image
+      folder_sharing:
+        add_button: Ajouter
+        add_title: Ajouter des personnes
+        all_have_access: Tout le monde dans l'espace de travail a déjà accès.
+        open_hint: Ce dossier est ouvert à tout le monde dans votre espace de travail.
+          Restreignez-le pour choisir qui y a accès.
+        owner_badge: Propriétaire
+        remove_aria: Retirer l'accès
+        remove_confirm: Retirer %{name} de ce dossier ?
+        restrict_hint: Seules les personnes que vous ajoutez (et les administrateurs)
+          peuvent voir ce dossier et son contenu.
+        restrict_label: Restreindre l'accès
+        role_aria: Niveau d'accès
+        role_editor: Peut modifier
+        role_manager: Gestionnaire
+        role_viewer: Peut voir
+        select_placeholder: Choisissez une personne…
+        you_badge: Vous
+      search_bar:
+        clear: Effacer la recherche
+        placeholder: Rechercher des fichiers…
+        submit: Rechercher
+      sidebar:
+        all_files: Tous les fichiers
+        label: Dossiers
+        new_folder: Nouveau dossier
   files:
     index:
-      title: Fichiers
-      subtitle: Téléversez, organisez et retrouvez vos fichiers.
-      new_folder: Nouveau dossier
-      new_folder_hint: Regroupez vos fichiers dans un dossier.
-      upload: Téléverser
-      breadcrumb: Fil d'Ariane
-      all_files: Tous les fichiers
-      click_to_upload: Cliquez pour téléverser
-      drag_and_drop: ou glissez-déposez
-      upload_hint: Vous pouvez téléverser tout type de fichier.
-      selected_files: Fichiers sélectionnés
-      upload_submit: Téléverser les fichiers
-      col_name: Nom
-      col_kind: Type
-      col_size: Taille
-      col_added: Ajouté
-      col_actions: Actions
-      empty_folder: Ce dossier est vide.
-      search_results:
-        zero: "Aucun résultat pour « %{q} »"
-        one: "1 résultat pour « %{q} »"
-        other: "%{count} résultats pour « %{q} »"
-      search_empty: Aucun document ne correspond à votre recherche. Essayez un autre terme ou effacez les filtres.
-      empty_title: Aucun fichier pour l'instant
-      empty_description: Téléversez des fichiers pour les organiser dans des dossiers — factures, contrats, tout ce que vous voulez.
-      empty_upload: Téléverser des fichiers
-      new_internal_document: Nouveau document
-      internal_documents: Documents internes
-      emails: E-mails
-      files_section: Fichiers
-      manage_access: Gérer l'accès
-      manage_access_locked: "Gérer l'accès · Privé"
-      review_n: "Examiner %{count}"
       ai_analyze: Analyser avec l'IA
-      ai_analyze_hint: Extrait et classe les documents commerciaux (factures, reçus…). Désactivez pour simplement stocker le fichier.
-      filters: Filtres
-      filter_category: Catégorie
-      filter_type: Type
-      filter_status: Statut
-      filter_month: Mois
-      filter_folder: Dossier
-      filter_all_categories: Toutes les catégories
-      filter_all_types: Tous les types
-      filter_all_statuses: Tous les statuts
-      filter_all_folders: Tous les dossiers
-      filter_types_selected: "%{count} sélectionné(s)"
-      reanalyze_all: "Tout réanalyser (%{count})"
+      ai_analyze_hint: Extrait et classe les documents commerciaux (factures, reçus…).
+        Désactivez pour simplement stocker le fichier.
+      all_files: Tous les fichiers
+      breadcrumb: Fil d'Ariane
+      click_to_upload: Cliquez pour téléverser
+      col_actions: Actions
+      col_added: Ajouté
+      col_kind: Type
+      col_name: Nom
+      col_size: Taille
+      download_zip: Télécharger le ZIP
+      drag_and_drop: ou glissez-déposez
+      emails: E-mails
+      empty_description: Téléversez des fichiers pour les organiser dans des dossiers
+        — factures, contrats, tout ce que vous voulez.
+      empty_folder: Ce dossier est vide.
+      empty_title: Aucun fichier pour l'instant
+      empty_upload: Téléverser des fichiers
       export: Exporter
-      export_confirm: Exporter les documents correspondant aux filtres actuels au format ZIP ?
-      exports_heading: Exports récents
+      export_confirm: Exporter les documents correspondant aux filtres actuels au
+        format ZIP ?
+      export_failed: Échec de l'export
       exports_col_date: Date
-      exports_col_status: Statut
       exports_col_documents: Documents
       exports_col_download: Télécharger
-      download_zip: Télécharger le ZIP
-      export_failed: Échec de l'export
-    uploads:
-      create:
-        no_files: Choisissez au moins un fichier à téléverser.
-        uploaded_one: Fichier téléversé.
-        uploaded_many: "%{count} fichiers téléversés."
-        analyzed_one: Fichier téléversé et mis en file d'attente pour l'analyse par l'IA.
-        analyzed_many: "%{count} fichiers téléversés et mis en file d'attente pour l'analyse par l'IA."
-        failed: "Échec du téléversement : %{message}"
-      destroy:
-        deleted: Fichier supprimé.
-      analyze:
-        analyzing: Analyse de ce fichier par l'IA…
+      exports_col_status: Statut
+      exports_heading: Exports récents
+      files_section: Fichiers
+      filter_all_categories: Toutes les catégories
+      filter_all_folders: Tous les dossiers
+      filter_all_statuses: Tous les statuts
+      filter_all_types: Tous les types
+      filter_category: Catégorie
+      filter_folder: Dossier
+      filter_month: Mois
+      filter_status: Statut
+      filter_type: Type
+      filter_types_selected: "%{count} sélectionné(s)"
+      filters: Filtres
+      internal_documents: Documents internes
+      manage_access: Gérer l'accès
+      manage_access_locked: Gérer l'accès · Privé
+      new_folder: Nouveau dossier
+      new_folder_hint: Regroupez vos fichiers dans un dossier.
+      new_internal_document: Nouveau document
+      reanalyze_all: Tout réanalyser (%{count})
+      review_n: Examiner %{count}
+      search_empty: Aucun document ne correspond à votre recherche. Essayez un autre
+        terme ou effacez les filtres.
+      search_results:
+        one: 1 résultat pour « %{q} »
+        other: "%{count} résultats pour « %{q} »"
+        zero: Aucun résultat pour « %{q} »
+      selected_files: Fichiers sélectionnés
+      subtitle: Téléversez, organisez et retrouvez vos fichiers.
+      title: Fichiers
+      upload: Téléverser
+      upload_hint: Vous pouvez téléverser tout type de fichier.
+      upload_submit: Téléverser les fichiers
     public_links:
       create:
         created: Lien public prêt.
       destroy:
         revoked: Lien public révoqué.
     scout_thread_linker:
-      body: "J'ai extrait un document de cet e-mail et l'ai classé dans Fichiers : **[%{title}](%{path})**."
-  components:
-    files:
-      search_bar:
-        placeholder: Rechercher des fichiers…
-        submit: Rechercher
-        clear: Effacer la recherche
-      sidebar:
-        label: Dossiers
-        all_files: Tous les fichiers
-        new_folder: Nouveau dossier
-      file_actions_menu:
-        actions: Actions du fichier
-        open: Ouvrir
-        download: Télécharger
-        move_to: Déplacer vers
-        remove_from_folder: Retirer du dossier
-        delete: Supprimer
-        delete_confirm: "Supprimer « %{name} » ? Cette action est irréversible."
-      file_meta:
-        kind_image: Image
-        kind_file: Fichier
-      doc_row:
-        kind: Document interne
-        updated: Mis à jour le %{date}
-        actions: Actions du document
-        open: Ouvrir
-        edit: Modifier
-        move_to: Déplacer vers
-        remove_from_folder: Retirer du dossier
-      email_row:
-        no_subject: (sans objet)
-        actions: Actions de l'e-mail
-        open: Ouvrir dans Courrier
-        remove_from_folder: Retirer du dossier
-      folder_sharing:
-        open_hint: Ce dossier est ouvert à tout le monde dans votre espace de travail. Restreignez-le pour choisir qui y a accès.
-        restrict_label: Restreindre l'accès
-        restrict_hint: Seules les personnes que vous ajoutez (et les administrateurs) peuvent voir ce dossier et son contenu.
-        you_badge: Vous
-        owner_badge: Propriétaire
-        role_aria: Niveau d'accès
-        role_viewer: Peut voir
-        role_editor: Peut modifier
-        role_manager: Gestionnaire
-        remove_confirm: "Retirer %{name} de ce dossier ?"
-        remove_aria: Retirer l'accès
-        add_title: Ajouter des personnes
-        all_have_access: Tout le monde dans l'espace de travail a déjà accès.
-        select_placeholder: Choisissez une personne…
-        add_button: Ajouter
-      file_link_picker:
-        button: Insérer un lien de fichier
-        title: Insérer un lien de fichier
-        hint: Choisissez un fichier — un lien public est créé et inséré dans votre message.
-        loading: Chargement des fichiers…
-        empty: Aucun fichier à lier pour l'instant.
-        insert: Insérer
+      body: 'J''ai extrait un document de cet e-mail et l''ai classé dans Fichiers
+        : **[%{title}](%{path})**.'
+    uploads:
+      analyze:
+        analyzing: Analyse de ce fichier par l'IA…
+      create:
+        analyzed_many: "%{count} fichiers téléversés et mis en file d'attente pour
+          l'analyse par l'IA."
+        analyzed_one: Fichier téléversé et mis en file d'attente pour l'analyse par
+          l'IA.
+        failed: 'Échec du téléversement : %{message}'
+        no_files: Choisissez au moins un fichier à téléverser.
+        uploaded_many: "%{count} fichiers téléversés."
+        uploaded_one: Fichier téléversé.
+      destroy:
+        deleted: Fichier supprimé.

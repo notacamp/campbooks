@@ -1,18 +1,20 @@
 ---
 es:
+  notifier:
+    account_export_failed:
+      body: Algo salió mal al preparar la exportación de tus datos. Inténtalo de nuevo.
+      title: Error en la exportación de datos
+    account_export_ready:
+      body: La exportación de tus datos está lista para descargar en Ajustes → Cuenta.
+      title: Exportación de datos lista
   settings:
     account:
-      show:
-        data_export_download: Descargar
-        data_export_preparing: "Preparando tu exportación: te avisaremos cuando esté lista."
-      export:
-        export_queued: "Estamos preparando la exportación de tus datos. Te avisaremos cuando esté lista."
       download_export:
         export_not_ready: Tu exportación aún no está lista.
-  notifier:
-    account_export_ready:
-      title: Exportación de datos lista
-      body: "La exportación de tus datos está lista para descargar en Ajustes → Cuenta."
-    account_export_failed:
-      title: Error en la exportación de datos
-      body: Algo salió mal al preparar la exportación de tus datos. Inténtalo de nuevo.
+      export:
+        export_queued: Estamos preparando la exportación de tus datos. Te avisaremos
+          cuando esté lista.
+      show:
+        data_export_download: Descargar
+        data_export_preparing: 'Preparando tu exportación: te avisaremos cuando esté
+          lista.'

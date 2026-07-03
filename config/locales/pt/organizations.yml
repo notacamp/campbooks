@@ -1,31 +1,33 @@
+---
 pt:
+  components:
+    organization_card:
+      members: "%{count} membros"
   organizations:
-    index:
-      heading: "Organizações"
-      subheading: "%{count} organizações"
-      sync_from_contacts: "Sincronizar dos contactos"
-      empty: "Ainda sem organizações"
-      empty_hint: "Sincronize a partir dos seus contactos para criar o diretório de organizações."
-    show:
-      back: "Organizações"
-      members_label: "Membros"
-      emails_label: "Emails"
-      documents_label: "Documentos"
-      members_heading: "Membros"
-      no_members: "Nenhum membro nesta organização."
-      recent_emails_heading: "Emails recentes"
-      recent_documents_heading: "Documentos recentes"
-      no_emails: "Ainda sem emails desta organização."
-      no_documents: "Ainda sem documentos desta organização."
-      no_subject: "(sem assunto)"
-    update:
-      saved: "Organização atualizada."
     backfill:
       backfilled: "%{count} organizações sincronizadas dos contactos."
     emails:
       no_subject: "(sem assunto)"
+    index:
+      empty: Ainda sem organizações
+      empty_hint: Sincronize a partir dos seus contactos para criar o diretório de
+        organizações.
+      heading: Organizações
+      subheading: "%{count} organizações"
+      sync_from_contacts: Sincronizar dos contactos
     organization_card:
       members: "%{count} membros"
-  components:
-    organization_card:
-      members: "%{count} membros"
+    show:
+      back: Organizações
+      documents_label: Documentos
+      emails_label: Emails
+      members_heading: Membros
+      members_label: Membros
+      no_documents: Ainda sem documentos desta organização.
+      no_emails: Ainda sem emails desta organização.
+      no_members: Nenhum membro nesta organização.
+      no_subject: "(sem assunto)"
+      recent_documents_heading: Documentos recentes
+      recent_emails_heading: Emails recentes
+    update:
+      saved: Organização atualizada.

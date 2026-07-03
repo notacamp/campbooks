@@ -46,6 +46,7 @@ en:
         to create your account.
       beta_code_label: Invite code
       beta_code_placeholder: e.g. ABCD-2345
+      code_hint: We'll email you a 6-digit code to confirm it's you.
       email_label: Email address
       email_placeholder: you@example.com
       have_account: Already have an account?
@@ -53,20 +54,19 @@ en:
       name_placeholder: Your name
       privacy: Privacy Policy
       sign_in: Sign in
-      code_hint: We'll email you a 6-digit code to confirm it's you.
       submit: Send verification code
       subtitle: A couple of quick steps, then Scout gets to work on your inbox.
       terms: Terms of Service
-      title: Create your account
       terms_consent_html: I agree to the %{terms} and %{privacy}.
+      title: Create your account
     password:
       password_hint: At least 8 characters. A password manager's suggestion is perfect.
       password_label: Password
       password_placeholder: At least 8 characters
       submit: Create account
       title: Last step, promise
-      verified_prose_html: '%{email} is verified. Choose a password and your account
-        is ready.'
+      verified_prose_html: "%{email} is verified. Choose a password and your account
+        is ready."
     pending_approval:
       body: Your account request has been submitted for review. You'll receive an
         email when it's approved.

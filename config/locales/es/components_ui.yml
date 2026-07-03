@@ -54,18 +54,51 @@ es:
       more: Leer más
     code_block:
       empty: "(vacío)"
+    connect_provider_card:
+      google:
+        description: Gmail y Google Workspace
+        label: Google
+      microsoft:
+        description: Outlook y Microsoft 365
+        label: Microsoft 365
+      zoho:
+        description: Buzones de Zoho Mail
+        label: Zoho Mail
     email_html_preview:
       frame_title: Vista previa del correo
+    first_sync_stage:
+      counter_found: encontrados
+      counter_needs_you: le necesitan
+      counter_sorted: ordenados
+      cta_done: Muéstrame lo que importa
+      error_cta: Comprobar la conexión de la cuenta
+      error_title: Scout no pudo acceder a su buzón
+      escape: Ver cómo se llena la bandeja
+      subtitle_done: "%{needs_you} cosas le esperan. Todo lo demás está ordenado y
+        fuera del camino."
+      subtitle_done_calm: Nada le espera ahora mismo. Todo está ordenado y fuera del
+        camino.
+      subtitle_empty: Este buzón empieza limpio. El correo nuevo se leerá y ordenará
+        en cuanto llegue.
+      subtitle_error: La primera sincronización no se completó. Volver a conectar
+        la cuenta suele solucionarlo.
+      subtitle_scanning: Ordenando todo según llega. Suele tardar uno o dos minutos.
+      subtitle_waiting: Conectado. Accediendo a su buzón.
+      title_done: Su bandeja de entrada está ordenada
+      title_empty: Empieza de cero
+      title_error: La primera sincronización tuvo un tropiezo
+      title_scanning: Scout está leyendo su bandeja de entrada
     folder_pane:
       collapse: Contraer
       expand: Expandir
       folders: Carpetas
       new_folder: Nueva carpeta
     folder_pane_custom_folders:
-      delete_confirm: '¿Eliminar la carpeta %{name}? Tus correos y las carpetas del proveedor no se modifican.'
+      delete_confirm: "¿Eliminar la carpeta %{name}? Tus correos y las carpetas del
+        proveedor no se modifican."
       document_count:
-        one: '%{count} documento'
-        other: '%{count} documentos'
+        one: "%{count} documento"
+        other: "%{count} documentos"
       edit_title: Ajustes de la carpeta
       icon_label: Icono de la carpeta
       move_label: Mover a

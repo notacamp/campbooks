@@ -23,7 +23,7 @@ pt:
         empty: Nada mais para adicionar.
         no_subject: "(sem assunto)"
         search_placeholder: Pesquisar documentos e emails…
-        title: "Adicionar a %{pipeline}"
+        title: Adicionar a %{pipeline}
       stage_row:
         description_placeholder: Descrição (opcional)
         name_placeholder: Nome da fase

@@ -1,44 +1,55 @@
 ---
 es:
-  navigation:
-    settings:
-      items:
-        data_privacy: "Datos y Privacidad"
   activerecord:
     attributes:
       ai_configuration:
         purposes:
-          reminder_extraction: "Extracción de Recordatorios"
+          reminder_extraction: Extracción de Recordatorios
+  navigation:
+    settings:
+      items:
+        data_privacy: Datos y Privacidad
   settings:
     data_privacy:
       show:
-        title: "Datos y Privacidad"
-        subtitle: "Controla cómo se procesan y almacenan tus datos, y qué IA puede verlos."
-        ai_toggle_heading: "Procesamiento de IA"
-        ai_toggle_desc: "Cuando está activado, Scout usa IA para procesar tus correos, documentos y contactos. Desactívalo para pausar toda la IA; tus resúmenes y etiquetas existentes se conservan."
+        ai_paused_note: El procesamiento de IA está en pausa. Scout, el etiquetado
+          automático, los resúmenes y el análisis no se ejecutarán hasta que vuelvas
+          a activarlo.
+        ai_providers_desc: Qué proveedor gestiona cada tarea de IA y dónde se ejecuta.
+          El verde indica residencia de datos en la UE.
+        ai_providers_heading: Proveedores de IA y regiones de datos
+        ai_toggle_desc: Cuando está activado, Scout usa IA para procesar tus correos,
+          documentos y contactos. Desactívalo para pausar toda la IA; tus resúmenes
+          y etiquetas existentes se conservan.
+        ai_toggle_heading: Procesamiento de IA
+        calendar: Calendario
+        configure_ai: Configurar proveedores de IA
+        connected: Conectado
+        delete_account: Eliminar cuenta
+        export_button: Descargar mis datos
+        google_drive: Google Drive
+        hosting_cloud: Tus datos se almacenan en el servicio alojado de Campbooks.
+          Consulta la política de privacidad para más detalles.
+        hosting_heading: Dónde se alojan tus datos
+        hosting_self_hosted: Esta es una instancia de Campbooks autoalojada. Tus datos
+          están en una infraestructura que tú controlas.
+        manage_integrations: Gestionar integraciones
+        not_configured: No configurado
+        not_connected: No conectado
+        notion: Notion
+        scout_posts_desc: Cuando Scout archiva un documento de un correo, publicar
+          un enlace en la discusión de ese correo.
         scout_posts_heading: Actualizaciones de hilo de Scout
-        scout_posts_desc: "Cuando Scout archiva un documento de un correo, publicar un enlace en la discusión de ese correo."
-        ai_paused_note: "El procesamiento de IA está en pausa. Scout, el etiquetado automático, los resúmenes y el análisis no se ejecutarán hasta que vuelvas a activarlo."
-        ai_providers_heading: "Proveedores de IA y regiones de datos"
-        ai_providers_desc: "Qué proveedor gestiona cada tarea de IA y dónde se ejecuta. El verde indica residencia de datos en la UE."
-        not_configured: "No configurado"
-        configure_ai: "Configurar proveedores de IA"
-        hosting_heading: "Dónde se alojan tus datos"
-        hosting_self_hosted: "Esta es una instancia de Campbooks autoalojada. Tus datos están en una infraestructura que tú controlas."
-        hosting_cloud: "Tus datos se almacenan en el servicio alojado de Campbooks. Consulta la política de privacidad para más detalles."
-        sub_processors_heading: "Servicios conectados"
-        sub_processors_desc: "Servicios de terceros que reciben tus datos cuando los conectas."
-        google_drive: "Google Drive"
-        notion: "Notion"
-        zoho_drive: "Zoho WorkDrive"
-        calendar: "Calendario"
-        connected: "Conectado"
-        not_connected: "No conectado"
-        manage_integrations: "Gestionar integraciones"
-        your_data_heading: "Tus datos"
-        your_data_desc: "Descarga una copia de tus datos personales o elimina tu cuenta permanentemente."
-        export_button: "Descargar mis datos"
-        delete_account: "Eliminar cuenta"
+        sub_processors_desc: Servicios de terceros que reciben tus datos cuando los
+          conectas.
+        sub_processors_heading: Servicios conectados
+        subtitle: Controla cómo se procesan y almacenan tus datos, y qué IA puede
+          verlos.
+        title: Datos y Privacidad
+        your_data_desc: Descarga una copia de tus datos personales o elimina tu cuenta
+          permanentemente.
+        your_data_heading: Tus datos
+        zoho_drive: Zoho WorkDrive
       update:
-        updated: "Configuración de privacidad guardada."
-        update_failed: "No se pudo guardar tu configuración de privacidad."
+        update_failed: No se pudo guardar tu configuración de privacidad.
+        updated: Configuración de privacidad guardada.

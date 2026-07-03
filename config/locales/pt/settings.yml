@@ -1,49 +1,6 @@
 ---
 pt:
   settings:
-    api_clients:
-      index:
-        title: Acesso à API
-        subtitle: Crie clientes OAuth para aceder aos seus dados do Campbooks a partir das suas próprias aplicações e scripts.
-        new_client: Novo cliente
-        read_docs: Ver a documentação da API
-        col_name: Nome
-        col_client_id: ID do cliente
-        col_scopes: Permissões
-        col_created: Criado
-        regenerate: Regenerar segredo
-        regenerate_confirm: Regenerar o segredo deste cliente? O segredo atual deixa de funcionar imediatamente.
-        revoke: Revogar tokens
-        revoke_confirm: Revogar todos os tokens ativos deste cliente? As aplicações que o usam precisarão de um novo token.
-        delete: Eliminar
-        delete_confirm: Eliminar o cliente "%{name}"? Esta ação não pode ser anulada.
-        no_clients_title: Ainda não há clientes de API
-        no_clients_desc: Crie um cliente para obter um ID e um segredo para a API do Campbooks.
-      new:
-        title: Novo cliente de API
-        subtitle: Dê um nome ao cliente e escolha a que pode aceder.
-        name_label: Nome
-        name_placeholder: ex. Sincronização de faturação
-        name_hint: Uma etiqueta para reconhecer este cliente mais tarde.
-        scopes_label: Permissões
-        scopes_hint: Conceda apenas o acesso de que este cliente precisa.
-        create: Criar cliente
-        cancel: Cancelar
-      reveal:
-        title: Cliente criado
-        subtitle: Copie agora o segredo de "%{name}".
-        warning: Esta é a única vez que o segredo do cliente é mostrado. Guarde-o num local seguro — pode regenerá-lo mais tarde se o perder.
-        client_id_label: ID do cliente
-        client_secret_label: Segredo do cliente
-        copy: Copiar
-        next_steps_title: Troque-os por um token de acesso
-        done: Concluído
-      create:
-        scopes_required: Selecione pelo menos uma permissão.
-      revoke:
-        revoked: Todos os tokens de "%{name}" foram revogados.
-      destroy:
-        deleted: O cliente "%{name}" foi eliminado.
     account:
       analyze_writing_style:
         queued: O Scout está a analisar os seus e-mails enviados — o seu perfil de
@@ -84,8 +41,8 @@ pt:
         danger_zone_title: Zona de perigo
         data_export_button: Pedir os meus dados
         data_export_desc: Obtenha uma cópia completa dos seus dados pessoais — perfil,
-          sessões, conversas de IA, além do conteúdo dos seus emails, anexos e
-          documentos — num ficheiro para transferir.
+          sessões, conversas de IA, além do conteúdo dos seus emails, anexos e documentos
+          — num ficheiro para transferir.
         data_export_title: Os seus dados
         delete_account_button: Eliminar conta
         language_subtitle: Escolha o idioma da interface do Campbooks.
@@ -185,6 +142,54 @@ pt:
         switched_to_byo: Mudou para as suas próprias chaves. Adicione um fornecedor
           abaixo para ativar a IA.
         switched_to_managed: A usar agora o Campbooks AI.
+    api_clients:
+      create:
+        scopes_required: Selecione pelo menos uma permissão.
+      destroy:
+        deleted: O cliente "%{name}" foi eliminado.
+      index:
+        col_client_id: ID do cliente
+        col_created: Criado
+        col_name: Nome
+        col_scopes: Permissões
+        delete: Eliminar
+        delete_confirm: Eliminar o cliente "%{name}"? Esta ação não pode ser anulada.
+        new_client: Novo cliente
+        no_clients_desc: Crie um cliente para obter um ID e um segredo para a API
+          do Campbooks.
+        no_clients_title: Ainda não há clientes de API
+        read_docs: Ver a documentação da API
+        regenerate: Regenerar segredo
+        regenerate_confirm: Regenerar o segredo deste cliente? O segredo atual deixa
+          de funcionar imediatamente.
+        revoke: Revogar tokens
+        revoke_confirm: Revogar todos os tokens ativos deste cliente? As aplicações
+          que o usam precisarão de um novo token.
+        subtitle: Crie clientes OAuth para aceder aos seus dados do Campbooks a partir
+          das suas próprias aplicações e scripts.
+        title: Acesso à API
+      new:
+        cancel: Cancelar
+        create: Criar cliente
+        name_hint: Uma etiqueta para reconhecer este cliente mais tarde.
+        name_label: Nome
+        name_placeholder: ex. Sincronização de faturação
+        scopes_hint: Conceda apenas o acesso de que este cliente precisa.
+        scopes_label: Permissões
+        subtitle: Dê um nome ao cliente e escolha a que pode aceder.
+        title: Novo cliente de API
+      reveal:
+        client_id_label: ID do cliente
+        client_secret_label: Segredo do cliente
+        copy: Copiar
+        done: Concluído
+        next_steps_title: Troque-os por um token de acesso
+        subtitle: Copie agora o segredo de "%{name}".
+        title: Cliente criado
+        warning: Esta é a única vez que o segredo do cliente é mostrado. Guarde-o
+          num local seguro — pode regenerá-lo mais tarde se o perder.
+      revoke:
+        revoked: Todos os tokens de "%{name}" foram revogados.
     general:
       show:
         ai_providers_hint: Procura fornecedores de IA e definições de modelos? Agora
@@ -289,35 +294,49 @@ pt:
           disconnect: Desligar
           disconnect_confirm: Desligar o Google Drive? Os envios de documentos serão
             interrompidos.
-          failed_count:
-            one: Um documento falhou o envio. Pode tentar novamente abaixo.
-            other: "%{count} documentos falharam o envio. Pode tentar novamente abaixo."
-          retry_all_failed: Tentar novamente todos os envios falhados
           drive_org_desc: Cada tipo de documento pode ter a sua própria pasta, padrão
             de nomenclatura e estrutura de subpastas.
           drive_org_heading: Como o Drive organiza os seus ficheiros
           edit_config: Editar
+          failed_count:
+            one: Um documento falhou o envio. Pode tentar novamente abaixo.
+            other: "%{count} documentos falharam o envio. Pode tentar novamente abaixo."
           folder_set: Pasta definida
           off_badge: Desativado
           on_badge: Ativado
           reconnect_button: Religar o Google Drive
           reconnect_prompt: Religue para conceder acesso completo ao Drive — necessário
             para navegar e escolher pastas existentes ao enviar ficheiros.
+          retry_all_failed: Tentar novamente todos os envios falhados
           subtitle: Envie documentos para o Google Drive com regras de pasta e nomenclatura
             por tipo.
           title: Google Drive
       google_drive_configs:
+        browse_folders:
+          browse_failed: 'Não foi possível listar as pastas: %{message}'
+          create_folder: Criar
+          my_drive: O Meu Drive
+          new_folder_placeholder: Nome da nova pasta
+          no_subfolders: Sem subpastas aqui
+          reconnect_needed: Religue o Google Drive com acesso completo para explorar
+            pastas.
+          select: Selecionar
+          select_my_drive: Usar a raiz do Meu Drive
+          select_this: Selecionar "%{name}"
         edit:
-          auto_push_default_note: O envio automático está ativo por padrão — documentos aprovados deste tipo serão enviados automaticamente para o Drive. Desmarque a caixa acima para pausar.
-          auto_push_hint: Quando marcado, os documentos aprovados deste tipo são enviados automaticamente para o Google Drive. Desmarque para pausar.
+          auto_push_default_note: O envio automático está ativo por padrão — documentos
+            aprovados deste tipo serão enviados automaticamente para o Drive. Desmarque
+            a caixa acima para pausar.
+          auto_push_hint: Quando marcado, os documentos aprovados deste tipo são enviados
+            automaticamente para o Google Drive. Desmarque para pausar.
           auto_push_label: Enviar automaticamente quando aprovado
           browse: Explorar
           folder_from_id: Pasta selecionada
           folder_label: Pasta de destino
-          no_folder_selected: Nenhuma pasta selecionada — escolha uma abaixo
           naming_pattern_hint: 'Marcadores disponíveis: {date}, {entity}, {reference},
             {type}, {vendor}, {id}'
           naming_pattern_label: Padrão de nomenclatura dos ficheiros
+          no_folder_selected: Nenhuma pasta selecionada — escolha uma abaixo
           subfolder_pattern_hint_html: "<strong>Simples</strong>: Todos os ficheiros
             vão diretamente para a pasta de destino.<br><strong>Ano</strong>: Organizado
             por ano (ex.: /Pasta/2026/).<br><strong>Ano/Mês</strong>: Organizado por
@@ -326,16 +345,6 @@ pt:
           subfolder_pattern_label: Espaço de trabalho de subpastas
           subtitle: Controle como os documentos deste tipo são enviados para o Google
             Drive.
-        browse_folders:
-          browse_failed: 'Não foi possível listar as pastas: %{message}'
-          create_folder: Criar
-          my_drive: O Meu Drive
-          new_folder_placeholder: Nome da nova pasta
-          no_subfolders: Sem subpastas aqui
-          reconnect_needed: Religue o Google Drive com acesso completo para explorar pastas.
-          select: Selecionar
-          select_my_drive: Usar a raiz do Meu Drive
-          select_this: 'Selecionar "%{name}"'
       index:
         show:
           api_connections_desc: Guarde integrações de API de saída (URL base + autenticação)

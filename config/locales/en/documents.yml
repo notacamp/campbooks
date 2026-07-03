@@ -23,6 +23,10 @@ en:
         subtitle: Choose where to put %{document}.
         title: Send to Google Drive
         upload_here: Upload to %{folder}
+    folders:
+      add_prompt: Add to folder…
+      label: Folders
+      remove: Remove from %{name}
     forms:
       bank_statement:
         account_number: Account Number
@@ -67,10 +71,6 @@ en:
         invoice_number: Invoice Number
         tax_amount_cents: Tax Amount (cents)
         tax_rate: Tax Rate (%)
-    folders:
-      add_prompt: Add to folder…
-      label: Folders
-      remove: Remove from %{name}
     index:
       accepted_formats: PDF, JPG, PNG, WEBP, HEIC
       click_to_upload: Click to upload
@@ -219,32 +219,33 @@ en:
         ai_unsure: "%{count} the AI wasn't sure about — skim to confirm or re-file"
         needs_review: Needs review
     written:
-      index:
-        title: Written documents
-        back_to_documents: Back to Docs
-        new: New document
-        empty_title: No written documents yet
-        empty_description: Write formatted documents like letters, reports, and notes from scratch.
-      new:
-        title: Write a document
-        title_placeholder: Document title
-        editor_placeholder: Start writing…
-        save: Save document
-        cancel: Cancel
-        back_to_documents: Back to Docs
       create:
         created: Document saved.
-      show:
-        edit: Edit
-        back_to_documents: Back to Docs
-        created_at: "Created %{date}"
-        by: by %{name}
       edit:
-        title: Edit document
-        title_placeholder: Document title
+        back_to_document: Back to document
+        cancel: Cancel
         editor_placeholder: Start writing…
         save: Save changes
+        title: Edit document
+        title_placeholder: Document title
+      index:
+        back_to_documents: Back to Docs
+        empty_description: Write formatted documents like letters, reports, and notes
+          from scratch.
+        empty_title: No written documents yet
+        new: New document
+        title: Written documents
+      new:
+        back_to_documents: Back to Docs
         cancel: Cancel
-        back_to_document: Back to document
+        editor_placeholder: Start writing…
+        save: Save document
+        title: Write a document
+        title_placeholder: Document title
+      show:
+        back_to_documents: Back to Docs
+        by: by %{name}
+        created_at: Created %{date}
+        edit: Edit
       update:
         updated: Document updated.
