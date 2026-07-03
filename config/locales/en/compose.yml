@@ -1,0 +1,33 @@
+en:
+  components:
+    compose:
+      engine:
+        bcc_button: Bcc
+        cc_button: Cc
+        collapse_envelope: Collapse recipient fields
+        discard: Discard
+        draft_saved: Draft saved
+        edit_recipients: Edit recipients and subject
+        expand_quote_title: Show the quoted message and edit it
+        label_bcc: Bcc
+        label_cc: Cc
+        label_from: From
+        label_signature: Signature
+        label_subject: Subject
+        label_to: To
+        no_signature: No signature
+        placeholder_bcc: Add Bcc…
+        placeholder_body: Write your message…
+        placeholder_cc: Add Cc…
+        placeholder_subject: Subject
+        placeholder_to: Search contacts or type an email…
+        quoted_from: On %{date}, %{who} wrote
+        quoted_from_undated: "%{who} wrote"
+        quoted_generic: Quoted message
+        recipients_more: "%{name} +%{count}"
+        saving: Saving…
+        schedule: Schedule
+        schedule_at_label: Send at
+        schedule_send: Schedule send
+        send: Send
+        signature_default: "%{name} (default)"

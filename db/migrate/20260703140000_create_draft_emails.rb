@@ -12,6 +12,7 @@ class CreateDraftEmails < ActiveRecord::Migration[8.1]
       t.text :bcc_address
       t.string :subject
       t.text :body
+      t.text :quoted_body
       t.jsonb :attachments_json, null: false, default: []
 
       t.timestamps

@@ -122,6 +122,7 @@ export default class extends Controller {
       bcc_address: this._field("bcc_address"),
       subject: this._field("subject"),
       body: this._field("body"),
+      quoted_body: this._field("quoted_body"),
       signature_id: this._field("signature_id"),
       email_account_id: this._field("email_account_id"),
       attachments_json: this._attachments()

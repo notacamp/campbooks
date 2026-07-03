@@ -49,9 +49,11 @@ module Campbooks
       toggle_header: '<path d="M6 4h12a2 2 0 0 1 2 2v2H4V6a2 2 0 0 1 2-2z"/><path d="M4 10h16v4H4z"/><path d="M6 16H4v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2h-2"/><path d="M9 4v16"/><path d="M4 10h16"/>'
     }.freeze
 
+    # frameless: drops the bordered-box chrome so the editor reads as an open
+    # canvas (the new compose surfaces); the bubble replaces the toolbar there.
     def initialize(input_name:, content: nil, placeholder: nil, variant: :full, images: true,
                    upload_url: nil, min_height: nil, editor_class: nil, wrapper_class: nil, toolbar: true,
-                   tables: nil, font_family: nil, highlight: nil, superscript: nil, subscript: nil)
+                   bubble: false, frameless: false, tables: nil, font_family: nil, highlight: nil, superscript: nil, subscript: nil)
       @input_name = input_name
       @content = content.to_s
       @placeholder = placeholder
@@ -62,6 +64,8 @@ module Campbooks
       @editor_class = editor_class
       @wrapper_class = wrapper_class
       @toolbar = toolbar
+      @bubble = bubble
+      @frameless = frameless
       @tables = tables
       @font_family = font_family
       @highlight = highlight
@@ -80,8 +84,8 @@ module Campbooks
     def view_template
       div(
         class: class_names(
-          "rte relative border border-gray-200 rounded-lg bg-card overflow-hidden",
-          "focus-within:border-accent-500 focus-within:ring-1 focus-within:ring-accent-500",
+          "rte relative",
+          @frameless ? nil : "border border-gray-200 rounded-lg bg-card overflow-hidden focus-within:border-accent-500 focus-within:ring-1 focus-within:ring-accent-500",
           @wrapper_class
         ),
         data: {
@@ -102,6 +106,7 @@ module Campbooks
       ) do
         input(type: "hidden", name: @input_name, value: @content, data: { tiptap_editor_target: "input" })
         render_toolbar if @toolbar
+        render_bubble if @bubble
         link_popover
         image_popover if @images
         file_input if @images && @upload_url.present?
@@ -181,6 +186,24 @@ module Campbooks
         tool(:undo, "undo", t(".undo"))
         tool(:redo, "redo", t(".redo"))
         tool(:clear, "clearFormatting", t(".clear_formatting"))
+      end
+    end
+
+    # The selection bubble used by the toolbar-less compose surfaces: a compact
+    # dark pill that floats over the current selection with the essential marks.
+    # Positioning + visibility live in the tiptap-editor controller.
+    def render_bubble
+      div(data: { tiptap_editor_target: "bubble", action: "mousedown->tiptap-editor#keepFocus" }, class: "tiptap-bubble") do
+        tool(:bold,      "toggleBold",      t(".bold"),      active: "bold")
+        tool(:italic,    "toggleItalic",    t(".italic"),    active: "italic")
+        tool(:underline, "toggleUnderline", t(".underline"), active: "underline")
+        tool(:strike,    "toggleStrike",    t(".strikethrough"), active: "strike")
+        divider
+        tool(:bullet_list,  "toggleBulletList",  t(".bullet_list"),   active: "bulletList")
+        tool(:ordered_list, "toggleOrderedList", t(".numbered_list"), active: "orderedList")
+        tool(:quote,        "toggleBlockquote",  t(".blockquote"),    active: "blockquote")
+        divider
+        tool(:link, "openLink", t(".link"), active: "link")
       end
     end
 

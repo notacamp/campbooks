@@ -48,7 +48,7 @@ class DraftEmailsController < ApplicationController
 
   def draft_params
     permitted = params.require(:draft_email).permit(
-      :mode, :to_address, :cc_address, :bcc_address, :subject, :body, :signature_id,
+      :mode, :to_address, :cc_address, :bcc_address, :subject, :body, :quoted_body, :signature_id,
       attachments_json: [ :signed_id, :filename, :byte_size ]
     )
     # The signature must be the user's own; a stray id is dropped, not an error.
