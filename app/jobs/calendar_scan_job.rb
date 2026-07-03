@@ -72,9 +72,12 @@ class CalendarScanJob < ApplicationJob
       calendar = account.calendars.find_or_initialize_by(provider_calendar_id: attrs[:provider_calendar_id])
       is_new = calendar.new_record?
       calendar.assign_attributes(
-        name: attrs[:name], description: attrs[:description], color: attrs[:color],
+        name: attrs[:name], description: attrs[:description],
         time_zone: attrs[:time_zone], is_primary: attrs[:is_primary], is_writable: attrs[:is_writable]
       )
+      # Seed the provider's color only on first discovery — the calendar's color
+      # is user-editable (sidebar picker) and must survive full sweeps.
+      calendar.color = attrs[:color] if is_new
       # Auto-enable the primary calendar the first time we see it; never override a
       # user's later on/off choice.
       calendar.syncing = true if is_new && attrs[:is_primary]

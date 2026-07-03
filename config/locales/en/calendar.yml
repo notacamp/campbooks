@@ -2,6 +2,7 @@
 en:
   calendar:
     index:
+      close_sidebar: Close
       connect_cta: Connect a calendar
       empty_desc: Connect a Google or Zoho calendar to see and manage your events
         here.
@@ -11,8 +12,10 @@ en:
       next: Next
       previous: Previous
       reminders: Reminders
+      sidebar_title: Calendars
       title: Calendar
       today: Today
+      toggle_sidebar: Show or hide the calendar list
       upcoming: Upcoming
       view_agenda: Agenda
       view_day: Day
@@ -102,6 +105,23 @@ en:
         now: Now
         today: Today
         tomorrow: Tomorrow
+      sidebar:
+        account_color: Account color
+        add: Add
+        add_calendars:
+          one: More calendars (%{count})
+          other: More calendars (%{count})
+        calendar_options: Calendar options
+        color_label: Color
+        connect_account: Connect an account
+        hide_calendar: Hide from my calendar
+        managers_only: Only calendar managers can enable these.
+        none_synced: No calendars syncing yet.
+        primary: (primary)
+        refresh_list: Refresh calendar list
+        show_calendar: Show on my calendar
+        stop_syncing: Stop syncing for everyone
+        stop_syncing_confirm: Stop syncing %{name}? Its events disappear from the calendar for everyone on this account.
       week_grid:
         add: "+ Add"
         untitled: "(No title)"

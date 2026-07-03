@@ -160,6 +160,22 @@ class User < ApplicationRecord
     update_column(:dismissed_tours, (Array(dismissed_tours) + [ key ]).uniq)
   end
 
+  # ── Per-user calendar visibility (sidebar show/hide) ────────────────────────
+  # Calendars this user has hidden from their /calendar view, stored in the
+  # hidden_calendar_ids jsonb array of uuid strings. Display-only and personal:
+  # the calendar keeps syncing for everyone (Calendar#syncing is account-wide);
+  # hiding just drops its events from this user's grid. Mirrors dismissed_tours:
+  # a single cheap column write, no validations or callbacks.
+  def calendar_hidden?(calendar)
+    Array(hidden_calendar_ids).include?(calendar.id.to_s)
+  end
+
+  def set_calendar_hidden!(calendar, hidden)
+    ids = Array(hidden_calendar_ids).map(&:to_s)
+    updated = hidden ? (ids + [ calendar.id.to_s ]).uniq : ids - [ calendar.id.to_s ]
+    update_column(:hidden_calendar_ids, updated) unless updated == ids
+  end
+
   # ── Two-factor authentication ───────────────────────────────────────────────
   # True when the user has any second factor turned on. Gates the login challenge
   # (SessionsController#create): password-only login when false, second-factor

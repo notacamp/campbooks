@@ -232,10 +232,14 @@ Rails.application.routes.draw do
   resources :calendar_accounts, only: [ :update, :destroy ] do
     member do
       get :sharing
+      post :refresh # re-pull the provider's calendar list on demand (sidebar)
     end
     # Per-calendar sync toggle / color override within a connected account.
     resources :calendars, only: [ :update ]
   end
+  # Per-user show/hide of a calendar on /calendar (:id is the calendar's id).
+  # Display-only — distinct from the account-wide syncing toggle above.
+  resources :calendar_visibilities, only: [ :update ]
 
   resources :email_scans, only: [ :show ]
 
