@@ -2,6 +2,7 @@
 pt:
   calendar:
     index:
+      close_sidebar: Fechar
       connect_cta: Ligar um calendário
       empty_desc: Ligue um calendário Google ou Zoho para ver e gerir os seus eventos
         aqui.
@@ -11,8 +12,10 @@ pt:
       next: Próximo
       previous: Anterior
       reminders: Lembretes
+      sidebar_title: Calendários
       title: Calendário
       today: Hoje
+      toggle_sidebar: Mostrar ou ocultar a lista de calendários
       upcoming: Próximos
       view_agenda: Agenda
       view_day: Dia
@@ -33,9 +36,6 @@ pt:
       all_day_label: Dia inteiro
       calendar_label: Calendário
       cancel: Cancelar
-      color_default: Cor do calendário
-      color_hint: Mantenha a cor do calendário para usar a cor do tipo.
-      color_label: Cor
       create: Criar evento
       delete: Eliminar evento
       delete_confirm: Eliminar este evento?
@@ -65,6 +65,34 @@ pt:
       rsvp_saved: A sua resposta foi guardada.
     update:
       updated: Evento atualizado.
+  calendar_imports:
+    create:
+      imported:
+        one: 1 evento importado.
+        other: "%{count} eventos importados."
+      no_calendar: Escolha um calendário para onde importar.
+      no_file: Escolha um ficheiro .ics para importar.
+      parse_failed: Não foi possível ler o ficheiro como calendário. Exporte um .ics novo e tente de novo.
+      skipped_duplicate:
+        one: 1 duplicado ignorado.
+        other: "%{count} duplicados ignorados."
+      skipped_malformed:
+        one: 1 evento ilegível ignorado.
+        other: "%{count} eventos ilegíveis ignorados."
+      skipped_recurring:
+        one: 1 evento recorrente ignorado (ainda não suportado).
+        other: "%{count} eventos recorrentes ignorados (ainda não suportados)."
+      too_large: O ficheiro é demasiado grande (máx. 2 MB).
+      truncated: O ficheiro tinha mais de %{max} eventos — só os primeiros %{max} foram importados.
+      wrong_type: Isso não parece um ficheiro de calendário (.ics).
+    new:
+      calendar_label: Importar para
+      file_hint: Até %{max_events} eventos por ficheiro. Eventos recorrentes são ignorados por agora.
+      file_label: Ficheiro de calendário (.ics)
+      no_writable_calendars: Ligue um calendário sincronizado e com escrita antes de importar.
+      submit: Importar eventos
+      subtitle: Traga eventos de outra aplicação de calendário. Os eventos importados sincronizam com o seu fornecedor tal como os criados aqui.
+      title: Importar eventos
   components:
     calendar:
       agenda_list:
@@ -98,6 +126,24 @@ pt:
         now: Agora
         today: Hoje
         tomorrow: Amanhã
+      sidebar:
+        account_color: Cor da conta
+        add: Adicionar
+        add_calendars:
+          one: Mais calendários (%{count})
+          other: Mais calendários (%{count})
+        calendar_options: Opções do calendário
+        color_label: Cor
+        connect_account: Ligar uma conta
+        hide_calendar: Ocultar do meu calendário
+        import_ics: Importar eventos (.ics)
+        managers_only: Só os gestores do calendário os podem ativar.
+        none_synced: Ainda não há calendários a sincronizar.
+        primary: (principal)
+        refresh_list: Atualizar lista de calendários
+        show_calendar: Mostrar no meu calendário
+        stop_syncing: Parar de sincronizar para todos
+        stop_syncing_confirm: Parar de sincronizar %{name}? Os eventos desaparecem do calendário para todos nesta conta.
       week_grid:
         add: "+ Adicionar"
         untitled: "(Sem título)"

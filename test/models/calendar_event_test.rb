@@ -11,26 +11,20 @@ class CalendarEventTest < ActiveSupport::TestCase
     )
   end
 
-  test "display_color falls back to the calendar color when untyped" do
+  test "display_color is always the owning calendar's color" do
     assert_equal "#123456", @event.display_color
   end
 
-  test "provider_color is nil when untyped and unoverridden (inherit at provider)" do
-    assert_nil @event.provider_color
-  end
-
-  test "an assigned event type colors the event" do
-    type = @ws.event_types.create!(name: "Meeting", color: "#ff0000")
+  test "an assigned event type never changes the color (only its icon marks the event)" do
+    type = @ws.event_types.create!(name: "Meeting", icon: "users")
     @event.update!(event_type: type)
-    assert_equal "#ff0000", @event.display_color
-    assert_equal "#ff0000", @event.provider_color
+    assert_equal "#123456", @event.display_color
+    assert_equal "users", @event.event_type.icon
   end
 
-  test "an explicit per-event color overrides the type color" do
-    type = @ws.event_types.create!(name: "Meeting", color: "#ff0000")
-    @event.update!(event_type: type, color: "#00ff00")
-    assert_equal "#00ff00", @event.display_color
-    assert_equal "#00ff00", @event.provider_color
+  test "a calendar without its own color falls back to the account color" do
+    @event.calendar.update!(color: nil)
+    assert_equal @event.calendar_account.color, @event.display_color
   end
 
   test "type_status defaults to pending" do

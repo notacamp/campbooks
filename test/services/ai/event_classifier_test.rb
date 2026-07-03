@@ -23,27 +23,27 @@ class Ai::EventClassifierTest < ActiveSupport::TestCase
   end
 
   test "maps the chosen name back to the event type" do
-    meeting = @ws.event_types.create!(name: "Meeting", color: "#5484ed")
+    meeting = @ws.event_types.create!(name: "Meeting", icon: "users")
     assert_equal meeting, classifier_returning('{"type":"Meeting"}').call
   end
 
   test "matching is case-insensitive" do
-    meeting = @ws.event_types.create!(name: "Meeting", color: "#5484ed")
+    meeting = @ws.event_types.create!(name: "Meeting", icon: "users")
     assert_equal meeting, classifier_returning('{"type":"meeting"}').call
   end
 
   test "returns nil when the AI declines to pick a type" do
-    @ws.event_types.create!(name: "Meeting", color: "#5484ed")
+    @ws.event_types.create!(name: "Meeting", icon: "users")
     assert_nil classifier_returning('{"type":null}').call
   end
 
   test "tolerates a fenced ```json code block" do
-    meeting = @ws.event_types.create!(name: "Meeting", color: "#5484ed")
+    meeting = @ws.event_types.create!(name: "Meeting", icon: "users")
     assert_equal meeting, classifier_returning("```json\n{\"type\":\"Meeting\"}\n```").call
   end
 
   test "returns nil on unparseable model output" do
-    @ws.event_types.create!(name: "Meeting", color: "#5484ed")
+    @ws.event_types.create!(name: "Meeting", icon: "users")
     assert_nil classifier_returning("not json at all").call
   end
 end

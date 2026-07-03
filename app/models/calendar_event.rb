@@ -1,8 +1,9 @@
 class CalendarEvent < ApplicationRecord
   belongs_to :calendar
   belongs_to :source_email_message, class_name: "EmailMessage", optional: true
-  # The calendar-only "tag" that colors this event. Optional: most events inherit
-  # the calendar color. Assigned manually on the form or by AI auto-classification.
+  # The calendar-only "tag" whose icon marks this event on the grids. Optional:
+  # untyped events show no glyph. Assigned manually on the form or by AI
+  # auto-classification.
   belongs_to :event_type, optional: true
 
   enum :status, { confirmed: 0, tentative: 1, cancelled: 2 }
@@ -56,17 +57,10 @@ class CalendarEvent < ApplicationRecord
     end_at - start_at
   end
 
-  # The hex color to render this event in: an explicit per-event override, else the
-  # assigned event type's color, else the calendar's color (the common case).
-  # Mirrors/extends the Calendar#display_color → CalendarAccount#color chain.
+  # The hex color to render this event in: always the owning calendar's
+  # (Calendar#display_color → CalendarAccount#color). Events carry no color of
+  # their own — their event type's icon is the per-event visual distinction.
   def display_color
-    color.presence || event_type&.color || calendar.display_color
-  end
-
-  # The color to push to the provider on two-way sync: an explicit override, else
-  # the type's color, else nil (= inherit the calendar default at the provider, so
-  # an untyped event without an override doesn't pin a color remotely).
-  def provider_color
-    color.presence || event_type&.color
+    calendar.display_color
   end
 end

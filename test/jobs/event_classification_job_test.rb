@@ -5,12 +5,11 @@ class EventClassificationJobTest < ActiveSupport::TestCase
     @ws = Workspace.create!(name: "Classify Job WS")
     account = @ws.calendar_accounts.create!(email_address: "cal@example.com", refresh_token: "tok")
     calendar = account.calendars.create!(provider_calendar_id: "pc1", name: "Primary")
-    # "local-" id so push_color_to_provider stays inert (no provider write enqueued).
     @event = calendar.calendar_events.create!(
       provider_event_id: "local-e1", title: "Sync",
       start_at: Time.current, end_at: Time.current + 1.hour
     )
-    @type = @ws.event_types.create!(name: "Meeting", color: "#5484ed")
+    @type = @ws.event_types.create!(name: "Meeting", icon: "users")
   end
 
   # minitest 6 ships no Object#stub, so save/restore the methods by hand.

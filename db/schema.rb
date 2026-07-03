@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_03_220641) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_04_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -239,7 +239,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_220641) do
     t.boolean "all_day", default: false, null: false
     t.jsonb "attendees", default: [], null: false
     t.uuid "calendar_id", null: false
-    t.string "color"
     t.string "conference_url"
     t.datetime "created_at", null: false
     t.text "description"
@@ -247,6 +246,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_220641) do
     t.string "end_time_zone"
     t.uuid "event_type_id"
     t.string "html_link"
+    t.string "ics_uid"
     t.boolean "is_organizer", default: false, null: false
     t.string "location"
     t.datetime "original_start_at"
@@ -264,6 +264,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_220641) do
     t.string "title"
     t.integer "type_status", default: 0, null: false
     t.datetime "updated_at", null: false
+    t.index ["calendar_id", "ics_uid"], name: "index_calendar_events_on_calendar_and_ics_uid", unique: true, where: "(ics_uid IS NOT NULL)"
     t.index ["calendar_id", "provider_event_id"], name: "index_calendar_events_on_calendar_and_provider_id", unique: true
     t.index ["calendar_id"], name: "index_calendar_events_on_calendar_id"
     t.index ["event_type_id"], name: "index_calendar_events_on_event_type_id"
@@ -755,8 +756,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_220641) do
   end
 
   create_table "event_types", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.string "color", null: false
     t.datetime "created_at", null: false
+    t.string "icon"
     t.string "name", null: false
     t.datetime "updated_at", null: false
     t.uuid "workspace_id", null: false
@@ -1619,6 +1620,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_220641) do
     t.boolean "email_on_thread_activity", default: true, null: false
     t.boolean "email_on_waiting_on_replies_digest", default: true, null: false
     t.datetime "email_otp_enabled_at"
+    t.jsonb "hidden_calendar_ids", default: [], null: false
     t.jsonb "inbox_smart_groups", default: {}, null: false
     t.string "locale"
     t.datetime "mfa_last_totp_at"

@@ -126,7 +126,6 @@ module Zoho
         start_time_zone: dt["timezone"],
         end_time_zone: dt["timezone"],
         all_day: e["isallday"] == true,
-        color: e["color"].presence, # Zoho stores a hex directly; nil → inherits calendar color
         status: e["iscancelled"] == true ? "cancelled" : "confirmed",
         rsvp_status: nil,
         is_organizer: e["isorganizer"] == true,
@@ -144,7 +143,6 @@ module Zoho
       payload[:title] = attrs[:title] if attrs.key?(:title)
       payload[:description] = attrs[:description] if attrs.key?(:description)
       payload[:location] = attrs[:location] if attrs.key?(:location)
-      payload[:color] = attrs[:color] if attrs[:color].present? # hex passthrough (Zoho path unverified)
       if attrs[:start_at]
         payload[:dateandtime] = {
           start: zoho_time(attrs[:start_at]),

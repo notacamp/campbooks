@@ -1,6 +1,6 @@
 module Ai
   # Classifies a single CalendarEvent into one of the workspace's EventTypes (or
-  # none) so it can be auto-colored. Mirrors Ai::ContactAnalyzer's text-provider
+  # none) so its type icon marks it. Mirrors Ai::ContactAnalyzer's text-provider
   # idiom: the workspace's configured text model, with the self-hosted legacy
   # Anthropic key as a fallback. Returns the matched EventType or nil.
   #

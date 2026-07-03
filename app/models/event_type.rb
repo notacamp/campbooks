@@ -1,9 +1,10 @@
 class EventType < ApplicationRecord
-  # A lightweight, calendar-only "tag": a name, a color, and an AI prompt used to
-  # auto-classify (and thus auto-color) calendar events. Mirrors DocumentType's
-  # name + color + rich-text-prompt shape, without the document-specific machinery.
+  # A lightweight, calendar-only "tag": a name, an icon, and an AI prompt used to
+  # auto-classify calendar events. The icon (from the app-wide Campbooks::Icon
+  # set, like folders) renders on event chips; chip color always comes from the
+  # owning calendar. Mirrors DocumentType's name + rich-text-prompt shape.
   belongs_to :workspace
-  # Clearing a type leaves its events untyped (they fall back to the calendar color).
+  # Clearing a type leaves its events untyped (they just show no icon).
   has_many :calendar_events, dependent: :nullify
 
   has_rich_text :prompt
@@ -22,16 +23,17 @@ class EventType < ApplicationRecord
   end
 
   validates :name, presence: true, uniqueness: { scope: :workspace_id }
-  validates :color, presence: true
+  # Same rule as MailFolder#icon: only glyphs from the app-wide set, blank OK
+  # (a type without an icon simply doesn't mark its events).
+  validates :icon, inclusion: { in: ->(_) { Campbooks::Icon::NAMES } }, allow_blank: true
 
   # A sensible default set users can create in one click from the empty state.
-  # Colors come from the Google event palette (Calendars::EventColors) so the
-  # assigned color round-trips through two-way sync to Google.
+  # Icons come from the app-wide Campbooks::Icon set (same picker as folders).
   STARTERS = [
-    { name: "Meeting",     color: "#5484ed", prompt: "Calls, syncs, stand-ups, interviews, or any scheduled meeting with other people." },
-    { name: "Deadline",    color: "#dc2127", prompt: "Due dates, submission cut-offs, filing or payment deadlines — anything that must be done by a certain date." },
-    { name: "Travel",      color: "#ffb878", prompt: "Flights, trains, drives, hotel check-ins, commutes, or anything about getting from one place to another." },
-    { name: "Personal",    color: "#7ae7bf", prompt: "Personal errands, family, social plans, health, exercise, or other non-work commitments." },
-    { name: "Appointment", color: "#dbadff", prompt: "Doctor, dentist, service bookings, viewings, or a reserved slot with a provider." }
+    { name: "Meeting",     icon: "users",          prompt: "Calls, syncs, stand-ups, interviews, or any scheduled meeting with other people." },
+    { name: "Deadline",    icon: "flag",           prompt: "Due dates, submission cut-offs, filing or payment deadlines — anything that must be done by a certain date." },
+    { name: "Travel",      icon: "paper-airplane", prompt: "Flights, trains, drives, hotel check-ins, commutes, or anything about getting from one place to another." },
+    { name: "Personal",    icon: "heart",          prompt: "Personal errands, family, social plans, health, exercise, or other non-work commitments." },
+    { name: "Appointment", icon: "calendar",       prompt: "Doctor, dentist, service bookings, viewings, or a reserved slot with a provider." }
   ].freeze
 end

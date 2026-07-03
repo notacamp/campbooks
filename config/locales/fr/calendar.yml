@@ -2,6 +2,7 @@
 fr:
   calendar:
     index:
+      close_sidebar: Fermer
       connect_cta: Connecter un calendrier
       empty_desc: Connectez un calendrier Google ou Zoho pour voir et gérer vos événements
         ici.
@@ -11,8 +12,10 @@ fr:
       next: Suivant
       previous: Précédent
       reminders: Rappels
+      sidebar_title: Calendriers
       title: Calendrier
       today: Aujourd'hui
+      toggle_sidebar: Afficher ou masquer la liste des calendriers
       upcoming: À venir
       view_agenda: Agenda
       view_day: Jour
@@ -33,9 +36,6 @@ fr:
       all_day_label: Toute la journée
       calendar_label: Calendrier
       cancel: Annuler
-      color_default: Couleur du calendrier
-      color_hint: Laissez la couleur du calendrier pour utiliser celle du type.
-      color_label: Couleur
       create: Créer un événement
       delete: Supprimer l'événement
       delete_confirm: Supprimer cet événement ?
@@ -65,6 +65,34 @@ fr:
       rsvp_saved: Votre réponse a été enregistrée.
     update:
       updated: Événement mis à jour.
+  calendar_imports:
+    create:
+      imported:
+        one: 1 événement importé.
+        other: "%{count} événements importés."
+      no_calendar: Choisissez un calendrier de destination.
+      no_file: Choisissez un fichier .ics à importer.
+      parse_failed: Impossible de lire ce fichier comme un calendrier. Exportez un nouveau .ics et réessayez.
+      skipped_duplicate:
+        one: 1 doublon ignoré.
+        other: "%{count} doublons ignorés."
+      skipped_malformed:
+        one: 1 événement illisible ignoré.
+        other: "%{count} événements illisibles ignorés."
+      skipped_recurring:
+        one: 1 événement récurrent ignoré (pas encore pris en charge).
+        other: "%{count} événements récurrents ignorés (pas encore pris en charge)."
+      too_large: Ce fichier est trop volumineux (2 Mo max).
+      truncated: Le fichier contenait plus de %{max} événements — seuls les %{max} premiers ont été importés.
+      wrong_type: Cela ne ressemble pas à un fichier de calendrier (.ics).
+    new:
+      calendar_label: Importer dans
+      file_hint: Jusqu'à %{max_events} événements par fichier. Les événements récurrents sont ignorés pour l'instant.
+      file_label: Fichier de calendrier (.ics)
+      no_writable_calendars: Connectez un calendrier synchronisé et accessible en écriture avant d'importer.
+      submit: Importer les événements
+      subtitle: Récupérez des événements d'une autre application de calendrier. Les événements importés se synchronisent avec votre fournisseur comme ceux créés ici.
+      title: Importer des événements
   components:
     calendar:
       agenda_list:
@@ -98,6 +126,24 @@ fr:
         now: Maintenant
         today: Aujourd'hui
         tomorrow: Demain
+      sidebar:
+        account_color: Couleur du compte
+        add: Ajouter
+        add_calendars:
+          one: Plus de calendriers (%{count})
+          other: Plus de calendriers (%{count})
+        calendar_options: Options du calendrier
+        color_label: Couleur
+        connect_account: Connecter un compte
+        hide_calendar: Masquer de mon calendrier
+        import_ics: Importer des événements (.ics)
+        managers_only: Seuls les gestionnaires du calendrier peuvent les activer.
+        none_synced: Aucun calendrier synchronisé pour l'instant.
+        primary: (principal)
+        refresh_list: Actualiser la liste des calendriers
+        show_calendar: Afficher sur mon calendrier
+        stop_syncing: Arrêter la synchronisation pour tous
+        stop_syncing_confirm: Arrêter la synchronisation de %{name} ? Ses événements disparaîtront du calendrier pour tout le monde sur ce compte.
       week_grid:
         add: "+ Ajouter"
         untitled: "(Sans titre)"

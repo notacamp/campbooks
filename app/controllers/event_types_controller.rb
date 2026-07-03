@@ -7,8 +7,7 @@ class EventTypesController < ApplicationController
   end
 
   def new
-    # Pre-select a palette color so the swatch picker has a default (color is required).
-    @type = Current.workspace.event_types.new(color: Calendars::EventColors.palette.first[:hex])
+    @type = Current.workspace.event_types.new
   end
 
   def create
@@ -70,6 +69,6 @@ class EventTypesController < ApplicationController
   end
 
   def type_params
-    params.require(:event_type).permit(:name, :color, :prompt)
+    params.require(:event_type).permit(:name, :icon, :prompt)
   end
 end

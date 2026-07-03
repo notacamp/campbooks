@@ -68,12 +68,10 @@ RSpec.describe CalendarScanJob, type: :job do
       expect(calendar.reload.sync_token).to eq("tok_abc")
     end
 
-    it "stores the per-event color the provider returned" do
-      allow(client).to receive(:list_events_full).and_return(
-        { events: [ event_attrs(provider_event_id: "evt_colored", color: "#fbd75b") ], next_sync_token: "tok_c" }
-      )
-      described_class.perform_now(account.id, "full")
-      expect(CalendarEvent.find_by(provider_event_id: "evt_colored").color).to eq("#fbd75b")
+    it "keeps a user-edited calendar color across full syncs" do
+      calendar.update!(color: "#123456")
+      described_class.perform_now(account.id, "full") # provider list says #3b82f6
+      expect(calendar.reload.color).to eq("#123456")
     end
 
     it "auto-enables the primary calendar when first discovered" do
@@ -98,6 +96,7 @@ RSpec.describe CalendarScanJob, type: :job do
       primary = account.reload.calendars.find_by(is_primary: true)
       expect(primary).to be_present
       expect(primary.syncing).to be(true)
+      expect(primary.color).to eq("#3b82f6") # provider color seeds first discovery only
     end
 
     it "records a completed sync log" do

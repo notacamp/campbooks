@@ -15,7 +15,7 @@ module Feed
           .where(all_day: false)
           .where(start_at: now..(now + WINDOW))
           .order(:start_at)
-          .includes(calendar: :calendar_account)
+          .includes(:event_type, calendar: :calendar_account)
           .map do |event|
             soon = event.start_at <= now + ATTENTION_WITHIN
             {
