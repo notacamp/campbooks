@@ -25,7 +25,7 @@ import Subscript from "@tiptap/extension-subscript"
 // the toolbar buttons, and drives the link/image popovers + image upload.
 export default class extends Controller {
   static targets = [
-    "editor", "input", "toolbar", "blockType", "colorInput",
+    "editor", "input", "toolbar", "bubble", "blockType", "colorInput",
     "linkPopover", "linkInput", "imagePopover", "imageInput", "imageError", "fileInput",
     "highlightInput", "fontFamilySelect"
   ]
@@ -81,8 +81,10 @@ export default class extends Controller {
       extensions,
       content: this.contentValue || "",
       onUpdate: () => this._sync(),
-      onSelectionUpdate: () => this._refreshToolbar(),
-      onTransaction: () => this._refreshToolbar()
+      onSelectionUpdate: () => { this._refreshToolbar(); this._updateBubble() },
+      onTransaction: () => this._refreshToolbar(),
+      onFocus: () => this._updateBubble(),
+      onBlur: () => this._hideBubble()
     })
 
     if (this.hasToolbarTarget) {
@@ -284,16 +286,21 @@ export default class extends Controller {
   }
 
   _refreshToolbar() {
-    if (!this.hasToolbarTarget || !this.editor) return
+    if (!this.editor) return
+    const containers = []
+    if (this.hasToolbarTarget) containers.push(this.toolbarTarget)
+    if (this.hasBubbleTarget) containers.push(this.bubbleTarget)
+    if (containers.length === 0) return
 
-    this.toolbarTarget.querySelectorAll("[data-rte-active]").forEach((btn) => {
+    containers.forEach((container) => container.querySelectorAll("[data-rte-active]").forEach((btn) => {
       const spec = btn.dataset.rteActive
       let active = false
       try {
         active = spec.startsWith("{") ? this.editor.isActive(JSON.parse(spec)) : this.editor.isActive(spec)
       } catch (_e) { active = false }
       btn.classList.toggle("is-active", active)
-    })
+    }))
+    if (!this.hasToolbarTarget) return
 
     if (this.hasBlockTypeTarget) {
       let value = "paragraph"
@@ -319,6 +326,38 @@ export default class extends Controller {
       const font = this.editor.getAttributes("textStyle").fontFamily || ""
       this.fontFamilySelectTarget.value = font
     }
+  }
+
+  // ── selection bubble (toolbar-less compose surfaces) ─────────
+  // Wired as mousedown->tiptap-editor#keepFocus on the bubble container so
+  // clicking a bubble button never blurs the editor (blur would hide the
+  // bubble before the click lands).
+  keepFocus(event) {
+    event.preventDefault()
+  }
+
+  _updateBubble() {
+    if (!this.hasBubbleTarget || !this.editor) return
+    const { from, to, empty } = this.editor.state.selection
+    if (empty || !this.editor.isFocused) return this._hideBubble()
+
+    const start = this.editor.view.coordsAtPos(from)
+    const end = this.editor.view.coordsAtPos(to, -1)
+    const wrap = this.element.getBoundingClientRect()
+    const bubble = this.bubbleTarget
+
+    bubble.classList.add("is-open")
+    const width = bubble.offsetWidth
+    const mid = (start.left + end.left) / 2 - wrap.left
+    const left = Math.min(Math.max(mid - width / 2, 8), Math.max(wrap.width - width - 8, 8))
+    let top = start.top - wrap.top - bubble.offsetHeight - 8
+    if (top < 4) top = end.bottom - wrap.top + 8
+    bubble.style.left = `${left}px`
+    bubble.style.top = `${top}px`
+  }
+
+  _hideBubble() {
+    if (this.hasBubbleTarget) this.bubbleTarget.classList.remove("is-open")
   }
 
   _normalizeUrl(url) {

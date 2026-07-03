@@ -530,6 +530,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_03_140000) do
     t.uuid "email_account_id"
     t.uuid "in_reply_to_id"
     t.integer "mode", default: 0, null: false
+    t.text "quoted_body"
     t.uuid "signature_id"
     t.string "subject"
     t.text "to_address"

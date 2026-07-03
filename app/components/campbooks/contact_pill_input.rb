@@ -2,11 +2,14 @@
 
 module Campbooks
   class ContactPillInput < Campbooks::Base
-    def initialize(name:, value: "", placeholder: "Search contacts...", label: nil, **attrs)
+    # bare: renders without the boxed border — for the hairline envelope rows of
+    # the new compose surfaces, where the row (not the control) carries focus.
+    def initialize(name:, value: "", placeholder: "Search contacts...", label: nil, bare: false, **attrs)
       @name = name
       @value = value
       @placeholder = placeholder
       @label = label
+      @bare = bare
       @attrs = attrs
     end
 
@@ -27,8 +30,8 @@ module Campbooks
         div(
           data: { contact_pill_input_target: "pills" },
           class: class_names(
-            "flex flex-wrap items-center gap-1 bg-card border border-gray-200 rounded-md px-2 py-0.5 min-h-[28px]",
-            "focus-within:border-accent-500 focus-within:ring-1 focus-within:ring-accent-500",
+            "flex flex-wrap items-center gap-1 min-h-[28px]",
+            @bare ? "bg-transparent" : "bg-card border border-gray-200 rounded-md px-2 py-0.5 focus-within:border-accent-500 focus-within:ring-1 focus-within:ring-accent-500",
             @attrs[:class]
           )
         ) do

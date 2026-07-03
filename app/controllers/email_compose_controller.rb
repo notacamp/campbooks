@@ -227,11 +227,19 @@ class EmailComposeController < ApplicationController
   def compose_params
     {
       subject: params[:subject],
-      body: params[:body],
+      body: merged_body,
       to_address: params[:to_address],
       cc_address: params[:cc_address].presence,
       bcc_address: params[:bcc_address].presence
     }
+  end
+
+  # The new composer keeps the quoted thread OUT of the editor (a collapsed
+  # pill + hidden quoted_body field) unless the user expands it. Sends merge it
+  # back in, preserving the classic body-then-quote order; the legacy inline
+  # form simply never posts quoted_body.
+  def merged_body
+    [ params[:body], params[:quoted_body] ].select(&:present?).join
   end
 
   # Resolve the signed blob ids submitted by the attachment tray into the
