@@ -37,4 +37,17 @@ class EmailThreadAwaitingReplyTest < ActiveSupport::TestCase
     assert_not_includes result, recent
     assert_not_includes result, dismissed
   end
+
+  test ".awaiting_reply vets with the AI verdict — drops 'no follow-up expected', keeps confirmed and unjudged" do
+    unjudged  = thread(last_outbound_at: 1.day.ago, last_inbound_at: 2.days.ago)
+    confirmed = thread(last_outbound_at: 1.day.ago, last_inbound_at: 2.days.ago,
+                       follow_up_last_analyzed_at: 1.day.ago, follow_up_expected: true)
+    fyi       = thread(last_outbound_at: 1.day.ago, last_inbound_at: 2.days.ago,
+                       follow_up_last_analyzed_at: 1.day.ago, follow_up_expected: false)
+
+    result = EmailThread.awaiting_reply
+    assert_includes result, unjudged
+    assert_includes result, confirmed
+    assert_not_includes result, fyi
+  end
 end

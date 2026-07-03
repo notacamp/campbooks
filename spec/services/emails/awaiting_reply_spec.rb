@@ -96,12 +96,12 @@ RSpec.describe Emails::AwaitingReply do
       expect(query.due).not_to include(thread) # …but the AI said wait
     end
 
-    it "respects an AI 'no': stays in the list, never nudges" do
+    it "drops a thread the AI judged as not expecting a reply (FYI / closing)" do
       thread = waiting_thread(sent_ago: 4.days.ago,
                               follow_up_last_analyzed_at: 4.days.ago,
                               follow_up_expected: false)
-      expect(query.threads).to include(thread)
-      expect(query.due).not_to include(thread)
+      expect(query.threads).not_to include(thread) # AI vetted it out of the list…
+      expect(query.due).not_to include(thread)     # …and out of the nudge set
     end
   end
 end
