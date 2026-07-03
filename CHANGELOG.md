@@ -16,6 +16,17 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- **A roomier, calmer calendar.** The month and week views now stretch to fill the
+  whole page instead of floating in a short, narrow box, so far more of your schedule
+  is visible at a glance. The week and day views open on your working hours (no more
+  staring at an empty pre‑dawn grid) and their day header stays pinned as a frosted
+  glass bar while the hours scroll underneath. Hovering a day in the month grid, or
+  an empty slot in the week/day grid, now shows a clear "click to add" cue, and
+  timed events read as a tidy time + title line rather than a wall of colored bars.
+  Today is gently highlighted throughout.
+
 ## [0.7.0] - 2026-06-30
 
 ### Added
