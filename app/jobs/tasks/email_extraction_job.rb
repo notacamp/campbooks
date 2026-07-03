@@ -25,20 +25,23 @@ module Tasks
       body = Emails::PlainText.of(email.body)
       content = [ email.subject, email.ai_summary, body ].compact_blank.join("\n\n")
 
+      memory = task_learning_memory(workspace)
+
       items = Ai::TaskExtractor.new(
         source:      email,
         content:     content,
         anchor_date: (email.received_at || Time.current).to_date,
         time_zone:   Time.zone,
         workspace:   workspace,
-        known_tasks: known_thread_titles(email)
+        known_tasks: known_thread_titles(email),
+        learning_memory: memory
       ).extract
 
       # Fingerprint on the THREAD so the same ask restated in a follow-up message
       # of one conversation dedupes instead of piling up a task per reply.
       tasks = Tasks::Builder.call(
         workspace: workspace, source: email, raw_items: items, anchor_tz: Time.zone,
-        fingerprint_source: email.email_thread || email
+        fingerprint_source: email.email_thread || email, learning_memory: memory
       )
 
       Feed::RefreshJob.enqueue_for_workspace(workspace) if tasks.any?
@@ -57,6 +60,15 @@ module Tasks
       Task.where(source_type: "EmailMessage",
                  source_id: EmailMessage.where(email_thread_id: email.email_thread_id).select(:id))
           .order(created_at: :desc).limit(20).pluck(:title)
+    end
+
+    # One memory per run, shared by the extractor (soft prompt hint) and the builder
+    # (deterministic suppression). Best-effort: a failure here just means no learning.
+    def task_learning_memory(workspace)
+      Learning::Memory.new(source: Learning::Sources::Tasks.new(workspace))
+    rescue => e
+      Rails.logger.warn("[#{self.class.name}] learning_memory failed: #{e.message}")
+      nil
     end
   end
 end
