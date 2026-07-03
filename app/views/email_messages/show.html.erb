@@ -229,8 +229,8 @@
             <%= render partial: "search_results", locals: { messages: @messages, search_params: @search_params, pagy: @pagy } %>
           <% else %>
             <div id="email_threads" data-controller="email-thread" data-inbox-view-mode="breathable">
-              <% if @threads.any? || @pinned_threads&.any? %>
-                <%= render partial: "thread_list", locals: { threads: @threads, current_group: @current_group, tag_groups: @tag_groups, pinned_threads: @pinned_threads, group_items: @group_items, smart_group_items: @smart_group_items, current_smart_group: @current_smart_group } %>
+              <% if @threads.any? || @pinned_threads&.any? || @waiting_threads&.any? %>
+                <%= render partial: "thread_list", locals: { threads: @threads, current_group: @current_group, tag_groups: @tag_groups, pinned_threads: @pinned_threads, waiting_threads: @waiting_threads, group_items: @group_items, smart_group_items: @smart_group_items, current_smart_group: @current_smart_group } %>
               <% else %>
                 <%= render(Campbooks::EmptyState.new(variant: :inline, class: "p-6")) do %>
                   <p class="text-[11px] text-gray-400"><%= t(".no_emails_yet") %></p>

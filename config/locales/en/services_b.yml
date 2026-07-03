@@ -63,6 +63,9 @@ en:
         unread:
           label: Unread
           prompt: Summarize my unread emails
+        waiting_on_reply:
+          label: Waiting on replies
+          prompt: What am I still waiting to hear back on?
       subtitle:
         all_caught_up: You're all caught up. Ask me about your emails, documents,
           or contacts whenever you need.
