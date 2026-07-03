@@ -25,6 +25,9 @@ class EmailComposeController < ApplicationController
     # A mode switch carries the working draft along so autosave keeps updating
     # the same row instead of forking a second one.
     @draft = Current.user.draft_emails.find_by(id: params[:draft_email_id]) if params[:draft_email_id].present?
+    # Decided behavior: Scout pre-drafts only when a suggestion is already
+    # cached on the thread (never a surprise model call on open).
+    @scout_draft = cached_scout_draft if %w[reply reply_all].include?(mode) && @prefill_body.blank?
 
     respond_to do |format|
       format.turbo_stream { render turbo_stream: dock_stream }
@@ -167,9 +170,21 @@ class EmailComposeController < ApplicationController
       signatures: @signatures,
       signature_id: @signature&.id,
       accounts: [],
-      attachment_entries: forward_attachment_entries
+      attachment_entries: forward_attachment_entries,
+      scout_draft: @scout_draft
     })
     streams
+  end
+
+  # The freshest non-outdated Scout draft on the thread (created by the
+  # suggest-reply tools). Question prompts also live as draft messages but
+  # carry ai_suggested_actions — excluded so they never ghost into the canvas.
+  def cached_scout_draft
+    agent_thread = @message.email_thread&.agent_thread
+    agent_thread&.agent_messages
+                &.where(draft: true, outdated: false, author_type: :ai)
+                &.where("ai_suggested_actions = '[]'::jsonb") # a hash [] compiles to an empty IN, not jsonb equality
+                &.order(created_at: :desc)&.first&.content
   end
 
   # Forwarding carries the original files along as removable chips (their

@@ -9,8 +9,10 @@ export default class extends Controller {
   static targets = [
     "summary", "summaryRecipients", "summarySubject", "fields",
     "ccRow", "bccRow", "ccToggle", "bccToggle",
-    "subjectInput", "collapseButton", "quoteWrap", "quotedInput", "sendButton"
+    "subjectInput", "collapseButton", "quoteWrap", "quotedInput", "sendButton",
+    "scoutDraft", "scoutText", "scoutSpark"
   ]
+  static values = { messageId: { type: String, default: "" } }
 
   connect() {
     this._focusInitial()
@@ -89,6 +91,68 @@ export default class extends Controller {
       event.preventDefault()
       this.element.requestSubmit(this.hasSendButtonTarget ? this.sendButtonTarget : undefined)
     }
+  }
+
+  // ── Scout ghost draft (Probe 02) ─────────────────────────────
+  // Take ownership: the ghost's text becomes editor content (plain ink).
+  useScoutDraft(event) {
+    event?.preventDefault()
+    if (!this.hasScoutTextTarget) return
+    const text = this.scoutTextTarget.textContent.trim()
+    const html = text.split(/\n{2,}/).map((p) =>
+      `<p>${this._escapeHtml(p).replace(/\n/g, "<br>")}</p>`
+    ).join("")
+    this._editorController()?.setContent(html)
+    this.dismissScoutDraft()
+    this.element.dispatchEvent(new Event("input", { bubbles: true }))
+    this.element.querySelector(".ProseMirror")?.focus()
+  }
+
+  dismissScoutDraft(event) {
+    event?.preventDefault()
+    if (this.hasScoutDraftTarget) this.scoutDraftTarget.remove()
+  }
+
+  // Ask Scout to draft this reply (footer spark), or regenerate with a tone
+  // instruction (ghost chips). The stream replaces #compose_scout_slot.
+  requestScoutDraft(event) {
+    event?.preventDefault()
+    this._fetchScoutDraft()
+  }
+
+  retoneScoutDraft(event) {
+    event?.preventDefault()
+    const tone = event.params.tone
+    const current = this.hasScoutTextTarget ? this.scoutTextTarget.textContent.trim() : ""
+    this._fetchScoutDraft(`Rewrite this draft to be ${tone}, keeping the same facts:\n${current}`)
+  }
+
+  _fetchScoutDraft(summary = "") {
+    if (!this.messageIdValue) return
+    if (this.hasScoutSparkTarget) this.scoutSparkTarget.classList.add("animate-pulse")
+    if (this.hasScoutDraftTarget) this.scoutDraftTarget.classList.add("opacity-50", "pointer-events-none")
+
+    const params = new URLSearchParams({ tool: "draft_reply", surface: "dock" })
+    if (summary) params.set("args[summary]", summary)
+    fetch(`/email_messages/${this.messageIdValue}/tool`, {
+      method: "POST",
+      headers: {
+        "X-CSRF-Token": document.querySelector("meta[name='csrf-token']")?.content || "",
+        "Accept": "text/vnd.turbo-stream.html",
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: params.toString()
+    }).then((r) => r.text()).then((html) => {
+      if (html) Turbo.renderStreamMessage(html)
+    }).finally(() => {
+      if (this.hasScoutSparkTarget) this.scoutSparkTarget.classList.remove("animate-pulse")
+    })
+  }
+
+  _escapeHtml(str) {
+    const div = document.createElement("div")
+    div.textContent = str
+    return div.innerHTML
   }
 
   // ── discard ──────────────────────────────────────────────────

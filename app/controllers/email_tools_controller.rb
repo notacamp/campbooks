@@ -139,14 +139,19 @@ class EmailToolsController < ApplicationController
                   user: Current.user
                 )
               end
-              locals = { questions: result[:questions], email_message: email_message, surface: params[:surface] }
-              if slot
-                [ turbo_stream.update(slot, partial: "email_comments/draft_questions", locals: locals) ]
+              if params[:surface] == "dock"
+                # The ghost slot sits inside the compose <form>, so the
+                # question form can't nest there — point the user at Scout.
+                [ notify_stream(t(".draft_needs_info"), severity: :warning) ]
               else
-                [ turbo_stream.append("comments_list", partial: "email_comments/draft_questions", locals: locals) ]
+                locals = { questions: result[:questions], email_message: email_message, surface: params[:surface] }
+                if slot
+                  [ turbo_stream.update(slot, partial: "email_comments/draft_questions", locals: locals) ]
+                else
+                  [ turbo_stream.append("comments_list", partial: "email_comments/draft_questions", locals: locals) ]
+                end
               end
             else
-              toast = { message: t(".draft_ready"), variant: :success }
               thread = email_message.email_thread
               agent_thread_for(thread)&.agent_messages&.where(draft: true, outdated: false)&.update_all(outdated: true)
               if thread
@@ -158,10 +163,17 @@ class EmailToolsController < ApplicationController
                   user: Current.user
                 )
               end
-              locals = { draft: result[:draft], email_message: email_message, surface: params[:surface] }
-              if slot
-                [ turbo_stream.update(slot, partial: "email_comments/draft", locals: locals) ]
+              if params[:surface] == "dock"
+                # Regeneration inside the open Dock: swap the ghost in place.
+                [ turbo_stream.update("compose_scout_slot", partial: "email_compose/scout_draft",
+                                      locals: { text: result[:draft]["body"], message: email_message }) ]
+              elsif slot
+                # "Suggest reply" from the thread/drawer strips: the reply now
+                # starts answered — open the Dock with the ghost pre-loaded.
+                [ dock_with_scout_stream(email_message, result[:draft]) ]
               else
+                toast = { message: t(".draft_ready"), variant: :success }
+                locals = { draft: result[:draft], email_message: email_message, surface: params[:surface] }
                 [ turbo_stream.append("comments_list", partial: "email_comments/draft", locals: locals) ]
               end
             end
@@ -451,6 +463,28 @@ class EmailToolsController < ApplicationController
   # Discussion panel (comments_list flow). See COMPOSE_SLOTS.
   def draft_slot
     COMPOSE_SLOTS[params[:surface].to_s]
+  end
+
+  # A ready Scout draft opens the Dock with the ghost block pre-loaded — the
+  # reply starts answered instead of a card floating above the thread.
+  def dock_with_scout_stream(email_message, draft)
+    prefill = Emails::ComposePrefill.for(message: email_message, mode: "reply")
+    turbo_stream.update("compose_dock", partial: "email_compose/dock", locals: {
+      mode: :reply,
+      message: email_message,
+      draft: nil,
+      to: prefill.to,
+      cc: prefill.cc,
+      bcc: "",
+      subject: prefill.subject,
+      body: "",
+      quoted_body: prefill.quoted_body,
+      signatures: Current.user.signatures.ordered.includes(:email_accounts),
+      signature_id: Signature.default_for(Current.user, email_message.email_account)&.id,
+      accounts: [],
+      attachment_entries: [],
+      scout_draft: draft["body"]
+    })
   end
 
   def agent_thread_for(email_thread)

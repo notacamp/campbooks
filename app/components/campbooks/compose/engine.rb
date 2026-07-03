@@ -15,10 +15,12 @@ module Campbooks
     #   expanding folds it into the editor for editing).
     # - Autosave (compose-autosave) creates a DraftEmail on first input.
     class Engine < Campbooks::Base
+      # scout_draft: raw text of a Scout-generated reply, shown as an Ember-glass
+      # ghost block above the canvas until the user takes ownership (Probe 02).
       def initialize(shell:, mode:, action_url:, message: nil, draft: nil,
                      to: "", cc: "", bcc: "", subject: "", body: "", quoted_body: "",
                      signatures: [], signature_id: nil, account: nil, accounts: [],
-                     attachment_entries: [])
+                     attachment_entries: [], scout_draft: nil)
         @shell = shell
         @mode = mode.to_sym
         @action_url = action_url
@@ -35,6 +37,7 @@ module Campbooks
         @account = account
         @accounts = accounts
         @attachment_entries = attachment_entries
+        @scout_draft = scout_draft
       end
 
       def view_template
@@ -48,6 +51,7 @@ module Campbooks
                # leaves the page after send, and a Turbo submit would swallow
                # the cross-layout redirect (known gotcha) — full request there.
                turbo: dock? ? "true" : "false",
+               compose_engine_message_id_value: @message&.id.to_s,
                compose_autosave_url_value: helpers.draft_emails_path,
                compose_autosave_draft_id_value: @draft&.id.to_s,
                compose_autosave_mode_value: @mode.to_s,
@@ -212,6 +216,11 @@ module Campbooks
       # ── editor ───────────────────────────────────────────────────
       def editor_block
         div(class: class_names("flex-1 min-h-0 flex flex-col", dock? ? "px-5" : nil)) do
+          # On-demand Scout drafts stream into this slot; a cached suggestion
+          # renders into it straight away.
+          div(id: "compose_scout_slot", class: "flex-shrink-0 empty:hidden") do
+            render(ScoutDraft.new(text: @scout_draft, message: @message)) if @scout_draft.present? && @message
+          end
           render(RichTextEditor.new(
             input_name: "body",
             content: @body,
@@ -260,6 +269,7 @@ module Campbooks
               "flex items-center gap-1 flex-shrink-0 border-t border-gray-100",
               dock? ? "px-4 py-3" : "py-3 mt-2"
             )) do
+          scout_spark_button if @message && helpers.ai_provider_available?(:text)
           render(Campbooks::Files::FileLinkPicker.new)
           if helpers.email_templates_enabled? && helpers.current_entitlements.feature?(:email_templates)
             render(EmailTemplatePicker.new(frame_id: "etp_#{@message&.id || @draft&.id || 'new'}"))
@@ -275,6 +285,20 @@ module Campbooks
           end
           schedule_control if helpers.current_entitlements.feature?(:email_scheduling)
           send_button
+        end
+      end
+
+      # The one Ember pixel in the composer: asks Scout to draft this reply
+      # (Meaning Rule — Ember only where it means Scout).
+      def scout_spark_button
+        button(type: "button",
+               title: t(".scout_draft_title"), aria_label: t(".scout_draft_title"),
+               style: "background-image: var(--ember);",
+               data: { compose_engine_target: "scoutSpark", action: "click->compose-engine#requestScoutDraft" },
+               class: "w-8 h-8 rounded-lg flex items-center justify-center text-white flex-shrink-0 hover:opacity-90 transition-opacity") do
+          svg(class: "w-3.5 h-3.5", fill: "currentColor", viewBox: "0 0 24 24") do
+            raw(safe('<path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9L12 2z"/>'))
+          end
         end
       end
 
