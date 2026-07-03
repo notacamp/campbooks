@@ -16,6 +16,18 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Keyboard shortcuts no longer scramble the inbox.** After moving between emails
+  with the arrow keys, pressing a shortcut (archive, reply, forward…) could leave the
+  inbox unstyled — plain text with underlined links — until you reloaded. Shortcuts
+  now always act on the email you're actually reading.
+- **The Compose button now sits flush right in the inbox toolbar** instead of drifting
+  toward the middle on wide screens.
+- **Emails opened in the bottom-right drawer are now marked as read.** Opening a
+  message in the drawer (the List and Board inbox layouts) clears its unread dot and
+  updates your unread counts, just like opening it in the full reading view.
+
 ## [0.7.0] - 2026-06-30
 
 ### Added
