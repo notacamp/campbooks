@@ -123,6 +123,28 @@ pt:
         type_company: Empresa
         type_personal: Pessoal
         workspace_title: Espaço de trabalho
+      welcome:
+        ai_key_body: As instalações auto-hospedadas trazem o seu próprio modelo. Dois
+          minutos, uma chave.
+        ai_key_title: Adicione uma chave de IA para o Scout poder ler
+        connected_title:
+          one: Caixa de correio ligada
+          other: "%{count} caixas de correio ligadas"
+        continue_home: Ir para a minha caixa de entrada
+        greeting: Olá %{name}, sou o Scout.
+        greeting_anonymous: Olá, sou o Scout.
+        more_setup: Mais opções de configuração
+        pitch: 'Leio o que chega à sua caixa de entrada, organizo tudo e mostro apenas
+          o que precisa de si: respostas, prazos, documentos. Ligue a sua caixa de
+          correio e começo já.'
+        privacy_note: O Campbooks lê a sua caixa de entrada para a organizar e extrair
+          documentos e prazos. O seu correio continua privado e pode desligar a qualquer
+          momento nas Definições.
+        see_demo: Veja primeiro como funciona
+        skip: Saltar por agora e explorar a aplicação
+        type_company: Trabalho
+        type_personal: Pessoal
+        type_question: Vai usar isto sobretudo para correio de trabalho ou pessoal?
       workspace:
         address_line1_label: Morada linha 1
         address_line1_placeholder: Rua e número
@@ -185,3 +207,35 @@ pt:
         no_suggestions: Sem sugestões adicionais — as suas etiquetas de modelo cobrem
           bem os casos mais comuns.
         save_hint: Marque as sugestões que pretende adicionar e guarde.
+  setup_status:
+    items:
+      ai_configuration:
+        cta: Configurar IA
+        description: 'As instalações auto-hospedadas trazem o seu próprio modelo:
+          adicione uma chave e o Scout começa a ler, organizar e redigir.'
+        message: Adicione uma chave de IA para o Scout poder ler
+      document_provider:
+        cta: Adicionar IA de documentos
+        description: Uma chave com capacidade de visão permite ao Scout ler também
+          PDFs, digitalizações e fotografias. Opcional e fácil de adicionar mais tarde.
+        message: Adicione IA de documentos (opcional)
+      document_types:
+        cta: Rascunhar com o Scout
+        description: 'Faturas, contratos, recibos: o Scout pode propor um conjunto
+          inicial para o seu tipo de trabalho, pronto a editar.'
+        message: Deixe o Scout rascunhar os seus tipos de documento
+      email_account:
+        cta: Ligar uma caixa de correio
+        description: 'O Scout organiza o correio à medida que chega: o que precisa
+          de si, os prazos e os documentos escondidos nos anexos.'
+        message: Ligue a sua caixa de correio
+      tags:
+        cta: Sugerir com o Scout
+        description: As etiquetas ensinam ao Scout como pensa sobre o correio. Comece
+          pelas sugestões e mude o que quiser.
+        message: Deixe o Scout sugerir etiquetas de e-mail
+      workspace:
+        cta: Apresente-se
+        description: Uma frase sobre o que faz ajuda o Scout a organizar e redigir
+          como você faria.
+        message: Apresente o seu espaço de trabalho

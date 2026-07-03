@@ -1,0 +1,62 @@
+---
+es:
+  components:
+    compose:
+      dock:
+        dialog_label_forward: Reenviar mensaje
+        dialog_label_new_message: Mensaje nuevo
+        dialog_label_reply: Responder
+        dialog_label_reply_all: Responder a todos
+        draft: Borrador
+        draft_saved: Borrador guardado
+        expand_title: Abrir en página completa
+        minimize_title: Minimizar
+        mode_forward: Reenviar
+        mode_new_message: Mensaje nuevo
+        mode_reply: Responder
+        mode_reply_all: Responder a todos
+        restore_aria: Seguir escribiendo
+        switch_mode: Cambiar el modo de respuesta
+      engine:
+        bcc_button: Cco
+        cc_button: Cc
+        collapse_envelope: Contraer los campos de destinatarios
+        discard: Descartar
+        draft_saved: Borrador guardado
+        edit_recipients: Editar destinatarios y asunto
+        expand_quote_title: Mostrar el mensaje citado y editarlo
+        label_bcc: Cco
+        label_cc: Cc
+        label_from: De
+        label_signature: Firma
+        label_subject: Asunto
+        label_to: Para
+        no_signature: Sin firma
+        placeholder_bcc: Añadir Cco…
+        placeholder_body: Escriba su mensaje…
+        placeholder_cc: Añadir Cc…
+        placeholder_subject: Asunto
+        placeholder_to: Buscar contactos o escribir correo…
+        quoted_from: El %{date}, %{who} escribió
+        quoted_from_undated: "%{who} escribió"
+        quoted_generic: Mensaje citado
+        recipients_more: "%{name} +%{count}"
+        saving: Guardando…
+        schedule: Programar
+        schedule_at_label: Enviar el
+        schedule_send: Programar envío
+        scout_draft_title: Redactar esta respuesta con Scout
+        send: Enviar
+        signature_default: "%{name} (predeterminada)"
+      pill:
+        draft_saved: Borrador guardado
+        resume_aria: Retomar el borrador
+        untitled: Borrador
+      scout_draft:
+        ai_tag: IA
+        drafted_label: redactado a partir de esta conversación
+        start_blank: Empezar en blanco
+        tone_firmer: Más firme
+        tone_shorter: Más corto
+        tone_warmer: Más cálido
+        use_draft: Usar este borrador

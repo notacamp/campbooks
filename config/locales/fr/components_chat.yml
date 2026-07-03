@@ -45,8 +45,8 @@ fr:
     chat_message:
       ai_badge: IA
       draft_badge: Brouillon
+      step_searched: Recherché %{tool}
       thinking_summary: Raisonnement
-      step_searched: "Recherché %{tool}"
       time_ago: il y a %{time}
     command_palette:
       capture_placeholder: Déplacer vers quel dossier…

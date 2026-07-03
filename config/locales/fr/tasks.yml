@@ -5,173 +5,175 @@ fr:
       task:
         all_day: Toute la journée
         description: Description
-        due_at: "Date d'échéance"
+        due_at: Date d'échéance
         priorities:
           high: Haute
           low: Basse
           normal: Normale
           urgent: Urgente
-        priority: "Priorité"
+        priority: Priorité
         status: Statut
         statuses:
-          blocked: "Bloquée"
-          cancelled: "Annulée"
-          done: "Terminée"
+          blocked: Bloquée
+          cancelled: Annulée
+          done: Terminée
           in_progress: En cours
-          suggested: "Suggérée"
-          todo: "À faire"
+          suggested: Suggérée
+          todo: À faire
         title: Titre
       task_email_link:
         relationships:
-          blocked_by: "Bloquée par"
+          blocked_by: Bloquée par
           follow_up: Suivi
-          reference: "Référence"
-          related: "Liée"
+          reference: Référence
+          related: Liée
     models:
       task:
-        one: "Tâche"
-        other: "Tâches"
+        one: Tâche
+        other: Tâches
   components:
     tasks:
       board_card:
         overdue: En retard
-        today: "Aujourd'hui"
+        today: Aujourd'hui
       board_column:
         empty: Rien ici
       form:
         assignees_label: Responsables
         cancel: Annuler
-        create: "Créer une tâche"
+        create: Créer une tâche
         description_label: Description
-        description_placeholder: "Ajoutez des détails, des liens ou du contexte…"
-        due_label: "Date d'échéance"
-        labels_label: "Étiquettes"
+        description_placeholder: Ajoutez des détails, des liens ou du contexte…
+        due_label: Date d'échéance
+        labels_label: Étiquettes
         no_labels: Aucune étiquette dans cet espace de travail.
-        priority_label: "Priorité"
+        priority_label: Priorité
         save: Enregistrer les modifications
         status_label: Statut
         title_label: Titre
         title_placeholder: Que faut-il faire ?
       row:
-        due_today: "À rendre aujourd'hui"
-        due_tomorrow: "À rendre demain"
+        due_today: À rendre aujourd'hui
+        due_tomorrow: À rendre demain
         in_days:
-          one: "À rendre dans %{count} jour"
-          other: "À rendre dans %{count} jours"
-        no_due_date: "Sans date d'échéance"
+          one: À rendre dans %{count} jour
+          other: À rendre dans %{count} jours
+        no_due_date: Sans date d'échéance
         overdue: En retard
         unassigned: Non attribuée
   tasks:
     accept:
-      accepted: "Tâche conservée."
+      accepted: Tâche conservée.
     archive:
-      archived: "Tâche archivée."
+      archived: Tâche archivée.
     assign:
-      assigned: "Responsables mis à jour."
+      assigned: Responsables mis à jour.
     attach_document:
       attached: Document joint.
       not_found: Ce document est introuvable.
     comments:
       form:
-        placeholder: "Ajoutez un commentaire, ou @scout pour de l'aide…"
+        placeholder: Ajoutez un commentaire, ou @scout pour de l'aide…
     complete:
-      completed: "Tâche terminée."
+      completed: Tâche terminée.
     create:
-      created: "Tâche créée."
+      created: Tâche créée.
     destroy:
-      deleted: "Tâche supprimée."
+      deleted: Tâche supprimée.
     detach_document:
-      detached: "Document détaché."
+      detached: Document détaché.
     dismiss:
-      dismissed: "Suggestion ignorée."
+      dismissed: Suggestion ignorée.
     document_picker:
       attach: Joindre
       no_results: Aucun document correspondant.
-      search_placeholder: "Recherchez vos documents…"
+      search_placeholder: Recherchez vos documents…
     edit:
-      title: "Modifier la tâche"
+      title: Modifier la tâche
     email_picker:
       link: Lier
       no_results: Aucun e-mail correspondant.
-      search_placeholder: "Recherchez vos e-mails par objet…"
+      search_placeholder: Recherchez vos e-mails par objet…
     index:
       all: Toutes
-      archived: "Archivées"
+      archived: Archivées
       board_view: Tableau
-      empty_body: "Créez une tâche, ou laissez Scout extraire des actions de vos e-mails."
+      empty_body: Créez une tâche, ou laissez Scout extraire des actions de vos e-mails.
       empty_title: Aucune tâche pour l'instant
       list_view: Liste
-      new: "Nouvelle tâche"
+      new: Nouvelle tâche
       subtitle: Actions issues de vos e-mails et vos propres tâches.
-      title: "Tâches"
+      title: Tâches
       triage_banner:
         one: "%{count} tâche suggérée à examiner dans Skim"
         other: "%{count} tâches suggérées à examiner dans Skim"
     link_email:
-      linked: "E-mail lié."
+      linked: E-mail lié.
       not_found: Cet e-mail est introuvable.
     move:
       invalid_status: Ce statut n'existe pas.
-      moved: "Tâche déplacée."
+      moved: Tâche déplacée.
     new:
-      title: "Nouvelle tâche"
+      title: Nouvelle tâche
     remind:
-      no_due: "Ajoutez d'abord une date d'échéance pour définir un rappel."
+      no_due: Ajoutez d'abord une date d'échéance pour définir un rappel.
       remind_failed: Impossible de définir le rappel.
-      reminded: "Rappel défini — confirmez-le sur la page Rappels pour l'ajouter à votre calendrier."
+      reminded: Rappel défini — confirmez-le sur la page Rappels pour l'ajouter à
+        votre calendrier.
     show:
-      activity: "Activité"
+      activity: Activité
       add_document: Joindre un document
       add_email: Lier un e-mail
-      ai_reasoning: "Scout a signalé ceci :"
+      ai_reasoning: 'Scout a signalé ceci :'
       archive: Archiver
-      archived_notice: "Cette tâche est archivée. Elle est masquée de vos listes actives."
+      archived_notice: Cette tâche est archivée. Elle est masquée de vos listes actives.
       assignees: Responsables
-      back: "Toutes les tâches"
-      created_by: "Créée par %{name}"
+      back: Toutes les tâches
+      created_by: Créée par %{name}
       created_by_ai: Extraite par Scout
       delete: Supprimer
-      delete_confirm: "Supprimer cette tâche ? Cette action est irréversible."
+      delete_confirm: Supprimer cette tâche ? Cette action est irréversible.
       description: Description
-      detach: "Détacher"
+      detach: Détacher
       discussion: Discussion
-      discussion_empty: Lancez la discussion. Mentionnez @scout pour faire intervenir l'IA.
+      discussion_empty: Lancez la discussion. Mentionnez @scout pour faire intervenir
+        l'IA.
       documents: Documents
       edit: Modifier
-      labels: "Étiquettes"
-      linked_emails: "E-mails liés"
-      mark_done: "Marquer comme terminée"
+      labels: Étiquettes
+      linked_emails: E-mails liés
+      mark_done: Marquer comme terminée
       no_activity: Aucune activité pour l'instant.
       no_assignees: Non attribuée
       no_description: Aucune description pour l'instant.
       no_documents: Aucun document joint.
       no_labels: Aucune étiquette.
-      no_linked_emails: "Aucun e-mail lié."
-      origin: "Créée depuis cet e-mail"
-      priority: "Priorité : %{level}"
+      no_linked_emails: Aucun e-mail lié.
+      origin: Créée depuis cet e-mail
+      priority: 'Priorité : %{level}'
       relationship: Relation
       remind: Me rappeler
-      reminder_set: "Rappel défini"
+      reminder_set: Rappel défini
       reopen: Rouvrir
       status: Statut
       unarchive: Restaurer
       unlink: Dissocier
-      update: "Mettre à jour"
+      update: Mettre à jour
     skim:
       accept: Garder
-      all_tasks: "Toutes les tâches"
-      complete: "Terminée"
+      all_tasks: Toutes les tâches
+      complete: Terminée
       dismiss: Ignorer
-      empty_body: "Scout n'a suggéré aucune tâche pour l'instant."
-      empty_title: "Rien à examiner"
-      from_document: "Du document : %{title}"
-      from_email: "De l'e-mail : %{subject}"
+      empty_body: Scout n'a suggéré aucune tâche pour l'instant.
+      empty_title: Rien à examiner
+      from_document: 'Du document : %{title}'
+      from_email: 'De l''e-mail : %{subject}'
       subtitle: Scout a extrait ces actions de vos e-mails. Gardez celles qui comptent.
-      title: "Tâches suggérées"
-      why: "Pourquoi c'est une tâche :"
+      title: Tâches suggérées
+      why: 'Pourquoi c''est une tâche :'
     unarchive:
-      unarchived: "Tâche restaurée."
+      unarchived: Tâche restaurée.
     unlink_email:
-      unlinked: "E-mail dissocié."
+      unlinked: E-mail dissocié.
     update:
-      updated: "Tâche mise à jour."
+      updated: Tâche mise à jour.

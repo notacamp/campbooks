@@ -51,16 +51,16 @@ fr:
       over_limit: Vous avez atteint la limite de votre forfait pour %{feature}. Améliorez
         votre forfait pour en obtenir plus.
     features:
-      organizations: Organisations
       ai_model_access: Modèles d'IA
       document_templates: Modèles de documents
       email_accounts: Comptes e-mail
       emails_synced: E-mails synchronisés
       managed_ai: Campbooks AI
       notifications: Notifications
+      organizations: Organisations
       pipelines: Pipelines
       scout: Scout
-      tasks: "Tâches"
+      tasks: Tâches
       workflow_executions: Exécutions de workflow
       workflows: Workflows
   navigation:

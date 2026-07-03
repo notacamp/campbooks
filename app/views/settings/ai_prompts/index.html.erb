@@ -1,0 +1,20 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+<%= render(Campbooks::PageHeader.new(title: t("ai_prompts.settings.title"), subtitle: t("ai_prompts.settings.subtitle"))) %>
+
+<div class="space-y-3">
+  <% @entries.each do |entry| %>
+    <%= render "settings/ai_prompts/row", entry: entry, prompt: @prompts[entry.key] %>
+  <% end %>
+</div>
+
+<div class="mt-6">
+  <%= render(Campbooks::Card.new(padding: :md, class: "bg-amber-50 border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/25")) do %>
+    <div class="mb-2 flex items-center gap-1.5">
+      <svg class="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h2v2h-2v-2zm0-12h2v8h-2V5z"/>
+      </svg>
+      <span class="text-[11px] font-semibold text-amber-700 dark:text-amber-300"><%= t("ai_prompts.settings.help_title") %></span>
+    </div>
+    <p class="text-sm leading-relaxed text-gray-700 dark:text-gray-300"><%= t("ai_prompts.settings.help_body") %></p>
+  <% end %>
+</div>

@@ -132,16 +132,22 @@ class EmailMessages::BulkController < ApplicationController
           "<br><p style='font-size:12px;color:#9ca3af;'>---------- Forwarded message ----------<br><b>From:</b> #{ERB::Util.html_escape(from)}<br><b>Date:</b> #{date}<br><b>Subject:</b> #{ERB::Util.html_escape(msg.subject || '')}<br><b>To:</b> #{ERB::Util.html_escape(msg.to_address || '')}</p><br>#{body}"
         }.join("<br><hr style='border:0;border-top:1px dashed #d1d5db;margin:16px 0'><br>")
 
-        streams << turbo_stream.prepend("thread_compose_target",
-          partial: "email_compose/compose_area",
+        streams << turbo_stream.update("compose_dock",
+          partial: "email_compose/dock",
           locals: {
-            email_message: first,
             mode: :forward,
-            to_address: "",
-            cc_address: "",
+            message: first,
+            draft: nil,
+            to: "",
+            cc: "",
+            bcc: "",
             subject: "Fwd: #{messages.size} emails",
+            body: "",
             quoted_body: combined_body,
-            signature_content: Signature.default_for(Current.user, first.email_account)&.content
+            signatures: Current.user.signatures.ordered.includes(:email_accounts),
+            signature_id: Signature.default_for(Current.user, first.email_account)&.id,
+            accounts: [],
+            attachment_entries: []
           })
         toast = { message: t(".forwarded_compose", count: messages.size), variant: :success }
       end

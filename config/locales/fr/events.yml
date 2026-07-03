@@ -13,7 +13,7 @@ fr:
       files: Fichiers
       pipelines: Pipelines
       reminders: Rappels
-      tasks: "Tâches"
+      tasks: Tâches
     names:
       calendar_event_created: Événement de calendrier créé
       calendar_event_deleted: Événement de calendrier supprimé
@@ -31,6 +31,7 @@ fr:
       email_account_disconnected: Compte déconnecté
       email_archived: E-mail archivé
       email_bulk_archived: E-mails archivés en masse
+      email_filed: E-mail classé dans un dossier
       email_forwarded: E-mail transféré
       email_received: E-mail reçu
       email_sent: E-mail envoyé
@@ -38,7 +39,6 @@ fr:
       email_snoozed: E-mail reporté
       email_tagged: E-mail étiqueté
       email_trashed: E-mail mis à la corbeille
-      email_filed: E-mail classé dans un dossier
       email_unfiled: E-mail retiré du dossier
       file_deleted: Fichier supprimé
       file_filed: Fichier classé
@@ -61,11 +61,11 @@ fr:
       reminder_confirmed: Rappel confirmé
       reminder_created: Rappel créé
       reminder_dismissed: Rappel ignoré
-      task_archived: "Tâche archivée"
-      task_assigned: "Tâche assignée"
-      task_completed: "Tâche terminée"
-      task_created: "Tâche créée"
+      task_archived: Tâche archivée
+      task_assigned: Tâche assignée
+      task_completed: Tâche terminée
+      task_created: Tâche créée
       task_status_changed: Statut de la tâche modifié
-      task_unarchived: "Tâche restaurée"
+      task_unarchived: Tâche restaurée
     system_actor: Système
     time_ago: il y a %{time}

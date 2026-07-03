@@ -44,15 +44,6 @@ fr:
         overdue: En retard
         today: Aujourd'hui
         tomorrow: Demain
-      task_card:
-        complete: Terminer
-        dismiss: Ignorer
-        in_days:
-          one: Dans %{count} jour
-          other: Dans %{count} jours
-        overdue: En retard
-        today: "À rendre aujourd'hui"
-        tomorrow: "À rendre demain"
       reply_reminder_card:
         aged:
           one: "%{count} jour, sans réponse"
@@ -63,10 +54,10 @@ fr:
       shared:
         kbd_navigate: Naviguer
         many_participants: "%{names} et %{count} autres"
-        two_participants: "%{first} et %{second}"
         no_subject: "(sans objet)"
         priority: Priorité
         scout_read: je viens de le lire
+        two_participants: "%{first} et %{second}"
         unknown_sender: Expéditeur inconnu
         working: En cours…
         yesterday: Hier
@@ -81,6 +72,17 @@ fr:
         not_now: Pas maintenant
         prefix: Classer
         under: sous
+      task_card:
+        accept: Ajouter aux tâches
+        complete: Terminer
+        dismiss: Ignorer
+        in_days:
+          one: Dans %{count} jour
+          other: Dans %{count} jours
+        overdue: En retard
+        suggested: Tâche suggérée
+        today: À rendre aujourd'hui
+        tomorrow: À rendre demain
     time_of_day_greeting:
       greeting:
         afternoon: Bon après-midi, %{name}.
@@ -97,7 +99,9 @@ fr:
         le synchroniser automatiquement.
       reminder_dismissed: Rappel ignoré.
       restored: Rétabli.
-      task_completed: "Tâche terminée : %{title}"
+      task_accepted: 'Ajoutée à vos tâches : %{title}'
+      task_completed: 'Tâche terminée : %{title}'
+      task_dismissed: Suggestion ignorée.
       unsupported: Cette action n'est pas prise en charge ici.
   home:
     index:
@@ -105,6 +109,7 @@ fr:
       connect_body: Scout lit et trie vos e-mails avant votre arrivée. Connectez une
         boîte et votre fil prend vie.
       connect_cta: Connecter une boîte
+      connect_demo: Voyez-le d'abord en action
       connect_title: Connectez votre boîte de réception pour commencer
       disconnected_body: Scout ne peut pas accéder à votre boîte pour le moment —
         reconnectez-la pour que votre fil reprenne vie.
@@ -130,6 +135,7 @@ fr:
       scout_coach_title: Découvrez Scout
       subtitle:
         clear: Tout est à jour — Scout veille pour que ça dure.
+        fresh: Connectez une boîte mail ci-dessous et je fais une première passe.
         lots: "%{n} éléments requièrent votre attention. Scout les a empilés pour
           parcourir sans corvée."
         single: Un seul élément requiert votre attention — Scout a classé le reste.

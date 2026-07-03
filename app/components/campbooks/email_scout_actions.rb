@@ -24,18 +24,28 @@ module Campbooks
       @attrs = attrs
     end
 
-    # The reading-surface padding/border, shared so a server-side refresh of the
+    # The reading-surface padding, shared so a server-side refresh of the
     # strip (e.g. after an inline reply flips the chip to "Draft follow-up") matches
-    # the original render exactly.
-    SURFACE_CLASS = "px-5 py-3 border-b border-gray-100 flex-shrink-0"
+    # the original render exactly. No border — the Ember-glass block separates itself.
+    SURFACE_CLASS = "px-4 py-3 flex-shrink-0"
 
     def view_template
       return unless anything_to_show?
 
-      div(id: @attrs.delete(:id) || scout_strip_id, class: class_names("space-y-2", @attrs.delete(:class)), **@attrs) do
-        render(Campbooks::ScoutNote.new(message: note, compact: true)) if @show_note && note.present?
-        render(chat_actions) if actions.any?
-        provenance_note
+      div(id: @attrs.delete(:id) || scout_strip_id, class: class_names(@attrs.delete(:class)), **@attrs) do
+        if @show_note && note.present?
+          # Scout as a present entity — the same Ember-glass contribution block the
+          # home feed uses, with its suggested actions riding inside the block.
+          render(Campbooks::ScoutNote.new(message: note)) do
+            render(chat_actions) if actions.any?
+            div(class: "mt-2.5") { provenance_note } if provenance?
+          end
+        else
+          div(class: "space-y-2") do
+            render(chat_actions(wrapper_class: "flex items-center gap-2 flex-wrap")) if actions.any?
+            provenance_note
+          end
+        end
       end
     end
 
@@ -54,10 +64,14 @@ module Campbooks
     # Which AI provider/region produced this email's summary — data-governance
     # transparency; renders nothing when the email wasn't AI-analysed.
     def provenance_note
-      prov = @message.ai_provenance
-      return if prov.blank? || prov["provider"].blank?
+      return unless provenance?
 
-      render Campbooks::AiProvenanceNote.new(provenance: prov)
+      render Campbooks::AiProvenanceNote.new(provenance: @message.ai_provenance)
+    end
+
+    def provenance?
+      prov = @message.ai_provenance
+      prov.present? && prov["provider"].present?
     end
 
     def note
@@ -87,7 +101,7 @@ module Campbooks
       @message.email_thread&.holds_last_word?
     end
 
-    def chat_actions
+    def chat_actions(wrapper_class: "mt-3 flex items-center gap-2 flex-wrap")
       surface = @surface
       message = @message
       # The draft tools need the surface (so the preview lands in this surface's
@@ -103,7 +117,7 @@ module Campbooks
       Campbooks::ChatActions.new(
         suggested_actions: actions,
         tool_url_builder: builder,
-        wrapper_class: "flex items-center gap-2 flex-wrap"
+        wrapper_class: wrapper_class
       )
     end
   end

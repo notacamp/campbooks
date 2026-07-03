@@ -44,8 +44,8 @@ es:
     chat_message:
       ai_badge: IA
       draft_badge: Borrador
+      step_searched: Buscó %{tool}
       thinking_summary: Razonamiento
-      step_searched: "Buscó %{tool}"
       time_ago: hace %{time}
     command_palette:
       capture_placeholder: Mover a qué carpeta…

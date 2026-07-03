@@ -8,7 +8,8 @@ pt:
     event_type:
       delete_confirm: Eliminar %{name}?
     form:
-      ai_prompt_hint: O que a IA usa para reconhecer este tipo de evento. Suporta markdown.
+      ai_prompt_hint: O que a IA usa para reconhecer este tipo de evento. Suporta
+        markdown.
       ai_prompt_label: Instrução de IA
       color_label: Cor
       create_type: Criar tipo

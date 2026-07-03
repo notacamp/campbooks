@@ -1,0 +1,62 @@
+---
+pt:
+  components:
+    compose:
+      dock:
+        dialog_label_forward: Reencaminhar mensagem
+        dialog_label_new_message: Nova mensagem
+        dialog_label_reply: Responder
+        dialog_label_reply_all: Responder a todos
+        draft: Rascunho
+        draft_saved: Rascunho guardado
+        expand_title: Abrir em página inteira
+        minimize_title: Minimizar
+        mode_forward: Reencaminhar
+        mode_new_message: Nova mensagem
+        mode_reply: Responder
+        mode_reply_all: Responder a todos
+        restore_aria: Retomar a escrita
+        switch_mode: Mudar o modo de resposta
+      engine:
+        bcc_button: Bcc
+        cc_button: Cc
+        collapse_envelope: Recolher os campos de destinatários
+        discard: Descartar
+        draft_saved: Rascunho guardado
+        edit_recipients: Editar destinatários e assunto
+        expand_quote_title: Mostrar a mensagem citada e editá-la
+        label_bcc: Bcc
+        label_cc: Cc
+        label_from: De
+        label_signature: Assinatura
+        label_subject: Assunto
+        label_to: Para
+        no_signature: Sem assinatura
+        placeholder_bcc: Adicionar Bcc…
+        placeholder_body: Escreva a sua mensagem…
+        placeholder_cc: Adicionar Cc…
+        placeholder_subject: Assunto
+        placeholder_to: Pesquisar contactos ou escrever email…
+        quoted_from: A %{date}, %{who} escreveu
+        quoted_from_undated: "%{who} escreveu"
+        quoted_generic: Mensagem citada
+        recipients_more: "%{name} +%{count}"
+        saving: A guardar…
+        schedule: Agendar
+        schedule_at_label: Enviar em
+        schedule_send: Agendar envio
+        scout_draft_title: Redigir esta resposta com o Scout
+        send: Enviar
+        signature_default: "%{name} (predefinição)"
+      pill:
+        draft_saved: Rascunho guardado
+        resume_aria: Retomar o rascunho
+        untitled: Rascunho
+      scout_draft:
+        ai_tag: IA
+        drafted_label: redigido a partir desta conversa
+        start_blank: Começar do zero
+        tone_firmer: Mais firme
+        tone_shorter: Mais curto
+        tone_warmer: Mais caloroso
+        use_draft: Usar este rascunho

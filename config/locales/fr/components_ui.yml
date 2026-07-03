@@ -54,18 +54,52 @@ fr:
       more: Lire plus
     code_block:
       empty: "(vide)"
+    connect_provider_card:
+      google:
+        description: Gmail et Google Workspace
+        label: Google
+      microsoft:
+        description: Outlook et Microsoft 365
+        label: Microsoft 365
+      zoho:
+        description: Boîtes Zoho Mail
+        label: Zoho Mail
     email_html_preview:
       frame_title: Aperçu de l'e-mail
+    first_sync_stage:
+      counter_found: trouvés
+      counter_needs_you: ont besoin de vous
+      counter_sorted: triés
+      cta_done: Montrez-moi ce qui compte
+      error_cta: Vérifier la connexion du compte
+      error_title: Scout n'a pas pu joindre votre boîte
+      escape: Regarder la boîte se remplir
+      subtitle_done: "%{needs_you} choses vous attendent. Tout le reste est trié et
+        hors du chemin."
+      subtitle_done_calm: Rien ne vous attend pour le moment. Tout est trié et hors
+        du chemin.
+      subtitle_empty: Cette boîte démarre propre. Le nouveau courrier sera lu et trié
+        dès son arrivée.
+      subtitle_error: La première synchronisation n'a pas abouti. Reconnecter le compte
+        règle généralement le problème.
+      subtitle_scanning: Tri de tout ce qui arrive. Cela prend généralement une à
+        deux minutes.
+      subtitle_waiting: Connecté. Accès à votre boîte mail en cours.
+      title_done: Votre boîte de réception est triée
+      title_empty: Vous partez de zéro
+      title_error: La première synchronisation a rencontré un accroc
+      title_scanning: Scout lit votre boîte de réception
     folder_pane:
       collapse: Réduire
       expand: Développer
       folders: Dossiers
       new_folder: Nouveau dossier
     folder_pane_custom_folders:
-      delete_confirm: 'Supprimer le dossier %{name} ? Vos e-mails et les dossiers du fournisseur ne sont pas affectés.'
+      delete_confirm: Supprimer le dossier %{name} ? Vos e-mails et les dossiers du
+        fournisseur ne sont pas affectés.
       document_count:
-        one: '%{count} document'
-        other: '%{count} documents'
+        one: "%{count} document"
+        other: "%{count} documents"
       edit_title: Paramètres du dossier
       icon_label: Icône du dossier
       move_label: Déplacer vers

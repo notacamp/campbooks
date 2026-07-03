@@ -1,14 +1,11 @@
-<div class="text-center py-12">
-  <div class="mb-8">
-    <%= render(Campbooks::Logo.new(size: :lg)) %>
-  </div>
-  <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 dark:bg-amber-500/15 dark:text-amber-400">
-    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<% content_for :main_class, "mx-auto flex w-full max-w-[26.5rem] flex-col justify-center px-5 py-10 min-h-svh" %>
+
+<%= render "shared/auth_header", title: t(".heading"), subtitle: t(".body") %>
+
+<div class="mt-8 flex justify-center animate-stage-in" style="--stage-delay: .16s">
+  <div class="flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">
+    <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
     </svg>
   </div>
-  <h2 class="text-lg font-semibold text-gray-900 mb-2"><%= t(".heading") %></h2>
-  <p class="text-sm text-gray-500 max-w-sm mx-auto">
-    <%= t(".body") %>
-  </p>
 </div>

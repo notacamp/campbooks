@@ -174,6 +174,7 @@ pt:
       action_failed: Ação falhou. Tente novamente.
       conversation_archived: Esta conversa foi arquivada.
       conversation_snoozed: Esta conversa foi adiada.
+      draft_needs_info: O Scout precisa de mais contexto — pergunte no painel de Discussão.
       draft_ready: Rascunho pronto
       draft_saved: Rascunho guardado no Gmail
       draft_sent: Rascunho enviado
@@ -182,7 +183,8 @@ pt:
       no_email_selected: Nenhum e-mail selecionado
       no_send_permission: Não tem permissão para enviar a partir desta conta.
       reminder_confirmed: "%{title} adicionado ao teu calendário."
-      reminder_confirmed_no_calendar: Lembrete confirmado. Liga um calendário para o sincronizar automaticamente.
+      reminder_confirmed_no_calendar: Lembrete confirmado. Liga um calendário para
+        o sincronizar automaticamente.
       reminder_dismissed: Lembrete dispensado.
       reply_sent: Resposta enviada
       save_draft_html: Rascunho guardado

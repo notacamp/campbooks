@@ -118,12 +118,13 @@ pt:
     remind:
       no_due: Adicione uma data de entrega primeiro para definir um lembrete.
       remind_failed: Não foi possível definir o lembrete.
-      reminded: Lembrete definido — confirme-o na página de Lembretes para adicionar ao seu calendário.
+      reminded: Lembrete definido — confirme-o na página de Lembretes para adicionar
+        ao seu calendário.
     show:
       activity: Atividade
       add_document: Anexar um documento
       add_email: Associar um email
-      ai_reasoning: "O Scout sinalizou isto:"
+      ai_reasoning: 'O Scout sinalizou isto:'
       archive: Arquivar
       archived_notice: Esta tarefa está arquivada. Está oculta nas suas listas ativas.
       assignees: Responsáveis
@@ -134,7 +135,7 @@ pt:
       delete_confirm: Eliminar esta tarefa? Esta ação não pode ser anulada.
       description: Descrição
       detach: Desanexar
-      discussion: "Discussão"
+      discussion: Discussão
       discussion_empty: Inicie a discussão. Mencione @scout para trazer a IA.
       documents: Documentos
       edit: Editar
@@ -148,7 +149,7 @@ pt:
       no_labels: Sem etiquetas.
       no_linked_emails: Sem emails associados.
       origin: Criada a partir deste email
-      priority: "Prioridade: %{level}"
+      priority: 'Prioridade: %{level}'
       relationship: Relação
       remind: Lembrar-me
       reminder_set: Lembrete definido
@@ -164,11 +165,11 @@ pt:
       dismiss: Dispensar
       empty_body: O Scout não sugeriu nenhuma tarefa de momento.
       empty_title: Nada para rever
-      from_document: "Do documento: %{title}"
-      from_email: "Do email: %{subject}"
+      from_document: 'Do documento: %{title}'
+      from_email: 'Do email: %{subject}'
       subtitle: O Scout extraiu estas ações do seu email. Mantenha as que importam.
       title: Tarefas sugeridas
-      why: "Por que isto é uma tarefa:"
+      why: 'Por que isto é uma tarefa:'
     unarchive:
       unarchived: Tarefa restaurada.
     unlink_email:

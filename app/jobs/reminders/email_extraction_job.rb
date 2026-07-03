@@ -20,19 +20,24 @@ module Reminders
 
       Current.workspace = workspace
 
-      body = ActionController::Base.helpers.strip_tags(email.body.to_s)
+      # Quote-stripped text (see Emails::PlainText): analyse what the sender just
+      # wrote, and keep <style> CSS out of the model's context window.
+      body = Emails::PlainText.of(email.body)
       content = [ email.subject, email.ai_summary, body ].compact_blank.join("\n\n")
+
+      memory = reminder_learning_memory(workspace)
 
       items = Ai::ReminderExtractor.new(
         source:      email,
         content:     content,
         anchor_date: (email.received_at || Time.current).to_date,
         time_zone:   Time.zone,
-        workspace:   workspace
+        workspace:   workspace,
+        learning_memory: memory
       ).extract
 
       reminders = Reminders::Builder.call(
-        workspace: workspace, source: email, raw_items: items, anchor_tz: Time.zone
+        workspace: workspace, source: email, raw_items: items, anchor_tz: Time.zone, learning_memory: memory
       )
 
       announce_in_discussion(email, reminders)
@@ -42,6 +47,15 @@ module Reminders
     end
 
     private
+
+    # One memory per run, shared by the extractor (soft prompt hint) and the builder
+    # (deterministic suppression). Best-effort: a failure here just means no learning.
+    def reminder_learning_memory(workspace)
+      Learning::Memory.new(source: Learning::Sources::Reminders.new(workspace))
+    rescue => e
+      Rails.logger.warn("[#{self.class.name}] learning_memory failed: #{e.message}")
+      nil
+    end
 
     # Post one Scout message per reminder into the email's discussion, each phrased
     # as a *suggestion* (a potential reminder) with Approve / Dismiss buttons so the

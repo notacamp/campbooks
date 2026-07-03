@@ -22,6 +22,8 @@ class User < ApplicationRecord
   has_many :devices, dependent: :destroy
   has_many :feed_items, dependent: :delete_all
   has_many :bug_reports, dependent: :destroy
+  # Unsent composer drafts (Dock/Desk autosave). Private to their author.
+  has_many :draft_emails, dependent: :destroy
   # Security/audit trail. The FK is on_delete: :nullify so rows survive a user's
   # deletion (anonymized) for accountability; nullify here matches that intent.
   has_many :audit_events, dependent: :nullify
@@ -60,6 +62,8 @@ class User < ApplicationRecord
 
   attribute :role, :integer
   enum :role, { member: 0, admin: 1 }
+  # Where a brand-new email opens: the Desk (full page) or the Dock (sheet).
+  enum :compose_default, { desk: 0, dock: 1 }, prefix: :composes_in
 
   normalizes :email_address, with: ->(e) { e.strip.downcase }
 

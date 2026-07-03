@@ -51,6 +51,8 @@ pt:
         que recebeu para criar a sua conta.
       beta_code_label: Código de convite
       beta_code_placeholder: 'ex.: ABCD-2345'
+      code_hint: Enviaremos um código de 6 dígitos por e-mail para confirmar que é
+        você.
       email_label: Endereço de e-mail
       email_placeholder: voce@exemplo.com
       have_account: Já tem uma conta?
@@ -59,16 +61,20 @@ pt:
       privacy: Política de Privacidade
       sign_in: Iniciar sessão
       submit: Enviar código de verificação
-      tagline: Crie a sua conta
+      subtitle: Alguns passos rápidos e o Scout começa a trabalhar na sua caixa de
+        entrada.
       terms: Termos de Serviço
       terms_consent_html: Concordo com os %{terms} e a %{privacy}.
+      title: Crie a sua conta
     password:
+      password_hint: Pelo menos 8 caracteres. A sugestão do gestor de palavras-passe
+        é perfeita.
       password_label: Palavra-passe
       password_placeholder: Pelo menos 8 caracteres
       submit: Criar conta
-      tagline: Defina a sua palavra-passe
-      verified_prose: verificado. Escolha uma palavra-passe para concluir a criação
-        da sua conta.
+      title: Último passo, prometemos
+      verified_prose_html: "%{email} está verificado. Escolha uma palavra-passe e
+        a sua conta fica pronta."
     pending_approval:
       body: O seu pedido de conta foi submetido para análise. Receberá um e-mail quando
         for aprovado.
@@ -76,13 +82,13 @@ pt:
     resend_code:
       try_later: Demasiados pedidos. Por favor tente novamente mais tarde.
     verify:
-      code_label: Código de verificação
       code_sent_html: Enviámos um código de 6 dígitos para %{email}. Introduza-o abaixo
         para continuar.
+      digit_label: Dígito %{position} de 6
       resend: Reenviar código
       start_over: Recomeçar
       submit: Verificar
-      tagline: Verifique o seu e-mail
+      title: Verifique o seu e-mail
   sessions:
     new:
       beta_badge: Beta fechada
@@ -98,3 +104,4 @@ pt:
       signup_on_web_link: Crie uma conta na Web
       submit: Iniciar sessão
       tagline: A caixa de entrada que se organiza sozinha.
+      title: Bem-vindo de volta

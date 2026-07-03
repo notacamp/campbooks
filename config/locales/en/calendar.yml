@@ -77,11 +77,31 @@ en:
         all_day: All day
         untitled: "(No title)"
         video_call: Video call
+      scheduled_email_row:
+        to: To %{address}
       snoozed_row:
         no_subject: "(Snoozed email)"
-        snoozed_from: "Returns — %{account}"
-      scheduled_email_row:
-        to: "To %{address}"
+        snoozed_from: Returns — %{account}
+      time_until:
+        in_days:
+          one: In %{count} day
+          other: In %{count} days
+        in_hours:
+          one: In %{count} h
+          other: In %{count} h
+        in_minutes:
+          one: In %{count} min
+          other: In %{count} min
+        in_months:
+          one: In %{count} month
+          other: In %{count} months
+        in_weeks:
+          one: In %{count} week
+          other: In %{count} weeks
+        next_week: Next week
+        now: Now
+        today: Today
+        tomorrow: Tomorrow
       week_grid:
         add: "+ Add"
         untitled: "(No title)"

@@ -60,6 +60,7 @@ es:
       toolbar_undo: Deshacer
     compose_attachments:
       attach: Adjuntar archivos
+      remove: Quitar adjunto
       upload_failed: Error al subir
     contact_avatar:
       received_indicator: "↓"
@@ -113,8 +114,6 @@ es:
       selected_badge: Seleccionado
       send_to_notion: Guardar en Notion
       tags_label: Etiquetas
-    tag_chip:
-      remove: "Eliminar %{name}"
     email_filter_panel:
       accounts: Cuentas
       all_folders: Todas las carpetas
@@ -161,6 +160,8 @@ es:
       subtitle: Se añade a todas tus bandejas conectadas.
       title: Nueva carpeta
     rich_text_editor:
+      add_column_before: Añadir columna
+      add_row_before: Añadir fila
       align_center: Centrar
       align_left: Alinear a la izquierda
       align_right: Alinear a la derecha
@@ -170,9 +171,14 @@ es:
       bullet_list: Lista con viñetas
       clear_formatting: Borrar formato
       code_block: Bloque de código
+      default_font: Fuente predeterminada
+      delete_column: Eliminar columna
+      delete_row: Eliminar fila
+      font_family: Fuente
       heading_1: Título 1
       heading_2: Título 2
       heading_3: Título 3
+      highlight_color: Color de resaltado
       horizontal_rule: Separador
       image: Insertar imagen
       image_insert: Insertar
@@ -188,17 +194,12 @@ es:
       paragraph: Texto normal
       redo: Rehacer
       strikethrough: Tachado
+      subscript: Subíndice
+      superscript: Superíndice
+      table: Insertar tabla
       text_color: Color del texto
+      toggle_header: Alternar encabezado
       underline: Subrayado
       undo: Deshacer
-      table: Insertar tabla
-      add_row_before: Añadir fila
-      delete_row: Eliminar fila
-      add_column_before: Añadir columna
-      delete_column: Eliminar columna
-      toggle_header: Alternar encabezado
-      font_family: Fuente
-      default_font: Fuente predeterminada
-      highlight_color: Color de resaltado
-      superscript: Superíndice
-      subscript: Subíndice
+    tag_chip:
+      remove: Eliminar %{name}

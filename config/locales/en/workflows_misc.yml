@@ -62,10 +62,6 @@ en:
       took: took %{duration}
       trigger_data: Trigger data
   workflows:
-    notion_fields:
-      error: "Couldn't load fields: %{message}"
-      prompt: Enter a database ID and load its fields.
-      no_fields: This database has no fields Campbooks can fill in.
     edit:
       back_to_workflows: Back to workflows
       description_label: Description (optional)
@@ -104,6 +100,10 @@ en:
         other: "%{count} steps"
       subtitle: Automate your email processing with triggers and actions
       trigger_meta: "%{trigger} trigger · %{steps}"
+    notion_fields:
+      error: 'Couldn''t load fields: %{message}'
+      no_fields: This database has no fields Campbooks can fill in.
+      prompt: Enter a database ID and load its fields.
   zoho_drive_accounts:
     new:
       connect_button: Connect Zoho Drive Account

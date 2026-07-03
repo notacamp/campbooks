@@ -31,6 +31,7 @@ es:
       email_account_disconnected: Cuenta desconectada
       email_archived: Correo archivado
       email_bulk_archived: Correos archivados en masa
+      email_filed: Correo guardado en carpeta
       email_forwarded: Correo reenviado
       email_received: Correo recibido
       email_sent: Correo enviado
@@ -38,7 +39,6 @@ es:
       email_snoozed: Correo pospuesto
       email_tagged: Correo etiquetado
       email_trashed: Correo enviado a la papelera
-      email_filed: Correo guardado en carpeta
       email_unfiled: Correo quitado de la carpeta
       file_deleted: Archivo eliminado
       file_filed: Archivo archivado

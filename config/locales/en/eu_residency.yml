@@ -6,12 +6,14 @@ en:
   settings:
     data_privacy:
       show:
-        residency_heading: "Data residency"
-        residency_desc: "Restrict which region your data may be processed in by AI providers."
-        residency_eu_label: "Require EU data residency"
-        residency_eu_hint: "Only EU-region AI providers may be used. Text AI stays in the EU
-          (Mistral). Because there isn't an EU provider for document AI or semantic search yet,
-          those features are paused while this is on."
-        residency_paused_note: "EU data residency is on. Document AI and semantic search are
-          paused because they have no EU provider yet; text AI continues on an EU provider."
-        paused_badge: "Paused"
+        paused_badge: Paused
+        residency_desc: Restrict which region your data may be processed in by AI
+          providers.
+        residency_eu_hint: Only EU-region AI providers may be used. Text AI stays
+          in the EU (Mistral). Because there isn't an EU provider for document AI
+          or semantic search yet, those features are paused while this is on.
+        residency_eu_label: Require EU data residency
+        residency_heading: Data residency
+        residency_paused_note: EU data residency is on. Document AI and semantic search
+          are paused because they have no EU provider yet; text AI continues on an
+          EU provider.

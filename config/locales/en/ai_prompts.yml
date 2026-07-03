@@ -1,0 +1,70 @@
+---
+en:
+  ai_prompts:
+    ai_settings_link: Want to change what the AI extracts or how it labels things?
+    ai_settings_link_cta: Customize AI prompts
+    catalog:
+      document_analysis:
+        description: How Scout reads and labels the files and attachments you receive.
+        example: For invoices, always pull the supplier name and total. Treat documents
+          in Portuguese as fiscal records.
+        label: Document analysis
+        placeholder: e.g. For supplier invoices, always capture the PO number in the
+          title.
+      email_analysis:
+        description: How Scout summarizes each email and decides what needs your attention.
+        example: Keep summaries to one short sentence. Treat anything from our biggest
+          client as high priority.
+        label: Email summaries
+        placeholder: e.g. Keep summaries to one line. Flag anything about an outage
+          as high priority.
+      email_classification:
+        description: How Scout sorts incoming email into your tags.
+        example: Route scheduling emails to the Meetings tag; put supplier invoices
+          under Finance.
+        label: Email tagging
+        placeholder: e.g. Anything mentioning an invoice or receipt goes under Finance.
+      reminder_extraction:
+        description: How Scout spots dates worth remembering — due dates, renewals,
+          appointments.
+        example: Flag contract renewal and payment dates. Don't create reminders from
+          promotional offers.
+        label: Reminder extraction
+        placeholder: e.g. Always flag payment due dates. Ignore marketing 'limited
+          time' deadlines.
+      task_extraction:
+        description: How Scout decides which to-dos to pull from your emails and documents.
+        example: Treat requests from clients as high priority, and don't create tasks
+          from internal newsletters.
+        label: Task extraction
+        placeholder: e.g. Only create tasks for things a client is waiting on. Skip
+          anything from our own team.
+    customize_button: Customize AI
+    modal:
+      cancel: Cancel
+      close: Close
+      example_label: For example
+      hint: Plain language works best. Say what to prioritize, ignore, or how to label
+        things.
+      intro: Add your own guidance below. It's added to Scout's built-in instructions
+        for this feature — the output format and safety rules stay in place.
+      label: Your instructions
+      reset_hint: Leave empty and save to restore the default.
+      save: Save instructions
+      title: 'Customize: %{name}'
+    nav_label: AI Prompts
+    settings:
+      cleared: "%{name} is back to the default instructions."
+      customized: Customized
+      default: Default
+      edit: Edit
+      help_body: Your instructions are appended to Scout's built-in prompt for each
+        feature, so the underlying format and safety rules stay in place. Keep them
+        short and specific — say what to prioritize, ignore, or label. Clear the box
+        to go back to the default.
+      help_title: How this works
+      saved: Saved your instructions for %{name}.
+      subtitle: Give Scout your own guidance for how it reads your inbox, documents,
+        and more. Your notes are added on top of the built-in instructions — they
+        never replace the output format or safety rules.
+      title: AI Prompts

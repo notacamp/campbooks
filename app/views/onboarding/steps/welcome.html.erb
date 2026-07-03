@@ -1,0 +1,108 @@
+<%# The golden path after signup: meet Scout, connect an inbox. One screen, one
+    real decision. Everything else (workspace details, AI keys, taxonomy) lives
+    in the optional wizard behind "More setup options" and in Settings — never
+    homework before the product has shown value. %>
+<% content_for :main_class, "mx-auto flex w-full max-w-[26.5rem] flex-col justify-center px-5 py-10 min-h-svh" %>
+
+<%
+  first_name = (current_user.try(:name).presence ||
+                current_user.try(:email_address).to_s.split("@").first).to_s.split(/\s+/).first.presence
+  connected = @accounts.any?
+%>
+
+<div class="flex flex-col items-center text-center">
+  <div class="animate-stage-in-hero">
+    <%= render Campbooks::ScoutAvatar.new(size: :xl) %>
+  </div>
+
+  <h1 class="mt-6 text-[1.7rem] font-semibold leading-tight tracking-[-0.02em] text-foreground text-balance animate-stage-in" style="--stage-delay: .05s">
+    <%= first_name ? t(".greeting", name: first_name) : t(".greeting_anonymous") %>
+  </h1>
+  <p class="mt-3 max-w-sm text-[15px] leading-relaxed text-muted-foreground text-pretty animate-stage-in" style="--stage-delay: .1s">
+    <%= t(".pitch") %>
+  </p>
+
+  <% if connected %>
+    <%# Came back with an inbox already connected — celebrate and hand off to
+        home, where the first-sync stage (or the feed) is running. %>
+    <div class="mt-8 flex w-full flex-col items-center gap-4 animate-stage-in" style="--stage-delay: .16s">
+      <div class="flex w-full items-center gap-3 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-left dark:border-green-500/30 dark:bg-green-500/10">
+        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-green-600 text-white">
+          <svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 011.42-1.42l2.79 2.79 6.79-6.79a1 1 0 011.42 0z" clip-rule="evenodd"/></svg>
+        </span>
+        <div class="min-w-0">
+          <p class="truncate text-sm font-semibold text-green-800 dark:text-green-200"><%= t(".connected_title", count: @accounts.size) %></p>
+          <p class="truncate text-[13px] text-green-700/80 dark:text-green-300/80"><%= @accounts.map(&:email_address).join(" · ") %></p>
+        </div>
+      </div>
+      <%= render(Campbooks::Button.new(variant: :primary, href: root_path, size: :lg, class: "w-full justify-center", data: { turbo: false })) { t(".continue_home") } %>
+    </div>
+  <% else %>
+    <div class="mt-8 w-full space-y-2.5">
+      <div class="animate-stage-in" style="--stage-delay: .16s">
+        <%= render Campbooks::ConnectProviderCard.new(provider: :google) %>
+      </div>
+      <div class="animate-stage-in" style="--stage-delay: .22s">
+        <%= render Campbooks::ConnectProviderCard.new(provider: :zoho) %>
+      </div>
+      <% if microsoft_enabled? %>
+        <div class="animate-stage-in" style="--stage-delay: .28s">
+          <%= render Campbooks::ConnectProviderCard.new(provider: :microsoft) %>
+        </div>
+      <% end %>
+    </div>
+
+    <%# Pre-connect demo: the guided walkthrough with sample mail, for the
+        half-skeptical. Opens the overlay mounted in the layout. %>
+    <button type="button" data-action="product-tour#open"
+            class="mt-4 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted animate-stage-in" style="--stage-delay: .3s">
+      <svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4" style="color: var(--ember-solid)" aria-hidden="true"><path d="M12 2l1.7 5.6L19.5 9l-5.8 1.4L12 16l-1.7-5.6L4.5 9l5.8-1.4z"/></svg>
+      <%= t(".see_demo") %>
+    </button>
+
+    <p class="mt-6 flex max-w-sm items-start gap-2 text-left text-xs leading-relaxed text-muted-foreground animate-stage-in" style="--stage-delay: .34s">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"/></svg>
+      <span><%= t(".privacy_note") %></span>
+    </p>
+  <% end %>
+
+  <%# Optional, one tap, saves in place: tunes Scout's defaults (doc types,
+      tone) before the first scan. Skippable without consequence. %>
+  <div class="mt-8 w-full animate-stage-in" style="--stage-delay: .38s">
+    <p class="text-xs font-medium text-muted-foreground"><%= t(".type_question") %></p>
+    <%= form_with url: onboarding_path, method: :patch, class: "mt-2.5 grid grid-cols-2 gap-2" do |f| %>
+      <%= hidden_field_tag :step, "welcome" %>
+      <% { "company" => t(".type_company"), "individual" => t(".type_personal") }.each do |value, label| %>
+        <button type="submit" name="workspace[workspace_type]" value="<%= value %>"
+                class="cursor-pointer rounded-xl border px-3 py-2 text-sm font-medium transition-colors <%= @workspace_type == value ? "border-accent-600 bg-accent-600 text-white" : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground" %>"
+                <%= "aria-pressed=true" if @workspace_type == value %>>
+          <%= label %>
+        </button>
+      <% end %>
+    <% end %>
+  </div>
+
+  <% if @needs_ai_key %>
+    <%# Self-hosted without a text AI key: Scout can't read yet. Quiet notice,
+        not a blocker — managed cloud never sees this. %>
+    <a href="<%= onboarding_path(step: :ai_configuration) %>" class="mt-6 flex w-full items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-left transition-colors hover:border-amber-300 dark:border-amber-500/30 dark:bg-amber-500/10 animate-stage-in" style="--stage-delay: .42s">
+      <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-4 w-4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"/></svg>
+      </span>
+      <span class="min-w-0 flex-1">
+        <span class="block text-sm font-semibold text-amber-900 dark:text-amber-200"><%= t(".ai_key_title") %></span>
+        <span class="block text-[13px] text-amber-800/80 dark:text-amber-300/80"><%= t(".ai_key_body") %></span>
+      </span>
+    </a>
+  <% end %>
+
+  <div class="mt-10 flex flex-col items-center gap-3 animate-stage-in" style="--stage-delay: .44s">
+    <% unless connected %>
+      <%= button_to t(".skip"), snooze_onboarding_path, method: :post, form: { data: { turbo: false } },
+            class: "cursor-pointer border-0 bg-transparent text-sm font-medium text-muted-foreground transition-colors hover:text-foreground" %>
+    <% end %>
+    <a href="<%= onboarding_path(step: :workspace) %>" class="text-xs text-muted-foreground/70 transition-colors hover:text-muted-foreground">
+      <%= t(".more_setup") %>
+    </a>
+  </div>
+</div>

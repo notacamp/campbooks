@@ -64,7 +64,7 @@ module Campbooks
     # ── Sections ────────────────────────────────────────────────
 
     def header_section(&block)
-      div(class: "px-5 py-4 border-b border-gray-200 flex-shrink-0") do
+      div(class: "px-5 py-4 border-b border-gray-100 flex-shrink-0") do
         div(class: "flex items-center justify-between gap-2") do
           h2(class: "text-sm font-semibold text-gray-900 leading-snug truncate") do
             plain(@message.subject.presence || t(".no_subject"))
@@ -202,7 +202,7 @@ module Campbooks
       bubble = if sent
         "bg-accent-100 dark:bg-accent-500/15 rounded-br-md"
       else
-        "bg-card border border-gray-200 dark:border-gray-700 rounded-bl-md"
+        "bg-card border border-border rounded-bl-md"
       end
       # Each bubble shows its actual author (from_address) — your address on the
       # messages you sent, the sender's on theirs — so alignment + author never
@@ -235,7 +235,7 @@ module Campbooks
             end
             preview = msg.summary.presence || helpers.strip_tags(msg.body.to_s).squish
             if preview.present?
-              div(class: "mt-0.5 text-[12px] text-gray-500 dark:text-gray-400 line-clamp-1 group-open:hidden") { plain(preview.truncate(140)) }
+              div(class: "mt-0.5 text-[12px] text-muted-foreground line-clamp-1 group-open:hidden") { plain(preview.truncate(140)) }
             end
           end
 
@@ -244,7 +244,7 @@ module Campbooks
           # breaking the page layout on mobile.
           div(class: "px-3.5 pb-3 overflow-x-auto") do
             if msg.body.present?
-              div(class: "text-sm leading-relaxed text-gray-800 dark:text-gray-100 text-left", style: "word-wrap:break-word;font-family:system-ui,sans-serif") do
+              div(class: "text-sm leading-relaxed text-foreground/90 text-left", style: "word-wrap:break-word;font-family:system-ui,sans-serif") do
                 # Email bodies are attacker-controlled: sanitise with the full
                 # Loofah :prune safelist (drops <script>, on*= handlers and
                 # javascript: URLs; rewrites inline image URLs through the proxy)
@@ -256,7 +256,7 @@ module Campbooks
                 raw(safe(linkify_mentions(cleaned)))
               end
             elsif msg.summary.present?
-              div(class: "text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap leading-relaxed") { msg.summary }
+              div(class: "text-sm text-foreground/70 whitespace-pre-wrap leading-relaxed") { msg.summary }
             else
               div(class: "text-sm text-gray-400 italic") { t(".no_content") }
             end
@@ -269,8 +269,9 @@ module Campbooks
     # Reply/Forward and Discussion stay reachable even on long emails — the
     # turbo-frame/shortcuts wrappers break the flex height chain, so the body is
     # the scroll container and an opaque sticky bar is the reliable way to pin.
+    # Frosted like the app's other docked bars — it floats over the scrolling body.
     def drawer_footer
-      div(class: "px-4 py-3 border-t border-gray-200 flex-shrink-0 sticky bottom-0 bg-card space-y-2.5") do
+      div(class: "px-4 py-3 border-t border-gray-100 flex-shrink-0 sticky bottom-0 bg-card/90 backdrop-blur-md space-y-2.5") do
         if @can_send
           div(class: "flex items-center gap-2") do
             compose_button("reply", t(".reply"), REPLY_ICON, primary: true)
@@ -308,10 +309,10 @@ module Campbooks
       end
     end
 
-    # A Gmail-style reply/forward control: a small POST form that asks the compose
-    # controller to inject Campbooks::ComposeArea into the drawer's compose slot.
+    # A reply/forward control: a small POST form that asks the compose
+    # controller to open the Dock (bottom-sheet composer) for this message.
     def compose_button(mode, label, icon_svg, primary:)
-      form(action: helpers.compose_email_message_path(@message, mode: mode, compose_target: "drawer_compose_target"),
+      form(action: helpers.compose_email_message_path(@message, mode: mode),
            method: "post", class: "inline-flex") do
         input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
         button(

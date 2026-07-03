@@ -24,7 +24,7 @@
 
 <%= render(Campbooks::Swipeable.new(
       id: dom_id(thread, :thread_item),
-      class: "transition-colors #{active ? 'bg-subtle' : 'hover:bg-muted'}",
+      class: "mx-1.5 rounded-xl transition-colors #{active ? 'bg-subtle' : 'hover:bg-muted'}",
       data: { email_account_id: account&.id }.merge(active ? { active: "true" } : {}),
       left: [
         { key: "archive", label: t("components.swipeable.archive"), icon: :archive, color: "blue",
@@ -92,7 +92,8 @@
               )) %>
         <% end %>
         <% if unread && !active %>
-          <span class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-blue-500 border-2 border-white dark:border-card"></span>
+          <%# Ember = "this wants you" (same signal as the nav-rail attention dot) %>
+          <span class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-ember border-2 border-card"></span>
         <% end %>
       </div>
       <div class="min-w-0 flex-1">
@@ -112,9 +113,9 @@
             <span class="text-gray-400 flex-shrink-0" style="font-size:var(--thread-label-size,9px)"><%= messages_count %></span>
           <% end %>
           <% if has_any_attachments %>
-            <span class="w-auto h-4 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0 px-1 gap-0.5 js-inbox-attachments">
-              <svg style="width:7px;height:7px;color:#6b7280" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
-              <span style="font-size:var(--thread-label-size,8px);font-weight:600;color:#6b7280;line-height:1"><%= total_attachments %></span>
+            <span class="w-auto h-4 rounded-full bg-subtle text-muted-foreground flex items-center justify-center flex-shrink-0 px-1 gap-0.5 js-inbox-attachments">
+              <svg style="width:7px;height:7px" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+              <span style="font-size:var(--thread-label-size,8px);font-weight:600;line-height:1"><%= total_attachments %></span>
             </span>
           <% end %>
           <% latest.document_types.first(1).each do |dt| %>

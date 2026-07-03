@@ -31,6 +31,7 @@ en:
       email_account_disconnected: Account disconnected
       email_archived: Email archived
       email_bulk_archived: Emails bulk-archived
+      email_filed: Email filed
       email_forwarded: Email forwarded
       email_received: Email received
       email_sent: Email sent
@@ -38,7 +39,6 @@ en:
       email_snoozed: Email snoozed
       email_tagged: Email tagged
       email_trashed: Email trashed
-      email_filed: Email filed
       email_unfiled: Email removed from folder
       file_deleted: File deleted
       file_filed: File filed

@@ -53,18 +53,52 @@ en:
       more: Read more
     code_block:
       empty: "(empty)"
+    connect_provider_card:
+      google:
+        description: Gmail and Google Workspace
+        label: Google
+      microsoft:
+        description: Outlook and Microsoft 365
+        label: Microsoft 365
+      zoho:
+        description: Zoho Mail inboxes
+        label: Zoho Mail
     email_html_preview:
       frame_title: Email preview
+    first_sync_stage:
+      counter_found: found
+      counter_needs_you: need you
+      counter_sorted: sorted
+      cta_done: Show me what matters
+      error_cta: Check the account connection
+      error_title: Scout couldn't reach your inbox
+      escape: Watch the inbox fill instead
+      subtitle_done: "%{needs_you} things are waiting on you. Everything else is sorted
+        and out of the way."
+      subtitle_done_calm: Nothing is waiting on you right now. Everything is sorted
+        and out of the way.
+      subtitle_empty: This mailbox is starting clean. New mail will be read and sorted
+        the moment it lands.
+      subtitle_error: The first sync didn't go through. Reconnecting the account usually
+        fixes it.
+      subtitle_scanning: Sorting everything as it comes in. This usually takes a minute
+        or two.
+      subtitle_waiting: Connected. Reaching your mailbox now.
+      title_done: Your inbox is sorted
+      title_empty: You're starting clean
+      title_error: The first sync hit a snag
+      title_scanning: Scout is reading your inbox
     folder_pane:
       collapse: Collapse
       expand: Expand
       folders: Folders
       new_folder: New folder
     folder_pane_custom_folders:
-      delete_confirm: 'Remove the %{name} folder? Your emails and provider folders are untouched.'
+      delete_confirm: Remove the %{name} folder? Your emails and provider folders
+        are untouched.
       document_count:
-        one: '%{count} document'
-        other: '%{count} documents'
+        one: "%{count} document"
+        other: "%{count} documents"
       edit_title: Folder settings
       icon_label: Folder icon
       move_label: Move to

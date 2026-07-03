@@ -32,7 +32,8 @@ export default class extends Controller {
   static targets = ["dialog", "input", "list", "breadcrumb"]
   static values = {
     context: { type: String, default: "" },
-    messageId: { type: Number, default: 0 },
+    // UUID string (Number would truncate "95be…" to 95 and break every action)
+    messageId: { type: String, default: "" },
     subject: { type: String, default: "" },
     folders: { type: Array, default: [] },
     commands: { type: Array, default: [] },

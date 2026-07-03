@@ -29,13 +29,13 @@ fr:
       success: Événement '%{title}' ajouté à votre calendrier
     create_task_from_email:
       failure: Impossible de créer la tâche.
-      success: "Tâche créée : %{title}"
-    link_task_to_email:
-      failure: "Impossible d'associer l'e-mail à cette tâche."
-      success: "Associé à la tâche : %{title}"
+      success: 'Tâche créée : %{title}'
     forward_email:
       failure: Impossible de transférer à %{to_address}
       success: Transféré à %{to_address}
+    link_task_to_email:
+      failure: Impossible d'associer l'e-mail à cette tâche.
+      success: 'Associé à la tâche : %{title}'
     pin:
       success: Épinglé en haut de votre boîte de réception.
     reclassify:
