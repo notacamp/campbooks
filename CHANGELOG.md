@@ -16,6 +16,12 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- The inbox search bar now stretches across the whole top band, meeting the
+  Compose button instead of stopping short and leaving a dead gap on wide
+  screens.
+
 ## [0.10.0] - 2026-07-04
 
 ### Added
