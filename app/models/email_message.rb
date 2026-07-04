@@ -145,8 +145,11 @@ class EmailMessage < ApplicationRecord
   # provider_labels captured at ingest; falls back to the synced kind=category
   # tags for mail ingested before the column existed (that path costs a tags
   # load — batch callers should preload :tags).
+  # Tolerates partially-SELECTed records (has_attribute?): batch pipelines load
+  # narrow column sets, and an unloaded attribute must degrade to "no hint", not
+  # raise — the hint is rescue-only evidence, never load-bearing.
   def provider_category_hint
-    labels = Array(provider_labels)
+    labels = has_attribute?(:provider_labels) ? Array(provider_labels) : []
     labels = tags.select(&:kind_category?).map(&:external_label_id) if labels.empty?
     GMAIL_NOISE_CATEGORY_HINTS.values_at(*labels).compact.first
   end
