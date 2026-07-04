@@ -16,6 +16,16 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Feed cards open the email right there.** Cards that ask you to decide
+  something — needs-attention mail, reply nudges, follow-ups, starred senders,
+  and reminders or suggested tasks that came from an email — now carry a small
+  "Show email" toggle that unfolds the full message (real formatting, safely
+  sandboxed) inside the card. Peek, decide, archive/file/confirm — without ever
+  leaving the feed. The message loads only when you open it, so the feed stays
+  as fast as before.
+
 ### Changed
 
 - **The month calendar's day cells are calmer to use.** Adding an event is now an

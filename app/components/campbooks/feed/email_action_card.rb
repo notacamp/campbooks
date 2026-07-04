@@ -16,9 +16,12 @@ module Campbooks
           end
           # Scout leads with a single-line read (AI does the boring part, visibly) —
           # no raw-email preview beneath it, that duplicated what Scout already said.
-          # If Scout had nothing to say, fall back to a short email excerpt.
+          # A collapsed "Show email" keeps the full message one tap away, so the
+          # decision never requires leaving the feed. If Scout had nothing to say,
+          # the email excerpt IS the body and needs no disclosure.
           if scout_message.present?
             render Campbooks::ScoutNote.new(message: scout_message, compact: true, class: "mt-2.5")
+            render Campbooks::Feed::ExpandablePreview.new(item: item, class: "mt-2")
           else
             email_body_preview(subject, margin: "mt-2.5")
           end

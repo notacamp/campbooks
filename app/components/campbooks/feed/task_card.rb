@@ -36,6 +36,9 @@ module Campbooks
         elsif subject.description.present?
           p(class: "mt-0.5 line-clamp-1 text-[13px] text-muted-foreground") { subject.description }
         end
+        # Accept/dismiss is a judgement on the email the task came from — show
+        # that source in place instead of sending the user away.
+        source_email_preview
         div(class: "mt-2.5 flex items-center justify-end gap-2") do
           act_button(tool: "dismiss_task", label: t(".dismiss"), variant: :ghost, key: "x", dismiss: true)
           act_button(tool: "accept", label: t(".accept"), variant: :primary, key: "c", primary: true)
@@ -55,10 +58,19 @@ module Campbooks
         if subject.assignees.any?
           p(class: "mt-0.5 truncate text-[12.5px] text-muted-foreground") { subject.assignees.first(3).map(&:name).join(", ") }
         end
+        source_email_preview
         div(class: "mt-2.5 flex items-center justify-end gap-2") do
           dismiss_button(label: t(".dismiss"), key: "x")
           act_button(tool: "complete", label: t(".complete"), variant: :primary, key: "c", primary: true)
         end
+      end
+
+      def source_email_preview
+        return unless subject.source_email
+
+        render Campbooks::Feed::ExpandablePreview.new(
+          item: item, label: t("components.feed.expandable_preview.show_source"), class: "mt-1.5"
+        )
       end
 
       def due_text

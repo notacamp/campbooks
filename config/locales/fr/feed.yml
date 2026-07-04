@@ -21,6 +21,12 @@ fr:
           one: "%{count} message"
           other: "%{count} messages"
         open: Ouvrir
+      email_preview_frame:
+        unavailable: Ce message n'est plus disponible.
+      expandable_preview:
+        hide: Masquer le message
+        show: Afficher le message
+        show_source: Afficher le message d'origine
       follow_up_card:
         aged:
           one: Vous avez répondu il y a %{count} jour · toujours sans réponse
