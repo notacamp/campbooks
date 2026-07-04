@@ -74,7 +74,7 @@ class EmailMessagesController < ApplicationController
         latest = scope.order(received_at: :desc).first
         if latest
           folder_id = params[:folder_name].present? ? nil : (params[:folder_id].presence || inbox_folder_id)
-          redirect_to email_message_path(latest, folder_id: folder_id, folder_name: params[:folder_name].presence, group: params[:group].presence, smart_group: valid_smart_group_param, inbox_settings: params[:inbox_settings].presence)
+          redirect_to email_message_path(latest, folder_id: folder_id, folder_name: params[:folder_name].presence, group: params[:group].presence, smart_group: valid_smart_group_param, inbox_settings: params[:inbox_settings].presence, show_list: params[:show_list].presence)
         else
           @accounts = Current.user.readable_email_accounts.ordered
           # With everything bundled the main list is empty but the inbox isn't:

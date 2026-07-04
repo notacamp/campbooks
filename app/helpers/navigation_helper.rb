@@ -49,7 +49,7 @@ module NavigationHelper
   def primary_nav_items
     [
       nav_item(:home, t("shared.nav.home"), root_path, exact: true, also_active_for: [ home_path ], badge: nav_attention.dot?(:home)),
-      nav_item(:mail, t("shared.nav.mail"), email_messages_path, badge: nav_attention.dot?(:mail)),
+      nav_item(:mail, t("shared.nav.mail"), email_messages_path(show_list: 1), badge: nav_attention.dot?(:mail)),
       nav_item(:calendar, t("shared.nav.calendar"), calendar_path, badge: nav_attention.dot?(:calendar)),
       nav_item(:scout, t("shared.nav.scout"), scout_path, ember: true, badge: nav_attention.dot?(:scout)),
       nav_item(:files, t("shared.nav.files"), files_path, badge: nav_attention.dot?(:files)),

@@ -54,6 +54,7 @@ major, minor, or patch change here.
 
 ### Fixed
 
+- **Tapping the inbox icon or a folder chip on mobile now shows the email list, not an already-open message.** The server redirect to the latest email is unchanged — on a phone or small tablet, tapping a nav item or a folder chip lands on the thread list first; tapping a row opens the reading pane as expected. Direct deep-links (push notifications, digest emails) still open straight to the email. Folder chips also gained a larger tap target and a press-down animation.
 - **The Skim rings are back.** In 0.10.0 the skim tray on the home feed and
   inbox rendered "Content missing" for most inboxes: the live categorizer's new
   Gmail-category rescue read a column (`provider_labels`) the tray's trimmed
