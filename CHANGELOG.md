@@ -36,6 +36,7 @@ major, minor, or patch change here.
 
 ### Changed
 
+- **Organizations moves off the mobile bottom dock into the "More" menu.** On narrow screens the dock is five items wide; Organizations now collapses into the "More" burger alongside Tasks, Workflows, Contacts, and Activity, freeing a dock slot for the items you reach every day.
 - **The home feed now ranks by priority, not by section.** Every card gets one
   score blending what it is (a due reminder, a follow-up, actionable mail…),
   how relevant it is (starred and known contacts up, newsletters and other bulk
