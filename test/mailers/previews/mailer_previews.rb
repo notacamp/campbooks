@@ -35,11 +35,35 @@ class MailerPreviews < ActionMailer::Preview
     )
   end
 
-  # Renders against live data (dev only): the digest of whatever the seed user is
-  # currently waiting on. Shows the empty (unsent) state when nothing is due.
-  def waiting_on_replies_digest
+  # Renders the daily "needs attention" digest. Uses live data from the seed user
+  # when available; falls back to sample records so all three sections are always
+  # visible in the preview (no real emails sent to or from real people).
+  def needs_attention_digest
     user = User.find_by(email_address: "admin@example.com") || User.first
-    thread_ids = user ? Emails::AwaitingReply.new(user).due.map(&:id) : []
-    DigestMailer.waiting_on_replies(user: user, thread_ids: thread_ids)
+    if user
+      thread_ids   = Emails::AwaitingReply.new(user).due.map(&:id)
+      reminder_ids = Reminder.accessible_to(user)
+                             .pending
+                             .where(due_at: ...1.day.from_now)
+                             .where.not(source_type: "Task")
+                             .order(:due_at)
+                             .pluck(:id)
+      task_ids = begin
+        overdue      = Task.accessible_to(user).active.where.not(due_at: nil).where(due_at: ...Time.current)
+        high_prio    = Task.accessible_to(user).active.where(priority: [ Task.priorities[:high], Task.priorities[:urgent] ])
+        overdue.or(high_prio).distinct.pluck(:id)
+      rescue StandardError
+        []
+      end
+    else
+      thread_ids = reminder_ids = task_ids = []
+    end
+
+    DigestMailer.needs_attention(
+      user: user,
+      thread_ids: thread_ids,
+      reminder_ids: reminder_ids,
+      task_ids: task_ids
+    )
   end
 end

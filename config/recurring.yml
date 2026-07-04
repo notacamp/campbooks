@@ -58,11 +58,12 @@ production:
     # logs, workflow run-history, and dismissed feed cards. Never user content.
     class: RetentionSweepJob
     schedule: every day at 4am
-  waiting_on_replies_digest:
-    # Daily out-of-app nudge: email each opted-in user the conversations they sent
-    # last and are still waiting to hear back on (Emails::AwaitingReply#due). Skips
-    # users with nothing due, so an on-by-default digest never sends an empty email.
-    class: WaitingOnRepliesDigestJob
+  needs_attention_digest:
+    # Daily out-of-app digest: email each opted-in user everything that needs their
+    # attention — follow-ups they're waiting on (Emails::AwaitingReply#due), reminders
+    # due soon or overdue, and overdue / high-priority tasks. Skips users with nothing
+    # due so the digest never sends an empty email.
+    class: NeedsAttentionDigestJob
     schedule: every day at 8am
   contact_analysis_backfill:
     # Self-heal: profile contacts that were never AI-analyzed (e.g. mail ingested
@@ -103,8 +104,8 @@ development:
   feed_refresh:
     class: Feed::RefreshAllJob
     schedule: every 15 minutes
-  waiting_on_replies_digest:
-    class: WaitingOnRepliesDigestJob
+  needs_attention_digest:
+    class: NeedsAttentionDigestJob
     schedule: every day at 8am
   contact_analysis_backfill:
     class: ContactAnalysisBackfillJob

@@ -482,8 +482,8 @@ en:
         subtitle: Choose how you want to be notified about new activity.
         tags_title: Tags
         title: Notification Preferences
-        waiting_digest_hint: A daily email of the conversations you're still waiting to hear back on.
-        waiting_digest_label: Waiting on replies
+        waiting_digest_hint: A daily digest of everything that needs your attention — follow-ups, upcoming reminders, and overdue or high-priority tasks.
+        waiting_digest_label: Daily needs-attention digest
       section:
         email_label: Email
         in_app_label: In-app
