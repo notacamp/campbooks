@@ -16,6 +16,17 @@ class CalendarPreview < ViewComponent::Preview
     render Campbooks::Calendar::MonthGrid.new(date: Date.current, events: sample_events)
   end
 
+  # A day with more events than fit — exercises the "+N more" chip / mobile dots
+  # and the day popover that expands to the full list.
+  def month_grid_overflow
+    base = Date.current.to_time
+    titles = [ "Standup", "Design review", "1:1 with Sam", "Client call", "Lunch with Jamie", "Team retro" ]
+    events = titles.each_with_index.map do |title, i|
+      event(id: 70 + i, title: title, start_at: base.change(hour: 9 + i))
+    end
+    render Campbooks::Calendar::MonthGrid.new(date: Date.current, events: events)
+  end
+
   def week_grid
     render Campbooks::Calendar::WeekGrid.new(date: Date.current, events: sample_events)
   end
