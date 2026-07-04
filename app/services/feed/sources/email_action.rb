@@ -41,14 +41,17 @@ module Feed
           EmailMessage.accessible_to(user).with_ai_todos.where(skimmed_at: nil)
             .not_answered_by_owner
             .select(:id, :received_at, :created_at, :ai_priority, :pinned_at, :read,
-                    :email_account_id, :email_thread_id)
+                    :category, :email_account_id, :email_thread_id, :contact_id)
         ))
       end
 
+      # Intrinsic urgency (0–100 band; Feed::Ranking layers relevance + decay on
+      # top): generic actionable mail sits mid-feed, Scout's high-priority read
+      # and the user's own pin push it toward the attention tier.
       def score_for(m)
-        s = 0
-        s += 100 if m.ai_priority == "high"
-        s += 60 if m.pinned_at.present?
+        s = 45
+        s += 40 if m.ai_priority == "high"
+        s += 30 if m.pinned_at.present?
         s += 5 unless m.read?
         s
       end

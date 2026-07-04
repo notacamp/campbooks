@@ -40,16 +40,17 @@ module Feed
             .where(skimmed_at: nil)
             .where("email_messages.received_at >= ?", WINDOW.ago)
             .select(:id, :received_at, :created_at, :ai_priority, :read,
-                    :email_account_id, :email_thread_id, :contact_id)
+                    :category, :email_account_id, :email_thread_id, :contact_id)
         )
       end
 
-      # Above EmailAction's ceiling (165) so starred mail leads the attention
-      # cluster; small bumps for high-priority / unread.
+      # High intrinsic base; Feed::Ranking's starred-contact boost stacks on top,
+      # so fresh starred mail leads the attention cluster while still decaying
+      # with age like everything else.
       def score_for(m)
-        s = 200
-        s += 20 if m.ai_priority == "high"
-        s += 10 unless m.read?
+        s = 70
+        s += 10 if m.ai_priority == "high"
+        s += 5 unless m.read?
         s
       end
     end
