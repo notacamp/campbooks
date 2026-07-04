@@ -33,6 +33,13 @@ export default class extends Controller {
     this.#reset()
   }
 
+  // Wired on the email_detail turbo frame (email show shell): after an in-frame
+  // email navigation — a row tap from the revealed list on mobile — flip back to
+  // the detail pane. Desktop is unaffected (#reset only clears inline overrides).
+  frameLoad(event) {
+    if (event.target && event.target.id === "email_detail") this.showDetail()
+  }
+
   #reset() {
     if (this.hasListTarget) this.listTarget.style.display = ""
     if (this.hasDetailTarget) this.detailTarget.style.display = ""

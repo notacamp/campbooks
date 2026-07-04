@@ -1,0 +1,157 @@
+<%# The reading pane: email content + discussion panel. Rendered inside the
+    "email_detail" turbo frame by both the full show page and the frame-only
+    show_detail response, so clicking a thread row swaps just this pane while
+    the thread list (and its scroll position) stays put.
+    Uses absolute t("email_messages.show.…") keys — this markup moved here from
+    show.html.erb and the strings live under its scope in every locale. %>
+
+<%# Context carrier for everything OUTSIDE the frame that tracks the open email:
+    the command palette (Cmd+K) values and keyboard-shortcut message id live on
+    <body>, and the active-row highlight lives in the list pane. detail-context
+    pushes the fresh values up on every in-frame navigation; email_shortcuts
+    reads [data-detail-context] on turbo:frame-load to move the row highlight. %>
+<div hidden data-detail-context
+     data-controller="detail-context"
+     data-message-id="<%= @message.id %>"
+     data-subject="<%= @message.subject.to_s.truncate(120) %>"
+     data-folders="<%= (@folders || []).select { |f| f[:id] }.map { |f| { id: f[:id], name: f[:name] } }.to_json %>"
+     data-context="email-show"></div>
+
+<div class="flex w-full h-full min-w-0">
+  <!-- Email content -->
+  <div id="email_content" class="flex-1 flex flex-col min-w-0">
+    <!-- Mobile: back to list + Scout toggle (sidebar/thread list are hidden here) -->
+    <div class="lg:hidden flex items-center justify-between px-3 py-2 border-b border-border bg-card flex-shrink-0">
+      <button type="button" data-action="click->email-mobile#showList"
+              class="inline-flex items-center gap-1 min-h-[40px] px-1.5 -ml-1.5 rounded-md text-sm font-medium text-accent-600 hover:bg-accent-50 cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        <%= t("email_messages.show.back_to_inbox_label") %>
+      </button>
+      <button type="button" data-action="click->scout-mobile#open"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-accent-100 text-accent-700 dark:bg-accent-500/15 dark:text-accent-200 cursor-pointer">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/></svg>
+        <%= t("email_messages.show.discussion_button_label") %>
+      </button>
+    </div>
+    <%= render(Campbooks::EmailDetail.new(
+      message: @message,
+      thread: @thread,
+      thread_documents: @thread_documents || [],
+      thread_files: @thread_files || {},
+      context: :full,
+      thread_messages: @thread_messages,
+      can_send: @can_send
+    )) do %>
+      <div class="flex items-center gap-2 text-[11px] text-gray-400">
+        <% if @message.ai_processed? %>
+          <span class="text-[10px] font-semibold text-accent-600 bg-accent-100 rounded px-1.5 py-0.5"><%= t("email_messages.show.ai_processed_badge") %></span>
+        <% end %>
+        <% if @thread&.snoozed? %>
+          <span class="text-[10px] font-semibold text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-500/10 border border-yellow-200 dark:border-yellow-500/25 rounded px-1.5 py-0.5">
+            <%= t("email_messages.show.snoozed_until_badge", time: l(@thread.snoozed_until, format: :at)) %>
+          </span>
+          <%= button_to tool_email_message_path(@message, tool: "unsnooze"), method: :post,
+                form: { data: { turbo: true } },
+                class: "inline-flex items-center gap-1 px-2 py-1 text-[11px] text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300 hover:bg-yellow-50 dark:hover:bg-yellow-500/10 rounded-md transition-colors cursor-pointer border-0",
+                title: t("email_messages.show.unsnooze_title") do %>
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0"/></svg> <%= t("email_messages.show.unsnooze_label") %>
+          <% end %>
+        <% end %>
+        <%= render "reply_actions", message: @message, turbo_frame: nil %>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Discussion panel (hidden on mobile; opened as an overlay via the Discussion button) -->
+  <% comment_count = @comments.reject(&:draft?).size %>
+  <div class="hidden lg:flex flex-shrink-0 border-l border-border flex-col bg-card transition-all duration-200 w-12 js-inbox-chat relative"
+       data-controller="chat-panel panel-resize"
+       data-scout-mobile-target="panel"
+       data-panel-resize-storage-key-value="campbooks:scout-panel-width"
+       data-panel-resize-min-width-value="280"
+       data-panel-resize-max-width-value="800">
+    <%= render(Campbooks::ResizeHandle.new(edge: :left, data: { chat_panel_target: "handle" })) %>
+    <!-- Collapsed rail: the discoverable affordance (desktop only, shown when collapsed) -->
+    <button type="button"
+            data-chat-panel-target="rail"
+            data-action="click->chat-panel#toggle"
+            title="<%= t("email_messages.show.show_discussion_title") %>"
+            aria-label="<%= t("email_messages.show.show_discussion_aria") %>"
+            class="group relative flex-1 w-full flex flex-col items-center justify-center gap-3 py-4 cursor-pointer text-muted-foreground hover:text-foreground hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-500 transition-colors">
+      <span class="relative inline-flex">
+        <svg class="w-5 h-5 text-accent-600 dark:text-accent-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/>
+        </svg>
+        <% if comment_count > 0 %>
+          <span class="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 inline-flex items-center justify-center rounded-full bg-accent-500 text-white text-[10px] font-bold leading-none"><%= comment_count %></span>
+        <% end %>
+      </span>
+      <span class="[writing-mode:vertical-rl] rotate-180 text-[11px] font-semibold tracking-wide text-foreground/80"><%= t("email_messages.show.discussion_label") %></span>
+      <svg class="absolute bottom-3 left-1/2 -translate-x-1/2 w-3.5 h-3.5 opacity-50 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
+      </svg>
+    </button>
+
+    <!-- Expanded header (shown when open) -->
+    <div class="hidden px-4 py-3 border-b border-border flex-shrink-0 flex items-center gap-1.5" data-chat-panel-target="header">
+      <svg class="w-4 h-4 flex-shrink-0 text-accent-600 dark:text-accent-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/>
+      </svg>
+      <span class="text-[13px] font-semibold text-foreground"><%= t("email_messages.show.discussion_label") %></span>
+      <% if comment_count > 0 %>
+        <%= render(Campbooks::Badge.new(variant: :accent, size: :sm)) { comment_count } %>
+      <% end %>
+
+      <div class="ml-auto flex items-center gap-1.5">
+        <%= render "email_messages/follow_toggle",
+              email_message: @message,
+              following: (@agent_thread.present? && @agent_thread.thread_follows.exists?(user_id: Current.user.id)) %>
+        <div class="hidden lg:block">
+          <%= render(Campbooks::IconButton.new(aria_label: t("email_messages.show.collapse_discussion_aria"), size: :sm, class: "hover:bg-muted", data: { action: "click->chat-panel#toggle" })) do %>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
+            </svg>
+          <% end %>
+        </div>
+        <button type="button" data-action="click->scout-mobile#close" aria-label="<%= t("email_messages.show.close_discussion_aria") %>"
+                class="lg:hidden inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <% if @thread %>
+      <%= turbo_stream_from @thread %>
+    <% end %>
+    <div data-chat-panel-target="body" class="hidden flex flex-col flex-1 min-h-0">
+    <div class="flex-1 overflow-y-auto min-h-0 divide-y divide-border" id="comments_list" data-chat-input-target="list">
+      <% if @comments.any? %>
+        <% @comments.each do |comment| %>
+          <% if comment.draft? %>
+            <div class="px-4 py-3">
+              <% if comment.ai_suggested_actions.first.is_a?(Hash) && comment.ai_suggested_actions.first["question"] %>
+                <%= render "email_comments/draft_questions", questions: comment.ai_suggested_actions, email_message: @message %>
+              <% else %>
+                <%= render "email_comments/draft", draft: { "subject" => "Re: #{@message.subject}", "body" => comment.content }, email_message: @message, outdated: comment.outdated? %>
+              <% end %>
+            </div>
+          <% else %>
+            <%= render "email_comments/comment", comment: comment, email_message: @message %>
+          <% end %>
+        <% end %>
+      <% else %>
+        <div id="discussion_empty" class="px-4 py-10 text-center">
+          <p class="text-[13px] font-medium text-foreground"><%= t("email_messages.show.discussion_empty_heading") %></p>
+          <p class="mt-1.5 text-[12px] leading-relaxed text-muted-foreground max-w-[15rem] mx-auto">
+            <%= t("email_messages.show.discussion_empty_body", scout_mention: content_tag(:span, "@scout", class: "font-semibold text-accent-600 dark:text-accent-300")).html_safe %>
+          </p>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="px-4 py-3 border-t border-gray-200 flex-shrink-0">
+      <%= render "email_comments/form", email_message: @message %>
+    </div>
+    </div>
+  </div>
+</div>
