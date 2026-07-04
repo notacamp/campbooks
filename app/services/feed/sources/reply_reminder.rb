@@ -43,7 +43,10 @@ module Feed
             subject: m,
             dedupe_key: "reply_reminder:#{m.id}",
             sort_at: m.received_at,
-            score: overdue ? 70 + [ age, 60 ].min : 10,
+            # Overdue lands near the attention tier; Feed::Ranking's recency
+            # decay then fades it — a nag ignored for months goes quiet instead
+            # of climbing (aging used to *grow* this score).
+            score: overdue ? 75 : 35,
             attention: overdue || m.ai_priority == "high",
             data: { reason: "no_reply", since: m.received_at.iso8601, age_days: age }
           }
@@ -80,7 +83,8 @@ module Feed
             .where(skimmed_at: nil)
             .where("received_at < ?", now - AGED_DAYS.days)
             .merge(expects_reply)
-            .select(:id, :received_at, :ai_priority, :email_account_id, :email_thread_id, :contact_id)
+            .select(:id, :received_at, :ai_priority, :category, :email_account_id,
+                    :email_thread_id, :contact_id)
         ))
       end
 

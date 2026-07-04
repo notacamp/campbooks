@@ -30,14 +30,12 @@ RSpec.describe FeedItem, type: :model do
       expect(FeedItem.timeline).to contain_exactly(streamed)
     end
 
-    it "orders timeline newest-first and attention by score" do
-      older = build_item(dedupe_key: "old", sort_at: 2.days.ago)
-      newer = build_item(dedupe_key: "new", sort_at: 1.hour.ago)
-      expect(FeedItem.chronological.to_a).to eq([ newer, older ])
+    it "orders by score first, then recency within a tie" do
+      older_high = build_item(dedupe_key: "old-high", sort_at: 2.days.ago, score: 90)
+      newer_low  = build_item(dedupe_key: "new-low", sort_at: 1.hour.ago, score: 10)
+      newer_high = build_item(dedupe_key: "new-high", sort_at: 1.hour.ago, score: 90)
 
-      low = build_item(dedupe_key: "low", attention: true, score: 10)
-      high = build_item(dedupe_key: "high", attention: true, score: 90)
-      expect(FeedItem.attention.ranked.to_a.first(2)).to eq([ high, low ])
+      expect(FeedItem.ranked.to_a).to eq([ newer_high, older_high, newer_low ])
     end
   end
 
