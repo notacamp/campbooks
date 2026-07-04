@@ -22,6 +22,13 @@ module Campbooks
               p(class: "mt-0.5 line-clamp-1 text-[13px] text-muted-foreground") { subject.description }
             end
             render Campbooks::ReminderSourceLinks.new(reminder: subject, css: "mt-1.5")
+            # Confirming a date usually means double-checking the email that
+            # carried it — show it in place instead of sending the user away.
+            if subject.source_email
+              render Campbooks::Feed::ExpandablePreview.new(
+                item: item, label: t("components.feed.expandable_preview.show_source"), class: "mt-1.5"
+              )
+            end
             div(class: "mt-2.5 flex items-center justify-end gap-2") do
               act_button(tool: "dismiss_reminder", label: t(".dismiss"), variant: :ghost, key: "x", dismiss: true)
               act_button(tool: "confirm", label: t(".confirm"), variant: :primary, key: "c", primary: true)

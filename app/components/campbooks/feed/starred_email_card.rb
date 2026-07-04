@@ -56,11 +56,12 @@ module Campbooks
         end
       end
 
-      # Scout's read leads when present, as a single Ember line; otherwise the
-      # email excerpt is the body.
+      # Scout's read leads when present, as a single Ember line, with the full
+      # message one collapsed tap below; otherwise the email excerpt is the body.
       def body
         if (msg = scout_message).present?
           render Campbooks::ScoutNote.new(message: msg, compact: true, class: "mt-3")
+          render Campbooks::Feed::ExpandablePreview.new(item: item, class: "mt-2")
         else
           email_body_preview(subject, margin: "mt-3")
         end

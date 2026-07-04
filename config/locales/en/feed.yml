@@ -21,6 +21,12 @@ en:
           one: "%{count} message"
           other: "%{count} messages"
         open: Open
+      email_preview_frame:
+        unavailable: This message is no longer available.
+      expandable_preview:
+        hide: Hide email
+        show: Show email
+        show_source: Show source email
       follow_up_card:
         aged:
           one: You replied %{count} day ago · no reply yet

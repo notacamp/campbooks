@@ -22,6 +22,9 @@ module Campbooks
             if (snippet = excerpt(subject, length: 140)).present?
               p(class: "mt-1 line-clamp-1 text-[13px] leading-relaxed text-muted-foreground") { snippet }
             end
+            # "Reply or let it go" needs the message, not just one line of it —
+            # the collapsed preview shows the whole email without leaving the feed.
+            render Campbooks::Feed::ExpandablePreview.new(item: item, class: "mt-1.5")
             div(class: "mt-2.5 flex items-center justify-end gap-2") do
               dismiss_button(label: t(".dismiss"), variant: :ghost, key: "x")
               link_button(href: helpers.email_message_path(subject), label: t(".reply"), variant: :primary, key: "r")
