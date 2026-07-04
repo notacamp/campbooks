@@ -67,10 +67,12 @@ export default class extends Controller {
     if (!match) return
 
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
-    // Inbox rows carry data-turbo-frame="_top" so they navigate the full page in
-    // the Default layout. In the List/Board layouts the same rows should open
+    // Inbox rows carry data-turbo-frame="_top" (upgraded to the "email_detail"
+    // reading-pane frame by email_shortcuts in the Default layout) so they
+    // navigate in place. In the List/Board layouts the same rows should open
     // this drawer instead.
-    if (link.getAttribute("data-turbo-frame") === "_top" && !this._inboxUsesDrawer()) return
+    const frameTarget = link.getAttribute("data-turbo-frame")
+    if ((frameTarget === "_top" || frameTarget === "email_detail") && !this._inboxUsesDrawer()) return
 
     event.preventDefault()
     this._loadMessage(match[1])

@@ -11,45 +11,102 @@ export default class extends Controller {
 
   connect() {
     this.boundKeydown = this._keydown.bind(this)
-    this.boundFrameRender = this._onFrameRender.bind(this)
+    this.boundFrameLoad = this._onFrameLoad.bind(this)
     window.addEventListener("keydown", this.boundKeydown)
-    // The thread list lives inside the "email_detail" turbo frame, so in-frame
-    // navigation reloads it and can drop the server-rendered highlight. Re-derive
-    // the active row from the URL on load and after every frame render so the
-    // row-dependent shortcuts (x/e/#/mark, arrows) always have an anchor.
-    document.addEventListener("turbo:frame-render", this.boundFrameRender)
+    // The email_detail frame wraps only the reading pane; navigating it leaves
+    // the thread list untouched. After each in-frame navigation, take the open
+    // email's id from the frame's [data-detail-context] (URL-independent — the
+    // advance visit may not have pushed history yet) and move the row highlight.
+    document.addEventListener("turbo:frame-load", this.boundFrameLoad)
     // Advance to the next thread whenever the open one's row is removed by any
     // archive/trash/snooze (keyboard, Scout, command palette, bulk).
     this.boundStreamRender = this._onStreamRender.bind(this)
     document.addEventListener("turbo:before-stream-render", this.boundStreamRender)
+    // Upgrade inbox row clicks to in-frame navigation (capture: before Turbo).
+    this.boundThreadClick = this._interceptThreadClick.bind(this)
+    document.addEventListener("click", this.boundThreadClick, true)
     this._syncActiveRowFromUrl()
     this._syncMessageIdFromUrl()
   }
 
   disconnect() {
     window.removeEventListener("keydown", this.boundKeydown)
-    document.removeEventListener("turbo:frame-render", this.boundFrameRender)
+    document.removeEventListener("turbo:frame-load", this.boundFrameLoad)
     document.removeEventListener("turbo:before-stream-render", this.boundStreamRender)
+    document.removeEventListener("click", this.boundThreadClick, true)
+  }
+
+  // Rewrites a thread-row click from the default full-page visit to an
+  // email_detail frame navigation, so only the reading pane swaps and the list
+  // keeps its DOM — and scroll position. Runs in the capture phase so the new
+  // data attributes are in place before Turbo reads the link.
+  _interceptThreadClick(event) {
+    if (event.defaultPrevented) return
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return
+
+    const link = event.target.closest("a[href]")
+    if (!link || !link.closest('[data-inbox-pane="list"]')) return
+    if (link.closest('[data-select-mode="on"]')) return // tap = select, not open
+
+    const href = link.getAttribute("href") || ""
+    if (!this._messageIdFromPath(href)) return
+    // Intent links (?compose=follow_up) need a full visit: auto_draft_controller
+    // reads the flag from the URL on page load.
+    if (/[?&]compose=/.test(href)) return
+
+    // In the List/Board layouts rows open the bottom-right drawer instead
+    // (email_drawer_controller's own capture handler takes them).
+    const layout = document.querySelector("[data-inbox-layout]")?.getAttribute("data-inbox-layout")
+    if (layout === "list" || layout === "board") return
+
+    const frame = document.getElementById("email_detail")
+    if (!frame || !frame.dataset.detailNav) return
+    // The search/index shell hides the reading pane below lg — full visit there.
+    if (frame.dataset.detailNav === "when-visible" && frame.getClientRects().length === 0) return
+
+    link.dataset.turboFrame = "email_detail"
+    link.dataset.turboAction = "advance"
+
+    // Optimistic highlight — the response no longer re-renders the list.
+    const row = link.closest('[id*="thread_item"]')
+    if (row && !row.hasAttribute("data-active")) {
+      const current = document.querySelector('[id*="thread_item"][data-active]')
+      if (current) this._deactivateRow(current)
+      this._activateRow(row)
+    }
+  }
+
+  _onFrameLoad(event) {
+    if (!event.target || event.target.id !== "email_detail") return
+    const context = event.target.querySelector("[data-detail-context]")
+    const id = (context && context.dataset.messageId) || this._messageIdFromPath(window.location.pathname)
+    if (!id) return
+    this.messageIdValue = id
+    this._syncActiveRowToId(id)
   }
 
   // When a Turbo Stream is about to remove the currently-open thread's row (an
   // archive/trash/snooze from any surface), advance the detail pane to the next
   // thread. The sibling is captured before the removal, while it's still there.
+  // A replace/update of the open row (e.g. the mark-read broadcast fired by
+  // opening it) re-renders it without the highlight — re-apply it after render.
   _onStreamRender(event) {
     const stream = event.target
-    if (!stream || stream.tagName !== "TURBO-STREAM" || stream.getAttribute("action") !== "remove") return
+    if (!stream || stream.tagName !== "TURBO-STREAM") return
+    const action = stream.getAttribute("action")
+    const target = stream.getAttribute("target") || ""
 
-    const removed = document.getElementById(stream.getAttribute("target") || "")
-    if (!removed || !removed.hasAttribute("data-active")) return
+    if (action === "remove") {
+      const removed = document.getElementById(target)
+      if (!removed || !removed.hasAttribute("data-active")) return
 
-    const nextHref = this._nextThreadHref()
-    if (nextHref) setTimeout(() => this._visitThread(nextHref), 0)
-  }
-
-  _onFrameRender(event) {
-    if (event.target && event.target.id === "email_detail") {
-      this._syncActiveRowFromUrl()
-      this._syncMessageIdFromUrl()
+      const nextHref = this._nextThreadHref()
+      if (nextHref) setTimeout(() => this._visitThread(nextHref), 0)
+    } else if ((action === "replace" || action === "update") && target.includes("thread_item")) {
+      setTimeout(() => {
+        const id = this.messageIdValue || this._messageIdFromPath(window.location.pathname)
+        if (id) this._syncActiveRowToId(id)
+      }, 0)
     }
   }
 
@@ -267,14 +324,19 @@ export default class extends Controller {
     }
   }
 
-  // Mark the thread row matching the current URL as active. Covers both initial
-  // load and frame reloads where the server-rendered highlight was lost. The
+  // Mark the thread row matching the current URL as active. Covers the initial
+  // page load, before any in-frame navigation has stamped messageIdValue. The
   // drawer instance is a single-message view with no list, so it opts out.
   _syncActiveRowFromUrl() {
     if (this.contextValue === "drawer") return
 
     const id = this._messageIdFromPath(window.location.pathname)
-    if (!id) return
+    if (id) this._syncActiveRowToId(id)
+  }
+
+  // Move the list highlight to the row whose link points at the given message.
+  _syncActiveRowToId(id) {
+    if (this.contextValue === "drawer") return
 
     const rows = Array.from(document.querySelectorAll('[id*="thread_item"]'))
     if (rows.length === 0) return
@@ -287,23 +349,41 @@ export default class extends Controller {
     if (!target) return
 
     const current = rows.find(row => row.hasAttribute("data-active"))
-    if (current === target) return
-    if (current) this._deactivateRow(current)
-    this._activateRow(target)
+    if (current !== target) {
+      if (current) this._deactivateRow(current)
+      this._activateRow(target)
+    }
+
+    // With in-place navigation the previously clicked/focused row link stays in
+    // the DOM and keeps focus — its focus ring would linger on the wrong row
+    // (arrows/j-k move the selection without moving focus). Keep focus with the
+    // open thread, but only when it's already parked on some other row link.
+    const focused = document.activeElement
+    if (focused && focused.closest("[id*='thread_item']") && !target.contains(focused)) {
+      target.querySelector("a[href*='/email_messages/']")?.focus()
+    }
   }
 
+  // Mirrors _thread_row.html.erb's active/inactive classes (Swipeable wrapper
+  // carries the bg, the row link carries the text accent).
   _activateRow(row) {
     row.setAttribute("data-active", "true")
-    row.classList.add("bg-accent-50/50", "border-accent-500")
-    row.classList.remove("hover:bg-gray-50/70", "border-transparent")
+    row.classList.add("bg-subtle")
+    row.classList.remove("hover:bg-muted")
     const link = row.querySelector("a")
     if (link) link.classList.add("text-accent-700")
+    // Opening marks the thread read — drop the unread affordances right away
+    // (the ember dot and bold subject) instead of waiting for the broadcast.
+    const dot = row.querySelector(".bg-ember")
+    if (dot) dot.remove()
+    const bold = row.querySelector(".font-bold")
+    if (bold) bold.classList.remove("font-bold")
   }
 
   _deactivateRow(row) {
     row.removeAttribute("data-active")
-    row.classList.remove("bg-accent-50/50", "border-accent-500")
-    row.classList.add("hover:bg-gray-50/70", "border-transparent")
+    row.classList.remove("bg-subtle")
+    row.classList.add("hover:bg-muted")
     const link = row.querySelector("a")
     if (link) link.classList.remove("text-accent-700")
   }

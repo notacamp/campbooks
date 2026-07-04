@@ -1,0 +1,7 @@
+<%# Frame-only response for in-place email navigation: when the request comes
+    from the "email_detail" turbo frame (thread-row click, arrow keys), Turbo
+    swaps just the reading pane — the thread list, folder rail and top band
+    stay untouched, so the list keeps its scroll position and selection. %>
+<%= turbo_frame_tag "email_detail" do %>
+  <%= render "detail_pane" %>
+<% end %>

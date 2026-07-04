@@ -24,6 +24,9 @@ module Campbooks
         href: helpers.email_message_path(@message, **link_href_params),
         class: class_names(
           "flex items-start gap-2.5 mx-1.5 rounded-xl px-2.5 py-2 transition-colors",
+          # In-place navigation keeps focus on the clicked link — style the ring
+          # instead of letting the UA outline linger (cf. _thread_row).
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-500",
           @active ? "bg-subtle" : "hover:bg-muted",
           @attrs.delete(:class)
         ),
