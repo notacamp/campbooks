@@ -1,0 +1,13 @@
+pt:
+  recurrence:
+    field_label: Repetir
+    icon_label: Repete
+    none: Não repete
+    presets:
+      biweekly: A cada 2 semanas
+      custom: Personalizado
+      daily: Diariamente
+      monthly: Mensalmente
+      weekdays: Todos os dias úteis
+      weekly: Semanalmente
+      yearly: Anualmente

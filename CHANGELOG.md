@@ -25,6 +25,14 @@ major, minor, or patch change here.
   sandboxed) inside the card. Peek, decide, archive/file/confirm — without ever
   leaving the feed. The message loads only when you open it, so the feed stays
   as fast as before.
+- **Repeating calendar events.** Set how an event repeats — daily, every weekday,
+  weekly, every two weeks, monthly, or yearly — right on the event form. Campbooks
+  creates it as a real recurring series in Google/Zoho and shows every occurrence
+  on your calendar straight away; editing or deleting still lets you choose just
+  that one or the whole series.
+- **Repeating tasks.** Give a task a repeat schedule and, each time you complete
+  it, Campbooks lines up the next one — carrying the title, priority, labels, and
+  assignees forward — so recurring chores never fall off your list.
 
 ### Changed
 

@@ -58,7 +58,7 @@ module Api
       end
 
       def task_params
-        params.permit(:title, :description, :status, :priority, :due_at, :all_day, assignee_ids: [], tag_ids: [])
+        params.permit(:title, :description, :status, :priority, :due_at, :all_day, :rrule, assignee_ids: [], tag_ids: [])
       end
 
       # A new task defaults to `todo` (not `suggested` — that's reserved for AI

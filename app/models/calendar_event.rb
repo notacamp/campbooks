@@ -1,4 +1,6 @@
 class CalendarEvent < ApplicationRecord
+  include HasRecurrence
+
   belongs_to :calendar
   belongs_to :source_email_message, class_name: "EmailMessage", optional: true
   # The calendar-only "tag" whose icon marks this event on the grids. Optional:
@@ -26,6 +28,11 @@ class CalendarEvent < ApplicationRecord
   scope :visible, -> { where.not(status: :cancelled) }
   scope :upcoming, -> { visible.where(start_at: Time.current..).order(:start_at) }
   scope :for_series, ->(series_id) { where(recurring_event_provider_id: series_id) }
+  # A "master" carries the series rrule and is expanded locally into occurrences
+  # (Calendars::OccurrenceExpander) rather than rendered directly; "concrete" rows
+  # (plain events + provider-materialized instances) render as-is.
+  scope :series_masters, -> { where.not(rrule: [ nil, "" ]) }
+  scope :concrete,       -> { where(rrule: [ nil, "" ]) }
 
   # Finds an existing non-cancelled event already sourced from this email. Lets
   # Tools::CreateCalendarEvent and Reminders::Confirm stay idempotent so Scout, the
@@ -45,11 +52,31 @@ class CalendarEvent < ApplicationRecord
 
   delegate :calendar_account, :workspace, to: :calendar
 
-  # Part of a recurring series. Google is pulled with singleEvents=true, so we
-  # store concrete dated instances grouped by the series id (recurringEventId)
-  # rather than materializing a separate master row.
+  # Set on the transient, unsaved occurrence rows Calendars::OccurrenceExpander
+  # builds from a series master (so views can render them but not drag/mutate them
+  # as if they were real synced instances). Never persisted.
+  attr_accessor :occurrence_ghost
+  alias_method :occurrence_ghost?, :occurrence_ghost
+
+  # Part of a recurring series — either a provider-materialized instance (Google is
+  # pulled with singleEvents=true, so its occurrences arrive grouped by the series
+  # id in recurring_event_provider_id) or a local/Zoho "master" that still carries
+  # its rrule (HasRecurrence#recurring?, reached via super).
   def recurring?
-    recurring_event_provider_id.present?
+    recurring_event_provider_id.present? || super
+  end
+
+  # True for a series-definition row (an app-created or Zoho series held as one row
+  # with an rrule) — expanded into occurrences for display rather than shown raw.
+  def series_master?
+    rrule.present?
+  end
+
+  # True for a provider-materialized occurrence of a series (Google, singleEvents):
+  # governed by its series, so the form offers a this/all scope rather than letting
+  # you re-pick the recurrence rule on a single instance.
+  def series_instance?
+    recurring_event_provider_id.present? && rrule.blank?
   end
 
   def duration

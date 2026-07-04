@@ -6,9 +6,17 @@
 # links to emails. Status changes publish domain Events (the status-change log)
 # and a deadline can be promoted to a linked Reminder.
 class Task < ApplicationRecord
+  include HasRecurrence
+
   belongs_to :workspace
   belongs_to :created_by, class_name: "User", optional: true
   belongs_to :source, polymorphic: true, optional: true   # origin: EmailMessage | Document
+
+  # Recurring tasks: each occurrence links (flat) to the series root, so completing
+  # one spawns the next and a future "edit the whole series" can find its siblings.
+  # The root itself has a nil recurrence_parent.
+  belongs_to :recurrence_parent, class_name: "Task", optional: true
+  has_many :recurrence_children, class_name: "Task", foreign_key: :recurrence_parent_id, dependent: :nullify
 
   has_many :task_assignments, dependent: :destroy
   has_many :assignees, through: :task_assignments, source: :user
@@ -49,6 +57,7 @@ class Task < ApplicationRecord
   validates :status, presence: true
   validates :priority, presence: true
   validates :confidence, numericality: { greater_than_or_equal_to: 0.0, less_than_or_equal_to: 1.0 }
+  validate :recurring_requires_due_date
 
   # Stages rendered as board columns (suggested is Skim-only; cancelled hidden).
   BOARD_STATUSES = %w[todo in_progress blocked done].freeze
@@ -102,6 +111,9 @@ class Task < ApplicationRecord
                    payload: { title: title, from: previous, to: new_status })
     Events.publish("task.completed", subject: self, actor: by, payload: { title: title }) if done?
 
+    # Completing a recurring occurrence materializes the next one (Todoist-style).
+    spawn_next_occurrence!(by: by) if done?
+
     true
   end
 
@@ -142,6 +154,43 @@ class Task < ApplicationRecord
   end
 
   private
+
+  # A recurring task needs a due date to anchor the cadence — there's nothing to
+  # repeat from otherwise. (Rule parseability is checked by HasRecurrence.)
+  def recurring_requires_due_date
+    errors.add(:due_at, :blank) if recurring? && due_at.blank?
+  end
+
+  # When a recurring task is completed, materialize its next occurrence as a fresh
+  # todo carrying the same details forward. Idempotent (never two occurrences for
+  # the same series slot); a bounded rule (COUNT/UNTIL) simply stops producing.
+  def spawn_next_occurrence!(by: Current.user)
+    return unless recurring? && due_at.present?
+
+    next_due = recurrence.next_occurrence(dtstart: due_at, after: due_at)
+    return unless next_due
+
+    root_id = recurrence_parent_id || id
+    return if Task.where(recurrence_parent_id: root_id, due_at: next_due).exists?
+
+    next_task = workspace.tasks.create!(
+      title: title,
+      description: description,
+      priority: priority,
+      all_day: all_day,
+      status: :todo,
+      due_at: next_due,
+      rrule: rrule,
+      recurrence_parent_id: root_id,
+      created_by: created_by
+    )
+    next_task.update!(tag_ids: tag_ids) if tag_ids.any?
+    next_task.update!(assignee_ids: assignee_ids) if assignee_ids.any?
+    next_task
+  rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotUnique => e
+    Rails.logger.warn("[Task##{id}] failed to spawn next occurrence: #{e.class}: #{e.message}")
+    nil
+  end
 
   def publish_created
     Events.publish("task.created", subject: self, actor: created_by,
