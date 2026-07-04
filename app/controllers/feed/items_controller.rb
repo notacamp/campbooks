@@ -68,6 +68,13 @@ module Feed
       head :no_content
     end
 
+    # GET /feed/items/:id/preview — the card's inline "peek": the underlying
+    # email (or a reminder/task's source email) rendered into the collapsed
+    # turbo-frame lazily, so making the call never requires leaving the feed.
+    def preview
+      render Campbooks::Feed::EmailPreviewFrame.new(item: @item, subject: preview_message), layout: false
+    end
+
     private
 
     # Scoped to the user's own feed: anyone else's item 404s (not 403) so we don't
@@ -80,6 +87,19 @@ module Feed
 
     def tag_suggestion_item?
       @item.kind == "tag_suggestion" && @item.subject.is_a?(EmailMessage)
+    end
+
+    # The email behind this card, re-gated at render time: the feed admitted the
+    # subject once, but access can be revoked later (account unshared), so the
+    # body is only ever served through accessible_to. Nil (→ the frame's quiet
+    # "unavailable" note) for non-email cards and revoked/gone messages.
+    def preview_message
+      candidate =
+        case (subject = @item.subject)
+        when EmailMessage then subject
+        when Reminder, Task then subject.source_email
+        end
+      candidate && EmailMessage.accessible_to(current_user).find_by(id: candidate.id)
     end
 
     # Record the accept/reject so Feed::Sources::TagSuggestion learns to stop

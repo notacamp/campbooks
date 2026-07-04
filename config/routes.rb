@@ -86,6 +86,7 @@ Rails.application.routes.draw do
         post :dismiss
         post :seen
         post :undo
+        get :preview
       end
     end
   end
