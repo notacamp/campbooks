@@ -4,9 +4,11 @@ module Feed
   #   1. Collect candidates from each source (in registry order).
   #   2. Dedup by subject — the first source to claim a record wins, so an aged
   #      email surfaces as a reminder rather than also as an action.
-  #   3. upsert_all the survivors, preserving per-user state (seen/dismissed/acted)
+  #   3. Rank: Feed::Ranking turns each source's intrinsic score into the final
+  #      one (relevance boosts × recency decay) and gates the attention flag.
+  #   4. upsert_all the survivors, preserving per-user state (seen/dismissed/acted)
   #      and stamping generated_at = run time.
-  #   4. Reconcile: any active row a successful source *didn't* refresh this run
+  #   5. Reconcile: any active row a successful source *didn't* refresh this run
   #      (older generated_at) no longer qualifies — resolve it.
   #
   # Idempotent: running it twice with no underlying change is a no-op (the unique
@@ -24,7 +26,7 @@ module Feed
     def call
       return 0 unless @user&.workspace_id
 
-      rows = []
+      picked = []
       ran_kinds = []
       claimed = {}
 
@@ -45,10 +47,12 @@ module Feed
           subject = c[:subject]
           next if claimed[claim_key(subject)] # cross-source dedup: first source wins
           claimed[claim_key(subject)] = true
-          rows << row_for(klass.key, c, subject)
+          picked << [ klass.key, c ]
         end
       end
 
+      Feed::Ranking.new(@user, now: @now).apply!(picked)
+      rows = picked.map { |kind, c| row_for(kind, c, c[:subject]) }
       persist(rows, ran_kinds)
       rows.size
     end

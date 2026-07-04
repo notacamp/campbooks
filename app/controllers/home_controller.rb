@@ -4,8 +4,9 @@ require "pagy/extras/countless"
 
 # The Instagram-style home: story-rings (lazy Skim tray) above an infinite,
 # multi-source feed of things to address. A small "needs attention" cluster is
-# pinned on top; the rest is a reverse-chronological timeline reaching back as
-# far as there's anything actionable.
+# pinned on top; the rest is a ranked timeline — Feed::Ranking's blend of
+# urgency, relevance and recency — reaching back as far as there's anything
+# actionable.
 #
 # The feed is a materialized spine (feed_items) populated by Feed::Source classes
 # — see Feed::Reader / Feed::Generator. This controller only reads it: fast, and

@@ -18,10 +18,13 @@ module Feed
       @attention ||= present(@user.feed_items.active.attention.ranked.to_a)
     end
 
-    # Relation for the infinite timeline. The controller paginates this with
-    # pagy_countless, then hands the page back to #present.
+    # Relation for the infinite timeline, highest rank first — recency is one
+    # input to the rank (Feed::Ranking), not the ordering itself, so a fresh
+    # nothing-email can't outrank yesterday's overdue reply (nor a stale
+    # follow-up outrank this morning's mail). The controller paginates this
+    # with pagy_countless, then hands the page back to #present.
     def timeline_scope
-      @user.feed_items.active.timeline.chronological
+      @user.feed_items.active.timeline.ranked
     end
 
     # [{ item:, subject: }] for a set of feed_items, subjects batch-loaded with

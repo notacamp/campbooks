@@ -44,7 +44,10 @@ module Feed
 
     # ⇒ Array of attribute hashes, permission-scoped to @user:
     #   { subject:, dedupe_key:, sort_at:, score:, attention:, data: }
-    # The generator stamps `kind` from #key and fills in user/workspace.
+    # `score` is the kind's *intrinsic* urgency on a 0–100 band and `attention`
+    # a nomination — Feed::Ranking folds in relevance and recency decay to
+    # produce what's actually materialized. The generator stamps `kind` from
+    # #key and fills in user/workspace.
     def candidates = raise NotImplementedError
 
     # Is a materialized item still worth showing? Re-checks the live record.

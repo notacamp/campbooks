@@ -49,6 +49,6 @@ RSpec.describe Feed::Sources::TagSuggestion do
     record("accepted")
 
     card = candidates.find { |c| c[:subject].id == email.id }
-    expect(card[:score]).to eq(10)
+    expect(card[:score]).to eq(25)
   end
 end
