@@ -22,6 +22,9 @@ module Campbooks
             if reason.present?
               p(class: "mt-1 line-clamp-2 text-[13px] leading-relaxed text-muted-foreground") { reason }
             end
+            # "Nudge or let it rest" is judged on what was last said — the collapsed
+            # preview reopens the conversation without leaving the feed.
+            render Campbooks::Feed::ExpandablePreview.new(item: item, class: "mt-1.5")
             div(class: "mt-2.5 flex items-center justify-end gap-2") do
               act_button(tool: "dismiss_follow_up", label: t(".dismiss"), variant: :ghost, key: "x", dismiss: true)
               link_button(href: helpers.email_message_path(subject, compose: "follow_up"), label: t(".draft_follow_up"), variant: :primary, key: "d")

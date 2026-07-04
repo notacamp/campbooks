@@ -61,6 +61,12 @@ class Reminder < ApplicationRecord
     pending? && due_at.present? && due_at < Time.current
   end
 
+  # Origin email (when extracted from a mailbox message), or nil. Mirrors
+  # Task#source_email so email-backed surfaces can treat both uniformly.
+  def source_email
+    source if source_type == "EmailMessage"
+  end
+
   def money
     return nil if amount_cents.blank?
     Money.new(amount_cents, currency.presence || "EUR")
