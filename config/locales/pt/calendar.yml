@@ -106,6 +106,12 @@ pt:
         all_day: Dia inteiro
         untitled: "(Sem título)"
         video_call: Videochamada
+      month_grid:
+        add_event: Adicionar evento
+        more: "+%{count} mais"
+        show_events:
+          one: Ver %{count} evento
+          other: Ver %{count} eventos
       time_until:
         in_days:
           one: Em %{count} dia

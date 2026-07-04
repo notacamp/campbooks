@@ -106,6 +106,12 @@ fr:
         all_day: Toute la journée
         untitled: "(Sans titre)"
         video_call: Appel vidéo
+      month_grid:
+        add_event: Ajouter un événement
+        more: "+%{count} de plus"
+        show_events:
+          one: Voir %{count} événement
+          other: Voir %{count} événements
       time_until:
         in_days:
           one: Dans %{count} jour

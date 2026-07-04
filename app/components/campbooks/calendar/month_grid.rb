@@ -17,8 +17,7 @@ module Campbooks
         # (calendar-fill-height), so the month uses the whole page instead of
         # floating in a short box; on mobile it keeps a natural, scrollable height.
         div(class: "flex min-h-[32rem] flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm",
-            data: { controller: "calendar-create calendar-month-dnd calendar-fill-height",
-                    "calendar-create-mode-value": "month",
+            data: { controller: "calendar-month-dnd calendar-fill-height",
                     "calendar-fill-height-min-value": 512 }) do
           weekday_header
           # auto-rows-fr makes the week rows split the filled height evenly on lg;
@@ -77,69 +76,142 @@ module Campbooks
         reminders = reminders_by_day[day] || []
         snoozed = snoozed_by_day[day] || []
         scheduled = scheduled_by_day[day] || []
+        total = events.size + reminders.size + snoozed.size + scheduled.size
 
         div(
+          # The whole cell no longer creates an event on click — the "+" button does
+          # (see #day_header). The cell stays a drop target for cross-day drags and,
+          # when it holds events, hosts the "show the whole day" popover.
           data: {
-            "new-url": helpers.new_calendar_event_path(date: day.iso8601, view: "month"),
             "calendar-month-dnd-target": "day",
-            "date": day.iso8601
+            "date": day.iso8601,
+            **(total.positive? ? { controller: "calendar-day-popover" } : {})
           },
           class: class_names(
             "group relative flex min-h-[84px] flex-col gap-0.5 border-b border-r border-border/70 p-1 transition-colors duration-150",
-            "cursor-pointer [&:nth-child(7n)]:border-r-0 sm:min-h-[100px] lg:min-h-0",
+            "[&:nth-child(7n)]:border-r-0 sm:min-h-[100px] lg:min-h-0",
             today ? "bg-muted/40" : (in_month ? "bg-card hover:bg-muted/40" : "bg-muted/20 hover:bg-muted/30")
           )
         ) do
-          div(class: "flex items-center justify-between") do
-            a(href: helpers.new_calendar_event_path(date: day.iso8601, view: "month"),
-              data: { "calendar-event-modal-open": helpers.new_calendar_event_path(date: day.iso8601, view: "month") },
-              class: class_names(
-                "flex h-6 w-6 items-center justify-center rounded-full text-xs transition-colors",
-                today ? "bg-primary font-semibold text-primary-foreground" : (in_month ? "text-gray-700 group-hover:bg-muted" : "text-gray-400")
-              )) { day.day.to_s }
-            # The "click to add" cue — fades in on hover; the whole cell already
-            # creates, so this stays decorative (pointer-events-none).
-            span(class: "pointer-events-none flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity duration-150 group-hover:opacity-100 motion-reduce:transition-none") do
-              raw(safe(PLUS_SVG))
-            end
+          day_header(day, today:, in_month:)
+          mobile_dots(events, total) if total.positive?
+          day_chips(events, reminders, snoozed, scheduled)
+          day_popover(day, events, reminders, snoozed, scheduled) if total.positive?
+        end
+      end
+
+      def day_header(day, today:, in_month:)
+        div(class: "flex items-center justify-between") do
+          span(class: class_names(
+            "flex h-6 w-6 items-center justify-center rounded-full text-xs",
+            today ? "bg-primary font-semibold text-primary-foreground" : (in_month ? "text-gray-700" : "text-gray-400")
+          )) { day.day.to_s }
+
+          # The add-event affordance: a "+" that fades in on hover (sm+) and stays
+          # visible on touch, where there is no hover. This is now the only
+          # click-to-create in the month, so a stray tap on the cell can't spawn an
+          # event.
+          a(href: helpers.new_calendar_event_path(date: day.iso8601, view: "month"),
+            data: { "calendar-event-modal-open": helpers.new_calendar_event_path(date: day.iso8601, view: "month") },
+            "aria-label": t(".add_event"),
+            class: class_names(
+              "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground",
+              "transition hover:bg-primary hover:text-primary-foreground motion-reduce:transition-none",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:opacity-100",
+              "opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+            )) { raw(safe(PLUS_SVG)) }
+        end
+      end
+
+      # Phone columns (~46px at 375px) are too narrow for text chips, so the day
+      # condenses to a row of colored dots — a glance says "something's on"; a tap
+      # opens the day's full list.
+      def mobile_dots(events, total)
+        button(
+          type: "button",
+          data: { action: "calendar-day-popover#toggle", "calendar-day-popover-target": "trigger" },
+          "aria-expanded": "false",
+          "aria-label": t(".show_events", count: total),
+          class: "flex w-full flex-wrap items-center gap-1 border-0 bg-transparent p-0 pt-0.5 text-left sm:hidden"
+        ) do
+          events.first(5).each do |event|
+            span(class: "h-1.5 w-1.5 rounded-full", style: "background-color: #{event.display_color}")
           end
+          extra = total - [ events.size, 5 ].min
+          span(class: "text-[9px] font-medium text-muted-foreground") { "+#{extra}" } if extra.positive?
+        end
+      end
 
-          total = events.size + reminders.size + snoozed.size + scheduled.size
+      # sm+ has room for the full chips (time + title). Shows the first few; the
+      # rest live behind a "+N more" that opens the day popover.
+      def day_chips(events, reminders, snoozed, scheduled)
+        procs = chip_procs(events, reminders, snoozed, scheduled, draggable: true)
+        overflow = procs.size - MAX_CHIPS
 
-          # Phone columns (~46px at 375px) are too narrow for text chips, so the
-          # day condenses to a row of colored dots — a glance says "something's on"
-          # and the day opens for the detail.
-          if total.positive?
-            div(class: "flex flex-wrap items-center gap-1 pt-0.5 sm:hidden") do
-              events.first(5).each do |event|
-                span(class: "h-1.5 w-1.5 rounded-full", style: "background-color: #{event.display_color}")
-              end
-              extra = total - [ events.size, 5 ].min
-              span(class: "text-[9px] font-medium text-muted-foreground") { "+#{extra}" } if extra.positive?
-            end
-          end
-
-          # sm+ has room for the full chips (time + title).
-          div(class: "hidden min-h-0 flex-col gap-0.5 overflow-hidden sm:flex") do
-            shown = events.first(MAX_CHIPS)
-            shown.each { |event| render_chip(event) }
-            slots = MAX_CHIPS - shown.size
-            reminders.first(slots).each { |reminder| render Campbooks::Calendar::ReminderChip.new(reminder: reminder) } if slots.positive?
-            slots -= [ reminders.size, slots ].min
-            snoozed.first(slots).each { |thread| render Campbooks::Calendar::SnoozedChip.new(thread: thread) } if slots.positive?
-            slots -= [ snoozed.size, slots ].min
-            scheduled.first(slots).each { |email| render Campbooks::Calendar::ScheduledEmailChip.new(scheduled_email: email) } if slots.positive?
-            overflow = total - MAX_CHIPS
-            div(class: "px-1 pt-0.5 text-[10px] font-medium text-muted-foreground") { "+#{overflow}" } if overflow.positive?
+        div(class: "hidden min-h-0 flex-col gap-0.5 overflow-hidden sm:flex") do
+          procs.first(MAX_CHIPS).each(&:call)
+          if overflow.positive?
+            button(
+              type: "button",
+              data: { action: "calendar-day-popover#toggle", "calendar-day-popover-target": "trigger" },
+              "aria-expanded": "false",
+              class: "mt-0.5 w-full rounded px-1 py-0.5 text-left text-[10px] font-medium text-muted-foreground " \
+                     "transition-colors hover:bg-muted hover:text-foreground " \
+                     "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+            ) { t(".more", count: overflow) }
           end
         end
       end
 
-      def render_chip(event)
+      # The full-day list, shown by the "+N more" chip or the mobile dots. Rendered
+      # inside the cell but positioned `fixed` by the controller so it clears the
+      # card's clipping. Its chips aren't drag sources (a drag out of a floating
+      # popover reads as broken), so reschedule stays a grid-only gesture.
+      def day_popover(day, events, reminders, snoozed, scheduled)
+        div(
+          data: { "calendar-day-popover-target": "panel" },
+          class: "fixed left-0 top-0 z-50 hidden w-64 max-w-[calc(100vw-1rem)] rounded-xl border " \
+                 "border-border/70 bg-popover p-2 text-popover-foreground shadow-xl"
+        ) do
+          div(class: "mb-1 flex items-center justify-between px-1") do
+            span(class: "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground") do
+              "#{t('date.abbr_day_names')[day.wday]} #{day.day}"
+            end
+            button(
+              type: "button",
+              data: { action: "calendar-day-popover#close" },
+              "aria-label": t("shared.actions.close"),
+              class: "flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground " \
+                     "transition-colors hover:bg-muted hover:text-foreground"
+            ) { raw(safe(CLOSE_SVG)) }
+          end
+          # A click on any chip opens/navigates it and also dismisses the popover.
+          div(
+            data: { action: "click->calendar-day-popover#close" },
+            class: "max-h-[60vh] space-y-0.5 overflow-y-auto"
+          ) do
+            chip_procs(events, reminders, snoozed, scheduled, draggable: false).each(&:call)
+          end
+        end
+      end
+
+      # The day's items as an ordered list of render thunks: events, then reminders,
+      # snoozed threads and scheduled mail (matching the chip fill order).
+      def chip_procs(events, reminders, snoozed, scheduled, draggable:)
+        procs = []
+        events.each { |e| procs << -> { render_chip(e, draggable:) } }
+        reminders.each { |r| procs << -> { render Campbooks::Calendar::ReminderChip.new(reminder: r) } }
+        snoozed.each { |th| procs << -> { render Campbooks::Calendar::SnoozedChip.new(thread: th) } }
+        scheduled.each { |s| procs << -> { render Campbooks::Calendar::ScheduledEmailChip.new(scheduled_email: s) } }
+        procs
+      end
+
+      def render_chip(event, draggable: true)
         color = event.display_color
-        # Writable events become drag targets (cross-day reschedule); read-only
-        # events stay plain links, matching DayGrid/WeekTimeGrid.
-        drag = event.calendar.is_writable
+        # Writable events become drag targets (cross-day reschedule) in the grid;
+        # read-only events — and every chip inside the popover — stay plain links,
+        # matching DayGrid/WeekTimeGrid.
+        drag = draggable && event.calendar.is_writable
         drag_data = drag ? {
           "calendar-month-dnd-target": "event",
           "event-id": event.id,
@@ -183,6 +255,10 @@ module Campbooks
 
       PLUS_SVG = <<~SVG.freeze
         <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      SVG
+
+      CLOSE_SVG = <<~SVG.freeze
+        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
       SVG
     end
   end
