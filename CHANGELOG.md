@@ -33,6 +33,9 @@ major, minor, or patch change here.
   a stray click on a day no longer starts a new event. Days holding more events
   than fit show a "+N more" — click it, or tap the row of dots on a phone, to pop
   open the whole day's list.
+- The inbox search bar now stretches across the whole top band, meeting the
+  Compose button instead of stopping short and leaving a dead gap on wide
+  screens.
 
 ### Fixed
 
