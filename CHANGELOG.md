@@ -54,6 +54,11 @@ major, minor, or patch change here.
 
 ### Fixed
 
+- **Swipe actions in the "Waiting on replies" band now match the row's buttons.**
+  Swiping left on a waiting-reply thread now reveals "Dismiss follow-up" (the
+  same action as the inline × button) rather than Archive. The right side is
+  empty — "Draft follow-up" is a full-page action and stays tap-only.
+
 - **The Skim rings are back.** In 0.10.0 the skim tray on the home feed and
   inbox rendered "Content missing" for most inboxes: the live categorizer's new
   Gmail-category rescue read a column (`provider_labels`) the tray's trimmed
