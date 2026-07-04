@@ -16,6 +16,17 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Skim rings are back.** In 0.10.0 the skim tray on the home feed and
+  inbox rendered "Content missing" for most inboxes: the live categorizer's new
+  Gmail-category rescue read a column (`provider_labels`) the tray's trimmed
+  query didn't load, which 500'd the whole tray. The tray query now loads every
+  column the categorizer reads — including the bulk-mail headers it was
+  silently missing before, so Skim's ring placement matches regular triage —
+  and the Gmail hint degrades gracefully instead of erroring if a narrow query
+  ever starves it again.
+
 ### Changed
 
 - **The month calendar's day cells are calmer to use.** Adding an event is now an

@@ -95,7 +95,7 @@ module Emails
       scope = EmailMessage.where(email_account: accounts, skimmed_at: nil,
                                  email_thread_id: follow_up_ids.to_a)
       scope = Emails::InboxFolders.constrain(scope, accounts)
-      scope.includes(:contact)
+      scope.includes(:contact, :tags)
            .select(*SkimScope::SELECT)
            .order(received_at: :desc)
            .group_by(&:email_thread_id)
