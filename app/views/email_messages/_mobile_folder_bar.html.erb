@@ -18,10 +18,10 @@
         makes no sense, so they get no drop-target attr (see EmailFolder.droppable_name?). %>
     <% chip_data = { turbo_frame: "_top", folder_name: folder[:name], folder_active: active.to_s } %>
     <% chip_data[:mail_folder_drop_target] = "chip" if EmailFolder.droppable_name?(folder[:name]) %>
-    <%= link_to email_messages_path(folder_id: folder[:id]),
+    <%= link_to email_messages_path(folder_id: folder[:id], show_list: 1),
           data: chip_data,
           class: class_names(
-            "flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
+            "flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-colors active:scale-95",
             active ? "bg-accent-600 text-white" : "bg-muted text-muted-foreground hover:bg-accent"
           ) do %>
       <%= render(Campbooks::Icon.new(Campbooks::Icon.for_folder_name(folder[:name]), css_class: "w-4 h-4")) %>
@@ -49,10 +49,10 @@
     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
   </button>
 
-  <%= link_to t(".all"), email_messages_path(folder_id: "all"),
+  <%= link_to t(".all"), email_messages_path(folder_id: "all", show_list: 1),
         data: { turbo_frame: "_top" },
         class: class_names(
-          "flex-shrink-0 inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
+          "flex-shrink-0 inline-flex items-center px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-colors active:scale-95",
           @current_folder == "all" ? "bg-accent-600 text-white" : "bg-muted text-muted-foreground hover:bg-accent"
         ) %>
 
