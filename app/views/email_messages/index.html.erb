@@ -72,7 +72,9 @@
   </div>
 
   <!-- Email detail -->
-  <%= turbo_frame_tag "email_detail", src: params[:selected] && email_message_path(params[:selected]), class: "hidden lg:block flex-1 min-w-0 bg-card overflow-y-auto", data: { inbox_pane: "detail" } do %>
+  <%# detail_nav "when-visible": row clicks load into this pane on desktop; below
+      lg the pane is hidden, so clicks fall back to a full-page visit. %>
+  <%= turbo_frame_tag "email_detail", src: params[:selected] && email_message_path(params[:selected]), class: "hidden lg:block flex-1 min-w-0 bg-card overflow-y-auto", data: { inbox_pane: "detail", detail_nav: "when-visible" } do %>
     <%= render(Campbooks::EmptyState.new(
           variant: :standalone,
           title: t(".no_email_selected"),

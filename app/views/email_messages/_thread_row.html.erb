@@ -75,8 +75,11 @@
              value="<%= latest.id %>">
     </div>
 
+    <%# focus-visible: replace the UA outline (clipped to stray black bars by the
+        Swipeable wrapper's overflow-hidden) with the app's inset accent ring —
+        with in-place navigation the link keeps focus after opening. %>
     <%= link_to email_message_path(latest, folder_id: params[:folder_id].presence, group: params[:group].presence),
-          class: "flex items-start px-3 flex-1 min-w-0 #{active ? 'text-accent-700' : ''}",
+          class: "flex items-start px-3 flex-1 min-w-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-500 #{active ? 'text-accent-700' : ''}",
           style: "padding-top:var(--thread-py,0.8125rem);padding-bottom:var(--thread-py,0.8125rem);gap:var(--thread-gap,0.875rem)",
           data: { turbo_frame: "_top" } do %>
       <div class="relative shrink-0 mt-px">

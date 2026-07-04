@@ -157,10 +157,18 @@ class EmailMessagesController < ApplicationController
     raw_files = @thread_messages.flat_map { |m| m.files.map { |f| [ m, f ] } }
     @thread_files = raw_files.reject { |_, f| @thread_documents.any? { |d| d.original_file.filename.to_s == f.filename.to_s } }
 
-    # Load thread list for sidebar. NOTE: the whole 3-pane UI (folders + thread
-    # list + message) lives inside the "email_detail" turbo frame, so arrow-key /
-    # in-frame navigation reloads all of it — we can't skip the sidebar here.
-    # Only the first page is loaded up front; the rest streams in on scroll.
+    # In-place navigation: the "email_detail" turbo frame wraps only the reading
+    # pane, so a frame request (thread-row click, arrow keys) answers with just
+    # that pane — the thread list, folder rail and chrome are neither queried
+    # nor re-rendered, which is what keeps the list's scroll position intact.
+    if turbo_frame_request_id == "email_detail"
+      @folders = build_folder_list(folder_counts_for_lists) # detail-context needs the move-to-folder list
+      return render :show_detail, layout: false
+    end
+
+    # Load thread list for sidebar (full page loads only — frame requests
+    # returned above). Only the first page is loaded up front; the rest streams
+    # in on scroll.
     readable_ids = readable_account_ids
 
     # Keep any active inbox search/filter alive across opening an email: when the
@@ -228,13 +236,8 @@ class EmailMessagesController < ApplicationController
     end
 
     # Build folder list merged across accounts by folder name
-    folder_counts = Rails.cache.fetch("folder_counts/#{readable_ids.sort.join('_')}", expires_in: 1.minute) do
-      EmailMessage.where(email_account_id: readable_ids).group(:provider_folder_id).distinct.count(:email_thread_id)
-    end
-    @folders = folder_mappings[:name_to_ids].map { |name, ids|
-      count = ids.sum { |id| folder_counts[id] || 0 }
-      { id: ids.first, name: name, count: count }
-    }.sort_by { |f| f[:name] == "Inbox" ? "  " : f[:name] }
+    folder_counts = folder_counts_for_lists
+    @folders = build_folder_list(folder_counts)
     @common_folders = baseline_folders(folder_counts)
     @mail_folders = custom_folders
     @accounts = readable_accounts
@@ -388,6 +391,22 @@ class EmailMessagesController < ApplicationController
 
   def readable_account_ids
     @readable_account_ids ||= readable_accounts.map(&:id)
+  end
+
+  # Per-folder distinct thread counts, shared by the folder pane and the
+  # move-to-folder pickers. Cached briefly — it walks every message row.
+  def folder_counts_for_lists
+    Rails.cache.fetch("folder_counts/#{readable_account_ids.sort.join('_')}", expires_in: 1.minute) do
+      EmailMessage.where(email_account_id: readable_account_ids).group(:provider_folder_id).distinct.count(:email_thread_id)
+    end
+  end
+
+  # Folder list merged across accounts by folder name.
+  def build_folder_list(folder_counts)
+    folder_mappings[:name_to_ids].map { |name, ids|
+      count = ids.sum { |id| folder_counts[id] || 0 }
+      { id: ids.first, name: name, count: count }
+    }.sort_by { |f| f[:name] == "Inbox" ? "  " : f[:name] }
   end
 
   def workspace_tags

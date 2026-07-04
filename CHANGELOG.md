@@ -35,6 +35,11 @@ major, minor, or patch change here.
 
 ### Changed
 
+- **Opening an email no longer reloads the whole inbox.** Clicking a thread in the
+  list now swaps just the reading pane — the list keeps its scroll position and
+  your place stays in view. The command palette (⌘K), keyboard shortcuts, and the
+  discussion panel all follow along to the email on screen; on a phone the same
+  tap still flips you to the message as before.
 - **Smart sorting now reads Gmail's own verdicts.** When Gmail has already filed
   a message under Promotions, Social, or Updates and Campbooks' own rules see no
   bulk signal, the message follows Gmail's verdict into the matching smart group
