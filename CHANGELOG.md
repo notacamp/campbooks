@@ -54,6 +54,13 @@ major, minor, or patch change here.
 
 ### Fixed
 
+- **Documents no longer show your email address as their title.** Attachments
+  pulled in from received or sent email were incorrectly stored with the raw
+  sender address (e.g. `you@example.com`) as their name. Any document whose AI
+  analysis hadn't finished would surface that address as its title in the Files
+  list. The creation paths now leave the name blank so the filename is shown
+  instead, and a migration clears the stale email-address values from existing
+  rows.
 - **The Skim rings are back.** In 0.10.0 the skim tray on the home feed and
   inbox rendered "Content missing" for most inboxes: the live categorizer's new
   Gmail-category rescue read a column (`provider_labels`) the tray's trimmed
