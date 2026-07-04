@@ -105,6 +105,12 @@ es:
         all_day: Todo el día
         untitled: "(Sin título)"
         video_call: Videollamada
+      month_grid:
+        add_event: Añadir evento
+        more: "+%{count} más"
+        show_events:
+          one: Ver %{count} evento
+          other: Ver %{count} eventos
       time_until:
         in_days:
           one: En %{count} día

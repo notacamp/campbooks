@@ -110,6 +110,12 @@ en:
       snoozed_row:
         no_subject: "(Snoozed email)"
         snoozed_from: Returns — %{account}
+      month_grid:
+        add_event: Add event
+        more: "+%{count} more"
+        show_events:
+          one: Show %{count} event
+          other: Show %{count} events
       time_until:
         in_days:
           one: In %{count} day
