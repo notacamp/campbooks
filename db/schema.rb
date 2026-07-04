@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_04_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_04_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -817,7 +817,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_04_100000) do
     t.index ["subject_type", "subject_id"], name: "idx_feed_items_subject"
     t.index ["user_id", "dedupe_key"], name: "idx_feed_items_user_dedupe", unique: true
     t.index ["user_id", "score", "sort_at"], name: "idx_feed_items_attention", order: { score: :desc, sort_at: :desc }, where: "((dismissed_at IS NULL) AND (acted_at IS NULL) AND (attention = true))"
-    t.index ["user_id", "sort_at"], name: "idx_feed_items_timeline", order: { sort_at: :desc }, where: "((dismissed_at IS NULL) AND (acted_at IS NULL) AND (attention = false))"
+    t.index ["user_id", "score", "sort_at"], name: "idx_feed_items_timeline", order: { score: :desc, sort_at: :desc }, where: "((dismissed_at IS NULL) AND (acted_at IS NULL) AND (attention = false))"
     t.index ["user_id"], name: "index_feed_items_on_user_unseen_active", where: "((seen_at IS NULL) AND (dismissed_at IS NULL) AND (acted_at IS NULL))"
     t.index ["workspace_id"], name: "index_feed_items_on_workspace_id"
   end

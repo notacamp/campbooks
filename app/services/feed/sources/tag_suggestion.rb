@@ -22,7 +22,9 @@ module Feed
               subject: m,
               dedupe_key: "tag_suggestion:#{m.id}",
               sort_at: m.received_at || m.created_at,
-              score: verdict == "accepted" ? 10 : 0,
+              # Low-stakes filing chores: below actionable mail, a learned
+              # always-accepted tag floats above the rest.
+              score: verdict == "accepted" ? 25 : 15,
               attention: false,
               data: { tag_name: tag_name }
             }
@@ -70,8 +72,8 @@ module Feed
             .where("ai_suggested_actions @> ?", add_tag_json)
             .where.not("ai_suggested_actions @> ?", draft_reply_json)
             .where(ai_todo_dismissed: false, skimmed_at: nil)
-            .select(:id, :received_at, :created_at, :ai_suggested_actions, :email_account_id,
-                    :email_thread_id, :contact_id, :from_address)
+            .select(:id, :received_at, :created_at, :ai_suggested_actions, :category,
+                    :email_account_id, :email_thread_id, :contact_id, :from_address)
         ))
       end
 

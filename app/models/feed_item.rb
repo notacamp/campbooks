@@ -18,12 +18,13 @@ class FeedItem < ApplicationRecord
   # a kind without a migration — the source registry owns the list, not the schema.
   KINDS = %w[calendar_event starred_email email_action reply_reminder tag_suggestion reminder follow_up task].freeze
 
-  scope :for_user,      ->(user) { where(user: user) }
-  scope :active,        -> { where(dismissed_at: nil, acted_at: nil) }
-  scope :attention,     -> { where(attention: true) }
-  scope :timeline,      -> { where(attention: false) }
-  scope :ranked,        -> { order(score: :desc, sort_at: :desc) }
-  scope :chronological, -> { order(sort_at: :desc, id: :desc) }
+  scope :for_user,  ->(user) { where(user: user) }
+  scope :active,    -> { where(dismissed_at: nil, acted_at: nil) }
+  scope :attention, -> { where(attention: true) }
+  scope :timeline,  -> { where(attention: false) }
+  # The feed's one ordering: rank first (Feed::Ranking's blend of urgency,
+  # relevance and recency decay), recency as the tiebreak, id for stability.
+  scope :ranked,    -> { order(score: :desc, sort_at: :desc, id: :desc) }
 
   def active?    = dismissed_at.nil? && acted_at.nil?
   def seen?      = seen_at.present?

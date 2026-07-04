@@ -36,6 +36,13 @@ major, minor, or patch change here.
 
 ### Changed
 
+- **The home feed now ranks by priority, not by section.** Every card gets one
+  score blending what it is (a due reminder, a follow-up, actionable mail…),
+  how relevant it is (starred and known contacts up, newsletters and other bulk
+  mail down, conversations you've written in up), and how fresh it is — scores
+  decay with age, so a follow-up from two years ago sinks to the bottom instead
+  of pinning above this morning's mail. "Needs attention" keeps only what's
+  urgent *now*; stale items demote into the ranked timeline automatically.
 - **The month calendar's day cells are calmer to use.** Adding an event is now an
   explicit "+" that fades in when you hover a day (and stays visible on touch), so
   a stray click on a day no longer starts a new event. Days holding more events
