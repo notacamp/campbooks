@@ -26,6 +26,25 @@ major, minor, or patch change here.
   leaving the feed. The message loads only when you open it, so the feed stays
   as fast as before.
 
+### Changed
+
+- **The month calendar's day cells are calmer to use.** Adding an event is now an
+  explicit "+" that fades in when you hover a day (and stays visible on touch), so
+  a stray click on a day no longer starts a new event. Days holding more events
+  than fit show a "+N more" — click it, or tap the row of dots on a phone, to pop
+  open the whole day's list.
+
+### Fixed
+
+- **The Skim rings are back.** In 0.10.0 the skim tray on the home feed and
+  inbox rendered "Content missing" for most inboxes: the live categorizer's new
+  Gmail-category rescue read a column (`provider_labels`) the tray's trimmed
+  query didn't load, which 500'd the whole tray. The tray query now loads every
+  column the categorizer reads — including the bulk-mail headers it was
+  silently missing before, so Skim's ring placement matches regular triage —
+  and the Gmail hint degrades gracefully instead of erroring if a narrow query
+  ever starves it again.
+
 ## [0.10.0] - 2026-07-04
 
 ### Added
