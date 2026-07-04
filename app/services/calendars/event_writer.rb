@@ -31,14 +31,17 @@ module Calendars
     private
 
     def create
-      remote = @client.create_event(@calendar, attrs_for_provider)
+      remote = @client.create_event(@calendar, attrs_for_provider(recurrence: true))
       apply_remote!(remote)
     end
 
     def update(scope)
       target = target_provider_id(scope)
+      # Only carry the series rule when writing the series itself — editing a local
+      # master, or an "all events" edit of a provider series; a single-instance edit
+      # must not restamp the recurrence.
       with_conflict_retry do |etag|
-        @client.update_event(@calendar, target, attrs_for_provider, etag: etag)
+        @client.update_event(@calendar, target, attrs_for_provider(recurrence: scope.to_sym == :all || @event.series_master?), etag: etag)
       end
     end
 
@@ -88,8 +91,8 @@ module Calendars
       end
     end
 
-    def attrs_for_provider
-      {
+    def attrs_for_provider(recurrence: false)
+      attrs = {
         title: @event.title,
         description: @event.description,
         location: @event.location,
@@ -99,6 +102,8 @@ module Calendars
         time_zone: @event.start_time_zone,
         attendees: @event.attendees
       }
+      attrs[:rrule] = @event.rrule if recurrence && @event.rrule.present?
+      attrs
     end
 
     PROVIDER_RSVP = {

@@ -254,6 +254,12 @@ module Google
           a.is_a?(String) ? { email: a } : { email: a[:email], displayName: a[:name] }.compact
         end
       end
+
+      # Recurrence: Google takes an array of iCal lines; the DTSTART is implied by
+      # the event's start above, so a bare "FREQ=WEEKLY" repeats on that weekday.
+      # Google then expands the series and syncs the concrete instances back (we
+      # pull with singleEvents=true).
+      payload[:recurrence] = [ "RRULE:#{attrs[:rrule]}" ] if attrs[:rrule].present?
       payload
     end
 

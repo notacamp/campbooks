@@ -1579,6 +1579,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_04_120000) do
     t.text "justification"
     t.integer "position", default: 0, null: false
     t.integer "priority", default: 1, null: false
+    t.uuid "recurrence_parent_id"
+    t.string "rrule"
     t.uuid "source_id"
     t.string "source_type"
     t.integer "status", default: 0, null: false
@@ -1587,6 +1589,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_04_120000) do
     t.uuid "workspace_id", null: false
     t.index ["created_by_id"], name: "index_tasks_on_created_by_id"
     t.index ["extraction_fingerprint"], name: "index_tasks_on_fingerprint", unique: true, where: "(extraction_fingerprint IS NOT NULL)"
+    t.index ["recurrence_parent_id"], name: "index_tasks_on_recurrence_parent_id"
     t.index ["source_type", "source_id"], name: "index_tasks_on_source"
     t.index ["workspace_id", "archived_at"], name: "index_tasks_on_workspace_id_and_archived_at"
     t.index ["workspace_id", "status", "due_at"], name: "index_tasks_on_workspace_status_due"
@@ -1900,6 +1903,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_04_120000) do
   add_foreign_key "task_email_links", "users", column: "created_by_id", on_delete: :nullify
   add_foreign_key "task_tags", "tags"
   add_foreign_key "task_tags", "tasks"
+  add_foreign_key "tasks", "tasks", column: "recurrence_parent_id", on_delete: :nullify
   add_foreign_key "tasks", "users", column: "created_by_id", on_delete: :nullify
   add_foreign_key "tasks", "workspaces"
   add_foreign_key "thread_follows", "agent_threads"

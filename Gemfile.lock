@@ -853,6 +853,7 @@ DEPENDENCIES
   grover (~> 1.1)
   i18n-tasks
   icalendar
+  ice_cube (~> 0.17)
   image_processing (~> 1.2)
   importmap-rails
   json_schemer

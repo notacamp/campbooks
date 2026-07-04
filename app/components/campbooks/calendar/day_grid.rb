@@ -92,7 +92,7 @@ module Campbooks
       def render_event(box)
         e = box[:event]
         color = e.display_color
-        drag = e.calendar.is_writable
+        drag = e.calendar.is_writable && !e.occurrence_ghost?
         a(href: helpers.edit_calendar_event_path(e),
           data: { "calendar-event-modal-open": helpers.edit_calendar_event_path(e) }.merge(drag ? { "calendar-dnd-target": "event", "event-id": e.id } : {}),
           class: class_names("absolute overflow-hidden rounded-lg px-2 py-1 text-xs leading-tight shadow-sm ring-1 ring-black/5", ("cursor-grab" if drag)),

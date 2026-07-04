@@ -96,7 +96,7 @@ module Api
       end
 
       def event_params
-        params.permit(:title, :description, :location, :start_at, :end_at, :all_day)
+        params.permit(:title, :description, :location, :start_at, :end_at, :all_day, :rrule)
       end
 
       def recurrence_scope

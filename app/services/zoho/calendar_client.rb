@@ -151,6 +151,9 @@ module Zoho
         }
       end
       payload[:isallday] = true if attrs[:all_day]
+      # Zoho carries the recurrence as a bare RRULE string (mirrors normalize_event
+      # reading e["rrule"]). ⚠️ Unverified against a live Zoho grant.
+      payload[:rrule] = attrs[:rrule] if attrs[:rrule].present?
       payload
     end
 

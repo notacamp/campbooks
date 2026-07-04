@@ -28,26 +28,35 @@ class CalendarController < ApplicationController
 
     # Only calendars that are syncing render (off means off — matching the
     # sidebar checkboxes), minus the ones this user personally hid.
-    scope = CalendarEvent.accessible_to(Current.user).visible
-                         .where(calendars: { syncing: true })
-                         .order(:start_at)
-                         .includes(:event_type, calendar: :calendar_account)
+    base = CalendarEvent.accessible_to(Current.user).visible
+                        .where(calendars: { syncing: true })
+                        .includes(:event_type, calendar: :calendar_account)
     hidden_ids = Array(Current.user.hidden_calendar_ids)
-    scope = scope.where.not(calendar_id: hidden_ids) if hidden_ids.any?
+    base = base.where.not(calendar_id: hidden_ids) if hidden_ids.any?
 
-    # Agenda lists your next events from the anchor date forward (no hard window),
-    # so it never reads "nothing coming up" when your next event is just past the
-    # month edge. Week/Month query their exact grid range.
+    # Concrete rows (plain events + provider-materialized instances) render as-is;
+    # series masters (an app-created or Zoho series held as one row with an rrule)
+    # are expanded into occurrences below. Agenda lists your next events from the
+    # anchor forward (no hard window) so it never reads "nothing coming up" when
+    # your next event is just past the month edge; week/month query their range.
+    concrete = base.concrete.order(:start_at)
     @events = if @view == "agenda"
       # Upcoming = from the anchor forward, minus timed events that already ended,
       # so the list never shows things that are over. All-day events stay.
-      scope.where(start_at: @date.beginning_of_day..)
-           .where("COALESCE(calendar_events.end_at, calendar_events.start_at) >= :now OR calendar_events.all_day = :all_day",
-                  now: Time.current, all_day: true)
-           .limit(AGENDA_LIMIT)
+      concrete.where(start_at: @date.beginning_of_day..)
+              .where("COALESCE(calendar_events.end_at, calendar_events.start_at) >= :now OR calendar_events.all_day = :all_day",
+                     now: Time.current, all_day: true)
+              .limit(AGENDA_LIMIT)
     else
-      scope.in_range(@range.begin, @range.end)
+      concrete.in_range(@range.begin, @range.end)
     end
+
+    # Fold each recurring series' occurrences into the window, letting a real synced
+    # instance win over a locally-expanded ghost of the same slot.
+    merged = Calendars::OccurrenceExpander.new(
+      concrete: @events, masters: base.series_masters, from: @range.begin, to: @range.end
+    ).events
+    @events = @view == "agenda" ? merged.first(AGENDA_LIMIT) : merged
 
     # Pending reminders ride alongside events as distinct "suggestion" chips. Only
     # unconfirmed ones (confirmed reminders already exist as real CalendarEvents).

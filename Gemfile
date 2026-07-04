@@ -104,6 +104,11 @@ gem "liquid"
 # VTIMEZONE-aware via the tzinfo dependency Rails already carries.
 gem "icalendar"
 
+# Recurrence rules (RFC 5545 RRULE): parse, build, and expand occurrences.
+# Shared by recurring calendar events (the RRULE we round-trip with
+# Google/Zoho) and recurring tasks. See Recurrence (app/models/recurrence.rb).
+gem "ice_cube", "~> 0.17"
+
 # JSON Schema validation (Draft 2020-12) — validates per-workspace entitlement
 # overrides against the schema composed from the plan-feature catalog
 # (config/plans.yml). See app/services/entitlements/.

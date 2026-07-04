@@ -26,7 +26,7 @@ module Api
           conference_url: @event.conference_url,
           html_link: @event.html_link,
           is_organizer: @event.is_organizer,
-          recurring: @event.rrule.present?,
+          recurring: @event.recurring?,
           source_email_message_id: @event.source_email_message_id,
           created_at: @event.created_at.iso8601
         }

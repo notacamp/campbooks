@@ -21,6 +21,7 @@ module Campbooks
                 "truncate text-sm font-medium",
                 done_or_cancelled? ? "text-muted-foreground line-through" : "text-foreground"
               )) { @task.title }
+              render Campbooks::RecurrenceIcon.new if @task.recurring?
               priority_flag if @task.priority_high? || @task.priority_urgent?
             end
             div(class: "mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground") do

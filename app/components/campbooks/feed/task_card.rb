@@ -52,6 +52,10 @@ module Campbooks
             span(class: "text-muted-foreground/50") { "·" }
             span(class: class_names("font-medium", subject.overdue? ? "text-red-600" : "text-muted-foreground")) { due_text }
           end
+          if subject.recurring?
+            span(class: "text-muted-foreground/50") { "·" }
+            render Campbooks::RecurrenceIcon.new(css: "w-3 h-3 text-muted-foreground shrink-0")
+          end
         end
         a(href: helpers.task_path(subject),
           class: "mt-1 block truncate text-sm font-semibold leading-snug text-foreground hover:underline") { subject.title }
