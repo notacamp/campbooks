@@ -16,6 +16,14 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The month calendar's day cells are calmer to use.** Adding an event is now an
+  explicit "+" that fades in when you hover a day (and stays visible on touch), so
+  a stray click on a day no longer starts a new event. Days holding more events
+  than fit show a "+N more" — click it, or tap the row of dots on a phone, to pop
+  open the whole day's list.
+
 ## [0.10.0] - 2026-07-04
 
 ### Added
