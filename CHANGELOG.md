@@ -16,6 +16,17 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The month calendar's day cells are calmer to use.** Adding an event is now an
+  explicit "+" that fades in when you hover a day (and stays visible on touch), so
+  a stray click on a day no longer starts a new event. Days holding more events
+  than fit show a "+N more" — click it, or tap the row of dots on a phone, to pop
+  open the whole day's list.
+- The inbox search bar now stretches across the whole top band, meeting the
+  Compose button instead of stopping short and leaving a dead gap on wide
+  screens.
+
 ### Fixed
 
 - **The Skim rings are back.** In 0.10.0 the skim tray on the home feed and
@@ -26,14 +37,6 @@ major, minor, or patch change here.
   silently missing before, so Skim's ring placement matches regular triage —
   and the Gmail hint degrades gracefully instead of erroring if a narrow query
   ever starves it again.
-
-### Changed
-
-- **The month calendar's day cells are calmer to use.** Adding an event is now an
-  explicit "+" that fades in when you hover a day (and stays visible on touch), so
-  a stray click on a day no longer starts a new event. Days holding more events
-  than fit show a "+N more" — click it, or tap the row of dots on a phone, to pop
-  open the whole day's list.
 
 ## [0.10.0] - 2026-07-04
 
