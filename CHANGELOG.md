@@ -18,6 +18,7 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Broader daily digest.** The "waiting on replies" email has been expanded into a unified "needs attention" digest. One daily email now groups three sections — follow-ups you're still waiting on, reminders that are due soon or overdue, and tasks that are overdue or high-priority — with empty sections omitted automatically. The preference toggle in Settings → Notifications gates all three sections. (#177)
 - **Feed cards open the email right there.** Cards that ask you to decide
   something — needs-attention mail, reply nudges, follow-ups, starred senders,
   and reminders or suggested tasks that came from an email — now carry a small
