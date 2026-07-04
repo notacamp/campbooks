@@ -18,9 +18,16 @@ module Emails
     # sits well under this, so it does not reintroduce the perma-cap behaviour.
     MAX = 500
 
+    # Everything the tray/cards render PLUS every column Emails::Categorizer
+    # reads — SkimBuilder re-runs the rules categorizer live on these partial
+    # records, so starving it of a column raises MissingAttributeError (bit us
+    # in v0.10.0: the provider-hint rung reads provider_labels). The bulk-header
+    # trio rides along for the same reason: without it Skim's live verdicts
+    # silently ignore the list/auto-submitted signals process-time triage sees.
     SELECT = %i[
       id from_address subject summary ai_summary received_at email_account_id provider_folder_id
       read ai_priority category email_thread_id pinned_at skimmed_at contact_id
+      provider_labels header_list_unsubscribe header_precedence header_auto_submitted
     ].freeze
 
     def self.for(user)
@@ -40,7 +47,7 @@ module Emails
 
       scope
         .where("email_messages.received_at >= :since OR email_messages.pinned_at IS NOT NULL", since: WINDOW.ago)
-        .includes(:contact)
+        .includes(:contact, :tags)
         .select(*SELECT)
         .order(received_at: :desc)
         .limit(MAX)
