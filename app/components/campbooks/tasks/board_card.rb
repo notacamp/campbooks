@@ -17,7 +17,10 @@ module Campbooks
           draggable: "true",
           data: { tasks_board_target: "card", task_id: @task.id, move_url: helpers.move_task_path(@task) }
         ) do
-          span(class: "block truncate text-[13px] font-medium text-foreground") { @task.title }
+          div(class: "flex items-center gap-1.5") do
+            span(class: "block truncate text-[13px] font-medium text-foreground") { @task.title }
+            render Campbooks::RecurrenceIcon.new(css: "w-3 h-3 text-gray-400 shrink-0") if @task.recurring?
+          end
 
           if @task.due_at || @task.priority_high? || @task.priority_urgent?
             div(class: "mt-1.5 flex items-center gap-2 text-[11px]") do

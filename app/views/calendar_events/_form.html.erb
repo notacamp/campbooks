@@ -74,7 +74,13 @@
     <%= f.text_area :description, rows: 3, class: field_classes %>
   </div>
 
-  <% if @event.persisted? && @event.recurring? %>
+  <%# The "Repeat" picker creates/edits a series. A provider-materialized instance
+      is governed by its series, so it gets the this/all scope selector below instead. %>
+  <% unless @event.series_instance? %>
+    <%= render Campbooks::RecurrencePicker.new(name: "calendar_event[rrule]", selected: @event.rrule) %>
+  <% end %>
+
+  <% if @event.persisted? && @event.series_instance? %>
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".recurrence_label") %></label>
       <select name="recurrence_scope" class="<%= field_classes %>">

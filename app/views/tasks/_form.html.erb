@@ -35,6 +35,8 @@
           selected: @task.status == "suggested" ? "todo" : @task.status) %>
   </div>
 
+  <%= render Campbooks::RecurrencePicker.new(name: "task[rrule]", selected: @task.rrule) %>
+
   <fieldset>
     <legend class="mb-1.5 text-sm font-medium text-foreground"><%= t("components.tasks.form.labels_label") %></legend>
     <% if @labels.any? %>

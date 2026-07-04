@@ -210,8 +210,9 @@ module Campbooks
         color = event.display_color
         # Writable events become drag targets (cross-day reschedule) in the grid;
         # read-only events — and every chip inside the popover — stay plain links,
-        # matching DayGrid/WeekTimeGrid.
-        drag = draggable && event.calendar.is_writable
+        # matching DayGrid/WeekTimeGrid. A ghost occurrence isn't a real row —
+        # dragging it would move the whole series' anchor — so it never drags.
+        drag = draggable && event.calendar.is_writable && !event.occurrence_ghost?
         drag_data = drag ? {
           "calendar-month-dnd-target": "event",
           "event-id": event.id,

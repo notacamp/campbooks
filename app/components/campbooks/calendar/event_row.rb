@@ -28,7 +28,7 @@ module Campbooks
             end
           end
           countdown
-          raw(safe(recurring_icon)) if @event.recurring?
+          render Campbooks::RecurrenceIcon.new(css: "w-3.5 h-3.5 text-gray-300 shrink-0") if @event.recurring?
         end
       end
 
@@ -52,10 +52,6 @@ module Campbooks
 
       def subtitle
         @event.location.presence || (@event.conference_url.present? ? t(".video_call") : nil)
-      end
-
-      def recurring_icon
-        '<svg class="w-3.5 h-3.5 text-gray-300 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 014-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 01-4 4H3"/></svg>'
       end
     end
   end

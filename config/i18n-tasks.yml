@@ -35,6 +35,7 @@ ignore_unused:
   - 'time.*'
   - 'helpers.*'
   - 'components.*'          # Phlex t() uses a custom components.<name> scope
+  - 'recurrence.*'          # shared recurrence labels resolved dynamically (recurrence.presets.<key>) + in Campbooks::RecurrencePicker (components/* excluded from scan)
   - 'contacts.skim.*'       # skim deck copy; `emails` is rendered by Campbooks::ContactSkimCard (components/* excluded from scan)
   - 'events.*'              # activity-feed labels: resolved dynamically (events.names.<key>) and in Campbooks::Activity::EventRow (components/* excluded from scan)
 
