@@ -34,6 +34,12 @@ major, minor, or patch change here.
   it, Campbooks lines up the next one — carrying the title, priority, labels, and
   assignees forward — so recurring chores never fall off your list.
 
+### Fixed
+
+- **The mobile bottom nav hides itself while you scroll down** and glides back
+  the moment you scroll up — reclaiming screen space during reading without
+  making navigation hard to reach.
+
 ### Changed
 
 - **The home feed now ranks by priority, not by section.** Every card gets one
