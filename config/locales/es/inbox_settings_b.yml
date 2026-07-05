@@ -30,19 +30,6 @@ es:
         subtitle: Qué documentos busca Scout y los datos que extrae.
       update:
         success: Tipo de documento actualizado.
-    external_labels:
-      index:
-        account_label: Cuenta
-        color_label: Color
-        heading: Etiquetas
-        new_label_label: Nueva etiqueta
-        new_label_placeholder: Nombre de la etiqueta
-        no_accounts: Aún no hay cuentas de correo conectadas.
-        subtitle: Etiquetas del proveedor sincronizadas con su buzón.
-        sync: Sincronizar
-      labels:
-        delete_confirm: "¿Eliminar esta etiqueta de su buzón?"
-        empty: Aún no hay etiquetas. Sincronice desde su proveedor o añada una arriba.
     signatures:
       form:
         assign_accounts_heading: Asignar a cuentas

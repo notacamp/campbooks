@@ -410,10 +410,6 @@ Rails.application.routes.draw do
       member { post :set_default }
     end
 
-    resources :external_labels, only: [ :index, :create, :update, :destroy ] do
-      collection { post :sync }
-    end
-
     get  "accounts", to: "accounts#show", as: :accounts
     post "accounts/scan", to: "accounts#scan_now", as: :accounts_scan
   end
@@ -544,8 +540,6 @@ Rails.application.routes.draw do
       end
     end
     resources :tags, only: [ :create, :destroy ], controller: "email_message_tags"
-    resources :labels, only: [ :create, :destroy ], controller: "email_message_zoho_labels"
-    resources :zoho_labels, only: [ :create, :destroy ], controller: "email_message_zoho_labels"
   end
 
   # Calendar — agenda + month/week views over synced events, with two-way event
