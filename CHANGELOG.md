@@ -20,10 +20,10 @@ major, minor, or patch change here.
 
 - **Inbox settings, now in the dashboard.** Everything from the inbox's gear
   menu — tags, document types, filtering, smart groups, labels, signatures,
-  connected accounts, and display preferences — is now also reachable from
-  **Settings → Inbox**, gathered into one focused page. The gear menu still
-  works; this just gives the same controls a permanent home alongside your
-  other settings.
+  connected accounts, and display preferences — is now also reachable from the
+  settings sidebar, under a new **Inbox** group with a page per panel. The gear
+  menu still works; this just gives the same controls a permanent home alongside
+  your other settings.
 - **Search like you already know how.** The inbox search bar now understands
   Gmail-style modifiers — `from:`, `to:`, `subject:`, `has:attachment`,
   `is:unread/read/pinned`, `before:`/`after:`, `tag:`, `folder:`, `category:`,

@@ -4,6 +4,7 @@ es:
     settings:
       groups:
         ai_and_automation: IA y automatización
+        inbox: Bandeja de entrada
         workspace: Espacio de trabajo
         your_account: Su cuenta
       items:
@@ -13,7 +14,6 @@ es:
         document_templates: Plantillas de documentos
         email_templates: Plantillas de correo
         general: General
-        inbox: Recibidos
         integrations: Integraciones
         members: Miembros
         notifications: Notificaciones

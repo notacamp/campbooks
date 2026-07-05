@@ -107,7 +107,6 @@ module NavigationHelper
     [
       [ t("navigation.settings.groups.workspace"), [
         [ settings_root_path, %w[general], t("navigation.settings.items.general"), "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" ],
-        [ settings_inbox_path, %w[inbox], t("navigation.settings.items.inbox"), "M2.25 13.5h3.86a2.25 2.25 0 012.012 1.244l.256.512a2.25 2.25 0 002.013 1.244h3.218a2.25 2.25 0 002.013-1.244l.256-.512a2.25 2.25 0 012.013-1.244h3.859m-19.5.338V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 00-2.15-1.588H6.911a2.25 2.25 0 00-2.15 1.588L2.35 13.177a2.25 2.25 0 00-.1.661z" ],
         [ settings_plan_path, %w[plan], t("navigation.settings.items.plan"), "M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 18.75z" ],
         [ settings_members_path, %w[members], t("navigation.settings.items.members"), "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" ],
         [ settings_integrations_root_path, %w[integrations notion google_drive zoho_drive calendars], t("navigation.settings.items.integrations"), "M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" ],
@@ -116,6 +115,7 @@ module NavigationHelper
         (hotwire_native_app? ? nil : [ settings_api_clients_path, %w[api_clients], t("navigation.settings.items.api_access"), "M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" ]),
         [ settings_data_privacy_path, %w[data_privacy], t("navigation.settings.items.data_privacy"), "M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" ]
       ].compact ],
+      inbox_settings_nav_group,
       [ t("navigation.settings.groups.ai_and_automation"), [
         [ settings_pipelines_path, %w[pipelines], t("navigation.settings.items.pipelines"), "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" ],
         [ settings_document_templates_path, %w[document_templates], t("navigation.settings.items.document_templates"), "M4.5 3.75h15a2.25 2.25 0 012.25 2.25v10.5A2.25 2.25 0 0119.5 18.75h-15a2.25 2.25 0 01-2.25-2.25V6A2.25 2.25 0 014.5 3.75z" ],
@@ -129,6 +129,20 @@ module NavigationHelper
         [ settings_notifications_path, %w[notifications], t("navigation.settings.items.notifications"), "M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" ]
       ] ]
     ]
+  end
+
+  # The "Inbox" settings group: one sidebar item per inbox-settings panel, sourced
+  # from the shared InboxSettings::Sections catalog so it stays in lockstep with the
+  # inbox gear-icon modal. Each item is [path, active_keys, label, icon_path]; the
+  # active key is "inbox_<section>" (set by Settings::InboxController#current_section).
+  def inbox_settings_nav_group
+    items = InboxSettings::Sections::ALL.map do |section|
+      [ settings_inbox_section_path(section[:key]),
+        [ "inbox_#{section[:key]}" ],
+        t(InboxSettings::Sections.label_key(section[:key])),
+        InboxSettings::Sections::ICON_PATHS[section[:icon]] ]
+    end
+    [ t("navigation.settings.groups.inbox"), items ]
   end
 
   # Renders the section nav for the current area, or nothing when the current

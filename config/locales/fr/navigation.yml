@@ -4,6 +4,7 @@ fr:
     settings:
       groups:
         ai_and_automation: IA & automatisation
+        inbox: Boîte de réception
         workspace: Espace de travail
         your_account: Votre compte
       items:
@@ -13,7 +14,6 @@ fr:
         document_templates: Modèles de documents
         email_templates: Modèles d'e-mail
         general: Général
-        inbox: Boîte de réception
         integrations: Intégrations
         members: Membres
         notifications: Notifications

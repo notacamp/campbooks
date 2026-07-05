@@ -4,6 +4,7 @@ en:
     settings:
       groups:
         ai_and_automation: AI & automation
+        inbox: Inbox
         workspace: Workspace
         your_account: Your account
       items:
@@ -13,7 +14,6 @@ en:
         document_templates: Document templates
         email_templates: Email templates
         general: General
-        inbox: Inbox
         integrations: Integrations
         members: Members
         notifications: Notifications
