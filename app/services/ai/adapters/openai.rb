@@ -30,6 +30,12 @@ module Ai
       # trace via reasoning_content and needs max_completion_tokens, no temperature).
       REASONING_MODELS = %w[reasoner o1 o3 o4-mini gpt-5].freeze
 
+      # DeepSeek reuses this adapter pointed at api.deepseek.com. Report the
+      # correct service key so the health dashboard distinguishes the two.
+      def system_health_service
+        @endpoint_url.to_s.include?("deepseek") ? "ai_deepseek" : super
+      end
+
       def supports_tools? = true
 
       def supports_thinking?(model)

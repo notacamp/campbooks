@@ -17,7 +17,8 @@ fr:
         integrations: Intégrations
         members: Membres
         notifications: Notifications
-        security: Sécurité
+        security: "Sécurité"
+        system_health: "Santé du système"
   statuses:
     approved: Approuvé
     completed: Terminé

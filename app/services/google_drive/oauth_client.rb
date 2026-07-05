@@ -90,6 +90,7 @@ module GoogleDrive
 
     def connection
       @connection ||= Faraday.new do |f|
+        f.use SystemHealth::FaradayMiddleware, service: "google_drive_oauth"
         f.request :url_encoded
         f.response :raise_error
         # Bound the token-refresh call (see Google::OauthClient#connection).

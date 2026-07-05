@@ -1,0 +1,92 @@
+---
+es:
+  settings:
+    system_health:
+      show:
+        call_log_heading: "Registro de llamadas"
+        empty_description: "Las llamadas aparecen aquí a medida que los buzones, calendarios, IA e integraciones de su espacio de trabajo funcionan."
+        empty_title: "Aún no hay llamadas externas"
+        last_24_hours: "Últimas 24 horas"
+        not_allowed: Solo los administradores del espacio de trabajo pueden ver la salud del sistema.
+        services_heading: "Servicios"
+        stat_calls: "Llamadas (24h)"
+        stat_errors: "Errores (24h)"
+        stat_issues: "Servicios con problemas"
+        subtitle: "Las conexiones de su espacio de trabajo con proveedores de correo, calendarios, IA e integraciones."
+        title: "Salud del sistema"
+  admin:
+    system_health:
+      calls:
+        no_matches: Ninguna llamada coincidió con sus filtros.
+      show:
+        call_log_heading: Registro de llamadas
+        empty_description: Las llamadas a proveedores de correo, calendarios, modelos de IA e integraciones aparecen aquí mientras Campbooks trabaja. Puede desactivar el registro configurando la variable de entorno DISABLE_SYSTEM_HEALTH.
+        empty_title: Aún no se han registrado llamadas externas
+        filter_all_services: Todos los servicios
+        filter_all_statuses: Todos los estados
+        filter_error: Solo errores
+        filter_success: Solo exitosas
+        idle_services: "Sin actividad en las últimas 24 horas: %{services}."
+        last_24_hours: Últimas 24 horas
+        services_heading: Servicios
+        stat_calls: Llamadas (24h)
+        stat_errors: Errores (24h)
+        stat_issues: Servicios con problemas
+        subtitle: Todas las llamadas que Campbooks realiza a servicios externos, con errores y tiempos de respuesta.
+        title: Salud del sistema
+        window_24h: Últimas 24 horas
+        window_30d: Últimos 30 días
+        window_7d: Últimos 7 días
+  components:
+    sparkline: {}
+    system_health:
+      call_row:
+        no_operation: "(sin operación)"
+      service_card:
+        avg_duration: promedio %{ms} ms
+        bucket_calls:
+          one: 1 llamada
+          other: "%{count} llamadas"
+        bucket_errors:
+          one: 1 error
+          other: "%{count} errores"
+        bucket_label: "%{time} · %{calls}, %{errors}"
+        calls:
+          one: "%{formatted} llamada"
+          other: "%{formatted} llamadas"
+        error_rate: "%{rate}% errores"
+        last_error_ago: Último error hace %{time}
+        sparkline_label: "Actividad en las últimas 24 horas: %{total} llamadas, %{errors} errores"
+        state:
+          degraded: Degradado
+          failing: Con fallos
+          healthy: Operativo
+          idle: Inactivo
+  system_health:
+    services:
+      ai_anthropic: Anthropic
+      ai_deepseek: DeepSeek
+      ai_gemini: Gemini
+      ai_mistral: Mistral
+      ai_openai: OpenAI
+      connection: Conexiones
+      discord: Discord
+      github: GitHub
+      google_calendar: Google Calendar
+      google_drive: Google Drive
+      google_drive_oauth: Tokens de Google Drive
+      google_mail: Google Mail
+      google_oauth: Autenticación y tokens de Google
+      microsoft_mail: Microsoft Mail
+      microsoft_oauth: Autenticación y tokens de Microsoft
+      notion: Notion
+      notion_oauth: OAuth de Notion
+      push_apns: Apple Push
+      push_fcm: Google Push (FCM)
+      slack: Slack
+      smtp: Correo transaccional (SMTP)
+      webhook: Webhooks
+      zoho_calendar: Zoho Calendar
+      zoho_drive: Zoho Drive
+      zoho_mail: Zoho Mail
+      zoho_oauth: Autenticación y tokens de Zoho

@@ -18,6 +18,7 @@ es:
         members: Miembros
         notifications: Notificaciones
         security: Seguridad
+        system_health: "Salud del sistema"
   statuses:
     approved: Aprobado
     completed: Completado
