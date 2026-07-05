@@ -115,6 +115,7 @@ module NavigationHelper
         (hotwire_native_app? ? nil : [ settings_api_clients_path, %w[api_clients], t("navigation.settings.items.api_access"), "M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" ]),
         [ settings_data_privacy_path, %w[data_privacy], t("navigation.settings.items.data_privacy"), "M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" ]
       ].compact ],
+      inbox_settings_nav_group,
       [ t("navigation.settings.groups.ai_and_automation"), [
         [ settings_pipelines_path, %w[pipelines], t("navigation.settings.items.pipelines"), "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" ],
         # Document + email templates are readiness-gated (Features.*): their
@@ -132,6 +133,20 @@ module NavigationHelper
         [ settings_notifications_path, %w[notifications], t("navigation.settings.items.notifications"), "M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" ]
       ] ]
     ]
+  end
+
+  # The "Inbox" settings group: one sidebar item per inbox-settings panel, sourced
+  # from the shared InboxSettings::Sections catalog so it stays in lockstep with the
+  # inbox gear-icon modal. Each item is [path, active_keys, label, icon_path]; the
+  # active key is "inbox_<section>" (set by Settings::InboxController#current_section).
+  def inbox_settings_nav_group
+    items = InboxSettings::Sections::ALL.map do |section|
+      [ settings_inbox_section_path(section[:key]),
+        [ "inbox_#{section[:key]}" ],
+        t(InboxSettings::Sections.label_key(section[:key])),
+        InboxSettings::Sections::ICON_PATHS[section[:icon]] ]
+    end
+    [ t("navigation.settings.groups.inbox"), items ]
   end
 
   # Renders the section nav for the current area, or nothing when the current

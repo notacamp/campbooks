@@ -1,0 +1,18 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+
+<%# Reuses the matching InboxSettings::* panel — the same one the inbox gear-icon
+    modal shows — via the shared inbox_settings_panel Turbo Frame, so no panel logic
+    is duplicated. Each panel carries its own header (title + actions), so there's no
+    separate PageHeader here. Wrapped in the inbox-settings-modal Stimulus controller
+    so the Display panel's localStorage toggles work on this page too; it no-ops for
+    the other panels. %>
+<div class="bg-card rounded-xl shadow-sm border border-border overflow-hidden"
+     data-controller="inbox-settings-modal">
+  <%= turbo_frame_tag "inbox_settings_panel",
+        src: public_send(@section[:path]),
+        data: { inbox_settings_modal_target: "panel" } do %>
+    <div class="flex items-center justify-center py-24 text-sm text-muted-foreground">
+      <%= t("shared.actions.loading") %>
+    </div>
+  <% end %>
+</div>
