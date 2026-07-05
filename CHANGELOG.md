@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-07-05
+
 ### Added
 
 - **API: tags now report `kind`, `hidden`, and `email_count`,** and `GET /tags`
