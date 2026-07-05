@@ -86,10 +86,11 @@ Doorkeeper.configure do
   # scope, so the safe default is "denied" (Api::V1::BaseController surfaces a
   # clear hint). Keep in sync with Api::Scopes (guarded by a spec).
   optional_scopes :"emails:read", :"emails:write", :"emails:send",
+                  :"email_accounts:read", :"email_accounts:write",
                   :"documents:read", :"documents:write",
                   :"contacts:read", :"contacts:write",
                   :"tags:read", :"tags:write",
-                  :"document_types:read",
+                  :"document_types:read", :"document_types:write",
                   :"workflows:read", :"workflows:trigger",
                   :"scout:read", :"scout:write",
                   :"scheduled_emails:read", :"scheduled_emails:write",

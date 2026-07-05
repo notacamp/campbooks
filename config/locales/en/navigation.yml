@@ -4,6 +4,7 @@ en:
     settings:
       groups:
         ai_and_automation: AI & automation
+        inbox: Inbox
         workspace: Workspace
         your_account: Your account
       items:

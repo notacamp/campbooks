@@ -9,20 +9,23 @@ module Api
   module Scopes
     # scope name (String) => short, human-readable description
     CATALOG = {
-      "emails:read"     => "Read email messages, threads, and folders",
-      "emails:write"    => "Mark emails read/unread",
-      "emails:send"     => "Compose, send, and reply to email",
-      "documents:read"  => "List and download documents",
-      "documents:write" => "Upload, update, approve, reject, and reclassify documents",
-      "contacts:read"   => "Read contacts",
-      "contacts:write"  => "Update contacts and change their state (star, block, allow)",
-      "tags:read"       => "List tags",
-      "tags:write"      => "Add and remove tags on emails",
-      "document_types:read" => "List document types",
-      "workflows:read"     => "List workflows and their run history",
-      "workflows:trigger"  => "Trigger a workflow",
-      "scout:read"         => "Read Scout chat threads and messages",
-      "scout:write"        => "Create Scout threads and send messages",
+      "emails:read"          => "Read email messages, threads, and folders",
+      "emails:write"         => "Mark emails read/unread",
+      "emails:send"          => "Compose, send, and reply to email",
+      "email_accounts:read"  => "List connected email accounts",
+      "email_accounts:write" => "Connect an email account (upload an OAuth refresh token)",
+      "documents:read"       => "List and download documents",
+      "documents:write"      => "Upload, update, approve, reject, and reclassify documents",
+      "contacts:read"        => "Read contacts",
+      "contacts:write"       => "Update contacts and change their state (star, block, allow)",
+      "tags:read"            => "List tags",
+      "tags:write"           => "Create tags and add or remove them on emails",
+      "document_types:read"  => "List document types",
+      "document_types:write" => "Create document types",
+      "workflows:read"       => "List workflows and their run history",
+      "workflows:trigger"    => "Trigger a workflow",
+      "scout:read"           => "Read Scout chat threads and messages",
+      "scout:write"          => "Create Scout threads and send messages",
       "scheduled_emails:read"  => "List and read scheduled emails",
       "scheduled_emails:write" => "Schedule, update, and cancel emails",
       "calendar:read"          => "Read calendar events",
@@ -32,7 +35,7 @@ module Api
       "tasks:read"             => "List and read tasks",
       "tasks:write"            => "Create, update, and complete tasks",
       "folders:read"           => "List folders and their contents",
-      "folders:write"          => "File and unfile documents in folders",
+      "folders:write"          => "Create folders and file or unfile documents",
       "templates:read"         => "List email templates",
       "templates:write"        => "Create, update, and delete email templates"
     }.freeze
@@ -42,6 +45,17 @@ module Api
     # All enabled scope names, as strings.
     def all
       CATALOG.keys
+    end
+
+    # Scope names grouped by resource family ("emails:read" → "emails"), in
+    # catalog order. The scope picker renders one group per family.
+    def families
+      CATALOG.keys.group_by { |key| key.split(":").first }
+    end
+
+    # The scope family of a single scope name.
+    def family_of(scope)
+      scope.to_s.split(":").first
     end
 
     def description(scope)

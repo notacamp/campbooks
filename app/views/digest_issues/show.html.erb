@@ -1,0 +1,16 @@
+<div class="mb-4">
+  <%= link_to digest_path(@digest),
+      class: "inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground" do %>
+    <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M19 12H5M12 5l-7 7 7 7"/>
+    </svg>
+    <%= t("digests.issues.back") %>
+  <% end %>
+</div>
+
+<%= render Campbooks::PageHeader.new(
+  title: @digest.name,
+  subtitle: t("digests.issues.show.subtitle", date: l(@issue.created_at, format: :long))
+) %>
+
+<%= render Campbooks::Digests::IssueContent.new(issue: @issue) %>

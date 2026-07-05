@@ -132,6 +132,13 @@ Rails.application.routes.draw do
     end
   end
 
+  # Scheduled digests — user-owned, workspace-scoped, multi-source + optional AI.
+  # ScheduledDigest.model_name = "Digest" so helpers resolve as digest_*/digests_*.
+  resources :digests do
+    member { post :run_now }
+    resources :issues, only: :show, controller: "digest_issues"
+  end
+
   # Global search (Cmd+K command palette)
   get "search", to: "search#index"
 
@@ -274,6 +281,12 @@ Rails.application.routes.draw do
   namespace :settings do
     root to: "general#show"
     resource :general, only: [ :show, :update ], controller: "general"
+    # Inbox settings — one dashboard page per inbox-settings panel, grouped under
+    # "Inbox" in the sidebar. Each page embeds the matching InboxSettings::* panel
+    # via the shared inbox_settings_panel Turbo Frame. Bare /settings/inbox
+    # redirects to the first panel; unknown sections 404 in the controller.
+    get "inbox", to: redirect("/settings/inbox/tags"), as: :inbox
+    get "inbox/:section", to: "inbox#show", as: :inbox_section
     resource :plan, only: [ :show ], controller: "plan"
     resource :ai, only: [ :show ], controller: "ai" do
       post :switch_mode

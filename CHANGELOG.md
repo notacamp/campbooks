@@ -30,12 +30,54 @@ major, minor, or patch change here.
   assigning yourself stays silent. `@mentioning` a teammate in a task
   discussion now works like email discussions: they're subscribed to the
   thread and notified.
+- **Scheduled digests.** Build your own recurring briefings: a digest is a saved
+  scope (emails matching a search query, upcoming calendar events, tasks due soon,
+  reminders, recently received documents — mix and match), a schedule (daily,
+  weekly, or monthly at your chosen time), an optional AI summary, and a delivery
+  choice (email and/or a home-feed card). Six presets get you started — Newsletter
+  roundup, Week ahead, Upcoming tasks, Invoice tracker, Client pulse, or fully
+  custom — and every issue is kept, so `/digests` doubles as a browsable archive.
+  With AI enabled, Scout groups the period's items into thematic sections with a
+  short overview and per-item notes (every line links back to the real email,
+  event, task, or document — nothing is invented, and anything the AI doesn't
+  place lands in an "Everything else" section so nothing is hidden). Without AI
+  configured, digests still deliver as clean grouped lists. Per-digest custom AI
+  instructions ride the same guardrails as the workspace AI-prompt system, and a
+  new "Digest generation" entry appears in Settings → AI Prompts. Disabled by
+  default behind `ENABLE_DIGESTS=1` while it hardens; on Campbooks Cloud it is a
+  paid-plan feature.
 - **Mobile folder bottom-sheet.** Tapping "Folders" in the mobile chip bar slides
   up a full-screen sheet with the complete folder list: system folders (Inbox, Sent,
   Drafts, Archive, Spam, Trash) and custom folders with their icons, message counts,
   collapsible nesting, and the rename/move/delete edit affordances that were previously
   desktop-only. The chip bar stays for fast one-tap switching; the sheet is purely
   additive. Custom folders stay live via turbo streams on create/update/delete.
+- **Inbox settings, now in the dashboard.** Everything from the inbox's gear
+  menu — tags, document types, filtering, smart groups, labels, signatures,
+  connected accounts, and display preferences — is now also reachable from the
+  settings sidebar, under a new **Inbox** group with a page per panel. The gear
+  menu still works; this just gives the same controls a permanent home alongside
+  your other settings.
+- **Let your AI agent run your inbox (MCP).** The MCP endpoint at `/api/mcp` grew from a
+  REST mirror into a full agent surface: `get_overview` / `get_setup_status` / `guide`
+  (on-demand knowledge topics so agents stay lean), `search_emails` (semantic + keyword),
+  bulk inbox actions (`update_emails`, `move_emails_to_folder`, `tag_emails`,
+  `forward_email`), Skim triage over MCP (`get_skim_deck` / `skim_decide`, wired into the
+  same learning loop as the UI), task tools, `list_calendars` / `create_event_from_email`,
+  taxonomy creation (`create_tag` / `create_document_type` / `create_folder`), and email
+  account tools — `list_email_accounts` plus `connect_email_account`, which can accept a
+  locally-minted OAuth refresh token for self-hosted setups. Three new scopes:
+  `email_accounts:read`, `email_accounts:write`, `document_types:write`.
+- **MCP keys — agent credentials that don't expire.** `/api/mcp` now also accepts
+  `Bearer <client-id>.<client-secret>` (and HTTP Basic) so agent configs need no token
+  refresh; the Settings → API access reveal page shows a ready-to-copy "MCP key".
+  Rotate the client secret (or delete the client) to revoke. REST tokens are unchanged.
+- **Claude Code plugin.** `/plugin marketplace add notacamp/campbooks` installs the
+  `campbooks` plugin: the MCP server preconfigured (prompts for your server URL and MCP
+  key — self-hosted friendly), a guided `/campbooks:setup` onboarding skill, a
+  `/campbooks:triage` daily-inbox skill, and a local OAuth helper script for connecting
+  mailboxes on self-hosted instances. Config snippets for Cursor, Windsurf, Codex CLI,
+  and Gemini CLI ship in the plugin README.
 - **Search like you already know how.** The inbox search bar now understands
   Gmail-style modifiers — `from:`, `to:`, `subject:`, `has:attachment`,
   `is:unread/read/pinned`, `before:`/`after:`, `tag:`, `folder:`, `category:`,

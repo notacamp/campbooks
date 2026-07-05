@@ -65,6 +65,13 @@ module Features
       flag?("ENABLE_TASKS")
     end
 
+    # User-configured scheduled digests: saved scopes + rrule + optional AI
+    # summarization, delivered by email and/or home feed. Gated until production-
+    # ready; orthogonal to the per-workspace `:digests` billing entitlement.
+    def digests?
+      flag?("ENABLE_DIGESTS")
+    end
+
     private
 
     def flag?(name)

@@ -16,6 +16,9 @@ module Mcp
     DEFAULT_LIMIT = 20
     MAX_LIMIT = 50
 
+    # Default palette used when a caller omits the color for a new tag or document type.
+    DEFAULT_COLORS = %w[#595dec #0584da #00a8a8 #2ea55c #dca81c #e76e08 #de3b3d #d44996 #767988].freeze
+
     # Editable document fields (mirror Api::V1::DocumentsController#document_params).
     DOCUMENT_FIELDS = %w[
       document_type_id vendor_name vendor_nif document_date due_date invoice_number
@@ -36,24 +39,39 @@ module Mcp
     end
 
     # Tools the caller may see: enabled (Features flag on) AND scope granted.
-    # `granted` answers token_has_scope?(scope_string).
+    # `granted` answers token_has_scope?(scope_string). A nil scope means the
+    # tool is available to any authenticated client (the meta tools).
     def visible_to(granted)
-      all.select { |tool| tool.available? && granted.call(tool.scope) }
+      all.select { |tool| tool.available? && (tool.scope.nil? || granted.call(tool.scope)) }
     end
 
     # ---- catalog ----------------------------------------------------------
 
     def definitions
       [
+        # meta (scope: nil — any authenticated client)
+        get_overview, get_setup_status, guide,
         # email
-        list_emails, get_email, send_email, reply_email, mark_email_read, mark_email_unread,
+        list_emails, search_emails, get_email, send_email, reply_email, mark_email_read, mark_email_unread,
         add_email_tag, remove_email_tag,
+        # inbox actions
+        update_emails, move_emails_to_folder, tag_emails, forward_email,
+        # skim
+        get_skim_deck, skim_decide,
+        # accounts
+        list_email_accounts, connect_email_account,
         # documents
         list_documents, get_document, upload_document, update_document,
         approve_document, reject_document, reclassify_document,
         # contacts / tags / document types
         list_contacts, get_contact, update_contact, set_contact_state,
         list_tags, list_document_types,
+        # taxonomy (create)
+        create_tag, create_document_type, create_folder,
+        # tasks (all gated on Features.tasks?)
+        list_tasks, get_task, create_task, update_task, complete_task, create_task_from_email,
+        # calendar helpers
+        list_calendars, create_event_from_email,
         # workflows (flag-gated)
         list_workflows, trigger_workflow, list_workflow_executions,
         # scout
@@ -73,7 +91,179 @@ module Mcp
       ]
     end
 
-    # ---- email ------------------------------------------------------------
+    # ---- meta ----------------------------------------------------------------
+
+    def get_overview
+      build(
+        name: "get_overview",
+        description: "Cheap snapshot of what needs attention. Call this first. " \
+                     "Returns only the sections whose scope the token holds.",
+        scope: nil,
+        input_schema: object_schema(properties: {})
+      ) do |_args|
+        result = { hint: "Use guide(topic) to learn workflows; get_setup_status if something looks unconfigured." }
+
+        if scope_granted?("emails:read")
+          awaiting = Emails::AwaitingReply.new(Current.user)
+          # SkimScope's relation carries a custom SELECT list that breaks COUNT —
+          # strip it (the relation's LIMIT still caps the count at SkimScope::MAX).
+          skim_count = Emails::SkimScope.for(Current.user).except(:select, :includes, :order).count
+          accessible = EmailMessage.accessible_to(Current.user)
+          result[:emails] = {
+            unread_count: accessible.where(read: false).count,
+            pinned_count: accessible.pinned.count,
+            awaiting_reply_count: awaiting.count,
+            skim_pending_count: skim_count
+          }
+        end
+
+        if scope_granted?("documents:read")
+          result[:documents] = {
+            needs_review_count: Current.workspace.documents.needs_review.count,
+            ai_failed_count: Current.workspace.documents.ai_failed_attention.count
+          }
+        end
+
+        if scope_granted?("tasks:read") && Features.tasks? &&
+            Current.workspace.entitlements.feature?(:tasks)
+          tasks = Task.accessible_to(Current.user)
+          result[:tasks] = {
+            active_count: tasks.active.count,
+            suggested_count: tasks.triage.count,
+            due_today_count: tasks.active.where(due_at: Time.current.beginning_of_day..Time.current.end_of_day).count
+          }
+        end
+
+        if scope_granted?("calendar:read")
+          today_events = CalendarEvent.accessible_to(Current.user)
+                                      .where(start_at: Time.current.beginning_of_day..Time.current.end_of_day)
+                                      .order(:start_at)
+          result[:calendar] = {
+            today_count: today_events.count,
+            today: today_events.limit(3).map { |e| { id: e.id, title: e.title, start_at: e.start_at&.iso8601 } }
+          }
+        end
+
+        if scope_granted?("reminders:read")
+          reminders = Reminder.accessible_to(Current.user)
+          next_due = reminders.pending.order(:due_at).limit(3)
+          result[:reminders] = {
+            pending_count: reminders.pending.count,
+            overdue_count: reminders.overdue.count,
+            next: next_due.map { |r| { id: r.id, title: r.title, due_at: r.due_at&.iso8601, reminder_type: r.reminder_type } }
+          }
+        end
+
+        result
+      end
+    end
+
+    def get_setup_status
+      build(
+        name: "get_setup_status",
+        description: "Workspace setup snapshot for onboarding and diagnostics. " \
+                     "Lists gaps as next_steps to guide the setup flow.",
+        scope: nil,
+        input_schema: object_schema(properties: {})
+      ) do |_args|
+        resolver = Current.workspace.entitlements
+        accounts = Current.workspace.email_accounts.active.to_a
+
+        detail_rows = if scope_granted?("email_accounts:read")
+          accounts.map do |a|
+            { id: a.id, email_address: a.email_address, provider: a.provider,
+              active: a.active?, scanning: a.actively_scanning?,
+              last_scanned_at: a.last_scanned_at&.iso8601 }
+          end
+        end
+
+        email_section = {
+          count: accounts.size,
+          active_count: accounts.count(&:active?),
+          scanning_now: accounts.any?(&:actively_scanning?)
+        }
+        email_section[:details] = detail_rows if detail_rows
+
+        ai_setup = Ai::ProviderSetup.new(Current.workspace)
+        ai_section = {
+          text_configured: ai_setup.configured?(:text),
+          documents_configured: ai_setup.configured?(:documents),
+          managed_available: Ai::Platform.available?,
+          processing_enabled: Current.workspace.ai_processing_enabled?
+        }
+
+        taxonomy = {
+          tags: Current.workspace.tags.count,
+          document_types: Current.workspace.document_types.count,
+          folders: Current.workspace.mail_folders.count
+        }
+
+        feat_keys = %i[workflows tasks email_board microsoft email_templates document_templates]
+        features_hash = feat_keys.each_with_object({}) { |k, h| h[k] = Features.public_send(:"#{k}?") }
+
+        ent_keys = %i[email_accounts tasks email_scheduling email_templates workflows]
+        entitlements_hash = ent_keys.each_with_object({}) do |k, h|
+          h[k.to_s] = resolver.allow?(k).to_s
+        end
+
+        next_steps = []
+        next_steps << "Connect a mailbox via connect_email_account to start receiving email." if accounts.empty?
+        unless ai_setup.configured?(:text)
+          next_steps << "Configure an AI provider in Settings → AI to enable triage and Scout."
+        end
+        if Current.workspace.document_types.none?
+          next_steps << "Create document types (create_document_type) so AI can classify your attachments."
+        end
+        if Current.workspace.tags.none?
+          next_steps << "Create a few tags (create_tag) to label and filter important emails."
+        end
+        if Current.workspace.mail_folders.none?
+          next_steps << "Create folders (create_folder) to organise emails and documents."
+        end
+
+        {
+          workspace: {
+            name: Current.workspace.name,
+            version: Campbooks::VERSION,
+            self_hosted: Rails.application.config.self_hosted
+          },
+          email_accounts: email_section,
+          ai: ai_section,
+          taxonomy: taxonomy,
+          features: features_hash,
+          entitlements: entitlements_hash,
+          next_steps: next_steps.first(5)
+        }
+      end
+    end
+
+    def guide
+      build(
+        name: "guide",
+        description: "Narrative guides for working with Campbooks over MCP. " \
+                     "No topic → list of available topics. With topic → full markdown guide.",
+        scope: nil,
+        input_schema: object_schema(properties: {
+          topic: {
+            type: "string",
+            description: "One of the topic names returned by a topic-less call",
+            enum: Mcp::Guides::TOPICS.map { |t| t[:name] }
+          }
+        })
+      ) do |args|
+        topic = args["topic"].to_s.strip.presence
+        if topic.nil?
+          { topics: Mcp::Guides::TOPICS }
+        else
+          content = Mcp::Guides.load(topic)
+          raise Mcp::ToolError, "Unknown topic: #{topic}. Call guide() with no args for the list." unless content
+
+          { topic: topic, content: content }
+        end
+      end
+    end
+
+    # ---- email ---------------------------------------------------------------
 
     def list_emails
       build(
@@ -93,20 +283,104 @@ module Mcp
           like = "%#{args["query"]}%"
           scope = scope.where("email_messages.subject ILIKE :q OR email_messages.from_address ILIKE :q", q: like)
         end
-        { emails: scope.limit(clamp_limit(args["limit"])).map { |e| Api::V1::EmailSerializer.new(e).as_json } }
+        rows = scope.limit(clamp_limit(args["limit"])).map { |e| Api::V1::EmailSerializer.new(e).as_json }
+        { emails: rows, count: rows.size }
+      end
+    end
+
+    def search_emails
+      build(
+        name: "search_emails",
+        description: "Search emails with filters. Uses semantic + keyword blend when a text query " \
+                     "is given. Prefer this over list_emails when the caller wants to find specific messages.",
+        scope: "emails:read",
+        input_schema: object_schema(
+          properties: {
+            query: { type: "string", description: "Full-text search query (subject, body, sender)" },
+            unread: { type: "boolean" },
+            category: { type: "string", description: "Email category e.g. personal, promotions, updates" },
+            sender: { type: "string", description: "Sender address or name fragment" },
+            date_from: { type: "string", description: "ISO-8601 date; only emails received on or after" },
+            date_to: { type: "string", description: "ISO-8601 date; only emails received before" },
+            has_attachment: { type: "boolean" },
+            limit: limit_property
+          },
+          required: %w[query]
+        )
+      ) do |args|
+        require_arg(args, "query")
+        search_params = { q: args["query"] }.tap do |p|
+          p[:sender]         = args["sender"]    if args["sender"].present?
+          p[:category]       = args["category"]  if args["category"].present?
+          p[:date_from]      = args["date_from"] if args["date_from"].present?
+          p[:date_to]        = args["date_to"]   if args["date_to"].present?
+          p[:has_attachment] = "1"               if args["has_attachment"] == true
+          p[:unread]         = "1"               if args["unread"] == true
+        end
+
+        searcher = Emails::Search.new(user: Current.user, params: search_params)
+        records = if searcher.text_query?
+          # results is a bounded Array (semantic + keyword blend), not a relation.
+          searcher.results.first(clamp_limit(args["limit"]))
+        else
+          searcher.scope.order(received_at: :desc).limit(clamp_limit(args["limit"]))
+        end
+
+        rows = records.map do |email|
+          snippet = email.ai_summary.presence ||
+                    Emails::PlainText.of(email.body.to_s).truncate(200)
+          {
+            id: email.id,
+            subject: email.subject,
+            from: email.from_address,
+            received_at: email.received_at&.iso8601,
+            category: email.category,
+            read: email.read,
+            thread_id: email.email_thread_id,
+            snippet: snippet
+          }
+        end
+
+        { emails: rows, count: rows.size }
       end
     end
 
     def get_email
       build(
         name: "get_email",
-        description: "Fetch a single email by id, including its body.",
+        description: "Fetch a single email by id. format=text (default) returns plain text body, " \
+                     "truncated at 20 000 chars; format=html returns the raw provider HTML. " \
+                     "Also returns linked document/task/tag ids.",
         scope: "emails:read",
-        input_schema: id_schema("The email id")
+        input_schema: object_schema(
+          properties: {
+            id: { type: "string", description: "The email id" },
+            format: { type: "string", enum: %w[text html], description: "Body format (default: text)" }
+          },
+          required: [ "id" ]
+        )
       ) do |args|
         require_arg(args, "id")
         email = EmailMessage.accessible_to(Current.user).find(args["id"])
-        { email: Api::V1::EmailSerializer.new(email, detail: true).as_json }
+        data = Api::V1::EmailSerializer.new(email, detail: true).as_json
+
+        if args["format"] == "html"
+          # keep raw body as-is
+        else
+          plain = Emails::PlainText.of(email.body.to_s, strip_quotes: false)
+          truncated = plain.length > 20_000
+          data[:body] = plain.first(20_000)
+          data[:body_truncated] = truncated
+        end
+
+        linked = {
+          document_ids: email.documents.ids,
+          tag_names: email.tag_names
+        }
+        linked[:task_ids] = email.linked_tasks.ids if Features.tasks?
+        data[:linked] = linked
+
+        { email: data }
       end
     end
 
@@ -117,7 +391,7 @@ module Mcp
         scope: "emails:send",
         input_schema: object_schema(
           properties: {
-            email_account_id: { type: "integer", description: "Id of the sending account (must be one the caller may send from)" },
+            email_account_id: { type: "string", description: "Id of the sending account (must be one the caller may send from)" },
             to_address: { type: "string", description: "Recipient address(es), comma-separated" },
             subject: { type: "string" },
             body: { type: "string", description: "HTML or plain-text body" },
@@ -147,12 +421,12 @@ module Mcp
         scope: "emails:send",
         input_schema: object_schema(
           properties: {
-            id: { type: "integer", description: "The email to reply to" },
+            id: { type: "string", description: "The email to reply to" },
             body: { type: "string" },
             to_address: { type: "string", description: "Override recipient (defaults to the original sender)" },
             cc_address: { type: "string" },
             bcc_address: { type: "string" },
-            email_account_id: { type: "integer", description: "Override sending account" }
+            email_account_id: { type: "string", description: "Override sending account" }
           },
           required: [ "id", "body" ]
         )
@@ -207,8 +481,8 @@ module Mcp
         scope: "tags:write",
         input_schema: object_schema(
           properties: {
-            email_id: { type: "integer" },
-            tag_id: { type: "integer", description: "The tag to attach (or pass name)" },
+            email_id: { type: "string" },
+            tag_id: { type: "string", description: "The tag to attach (or pass name)" },
             name: { type: "string", description: "Tag name (case-insensitive) if tag_id is not given" }
           },
           required: [ "email_id" ]
@@ -229,8 +503,8 @@ module Mcp
         scope: "tags:write",
         input_schema: object_schema(
           properties: {
-            email_id: { type: "integer" },
-            tag_id: { type: "integer" }
+            email_id: { type: "string" },
+            tag_id: { type: "string" }
           },
           required: [ "email_id", "tag_id" ]
         )
@@ -243,7 +517,350 @@ module Mcp
       end
     end
 
-    # ---- documents --------------------------------------------------------
+    # ---- inbox actions -------------------------------------------------------
+
+    def update_emails
+      build(
+        name: "update_emails",
+        description: "Bulk-act on emails. archive/unarchive/trash/snooze/unsnooze act on whole threads " \
+                     "(mirrors inbox UI). trash moves messages to the provider trash folder. " \
+                     "mark_read/mark_unread flag is applied to all messages in the thread.",
+        scope: "emails:write",
+        input_schema: object_schema(
+          properties: {
+            ids: { type: "array", items: { type: "string" }, description: "Email ids (1–100 UUIDs)", minItems: 1, maxItems: 100 },
+            action: { type: "string", enum: %w[archive unarchive trash snooze unsnooze mark_read mark_unread] },
+            snoozed_until: { type: "string", description: "ISO-8601 (required for snooze action)" }
+          },
+          required: %w[ids action]
+        )
+      ) do |args|
+        require_arg(args, "ids", "action")
+        ids = Array(args["ids"]).first(100)
+        action = args["action"].to_s
+
+        result = case action
+        when "archive"
+          Tools::BulkArchive.call("email_ids" => ids)
+        when "unarchive"
+          Tools::BulkUnarchive.call("email_ids" => ids)
+        when "mark_read"
+          Tools::BulkMarkRead.call(email_ids: ids, read: true)
+        when "mark_unread"
+          Tools::BulkMarkRead.call(email_ids: ids, read: false)
+        when "snooze"
+          raise Mcp::ToolError, "snoozed_until is required for snooze." if args["snoozed_until"].blank?
+          until_time = parse_time(args["snoozed_until"])
+          raise Mcp::ToolError, "Invalid snoozed_until time." unless until_time
+
+          Tools::BulkSnooze.call("email_ids" => ids, "snoozed_until" => until_time.iso8601)
+        when "unsnooze"
+          Tools::BulkUnsnooze.call("email_ids" => ids)
+        when "trash"
+          # Trash acts per-thread like BulkSnooze — one call per thread, using the
+          # first accessible message as the representative (mirrors Tools::BulkSnooze).
+          scope = EmailMessage.accessible_to(Current.user).where(id: ids)
+          count = 0
+          scope.includes(:email_account).find_each.group_by(&:email_account).each do |_account, messages|
+            messages.group_by(&:email_thread).each do |thread, msgs|
+              next unless thread
+
+              result = Tools::Trash.call(msgs.first)
+              count += 1 if result
+            end
+          end
+          { trashed_count: count }
+        else
+          raise Mcp::ToolError, "Unknown action: #{action}."
+        end
+
+        result.merge(action: action)
+      end
+    end
+
+    def move_emails_to_folder
+      build(
+        name: "move_emails_to_folder",
+        description: "Move emails (and their full threads) to a folder. Pass folder_name to work " \
+                     "cross-account — it provisions the provider folder on each mailbox if missing. " \
+                     "Pass folder_id when you already have a provider folder id for a single account.",
+        scope: "emails:write",
+        input_schema: object_schema(
+          properties: {
+            ids: { type: "array", items: { type: "string" }, description: "Email ids (UUIDs)" },
+            folder_name: { type: "string", description: "Folder name (cross-account; provisions if missing)" },
+            folder_id: { type: "string", description: "Provider folder id (single-account)" }
+          },
+          required: %w[ids]
+        )
+      ) do |args|
+        require_arg(args, "ids")
+        unless args["folder_name"].present? || args["folder_id"].present?
+          raise Mcp::RpcError.new(-32_602, "Provide folder_name or folder_id.")
+        end
+
+        Tools::BulkMoveToFolder.call(
+          email_ids: Array(args["ids"]),
+          folder_id: args["folder_id"],
+          folder_name: args["folder_name"]
+        )
+      end
+    end
+
+    def tag_emails
+      build(
+        name: "tag_emails",
+        description: "Add or remove a tag on a set of emails. The tag must exist — " \
+                     "use create_tag to make new ones.",
+        scope: "tags:write",
+        input_schema: object_schema(
+          properties: {
+            ids: { type: "array", items: { type: "string" }, description: "Email ids (UUIDs)" },
+            tag_name: { type: "string" },
+            action: { type: "string", enum: %w[add remove], description: "Default: add" }
+          },
+          required: %w[ids tag_name]
+        )
+      ) do |args|
+        require_arg(args, "ids", "tag_name")
+        result = Tools::BulkTag.call(
+          "email_ids" => Array(args["ids"]),
+          "tag_name" => args["tag_name"],
+          "action" => args["action"].presence || "add"
+        )
+        raise Mcp::ToolError, "#{result[:error]} — use create_tag to create it first." if result[:error]
+
+        result
+      end
+    end
+
+    def forward_email
+      build(
+        name: "forward_email",
+        description: "Forward an email to another address.",
+        scope: "emails:send",
+        input_schema: object_schema(
+          properties: {
+            id: { type: "string", description: "Email id" },
+            to_address: { type: "string", description: "Recipient address" }
+          },
+          required: %w[id to_address]
+        )
+      ) do |args|
+        require_arg(args, "id", "to_address")
+        msg = EmailMessage.accessible_to(Current.user).find(args["id"])
+        result = EmailActions.run("forward_email", email_message: msg,
+                                  args: { "to_address" => args["to_address"] }, user: Current.user)
+        raise Mcp::ToolError, (result[:message] || "Could not forward the email.") unless result[:success]
+
+        result.slice(:success, :tool, :message)
+      end
+    end
+
+    # ---- skim ----------------------------------------------------------------
+
+    def get_skim_deck
+      build(
+        name: "get_skim_deck",
+        description: "Return the Skim inbox deck as compact rings and cluster cards. " \
+                     "Apply decisions with skim_decide(action, email_ids). " \
+                     "keep=dismiss from tray, archive=move out of inbox, promote=pin.",
+        scope: "emails:read",
+        input_schema: object_schema(properties: {
+          theme: { type: "string", description: "Filter to a single ring theme (optional)" }
+        })
+      ) do |args|
+        memory = Emails::SkimActionMemory.new(Current.user)
+        rings = Emails::SkimDeck.for(
+          Current.user,
+          whitelist_mode: Current.workspace.whitelist_mode?,
+          memory: memory
+        )
+
+        theme_filter = args["theme"].to_s.strip.presence
+        rings = rings.select { |r| r[:theme].to_s == theme_filter } if theme_filter
+
+        compact_rings = rings.map do |ring|
+          {
+            theme: ring[:theme],
+            label: ring[:label],
+            clusters: ring[:clusters].map { |c| compact_cluster(c) }
+          }
+        end
+
+        {
+          rings: compact_rings,
+          hint: "Apply decisions with skim_decide(action, email_ids). " \
+                "keep=dismiss from tray, archive=move out of inbox, promote=pin."
+        }
+      end
+    end
+
+    def skim_decide
+      build(
+        name: "skim_decide",
+        description: "Apply a Skim triage decision to a cluster's emails. " \
+                     "Mirrors the inbox UI learning loop — decisions train future suggestions.",
+        scope: "emails:write",
+        input_schema: object_schema(
+          properties: {
+            action: { type: "string", enum: %w[keep archive promote restore unpromote] },
+            email_ids: { type: "array", items: { type: "string" }, description: "Email ids from the cluster" }
+          },
+          required: %w[action email_ids]
+        )
+      ) do |args|
+        require_arg(args, "action", "email_ids")
+        action = args["action"].to_s
+        ids = Array(args["email_ids"])
+
+        affected = case action
+        when "keep"
+          result = Emails::SkimDismiss.new(Current.user, ids).call
+          Emails::SkimDecisionRecorder.record(Current.user, ids, action: "keep")
+          result
+        when "archive"
+          result = Emails::SkimArchive.new(Current.user, ids).call
+          Emails::SkimDecisionRecorder.record(Current.user, ids, action: "archive")
+          result
+        when "promote"
+          result = Emails::SkimPromote.new(Current.user, ids).call
+          Emails::SkimDecisionRecorder.record(Current.user, ids, action: "promote")
+          result
+        when "restore"
+          Emails::SkimRestore.new(Current.user, ids).call
+        when "unpromote"
+          Emails::SkimUnpromote.new(Current.user, ids).call
+        else
+          raise Mcp::ToolError, "Unknown action: #{action}."
+        end
+
+        { action: action, affected: affected }
+      end
+    end
+
+    # ---- accounts -----------------------------------------------------------
+
+    def list_email_accounts
+      build(
+        name: "list_email_accounts",
+        description: "List connected email accounts visible to the caller. " \
+                     "Use the id as email_account_id for send_email / create_scheduled_email.",
+        scope: "email_accounts:read",
+        input_schema: object_schema(properties: {})
+      ) do |_args|
+        rows = Current.user.email_account_users.includes(:email_account).map do |eau|
+          a = eau.email_account
+          {
+            id: a.id,
+            email_address: a.email_address,
+            provider: a.provider,
+            active: a.active?,
+            scanning: a.actively_scanning?,
+            last_scanned_at: a.last_scanned_at&.iso8601,
+            name: a.name,
+            color: a.color,
+            can_read: eau.can_read,
+            can_send: eau.can_send,
+            can_manage: eau.can_manage,
+            owner: eau.owner
+          }
+        end
+        { email_accounts: rows, count: rows.size }
+      end
+    end
+
+    def connect_email_account
+      build(
+        name: "connect_email_account",
+        description: "Connect a new email account. mode=web returns a URL to open in a browser " \
+                     "(normal OAuth flow). mode=token is for self-hosted setups: supply a refresh_token " \
+                     "minted with THIS server's configured OAuth client — tokens from a different " \
+                     "client will fail refresh. Never echoes the refresh_token back.",
+        scope: "email_accounts:write",
+        input_schema: object_schema(
+          properties: {
+            mode: { type: "string", enum: %w[web token], description: "Default: web" },
+            provider: { type: "string", enum: %w[zoho google microsoft] },
+            refresh_token: { type: "string", description: "Required for token mode" },
+            email_address: { type: "string", description: "Optional: verified server-side; error if mismatch" }
+          }
+        )
+      ) do |args|
+        mode = args["mode"].presence || "web"
+
+        if mode == "web"
+          next { connect_path: "/email_accounts/new",
+                 note: "Open this path on your Campbooks server in a browser; the OAuth consent flow finishes there." }
+        end
+
+        # token mode
+        provider = args["provider"].to_s.presence
+        raise Mcp::RpcError.new(-32_602, "provider is required for token mode.") unless provider.present?
+        raise Mcp::RpcError.new(-32_602, "refresh_token is required for token mode.") if args["refresh_token"].blank?
+        raise Mcp::ToolError, "Microsoft accounts are not available on this server." if provider == "microsoft" && !Features.microsoft?
+
+        # entitlement cap (mirrors EmailAccountCapGuard)
+        unless Current.workspace.entitlements.allow?(:email_accounts) == :ok
+          limit_val = Current.workspace.entitlements.limit(:email_accounts)
+          plan_name = Current.workspace.entitlements.plan_name
+          raise Mcp::ToolError, "Your plan (#{plan_name}) allows #{limit_val} connected mailbox(es). Upgrade to connect more."
+        end
+
+        # Validate token + resolve identity server-side (never trust caller-supplied email alone)
+        identity = resolve_oauth_identity(provider, args["refresh_token"])
+
+        if args["email_address"].present? && identity[:email].to_s.downcase != args["email_address"].to_s.downcase
+          raise Mcp::ToolError, "The resolved email (#{identity[:email]}) does not match the supplied email_address."
+        end
+
+        # Create or reactivate exactly like the OAuth callbacks
+        existing = EmailAccount.find_by(email_address: identity[:email])
+        account = if existing
+          existing.update!(refresh_token: args["refresh_token"], active: true)
+          existing
+        else
+          EmailAccount.create!(
+            email_address: identity[:email],
+            provider: provider,
+            provider_account_id: identity[:account_id],
+            refresh_token: args["refresh_token"],
+            workspace: Current.workspace
+          )
+        end
+
+        account.email_account_users.find_or_create_by!(user: Current.user) do |entry|
+          entry.owner = true
+          entry.can_read = true
+          entry.can_send = true
+          entry.can_manage = true
+        end
+
+        # Calendar provisioning best-effort (rescue+log like the callbacks do)
+        begin
+          Calendars::AccountProvisioner.call(
+            email_address: identity[:email],
+            provider: provider.to_sym,
+            refresh_token: args["refresh_token"],
+            workspace: Current.workspace,
+            owner: Current.user,
+            provider_account_id: identity[:account_id]
+          )
+        rescue => e
+          Rails.logger.warn("[MCP connect_email_account] calendar provisioning failed: #{e.message}")
+        end
+
+        Events.publish("email_account.connected", subject: account,
+                       payload: { "email_address" => account.email_address, "provider" => account.provider })
+        EmailScanJob.perform_later(account.id, "delta")
+
+        { account: { id: account.id, email_address: account.email_address,
+                     provider: account.provider, active: account.active? },
+          scan_enqueued: true }
+      end
+    end
+
+    # ---- documents ----------------------------------------------------------
 
     def list_documents
       build(
@@ -252,7 +869,7 @@ module Mcp
         scope: "documents:read",
         input_schema: object_schema(properties: {
           limit: limit_property,
-          document_type_id: { type: "integer" },
+          document_type_id: { type: "string" },
           review_status: { type: "string", description: "e.g. pending, approved, rejected" }
         })
       ) do |args|
@@ -261,7 +878,8 @@ module Mcp
         if args["review_status"].present? && Document.review_statuses.key?(args["review_status"])
           scope = scope.by_review_status(args["review_status"])
         end
-        { documents: scope.limit(clamp_limit(args["limit"])).map { |d| Api::V1::DocumentSerializer.new(d).as_json } }
+        rows = scope.limit(clamp_limit(args["limit"])).map { |d| Api::V1::DocumentSerializer.new(d).as_json }
+        { documents: rows, count: rows.size }
       end
     end
 
@@ -312,8 +930,8 @@ module Mcp
         scope: "documents:write",
         input_schema: object_schema(
           properties: {
-            id: { type: "integer" },
-            document_type_id: { type: "integer" },
+            id: { type: "string" },
+            document_type_id: { type: "string" },
             vendor_name: { type: "string" },
             client_name: { type: "string" },
             invoice_number: { type: "string" },
@@ -372,8 +990,8 @@ module Mcp
         scope: "documents:write",
         input_schema: object_schema(
           properties: {
-            id: { type: "integer" },
-            document_type_id: { type: "integer" }
+            id: { type: "string" },
+            document_type_id: { type: "string" }
           },
           required: [ "id", "document_type_id" ]
         )
@@ -388,7 +1006,7 @@ module Mcp
       end
     end
 
-    # ---- contacts / tags / document types --------------------------------
+    # ---- contacts / tags / document types ----------------------------------
 
     def list_contacts
       build(
@@ -407,7 +1025,8 @@ module Mcp
           like = "%#{args["query"]}%"
           scope = scope.where("contacts.name ILIKE :q OR contacts.email ILIKE :q", q: like)
         end
-        { contacts: scope.order(:name).limit(clamp_limit(args["limit"])).map { |c| Api::V1::ContactSerializer.new(c).as_json } }
+        rows = scope.order(:name).limit(clamp_limit(args["limit"])).map { |c| Api::V1::ContactSerializer.new(c).as_json }
+        { contacts: rows, count: rows.size }
       end
     end
 
@@ -431,7 +1050,7 @@ module Mcp
         scope: "contacts:write",
         input_schema: object_schema(
           properties: {
-            id: { type: "integer" },
+            id: { type: "string" },
             name: { type: "string" },
             relationship_type: { type: "string" }
           },
@@ -455,7 +1074,7 @@ module Mcp
         scope: "contacts:write",
         input_schema: object_schema(
           properties: {
-            id: { type: "integer" },
+            id: { type: "string" },
             state: { type: "string", enum: %w[star unstar allow block unblock] }
           },
           required: [ "id", "state" ]
@@ -482,7 +1101,8 @@ module Mcp
         scope: "tags:read",
         input_schema: object_schema(properties: { limit: limit_property })
       ) do |args|
-        { tags: Current.workspace.tags.by_name.limit(clamp_limit(args["limit"])).map { |t| Api::V1::TagSerializer.new(t).as_json } }
+        rows = Current.workspace.tags.by_name.limit(clamp_limit(args["limit"])).map { |t| Api::V1::TagSerializer.new(t).as_json }
+        { tags: rows, count: rows.size }
       end
     end
 
@@ -493,11 +1113,316 @@ module Mcp
         scope: "document_types:read",
         input_schema: object_schema(properties: {})
       ) do |_args|
-        { document_types: Current.workspace.document_types.order(:category, :name).map { |t| Api::V1::DocumentTypeSerializer.new(t).as_json } }
+        rows = Current.workspace.document_types.order(:category, :name).map { |t| Api::V1::DocumentTypeSerializer.new(t).as_json }
+        { document_types: rows, count: rows.size }
       end
     end
 
-    # ---- workflows (gated behind Features.workflows?) ---------------------
+    # ---- taxonomy (create) --------------------------------------------------
+
+    def create_tag
+      build(
+        name: "create_tag",
+        description: "Create a new workspace tag. Tags apply to emails and can be used for filtering.",
+        scope: "tags:write",
+        input_schema: object_schema(
+          properties: {
+            name: { type: "string" },
+            color: { type: "string", description: "Hex color (optional; a default is assigned)" }
+          },
+          required: %w[name]
+        )
+      ) do |args|
+        require_arg(args, "name")
+        color = args["color"].presence || DEFAULT_COLORS.sample
+        tag = Current.workspace.tags.build(
+          name: args["name"], color: color, source: :local, kind: :user
+        )
+        tag.save!
+        { tag: Api::V1::TagSerializer.new(tag).as_json }
+      rescue ActiveRecord::RecordInvalid => e
+        raise Mcp::ToolError, "Tag '#{args["name"]}' already exists." if e.message =~ /unique|already taken/i
+
+        raise
+      end
+    end
+
+    def create_document_type
+      build(
+        name: "create_document_type",
+        description: "Create a new document type for classifying attachments.",
+        scope: "document_types:write",
+        input_schema: object_schema(
+          properties: {
+            name: { type: "string" },
+            category: { type: "string", description: "One of: #{DocumentType::CATEGORIES.join(', ')}" },
+            auto_star: { type: "boolean" },
+            color: { type: "string", description: "Hex color (optional; a default is assigned)" }
+          },
+          required: %w[name]
+        )
+      ) do |args|
+        require_arg(args, "name")
+        category = args["category"].presence
+        category = DocumentType.default_category_for(args["name"]) if category.blank?
+        category = nil unless DocumentType::CATEGORIES.include?(category)
+
+        doc_type = Current.workspace.document_types.build(
+          name: args["name"],
+          category: category,
+          color: args["color"].presence || DEFAULT_COLORS.sample,
+          auto_star: args["auto_star"] || false
+        )
+        doc_type.save!
+        { document_type: Api::V1::DocumentTypeSerializer.new(doc_type).as_json }
+      rescue ActiveRecord::RecordInvalid => e
+        raise Mcp::ToolError, "Document type '#{args["name"]}' already exists." if e.message =~ /unique|already taken/i
+
+        raise
+      end
+    end
+
+    def create_folder
+      build(
+        name: "create_folder",
+        description: "Create a custom folder. When provision: true, the folder is created on " \
+                     "every connected mailbox the caller manages — useful for inbox organisation. " \
+                     "Provisioning creates the folder on each provider; failures on individual " \
+                     "accounts are reported but do not abort the others.",
+        scope: "folders:write",
+        input_schema: object_schema(
+          properties: {
+            name: { type: "string" },
+            parent_id: { type: "string", description: "Optional parent folder id" },
+            icon: { type: "string", description: "Optional emoji icon" },
+            provision: { type: "boolean", description: "Create on all connected mailboxes (default: false)" }
+          },
+          required: %w[name]
+        )
+      ) do |args|
+        require_arg(args, "name")
+        folder = Current.workspace.mail_folders.build(
+          name: args["name"],
+          parent_id: args["parent_id"],
+          icon: args["icon"]
+        )
+        folder.save!
+
+        result = { folder: Api::V1::FolderSerializer.new(folder).as_json }
+
+        if args["provision"]
+          provision_result = MailFolders::Provisioner.provision_all(folder, Current.user)
+          result[:provision] = {
+            created_count: provision_result[:created].size,
+            failed_count: provision_result[:failed].size
+          }
+        end
+
+        result
+      end
+    end
+
+    # ---- tasks (all gated on Features.tasks?) --------------------------------
+
+    def list_tasks
+      build(
+        name: "list_tasks",
+        description: "List workspace tasks. Optional status filter; include_archived to see archived tasks.",
+        scope: "tasks:read",
+        enabled: -> { Features.tasks? },
+        input_schema: object_schema(properties: {
+          status: { type: "string", description: "Filter by status (suggested/todo/in_progress/blocked/done/cancelled)" },
+          include_archived: { type: "boolean" },
+          limit: limit_property
+        })
+      ) do |args|
+        ensure_entitled!(:tasks)
+        scope = Task.accessible_to(Current.user).includes(:assignees, :tags)
+        scope = args["include_archived"] ? scope : scope.not_archived
+        scope = scope.where(status: args["status"]) if args["status"].present? && Task.statuses.key?(args["status"])
+        { tasks: scope.order(created_at: :desc).limit(clamp_limit(args["limit"])).map { |t| Api::V1::TaskSerializer.new(t).as_json },
+          count: scope.count }
+      end
+    end
+
+    def get_task
+      build(
+        name: "get_task",
+        description: "Fetch a task by id with full detail.",
+        scope: "tasks:read",
+        enabled: -> { Features.tasks? },
+        input_schema: id_schema("The task id")
+      ) do |args|
+        ensure_entitled!(:tasks)
+        require_arg(args, "id")
+        task = Task.accessible_to(Current.user).find(args["id"])
+        { task: Api::V1::TaskSerializer.new(task, detail: true).as_json }
+      end
+    end
+
+    def create_task
+      build(
+        name: "create_task",
+        description: "Create a task in the workspace.",
+        scope: "tasks:write",
+        enabled: -> { Features.tasks? },
+        input_schema: object_schema(
+          properties: {
+            title: { type: "string" },
+            description: { type: "string" },
+            due_at: { type: "string", description: "ISO-8601" },
+            all_day: { type: "boolean" },
+            priority: { type: "string", enum: %w[low normal high urgent] },
+            status: { type: "string", enum: %w[todo in_progress blocked], description: "Default: todo" }
+          },
+          required: %w[title]
+        )
+      ) do |args|
+        ensure_entitled!(:tasks)
+        require_arg(args, "title")
+        status = Task.statuses.key?(args["status"].to_s) ? args["status"] : "todo"
+        task = Current.workspace.tasks.new(
+          title: args["title"], description: args["description"],
+          due_at: parse_time(args["due_at"]), all_day: args["all_day"] ? true : false,
+          priority: args["priority"].presence || "normal",
+          status: status, created_by: Current.user
+        )
+        task.save!
+        { task: Api::V1::TaskSerializer.new(task, detail: true).as_json }
+      end
+    end
+
+    def update_task
+      build(
+        name: "update_task",
+        description: "Update a task's fields. Status changes use the proper transition (publishes events).",
+        scope: "tasks:write",
+        enabled: -> { Features.tasks? },
+        input_schema: object_schema(
+          properties: {
+            id: { type: "string" },
+            title: { type: "string" },
+            description: { type: "string" },
+            due_at: { type: "string" },
+            all_day: { type: "boolean" },
+            priority: { type: "string" },
+            status: { type: "string" }
+          },
+          required: %w[id]
+        )
+      ) do |args|
+        ensure_entitled!(:tasks)
+        require_arg(args, "id")
+        task = Task.accessible_to(Current.user).find(args["id"])
+        permitted = args.slice("title", "description", "due_at", "all_day", "priority")
+        permitted["due_at"] = parse_time(args["due_at"]) if args.key?("due_at")
+        task.update!(permitted.compact)
+        if args["status"].present?
+          unless Task.statuses.key?(args["status"])
+            raise Mcp::ToolError, "Invalid status '#{args["status"]}'. Valid: #{Task.statuses.keys.join(", ")}."
+          end
+          task.move_to_status!(args["status"], by: Current.user) if args["status"] != task.status
+        end
+        { task: Api::V1::TaskSerializer.new(task.reload, detail: true).as_json }
+      end
+    end
+
+    def complete_task
+      build(
+        name: "complete_task",
+        description: "Mark a task as done.",
+        scope: "tasks:write",
+        enabled: -> { Features.tasks? },
+        input_schema: id_schema("The task id")
+      ) do |args|
+        ensure_entitled!(:tasks)
+        require_arg(args, "id")
+        task = Task.accessible_to(Current.user).find(args["id"])
+        task.move_to_status!(:done, by: Current.user)
+        { task: Api::V1::TaskSerializer.new(task, detail: true).as_json }
+      end
+    end
+
+    def create_task_from_email
+      build(
+        name: "create_task_from_email",
+        description: "Extract and create a task from an email via the action registry.",
+        scope: "tasks:write",
+        enabled: -> { Features.tasks? },
+        input_schema: object_schema(
+          properties: {
+            email_id: { type: "string" },
+            title: { type: "string", description: "Override the extracted title" }
+          },
+          required: %w[email_id]
+        )
+      ) do |args|
+        ensure_entitled!(:tasks)
+        require_arg(args, "email_id")
+        msg = EmailMessage.accessible_to(Current.user).find(args["email_id"])
+        result = EmailActions.run("create_task_from_email", email_message: msg,
+                                  args: { "title" => args["title"] }.compact, user: Current.user)
+        raise Mcp::ToolError, (result[:message] || "Could not create task from email.") unless result[:success]
+
+        result.slice(:success, :tool, :message, :result)
+      end
+    end
+
+    # ---- calendar helpers ---------------------------------------------------
+
+    def list_calendars
+      build(
+        name: "list_calendars",
+        description: "List calendars visible to the caller. Use the id as calendar_id in create_calendar_event.",
+        scope: "calendar:read",
+        input_schema: object_schema(properties: {})
+      ) do |_args|
+        all_cals = Calendar.where(calendar_account: Current.user.readable_calendar_accounts)
+                           .includes(:calendar_account)
+        rows = all_cals.map do |cal|
+          writable = cal.is_writable && cal.calendar_account.writable_by?(Current.user)
+          {
+            id: cal.id,
+            name: cal.name,
+            provider: cal.provider,
+            primary: cal.is_primary,
+            writable: writable,
+            syncing: cal.syncing,
+            color: cal.display_color
+          }
+        end
+        { calendars: rows, count: rows.size }
+      end
+    end
+
+    def create_event_from_email
+      build(
+        name: "create_event_from_email",
+        description: "Extract and create a calendar event from an email. " \
+                     "AI infers the event details; supply overrides to refine them.",
+        scope: "calendar:write",
+        input_schema: object_schema(
+          properties: {
+            email_id: { type: "string" },
+            title: { type: "string" },
+            start_time: { type: "string", description: "ISO-8601 override" },
+            end_time: { type: "string", description: "ISO-8601 override" },
+            calendar_id: { type: "string" }
+          },
+          required: %w[email_id]
+        )
+      ) do |args|
+        require_arg(args, "email_id")
+        msg = EmailMessage.accessible_to(Current.user).find(args["email_id"])
+        tool_args = args.slice("title", "start_time", "end_time", "calendar_id").compact
+        event = Tools::CreateCalendarEvent.call(msg, tool_args, user: Current.user)
+        raise Mcp::ToolError, "Could not determine event details from this email." unless event
+
+        { event: Api::V1::CalendarEventSerializer.new(event, detail: true).as_json }
+      end
+    end
+
+    # ---- workflows (gated behind Features.workflows?) -----------------------
 
     def list_workflows
       build(
@@ -508,7 +1433,8 @@ module Mcp
         input_schema: object_schema(properties: { limit: limit_property })
       ) do |args|
         scope = Current.workspace.workflows.order(created_at: :desc)
-        { workflows: scope.limit(clamp_limit(args["limit"])).map { |w| Api::V1::WorkflowSerializer.new(w).as_json } }
+        rows = scope.limit(clamp_limit(args["limit"])).map { |w| Api::V1::WorkflowSerializer.new(w).as_json }
+        { workflows: rows, count: rows.size }
       end
     end
 
@@ -520,7 +1446,7 @@ module Mcp
         enabled: -> { Features.workflows? },
         input_schema: object_schema(
           properties: {
-            id: { type: "integer" },
+            id: { type: "string" },
             payload: { type: "object", additionalProperties: true, description: "Exposed to the workflow's Liquid templates" }
           },
           required: [ "id" ]
@@ -544,17 +1470,18 @@ module Mcp
         scope: "workflows:read",
         enabled: -> { Features.workflows? },
         input_schema: object_schema(
-          properties: { workflow_id: { type: "integer" }, limit: limit_property },
+          properties: { workflow_id: { type: "string" }, limit: limit_property },
           required: [ "workflow_id" ]
         )
       ) do |args|
         require_arg(args, "workflow_id")
         workflow = Current.workspace.workflows.find(args["workflow_id"])
-        { executions: workflow.executions.limit(clamp_limit(args["limit"])).map { |e| Api::V1::WorkflowExecutionSerializer.new(e).as_json } }
+        rows = workflow.executions.limit(clamp_limit(args["limit"])).map { |e| Api::V1::WorkflowExecutionSerializer.new(e).as_json }
+        { executions: rows, count: rows.size }
       end
     end
 
-    # ---- scout ------------------------------------------------------------
+    # ---- scout --------------------------------------------------------------
 
     def list_scout_threads
       build(
@@ -564,7 +1491,8 @@ module Mcp
         input_schema: object_schema(properties: { limit: limit_property })
       ) do |args|
         scope = Current.user.agent_threads.scout_visible.recent
-        { threads: scope.limit(clamp_limit(args["limit"])).map { |t| Api::V1::AgentThreadSerializer.new(t).as_json } }
+        rows = scope.limit(clamp_limit(args["limit"])).map { |t| Api::V1::AgentThreadSerializer.new(t).as_json }
+        { threads: rows, count: rows.size }
       end
     end
 
@@ -589,8 +1517,8 @@ module Mcp
         scope: "scout:read",
         input_schema: object_schema(
           properties: {
-            thread_id: { type: "integer" },
-            after_message_id: { type: "integer", description: "Only messages created after this one" }
+            thread_id: { type: "string" },
+            after_message_id: { type: "string", description: "Only messages created after this one" }
           },
           required: [ "thread_id" ]
         )
@@ -601,7 +1529,8 @@ module Mcp
         if args["after_message_id"].present? && (pivot = thread.agent_messages.find_by(id: args["after_message_id"]))
           scope = scope.where("agent_messages.created_at > ?", pivot.created_at)
         end
-        { messages: scope.map { |m| Api::V1::AgentMessageSerializer.new(m).as_json } }
+        rows = scope.map { |m| Api::V1::AgentMessageSerializer.new(m).as_json }
+        { messages: rows, count: rows.size }
       end
     end
 
@@ -612,7 +1541,7 @@ module Mcp
         scope: "scout:write",
         input_schema: object_schema(
           properties: {
-            thread_id: { type: "integer" },
+            thread_id: { type: "string" },
             content: { type: "string" }
           },
           required: [ "thread_id", "content" ]
@@ -630,7 +1559,7 @@ module Mcp
       end
     end
 
-    # ---- scheduled emails -------------------------------------------------
+    # ---- scheduled emails ---------------------------------------------------
 
     def list_scheduled_emails
       build(
@@ -644,7 +1573,8 @@ module Mcp
       ) do |args|
         scope = ScheduledEmail.accessible_to(Current.user).order(Arel.sql("COALESCE(next_occurrence_at, scheduled_at) ASC"))
         scope = scope.where(status: args["status"]) if args["status"].present? && ScheduledEmail.statuses.key?(args["status"])
-        { scheduled_emails: scope.limit(clamp_limit(args["limit"])).map { |s| Api::V1::ScheduledEmailSerializer.new(s).as_json } }
+        rows = scope.limit(clamp_limit(args["limit"])).map { |s| Api::V1::ScheduledEmailSerializer.new(s).as_json }
+        { scheduled_emails: rows, count: rows.size }
       end
     end
 
@@ -668,7 +1598,7 @@ module Mcp
         scope: "scheduled_emails:write",
         input_schema: object_schema(
           properties: {
-            email_account_id: { type: "integer" },
+            email_account_id: { type: "string" },
             to_address: { type: "string" },
             subject: { type: "string" },
             body: { type: "string" },
@@ -703,8 +1633,8 @@ module Mcp
         scope: "scheduled_emails:write",
         input_schema: object_schema(
           properties: {
-            id: { type: "integer" },
-            email_account_id: { type: "integer" },
+            id: { type: "string" },
+            email_account_id: { type: "string" },
             to_address: { type: "string" },
             subject: { type: "string" },
             body: { type: "string" },
@@ -744,7 +1674,7 @@ module Mcp
       end
     end
 
-    # ---- calendar events --------------------------------------------------
+    # ---- calendar events ----------------------------------------------------
 
     def list_calendar_events
       build(
@@ -760,7 +1690,8 @@ module Mcp
         scope = CalendarEvent.accessible_to(Current.user).order(start_at: :asc)
         scope = scope.where("calendar_events.start_at >= ?", parse_time(args["start_after"])) if parse_time(args["start_after"])
         scope = scope.where("calendar_events.start_at < ?", parse_time(args["start_before"])) if parse_time(args["start_before"])
-        { events: scope.limit(clamp_limit(args["limit"])).map { |e| Api::V1::CalendarEventSerializer.new(e).as_json } }
+        rows = scope.limit(clamp_limit(args["limit"])).map { |e| Api::V1::CalendarEventSerializer.new(e).as_json }
+        { events: rows, count: rows.size }
       end
     end
 
@@ -784,14 +1715,13 @@ module Mcp
         scope: "calendar:write",
         input_schema: object_schema(
           properties: {
-            calendar_id: { type: "integer", description: "Id of a writable calendar" },
+            calendar_id: { type: "string", description: "Id of a writable calendar" },
             title: { type: "string" },
             start_at: { type: "string", description: "ISO-8601 start" },
             end_at: { type: "string", description: "ISO-8601 end" },
             description: { type: "string" },
             location: { type: "string" },
-            all_day: { type: "boolean" },
-            color: { type: "string", description: "Hex color, optional" }
+            all_day: { type: "boolean" }
           },
           required: [ "calendar_id", "title", "start_at" ]
         )
@@ -800,10 +1730,12 @@ module Mcp
         calendar = writable_calendars.find_by(id: args["calendar_id"])
         raise Mcp::ToolError, "That calendar does not exist or is not writable." unless calendar
 
+        # An event has no color of its own — it renders in its calendar's color
+        # (CalendarEvent#display_color), so the tool does not expose a color field.
         event = calendar.calendar_events.new(
           title: args["title"], description: args["description"], location: args["location"],
           start_at: args["start_at"], end_at: args["end_at"], all_day: args["all_day"] || false,
-          color: args["color"], provider_event_id: "local-#{SecureRandom.uuid}",
+          provider_event_id: "local-#{SecureRandom.uuid}",
           status: :confirmed, outbound_pending: true
         )
         event.save!
@@ -819,10 +1751,10 @@ module Mcp
         scope: "calendar:write",
         input_schema: object_schema(
           properties: {
-            id: { type: "integer" },
+            id: { type: "string" },
             title: { type: "string" }, description: { type: "string" }, location: { type: "string" },
             start_at: { type: "string" }, end_at: { type: "string" },
-            all_day: { type: "boolean" }, color: { type: "string" },
+            all_day: { type: "boolean" },
             recurrence_scope: { type: "string", enum: %w[this all] }
           },
           required: [ "id" ]
@@ -830,7 +1762,7 @@ module Mcp
       ) do |args|
         require_arg(args, "id")
         event = writable_event(args["id"])
-        event.update!(args.slice("title", "description", "location", "start_at", "end_at", "all_day", "color")
+        event.update!(args.slice("title", "description", "location", "start_at", "end_at", "all_day")
                           .merge(outbound_pending: true))
         Calendars::EventWriteJob.perform_later(event.id, "update", recurrence_scope(args))
         { event: Api::V1::CalendarEventSerializer.new(event, detail: true).as_json }
@@ -843,7 +1775,7 @@ module Mcp
         description: "Delete a calendar event (async provider delete). recurrence_scope: this|all.",
         scope: "calendar:write",
         input_schema: object_schema(
-          properties: { id: { type: "integer" }, recurrence_scope: { type: "string", enum: %w[this all] } },
+          properties: { id: { type: "string" }, recurrence_scope: { type: "string", enum: %w[this all] } },
           required: [ "id" ]
         )
       ) do |args|
@@ -862,7 +1794,7 @@ module Mcp
         scope: "calendar:write",
         input_schema: object_schema(
           properties: {
-            id: { type: "integer" },
+            id: { type: "string" },
             rsvp_status: { type: "string", enum: %w[needs_action accepted declined tentative] }
           },
           required: [ "id", "rsvp_status" ]
@@ -878,7 +1810,7 @@ module Mcp
       end
     end
 
-    # ---- reminders --------------------------------------------------------
+    # ---- reminders ----------------------------------------------------------
 
     def list_reminders
       build(
@@ -892,7 +1824,8 @@ module Mcp
       ) do |args|
         scope = Reminder.accessible_to(Current.user).order(due_at: :asc)
         scope = scope.where(status: args["status"]) if args["status"].present? && Reminder.statuses.key?(args["status"])
-        { reminders: scope.limit(clamp_limit(args["limit"])).map { |r| Api::V1::ReminderSerializer.new(r).as_json } }
+        rows = scope.limit(clamp_limit(args["limit"])).map { |r| Api::V1::ReminderSerializer.new(r).as_json }
+        { reminders: rows, count: rows.size }
       end
     end
 
@@ -915,7 +1848,7 @@ module Mcp
         description: "Confirm a reminder into a calendar event. Optionally pass due_at to adjust the time first.",
         scope: "reminders:write",
         input_schema: object_schema(
-          properties: { id: { type: "integer" }, due_at: { type: "string", description: "ISO-8601" } },
+          properties: { id: { type: "string" }, due_at: { type: "string", description: "ISO-8601" } },
           required: [ "id" ]
         )
       ) do |args|
@@ -954,7 +1887,7 @@ module Mcp
         description: "Snooze a reminder until the given time, or one week out when omitted.",
         scope: "reminders:write",
         input_schema: object_schema(
-          properties: { id: { type: "integer" }, until: { type: "string", description: "ISO-8601" } },
+          properties: { id: { type: "string" }, until: { type: "string", description: "ISO-8601" } },
           required: [ "id" ]
         )
       ) do |args|
@@ -965,7 +1898,7 @@ module Mcp
       end
     end
 
-    # ---- email templates --------------------------------------------------
+    # ---- email templates ---------------------------------------------------
 
     def list_email_templates
       build(
@@ -976,11 +1909,12 @@ module Mcp
         input_schema: object_schema(properties: { limit: limit_property })
       ) do |args|
         scope = Current.workspace.email_templates.recent
-        { email_templates: scope.limit(clamp_limit(args["limit"])).map { |t| Api::V1::EmailTemplateSerializer.new(t).as_json } }
+        rows = scope.limit(clamp_limit(args["limit"])).map { |t| Api::V1::EmailTemplateSerializer.new(t).as_json }
+        { email_templates: rows, count: rows.size }
       end
     end
 
-    # ---- folders ----------------------------------------------------------
+    # ---- folders ------------------------------------------------------------
 
     def list_folders
       build(
@@ -989,7 +1923,8 @@ module Mcp
         scope: "folders:read",
         input_schema: object_schema(properties: {})
       ) do |_args|
-        { folders: Current.workspace.mail_folders.ordered.map { |f| Api::V1::FolderSerializer.new(f).as_json } }
+        rows = Current.workspace.mail_folders.ordered.map { |f| Api::V1::FolderSerializer.new(f).as_json }
+        { folders: rows, count: rows.size }
       end
     end
 
@@ -1012,7 +1947,7 @@ module Mcp
         description: "File a document into a folder.",
         scope: "folders:write",
         input_schema: object_schema(
-          properties: { mail_folder_id: { type: "integer" }, document_id: { type: "integer" } },
+          properties: { mail_folder_id: { type: "string" }, document_id: { type: "string" } },
           required: [ "mail_folder_id", "document_id" ]
         )
       ) do |args|
@@ -1040,7 +1975,7 @@ module Mcp
       end
     end
 
-    # ---- helpers ----------------------------------------------------------
+    # ---- helpers ------------------------------------------------------------
 
     def build(name:, description:, scope:, input_schema:, enabled: -> { true }, &handler)
       Tool.new(name: name, description: description, scope: scope,
@@ -1052,7 +1987,7 @@ module Mcp
     end
 
     def id_schema(description)
-      object_schema(properties: { id: { type: "integer", description: description } }, required: [ "id" ])
+      object_schema(properties: { id: { type: "string", description: description } }, required: [ "id" ])
     end
 
     def limit_property
@@ -1135,6 +2070,66 @@ module Mcp
       Time.zone.parse(value.to_s)
     rescue ArgumentError
       nil
+    end
+
+    # True when the current request's credential carries the named scope.
+    # Handlers use this to gate optional sections in get_overview / get_setup_status.
+    def scope_granted?(name)
+      Current.api_scopes.to_a.include?(name.to_s)
+    end
+
+    # Compact a skim cluster for MCP output — drop the heavy `emails` array,
+    # keep only the fields an agent needs to propose a decision.
+    def compact_cluster(card)
+      {
+        category: card[:category],
+        title: card[:title],
+        summary: card[:summary],
+        count: card[:count],
+        unread_count: card[:unread_count],
+        bucket: card[:bucket],
+        importance: card[:importance],
+        priority_suggested: card[:priority_suggested],
+        scout_suggestion: card[:scout_suggestion],
+        follow_up: card[:follow_up],
+        follow_up_reason: card[:follow_up_reason],
+        latest_received_at: card[:latest_received_at]&.iso8601,
+        email_ids: card[:email_ids],
+        # The builder already loaded these — reuse its per-email detail, no refetch.
+        samples: (card[:emails] || []).first(3).map { |e| e.slice(:id, :sender, :subject) }
+      }
+    end
+
+    # Validate a refresh_token with the provider and return the resolved identity.
+    # Raises Mcp::ToolError on permanent auth failure (wrong client, revoked token).
+    def resolve_oauth_identity(provider, refresh_token)
+      case provider.to_s
+      when "zoho"
+        access_token = Zoho::OauthClient.new(refresh_token: refresh_token).refresh!
+        Zoho::AccountDiscovery.new(access_token).discover_identity ||
+          raise(Mcp::ToolError, "Could not determine Zoho account identity from the token.")
+      when "google"
+        access_token = Google::OauthClient.new(refresh_token: refresh_token).refresh!
+        Google::AccountDiscovery.new(access_token).discover_identity ||
+          raise(Mcp::ToolError, "Could not determine Google account identity from the token.")
+      else
+        raise Mcp::ToolError, "Provider #{provider} does not support token mode."
+      end
+    rescue KeyError => e
+      raise Mcp::ToolError, "#{provider.to_s.capitalize} OAuth is not configured on this server " \
+                            "(missing #{e.message}). Token mode requires the server's own " \
+                            "OAuth client credentials (#{provider.to_s.upcase}_CLIENT_ID / _SECRET)."
+    rescue PermanentAuthError => e
+      raise Mcp::ToolError, "Token refresh failed: #{e.message}. The refresh_token must be " \
+                            "minted with THIS server's configured OAuth client credentials — " \
+                            "tokens from a different client_id will not work."
+    rescue AuthenticationError => e
+      raise Mcp::ToolError, "Token validation failed (transient): #{e.message}. Try again."
+    end
+
+    # iso helper: format a time as ISO-8601 string, nil-safe.
+    def iso(t)
+      t&.iso8601
     end
   end
 end

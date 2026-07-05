@@ -1,0 +1,11 @@
+<% if @digest %>
+  <%= render Campbooks::PageHeader.new(title: t(".title_form")) %>
+  <%= render Campbooks::Digests::Form.new(digest: @digest, preset: @preset) %>
+<% else %>
+  <%= render Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle")) %>
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <% Digests::Presets.all(Current.workspace).each do |preset| %>
+      <%= render Campbooks::Digests::PresetCard.new(preset: preset) %>
+    <% end %>
+  </div>
+<% end %>

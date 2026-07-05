@@ -1,0 +1,18 @@
+<%= t("digest_mailer.issue.greeting", name: @user.name) %>
+
+<% if @issue.overview.present? %>
+<%= @issue.overview %>
+
+<% end %>
+<% @sections.each do |section| %>
+== <%= section[:title].upcase %> ==
+<% section[:items].each do |item| %>
+* <%= item[:title] %><% if item[:subtitle].present? %> — <%= item[:subtitle] %><% end %><% if item[:note].present? %> · <%= item[:note] %><% end %>
+  <%= item[:url] %>
+<% end %>
+<% if section[:overflow] > 0 %>
+  (<%= t("digest_mailer.issue.and_more", count: section[:overflow]) %> — <%= @manage_url %>)
+<% end %>
+
+<% end %>
+<%= t("digest_mailer.issue.footer_text", manage_url: @manage_url) %>
