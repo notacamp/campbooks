@@ -7,6 +7,11 @@ require "rails_helper"
 # a separate effort, and the handoff already needs the installed app + a one-time
 # token).
 RSpec.describe "MFA on non-password sign-in", type: :request do
+  # The Zoho OAuth callback constructs a client (which ENV.fetches its app
+  # credentials) before the MFA gate runs; supply dummies so it reaches the gate
+  # instead of raising KeyError (CI has no real keys).
+  around { |example| with_env("ZOHO_CLIENT_ID" => "test-id", "ZOHO_CLIENT_SECRET" => "test-secret") { example.run } }
+
   let(:user) { create(:user) }
 
   before { user.update!(totp_secret: ROTP::Base32.random, totp_enabled_at: Time.current) }

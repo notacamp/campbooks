@@ -25,7 +25,7 @@ RSpec.describe "Documents list filters", type: :request do
       titled("MAY-DOC",    Date.new(2026, 5, 10))
       titled("APRIL-DOC",  Date.new(2026, 4, 1))
 
-      get documents_path(month: "2026-06")
+      get files_path(month: "2026-06")
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("JUNE-ALPHA", "JUNE-BETA")
@@ -37,7 +37,7 @@ RSpec.describe "Documents list filters", type: :request do
       titled("JUNE-ALPHA", Date.new(2026, 6, 15))
       titled("MAY-DOC",    Date.new(2026, 5, 10))
 
-      get documents_path
+      get files_path
 
       expect(response.body).to include("JUNE-ALPHA", "MAY-DOC")
     end
@@ -45,7 +45,7 @@ RSpec.describe "Documents list filters", type: :request do
     it "ignores an unparseable month instead of raising" do
       titled("JUNE-ALPHA", Date.new(2026, 6, 15))
 
-      get documents_path(month: "garbage")
+      get files_path(month: "garbage")
 
       expect(response).to have_http_status(:ok)
       expect(response.body).to include("JUNE-ALPHA")
