@@ -25,7 +25,10 @@ module Contacts
 
     def self.find_duplicate_person(person)
       normalized = normalize_name(person.name)
-      Person.where.not(id: person.id)
+      # Workspace-scoped: an unscoped search would auto-merge same-named people
+      # across tenants, moving their contacts into another workspace.
+      person.workspace.people
+            .where.not(id: person.id)
             .where.not(name: nil)
             .select { |other| similar_name?(normalized, normalize_name(other.name)) }
             .first

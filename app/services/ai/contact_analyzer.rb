@@ -60,6 +60,11 @@ module Ai
 
       Contacts::Consolidator.consolidate!(person)
 
+      # Materialize the Organizations directory as analyses land, so it fills on
+      # its own instead of waiting for a manual "Sync from contacts". Re-resolve
+      # through the contact: consolidation may have merged the person just saved.
+      Organizations::Backfill.link_analyzed_person(@contact.reload.person)
+
       # Auto-tag the sender from its freshly-analyzed profile (existing tags only).
       Contacts::SenderTagger.new(@contact).call
     rescue => e
@@ -197,8 +202,21 @@ module Ai
     # Anthropic key (legacy) when nothing is configured, so behavior is unchanged
     # where it used to "just work" and this honors a configured provider where it
     # didn't before. Returns the raw model text.
+    #
+    # The job only runs when ProviderSetup.configured? passed, so resolving NO
+    # provider here means resolution itself broke (e.g. Current.workspace unset
+    # in a job) — log it loudly. A silent nil kept contact profiling (and the
+    # Organizations directory) dead in prod for weeks with zero trace.
     def generate_text(system_prompt, user_message, max_tokens)
       config = Ai::Configuration.for_any(AiConfiguration::TEXT_PURPOSES)
+      if config.nil? && !Ai::LegacyFallback.allowed?
+        Rails.logger.error(
+          "[ContactAnalyzer] no text provider resolved for contact #{@contact.id} " \
+          "(workspace #{@contact.workspace_id}, Current.workspace #{Current.workspace&.id || 'unset'}) — skipping analysis"
+        )
+        return nil
+      end
+
       if config
         config[:adapter].chat(
           system: system_prompt,
