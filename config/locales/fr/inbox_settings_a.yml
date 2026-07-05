@@ -103,7 +103,7 @@ fr:
         delete_confirm: Supprimer %{name} ?
         edit: Modifier
         hide: Masquer
-        synced_with_title: Synchronisé avec %{account}
+        synced_with_title: Synchronisée avec %{account}
         tagged_messages_title: Messages étiquetés
       toggle_hidden:
         hidden: "%{name} masqué"

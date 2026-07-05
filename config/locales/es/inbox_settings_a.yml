@@ -102,7 +102,7 @@ es:
         delete_confirm: "¿Eliminar %{name}?"
         edit: Editar
         hide: Ocultar
-        synced_with_title: Sincronizado con %{account}
+        synced_with_title: Sincronizada con %{account}
         tagged_messages_title: Mensajes etiquetados
       toggle_hidden:
         hidden: "%{name} ocultada"
