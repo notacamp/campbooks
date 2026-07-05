@@ -37,10 +37,56 @@ RSpec.describe Settings::InvitationsController, type: :controller do
   end
 
   describe "DELETE destroy" do
-    it "cancels the invitation" do
+    it "cancels the invitation when the actor is the inviter" do
       invitation = create(:invitation, workspace: workspace, invited_by: user)
       delete :destroy, params: { id: invitation.id }
       expect(invitation.reload).to be_cancelled
+    end
+
+    it "denies a member who didn't send the invitation" do
+      other = create(:user, workspace: workspace)
+      invitation = create(:invitation, workspace: workspace, invited_by: other)
+
+      delete :destroy, params: { id: invitation.id }
+
+      expect(invitation.reload).to be_pending
+      expect(response).to redirect_to(settings_members_path)
+      expect(flash[:error]).to be_present
+    end
+
+    it "lets a workspace admin cancel anyone's invitation" do
+      user.update!(role: :admin)
+      other = create(:user, workspace: workspace)
+      invitation = create(:invitation, workspace: workspace, invited_by: other)
+
+      delete :destroy, params: { id: invitation.id }
+
+      expect(invitation.reload).to be_cancelled
+    end
+  end
+
+  describe "POST approve" do
+    it "lets a workspace admin release a pending unapproved invitation" do
+      user.update!(role: :admin)
+      other = create(:user, workspace: workspace)
+      invitation = create(:invitation, workspace: workspace, invited_by: other, admin_approved: false)
+
+      expect {
+        post :approve, params: { id: invitation.id }
+      }.to have_enqueued_mail(InvitationMailer, :invitation)
+
+      expect(invitation.reload).to be_admin_approved
+      expect(flash[:success]).to include(invitation.email)
+    end
+
+    it "denies a plain member" do
+      other = create(:user, workspace: workspace)
+      invitation = create(:invitation, workspace: workspace, invited_by: other, admin_approved: false)
+
+      post :approve, params: { id: invitation.id }
+
+      expect(invitation.reload).not_to be_admin_approved
+      expect(flash[:error]).to be_present
     end
   end
 

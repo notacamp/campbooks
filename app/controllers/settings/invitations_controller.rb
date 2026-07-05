@@ -1,5 +1,6 @@
 class Settings::InvitationsController < Settings::BaseController
-  before_action :set_invitation, only: [ :destroy, :resend ]
+  before_action :set_invitation, only: [ :approve, :destroy, :resend ]
+  before_action :require_invitation_manager, only: [ :destroy, :resend ]
 
   def create
     @invitation = Current.workspace.invitations.new(invitation_params)
@@ -27,6 +28,20 @@ class Settings::InvitationsController < Settings::BaseController
     end
   end
 
+  # A workspace admin releases a teammate's invitation that is awaiting
+  # approval (cloud mode). Instance operators keep their own global queue at
+  # /admin/invitations for moderation.
+  def approve
+    unless Current.user.admin?
+      redirect_to settings_members_path, error: t("settings.invitations.not_allowed")
+      return
+    end
+
+    @invitation.approve_by_admin!
+    Notifier.invitation_resolved(@invitation)
+    redirect_to settings_members_path, success: t(".approved", email: @invitation.email)
+  end
+
   def destroy
     @invitation.cancel!
     Notifier.invitation_resolved(@invitation)
@@ -50,6 +65,14 @@ class Settings::InvitationsController < Settings::BaseController
 
   def set_invitation
     @invitation = Current.workspace.invitations.find(params[:id])
+  end
+
+  # Cancelling or resending an invitation is for the person who sent it or a
+  # workspace admin — not any passing member.
+  def require_invitation_manager
+    return if Current.user.admin? || @invitation.invited_by_id == Current.user.id
+
+    redirect_to settings_members_path, error: t("settings.invitations.not_allowed")
   end
 
   def invitation_params

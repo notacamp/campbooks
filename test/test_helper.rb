@@ -50,9 +50,12 @@ module ActionDispatch
     # Sign in through the real cookie-session endpoint, as a browser would.
     # An active session is signed out first — SessionsController silently
     # ignores a login attempt while one is live (redirect_if_authenticated).
+    # Literal paths, not helpers: after a request into a mounted engine
+    # (e.g. /jobs), the integration session resolves URL helpers against the
+    # ENGINE's router, so session_path would 404 and the switch would no-op.
     def sign_in_as(user, password: "password123")
-      delete session_path if cookies[:session_id].present?
-      post session_path, params: { email_address: user.email_address, password: password }
+      delete "/session" if cookies[:session_id].present?
+      post "/session", params: { email_address: user.email_address, password: password }
     end
   end
 end

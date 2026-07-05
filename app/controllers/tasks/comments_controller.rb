@@ -17,6 +17,13 @@ module Tasks
       # Commenting follows the thread, so you hear about replies.
       ThreadFollow.find_or_create_by!(user: Current.user, agent_thread: thread)
 
+      # @Teammate mentions: follow them onto the thread + bell them (mirrors
+      # EmailCommentsController#process_participants).
+      mentioned_users(message.content).each do |mentioned|
+        ThreadFollow.find_or_create_by!(user: mentioned, agent_thread: thread)
+        Notifier.task_mention(@task, mentioned_user: mentioned, actor: Current.user)
+      end
+
       streams = [
         turbo_stream.remove("discussion_empty"),
         turbo_stream.append("comments_list", partial: "tasks/comments/comment", locals: { comment: message, task: @task }),
@@ -65,6 +72,15 @@ module Tasks
       @task = Task.accessible_to(current_user).find(params[:task_id])
     rescue ActiveRecord::RecordNotFound
       head :not_found
+    end
+
+    # Workspace members whose full name is @mentioned in the comment (same
+    # matching as EmailCommentsController#mentioned_users).
+    def mentioned_users(content)
+      text = content.to_s
+      Current.workspace.users.where.not(id: Current.user.id).select do |user|
+        user.name.present? && text.match?(/(?<!\w)@#{Regexp.escape(user.name)}\b/i)
+      end
     end
   end
 end

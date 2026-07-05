@@ -307,10 +307,11 @@ Rails.application.routes.draw do
       # Read-only personal security/audit history (sign-ins, MFA changes, exports…).
       get "audit_log", to: "security/audit_log#index"
     end
-    resources :members, only: [ :index ]
+    resources :members, only: [ :index, :update ]
     resources :invitations, only: [ :create, :destroy ] do
       member do
         post :resend
+        post :approve # workspace admin releases a pending (cloud) invitation
       end
     end
     resources :notifications, only: [ :index ] do

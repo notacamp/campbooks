@@ -60,10 +60,13 @@ en:
         update:
           mapping_saved: Folder mapping saved.
     invitations:
+      approve:
+        approved: Invitation for %{email} approved and sent.
       create:
         pending_review: Invitation for %{email} submitted for admin review.
         sent: Invitation sent to %{email}.
       destroy:
         cancelled: Invitation cancelled.
+      not_allowed: You don't have permission to manage this invitation.
       resend:
         resent: Invitation resent to %{email}.

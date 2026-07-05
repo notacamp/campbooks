@@ -117,5 +117,12 @@ RSpec.describe Auth::OauthSignIn do
       result = call(email: "oauthonly@corp.com")
       expect(result.user.password_set_by_user).to be(false)
     end
+
+    it "makes the founder their workspace's admin, without instance access" do
+      create(:user) # the instance already has users — only the very first gets app_admin
+      result = call(email: "founder@corp.com")
+      expect(result.user).to be_admin
+      expect(result.user.app_admin?).to be(false)
+    end
   end
 end

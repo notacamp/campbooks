@@ -465,6 +465,8 @@ pt:
           title: Zoho Drive
     members:
       index:
+        approve: Aprovar
+        awaiting_approval: A aguardar aprovação
         cancel_confirm: Cancelar este convite?
         cancel_invitation: Cancelar
         current_members_heading: Membros atuais (%{count})
@@ -474,6 +476,8 @@ pt:
         invite_button: Convidar membro
         invite_modal_heading: Convidar um membro
         invited_by: Convidado por %{name}
+        make_admin: Tornar administrador
+        make_member: Tornar membro
         no_members: Ainda sem membros.
         past_heading: Convites anteriores (%{count})
         pending_heading: Convites pendentes
@@ -482,6 +486,11 @@ pt:
         subtitle: Gira quem tem acesso a este espaço de trabalho.
         title: Membros
         you_badge: você
+      update:
+        invalid_role: Essa função não existe.
+        not_allowed: Só os administradores do espaço de trabalho podem alterar funções.
+        own_role: Não pode alterar a sua própria função.
+        updated: A função de %{name} foi atualizada.
     notifications:
       digest_preference:
         saved: Preferências de notificação guardadas.

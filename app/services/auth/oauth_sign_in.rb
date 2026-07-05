@@ -82,7 +82,11 @@ module Auth
           email_address: @email,
           name: @name || @email.split("@").first,
           password: SecureRandom.hex(32),
-          password_set_by_user: false
+          password_set_by_user: false,
+          # Founding a workspace makes you its admin; the instance's very
+          # first account also operates the instance (mirrors registration).
+          role: :admin,
+          app_admin: !User.exists?
         )
         user.identities.create!(provider: @provider, uid: @uid, email: @email)
       end
