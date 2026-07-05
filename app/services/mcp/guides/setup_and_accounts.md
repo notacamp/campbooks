@@ -17,6 +17,9 @@ Accepts a `refresh_token` that was minted using the **same OAuth client
 credentials configured on this Campbooks server**. This is critical: a token
 from a different client_id (e.g. from the cloud production client) will fail
 the refresh step with an error directing you to use the server's own client.
+If the server has no provider OAuth configured at all (the ZOHO_CLIENT_ID or
+GOOGLE_CLIENT_ID environment variable is missing), token mode returns a clear
+"not configured" ToolError naming the missing variable — set it up first.
 
 Process:
 1. The caller obtains a refresh token using the server's OAuth client

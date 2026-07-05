@@ -248,4 +248,97 @@ class Api::McpToolsTest < ActionDispatch::IntegrationTest
     names = body.dig("result", "tools").map { |t| t["name"] }
     refute_includes names, "list_tasks", "list_tasks should not appear when tasks? is off"
   end
+
+  # ---- Fix 1: id params must be string (UUID PKs) ---------------------------
+
+  test "all id and *_id inputSchema properties are typed string" do
+    Mcp::Registry.all.each do |tool|
+      props = (tool.input_schema[:properties] || {})
+      props.each do |key, schema|
+        next unless key.to_s == "id" || key.to_s.end_with?("_id")
+        next unless schema.is_a?(Hash)
+        assert_equal "string", schema[:type],
+                     "#{tool.name}.#{key} should be type:string but got #{schema[:type].inspect}"
+      end
+    end
+  end
+
+  test "id_schema helper produces type string" do
+    tool = Mcp::Registry.find("mark_email_read")
+    assert_equal "string", tool.input_schema.dig(:properties, :id, :type)
+  end
+
+  # ---- Fix 2: create_task without all_day does not raise NOT NULL -----------
+
+  test "create_task without all_day succeeds" do
+    saved = ENV["ENABLE_TASKS"]
+    ENV["ENABLE_TASKS"] = "1"
+    begin
+      @workspace.update!(plan: "pro")
+      payload = call_tool("create_task", { "title" => "Test no all_day" })
+      assert payload.key?("task"), "Expected task key: #{payload.inspect}"
+      assert_equal "Test no all_day", payload.dig("task", "title")
+    ensure
+      saved.nil? ? ENV.delete("ENABLE_TASKS") : (ENV["ENABLE_TASKS"] = saved)
+    end
+  end
+
+  # ---- Fix 3: update_task with bogus status returns isError -----------------
+
+  test "update_task with invalid status returns isError" do
+    saved = ENV["ENABLE_TASKS"]
+    ENV["ENABLE_TASKS"] = "1"
+    begin
+      @workspace.update!(plan: "pro")
+      task = @workspace.tasks.create!(title: "Status guard", status: :todo, created_by: @user)
+      body = mcp_call("tools/call", {
+        name: "update_task",
+        arguments: { "id" => task.id, "status" => "definitely_not_valid" }
+      })
+      assert body.dig("result", "isError"), "Expected isError for bogus status"
+      text = body.dig("result", "content", 0, "text")
+      assert_includes text, "Invalid status"
+    ensure
+      saved.nil? ? ENV.delete("ENABLE_TASKS") : (ENV["ENABLE_TASKS"] = saved)
+    end
+  end
+
+  # ---- Fix 5: list tools include count field --------------------------------
+
+  test "list_emails returns a count field" do
+    ea = @workspace.email_accounts.create!(
+      email_address: "count-test-#{SecureRandom.hex(4)}@example.com",
+      provider: :zoho, refresh_token: "dummy"
+    )
+    @user.email_account_users.create!(email_account: ea, can_read: true, can_send: false, can_manage: false, owner: true)
+    ea.email_messages.create!(
+      provider_message_id: SecureRandom.hex, subject: "Count test email",
+      from_address: "x@example.com", to_address: "me@example.com",
+      received_at: 1.hour.ago
+    )
+
+    payload = call_tool("list_emails")
+    assert payload.key?("count"), "Expected count key in list_emails response"
+    assert_kind_of Integer, payload["count"]
+  end
+
+  test "list_tags returns a count field" do
+    @workspace.tags.create!(name: "TagForCount", color: "#595dec", source: :local)
+    payload = call_tool("list_tags")
+    assert payload.key?("count"), "Expected count key in list_tags response"
+    assert_kind_of Integer, payload["count"]
+  end
+
+  test "list_document_types returns a count field" do
+    payload = call_tool("list_document_types")
+    assert payload.key?("count"), "Expected count key in list_document_types response"
+    assert_kind_of Integer, payload["count"]
+  end
+
+  test "list_folders returns a count field" do
+    @workspace.mail_folders.create!(name: "FolderForCount")
+    payload = call_tool("list_folders")
+    assert payload.key?("count"), "Expected count key in list_folders response"
+    assert_kind_of Integer, payload["count"]
+  end
 end

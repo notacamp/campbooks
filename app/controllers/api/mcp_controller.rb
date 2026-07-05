@@ -223,6 +223,20 @@ module Api
       tool_error("Not found.")
     rescue ActiveRecord::RecordInvalid => e
       tool_error("Validation failed: #{e.record.errors.full_messages.join(', ')}")
+    rescue ArgumentError => e
+      # Enum assignment / time parsing errors carry a safe, useful message
+      # ("'critical' is not a valid priority"); surface it as a tool failure.
+      tool_error(e.message)
+    rescue Mcp::RpcError
+      raise # protocol errors (bad/missing args, scope) propagate to #handle
+    rescue => e
+      # Backstop: any other exception (a missing provider ENV var, a DB
+      # constraint, a provider client blowing up) must never leak a stack trace,
+      # internal path, or secret name to the MCP client. Log it server-side and
+      # return an opaque, honest failure.
+      Rails.logger.error("[MCP] tool #{name} raised #{e.class}: #{e.message}")
+      Rails.error.report(e, handled: true, context: { mcp_tool: name })
+      tool_error("The #{name} tool couldn't complete. A connected service or setting may be misconfigured.")
     end
 
     def text_content(data)

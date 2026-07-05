@@ -19,9 +19,11 @@ for example, to preserve a formatted table the user wants to inspect.
 
 ## Limit list results
 
-Every list tool accepts a `limit` parameter (default 20, max 50). Pass the
+Most list tools accept a `limit` parameter (default 20, max 50). Pass the
 smallest limit that serves the task. For a summary ("how many unread?") you
-do not need list results at all — get_overview has the count.
+do not need list results at all — get_overview has the count. A few tools that
+return small fixed sets (list_folders, list_document_types, list_email_accounts)
+return everything without a limit parameter.
 
 ## Batch ids into bulk tools
 

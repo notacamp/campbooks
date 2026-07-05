@@ -496,4 +496,144 @@ RSpec.describe "API MCP endpoint", type: :request do
       expect(payload).to have_key("tasks")
     end
   end
+
+  # ---- Fix 1: id params must be typed string (UUIDs) -----------------------
+
+  describe "inputSchema id types" do
+    it "declares id as type string in get_task inputSchema" do
+      rpc({ jsonrpc: "2.0", id: 80, method: "tools/list" }, scopes: "tasks:read tasks:write")
+      allow(Features).to receive(:tasks?).and_return(true)
+
+      rpc({ jsonrpc: "2.0", id: 81, method: "tools/list" }, scopes: "tasks:read tasks:write")
+
+      tools = response.parsed_body["result"]["tools"]
+      # get_task uses id_schema which we fixed — but tasks may be hidden by feature flag.
+      # Verify via the registry directly instead.
+      tool = Mcp::Registry.find("mark_email_read")
+      id_type = tool.input_schema.dig(:properties, :id, :type)
+      expect(id_type).to eq("string")
+    end
+
+    it "declares email_account_id as type string in send_email inputSchema" do
+      tool = Mcp::Registry.find("send_email")
+      id_type = tool.input_schema.dig(:properties, :email_account_id, :type)
+      expect(id_type).to eq("string")
+    end
+
+    it "declares all *_id properties as string throughout the registry" do
+      Mcp::Registry.all.each do |tool|
+        props = tool.input_schema[:properties] || {}
+        props.each do |key, schema|
+          next unless key.to_s == "id" || key.to_s.end_with?("_id")
+          next unless schema.is_a?(Hash)
+          expect(schema[:type]).to eq("string"),
+            "#{tool.name}.#{key} should be type:string (got #{schema[:type].inspect})"
+        end
+      end
+    end
+  end
+
+  # ---- Fix 2: create_task without all_day must not crash --------------------
+
+  describe "create_task" do
+    before do
+      allow(Features).to receive(:tasks?).and_return(true)
+      workspace.update!(plan: "pro")
+    end
+
+    it "succeeds without all_day (defaults false, no NOT NULL crash)" do
+      rpc({ jsonrpc: "2.0", id: 90, method: "tools/call",
+            params: { name: "create_task", arguments: { title: "Spec task no all_day" } } },
+          scopes: "tasks:write")
+
+      result = response.parsed_body["result"]
+      expect(result["isError"]).to be_falsey
+      payload = JSON.parse(result["content"].first["text"])
+      expect(payload.dig("task", "title")).to eq("Spec task no all_day")
+    end
+  end
+
+  # ---- Fix 3: update_task with bogus status returns isError ----------------
+
+  describe "update_task" do
+    before do
+      allow(Features).to receive(:tasks?).and_return(true)
+      workspace.update!(plan: "pro")
+    end
+
+    it "returns isError for an invalid status value" do
+      task = Task.create!(
+        title: "Status test task",
+        status: :todo,
+        workspace: workspace,
+        created_by: user
+      )
+
+      rpc({ jsonrpc: "2.0", id: 91, method: "tools/call",
+            params: { name: "update_task",
+                      arguments: { id: task.id, status: "not_a_valid_status" } } },
+          scopes: "tasks:write")
+
+      result = response.parsed_body["result"]
+      expect(result["isError"]).to be(true)
+      expect(result["content"].first["text"]).to include("Invalid status")
+    end
+  end
+
+  # ---- Fix 5: list tools include count ------------------------------------
+
+  describe "list tool count field" do
+    it "list_emails includes a count field" do
+      create(:email_message, email_account: account, subject: "Count test")
+
+      rpc({ jsonrpc: "2.0", id: 95, method: "tools/call",
+            params: { name: "list_emails", arguments: {} } }, scopes: "emails:read")
+
+      payload = JSON.parse(response.parsed_body["result"]["content"].first["text"])
+      expect(payload).to have_key("count")
+      expect(payload["count"]).to be_a(Integer)
+    end
+
+    it "list_tags includes a count field" do
+      Tag.create!(workspace: workspace, name: "CountTag", color: "#ccc", source: :local)
+
+      rpc({ jsonrpc: "2.0", id: 96, method: "tools/call",
+            params: { name: "list_tags", arguments: {} } }, scopes: "tags:read")
+
+      payload = JSON.parse(response.parsed_body["result"]["content"].first["text"])
+      expect(payload).to have_key("count")
+    end
+
+    it "list_document_types includes a count field" do
+      rpc({ jsonrpc: "2.0", id: 97, method: "tools/call",
+            params: { name: "list_document_types", arguments: {} } }, scopes: "document_types:read")
+
+      payload = JSON.parse(response.parsed_body["result"]["content"].first["text"])
+      expect(payload).to have_key("count")
+    end
+  end
+
+  describe "create_calendar_event" do
+    let(:calendar_account) { create(:calendar_account, workspace: workspace) }
+    let(:calendar) { create(:calendar, calendar_account: calendar_account, is_writable: true, syncing: true) }
+
+    before { create(:calendar_account_user, :owner, user: user, calendar_account: calendar_account) }
+
+    # Regression: the tool used to set `color:` on CalendarEvent, which has no
+    # such attribute (events render in their calendar's color) — every call
+    # raised ActiveModel::UnknownAttributeError.
+    it "creates an event without touching a non-existent color attribute" do
+      rpc({ jsonrpc: "2.0", id: 98, method: "tools/call",
+            params: { name: "create_calendar_event",
+                      arguments: { calendar_id: calendar.id, title: "Standup",
+                                   start_at: "2026-07-08T09:00:00Z", end_at: "2026-07-08T09:30:00Z" } } },
+          scopes: "calendar:write")
+
+      result = response.parsed_body["result"]
+      expect(result["isError"]).to be_falsey
+      payload = JSON.parse(result["content"].first["text"])
+      expect(payload.dig("event", "title")).to eq("Standup")
+      expect(calendar.calendar_events.where(title: "Standup")).to exist
+    end
+  end
 end

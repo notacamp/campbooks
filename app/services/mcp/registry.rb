@@ -283,7 +283,8 @@ module Mcp
           like = "%#{args["query"]}%"
           scope = scope.where("email_messages.subject ILIKE :q OR email_messages.from_address ILIKE :q", q: like)
         end
-        { emails: scope.limit(clamp_limit(args["limit"])).map { |e| Api::V1::EmailSerializer.new(e).as_json } }
+        rows = scope.limit(clamp_limit(args["limit"])).map { |e| Api::V1::EmailSerializer.new(e).as_json }
+        { emails: rows, count: rows.size }
       end
     end
 
@@ -390,7 +391,7 @@ module Mcp
         scope: "emails:send",
         input_schema: object_schema(
           properties: {
-            email_account_id: { type: "integer", description: "Id of the sending account (must be one the caller may send from)" },
+            email_account_id: { type: "string", description: "Id of the sending account (must be one the caller may send from)" },
             to_address: { type: "string", description: "Recipient address(es), comma-separated" },
             subject: { type: "string" },
             body: { type: "string", description: "HTML or plain-text body" },
@@ -420,12 +421,12 @@ module Mcp
         scope: "emails:send",
         input_schema: object_schema(
           properties: {
-            id: { type: "integer", description: "The email to reply to" },
+            id: { type: "string", description: "The email to reply to" },
             body: { type: "string" },
             to_address: { type: "string", description: "Override recipient (defaults to the original sender)" },
             cc_address: { type: "string" },
             bcc_address: { type: "string" },
-            email_account_id: { type: "integer", description: "Override sending account" }
+            email_account_id: { type: "string", description: "Override sending account" }
           },
           required: [ "id", "body" ]
         )
@@ -480,8 +481,8 @@ module Mcp
         scope: "tags:write",
         input_schema: object_schema(
           properties: {
-            email_id: { type: "integer" },
-            tag_id: { type: "integer", description: "The tag to attach (or pass name)" },
+            email_id: { type: "string" },
+            tag_id: { type: "string", description: "The tag to attach (or pass name)" },
             name: { type: "string", description: "Tag name (case-insensitive) if tag_id is not given" }
           },
           required: [ "email_id" ]
@@ -502,8 +503,8 @@ module Mcp
         scope: "tags:write",
         input_schema: object_schema(
           properties: {
-            email_id: { type: "integer" },
-            tag_id: { type: "integer" }
+            email_id: { type: "string" },
+            tag_id: { type: "string" }
           },
           required: [ "email_id", "tag_id" ]
         )
@@ -868,7 +869,7 @@ module Mcp
         scope: "documents:read",
         input_schema: object_schema(properties: {
           limit: limit_property,
-          document_type_id: { type: "integer" },
+          document_type_id: { type: "string" },
           review_status: { type: "string", description: "e.g. pending, approved, rejected" }
         })
       ) do |args|
@@ -877,7 +878,8 @@ module Mcp
         if args["review_status"].present? && Document.review_statuses.key?(args["review_status"])
           scope = scope.by_review_status(args["review_status"])
         end
-        { documents: scope.limit(clamp_limit(args["limit"])).map { |d| Api::V1::DocumentSerializer.new(d).as_json } }
+        rows = scope.limit(clamp_limit(args["limit"])).map { |d| Api::V1::DocumentSerializer.new(d).as_json }
+        { documents: rows, count: rows.size }
       end
     end
 
@@ -928,8 +930,8 @@ module Mcp
         scope: "documents:write",
         input_schema: object_schema(
           properties: {
-            id: { type: "integer" },
-            document_type_id: { type: "integer" },
+            id: { type: "string" },
+            document_type_id: { type: "string" },
             vendor_name: { type: "string" },
             client_name: { type: "string" },
             invoice_number: { type: "string" },
@@ -988,8 +990,8 @@ module Mcp
         scope: "documents:write",
         input_schema: object_schema(
           properties: {
-            id: { type: "integer" },
-            document_type_id: { type: "integer" }
+            id: { type: "string" },
+            document_type_id: { type: "string" }
           },
           required: [ "id", "document_type_id" ]
         )
@@ -1023,7 +1025,8 @@ module Mcp
           like = "%#{args["query"]}%"
           scope = scope.where("contacts.name ILIKE :q OR contacts.email ILIKE :q", q: like)
         end
-        { contacts: scope.order(:name).limit(clamp_limit(args["limit"])).map { |c| Api::V1::ContactSerializer.new(c).as_json } }
+        rows = scope.order(:name).limit(clamp_limit(args["limit"])).map { |c| Api::V1::ContactSerializer.new(c).as_json }
+        { contacts: rows, count: rows.size }
       end
     end
 
@@ -1047,7 +1050,7 @@ module Mcp
         scope: "contacts:write",
         input_schema: object_schema(
           properties: {
-            id: { type: "integer" },
+            id: { type: "string" },
             name: { type: "string" },
             relationship_type: { type: "string" }
           },
@@ -1071,7 +1074,7 @@ module Mcp
         scope: "contacts:write",
         input_schema: object_schema(
           properties: {
-            id: { type: "integer" },
+            id: { type: "string" },
             state: { type: "string", enum: %w[star unstar allow block unblock] }
           },
           required: [ "id", "state" ]
@@ -1098,7 +1101,8 @@ module Mcp
         scope: "tags:read",
         input_schema: object_schema(properties: { limit: limit_property })
       ) do |args|
-        { tags: Current.workspace.tags.by_name.limit(clamp_limit(args["limit"])).map { |t| Api::V1::TagSerializer.new(t).as_json } }
+        rows = Current.workspace.tags.by_name.limit(clamp_limit(args["limit"])).map { |t| Api::V1::TagSerializer.new(t).as_json }
+        { tags: rows, count: rows.size }
       end
     end
 
@@ -1109,7 +1113,8 @@ module Mcp
         scope: "document_types:read",
         input_schema: object_schema(properties: {})
       ) do |_args|
-        { document_types: Current.workspace.document_types.order(:category, :name).map { |t| Api::V1::DocumentTypeSerializer.new(t).as_json } }
+        rows = Current.workspace.document_types.order(:category, :name).map { |t| Api::V1::DocumentTypeSerializer.new(t).as_json }
+        { document_types: rows, count: rows.size }
       end
     end
 
@@ -1188,7 +1193,7 @@ module Mcp
         input_schema: object_schema(
           properties: {
             name: { type: "string" },
-            parent_id: { type: "integer", description: "Optional parent folder id" },
+            parent_id: { type: "string", description: "Optional parent folder id" },
             icon: { type: "string", description: "Optional emoji icon" },
             provision: { type: "boolean", description: "Create on all connected mailboxes (default: false)" }
           },
@@ -1278,7 +1283,7 @@ module Mcp
         status = Task.statuses.key?(args["status"].to_s) ? args["status"] : "todo"
         task = Current.workspace.tasks.new(
           title: args["title"], description: args["description"],
-          due_at: parse_time(args["due_at"]), all_day: args["all_day"],
+          due_at: parse_time(args["due_at"]), all_day: args["all_day"] ? true : false,
           priority: args["priority"].presence || "normal",
           status: status, created_by: Current.user
         )
@@ -1312,8 +1317,11 @@ module Mcp
         permitted = args.slice("title", "description", "due_at", "all_day", "priority")
         permitted["due_at"] = parse_time(args["due_at"]) if args.key?("due_at")
         task.update!(permitted.compact)
-        if args["status"].present? && Task.statuses.key?(args["status"]) && args["status"] != task.status
-          task.move_to_status!(args["status"], by: Current.user)
+        if args["status"].present?
+          unless Task.statuses.key?(args["status"])
+            raise Mcp::ToolError, "Invalid status '#{args["status"]}'. Valid: #{Task.statuses.keys.join(", ")}."
+          end
+          task.move_to_status!(args["status"], by: Current.user) if args["status"] != task.status
         end
         { task: Api::V1::TaskSerializer.new(task.reload, detail: true).as_json }
       end
@@ -1399,7 +1407,7 @@ module Mcp
             title: { type: "string" },
             start_time: { type: "string", description: "ISO-8601 override" },
             end_time: { type: "string", description: "ISO-8601 override" },
-            calendar_id: { type: "integer" }
+            calendar_id: { type: "string" }
           },
           required: %w[email_id]
         )
@@ -1425,7 +1433,8 @@ module Mcp
         input_schema: object_schema(properties: { limit: limit_property })
       ) do |args|
         scope = Current.workspace.workflows.order(created_at: :desc)
-        { workflows: scope.limit(clamp_limit(args["limit"])).map { |w| Api::V1::WorkflowSerializer.new(w).as_json } }
+        rows = scope.limit(clamp_limit(args["limit"])).map { |w| Api::V1::WorkflowSerializer.new(w).as_json }
+        { workflows: rows, count: rows.size }
       end
     end
 
@@ -1437,7 +1446,7 @@ module Mcp
         enabled: -> { Features.workflows? },
         input_schema: object_schema(
           properties: {
-            id: { type: "integer" },
+            id: { type: "string" },
             payload: { type: "object", additionalProperties: true, description: "Exposed to the workflow's Liquid templates" }
           },
           required: [ "id" ]
@@ -1461,13 +1470,14 @@ module Mcp
         scope: "workflows:read",
         enabled: -> { Features.workflows? },
         input_schema: object_schema(
-          properties: { workflow_id: { type: "integer" }, limit: limit_property },
+          properties: { workflow_id: { type: "string" }, limit: limit_property },
           required: [ "workflow_id" ]
         )
       ) do |args|
         require_arg(args, "workflow_id")
         workflow = Current.workspace.workflows.find(args["workflow_id"])
-        { executions: workflow.executions.limit(clamp_limit(args["limit"])).map { |e| Api::V1::WorkflowExecutionSerializer.new(e).as_json } }
+        rows = workflow.executions.limit(clamp_limit(args["limit"])).map { |e| Api::V1::WorkflowExecutionSerializer.new(e).as_json }
+        { executions: rows, count: rows.size }
       end
     end
 
@@ -1481,7 +1491,8 @@ module Mcp
         input_schema: object_schema(properties: { limit: limit_property })
       ) do |args|
         scope = Current.user.agent_threads.scout_visible.recent
-        { threads: scope.limit(clamp_limit(args["limit"])).map { |t| Api::V1::AgentThreadSerializer.new(t).as_json } }
+        rows = scope.limit(clamp_limit(args["limit"])).map { |t| Api::V1::AgentThreadSerializer.new(t).as_json }
+        { threads: rows, count: rows.size }
       end
     end
 
@@ -1506,8 +1517,8 @@ module Mcp
         scope: "scout:read",
         input_schema: object_schema(
           properties: {
-            thread_id: { type: "integer" },
-            after_message_id: { type: "integer", description: "Only messages created after this one" }
+            thread_id: { type: "string" },
+            after_message_id: { type: "string", description: "Only messages created after this one" }
           },
           required: [ "thread_id" ]
         )
@@ -1518,7 +1529,8 @@ module Mcp
         if args["after_message_id"].present? && (pivot = thread.agent_messages.find_by(id: args["after_message_id"]))
           scope = scope.where("agent_messages.created_at > ?", pivot.created_at)
         end
-        { messages: scope.map { |m| Api::V1::AgentMessageSerializer.new(m).as_json } }
+        rows = scope.map { |m| Api::V1::AgentMessageSerializer.new(m).as_json }
+        { messages: rows, count: rows.size }
       end
     end
 
@@ -1529,7 +1541,7 @@ module Mcp
         scope: "scout:write",
         input_schema: object_schema(
           properties: {
-            thread_id: { type: "integer" },
+            thread_id: { type: "string" },
             content: { type: "string" }
           },
           required: [ "thread_id", "content" ]
@@ -1561,7 +1573,8 @@ module Mcp
       ) do |args|
         scope = ScheduledEmail.accessible_to(Current.user).order(Arel.sql("COALESCE(next_occurrence_at, scheduled_at) ASC"))
         scope = scope.where(status: args["status"]) if args["status"].present? && ScheduledEmail.statuses.key?(args["status"])
-        { scheduled_emails: scope.limit(clamp_limit(args["limit"])).map { |s| Api::V1::ScheduledEmailSerializer.new(s).as_json } }
+        rows = scope.limit(clamp_limit(args["limit"])).map { |s| Api::V1::ScheduledEmailSerializer.new(s).as_json }
+        { scheduled_emails: rows, count: rows.size }
       end
     end
 
@@ -1585,7 +1598,7 @@ module Mcp
         scope: "scheduled_emails:write",
         input_schema: object_schema(
           properties: {
-            email_account_id: { type: "integer" },
+            email_account_id: { type: "string" },
             to_address: { type: "string" },
             subject: { type: "string" },
             body: { type: "string" },
@@ -1620,8 +1633,8 @@ module Mcp
         scope: "scheduled_emails:write",
         input_schema: object_schema(
           properties: {
-            id: { type: "integer" },
-            email_account_id: { type: "integer" },
+            id: { type: "string" },
+            email_account_id: { type: "string" },
             to_address: { type: "string" },
             subject: { type: "string" },
             body: { type: "string" },
@@ -1675,7 +1688,8 @@ module Mcp
         scope = CalendarEvent.accessible_to(Current.user).order(start_at: :asc)
         scope = scope.where("calendar_events.start_at >= ?", parse_time(args["start_after"])) if parse_time(args["start_after"])
         scope = scope.where("calendar_events.start_at < ?", parse_time(args["start_before"])) if parse_time(args["start_before"])
-        { events: scope.limit(clamp_limit(args["limit"])).map { |e| Api::V1::CalendarEventSerializer.new(e).as_json } }
+        rows = scope.limit(clamp_limit(args["limit"])).map { |e| Api::V1::CalendarEventSerializer.new(e).as_json }
+        { events: rows, count: rows.size }
       end
     end
 
@@ -1699,14 +1713,13 @@ module Mcp
         scope: "calendar:write",
         input_schema: object_schema(
           properties: {
-            calendar_id: { type: "integer", description: "Id of a writable calendar" },
+            calendar_id: { type: "string", description: "Id of a writable calendar" },
             title: { type: "string" },
             start_at: { type: "string", description: "ISO-8601 start" },
             end_at: { type: "string", description: "ISO-8601 end" },
             description: { type: "string" },
             location: { type: "string" },
-            all_day: { type: "boolean" },
-            color: { type: "string", description: "Hex color, optional" }
+            all_day: { type: "boolean" }
           },
           required: [ "calendar_id", "title", "start_at" ]
         )
@@ -1715,10 +1728,12 @@ module Mcp
         calendar = writable_calendars.find_by(id: args["calendar_id"])
         raise Mcp::ToolError, "That calendar does not exist or is not writable." unless calendar
 
+        # An event has no color of its own — it renders in its calendar's color
+        # (CalendarEvent#display_color), so the tool does not expose a color field.
         event = calendar.calendar_events.new(
           title: args["title"], description: args["description"], location: args["location"],
           start_at: args["start_at"], end_at: args["end_at"], all_day: args["all_day"] || false,
-          color: args["color"], provider_event_id: "local-#{SecureRandom.uuid}",
+          provider_event_id: "local-#{SecureRandom.uuid}",
           status: :confirmed, outbound_pending: true
         )
         event.save!
@@ -1734,10 +1749,10 @@ module Mcp
         scope: "calendar:write",
         input_schema: object_schema(
           properties: {
-            id: { type: "integer" },
+            id: { type: "string" },
             title: { type: "string" }, description: { type: "string" }, location: { type: "string" },
             start_at: { type: "string" }, end_at: { type: "string" },
-            all_day: { type: "boolean" }, color: { type: "string" },
+            all_day: { type: "boolean" },
             recurrence_scope: { type: "string", enum: %w[this all] }
           },
           required: [ "id" ]
@@ -1745,7 +1760,7 @@ module Mcp
       ) do |args|
         require_arg(args, "id")
         event = writable_event(args["id"])
-        event.update!(args.slice("title", "description", "location", "start_at", "end_at", "all_day", "color")
+        event.update!(args.slice("title", "description", "location", "start_at", "end_at", "all_day")
                           .merge(outbound_pending: true))
         Calendars::EventWriteJob.perform_later(event.id, "update", recurrence_scope(args))
         { event: Api::V1::CalendarEventSerializer.new(event, detail: true).as_json }
@@ -1758,7 +1773,7 @@ module Mcp
         description: "Delete a calendar event (async provider delete). recurrence_scope: this|all.",
         scope: "calendar:write",
         input_schema: object_schema(
-          properties: { id: { type: "integer" }, recurrence_scope: { type: "string", enum: %w[this all] } },
+          properties: { id: { type: "string" }, recurrence_scope: { type: "string", enum: %w[this all] } },
           required: [ "id" ]
         )
       ) do |args|
@@ -1777,7 +1792,7 @@ module Mcp
         scope: "calendar:write",
         input_schema: object_schema(
           properties: {
-            id: { type: "integer" },
+            id: { type: "string" },
             rsvp_status: { type: "string", enum: %w[needs_action accepted declined tentative] }
           },
           required: [ "id", "rsvp_status" ]
@@ -1807,7 +1822,8 @@ module Mcp
       ) do |args|
         scope = Reminder.accessible_to(Current.user).order(due_at: :asc)
         scope = scope.where(status: args["status"]) if args["status"].present? && Reminder.statuses.key?(args["status"])
-        { reminders: scope.limit(clamp_limit(args["limit"])).map { |r| Api::V1::ReminderSerializer.new(r).as_json } }
+        rows = scope.limit(clamp_limit(args["limit"])).map { |r| Api::V1::ReminderSerializer.new(r).as_json }
+        { reminders: rows, count: rows.size }
       end
     end
 
@@ -1830,7 +1846,7 @@ module Mcp
         description: "Confirm a reminder into a calendar event. Optionally pass due_at to adjust the time first.",
         scope: "reminders:write",
         input_schema: object_schema(
-          properties: { id: { type: "integer" }, due_at: { type: "string", description: "ISO-8601" } },
+          properties: { id: { type: "string" }, due_at: { type: "string", description: "ISO-8601" } },
           required: [ "id" ]
         )
       ) do |args|
@@ -1869,7 +1885,7 @@ module Mcp
         description: "Snooze a reminder until the given time, or one week out when omitted.",
         scope: "reminders:write",
         input_schema: object_schema(
-          properties: { id: { type: "integer" }, until: { type: "string", description: "ISO-8601" } },
+          properties: { id: { type: "string" }, until: { type: "string", description: "ISO-8601" } },
           required: [ "id" ]
         )
       ) do |args|
@@ -1891,7 +1907,8 @@ module Mcp
         input_schema: object_schema(properties: { limit: limit_property })
       ) do |args|
         scope = Current.workspace.email_templates.recent
-        { email_templates: scope.limit(clamp_limit(args["limit"])).map { |t| Api::V1::EmailTemplateSerializer.new(t).as_json } }
+        rows = scope.limit(clamp_limit(args["limit"])).map { |t| Api::V1::EmailTemplateSerializer.new(t).as_json }
+        { email_templates: rows, count: rows.size }
       end
     end
 
@@ -1904,7 +1921,8 @@ module Mcp
         scope: "folders:read",
         input_schema: object_schema(properties: {})
       ) do |_args|
-        { folders: Current.workspace.mail_folders.ordered.map { |f| Api::V1::FolderSerializer.new(f).as_json } }
+        rows = Current.workspace.mail_folders.ordered.map { |f| Api::V1::FolderSerializer.new(f).as_json }
+        { folders: rows, count: rows.size }
       end
     end
 
@@ -1927,7 +1945,7 @@ module Mcp
         description: "File a document into a folder.",
         scope: "folders:write",
         input_schema: object_schema(
-          properties: { mail_folder_id: { type: "integer" }, document_id: { type: "integer" } },
+          properties: { mail_folder_id: { type: "string" }, document_id: { type: "string" } },
           required: [ "mail_folder_id", "document_id" ]
         )
       ) do |args|
@@ -1967,7 +1985,7 @@ module Mcp
     end
 
     def id_schema(description)
-      object_schema(properties: { id: { type: "integer", description: description } }, required: [ "id" ])
+      object_schema(properties: { id: { type: "string", description: description } }, required: [ "id" ])
     end
 
     def limit_property
@@ -2087,6 +2105,10 @@ module Mcp
       else
         raise Mcp::ToolError, "Provider #{provider} does not support token mode."
       end
+    rescue KeyError => e
+      raise Mcp::ToolError, "#{provider.to_s.capitalize} OAuth is not configured on this server " \
+                            "(missing #{e.message}). Token mode requires the server's own " \
+                            "OAuth client credentials (#{provider.to_s.upcase}_CLIENT_ID / _SECRET)."
     rescue PermanentAuthError => e
       raise Mcp::ToolError, "Token refresh failed: #{e.message}. The refresh_token must be " \
                             "minted with THIS server's configured OAuth client credentials — " \

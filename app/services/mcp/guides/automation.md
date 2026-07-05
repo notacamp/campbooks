@@ -47,7 +47,10 @@ the cadence is correct before telling the user.
 
 Email templates are reusable message templates stored in the workspace. They are
 visible when the email_templates feature flag is on
-(get_setup_status.features.email_templates = true).
+(get_setup_status.features.email_templates = true). When the flag is off,
+list_email_templates and any related tools will not appear in tools/list —
+this is expected, not a missing tool. Set ENABLE_EMAIL_TEMPLATES=1 on the server
+to enable them.
 
 list_email_templates returns the available templates. To use a template when
 composing, retrieve its body and subject, present them to the user for any

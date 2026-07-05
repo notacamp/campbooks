@@ -25,7 +25,7 @@ tasks, calendar, and sending — through plain tool calls.
 |---|---|---|
 | Meta | get_overview, get_setup_status, guide | (any authenticated client) |
 | Email — read | list_emails, search_emails, get_email | emails:read |
-| Email — act | update_emails, tag_emails, forward_email | emails:write / emails:send |
+| Email — act | update_emails, move_emails_to_folder, tag_emails, forward_email | emails:write / emails:send |
 | Skim triage | get_skim_deck, skim_decide | emails:read / emails:write |
 | Email accounts | list_email_accounts, connect_email_account | email_accounts:read / write |
 | Documents | list_documents, get_document, approve_document | documents:read / write |

@@ -24,9 +24,12 @@ the AI so you do not need to fetch every email to form a view.
 
 ## Awaiting-reply
 
-`get_overview` returns `awaiting_reply_count` — the number of email threads
-where the current user sent the last message and has not heard back. These are
-detected without AI (header heuristics only). Useful as a gentle reminder to
+`get_overview` returns `emails.awaiting_reply_count` — the number of email threads
+where the current user sent the last message and has not heard back. Note that
+get_overview groups all email counts under an `emails` key: `emails.unread_count`,
+`emails.awaiting_reply_count`, `emails.skim_pending_count`, and `emails.pinned_count`.
+Similarly, document counts are under `documents`, task counts under `tasks`, and so on.
+These are detected without AI (header heuristics only). Useful as a gentle reminder to
 follow up.
 
 ## The Skim loop
@@ -67,6 +70,6 @@ threads the user explicitly wants to track.
 
 A healthy triage session: get_overview (headline numbers) → get_skim_deck
 (inspect clusters) → propose one ring at a time → skim_decide for confirmed
-batches → check awaiting_reply_count and offer follow-up drafts if nonzero.
+batches → check emails.awaiting_reply_count and offer follow-up drafts if nonzero.
 Do not archive everything; keep is appropriate for newsletters the user wants
 to keep but has already read.
