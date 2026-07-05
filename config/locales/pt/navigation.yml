@@ -4,6 +4,7 @@ pt:
     settings:
       groups:
         ai_and_automation: IA e automação
+        inbox: Caixa de entrada
         workspace: Espaço de trabalho
         your_account: A sua conta
       items:
