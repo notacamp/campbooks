@@ -1,14 +1,18 @@
 import { Controller } from "@hotwired/stimulus"
 
 // Auto-hides this element when the user scrolls down and reveals it on
-// scroll-up. Designed for the mobile bottom nav (#bottom-nav): the bar slides
-// off-screen to reclaim vertical space during downward reading, then glides
-// back as soon as the user scrolls up to act or navigate.
+// scroll-up. Designed for the mobile bottom nav: the bar slides off-screen to
+// reclaim vertical space during downward reading, then glides back as soon as
+// the user scrolls up to act or navigate.
 //
-// Technique: passive window scroll listener + requestAnimationFrame throttle
-// (the same pattern used by feed-focus). A small threshold (10 px) avoids
-// jitter from micro-bounces or inertia tails. An additional guard keeps the
-// bar shown while near the top of the page.
+// Listens on document in capture phase so it catches scroll events from both
+// window-level scrollers (application.html.erb pages: home feed, /files, etc.)
+// and fixed-height inner-container scrollers (email.html.erb inbox layout).
+// A single lastPos tracks the most-recent scrolling element's position; on
+// mobile only one pane scrolls at a time, so this is always correct.
+//
+// A 10 px threshold filters micro-jitter; a 60 px top guard keeps the bar
+// visible while the container is near its top.
 export default class extends Controller {
   // How many pixels the user must scroll in one direction before we react —
   // filters out micro-jitter and inertia tails.
@@ -19,34 +23,41 @@ export default class extends Controller {
   static TOP_GUARD = 60
 
   connect() {
-    this.lastScrollY = window.scrollY
+    this.lastPos = window.scrollY
     this.ticking = false
     this.hidden = false
 
     this.element.classList.add("transition-transform", "duration-300")
 
-    this.onScroll = () => {
+    this.onScroll = (e) => {
+      // Capture the current position for this specific scroll target right now
+      // (before rAF) so we always compare against the element that fired the event.
+      const target = e.target
+      this._pendingPos = (target === document || target === window)
+        ? window.scrollY
+        : target.scrollTop
+
       if (this.ticking) return
       this.ticking = true
       requestAnimationFrame(() => {
         this.ticking = false
-        this._update()
+        this._update(this._pendingPos)
       })
     }
 
-    window.addEventListener("scroll", this.onScroll, { passive: true })
+    // Capture phase: catches scroll on any descendant container as well as window.
+    document.addEventListener("scroll", this.onScroll, { passive: true, capture: true })
   }
 
   disconnect() {
-    window.removeEventListener("scroll", this.onScroll)
+    document.removeEventListener("scroll", this.onScroll, { capture: true })
   }
 
-  _update() {
-    const scrollY = window.scrollY
-    const delta = scrollY - this.lastScrollY
+  _update(pos) {
+    const delta = pos - this.lastPos
 
-    if (scrollY <= this.constructor.TOP_GUARD) {
-      // Always show near the top of the page.
+    if (pos <= this.constructor.TOP_GUARD) {
+      // Always show when near the top of the scrolling container.
       this._show()
     } else if (delta > this.constructor.THRESHOLD) {
       // Scrolling down — hide.
@@ -56,7 +67,7 @@ export default class extends Controller {
       this._show()
     }
 
-    this.lastScrollY = scrollY
+    this.lastPos = pos
   }
 
   _hide() {
