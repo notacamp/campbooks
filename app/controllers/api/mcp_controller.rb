@@ -7,9 +7,24 @@ module Api
   # Current.acting_user — and gates each tool by the same scope as its REST twin,
   # checked per-tool here rather than via a per-action before_action. Tools-only,
   # with a single synchronous JSON response per request (no SSE / server push).
+  #
+  # Auth extensions: in addition to Doorkeeper bearer tokens, this endpoint also
+  # accepts long-lived "MCP keys" (the application's own uid + plaintext secret):
+  #   Bearer <uid>.<secret>     — dot-delimited; Doorkeeper uids/secrets are dot-free
+  #   Basic base64(uid:secret)  — standard HTTP Basic equivalent
+  # REST v1 uses bearer tokens only; these two forms are MCP-only.
   class McpController < Api::V1::BaseController
     PROTOCOL_VERSION = "2025-03-26"
     SERVER_INFO = { name: "campbooks", version: Campbooks::VERSION }.freeze
+
+    # Replace the two BaseController token-auth filters with our own handler that
+    # also accepts MCP key credentials. establish_acting_identity! is re-declared
+    # here so it runs AFTER authenticate_api_client! (child before_actions append).
+    skip_before_action :doorkeeper_authorize!
+    skip_before_action :require_granted_scopes
+    skip_before_action :establish_acting_identity!
+    before_action :authenticate_api_client!
+    before_action :establish_acting_identity!
 
     # JSON-RPC 2.0 standard error codes + one server-defined code for scope denial.
     PARSE_ERROR = -32_700
@@ -19,6 +34,7 @@ module Api
     INSUFFICIENT_SCOPE = -32_000
 
     def create
+      Current.api_scopes = granted_scope_names
       payload = parse_payload
       return if performed? # parse error already rendered
 
@@ -32,6 +48,118 @@ module Api
     end
 
     private
+
+    # ---- authentication -------------------------------------------------------
+
+    # Accept three Authorization forms:
+    #   1. Bearer <uid>.<secret>      — MCP key (long-lived; does not expire)
+    #   2. Basic base64(uid:secret)   — HTTP-standard equivalent of form 1
+    #   3. Bearer <doorkeeper-token>  — existing short-lived token (unchanged)
+    #
+    # BCrypt compare per request is intentional: agent call rates are low and the
+    # 600/min rate limit guards against brute-force. Revoking *access tokens* does
+    # NOT disable an MCP key — to revoke a key, rotate the client secret or delete
+    # the client in Settings → API access.
+    def authenticate_api_client!
+      creds = extract_mcp_credentials
+      if creds
+        uid, secret = creds
+
+        if secret.blank?
+          return render_api_error("invalid_client", "Invalid client credentials.",
+                                  status: :unauthorized)
+        end
+
+        app = Doorkeeper::Application.find_by(uid: uid)
+
+        unless app&.confidential? && app.secret_matches?(secret)
+          return render_api_error("invalid_client", "Invalid client credentials.",
+                                  status: :unauthorized)
+        end
+
+        if app.scopes.empty?
+          return render_api_error("insufficient_scope",
+                                  "This client has no scopes. Assign scopes in Settings → API access.",
+                                  status: :forbidden)
+        end
+
+        @mcp_application = app
+      else
+        # Normal Doorkeeper token path — delegate to the original two checks.
+        doorkeeper_authorize!
+        require_granted_scopes
+      end
+    end
+
+    # Parse MCP-key credentials from the Authorization header without touching
+    # BCrypt. Returns [uid, secret] when a key credential is detected, nil otherwise.
+    def extract_mcp_credentials
+      auth = request.authorization
+      return nil unless auth
+
+      if auth.start_with?("Bearer ")
+        value = auth.delete_prefix("Bearer ")
+        # Doorkeeper uids and secrets are dot-free (urlsafe_base64 / hex), so a
+        # dot unambiguously marks this as a uid.secret MCP key, not a token.
+        return value.split(".", 2) if value.include?(".")
+      elsif auth.start_with?("Basic ")
+        begin
+          decoded = Base64.strict_decode64(auth.delete_prefix("Basic "))
+          parts   = decoded.split(":", 2)
+          return parts if parts.length == 2
+        rescue ArgumentError
+          # Malformed base64 — fall through and let Doorkeeper handle it.
+        end
+      end
+
+      nil
+    end
+
+    # ---- overrides ------------------------------------------------------------
+
+    # Return the MCP application when key auth was used; fall back to the token's
+    # application for the normal Doorkeeper path.
+    def api_client_application
+      @mcp_application || super
+    end
+
+    # Gate tool visibility and call authorization against the application's own
+    # scopes under key auth; delegate to the token's scopes otherwise.
+    def token_has_scope?(name)
+      @mcp_application ? @mcp_application.scopes.exists?(name.to_s) : super
+    end
+
+    # Rate-limit key for MCP requests. The rate limiter fires before auth, so
+    # @mcp_application is never set at this point — parse the uid from the header
+    # cheaply (no BCrypt) instead, which keeps key-auth clients in their own bucket.
+    def api_rate_limit_key
+      auth = request.authorization
+      if auth&.start_with?("Bearer ")
+        value = auth.delete_prefix("Bearer ")
+        return value.split(".", 2).first if value.include?(".")
+      elsif auth&.start_with?("Basic ")
+        begin
+          decoded = Base64.strict_decode64(auth.delete_prefix("Basic "))
+          uid = decoded.split(":", 2).first
+          return uid if uid.present?
+        rescue ArgumentError
+          # Ignore malformed base64; fall through to super.
+        end
+      end
+      super
+    end
+
+    # Scope names carried by the current credential (used by #create to seed
+    # Current.api_scopes so tool handlers can trim scope-gated sections).
+    def granted_scope_names
+      if @mcp_application
+        @mcp_application.scopes.map(&:to_s)
+      else
+        doorkeeper_token&.scopes&.map(&:to_s) || []
+      end
+    end
+
+    # ---- JSON-RPC -------------------------------------------------------------
 
     def parse_payload
       JSON.parse(request.raw_post.presence || "{}")
@@ -82,7 +210,7 @@ module Api
       tool = Mcp::Registry.find(name)
       raise Mcp::RpcError.new(INVALID_PARAMS, "Unknown tool: #{name}") unless tool&.available?
 
-      unless token_has_scope?(tool.scope)
+      unless tool.scope.nil? || token_has_scope?(tool.scope)
         raise Mcp::RpcError.new(INSUFFICIENT_SCOPE,
                                 "This token lacks the '#{tool.scope}' scope required by #{name}.")
       end

@@ -1,0 +1,24 @@
+{
+  "name": "campbooks",
+  "version": "0.1.0",
+  "description": "Let AI agents run your Campbooks inbox — triage, skim, documents, tasks, calendar, and email over MCP.",
+  "author": {
+    "name": "Not A Camp"
+  },
+  "homepage": "https://campbooks.not-a-camp.com",
+  "userConfig": {
+    "server_url": {
+      "type": "string",
+      "title": "Campbooks server URL",
+      "required": true,
+      "description": "https://app.campbooks.not-a-camp.com for Campbooks Cloud, or your self-hosted URL (no trailing slash)"
+    },
+    "mcp_key": {
+      "type": "string",
+      "title": "MCP key",
+      "sensitive": true,
+      "required": true,
+      "description": "From Settings → API access → New client — the ‘MCP key’ shown once (client-id.client-secret)"
+    }
+  }
+}

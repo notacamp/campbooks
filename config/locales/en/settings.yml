@@ -190,6 +190,9 @@ en:
         client_secret_label: Client secret
         copy: Copy
         done: Done
+        mcp_key_hint: "For AI agents (MCP): use as a Bearer credential at /api/mcp — it
+          does not expire; rotate the secret to revoke."
+        mcp_key_label: MCP key
         next_steps_title: Exchange these for an access token
         subtitle: Copy the secret for "%{name}" now.
         title: Client created

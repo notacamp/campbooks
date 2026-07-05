@@ -27,9 +27,10 @@ module Api
       wrap_parameters false
 
       # Per-client throttle. The `by` lambda runs before auth, so it tolerates a
-      # missing/invalid token by falling back to the request IP.
+      # missing/invalid token by falling back to the request IP. Subclasses may
+      # override `api_rate_limit_key` to supply a key without touching this macro.
       rate_limit to: 600, within: 1.minute,
-                 by: -> { doorkeeper_token&.application_id&.to_s || request.remote_ip },
+                 by: -> { api_rate_limit_key },
                  with: -> {
                    render_api_error("rate_limit_exceeded",
                                     "Too many requests. Slow down and retry shortly.",
@@ -65,7 +66,7 @@ module Api
             user = User.find_by(id: owner_id)
             [ user, user&.workspace ]
           else
-            application = doorkeeper_token&.application
+            application = api_client_application
             [ application&.created_by, application&.workspace ]
           end
 
@@ -99,6 +100,16 @@ module Api
       def current_user
         Current.user
       end
+
+      # The Doorkeeper application behind the current request. Subclasses that
+      # support alternative auth schemes (e.g. McpController's MCP keys) override
+      # this to return their own application when the token is absent.
+      def api_client_application = doorkeeper_token&.application
+
+      # Identity key used by the per-client rate limiter. Returns the application
+      # database ID as a string (so all credentials for the same client share one
+      # bucket) and falls back to the request IP for unauthenticated requests.
+      def api_rate_limit_key = doorkeeper_token&.application_id&.to_s || request.remote_ip
 
       # True if the bearer token was granted `name` (a scope string/symbol). Used
       # by the MCP endpoint, which gates each tool by its REST twin's scope inside

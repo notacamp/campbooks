@@ -105,13 +105,16 @@ above.
 | `emails:read` | List/read email messages, threads, folders (for accounts the credential's user can read) |
 | `emails:write` | Mark emails read/unread |
 | `emails:send` | Send and reply to email (from accounts the user can send from) |
+| `email_accounts:read` | List connected email accounts |
+| `email_accounts:write` | Connect an email account (upload an OAuth refresh token) |
 | `documents:read` | List/read documents and download files |
 | `documents:write` | Upload, update, approve, reject, and reclassify documents |
 | `contacts:read` | List/read contacts |
 | `contacts:write` | Update contacts and change their state (star/block/allow) |
 | `tags:read` | List the workspace's tags |
-| `tags:write` | Add/remove tags on emails |
+| `tags:write` | Create tags and add or remove them on emails |
 | `document_types:read` | List the workspace's document types |
+| `document_types:write` | Create document types |
 | `scout:read` | Read Scout chat threads and messages |
 | `scout:write` | Create Scout threads and send messages |
 | `scheduled_emails:read` | List and read scheduled emails |
@@ -123,7 +126,7 @@ above.
 | `tasks:read` | List and read tasks |
 | `tasks:write` | Create, update, and complete tasks |
 | `folders:read` | List folders and their contents |
-| `folders:write` | File and unfile documents in folders |
+| `folders:write` | Create folders and file or unfile documents |
 
 <!-- The `workflows:read` / `workflows:trigger` scopes are omitted while the Workflows feature is disabled by default (ENABLE_WORKFLOWS). Restore both rows above when it ships. -->
 
@@ -669,17 +672,38 @@ Removes the document from the folder. Returns `204 No Content`.
 (Model Context Protocol)** server, so MCP-capable AI clients (LLM agents, IDEs,
 Claude Desktop, etc.) can call Campbooks tools directly.
 
-Authentication is the **same Doorkeeper bearer token** as the REST API:
-
-```
-Authorization: Bearer YOUR_ACCESS_TOKEN
-```
-
-Configure an MCP client to point at `https://<your-campbooks-host>/api/mcp`
-with that header. OAuth 2.1 dynamic registration and SSE streaming are **not**
-yet supported.
-
 Protocol version: `2025-03-26`.
+
+### Authentication & MCP keys
+
+`POST /api/mcp` accepts three `Authorization` forms:
+
+| Form | Header value | Notes |
+|------|-------------|-------|
+| **MCP key** | `Bearer <uid>.<secret>` | Client's own uid + plaintext secret joined by a dot. Doorkeeper uids and secrets are dot-free, so the dot is unambiguous. |
+| **HTTP Basic** | `Basic base64(uid:secret)` | Standard HTTP equivalent of the MCP key form. |
+| **Doorkeeper token** | `Bearer <access-token>` | Short-lived (2 h) token from `POST /api/oauth/token`. Unchanged; works as before. |
+
+The REST API (`/api/v1/*`) accepts **only** Doorkeeper bearer tokens. Forms 1 and 2
+("MCP keys") are supported at `/api/mcp` only.
+
+**Expiry:** MCP keys do not expire. The server performs a bcrypt comparison on each
+request; agent call rates are well within the 600 req/min rate limit.
+
+**Revocation:** revoking access tokens does not disable an MCP key. To revoke an MCP
+key, either rotate the client secret or delete the client in Settings → API access.
+The MCP key is shown once at client creation (Settings → API access → New client).
+
+**Error codes for key auth:**
+
+| Status | `error.code` | When |
+|--------|-------------|------|
+| 401 | `invalid_client` | Client not found, secret mismatch, non-confidential app, or blank secret |
+| 403 | `insufficient_scope` | The client has no scopes assigned |
+
+Configure an MCP client to point at `https://<your-campbooks-host>/api/mcp` with one of
+the above headers. OAuth 2.1 dynamic registration and SSE streaming are **not** yet
+supported.
 
 ### Initialize
 

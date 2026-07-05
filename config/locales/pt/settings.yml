@@ -192,6 +192,9 @@ pt:
         client_secret_label: Segredo do cliente
         copy: Copiar
         done: Concluído
+        mcp_key_hint: "Para agentes de IA (MCP): use como credencial Bearer em /api/mcp —
+          não expira; rotacione o segredo para revogar."
+        mcp_key_label: Chave MCP
         next_steps_title: Troque-os por um token de acesso
         subtitle: Copie agora o segredo de "%{name}".
         title: Cliente criado
