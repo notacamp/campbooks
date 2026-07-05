@@ -31,15 +31,21 @@ module Campbooks
     end
 
     def view_template
+      attrs = @attrs.dup
+      existing_controller = attrs.dig(:data, :controller)
+      controller_value = [ "scroll-hide", existing_controller ].compact.join(" ")
+      data_attrs = (attrs.delete(:data) || {}).merge(controller: controller_value)
+
       nav(
         class: class_names(
           "lg:hidden fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around gap-1 px-1.5",
           "h-16 pb-[env(safe-area-inset-bottom)]",
           "bg-sidebar/90 backdrop-blur-lg border-t border-border",
-          @attrs.delete(:class)
+          attrs.delete(:class)
         ),
         aria_label: helpers.t("shared.topbar.main_navigation"),
-        **@attrs
+        data: data_attrs,
+        **attrs
       ) do
         dock_items.each { |item| item[:ember] ? scout_tab(item) : tab(item) }
         more_tab if overflow_items.any?
