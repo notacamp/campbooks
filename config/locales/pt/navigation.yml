@@ -13,6 +13,7 @@ pt:
         document_templates: Modelos de documentos
         email_templates: Modelos de email
         general: Geral
+        inbox: Entrada
         integrations: Integrações
         members: Membros
         notifications: Notificações

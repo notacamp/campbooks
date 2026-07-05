@@ -3,8 +3,9 @@
     (NavigationHelper) so this sidebar and the topbar user menu stay in sync.
     Each item is [path, active_keys, label, icon_path]; a link is active when
     current_section is in its key list.
-    Note: Tags, Contacts, Signatures, and Sync now live in the inbox settings
-    modal (the gear icon on the email page), so they are not listed here. %>
+    Note: inbox-specific settings (Tags, Filtering, Labels, Signatures, Accounts,
+    Display, …) live under the "Inbox" section, which opens the same panels as the
+    inbox gear-icon modal. Contacts is now its own primary-nav page. %>
 <nav class="w-full lg:w-56 lg:flex-shrink-0" aria-label="<%= t(".aria_label") %>">
   <% settings_nav_groups.each_with_index do |(heading, items), group_index| %>
     <div class="<%= "mt-6" unless group_index.zero? %>">
