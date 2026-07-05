@@ -12,7 +12,7 @@ A user can act on an email/thread from four surfaces — the **email UI** (singl
 | `Tools::Executor` | Scout *auto* actions (background) | `app/services/tools/executor.rb` |
 | `EmailMessages::BulkController#dispatch_tool` | Bulk multi-select | `app/controllers/email_messages/bulk_controller.rb` |
 | `EmailComposeController` | Reply / reply-all / forward / send | `app/controllers/email_compose_controller.rb` |
-| `EmailMessageTagsController` / `…ZohoLabelsController` | Manual tag/label by ID | — |
+| `EmailMessageTagsController` | Manual tag/label by ID (handles both local and external/synced tags) | — |
 | `Emails::SkimArchive` / `Emails::SkimRestore` | Skim | `app/services/emails/` |
 
 The same intent runs through different code on different surfaces, so behavior diverges (e.g. **"delete" permanently destroys records** via `BulkDelete`, but Scout's **"trash" only moves to a folder** via `Tools::Trash`). And the AI can propose actions the user can't actually perform.
@@ -43,8 +43,7 @@ Target set (union of everything found, de-duplicated and named consistently). `t
 | `delete` | "Delete permanently" | thread | **yes** | manage | `Tools::BulkDelete` (destroys DB rows) |
 | `snooze` / `unsnooze` | "Snooze until …" / "Unsnooze" | thread | no | read | `Tools::Snooze` / `Tools::Unsnooze` |
 | `mark_read` / `mark_unread` | "Mark read" / "Mark unread" | thread | no | read | `Tools::BulkMarkRead` / jobs |
-| `add_tag` / `remove_tag` | "Add tag: X" / "Remove tag: X" | message/thread | no | read | `Tools::AddTag` / `Tools::RemoveTag` (existing tags only) |
-| `add_label` / `remove_label` | "Add label: X" / "Remove label: X" | message | no | read | `EmailMessageZohoLabels…` (provider labels) |
+| `add_tag` / `remove_tag` | "Add tag: X" / "Remove tag: X" | message/thread | no | read | `Tools::AddTag` / `Tools::RemoveTag` · `EmailMessageTagsController` (synced tags mirror to provider labels) |
 | `move_to_folder` | "Move to: Folder" | thread | no | read | `Tools::BulkMoveToFolder` |
 | `reclassify` | "Re-classify" | message(s) | no | read | `Tools::Reclassify` (AI) |
 | `process_ai` | "Re-analyze with AI" | message(s) | no | read | `Tools::BulkProcessAi` |
@@ -87,7 +86,6 @@ Target set (union of everything found, de-duplicated and named consistently). `t
 | snooze / unsnooze | ● | ● | **● add** | ● | **● add** |
 | mark read / unread | **● add single** | ● | **● add** | **● add tool** | **● add** |
 | add/remove tag | ● | ● | ● (single only → **add bulk**) | ● ✅ | **● add** |
-| add/remove label | ● | **● add bulk** | **● add** | **● add tool** | **● add** |
 | move to folder | **● add single** | ● | ● | **● add tool** | **● add** |
 | draft_reply (AI) | · | · | **● add** | ● | **● add** |
 | reclassify | **● add** | **● add** | **● add** | ● (auto only → **also suggest**) | · |
