@@ -44,6 +44,7 @@ en:
       dashboard: Dashboard
       invitations: Invitations
       signup_requests: Signup Requests
+      system_health: System Health
       users: Users
     signup_requests:
       index:

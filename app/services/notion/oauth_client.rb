@@ -53,6 +53,7 @@ module Notion
 
     def connection
       @connection ||= Faraday.new do |f|
+        f.use SystemHealth::FaradayMiddleware, service: "notion_oauth"
         f.response :raise_error
         f.options.open_timeout = 10
         f.options.timeout = 30

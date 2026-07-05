@@ -16,7 +16,9 @@ class CalendarScanJob < ApplicationJob
 
     reconcile_stale_scans(accounts)
 
-    accounts.each { |account| sync_account(account, scope) }
+    accounts.each do |account|
+      Current.set(workspace: account.workspace) { sync_account(account, scope) }
+    end
   end
 
   private

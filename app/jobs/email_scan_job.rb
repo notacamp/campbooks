@@ -32,9 +32,13 @@ class EmailScanJob < ApplicationJob
         EmailScanJob.perform_later(account.id, "full") if account.sync_strategy.needs_periodic_resync?
       end
     when "full"
-      accounts.each { |account| scan_account(account, full: true) }
+      accounts.each do |account|
+        Current.set(workspace: account.workspace) { scan_account(account, full: true) }
+      end
     else
-      accounts.each { |account| scan_account(account, full: false) }
+      accounts.each do |account|
+        Current.set(workspace: account.workspace) { scan_account(account, full: false) }
+      end
     end
   end
 
