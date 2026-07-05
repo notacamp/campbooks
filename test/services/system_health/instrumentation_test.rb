@@ -23,7 +23,7 @@ class SystemHealth::InstrumentationTest < ActiveSupport::TestCase
   test "Google::MailClient records a google_mail success row on a 200 response" do
     stub_google_token
 
-    stub_request(:get, /gmail\.googleapis\.com/)
+    stub_request(:get, %r{\Ahttps://gmail\.googleapis\.com/})
       .to_return(
         status: 200,
         body: { "messages" => [], "resultSizeEstimate" => 0 }.to_json,
@@ -57,7 +57,7 @@ class SystemHealth::InstrumentationTest < ActiveSupport::TestCase
   test "Google::CalendarClient records success on 410 (expected_status) and still raises SyncTokenExpired" do
     stub_google_token
 
-    stub_request(:get, /googleapis\.com\/calendar/)
+    stub_request(:get, %r{\Ahttps://www\.googleapis\.com/calendar/})
       .to_return(
         status: 410,
         body: { "error" => { "message" => "Token has been expired or revoked." } }.to_json,
@@ -219,7 +219,7 @@ class SystemHealth::InstrumentationTest < ActiveSupport::TestCase
   # ── 7. Push::FcmSender ───────────────────────────────────────────────────────
 
   test "Push::FcmSender records a push_fcm success row with http_status 404 for an unregistered token" do
-    stub_request(:post, /fcm\.googleapis\.com/)
+    stub_request(:post, %r{\Ahttps://fcm\.googleapis\.com/})
       .to_return(
         status: 404,
         body: { "error" => { "status" => "NOT_FOUND", "message" => "Token not registered" } }.to_json,
