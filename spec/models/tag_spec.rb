@@ -56,4 +56,28 @@ RSpec.describe Tag, type: :model do
       expect(tag.reload.kind_system?).to be(true)
     end
   end
+
+  describe ".palette_color_for" do
+    it "is deterministic for the same seed" do
+      expect(Tag.palette_color_for("Invoices")).to eq(Tag.palette_color_for("Invoices"))
+    end
+
+    it "always returns a palette hex, never the old gold default" do
+      %w[Invoices Família flights Apps whatever].each do |seed|
+        color = Tag.palette_color_for(seed)
+        expect(Tag::PALETTE).to include(color)
+        expect(color).not_to eq("#ffd700")
+      end
+    end
+
+    it "spreads distinct seeds across more than one colour" do
+      colors = %w[alpha bravo charlie delta echo foxtrot golf hotel].map { |s| Tag.palette_color_for(s) }
+      expect(colors.uniq.size).to be > 1
+    end
+
+    it "falls back to the first palette colour for a blank/nil seed" do
+      expect(Tag.palette_color_for("")).to eq(Tag::PALETTE.first)
+      expect(Tag.palette_color_for(nil)).to eq(Tag::PALETTE.first)
+    end
+  end
 end

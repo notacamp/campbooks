@@ -44,6 +44,7 @@ pt:
       dashboard: Dashboard
       invitations: Convites
       signup_requests: Pedidos de Registo
+      system_health: Saúde do Sistema
       users: Utilizadores
     signup_requests:
       index:

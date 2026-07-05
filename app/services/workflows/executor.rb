@@ -67,16 +67,25 @@ module Workflows
       return unless definition
 
       if definition.http?
-        execute_http(send(definition.build, config), step_execution)
+        service = HTTP_SERVICES.fetch(step.action_type, "webhook")
+        execute_http(send(definition.build, config), step_execution, service: service)
       else
         send(definition.run, config, step_execution)
       end
     end
 
+    # Maps HTTP action types to their SystemHealth service key.
+    HTTP_SERVICES = {
+      "slack_message"   => "slack",
+      "discord_message" => "discord",
+      "http_request"    => "webhook",
+      "custom_action"   => "connection"
+    }.freeze
+
     # --- HTTP-backed actions -------------------------------------------------
 
-    def execute_http(request, step_execution)
-      result = HttpClient.call(**request)
+    def execute_http(request, step_execution, service: "webhook")
+      result = HttpClient.call(**request, service: service)
 
       step_execution.update!(
         status: result[:ok] ? :completed : :failed,

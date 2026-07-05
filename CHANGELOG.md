@@ -16,6 +16,23 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-07-05
+
+### Added
+
+- **API: tags now report `kind`, `hidden`, and `email_count`,** and `GET /tags`
+  accepts `?include_hidden=true` — so API and MCP clients can distinguish provider
+  system labels from real tags and spot unused ones.
+- **System health, for your workspace and the whole instance.** Campbooks now
+  records every call it makes to an outside service (mail providers, calendars,
+  storage, AI models, workflow webhooks, push, SMTP) with its outcome and
+  duration. Workspace admins get **Settings → System health**: their
+  workspace's services with error rates, hourly activity sparklines, the most
+  recent error, and a filterable call log. Instance operators get the sum of
+  all workspaces at `/admin/system_health`. Successes are kept 30 days, errors
+  90; set `DISABLE_SYSTEM_HEALTH=1` to opt out of recording entirely. See
+  `docs/system-health.md`.
+
 ### Changed
 
 - The home feed's Scout summary now caps at three lines with a "Read more"
@@ -35,6 +52,16 @@ major, minor, or patch change here.
 - Tag chips on an inbox thread row now update on every add/remove. Previously
   the first change silently broke the row's chip area, so any later tag change
   on the same thread didn't show until a reload.
+- **Hidden provider labels no longer leak through the API or MCP `list_tags`.**
+  Gmail system statuses (INBOX, CATEGORY_*) and AI-judged low-value labels are
+  excluded by default, matching what the inbox already hides — pass
+  `include_hidden=true` on `GET /tags` to include them.
+- **Synced provider labels that arrive without a colour now get a distinct,
+  stable colour** instead of every one sharing a single gold default, so they're
+  no longer indistinguishable at a glance.
+- **A label sync that fails for one mailbox is now reported to error tracking,**
+  not just written to the log — a silently-swallowed failure is how a mailbox's
+  labels drift stale for months unnoticed.
 
 ### Removed
 

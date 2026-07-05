@@ -12,12 +12,13 @@ module Workflows
     MAX_OPEN_TIMEOUT = 5
     MAX_BODY_BYTES = 64 * 1024
 
-    def self.call(method:, url:, headers: {}, body: nil, timeout: DEFAULT_TIMEOUT, connection: nil)
-      new(connection).call(method: method, url: url, headers: headers, body: body, timeout: timeout)
+    def self.call(method:, url:, headers: {}, body: nil, timeout: DEFAULT_TIMEOUT, connection: nil, service: "webhook")
+      new(connection, service: service).call(method: method, url: url, headers: headers, body: body, timeout: timeout)
     end
 
-    def initialize(connection = nil)
+    def initialize(connection = nil, service: "webhook")
       @connection = connection
+      @service = service
     end
 
     def call(method:, url:, headers: {}, body: nil, timeout: DEFAULT_TIMEOUT)
@@ -34,6 +35,18 @@ module Workflows
         error: nil
       }
     rescue UrlGuard::BlockedError => e
+      blocked_host = begin
+        URI.parse(url).host
+      rescue StandardError
+        "unknown"
+      end
+      SystemHealth.record(
+        service: @service,
+        operation: "BLOCKED #{method.to_s.upcase} #{blocked_host}",
+        status: :error,
+        error_class: e.class.name,
+        error_message: SystemHealth.sanitize_message(e.message)
+      )
       failure(e.message)
     rescue Faraday::TimeoutError
       failure("Request timed out after #{timeout}s")
@@ -55,6 +68,7 @@ module Workflows
 
     def connection(timeout)
       @connection ||= Faraday.new do |f|
+        f.use SystemHealth::FaradayMiddleware, service: @service
         f.options.timeout = timeout
         f.options.open_timeout = [ timeout, MAX_OPEN_TIMEOUT ].min
         f.adapter Faraday.default_adapter

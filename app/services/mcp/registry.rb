@@ -1101,7 +1101,9 @@ module Mcp
         scope: "tags:read",
         input_schema: object_schema(properties: { limit: limit_property })
       ) do |args|
-        rows = Current.workspace.tags.by_name.limit(clamp_limit(args["limit"])).map { |t| Api::V1::TagSerializer.new(t).as_json }
+        tags = Current.workspace.tags.visible.by_name.limit(clamp_limit(args["limit"])).to_a
+        counts = EmailMessageTag.where(tag_id: tags.map(&:id)).group(:tag_id).count
+        rows = tags.map { |t| Api::V1::TagSerializer.new(t, email_count: counts[t.id] || 0).as_json }
         { tags: rows, count: rows.size }
       end
     end
