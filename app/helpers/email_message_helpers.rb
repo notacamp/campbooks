@@ -1,4 +1,36 @@
 module EmailMessageHelpers
+  # The inbox "Waiting on replies" band shows threads whose last outbound went
+  # out within this window by default; anything staler is tucked behind a
+  # "Show older" disclosure so a pile of long-forgotten sends never buries the
+  # ones still worth chasing.
+  WAITING_RECENT_WINDOW = 30.days
+
+  # …but the band never collapses to (almost) nothing: at least this many rows
+  # stay visible regardless of age, promoting the freshest of the older threads
+  # when too few are recent.
+  WAITING_MIN_VISIBLE = 3
+
+  # Split the waiting-reply threads into the rows shown by default and the older
+  # ones hidden behind the disclosure. Returns [visible, hidden], preserving the
+  # caller's ordering within each group. Pure presentation over an already-loaded
+  # array — the durable list behind Scout's count and the feed still uses the full
+  # set (see Emails::AwaitingReply); this only declutters the inbox band.
+  def partition_waiting_threads(threads, now: Time.current)
+    threads = threads.to_a
+    cutoff = now - WAITING_RECENT_WINDOW
+    recent, older = threads.partition do |thread|
+      thread.last_outbound_at.present? && thread.last_outbound_at >= cutoff
+    end
+    return [ recent, older ] if older.empty? || recent.size >= WAITING_MIN_VISIBLE
+
+    # Too few recent threads to fill the band — promote the freshest of the older
+    # ones up to the floor so it stays useful.
+    promote = older.sort_by { |thread| thread.last_outbound_at || Time.at(0) }
+                   .last(WAITING_MIN_VISIBLE - recent.size)
+    visible = threads.select { |thread| recent.include?(thread) || promote.include?(thread) }
+    [ visible, older - promote ]
+  end
+
   def snooze_presets
     now = Time.current
     today_4pm = now.change(hour: 16, min: 0, sec: 0)
