@@ -1,19 +1,21 @@
 ---
 pt:
   digest_mailer:
-    waiting_on_replies:
-      and_more: e mais %{count}
-      cta: Abrir a caixa de entrada
-      footer_html: Está a receber isto porque o seu resumo de respostas pendentes está ativo. Faça a gestão nas suas %{settings_link}.
-      footer_text: Está a receber isto porque o seu resumo de respostas pendentes está ativo. Faça a gestão em %{settings_url}
+    needs_attention:
+      footer_html: Está a receber isto porque o seu resumo diário está ativo. Faça a gestão nas suas %{settings_link}.
+      footer_text: Está a receber isto porque o seu resumo diário está ativo. Faça a gestão em %{settings_url}
       greeting: Olá %{name},
-      intro:
-        one: Ainda está à espera de resposta a uma conversa. Quer dar um toque?
-        other: Ainda está à espera de resposta a %{count} conversas. Quer dar um toque?
+      intro: Aqui está o que precisa da sua atenção hoje.
+      overdue: Atrasado
+      section_follow_ups: Acompanhamentos
+      section_reminders: Lembretes
+      section_tasks: Tarefas
       settings_link: definições de notificações
       subject:
-        one: 1 resposta que ainda aguarda
-        other: "%{count} respostas que ainda aguarda"
+        one: 1 item precisa da sua atenção
+        other: "%{count} itens precisam da sua atenção"
+      task_high_priority: Alta prioridade
+      task_overdue: Atrasada
       waiting_days:
         one: À espera há %{count} dia
         other: À espera há %{count} dias

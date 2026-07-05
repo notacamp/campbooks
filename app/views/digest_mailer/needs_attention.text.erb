@@ -1,0 +1,29 @@
+<%= t("digest_mailer.needs_attention.greeting", name: @user.name) %>
+
+<%= t("digest_mailer.needs_attention.intro") %>
+
+<% if @follow_ups.any? %>
+== <%= t("digest_mailer.needs_attention.section_follow_ups").upcase %> ==
+<% @follow_ups.each do |item| %>
+* <%= item[:title] %><% if item[:meta] %> — <%= item[:meta] %><% end %><% if item[:reason] %> · <%= item[:reason] %><% end %>
+  <%= item[:url] %>
+<% end %>
+
+<% end %>
+<% if @reminders.any? %>
+== <%= t("digest_mailer.needs_attention.section_reminders").upcase %> ==
+<% @reminders.each do |item| %>
+* <%= item[:title] %><% if item[:meta] %> — <%= item[:meta] %><% end %>
+  <%= item[:url] %>
+<% end %>
+
+<% end %>
+<% if @tasks.any? %>
+== <%= t("digest_mailer.needs_attention.section_tasks").upcase %> ==
+<% @tasks.each do |item| %>
+* <%= item[:title] %><% if item[:meta] %> — <%= item[:meta] %><% end %>
+  <%= item[:url] %>
+<% end %>
+
+<% end %>
+<%= t("digest_mailer.needs_attention.footer_text", settings_url: @settings_url) %>
