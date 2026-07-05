@@ -28,6 +28,7 @@ module Google
 
     def connection
       @connection ||= Faraday.new do |f|
+        f.use SystemHealth::FaradayMiddleware, service: "google_oauth"
         f.adapter Faraday.default_adapter
         f.headers["Authorization"] = "Bearer #{@access_token}"
       end

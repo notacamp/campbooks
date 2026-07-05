@@ -98,6 +98,7 @@ module Microsoft
 
     def connection
       @connection ||= Faraday.new do |f|
+        f.use SystemHealth::FaradayMiddleware, service: "microsoft_oauth"
         f.request :url_encoded
         # Bound the token-refresh call so a hung provider endpoint can't wedge the
         # worker mid-scan (see Google::OauthClient#connection).

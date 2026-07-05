@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_06_110000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_06_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -813,6 +813,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_110000) do
     t.datetime "updated_at", null: false
     t.uuid "workspace_id", null: false
     t.index ["workspace_id"], name: "index_exports_on_workspace_id"
+  end
+
+  create_table "external_service_calls", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "duration_ms"
+    t.string "error_class"
+    t.text "error_message"
+    t.integer "http_status"
+    t.jsonb "metadata", default: {}, null: false
+    t.string "operation"
+    t.string "service", null: false
+    t.integer "status", default: 0, null: false
+    t.uuid "workspace_id"
+    t.index ["created_at"], name: "index_external_service_calls_on_created_at"
+    t.index ["service", "created_at"], name: "index_external_service_calls_on_service_and_created_at"
+    t.index ["status", "created_at"], name: "index_external_service_calls_on_error_and_created_at", where: "(status = 1)"
   end
 
   create_table "feed_items", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

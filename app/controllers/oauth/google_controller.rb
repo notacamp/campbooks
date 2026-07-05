@@ -32,8 +32,10 @@ class Oauth::GoogleController < ApplicationController
   private
 
   def fetch_email(access_token)
-    response = Faraday.get("https://www.googleapis.com/oauth2/v2/userinfo") do |req|
-      req.headers["Authorization"] = "Bearer #{access_token}"
+    response = SystemHealth.track(service: "google_drive_oauth", operation: "GET /oauth2/v2/userinfo") do
+      Faraday.get("https://www.googleapis.com/oauth2/v2/userinfo") do |req|
+        req.headers["Authorization"] = "Bearer #{access_token}"
+      end
     end
     data = JSON.parse(response.body)
     data["email"]

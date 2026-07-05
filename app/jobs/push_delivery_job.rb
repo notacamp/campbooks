@@ -19,16 +19,18 @@ class PushDeliveryJob < ApplicationJob
     apns = Push::ApnsSender.new if Push.apns_configured? && devices.any?(&:ios?)
     fcm  = Push::FcmSender.new  if Push.fcm_configured?  && devices.any?(&:android?)
 
-    devices.each do |device|
-      sender = device.ios? ? apns : fcm
-      next unless sender # provider for this platform isn't configured
+    Current.set(workspace: notification.user.workspace) do
+      devices.each do |device|
+        sender = device.ios? ? apns : fcm
+        next unless sender # provider for this platform isn't configured
 
-      begin
-        result = sender.deliver(device, **payload)
-        device.destroy if result == :invalid
-      rescue => e
-        Rails.logger.error("[push] delivery failed for device ##{device.id}: #{e.class}: #{e.message}")
-        Sentry.capture_exception(e) if defined?(Sentry)
+        begin
+          result = sender.deliver(device, **payload)
+          device.destroy if result == :invalid
+        rescue => e
+          Rails.logger.error("[push] delivery failed for device ##{device.id}: #{e.class}: #{e.message}")
+          Sentry.capture_exception(e) if defined?(Sentry)
+        end
       end
     end
   ensure
