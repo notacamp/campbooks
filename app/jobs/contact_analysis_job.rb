@@ -1,6 +1,18 @@
 class ContactAnalysisJob < ApplicationJob
   queue_as :default
   retry_on StandardError, wait: :polynomially_longer, attempts: 3
+  # Rate limits deserve more patience than generic errors: the analyzer lets
+  # them propagate (Ai::Adapters::Base::TRANSIENT_ERRORS), and this spaces the
+  # attempts out instead of losing the contact until the next catch-up pass.
+  # Declared after the StandardError handler so it wins for these classes.
+  retry_on(*Ai::Adapters::Base::TRANSIENT_ERRORS, wait: :polynomially_longer, attempts: 5)
+
+  # The whole backlog of a freshly-connected mailbox funnels through here (the
+  # catch-up enqueues up to 100 per workspace per pass). Unthrottled, that's
+  # ~100 concurrent LLM calls — one burst 429'd 280/284 requests against the
+  # shared managed key in prod. Two at a time keeps the drain steady and under
+  # every provider's rate limit, and shields the key the rest of the app uses.
+  limits_concurrency to: 2, key: "contact_analysis"
 
   def perform(contact_id, force: false, prompt: nil)
     contact = Contact.find(contact_id)
