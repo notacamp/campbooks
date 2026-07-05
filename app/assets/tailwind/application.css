@@ -1014,7 +1014,7 @@ dialog[open] {
   --thread-label-size: 9px;
 }
 
-#email_threads[data-inbox-view-mode="compact"] .js-inbox-labels {
+#email_threads[data-inbox-view-mode="compact"] .js-inbox-tags {
   display: none !important;
 }
 
