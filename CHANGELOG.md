@@ -16,6 +16,23 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Contact profiling runs again on hosted installs — and the Organizations
+  directory fills itself.** Background contact analysis ran without the
+  workspace context, so it never resolved the workspace's AI provider and
+  silently skipped every contact: profiles stayed empty, the Organizations page
+  stayed empty, and the self-heal re-enqueued the same contacts forever. The
+  job now sets the workspace, a freshly analyzed contact materializes its
+  organization (and membership) immediately instead of waiting for a manual
+  "Sync from contacts", and an upgrade migration backfills organizations from
+  already-analyzed contacts so existing installs catch up on their own. A
+  provider-resolution failure is now logged loudly instead of passing silently.
+- **People auto-merge is scoped to the workspace.** The duplicate-person
+  auto-merge that runs after contact analysis matched people by name across
+  all workspaces; two same-named people in different workspaces could have
+  been merged together. It now only ever merges within one workspace.
+
 ## [0.12.0] - 2026-07-05
 
 ### Added
