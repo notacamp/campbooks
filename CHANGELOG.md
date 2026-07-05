@@ -16,6 +16,13 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- The inbox **"Waiting on replies"** band now shows only threads you've been
+  waiting on for up to 30 days, always keeping at least three visible regardless
+  of age. Anything older folds behind a **"Show older"** toggle, so a backlog of
+  long-forgotten sends no longer buries the replies still worth chasing.
+
 ## [0.13.0] - 2026-07-05
 
 ### Added
