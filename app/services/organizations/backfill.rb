@@ -1,5 +1,28 @@
 module Organizations
   class Backfill
+    # Materialize a single freshly-analyzed person into the directory (org +
+    # membership) the moment analysis fills Person#organization, so organizations
+    # appear as profiling completes instead of waiting for a manual "Sync from
+    # contacts". Same semantics as the full backfill: a person already in the
+    # directory is left alone. Concurrent analyses can race on a new org name
+    # (unique index on workspace+name) — one retry resolves to the winner's row.
+    def self.link_analyzed_person(person)
+      return unless person
+
+      name = person.read_attribute(:organization).to_s.strip
+      return if name.blank?
+      return if person.organization_memberships.exists?
+
+      retries = 0
+      begin
+        org = person.workspace.organizations.find_or_create_by!(name: name)
+        OrganizationMembership.find_or_create_by!(person: person, organization: org) { |m| m.status = :active }
+      rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
+        raise if (retries += 1) > 1
+        retry
+      end
+    end
+
     def initialize(workspace) = @workspace = workspace
     def call
       created = 0
