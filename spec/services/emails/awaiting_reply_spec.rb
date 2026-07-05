@@ -96,6 +96,19 @@ RSpec.describe Emails::AwaitingReply do
       expect(query.due).not_to include(thread) # …but the AI said wait
     end
 
+    it "stops heuristic nudges once the silence outlives the max nudge age" do
+      thread = waiting_thread(sent_ago: 61.days.ago, replied_ago: 62.days.ago)
+      expect(query.threads).to include(thread) # still on the durable waiting list…
+      expect(query.due).not_to include(thread) # …but no longer proactively nudged
+    end
+
+    it "keeps nudging past the max age when the AI explicitly scheduled it" do
+      thread = waiting_thread(sent_ago: 90.days.ago, replied_ago: 91.days.ago,
+                              follow_up_last_analyzed_at: 1.day.ago,
+                              follow_up_expected: true, follow_up_at: 1.hour.ago)
+      expect(query.due).to include(thread)
+    end
+
     it "drops a thread the AI judged as not expecting a reply (FYI / closing)" do
       thread = waiting_thread(sent_ago: 4.days.ago,
                               follow_up_last_analyzed_at: 4.days.ago,

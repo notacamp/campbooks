@@ -14,10 +14,11 @@ RSpec.describe FeedItem, type: :model do
   end
 
   describe "scopes" do
-    it "active excludes dismissed and acted items" do
+    it "active excludes dismissed, acted and expired items" do
       live = build_item
       build_item(dedupe_key: "x:1", dismissed_at: Time.current)
       build_item(dedupe_key: "x:2", acted_at: Time.current)
+      build_item(dedupe_key: "x:3", expired_at: Time.current)
 
       expect(FeedItem.active).to contain_exactly(live)
     end
@@ -50,6 +51,14 @@ RSpec.describe FeedItem, type: :model do
 
       item.dismiss!
       expect(item.reload).not_to be_active
+    end
+
+    it "reactivate! clears user verdicts and system expiry alike" do
+      item = build_item(acted_at: Time.current, dismissed_at: Time.current, expired_at: Time.current)
+
+      item.reactivate!
+
+      expect(item.reload).to be_active
     end
   end
 end

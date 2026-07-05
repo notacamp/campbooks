@@ -4,12 +4,19 @@ module Feed
   # class turns that intrinsic score into the final materialized rank by mixing
   # in the cross-cutting signals no single source owns:
   #
-  #   final = (intrinsic + relevance boosts) × recency decay
+  #   final = (intrinsic + relevance boosts − ignored penalty)
+  #             × recency decay × engagement multiplier
   #
   # Relevance boosts (email subjects) read the sender and the conversation: a
-  # starred or analyzed-relationship contact lifts a card, provider noise
-  # categories (promotions, social, …) sink it, and a thread the user has
-  # actually written in outranks one they never touched.
+  # starred or analyzed-relationship contact lifts a card, a sender whose mail
+  # historically runs urgent lifts it further, provider noise categories
+  # (promotions, social, …) sink it, and a thread the user has actually written
+  # in outranks one they never touched.
+  #
+  # The behavioral signals close the loop on what this user does with the feed:
+  # a card they've been shown for days without touching drifts down (ignored
+  # penalty), and card kinds they habitually dismiss earn a per-kind discount
+  # while kinds they act on earn a premium (engagement multiplier).
   #
   # Recency decay is what keeps the feed honest about time: an item's score
   # halves every HALF_LIFE days past its action moment (sort_at), so a two-year-
@@ -47,6 +54,19 @@ module Feed
     BUSY_THREAD_AT = 4
     IMPORTANT_CATEGORY_BOOST = 10
     NOISE_CATEGORY_PENALTY = 25
+    # Contact analysis's read on how urgent a sender's mail tends to run.
+    SENDER_URGENCY_BOOST = { "high" => 8, "low" => -5 }.freeze
+
+    # A card the user was shown this long ago and never touched drifts down.
+    SEEN_IGNORE_AFTER = 2.days
+    SEEN_IGNORE_PENALTY = 8
+
+    # Per-kind engagement: how far back to read the user's feed history, and the
+    # Laplace prior that keeps the multiplier at exactly 1.0 with no evidence
+    # and near it while evidence is thin.
+    ENGAGEMENT_WINDOW = 90.days
+    ENGAGEMENT_PRIOR = 2.0
+    ENGAGEMENT_MULTIPLIER_RANGE = (0.7..1.2)
 
     # Mirrors the noise set Feed::Rewind excludes from highlights.
     NOISE_CATEGORIES = %w[promotions notifications social updates].freeze
@@ -74,10 +94,44 @@ module Feed
     private
 
     def rank(kind, candidate)
-      base = candidate[:score].to_i + boosts(candidate)
-      final = (base.clamp(0, nil) * decay(kind, candidate[:sort_at])).round
+      base = candidate[:score].to_i + boosts(candidate) - seen_ignore_penalty(candidate)
+      final = (base.clamp(0, nil) *
+               decay(kind, candidate[:sort_at]) *
+               engagement_multiplier(kind)).round
       candidate[:score] = final
       candidate[:attention] = !!candidate[:attention] && final >= ATTENTION_FLOOR
+    end
+
+    # The generator stamps each candidate with the seen_at of the row it already
+    # has; shown for days with no reaction means "not now" — yield to fresher cards.
+    def seen_ignore_penalty(candidate)
+      seen_at = candidate[:seen_at]
+      seen_at.present? && seen_at < @now - SEEN_IGNORE_AFTER ? SEEN_IGNORE_PENALTY : 0
+    end
+
+    # How this user treats this kind of card, from their trailing feed history:
+    # acted = engagement, dismissed = rejection. Deliberately blind to expiries —
+    # a calendar card expiring after the meeting says nothing about interest —
+    # and to rows never resolved at all (most cards are simply scrolled past).
+    def engagement_multiplier(kind)
+      stats = engagement_stats[kind.to_s]
+      return 1.0 unless stats
+
+      rate = (stats[:acted] + ENGAGEMENT_PRIOR) /
+             (stats[:acted] + stats[:dismissed] + ENGAGEMENT_PRIOR * 2)
+      (0.7 + 0.6 * rate).clamp(ENGAGEMENT_MULTIPLIER_RANGE.begin, ENGAGEMENT_MULTIPLIER_RANGE.end)
+    end
+
+    def engagement_stats
+      @engagement_stats ||= @user.feed_items
+        .where(created_at: (@now - ENGAGEMENT_WINDOW)..)
+        .group(:kind)
+        .pluck(
+          :kind,
+          Arel.sql("COUNT(*) FILTER (WHERE acted_at IS NOT NULL)"),
+          Arel.sql("COUNT(*) FILTER (WHERE dismissed_at IS NOT NULL)")
+        )
+        .to_h { |kind, acted, dismissed| [ kind, { acted: acted, dismissed: dismissed } ] }
     end
 
     # 1.0 while the action moment is in the future or within GRACE, then
@@ -103,6 +157,7 @@ module Feed
       if contact
         total += STARRED_CONTACT_BOOST if contact[:starred]
         total += KNOWN_RELATIONSHIP_BOOST if contact[:known_relationship]
+        total += SENDER_URGENCY_BOOST.fetch(contact[:urgency], 0)
       end
       total += ENGAGED_THREAD_BOOST if engaged_thread_ids.include?(subject.email_thread_id)
       total += BUSY_THREAD_BOOST if thread_count >= BUSY_THREAD_AT
@@ -132,10 +187,11 @@ module Feed
 
     def contacts_by_id
       @contacts_by_id ||= Contact.where(id: @contact_ids)
-        .pluck(:id, :starred_at, :relationship_type)
-        .to_h do |id, starred_at, relationship|
+        .pluck(:id, :starred_at, :relationship_type, :communication_patterns)
+        .to_h do |id, starred_at, relationship, patterns|
           known = relationship.present? && UNINFORMATIVE_RELATIONSHIPS.exclude?(relationship)
-          [ id, { starred: starred_at.present?, known_relationship: known } ]
+          urgency = patterns.is_a?(Hash) ? patterns["urgency_level"] : nil
+          [ id, { starred: starred_at.present?, known_relationship: known, urgency: urgency } ]
         end
     end
 

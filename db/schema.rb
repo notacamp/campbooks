@@ -804,6 +804,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_05_120000) do
     t.jsonb "data", default: {}, null: false
     t.string "dedupe_key", null: false
     t.datetime "dismissed_at"
+    t.datetime "expired_at"
     t.datetime "generated_at"
     t.string "kind", null: false
     t.integer "score", default: 0, null: false
@@ -816,9 +817,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_05_120000) do
     t.uuid "workspace_id", null: false
     t.index ["subject_type", "subject_id"], name: "idx_feed_items_subject"
     t.index ["user_id", "dedupe_key"], name: "idx_feed_items_user_dedupe", unique: true
-    t.index ["user_id", "score", "sort_at"], name: "idx_feed_items_attention", order: { score: :desc, sort_at: :desc }, where: "((dismissed_at IS NULL) AND (acted_at IS NULL) AND (attention = true))"
-    t.index ["user_id", "score", "sort_at"], name: "idx_feed_items_timeline", order: { score: :desc, sort_at: :desc }, where: "((dismissed_at IS NULL) AND (acted_at IS NULL) AND (attention = false))"
-    t.index ["user_id"], name: "index_feed_items_on_user_unseen_active", where: "((seen_at IS NULL) AND (dismissed_at IS NULL) AND (acted_at IS NULL))"
+    t.index ["user_id", "score", "sort_at"], name: "idx_feed_items_attention", order: { score: :desc, sort_at: :desc }, where: "((dismissed_at IS NULL) AND (acted_at IS NULL) AND (expired_at IS NULL) AND (attention = true))"
+    t.index ["user_id", "score", "sort_at"], name: "idx_feed_items_timeline", order: { score: :desc, sort_at: :desc }, where: "((dismissed_at IS NULL) AND (acted_at IS NULL) AND (expired_at IS NULL) AND (attention = false))"
+    t.index ["user_id"], name: "index_feed_items_on_user_unseen_active", where: "((seen_at IS NULL) AND (dismissed_at IS NULL) AND (acted_at IS NULL) AND (expired_at IS NULL))"
     t.index ["workspace_id"], name: "index_feed_items_on_workspace_id"
   end
 
