@@ -55,7 +55,7 @@ class WorkspaceAttributionJobsTest < ActiveSupport::TestCase
 
     # Stub Google Calendar list (google_calendar rows). Both accounts hit the
     # same endpoint; return an empty list so there are no calendars to iterate.
-    stub_request(:get, /www\.googleapis\.com\/calendar\/v3\/users\/me\/calendarList/)
+    stub_request(:get, %r{\Ahttps://www\.googleapis\.com/calendar/v3/users/me/calendarList})
       .to_return(
         status: 200,
         body: { "items" => [] }.to_json,
@@ -118,7 +118,7 @@ class WorkspaceAttributionJobsTest < ActiveSupport::TestCase
         headers: { "Content-Type" => "application/json" }
       )
 
-    stub_request(:post, /www\.googleapis\.com\/calendar\/v3\/calendars.*\/events/)
+    stub_request(:post, %r{\Ahttps://www\.googleapis\.com/calendar/v3/calendars/.*/events})
       .to_return(
         status: 200,
         body: {
