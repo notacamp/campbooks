@@ -12,7 +12,15 @@ module Feed
     # Registered before ReplyReminder/EmailAction so a follow-up thread is framed as
     # a follow-up, never re-surfaced as a generic action.
     class FollowUp < Feed::Source
-      SCORE = 80
+      # Urgency climbs with the other party's silence: a follow-up that just
+      # crossed the nudge threshold starts below fresh actionable mail and
+      # reaches full strength after two weeks unanswered. Feed::Ranking's decay
+      # (anchored on the stable sort_at below) then retires it — the combined
+      # curve peaks around the first week and fades past the generator's
+      # MIN_SCORE fence by roughly two months.
+      BASE_SCORE = 68
+      SILENCE_CLIMB = 12
+      SILENCE_CLIMB_DAYS = 14.0
 
       def self.key = "follow_up"
 
@@ -40,8 +48,11 @@ module Feed
         {
           subject: message,
           dedupe_key: "follow_up:#{thread.id}",
-          sort_at: thread.follow_up_at || now,
-          score: SCORE,
+          # A STABLE moment, never `now`: falling back to the run time would
+          # re-date the card on every generation, so decay could never bite and
+          # an ancient follow-up would pin the attention cluster forever.
+          sort_at: thread.follow_up_at || thread.last_outbound_at || now,
+          score: score_for(thread),
           attention: true,
           data: {
             "reason" => thread.follow_up_reason.to_s,
@@ -88,6 +99,11 @@ module Feed
         return 0 unless time
 
         ((now - time) / 1.day).floor
+      end
+
+      def score_for(thread)
+        silence = age_days(thread.last_outbound_at)
+        (BASE_SCORE + (silence * SILENCE_CLIMB / SILENCE_CLIMB_DAYS).clamp(0, SILENCE_CLIMB)).round
       end
     end
   end

@@ -35,6 +35,16 @@ major, minor, or patch change here.
   how well a message matches (subject beats sender, sender beats summary,
   semantic similarity counts too) with a light recency boost — a strong match
   from last month now outranks a weak match from this morning.
+- **The home feed now ranks by real urgency, not card type.** Every card kind
+  scores on one continuous "how much does this need you right now" scale —
+  reminders and tasks climb smoothly as their date approaches, reply nudges
+  firm up as the silence stretches — instead of jumping between per-type tiers
+  that made the feed read as sections. Ranking also learns from you: card kinds
+  you habitually dismiss drift down while kinds you act on rise, cards you've
+  been shown for days without touching yield to fresher ones, and mail from
+  senders whose messages historically run urgent gets a lift. The timeline
+  additionally interleaves card types (no more walls of one kind) and folds all
+  of a page's tag suggestions into a single queue row at the end.
 
 ### Fixed
 
@@ -52,6 +62,21 @@ major, minor, or patch change here.
   and Email templates entries appeared in the Settings menu even in deployments where
   those features are disabled, so clicking one opened a blank page. They're now hidden
   unless the feature is enabled.
+- **Stale follow-ups no longer haunt the feed.** A follow-up nudge without an
+  AI-scheduled time was re-dated to "now" on every refresh, so months-old,
+  clearly-irrelevant follow-ups could stay pinned in "Needs attention" forever.
+  They now age from the moment you sent the mail, retire from the feed once
+  truly stale (about two months), and proactive nudges stop for un-analyzed
+  threads silent past 60 days — the durable "waiting on replies" list in the
+  inbox is unaffected.
+- **Read starred-sender mail stops pinning "Needs attention".** Mail from
+  starred contacts used to hold a pinned spot for over a week even after being
+  read; now it pins only while unread (or flagged urgent) and otherwise ranks
+  high in the timeline.
+- **Fully stale cards leave the feed instead of piling up at the bottom**, and
+  a card resolved by the system (say, a snoozed thread whose snooze you extend)
+  can now come back if it genuinely needs you again — previously it was hidden
+  forever.
 
 ## [0.11.0] - 2026-07-05
 

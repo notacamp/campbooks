@@ -17,13 +17,12 @@ module Feed
           .order(:start_at)
           .includes(:event_type, calendar: :calendar_account)
           .map do |event|
-            soon = event.start_at <= now + ATTENTION_WITHIN
             {
               subject: event,
               dedupe_key: "calendar_event:#{event.id}",
               sort_at: event.start_at,
-              score: soon ? 95 : 40,
-              attention: soon,
+              score: score_for(event),
+              attention: event.start_at <= now + ATTENTION_WITHIN,
               data: { starts_at: event.start_at.iso8601 }
             }
           end
@@ -32,6 +31,15 @@ module Feed
       def still_valid?(item, event)
         return false if event.nil? || event.cancelled?
         event.end_at.nil? || event.end_at > now # not yet ended
+      end
+
+      private
+
+      # Urgency climbs as the start approaches: 40 at the window's edge, 100 at
+      # start time (~94 when it crosses into the attention cluster).
+      def score_for(event)
+        minutes_until = (event.start_at - now) / 60.0
+        ramp(minutes_until, from: WINDOW.in_minutes, to: 0, at_from: 40, at_to: 100)
       end
     end
   end

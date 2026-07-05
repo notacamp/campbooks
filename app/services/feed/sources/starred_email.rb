@@ -18,7 +18,10 @@ module Feed
             dedupe_key: "starred_email:#{m.id}",
             sort_at: m.received_at || m.created_at,
             score: score_for(m),
-            attention: true,
+            # Pin only mail that still needs the user: unread, or urgent by
+            # Scout's read. Once read, the card yields the attention cluster
+            # and lives high in the timeline off the starred-contact boost.
+            attention: !m.read? || m.ai_priority == "high",
             data: { starred_sender: true }
           }
         end

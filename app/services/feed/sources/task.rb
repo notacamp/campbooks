@@ -81,17 +81,25 @@ module Feed
         task.blocked? || (task.due_at.present? && task.due_at <= now + ATTENTION_WITHIN)
       end
 
+      # Blocked is a state, not a date — flat. Dated tasks glide: 92 overdue,
+      # 78 at one day out, 48 at a week, 22 at the horizon's edge.
       def score_for(task)
         return 85 if task.blocked?
 
         if task.due_at
-          days = ((task.due_at - now) / 1.day).floor
-          return 90 if days <= 0    # overdue
-          return 80 if days <= 1    # due today/tomorrow
-          return 60 if days <= 7
-          return 40
+          days = (task.due_at - now) / 1.day
+          return 92 if days <= 0 # overdue
+
+          if days <= 1
+            ramp(days, from: 0, to: 1, at_from: 92, at_to: 78)
+          elsif days <= 7
+            ramp(days, from: 1, to: 7, at_from: 78, at_to: 48)
+          else
+            ramp(days, from: 7, to: 14, at_from: 48, at_to: 22)
+          end
+        else
+          20 # assigned to me, no due date
         end
-        20    # assigned to me, no due date
       end
     end
   end
