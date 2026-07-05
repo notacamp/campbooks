@@ -18,6 +18,22 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Scheduled digests.** Build your own recurring briefings: a digest is a saved
+  scope (emails matching a search query, upcoming calendar events, tasks due soon,
+  reminders, recently received documents — mix and match), a schedule (daily,
+  weekly, or monthly at your chosen time), an optional AI summary, and a delivery
+  choice (email and/or a home-feed card). Six presets get you started — Newsletter
+  roundup, Week ahead, Upcoming tasks, Invoice tracker, Client pulse, or fully
+  custom — and every issue is kept, so `/digests` doubles as a browsable archive.
+  With AI enabled, Scout groups the period's items into thematic sections with a
+  short overview and per-item notes (every line links back to the real email,
+  event, task, or document — nothing is invented, and anything the AI doesn't
+  place lands in an "Everything else" section so nothing is hidden). Without AI
+  configured, digests still deliver as clean grouped lists. Per-digest custom AI
+  instructions ride the same guardrails as the workspace AI-prompt system, and a
+  new "Digest generation" entry appears in Settings → AI Prompts. Disabled by
+  default behind `ENABLE_DIGESTS=1` while it hardens; on Campbooks Cloud it is a
+  paid-plan feature.
 - **Mobile folder bottom-sheet.** Tapping "Folders" in the mobile chip bar slides
   up a full-screen sheet with the complete folder list: system folders (Inbox, Sent,
   Drafts, Archive, Spam, Trash) and custom folders with their icons, message counts,

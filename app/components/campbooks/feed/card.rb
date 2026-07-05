@@ -20,7 +20,8 @@ module Campbooks
         "follow_up"       => Campbooks::Feed::FollowUpCard,
         "tag_suggestion"  => Campbooks::Feed::TagSuggestionCard,
         "reminder"        => Campbooks::Feed::ReminderCard,
-        "task"            => Campbooks::Feed::TaskCard
+        "task"            => Campbooks::Feed::TaskCard,
+        "digest_issue"    => Campbooks::Feed::DigestCard
       }.freeze
 
       def initialize(item:, subject:)

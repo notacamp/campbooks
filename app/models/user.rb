@@ -24,6 +24,8 @@ class User < ApplicationRecord
   has_many :bug_reports, dependent: :destroy
   # Unsent composer drafts (Dock/Desk autosave). Private to their author.
   has_many :draft_emails, dependent: :destroy
+  has_many :scheduled_digests, dependent: :destroy
+  has_many :digest_issues, dependent: :destroy
   # Security/audit trail. The FK is on_delete: :nullify so rows survive a user's
   # deletion (anonymized) for accountability; nullify here matches that intent.
   has_many :audit_events, dependent: :nullify
