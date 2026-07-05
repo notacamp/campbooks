@@ -17,9 +17,16 @@ class ScheduledEmail < ApplicationRecord
   validates :body, presence: true
   validates :scheduled_at, presence: true
 
+  # A queued send is outbound mail on a specific mailbox: visible to whoever
+  # can read that mailbox (it will land in its Sent folder anyway) and to its
+  # creator (who may have lost account access since). Both branches stay
+  # workspace-bound, so a workspace member with no share on the account —
+  # which may be a teammate's personal mailbox — cannot read queued mail.
   scope :accessible_to, ->(user) {
     return none unless user
-    where(workspace_id: user.workspace_id)
+
+    where(workspace_id: user.workspace_id).where(created_by: user)
+      .or(where(workspace_id: user.workspace_id).where(email_account: user.readable_email_accounts))
   }
 
   scope :due, -> { pending.where("scheduled_at <= ?", Time.current) }
@@ -30,6 +37,15 @@ class ScheduledEmail < ApplicationRecord
       from, to
     )
   }
+
+  # Mutating a schedule (edit / cancel) takes more than visibility: the
+  # creator, or someone allowed to send from the account. Mailbox viewers
+  # (can_read only) can see the queue but not change it.
+  def editable_by?(user)
+    return false unless user
+
+    created_by_id == user.id || email_account&.sendable_by?(user)
+  end
 
   def recurring?
     rrule.present?

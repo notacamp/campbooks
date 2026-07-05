@@ -719,6 +719,7 @@ module Mcp
         require_arg(args, "id")
         ensure_entitled!(:email_scheduling)
         record = ScheduledEmail.accessible_to(Current.user).find(args["id"])
+        ensure_editable!(record)
         ensure_sendable!(args["email_account_id"]) if args.key?("email_account_id")
         record.update!(args.slice("email_account_id", "to_address", "cc_address", "bcc_address",
                                   "subject", "body", "scheduled_at", "rrule"))
@@ -737,6 +738,7 @@ module Mcp
         require_arg(args, "id")
         ensure_entitled!(:email_scheduling)
         record = ScheduledEmail.accessible_to(Current.user).find(args["id"])
+        ensure_editable!(record)
         record.update!(status: :cancelled)
         { scheduled_email: Api::V1::ScheduledEmailSerializer.new(record, detail: true).as_json }
       end
@@ -1080,6 +1082,14 @@ module Mcp
       return if account_id.present? && Current.user.sendable_email_accounts.exists?(id: account_id)
 
       raise Mcp::ToolError, "You can't send from that email account."
+    end
+
+    # Mailbox readers can see a queued send (accessible_to) but only the
+    # creator or someone with send access on the account may change it.
+    def ensure_editable!(scheduled_email)
+      return if scheduled_email.editable_by?(Current.user)
+
+      raise Mcp::ToolError, "You can't modify that scheduled email."
     end
 
     def resolve_tag(args)
