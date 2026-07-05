@@ -23,9 +23,26 @@
         </div>
       </div>
     </div>
-    <% waiting_threads.each do |thread| %>
+    <%# Recent silences stay in the band; anything staler than 30 days folds away
+        behind the disclosure below, keeping a floor of visible rows regardless of
+        age (see EmailMessageHelpers#partition_waiting_threads). %>
+    <% visible_threads, older_threads = partition_waiting_threads(waiting_threads) %>
+    <% visible_threads.each do |thread| %>
       <% next unless thread.latest_message %>
       <%= render "email_messages/thread_row", thread: thread, section_key: "waiting_replies" %>
+    <% end %>
+    <% older_threads = older_threads.select(&:latest_message) %>
+    <% if older_threads.any? %>
+      <details class="group/older">
+        <summary class="mx-1.5 my-0.5 inline-flex w-fit cursor-pointer select-none list-none items-center gap-1 rounded-md px-3 py-1.5 text-[12px] font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+          <svg class="h-3.5 w-3.5 flex-shrink-0 transition-transform duration-150 group-open/older:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          <span class="group-open/older:hidden"><%= t("email_messages.thread_list.waiting_show_older", count: older_threads.size) %></span>
+          <span class="hidden group-open/older:inline"><%= t("email_messages.thread_list.waiting_hide_older") %></span>
+        </summary>
+        <% older_threads.each do |thread| %>
+          <%= render "email_messages/thread_row", thread: thread, section_key: "waiting_replies" %>
+        <% end %>
+      </details>
     <% end %>
   <% end %>
 </div>

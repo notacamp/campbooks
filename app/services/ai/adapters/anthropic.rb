@@ -26,6 +26,7 @@ module Ai
 
         response = connection.post(@endpoint_url) do |req|
           req.body = body.to_json
+          req.options.context = { model: model.to_s }
         end
 
         extract_text(JSON.parse(response.body))

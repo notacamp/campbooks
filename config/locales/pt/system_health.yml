@@ -16,6 +16,23 @@ pt:
         title: "Saúde do sistema"
   admin:
     system_health:
+      call:
+        ai_metadata: Metadados de IA
+        not_captured: "(não capturado)"
+        request_body: Corpo do pedido
+        request_headers: Cabeçalhos do pedido
+        response_body: Corpo da resposta
+        response_headers: Cabeçalhos da resposta
+        summary:
+          ai_metadata: Modelo de IA / tokens
+          duration: "Duração"
+          error: Erro
+          service: Serviço
+          status: Estado
+          tokens_in: "%{count} entrada"
+          tokens_out: "%{count} saída"
+          workspace: Espaço de trabalho
+        title_fallback: Detalhe da chamada
       calls:
         no_matches: Nenhuma chamada correspondeu aos seus filtros.
       show:

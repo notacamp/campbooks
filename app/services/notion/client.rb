@@ -124,7 +124,7 @@ module Notion
 
     def connection
       @connection ||= Faraday.new do |f|
-        f.use SystemHealth::FaradayMiddleware, service: "notion"
+        f.use SystemHealth::FaradayMiddleware, service: "notion", workspace: -> { @integration.try(:workspace_id) }
         f.request :json
         f.response :raise_error
         # Bound every call so a hung Notion response can't wedge the sync worker
