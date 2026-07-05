@@ -130,12 +130,31 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Resolve builder image
+        # Start FROM the pre-baked campbooks-base (gems already compiled) when it
+        # exists; otherwise fall back to building gems from scratch (the Dockerfile
+        # default) so a release never hard-fails on a missing/not-yet-built base.
+        id: builder
+        run: |
+          base="${REGISTRY_IMAGE}-base:latest"
+          if docker buildx imagetools inspect "$base" >/dev/null 2>&1; then
+            echo "ref=$base" >> "$GITHUB_OUTPUT"
+            echo "Using pre-baked base image: $base"
+          else
+            echo "ref=gems" >> "$GITHUB_OUTPUT"
+            echo "::notice::campbooks-base not found — building gems from scratch this release."
+          fi
+
       - name: Build and push by digest
         id: build
         uses: docker/build-push-action@v7
         with:
           context: .
           platforms: ${{ matrix.platform }}
+          # Start from the pre-baked gems base when available (resolved above);
+          # `gems` (the Dockerfile's default) means build gems from scratch.
+          build-args: |
+            BUILDER_IMAGE=${{ steps.builder.outputs.ref }}
           labels: ${{ steps.meta.outputs.labels }}
           # Registry-backed layer cache, one image tag per arch. Unlike type=gha
           # it is not 10 GB-capped/LRU-evicted and not scoped to the triggering
