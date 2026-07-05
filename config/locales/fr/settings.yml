@@ -224,6 +224,10 @@ fr:
           pour aider Scout à comprendre qui vous êtes, ce que fait votre espace de
           travail et ce qui vous importe.
         workspace_profile_heading: Profil de l'espace de travail
+    inbox:
+      show:
+        subtitle: Gérez la façon dont votre boîte de réception trie, filtre et affiche vos messages.
+        title: Boîte de réception
     integrations:
       calendars:
         show:

@@ -217,6 +217,10 @@ es:
           ayudar a Scout a entender quién es usted, qué hace su espacio de trabajo
           y qué es importante para usted.
         workspace_profile_heading: Perfil del espacio de trabajo
+    inbox:
+      show:
+        subtitle: Gestiona cómo tu bandeja de entrada ordena, filtra y muestra el correo.
+        title: Bandeja de entrada
     integrations:
       calendars:
         show:

@@ -216,6 +216,10 @@ pt:
           o Scout a perceber quem é, o que faz o seu espaço de trabalho e o que é
           importante para si.
         workspace_profile_heading: Perfil do espaço de trabalho
+    inbox:
+      show:
+        subtitle: Faça a gestão da forma como a sua caixa de entrada organiza, filtra e apresenta o correio.
+        title: Caixa de entrada
     integrations:
       calendars:
         show:

@@ -274,6 +274,9 @@ Rails.application.routes.draw do
   namespace :settings do
     root to: "general#show"
     resource :general, only: [ :show, :update ], controller: "general"
+    # Inbox settings — hosts the same panels as the inbox gear-icon modal
+    # (Campbooks::InboxSettingsModal), surfaced as a Settings dashboard section.
+    resource :inbox, only: :show, controller: "inbox"
     resource :plan, only: [ :show ], controller: "plan"
     resource :ai, only: [ :show ], controller: "ai" do
       post :switch_mode

@@ -13,6 +13,7 @@ en:
         document_templates: Document templates
         email_templates: Email templates
         general: General
+        inbox: Inbox
         integrations: Integrations
         members: Members
         notifications: Notifications

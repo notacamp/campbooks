@@ -13,6 +13,7 @@ es:
         document_templates: Plantillas de documentos
         email_templates: Plantillas de correo
         general: General
+        inbox: Recibidos
         integrations: Integraciones
         members: Miembros
         notifications: Notificaciones

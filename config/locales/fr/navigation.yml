@@ -13,6 +13,7 @@ fr:
         document_templates: Modèles de documents
         email_templates: Modèles d'e-mail
         general: Général
+        inbox: Boîte de réception
         integrations: Intégrations
         members: Membres
         notifications: Notifications
