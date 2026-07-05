@@ -24,6 +24,12 @@ major, minor, or patch change here.
   in a dasherized form the Skim keyboard handler didn't recognise); follow-ups was the only
   ring affected. Keep (→) still works, and a tray shortcut into the Follow-ups ring now
   lands there correctly.
+- **Catching up a large contact backlog no longer trips the AI provider's rate
+  limit.** Contact profiling used to fire the whole catch-up batch at once
+  (up to a hundred concurrent AI calls), which rate-limited nearly every
+  request and slowed the catch-up to a crawl. Analyses now run a couple at a
+  time, and a rate-limited attempt is retried with backoff instead of being
+  dropped until the next pass.
 
 ## [0.12.1] - 2026-07-05
 

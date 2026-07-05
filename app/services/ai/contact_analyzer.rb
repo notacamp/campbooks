@@ -67,6 +67,8 @@ module Ai
 
       # Auto-tag the sender from its freshly-analyzed profile (existing tags only).
       Contacts::SenderTagger.new(@contact).call
+    rescue *Ai::Adapters::Base::TRANSIENT_ERRORS
+      raise # rate limits / provider blips are the job's to retry with backoff
     rescue => e
       Rails.logger.error("[ContactAnalyzer] Analysis failed for contact #{@contact.id}: #{e.message}")
     end
@@ -193,6 +195,8 @@ module Ai
     rescue JSON::ParserError => e
       Rails.logger.error("[ContactAnalyzer] Invalid JSON: #{e.message}")
       nil
+    rescue *Ai::Adapters::Base::TRANSIENT_ERRORS
+      raise # rate limits / provider blips are the job's to retry with backoff
     rescue => e
       Rails.logger.error("[ContactAnalyzer] API error: #{e.message}")
       nil
