@@ -9,7 +9,13 @@
 
 # Make sure RUBY_VERSION matches the Ruby version in .ruby-version
 ARG RUBY_VERSION=3.2.2
-FROM docker.io/library/ruby:$RUBY_VERSION-slim AS base
+# Pinned by digest, not just the floating :3.2.2-slim tag. An unpinned tag
+# re-resolves to whatever upstream last pushed, so the base layer digest drifts
+# between builds and invalidates the ENTIRE downstream cache chain — including
+# the slow bundle-install layer — on every release, even when nothing changed.
+# Pinning keeps the cache warm. Refresh deliberately when bumping Ruby:
+#   docker buildx imagetools inspect ruby:<ver>-slim   # copy the top-level Digest
+FROM docker.io/library/ruby:$RUBY_VERSION-slim@sha256:b1b1636eb4e9d3499fc6166f54f7bb96d792e005b887091346fd1ae01ad97229 AS base
 
 # Rails app lives here
 WORKDIR /rails

@@ -8,6 +8,15 @@ name: Publish image
 # Auth uses the built-in GITHUB_TOKEN (no secrets to configure). The first push
 # creates the package linked to this repo; it starts PRIVATE — flip it to public
 # in the package settings once if you want self-hosters to pull it.
+#
+# The build fans out over NATIVE runners — amd64 on ubuntu-latest, arm64 on
+# ubuntu-24.04-arm (free for public repos) — instead of emulating arm64 under
+# QEMU on one amd64 runner. QEMU made the arm64 `bundle install` ~10x slower
+# (~16 min); building natively drops it to parity with amd64. Each leg builds and
+# pushes its platform BY DIGEST, then the `merge` job stitches the two digests
+# into one multi-arch manifest carrying the semver tags. Layer cache lives in a
+# registry image (type=registry) rather than the 10 GB-capped, ref-scoped GHA
+# cache, so it actually survives across tag-triggered release builds.
 
 on:
   release:
@@ -24,7 +33,7 @@ env:
 jobs:
   # Hard gate: re-run the full test suite before publishing, WITH the :cloud
   # engine installed — because the image we're about to publish carries it (the
-  # build_and_push step passes the same token). Mirrors the `test` job in ci.yml.
+  # build passes the same token). Mirrors the `test` job in ci.yml.
   test:
     # The app image build + prod deploy must NOT fire for CLI releases, which are
     # tagged `cli/vX.Y.Z` and published by release-cli.yml (GoReleaser).
@@ -70,22 +79,46 @@ jobs:
           ACTIVE_RECORD_KEY_DERIVATION_SALT: ci_dummy_key_derivation_salt_not_prod
         run: bin/rails db:test:prepare test
 
-  build_and_push:
+  # Fan-out: one job per architecture, each on its OWN native runner (no QEMU).
+  # Builds the image for its single platform and pushes it BY DIGEST (no tag) —
+  # the `merge` job below assembles the tagged multi-arch manifest from the two
+  # digests. Per-platform registry cache keeps unchanged layers (e.g. gems) warm
+  # across releases.
+  build:
     if: ${{ !startsWith(github.event.release.tag_name, 'cli/') }}
-    runs-on: ubuntu-latest
     needs: test
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
+    env:
+      REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            # Native ARM runner — free for public repos. The prod host (Hetzner
+            # CAX41) and Apple Silicon / ARM self-hosters run arm64.
+            runner: ubuntu-24.04-arm
 
     steps:
+      - name: Prepare platform pair
+        # linux/amd64 -> linux-amd64 (used to name the per-arch cache + artifact)
+        env:
+          platform: ${{ matrix.platform }}
+        run: echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
+
       - name: Checkout code
         uses: actions/checkout@v6
 
-      # Emulation for the arm64 leg of the build. The prod host (Hetzner CAX41)
-      # and many self-hosters run arm64, so amd64-only images would not run there.
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+      - name: Extract labels
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY_IMAGE }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -97,30 +130,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels)
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ghcr.io/${{ github.repository }}
-          # Stable releases get 1.2.3, 1.2, and `latest`; prereleases get only
-          # their full version (latest=auto leaves `latest` untouched for them).
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-
-      - name: Build and push
+      - name: Build and push by digest
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
-          push: true
-          # Multi-arch: amd64 (most cloud hosts) + arm64 (the prod host and
-          # Apple Silicon / ARM self-hosters). The arm64 leg builds under QEMU
-          # emulation, so a release build takes longer — fine at release cadence.
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
+          platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Registry-backed layer cache, one image tag per arch. Unlike type=gha
+          # it is not 10 GB-capped/LRU-evicted and not scoped to the triggering
+          # ref, so a tag-triggered release build reliably restores it.
+          cache-from: type=registry,ref=${{ env.REGISTRY_IMAGE }}:buildcache-${{ env.PLATFORM_PAIR }}
+          cache-to: type=registry,ref=${{ env.REGISTRY_IMAGE }}:buildcache-${{ env.PLATFORM_PAIR }},mode=max
           # Pass the GitHub token to the build as the BuildKit secret the
           # Dockerfile mounts (id=cloud_bundle_token). With it present, `bundle
           # install` includes the optional :cloud group (the private
@@ -131,9 +152,75 @@ jobs:
           # engine and ships the open-source image.
           secrets: |
             cloud_bundle_token=${{ secrets.CLOUD_BUNDLE_TOKEN }}
+          # Push by digest only; the merge job applies the human tags.
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digest
+        run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Fan-in: combine the per-arch digests into one multi-arch manifest, tag it
+  # (semver + latest), and only then trigger the prod deploy.
+  merge:
+    if: ${{ !startsWith(github.event.release.tag_name, 'cli/') }}
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
+
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY_IMAGE }}
+          # Stable releases get 1.2.3, 1.2, and `latest`; prereleases get only
+          # their full version (latest=auto leaves `latest` untouched for them).
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create manifest list and push
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY_IMAGE }}@sha256:%s ' *)
+
+      - name: Inspect image
+        run: docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
 
       - name: Trigger production deploy (campbooks-cloud)
-        # Fire ONLY after the image is pushed, and ONLY for full releases (not
+        # Fire ONLY after the manifest is pushed, and ONLY for full releases (not
         # prereleases) — so a prerelease can smoke-test the build without shipping
         # to prod. Sends the version to campbooks-cloud's deploy.yml, which pulls
         # ghcr.io/notacamp/campbooks:<version>. Replaces the old notify-deploy.yml
