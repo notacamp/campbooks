@@ -16,6 +16,15 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Skim's follow-up cards respond to the keyboard and the Dismiss button again.** On the
+  Follow-ups ring, pressing **D** — or clicking **Dismiss** — now retires a follow-up as
+  intended. Both were silently inert (the card's action id and theme were being rendered
+  in a dasherized form the Skim keyboard handler didn't recognise); follow-ups was the only
+  ring affected. Keep (→) still works, and a tray shortcut into the Follow-ups ring now
+  lands there correctly.
+
 ## [0.12.1] - 2026-07-05
 
 ### Fixed

@@ -469,7 +469,10 @@ module Campbooks
       button(
         type: "button",
         class: class_names("inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors", classes),
-        data: { skim_action: key }
+        # .to_s so Phlex keeps the underscore: a *symbol* value gets dasherized
+        # (:dismiss_follow_up → "dismiss-follow-up"), which stopped skim-mode#onClick
+        # from matching `case "dismiss_follow_up"`. `key` stays a symbol for ICONS[].
+        data: { skim_action: key.to_s }
       ) do
         if icon == :star || icon == :star_filled
           star_icon(filled: icon == :star_filled, klass: "h-4 w-4 flex-shrink-0")
