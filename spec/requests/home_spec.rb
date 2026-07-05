@@ -13,7 +13,13 @@ RSpec.describe "Home feed", type: :request do
   end
 
   context "when signed in" do
-    before { sign_in(user) }
+    before do
+      # A completed scan log is required so FirstSyncStatus#stage? returns false
+      # (accounts exist but no completed scan → stage? true → renders first_sync
+      # view instead of the feed, breaking all feed assertions).
+      create(:email_scan_log, email_account: account)
+      sign_in(user)
+    end
 
     it "renders the timeline with a card per actionable item" do
       create(:email_message, email_account: account, subject: "Invoice #2025-114 sign-off",

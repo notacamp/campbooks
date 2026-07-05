@@ -241,6 +241,19 @@ RSpec.describe "API MCP endpoint", type: :request do
 
       expect(response.parsed_body.dig("result", "isError")).to be(true)
     end
+
+    it "get_setup_status returns workspace and next_steps" do
+      rpc({ jsonrpc: "2.0", id: 26, method: "tools/call",
+            params: { name: "get_setup_status", arguments: {} } },
+          scopes: "tags:read")
+
+      payload = JSON.parse(response.parsed_body["result"]["content"].first["text"])
+      expect(payload.dig("workspace", "name")).to eq(workspace.name)
+      expect(payload).to have_key("ai")
+      expect(payload).to have_key("taxonomy")
+      expect(payload).to have_key("next_steps")
+      expect(payload["next_steps"]).to be_a(Array)
+    end
   end
 
   describe "search_emails" do
@@ -610,6 +623,17 @@ RSpec.describe "API MCP endpoint", type: :request do
 
       payload = JSON.parse(response.parsed_body["result"]["content"].first["text"])
       expect(payload).to have_key("count")
+    end
+
+    it "list_folders includes a count field" do
+      workspace.mail_folders.create!(name: "FolderForCount")
+
+      rpc({ jsonrpc: "2.0", id: 98, method: "tools/call",
+            params: { name: "list_folders", arguments: {} } }, scopes: "folders:read")
+
+      payload = JSON.parse(response.parsed_body["result"]["content"].first["text"])
+      expect(payload).to have_key("count")
+      expect(payload["count"]).to be_a(Integer)
     end
   end
 

@@ -63,6 +63,34 @@ RSpec.describe "Files::Uploads", type: :request do
     end
   end
 
+  # -- analyze toggle at upload time (from files/uploads_controller_test.rb) --
+
+  describe "POST /files/uploads with analyze toggle" do
+    def pdf_upload
+      Rack::Test::UploadedFile.new(StringIO.new("%PDF-1.4 test"), "application/pdf", original_filename: "test.pdf")
+    end
+
+    it "analyze=1 stores a pending document and enqueues analysis" do
+      expect {
+        post files_uploads_path, params: { files: [ pdf_upload ], analyze: "1" }
+      }.to have_enqueued_job(DocumentProcessJob)
+
+      doc = workspace.documents.order(:id).last
+      expect(doc.ai_status).to eq("pending")
+      expect(doc.review_status).to eq("pending")
+    end
+
+    it "without the toggle the file is stored as-is and nothing is enqueued" do
+      expect {
+        post files_uploads_path, params: { files: [ pdf_upload ] }
+      }.not_to have_enqueued_job(DocumentProcessJob)
+
+      doc = workspace.documents.order(:id).last
+      expect(doc.ai_status).to eq("skipped")
+      expect(doc.review_status).to eq("approved")
+    end
+  end
+
   describe "POST /files/uploads/:id/analyze" do
     it "flips the file to pending and enqueues analysis when AI is available" do
       allow_any_instance_of(Files::UploadsController).to receive(:ai_provider_available?).and_return(true)

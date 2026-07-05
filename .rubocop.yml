@@ -1,6 +1,21 @@
 # Omakase Ruby styling for Rails
 inherit_gem: { rubocop-rails-omakase: rubocop.yml }
 
+# Local cops (lib/rubocop/cop/**). Campbooks/NoMinitest keeps the test suite on
+# RSpec — the project migrated off Minitest.
+require:
+  - ./lib/rubocop/cop/campbooks/no_minitest.rb
+
+Campbooks/NoMinitest:
+  Description: "Tests must be written with RSpec (spec/), not Minitest."
+  Enabled: true
+  Include:
+    - "**/*_test.rb"
+    - "test/**/*.rb"
+    - "spec/**/*.rb"
+    - "app/**/*.rb"
+    - "lib/**/*.rb"
+
 # Overwrite or add rules to create your own house style
 #
 # # Use `[a, [b, c]]` not `[ a, [ b, c ] ]`

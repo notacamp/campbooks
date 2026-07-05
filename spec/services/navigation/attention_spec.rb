@@ -14,13 +14,14 @@ RSpec.describe Navigation::Attention do
     end
 
     it "memoizes within the instance" do
+      # :files is where the review-queue dot now lives (moved from :documents)
       create(:document, :in_review, workspace: user.workspace, viewed_at: nil)
-      expect(attention.dot?(:documents)).to be true
+      expect(attention.dot?(:files)).to be true
 
       user.workspace.documents.needs_review.where(viewed_at: nil).update_all(viewed_at: Time.current)
-      expect(attention.dot?(:documents)).to be true # memoized
+      expect(attention.dot?(:files)).to be true # memoized
 
-      expect(described_class.new(user).dot?(:documents)).to be false
+      expect(described_class.new(user).dot?(:files)).to be false
     end
   end
 
@@ -77,9 +78,11 @@ RSpec.describe Navigation::Attention do
   end
 
   describe ":documents" do
-    it "lights up for an unviewed document needing review" do
+    # NOTE: the needs-review dot has moved from :documents to :files.
+    # :documents no longer lights up for needs_review docs (confirmed by the Minitest suite).
+    it "does not light up for an unviewed document needing review (moved to :files)" do
       create(:document, :in_review, workspace: user.workspace, viewed_at: nil)
-      expect(attention.dot?(:documents)).to be true
+      expect(attention.dot?(:documents)).to be false
     end
 
     it "stays clear when the document has been viewed" do
@@ -150,6 +153,33 @@ RSpec.describe Navigation::Attention do
     it "ignores acted items (even if unseen)" do
       feed_item(seen_at: nil, acted_at: Time.current)
       expect(attention.dot?(:home)).to be false
+    end
+  end
+
+  describe ":files" do
+    # The "needs review" attention dot moved from the (now-merged) Documents nav item to
+    # the Files item — the queue logic is unchanged, only which section it lights.
+    def build_needs_review_doc(viewed_at:)
+      doc = user.workspace.documents.new(document_type: "other", source: :manual_upload,
+                                         ai_status: :completed, review_status: :pending, viewed_at: viewed_at)
+      doc.original_file.attach(io: StringIO.new("x"), filename: "x.pdf", content_type: "application/pdf")
+      doc.save!
+      doc
+    end
+
+    it "the files dot lights when an unviewed needs_review document exists" do
+      build_needs_review_doc(viewed_at: nil)
+      expect(attention.dot?(:files)).to be true
+    end
+
+    it "the files dot clears once the document has been viewed" do
+      build_needs_review_doc(viewed_at: Time.current)
+      expect(attention.dot?(:files)).to be false
+    end
+
+    it "the legacy :documents section no longer lights a dot" do
+      build_needs_review_doc(viewed_at: nil)
+      expect(described_class.new(user).dot?(:documents)).to be false
     end
   end
 end

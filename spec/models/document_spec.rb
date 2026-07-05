@@ -18,12 +18,12 @@ RSpec.describe Document, type: :model do
   describe "enums" do
     it {
       is_expected.to define_enum_for(:document_type)
-        .with_values(expense_invoice: 0, revenue_invoice: 1, bank_statement: 2, receipt: 3, other: 4, insurance_policy: 5, vehicle_document: 6, contract: 7, certificate: 8, tax_document: 9, identification: 10, proposal: 11, correspondence: 12, bank_journal_entry: 13)
+        .with_values(expense_invoice: 0, revenue_invoice: 1, bank_statement: 2, receipt: 3, other: 4, insurance_policy: 5, vehicle_document: 6, contract: 7, certificate: 8, tax_document: 9, identification: 10, proposal: 11, correspondence: 12, bank_journal_entry: 13, credit_note: 14)
     }
 
     it {
       is_expected.to define_enum_for(:ai_status)
-        .with_values(pending: 0, processing: 1, completed: 2, failed: 3)
+        .with_values(pending: 0, processing: 1, completed: 2, failed: 3, skipped: 4)
         .with_prefix(:ai)
     }
 

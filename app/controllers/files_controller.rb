@@ -169,10 +169,13 @@ class FilesController < ApplicationController
 
   # The month picker (<input type="month">) submits a single "YYYY-MM" value; parse
   # it into the [year, month] pair `for_month` expects. Nil when absent/unparseable.
+  # Uses Date.strptime with an explicit format so Rails' lenient Date.parse doesn't
+  # silently convert strings like "garbage" into valid dates (it would interpret
+  # "garbage-01" as the 1st of the current month, applying a wrong filter).
   def month_filter
     return if params[:month].blank?
 
-    date = Date.parse("#{params[:month]}-01")
+    date = Date.strptime(params[:month], "%Y-%m")
     [ date.year, date.month ]
   rescue ArgumentError
     nil
