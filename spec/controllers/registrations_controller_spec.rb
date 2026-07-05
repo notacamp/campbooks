@@ -31,6 +31,7 @@ RSpec.describe RegistrationsController, type: :controller do
 
       new_user = User.find_by(email_address: "invited@example.com")
       expect(new_user.workspace).to eq(org)
+      expect(new_user).to be_member # invited users join as members, not admins
       expect(new_user.terms_accepted_at).to be_present
       expect(invitation.reload).to be_accepted
       expect(session[:invitation_token]).to be_nil
@@ -42,7 +43,9 @@ RSpec.describe RegistrationsController, type: :controller do
         patch :complete, params: { password: "password123" }
       }.to change(User, :count).by(1).and change(Workspace, :count).by(1)
 
-      expect(response).to redirect_to(onboarding_path(step: :workspace))
+      expect(User.order(:created_at).last).to be_admin # founders administer their workspace
+      # Straight to the Scout welcome screen (the onboarding-overhaul flow).
+      expect(response).to redirect_to(onboarding_path)
     end
 
     it "creates new org when invitation token email does not match" do
@@ -166,7 +169,7 @@ RSpec.describe RegistrationsController, type: :controller do
 
       expect(code.reload).to be_redeemed
       expect(code.redeemed_by).to eq(User.find_by(email_address: "beta@example.com"))
-      expect(response).to redirect_to(onboarding_path(step: :workspace))
+      expect(response).to redirect_to(onboarding_path)
     end
 
     it "refuses to create an account when the stored code is gone" do

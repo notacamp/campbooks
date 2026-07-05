@@ -18,6 +18,18 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Workspace admins can manage their own workspace.** Settings → Members now
+  shows each member's role and lets workspace admins promote or demote
+  teammates (never themselves), and approve teammates' pending invitations
+  right there — approval no longer requires the hosting operator. Whoever
+  creates a workspace is its admin automatically; on upgrade, workspaces that
+  had no admin get their earliest member promoted, so every workspace can
+  manage itself without manual steps.
+- **Being assigned a task now notifies you.** A bell notification (with the
+  task title, linking to the task) fires for each newly assigned person —
+  assigning yourself stays silent. `@mentioning` a teammate in a task
+  discussion now works like email discussions: they're subscribed to the
+  thread and notified.
 - **Scheduled digests.** Build your own recurring briefings: a digest is a saved
   scope (emails matching a search query, upcoming calendar events, tasks due soon,
   reminders, recently received documents — mix and match), a schedule (daily,
@@ -130,6 +142,40 @@ major, minor, or patch change here.
   a card resolved by the system (say, a snoozed thread whose snooze you extend)
   can now come back if it genuinely needs you again — previously it was hidden
   forever.
+- **The calendar "Manage access" page opens again.** Opening a calendar
+  account's sharing panel crashed with a template error, which made calendar
+  sharing unmanageable from the UI (roles could still be changed via the API).
+
+### Security
+
+- **Workspace admins are no longer application admins.** ⚠️ The admin role on
+  a user used to double as access to the instance-wide `/admin` panel and the
+  `/jobs` dashboard — surfaces that span every workspace on the server. Those
+  are now gated by a separate per-user `app_admin` flag; the role on a user
+  only governs their own workspace. Existing role-admins keep instance access
+  on upgrade (they're marked `app_admin` by the migration); self-hosters can
+  grant it in the Rails console with `user.update!(app_admin: true)`.
+- **Documents filed into restricted folders are hidden by direct link too.**
+  Folder read restrictions were enforced on the Files listing but not on a
+  document's own page or file download — anyone in the workspace who knew or
+  guessed the URL could open a restricted document. Both now 404 unless the
+  viewer can read one of the document's folders (workspace admins retain
+  access).
+- **Invitation controls are for the inviter and workspace admins.** Any
+  workspace member could cancel or resend any pending invitation; now only the
+  person who sent it or a workspace admin can.
+- **Scheduled emails now follow the mailbox's sharing.** Queued sends were
+  visible to every workspace member — including the recipient, subject, and
+  body of mail scheduled on a teammate's private mailbox — and anyone in the
+  workspace could edit or cancel them. A scheduled email is now visible only to
+  its creator and to people the mailbox is shared with, and only the creator or
+  someone with send permission on that mailbox can change or cancel it (web,
+  API, and MCP alike).
+- **"Schedule send" now checks send permission.** The composer's Schedule
+  button accepted any account id, so someone with read-only access to a shared
+  mailbox (or a crafted request naming any account) could queue an email from
+  it. Scheduling now requires send permission on the account, exactly like
+  pressing Send.
 
 ## [0.11.0] - 2026-07-05
 

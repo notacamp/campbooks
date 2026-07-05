@@ -121,6 +121,10 @@ pt:
       title: O Scout respondeu
     subject_label:
       fallback: a sua caixa de entrada
+    task_assigned:
+      title: "%{actor_name} atribuiu-lhe uma tarefa"
+    task_mention:
+      title: "%{actor_name} mencionou-o numa tarefa"
     thread_activity:
       title: Novo comentário de %{actor_name}
     thread_mention:

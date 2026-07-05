@@ -23,8 +23,11 @@ User.find_or_create_by!(email_address: "admin@example.com") do |user|
   user.password = ENV.fetch("SEED_PASSWORD", "changeme123")
   user.password_confirmation = ENV.fetch("SEED_PASSWORD", "changeme123")
   user.workspace = org
-  user.role = :admin
+  user.role = :admin # workspace admin
+  user.app_admin = true # and instance operator (/admin, /jobs)
 end
+# Older seeded databases predate the app_admin flag — keep the demo admin an operator.
+User.find_by(email_address: "admin@example.com")&.then { |u| u.update!(app_admin: true) unless u.app_admin? }
 
 User.find_or_create_by!(email_address: "partner@example.com") do |user|
   user.name = "Partner"

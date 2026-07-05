@@ -62,6 +62,10 @@ class User < ApplicationRecord
   has_many :recovery_codes, dependent: :destroy
   has_many :mfa_email_challenges, dependent: :destroy
 
+  # Workspace-level role: an admin manages THIS workspace (member roles,
+  # invitation approvals, restricted-folder bypass). Operating the INSTANCE
+  # (/admin, /jobs) is the separate `app_admin` boolean — the two are
+  # independent, and a workspace admin holds no cross-workspace power.
   attribute :role, :integer
   enum :role, { member: 0, admin: 1 }
   # Where a brand-new email opens: the Desk (full page) or the Dock (sheet).

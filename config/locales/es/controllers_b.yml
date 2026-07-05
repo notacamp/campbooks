@@ -62,10 +62,13 @@ es:
         update:
           mapping_saved: Asignación de carpeta guardada.
     invitations:
+      approve:
+        approved: Invitación para %{email} aprobada y enviada.
       create:
         pending_review: Invitación para %{email} enviada para revisión del administrador.
         sent: Invitación enviada a %{email}.
       destroy:
         cancelled: Invitación cancelada.
+      not_allowed: No tienes permiso para gestionar esta invitación.
       resend:
         resent: Invitación reenviada a %{email}.

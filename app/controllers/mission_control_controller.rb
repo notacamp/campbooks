@@ -15,6 +15,7 @@ class MissionControlController < ActionController::Base
   private
 
   def require_admin
-    head :forbidden unless Current.user&.admin?
+    # Instance operators only — the dashboard spans every workspace's jobs.
+    head :forbidden unless Current.user&.app_admin?
   end
 end
