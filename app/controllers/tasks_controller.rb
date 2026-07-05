@@ -67,13 +67,31 @@ class TasksController < ApplicationController
 
   def destroy
     @task.destroy
-    redirect_to tasks_path, success: t(".deleted")
+    respond_to do |format|
+      format.turbo_stream do
+        if params[:swipe].present?
+          render turbo_stream: [ turbo_stream.remove(dom_id(@task, :list_item)), notify_stream(t(".deleted")) ]
+        else
+          render turbo_stream: notify_stream(t(".deleted"))
+        end
+      end
+      format.html { redirect_to tasks_path, success: t(".deleted") }
+    end
   end
 
   # Soft-archive: hide the task from the active lists/board/feed without deleting it.
   def archive
     @task.archive!(by: current_user)
-    redirect_to @task, success: t(".archived")
+    respond_to do |format|
+      format.turbo_stream do
+        if params[:swipe].present?
+          render turbo_stream: [ turbo_stream.remove(dom_id(@task, :list_item)), notify_stream(t(".archived")) ]
+        else
+          render turbo_stream: notify_stream(t(".archived"))
+        end
+      end
+      format.html { redirect_to @task, success: t(".archived") }
+    end
   end
 
   def unarchive
@@ -84,7 +102,15 @@ class TasksController < ApplicationController
   # Quick "mark done" (feed / skim / index / detail).
   def complete
     @task.move_to_status!(:done, by: current_user)
-    respond_with_change(t(".completed"))
+    if params[:swipe].present?
+      respond_to do |format|
+        format.turbo_stream { render turbo_stream: [ turbo_stream.remove(dom_id(@task, :list_item)), notify_stream(t(".completed")) ] }
+        format.html { redirect_to @task, success: t(".completed") }
+        format.json { head :ok }
+      end
+    else
+      respond_with_change(t(".completed"))
+    end
   end
 
   # Triage queue for AI-suggested tasks: review them one by one and accept,

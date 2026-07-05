@@ -493,8 +493,8 @@ pt:
         subtitle: Escolha como pretende ser notificado sobre nova atividade.
         tags_title: Etiquetas
         title: Preferências de notificação
-        waiting_digest_hint: Um email diário das conversas de que ainda aguarda resposta.
-        waiting_digest_label: Respostas pendentes
+        waiting_digest_hint: Um resumo diário de tudo o que precisa da sua atenção — acompanhamentos, lembretes próximos e tarefas atrasadas ou de alta prioridade.
+        waiting_digest_label: Resumo diário de atenção
       section:
         email_label: E-mail
         in_app_label: Na aplicação
