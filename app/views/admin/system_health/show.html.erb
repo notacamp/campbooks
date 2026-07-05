@@ -62,5 +62,6 @@
         calls: @calls,
         pagy: @pagy,
         log_path: admin_system_health_path,
-        show_workspace: true %>
+        show_workspace: true,
+        row_href: ->(call) { call_admin_system_health_path(id: call.id) } %>
 </div>

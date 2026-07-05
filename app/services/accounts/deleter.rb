@@ -38,6 +38,8 @@ module Accounts
         CalendarSyncLog.where(calendar_account_id: calendar_account_ids).delete_all
         @workspace.calendar_accounts.destroy_all
 
+        ExternalServiceCall.where(workspace_id: @workspace.id).in_batches.delete_all
+
         @workspace.contacts.destroy_all
         @workspace.people.destroy_all
         @workspace.tags.destroy_all

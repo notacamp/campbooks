@@ -277,7 +277,7 @@ module Google
 
     def connection
       Faraday.new do |f|
-        f.use SystemHealth::FaradayMiddleware, service: "google_calendar", expected_statuses: [ 410, 412 ]
+        f.use SystemHealth::FaradayMiddleware, service: "google_calendar", expected_statuses: [ 410, 412 ], workspace: -> { @account.try(:workspace_id) }
         f.request :url_encoded
         f.options.open_timeout = 10
         f.options.timeout = 30
