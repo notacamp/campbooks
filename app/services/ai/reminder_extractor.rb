@@ -97,6 +97,11 @@ module Ai
         - For payment_due, set amount_cents (integer, in cents) and currency when an amount
           is present.
         - For a recurring obligation, extract only the SINGLE next upcoming occurrence.
+        - A round trip or multi-day itinerary has MORE THAN ONE dated commitment: extract a
+          separate reminder for each date the reader departs, at minimum the outbound departure
+          AND the return departure (a flight booking with a return leg is two reminders, not
+          one). Collapse same-day connecting segments into that day's single reminder using the
+          first departure's time; do not emit one reminder per connection.
         - confidence is your 0.0–1.0 certainty this is a real, dated commitment for the reader.
         - justification: one short sentence explaining why you extracted this, quoting the
           wording in the source that signals the date or obligation.
