@@ -16,12 +16,15 @@ class ScoutNoteComponentPreview < ViewComponent::Preview
     )
   end
 
-  # Compact one-line shape used on the dense home feed: Ember spark + "Scout" +
-  # the read, clamped to a single line.
+  # Compact shape used on the dense home feed: Ember spark + "Scout" + the read,
+  # clamped to three lines with a "Read more" (long message shown to demo the clamp).
   def compact
     render Campbooks::ScoutNote.new(
-      message: "matches your approved March quote, nothing unusual — I drafted an approval reply.",
-      compact: true
+      message: "matches your approved March quote, nothing unusual — I drafted an approval reply. " \
+               "The vendor kept the same net-30 terms and line items as the quote you signed off on " \
+               "in March, so there's nothing here that needs a second look before it goes out.",
+      compact: true,
+      lines: 3
     )
   end
 end

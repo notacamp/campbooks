@@ -18,6 +18,10 @@ major, minor, or patch change here.
 
 ### Changed
 
+- The home feed's Scout summary now caps at three lines with a "Read more"
+  toggle, instead of running the full read down the card. Keeps feed cards
+  short and scannable; the whole read is one tap away.
+
 - **Tags and provider labels are one concept.** Renaming or recoloring a
   synced tag now updates the label in the connected mailbox immediately;
   previously those edits were silently overwritten by the next background sync.
