@@ -604,6 +604,19 @@ RSpec.describe "API MCP endpoint", type: :request do
       expect(payload).to have_key("count")
     end
 
+    it "list_tags excludes hidden provider labels" do
+      Tag.create!(workspace: workspace, name: "VisibleTag", color: "#ccc", source: :local)
+      Tag.create!(workspace: workspace, name: "HIDDEN_CATEGORY", color: "#ccc", source: :external,
+                  email_account: account, external_label_id: "CATEGORY_UPDATES", kind: :category, hidden: true)
+
+      rpc({ jsonrpc: "2.0", id: 98, method: "tools/call",
+            params: { name: "list_tags", arguments: {} } }, scopes: "tags:read")
+
+      names = JSON.parse(response.parsed_body["result"]["content"].first["text"])["tags"].map { |t| t["name"] }
+      expect(names).to include("VisibleTag")
+      expect(names).not_to include("HIDDEN_CATEGORY")
+    end
+
     it "list_document_types includes a count field" do
       rpc({ jsonrpc: "2.0", id: 97, method: "tools/call",
             params: { name: "list_document_types", arguments: {} } }, scopes: "document_types:read")

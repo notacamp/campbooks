@@ -16,6 +16,12 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **API: tags now report `kind`, `hidden`, and `email_count`,** and `GET /tags`
+  accepts `?include_hidden=true` — so API and MCP clients can distinguish provider
+  system labels from real tags and spot unused ones.
+
 ### Changed
 
 - **Tags and provider labels are one concept.** Renaming or recoloring a
@@ -31,6 +37,16 @@ major, minor, or patch change here.
 - Tag chips on an inbox thread row now update on every add/remove. Previously
   the first change silently broke the row's chip area, so any later tag change
   on the same thread didn't show until a reload.
+- **Hidden provider labels no longer leak through the API or MCP `list_tags`.**
+  Gmail system statuses (INBOX, CATEGORY_*) and AI-judged low-value labels are
+  excluded by default, matching what the inbox already hides — pass
+  `include_hidden=true` on `GET /tags` to include them.
+- **Synced provider labels that arrive without a colour now get a distinct,
+  stable colour** instead of every one sharing a single gold default, so they're
+  no longer indistinguishable at a glance.
+- **A label sync that fails for one mailbox is now reported to error tracking,**
+  not just written to the log — a silently-swallowed failure is how a mailbox's
+  labels drift stale for months unnoticed.
 
 ### Removed
 
