@@ -30,7 +30,7 @@ en:
         email_accounts_heading: Email accounts
         heading: Display
         hide_account_hint: Hide an account to remove its threads from the list.
-        labels_option: Labels
+        tags_option: Tags
         no_accounts: No email accounts connected yet.
         show_heading: Show
         subheading: How your inbox looks on this device. Saved in this browser.
@@ -76,6 +76,8 @@ en:
         cancel: Cancel
         color_label: Color (hex)
         create_tag: Create tag
+        external_tag_hint: Renaming or recoloring this tag will update the label in
+          the connected mailbox.
         group_label: Group
         group_placeholder: e.g. Finance
       hidden_tag:
@@ -86,7 +88,7 @@ en:
         add_tag: Add tag
         filtered_group: Hidden by AI or you
         heading: Tags
-        hidden_heading: Hidden labels
+        hidden_heading: Hidden tags
         hidden_hint: system & AI-hidden
         no_tags: No tags yet. Add one to start sorting your inbox.
         subheading: Tags help Scout sort your inbox automatically.
@@ -95,9 +97,12 @@ en:
         delete_confirm: Delete %{name}?
         edit: Edit
         hide: Hide
+        synced_with_title: Synced with %{account}
         tagged_messages_title: Tagged messages
       toggle_hidden:
         hidden: "%{name} hidden"
         shown: "%{name} is now visible"
       update:
+        provider_update_failed: Could not update the label in your mailbox. Please
+          try again.
         updated_toast: Tag updated.

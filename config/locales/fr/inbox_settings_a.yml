@@ -32,7 +32,7 @@ fr:
         heading: Affichage
         hide_account_hint: Masquer un compte pour retirer ses conversations de la
           liste.
-        labels_option: Étiquettes
+        tags_option: Étiquettes
         no_accounts: Aucun compte e-mail connecté pour l'instant.
         show_heading: Afficher
         subheading: L'apparence de votre boîte de réception sur cet appareil. Enregistré
@@ -81,6 +81,8 @@ fr:
         cancel: Annuler
         color_label: Couleur (hex)
         create_tag: Créer une étiquette
+        external_tag_hint: Renommer ou recolorer cette étiquette mettra à jour le
+          libellé dans la boîte aux lettres connectée.
         group_label: Groupe
         group_placeholder: ex. Finance
       hidden_tag:
@@ -91,7 +93,7 @@ fr:
         add_tag: Ajouter une étiquette
         filtered_group: Masquées par l'IA ou par vous
         heading: Étiquettes
-        hidden_heading: Libellés masqués
+        hidden_heading: Étiquettes masquées
         hidden_hint: système et masqués par IA
         no_tags: Aucune étiquette pour l'instant. Ajoutez-en une pour commencer à
           trier votre boîte de réception.
@@ -101,9 +103,12 @@ fr:
         delete_confirm: Supprimer %{name} ?
         edit: Modifier
         hide: Masquer
+        synced_with_title: Synchronisé avec %{account}
         tagged_messages_title: Messages étiquetés
       toggle_hidden:
         hidden: "%{name} masqué"
         shown: "%{name} est maintenant visible"
       update:
+        provider_update_failed: Impossible de mettre à jour le libellé dans votre
+          boîte aux lettres. Veuillez réessayer.
         updated_toast: Étiquette mise à jour.
