@@ -2,7 +2,8 @@
   <%= render "email_messages/tags", message: @message %>
 <% end %>
 
-<%= turbo_stream.replace dom_id(@message, :thread_tags) do %>
+<%# update, not replace — see create.turbo_stream.erb. %>
+<%= turbo_stream.update dom_id(@message, :thread_tags) do %>
   <%= render "email_messages/thread_tags", message: @message %>
 <% end %>
 
