@@ -88,6 +88,9 @@ major, minor, or patch change here.
   a card resolved by the system (say, a snoozed thread whose snooze you extend)
   can now come back if it genuinely needs you again — previously it was hidden
   forever.
+- **The calendar "Manage access" page opens again.** Opening a calendar
+  account's sharing panel crashed with a template error, which made calendar
+  sharing unmanageable from the UI (roles could still be changed via the API).
 
 ### Security
 

@@ -117,17 +117,28 @@ class CalendarSharingPermissionsTest < ActionDispatch::IntegrationTest
 
   # sharing action is owner-only; editor has an entry (so set_calendar_account
   # succeeds) but owned_by? is false -> redirect.
-  test "editor cannot open the sharing panel; owner can" do
+  test "editor cannot open the sharing panel" do
     editor = create(:user, workspace: @workspace)
     create(:calendar_account_user, :editor, user: editor, calendar_account: @cal_account)
 
     sign_in_as editor
     get sharing_calendar_account_path(@cal_account)
     assert_response :redirect
+  end
 
+  # The sharing page renders for the owner, listing current members and the
+  # addable workspace teammates. (Regression: the template renders the settings
+  # sidebar, which needs current_section from the controller — without it this
+  # page 500s and calendar sharing is unmanageable in the UI.)
+  test "the owner can open the sharing panel and see members and addable teammates" do
+    teammate = create(:user, name: "Addable Teammate", workspace: @workspace)
     sign_in_as @owner_user
+
     get sharing_calendar_account_path(@cal_account)
+
     assert_response :success
+    assert_match @owner_user.name, response.body
+    assert_match teammate.name, response.body
   end
 
   # PATCH with params[:calendar_account] requires managed_by? (manager+); editor
@@ -137,12 +148,13 @@ class CalendarSharingPermissionsTest < ActionDispatch::IntegrationTest
     create(:calendar_account_user, :editor, user: editor, calendar_account: @cal_account)
     manager = create(:user, workspace: @workspace)
     create(:calendar_account_user, :manager, user: manager, calendar_account: @cal_account)
-    original_name = @cal_account.name
+    # Give the account a concrete name so the before/after comparison is unambiguous.
+    @cal_account.update_column(:name, "Before Rename")
 
     sign_in_as editor
     patch calendar_account_path(@cal_account), params: { calendar_account: { name: "Editor Rename" } }
     assert_response :redirect
-    assert_equal original_name, @cal_account.reload.name
+    assert_equal "Before Rename", @cal_account.reload.name
 
     sign_in_as manager
     patch calendar_account_path(@cal_account), params: { calendar_account: { name: "Manager Rename" } }
