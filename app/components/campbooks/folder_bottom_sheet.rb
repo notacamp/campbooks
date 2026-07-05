@@ -86,7 +86,9 @@ module Campbooks
         @system.each do |f|
           folder_row(
             name:      f[:name],
-            href:      helpers.email_messages_path(folder_id: f[:id]),
+            # show_list=1 lands mobile taps on the thread list, not the reading pane
+            # (see EmailMessagesController#index + email_mobile_controller); no-op on desktop.
+            href:      helpers.email_messages_path(folder_id: f[:id], show_list: 1),
             count:     f[:count],
             active:    system_active?(f),
             glyph:     Campbooks::Icon.for_folder_name(f[:name]),
@@ -100,7 +102,8 @@ module Campbooks
             current_folder:  @current,
             document_counts: @document_counts,
             section_id:      "sheet_custom_folders",
-            dom_prefix:      "sheet_"
+            dom_prefix:      "sheet_",
+            list_param:      true
           )
         )
 

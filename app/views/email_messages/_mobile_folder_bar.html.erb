@@ -17,13 +17,15 @@
   <%# Bar: non-scrolling trigger | scrollable chips %>
   <div class="flex items-stretch border-b border-gray-100 bg-card">
 
-    <%# "Folders" trigger — always visible, never scrolls with the chips.
-        A subtle pill with a list icon that lifts the bottom sheet. %>
+    <%# "Folders" trigger — never scrolls with the chips; opens the bottom sheet.
+        Mobile-only (lg:hidden): the sheet is a bottom-sheet idiom that reads wrong
+        full-width on desktop, and the index/search view keeps its chip bar there.
+        (On the show page the whole bar is already desktop_hidden.) %>
     <button type="button"
             data-action="folder-bottom-sheet#open"
             aria-haspopup="dialog"
             aria-label="<%= t(".folders_trigger") %>"
-            class="flex flex-shrink-0 items-center gap-1.5 border-r border-gray-100 px-3 text-[11px] font-medium text-gray-500 hover:text-gray-800 transition-colors cursor-pointer">
+            class="flex lg:hidden flex-shrink-0 items-center gap-1.5 border-r border-gray-100 px-3 text-[11px] font-medium text-gray-500 hover:text-gray-800 transition-colors cursor-pointer">
       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M3 7h18M3 12h18M3 17h18"/>
@@ -86,12 +88,15 @@
     </div>
   </div>
 
-  <%# Full-screen bottom sheet — renders backdrop + panel. %>
-  <%= render(Campbooks::FolderBottomSheet.new(
-    system_folders: @common_folders || [],
-    custom_folders: @mail_folders || [],
-    current_folder: @current_folder
-  )) %>
+  <%# Full-screen bottom sheet — renders backdrop + panel. Mobile-only, matching
+      the trigger above; on lg+ the desktop FolderPane covers this. %>
+  <div class="lg:hidden">
+    <%= render(Campbooks::FolderBottomSheet.new(
+      system_folders: @common_folders || [],
+      custom_folders: @mail_folders || [],
+      current_folder: @current_folder
+    )) %>
+  </div>
 
   <%# Shared New Folder dialog — sits on the wrapper (not inside the chip strip) so
       both the chip "+" and the sheet's "New folder" button reach the new-folder

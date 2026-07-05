@@ -162,7 +162,8 @@ class MailFoldersController < ApplicationController
         custom_folders: folders,
         document_counts: MailFolder.document_counts(folders),
         section_id: "sheet_custom_folders",
-        dom_prefix: "sheet_"
+        dom_prefix: "sheet_",
+        list_param: true
       ),
       layout: false
     )
