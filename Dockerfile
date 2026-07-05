@@ -9,6 +9,17 @@
 
 # Make sure RUBY_VERSION matches the Ruby version in .ruby-version
 ARG RUBY_VERSION=3.2.2
+
+# Where the gem-carrying build stage starts. Defaults to the local `gems` stage
+# below, so a plain `docker build .` (self-host) compiles gems from scratch with
+# no external dependency. CI overrides it to the pre-baked, multi-arch
+# ghcr.io/notacamp/campbooks-base:<tag> (built by base-image.yml, rebuilt only
+# when Gemfile.lock changes) so releases skip the cold gem compile. Safe either
+# way: the build stage re-runs `bundle install` against the CURRENT Gemfile.lock
+# after copying the code, so a stale/mismatched base is reconciled to just the
+# delta — never shipped wrong. `campbooks-base` IS this file's `gems` target.
+ARG BUILDER_IMAGE=gems
+
 # Pinned by digest, not just the floating :3.2.2-slim tag. An unpinned tag
 # re-resolves to whatever upstream last pushed, so the base layer digest drifts
 # between builds and invalidates the ENTIRE downstream cache chain — including
@@ -54,10 +65,14 @@ ENV RAILS_ENV="production" \
     BUNDLE_WITHOUT="development" \
     LD_PRELOAD="/usr/local/lib/libjemalloc.so"
 
-# Throw-away build stage to reduce size of final image
-FROM base AS build
-
-ARG INSTALL_PDF_BROWSER=false
+# ---------------------------------------------------------------------------
+# gems: runtime base + build toolchain + installed gems, but NO application code.
+# Published as ghcr.io/notacamp/campbooks-base (via `docker build --target gems`)
+# and rebuilt only when Gemfile.lock changes, so release builds can start here
+# instead of compiling every gem. Also the DEFAULT BUILDER_IMAGE, so a plain
+# `docker build .` still works with no external image.
+# ---------------------------------------------------------------------------
+FROM base AS gems
 
 # Install packages needed to build gems
 RUN apt-get update -qq && \
@@ -86,8 +101,35 @@ RUN --mount=type=secret,id=cloud_bundle_token \
     # -j 1 disable parallel compilation to avoid a QEMU bug: https://github.com/rails/bootsnap/issues/495
     bundle exec bootsnap precompile -j 1 --gemfile
 
-# Copy application code
+# ---------------------------------------------------------------------------
+# build: throw-away stage that turns gems + app code into the final artifacts.
+# Starts from ${BUILDER_IMAGE}: the local `gems` stage by default, or the
+# pre-baked campbooks-base image in CI (open-source gems already inside).
+# ---------------------------------------------------------------------------
+FROM ${BUILDER_IMAGE} AS build
+
+ARG INSTALL_PDF_BROWSER=false
+
+# Copy application code first, so the reconciling bundle install below sees THIS
+# build's Gemfile.lock (not whatever the pre-baked base was built from).
 COPY . .
+
+# Reconcile the bundle to this build's Gemfile.lock and, when a cloud token is
+# present, add the :cloud group on top of the (open-source-only) pre-baked base.
+# Against a matching base this is a fast no-op plus the incremental cloud gem;
+# against a stale base it installs only the delta; with no token (self-host) the
+# bundle is already satisfied. The token is a throwaway global credential removed
+# in the same layer, so it never lands in an image layer.
+RUN --mount=type=secret,id=cloud_bundle_token \
+    if [ -s /run/secrets/cloud_bundle_token ]; then \
+      bundle config set --global github.com "x-access-token:$(cat /run/secrets/cloud_bundle_token)" && \
+      bundle config set --local without development && \
+      bundle config set --local with cloud; \
+    fi && \
+    bundle install && \
+    rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git && \
+    # -j 1 disable parallel compilation to avoid a QEMU bug: https://github.com/rails/bootsnap/issues/495
+    bundle exec bootsnap precompile -j 1 --gemfile
 
 # Install the Node deps for the PDF renderer (puppeteer-core) when the browser
 # layer is enabled. PUPPETEER_SKIP_DOWNLOAD (set above) keeps it from pulling its
