@@ -41,8 +41,8 @@ module InboxSettings
         begin
           result = @tag.email_account.mail_client.update_label(
             @tag.external_label_id,
-            name: tag_params[:name] || @tag.name,
-            color: tag_params[:color] || @tag.color
+            name: tag_params[:name].presence || @tag.name,
+            color: tag_params[:color].presence || @tag.color
           )
           unless result.dig("status", "code") == 200 || result["id"].present?
             render turbo_stream: notify_stream(t(".provider_update_failed"), severity: :error)

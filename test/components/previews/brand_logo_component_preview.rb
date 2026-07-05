@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
 class BrandLogoComponentPreview < ViewComponent::Preview
+  def google
+    render(Campbooks::BrandLogo.new(brand: :google, size: :lg))
+  end
+
   def google_drive
     render(Campbooks::BrandLogo.new(brand: :google_drive, size: :lg))
   end
@@ -17,7 +21,7 @@ class BrandLogoComponentPreview < ViewComponent::Preview
     render(Campbooks::BrandLogo.new(brand: :unknown, size: :lg))
   end
 
-  # @param brand select { choices: [google_drive, notion, zoho, unknown] }
+  # @param brand select { choices: [google, google_drive, notion, zoho, unknown] }
   # @param size select { choices: [xs, sm, md, lg] }
   def playground(brand: :notion, size: :md)
     render(Campbooks::BrandLogo.new(brand: brand.to_sym, size: size.to_sym))
