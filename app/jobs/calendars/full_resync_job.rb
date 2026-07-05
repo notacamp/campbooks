@@ -16,8 +16,10 @@ module Calendars
       Rails.cache.write(key, true, expires_in: RATE_LIMIT)
 
       # Discard the stale token so the next sweep does a full pull for this calendar.
-      calendar.update_columns(sync_token: nil)
-      CalendarScanJob.perform_later(calendar.calendar_account_id, "full")
+      Current.set(workspace: calendar.workspace) do
+        calendar.update_columns(sync_token: nil)
+        CalendarScanJob.perform_later(calendar.calendar_account_id, "full")
+      end
     end
   end
 end

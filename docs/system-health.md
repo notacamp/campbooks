@@ -1,14 +1,20 @@
 # System health
 
-Campbooks talks to a lot of outside services: mail providers (Gmail, Zoho Mail, Microsoft 365), calendars, Google Drive, Notion, AI providers, workflow webhooks, push gateways, and SMTP. **System health** records every one of those calls and gives instance admins a dashboard to see which connections are working and which are failing.
+Campbooks talks to a lot of outside services: mail providers (Gmail, Zoho Mail, Microsoft 365), calendars, Google Drive, Notion, AI providers, workflow webhooks, push gateways, and SMTP. **System health** records every one of those calls and shows which connections are working and which are failing — per workspace, and instance-wide.
 
-## The dashboard
+## The workspace view
 
-`/admin/system_health` (visible to app admins only) shows:
+**Settings → System health** (visible to workspace admins) shows the workspace's own slice:
 
-- A summary of calls and errors over the last 24 hours.
-- One card per active service: its state, an hourly activity sparkline with errors highlighted, call volume, error rate, average response time, and the most recent error. Clicking a card filters the log to that service.
-- A call log, filterable by service, outcome, and time window (24 hours, 7 or 30 days).
+- A summary of the workspace's calls and errors over the last 24 hours.
+- One card per service the workspace actually used: its state, an hourly activity sparkline with errors highlighted, call volume, error rate, average response time, and the most recent error. Clicking a card filters the log to that service.
+- A call log of the workspace's calls, filterable by service, outcome, and time window (24 hours, 7 or 30 days).
+
+Calls are attributed to a workspace through the account that made them (its mailboxes, calendars, AI runs, workflow actions). Instance-level calls that belong to no workspace — transactional email, for example — appear only in the instance view.
+
+## The instance view
+
+`/admin/system_health` (visible to app admins only) is the sum of all workspaces plus the instance-level calls. Same layout, with two additions: services with no activity are listed so a silent integration is visible, and log rows name the workspace they belong to.
 
 States are derived from the last 24 hours of calls:
 

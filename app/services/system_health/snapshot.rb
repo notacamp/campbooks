@@ -30,9 +30,10 @@ class SystemHealth::Snapshot
   DEGRADED_RATE           = 0.05
   DEGRADED_MIN_ERRORS     = 3
 
-  def initialize(window: 24.hours)
-    @window = window
-    @since  = window.ago
+  def initialize(window: 24.hours, workspace: nil)
+    @window    = window
+    @since     = window.ago
+    @workspace = workspace
   end
 
   # Returns an Array of ServiceStat, sorted: failing first, then degraded,
@@ -63,8 +64,14 @@ class SystemHealth::Snapshot
     last_errors      = load_last_errors        # Query 3
     last_successes   = load_last_successes     # Query 4
 
-    # All known services + any services seen in the window not in the registry.
-    all_keys = (SystemHealth::SERVICES.keys + aggregates.keys).uniq
+    # When scoped to a workspace only show services observed in the window
+    # (skip the registry zero-fill — a workspace should not see 20 idle instance
+    # services). Instance mode (workspace nil) preserves the full registry union.
+    all_keys = if @workspace
+      aggregates.keys
+    else
+      (SystemHealth::SERVICES.keys + aggregates.keys).uniq
+    end
 
     entries = all_keys.map do |svc|
       agg      = aggregates[svc] || { total: 0, errors: 0, avg_duration_ms: nil }
@@ -105,10 +112,17 @@ class SystemHealth::Snapshot
     :healthy
   end
 
+  # Base scope shared across all 4 queries: applies the time window and, when
+  # workspace-scoped, restricts to that workspace's rows only.
+  def base_scope
+    scope = ExternalServiceCall.since(@since)
+    scope = scope.where(workspace_id: @workspace.id) if @workspace
+    scope
+  end
+
   # Query 1 — grouped aggregate per service.
   def load_aggregates
-    ExternalServiceCall
-      .since(@since)
+    base_scope
       .group(:service)
       .select(
         :service,
@@ -122,8 +136,7 @@ class SystemHealth::Snapshot
 
   # Query 2 — hourly bucket counts per service.
   def load_buckets
-    rows = ExternalServiceCall
-      .since(@since)
+    rows = base_scope
       .group(:service, Arel.sql("date_trunc('hour', created_at AT TIME ZONE 'UTC')"))
       .select(
         :service,
@@ -141,8 +154,7 @@ class SystemHealth::Snapshot
 
   # Query 3 — last error per service using DISTINCT ON.
   def load_last_errors
-    ExternalServiceCall
-      .since(@since)
+    base_scope
       .where(status: :error)
       .select("DISTINCT ON (service) service, created_at, error_class, error_message, http_status, operation")
       .order(Arel.sql("service, created_at DESC"))
@@ -159,8 +171,7 @@ class SystemHealth::Snapshot
 
   # Query 4 — last success timestamp per service using DISTINCT ON.
   def load_last_successes
-    ExternalServiceCall
-      .since(@since)
+    base_scope
       .where(status: :success)
       .select("DISTINCT ON (service) service, created_at")
       .order(Arel.sql("service, created_at DESC"))

@@ -1,10 +1,9 @@
-<% render "admin/sidebar" %>
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
 
 <%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
 
 <% totals = @snapshot.totals %>
-<% non_idle = @snapshot.services.reject { |e| e.state == :idle } %>
-<% idle     = @snapshot.services.select { |e| e.state == :idle } %>
+<% all_services = @snapshot.services %>
 
 <% if totals[:total] > 0 %>
   <%# ── Summary strip ── %>
@@ -24,27 +23,20 @@
           variant: issues_count > 0 ? :attention : :neutral)) %>
   </div>
 
-  <%# ── Service cards ── %>
+  <%# ── Service cards — workspace-scoped snapshot shows only observed services ── %>
   <div class="flex items-center justify-between mb-3">
     <span class="text-sm font-semibold"><%= t(".services_heading") %></span>
     <span class="text-sm text-muted-foreground"><%= t(".last_24_hours") %></span>
   </div>
 
   <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-    <% non_idle.each do |entry| %>
-      <%= render(Campbooks::SystemHealth::ServiceCard.new(entry: entry, log_path: admin_system_health_path)) %>
+    <% all_services.each do |entry| %>
+      <%= render(Campbooks::SystemHealth::ServiceCard.new(entry: entry, log_path: settings_system_health_path)) %>
     <% end %>
   </div>
 
-  <% if idle.any? %>
-    <% idle_names = idle.map { |e| t("system_health.services.#{e.service}", default: e.service.humanize) } %>
-    <p class="text-xs text-muted-foreground mt-4">
-      <%= t(".idle_services", services: idle_names.join(", ")) %>
-    </p>
-  <% end %>
-
 <% else %>
-  <%# ── Fresh install / everything idle ── %>
+  <%# ── No calls yet for this workspace ── %>
   <% es = Campbooks::EmptyState.new(variant: :card, title: t(".empty_title"), description: t(".empty_description")) %>
   <% es.with_icon(svg: render(Campbooks::Icon.new("chart-bar", css_class: "w-6 h-6 text-muted-foreground"))) %>
   <%= render(Campbooks::Card.new) do %>
@@ -61,6 +53,6 @@
   <%= render "shared/system_health/calls",
         calls: @calls,
         pagy: @pagy,
-        log_path: admin_system_health_path,
-        show_workspace: true %>
+        log_path: settings_system_health_path,
+        show_workspace: false %>
 </div>
