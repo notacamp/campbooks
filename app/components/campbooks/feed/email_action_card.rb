@@ -14,13 +14,13 @@ module Campbooks
           h3(class: "mt-3 text-[17px] font-semibold leading-snug tracking-tight text-foreground") do
             a(href: helpers.email_message_path(subject), class: "rounded-sm outline-none transition-colors hover:text-foreground/70 focus-visible:ring-2 focus-visible:ring-ring") { clean_subject(subject) }
           end
-          # Scout leads with a single-line read (AI does the boring part, visibly) —
-          # no raw-email preview beneath it, that duplicated what Scout already said.
-          # A collapsed "Show email" keeps the full message one tap away, so the
-          # decision never requires leaving the feed. If Scout had nothing to say,
-          # the email excerpt IS the body and needs no disclosure.
+          # Scout leads with a short read (AI does the boring part, visibly), capped
+          # at three lines with a "Read more" — no raw-email preview beneath it, that
+          # duplicated what Scout already said. A collapsed "Show email" keeps the full
+          # message one tap away, so the decision never requires leaving the feed. If
+          # Scout had nothing to say, the email excerpt IS the body and needs no disclosure.
           if scout_message.present?
-            render Campbooks::ScoutNote.new(message: scout_message, compact: true, class: "mt-2.5")
+            render Campbooks::ScoutNote.new(message: scout_message, compact: true, lines: 3, class: "mt-2.5")
             render Campbooks::Feed::ExpandablePreview.new(item: item, class: "mt-2")
           else
             email_body_preview(subject, margin: "mt-2.5")
