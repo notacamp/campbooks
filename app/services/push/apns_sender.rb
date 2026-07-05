@@ -22,8 +22,12 @@ module Push
       notification.badge = badge if badge
       notification.custom_payload = { url: url, category: category }.compact
 
+      start = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       response = @connection.push(notification)
-      classify(response, device)
+      result = classify(response, device)
+      duration_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - start) * 1000).round
+      record_apns(result, response, duration_ms)
+      result
     end
 
     def close
@@ -43,6 +47,18 @@ module Push
         %w[BadDeviceToken DeviceTokenNotForTopic Unregistered].include?(reason) ? :invalid : log_and(:error, reason, device)
       else
         log_and(:error, "#{response.status} #{response.body}", device)
+      end
+    end
+
+    def record_apns(result, response, duration_ms)
+      case result
+      when :ok
+        SystemHealth.record(service: "push_apns", operation: "deliver", status: :success, duration_ms: duration_ms)
+      when :invalid
+        SystemHealth.record(service: "push_apns", operation: "deliver", status: :success, duration_ms: duration_ms, http_status: 410, metadata: { result: "invalid_token" })
+      else
+        reason = response ? "#{response.status} #{response.body}" : "timeout"
+        SystemHealth.record(service: "push_apns", operation: "deliver", status: :error, duration_ms: duration_ms, error_message: SystemHealth.sanitize_message(reason))
       end
     end
 

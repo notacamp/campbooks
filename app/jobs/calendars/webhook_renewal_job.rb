@@ -24,7 +24,7 @@ module Calendars
         current = calendar.calendar_webhook_channels.max_by { |c| c.expires_at || Time.at(0) }
         next if current&.expires_at && current.expires_at > RENEW_BEFORE.from_now
 
-        register(calendar, address, replacing: current)
+        Current.set(workspace: calendar.workspace) { register(calendar, address, replacing: current) }
       end
     end
 

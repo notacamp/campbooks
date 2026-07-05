@@ -115,6 +115,7 @@ module GoogleDrive
 
     def json_connection
       @json_connection ||= Faraday.new do |f|
+        f.use SystemHealth::FaradayMiddleware, service: "google_drive"
         f.request :json
         f.response :raise_error
         # Bound every call so a hung Drive response can't wedge the worker.
@@ -128,6 +129,7 @@ module GoogleDrive
 
     def raw_connection
       @raw_connection ||= Faraday.new do |f|
+        f.use SystemHealth::FaradayMiddleware, service: "google_drive"
         f.response :raise_error
         # Raw file transfers can be large, so a generous read bound — but still
         # finite, so a stalled transfer can't pin the worker open indefinitely.

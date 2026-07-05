@@ -121,6 +121,7 @@ module Google
 
     def connection
       @connection ||= Faraday.new do |f|
+        f.use SystemHealth::FaradayMiddleware, service: "google_oauth"
         f.request :url_encoded
         # Bound the token-refresh call. This runs inline on every scan (the mail/
         # calendar clients read @oauth.access_token when building their connection),
