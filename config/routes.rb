@@ -274,9 +274,12 @@ Rails.application.routes.draw do
   namespace :settings do
     root to: "general#show"
     resource :general, only: [ :show, :update ], controller: "general"
-    # Inbox settings — hosts the same panels as the inbox gear-icon modal
-    # (Campbooks::InboxSettingsModal), surfaced as a Settings dashboard section.
-    resource :inbox, only: :show, controller: "inbox"
+    # Inbox settings — one dashboard page per inbox-settings panel, grouped under
+    # "Inbox" in the sidebar. Each page embeds the matching InboxSettings::* panel
+    # via the shared inbox_settings_panel Turbo Frame. Bare /settings/inbox
+    # redirects to the first panel; unknown sections 404 in the controller.
+    get "inbox", to: redirect("/settings/inbox/tags"), as: :inbox
+    get "inbox/:section", to: "inbox#show", as: :inbox_section
     resource :plan, only: [ :show ], controller: "plan"
     resource :ai, only: [ :show ], controller: "ai" do
       post :switch_mode

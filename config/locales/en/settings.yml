@@ -213,10 +213,6 @@ en:
           Scout understand who you are, what your workspace does, and what matters
           to you.
         workspace_profile_heading: Workspace Profile
-    inbox:
-      show:
-        subtitle: Manage how your inbox sorts, filters, and shows your mail.
-        title: Inbox
     integrations:
       calendars:
         show:

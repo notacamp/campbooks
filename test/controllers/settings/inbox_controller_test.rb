@@ -10,34 +10,41 @@ class Settings::InboxControllerTest < ActionDispatch::IntegrationTest
     )
   end
 
-  test "requires authentication" do
-    get settings_inbox_path
+  test "a section page requires authentication" do
+    get settings_inbox_section_path("tags")
     assert_response :redirect
   end
 
-  test "show renders the shared panel frame, eager-loads Tags, and links every section" do
+  test "bare /settings/inbox redirects to the first panel" do
     sign_in
     get settings_inbox_path
-    assert_response :success
-
-    # The Turbo Frame the InboxSettings::* panels render into (same id as the modal).
-    assert_includes @response.body, "inbox_settings_panel"
-    # The frame eager-loads the default (Tags) panel.
-    assert_includes @response.body, inbox_settings_tags_path
-    # A sub-nav entry for every catalog section, so the page can't silently drop one.
-    InboxSettings::Sections::ALL.each do |section|
-      assert_includes @response.body, %(data-section="#{section[:key]}"),
-        "expected a sub-nav link for the #{section[:key]} panel"
-    end
+    assert_redirected_to settings_inbox_section_path("tags")
   end
 
-  test "highlights the Inbox item in the settings sidebar" do
+  test "a section page embeds the matching panel via the shared frame" do
     sign_in
-    get settings_inbox_path
+    get settings_inbox_section_path("filtering")
     assert_response :success
-    # Only the settings sidebar links to settings_inbox_path, and only it marks the
-    # active section (the topbar user menu renders the same groups without aria-current).
-    assert_select "a[href=?][aria-current=?]", settings_inbox_path, "page"
+    assert_includes @response.body, "inbox_settings_panel"
+    assert_includes @response.body, inbox_settings_filtering_path
+  end
+
+  test "an unknown section 404s" do
+    sign_in
+    get settings_inbox_section_path("bogus")
+    assert_response :not_found
+  end
+
+  test "the settings sidebar has an Inbox group with every panel, active item highlighted" do
+    sign_in
+    get settings_inbox_section_path("tags")
+    assert_response :success
+    # One sidebar item per catalog section, so a panel can't be silently dropped.
+    InboxSettings::Sections::ALL.each do |section|
+      assert_select "a[href=?]", settings_inbox_section_path(section[:key])
+    end
+    # The current section is the highlighted one (only the sidebar marks active state).
+    assert_select "a[href=?][aria-current=?]", settings_inbox_section_path("tags"), "page"
   end
 
   private

@@ -4,6 +4,7 @@ pt:
     settings:
       groups:
         ai_and_automation: IA e automação
+        inbox: Caixa de entrada
         workspace: Espaço de trabalho
         your_account: A sua conta
       items:
@@ -13,7 +14,6 @@ pt:
         document_templates: Modelos de documentos
         email_templates: Modelos de email
         general: Geral
-        inbox: Entrada
         integrations: Integrações
         members: Membros
         notifications: Notificações

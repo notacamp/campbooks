@@ -1,43 +1,18 @@
 <% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
-<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
 
-<%# The same panels as the inbox gear-icon modal (Campbooks::InboxSettingsModal),
-    surfaced here as a Settings section. The sub-nav + Turbo Frame mirror the
-    modal; the InboxSettings::* controllers render into `inbox_settings_panel`
-    unchanged. The `inbox-settings-modal` Stimulus controller degrades gracefully
-    without a <dialog> — it just powers the Display panel's localStorage toggles
-    and the active-section highlight here. %>
+<%# Reuses the matching InboxSettings::* panel — the same one the inbox gear-icon
+    modal shows — via the shared inbox_settings_panel Turbo Frame, so no panel logic
+    is duplicated. Each panel carries its own header (title + actions), so there's no
+    separate PageHeader here. Wrapped in the inbox-settings-modal Stimulus controller
+    so the Display panel's localStorage toggles work on this page too; it no-ops for
+    the other panels. %>
 <div class="bg-card rounded-xl shadow-sm border border-border overflow-hidden"
      data-controller="inbox-settings-modal">
-  <div class="flex flex-col sm:flex-row min-h-[30rem]">
-    <nav class="w-full sm:w-52 flex-shrink-0 border-b sm:border-b-0 sm:border-r border-border bg-muted/30
-                flex gap-1 overflow-x-auto scrollbar-none p-2 sm:flex-col sm:gap-0.5 sm:overflow-x-visible"
-         aria-label="<%= t("components.inbox_settings_modal.settings_sections_label") %>">
-      <% InboxSettings::Sections::ALL.each_with_index do |section, index| %>
-        <%= link_to public_send(section[:path]),
-              aria: { current: (index.zero? ? "page" : nil) },
-              data: { turbo_frame: "inbox_settings_panel",
-                      inbox_settings_modal_target: "navItem",
-                      section: section[:key],
-                      action: "click->inbox-settings-modal#setActive" },
-              class: "flex shrink-0 whitespace-nowrap items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] cursor-pointer transition-colors " \
-                     "text-gray-600 hover:text-gray-900 hover:bg-gray-100/70 dark:text-gray-300 dark:hover:text-white dark:hover:bg-white/5 " \
-                     "aria-[current=page]:bg-accent-50 aria-[current=page]:text-accent-700 aria-[current=page]:font-medium " \
-                     "dark:aria-[current=page]:bg-accent-500/10 dark:aria-[current=page]:text-accent-300" do %>
-          <span class="w-4 h-4 flex-shrink-0 opacity-70"><%= raw InboxSettings::Sections.icon_svg(section[:icon]) %></span>
-          <span><%= t(InboxSettings::Sections.label_key(section[:key])) %></span>
-        <% end %>
-      <% end %>
-    </nav>
-
-    <div class="flex-1 min-w-0 bg-background">
-      <%= turbo_frame_tag "inbox_settings_panel",
-            src: public_send(InboxSettings::Sections.default[:path]),
-            data: { inbox_settings_modal_target: "panel" } do %>
-        <div class="flex items-center justify-center py-24 text-sm text-muted-foreground">
-          <%= t("shared.actions.loading") %>
-        </div>
-      <% end %>
+  <%= turbo_frame_tag "inbox_settings_panel",
+        src: public_send(@section[:path]),
+        data: { inbox_settings_modal_target: "panel" } do %>
+    <div class="flex items-center justify-center py-24 text-sm text-muted-foreground">
+      <%= t("shared.actions.loading") %>
     </div>
-  </div>
+  <% end %>
 </div>
