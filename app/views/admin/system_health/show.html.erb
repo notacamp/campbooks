@@ -58,10 +58,18 @@
     <span class="text-sm font-semibold"><%= t(".call_log_heading") %></span>
   </div>
 
+  <%# Carry the active filters into the detail link so its back link can restore them. %>
   <%= render "shared/system_health/calls",
         calls: @calls,
         pagy: @pagy,
         log_path: admin_system_health_path,
         show_workspace: true,
-        row_href: ->(call) { call_admin_system_health_path(id: call.id) } %>
+        row_href: ->(call) {
+          call_admin_system_health_path({
+            id: call.id,
+            service: params[:service].presence,
+            status: params[:status].presence,
+            window: params[:window].presence
+          }.compact)
+        } %>
 </div>

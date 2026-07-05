@@ -1,5 +1,15 @@
 <% render "admin/sidebar" %>
 
+<%# Return to the call log with whatever filters the row link carried over. %>
+<% back_params = { service: params[:service].presence, status: params[:status].presence, window: params[:window].presence }.compact %>
+<div class="mb-4">
+  <%= link_to admin_system_health_path(back_params) + "#call-log",
+        class: "inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors" do %>
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    <%= t(".back") %>
+  <% end %>
+</div>
+
 <%= render(Campbooks::PageHeader.new(
       title: @call.operation.presence || t(".title_fallback"),
       subtitle: l(@call.created_at, format: :at))) %>

@@ -1,61 +1,51 @@
 ---
 fr:
-  settings:
-    system_health:
-      show:
-        call_log_heading: "Journal des appels"
-        empty_description: "Les appels apparaissent ici au fur et à mesure que les boîtes aux lettres, calendriers, IA et intégrations de votre espace de travail fonctionnent."
-        empty_title: "Aucun appel externe pour l'instant"
-        last_24_hours: "Dernières 24 heures"
-        not_allowed: Seuls les administrateurs de l'espace de travail peuvent voir la santé du système.
-        services_heading: "Services"
-        stat_calls: "Appels (24h)"
-        stat_errors: "Erreurs (24h)"
-        stat_issues: "Services en difficulté"
-        subtitle: "Les connexions de votre espace de travail aux fournisseurs de messagerie, calendriers, IA et intégrations."
-        title: "Santé du système"
   admin:
     system_health:
       call:
-        ai_metadata: "Métadonnées IA"
+        ai_metadata: Métadonnées IA
+        back: Retour au journal des appels
         not_captured: "(non capturé)"
         request_body: Corps de la requête
-        request_headers: "En-têtes de la requête"
+        request_headers: En-têtes de la requête
         response_body: Corps de la réponse
-        response_headers: "En-têtes de la réponse"
+        response_headers: En-têtes de la réponse
         summary:
-          ai_metadata: "Modèle IA / tokens"
-          duration: "Durée"
+          ai_metadata: Modèle IA / tokens
+          duration: Durée
           error: Erreur
           service: Service
           status: Statut
           tokens_in: "%{count} entrants"
           tokens_out: "%{count} sortants"
-          workspace: "Espace de travail"
-        title_fallback: "Détail de l'appel"
+          workspace: Espace de travail
+        title_fallback: Détail de l'appel
       calls:
         no_matches: Aucun appel ne correspond à vos filtres.
       show:
         call_log_heading: Journal des appels
-        empty_description: Les appels aux fournisseurs de messagerie, calendriers, modèles d'IA et intégrations apparaissent ici pendant que Campbooks fonctionne. Vous pouvez désactiver l'enregistrement en définissant la variable d'environnement DISABLE_SYSTEM_HEALTH.
+        empty_description: Les appels aux fournisseurs de messagerie, calendriers,
+          modèles d'IA et intégrations apparaissent ici pendant que Campbooks fonctionne.
+          Vous pouvez désactiver l'enregistrement en définissant la variable d'environnement
+          DISABLE_SYSTEM_HEALTH.
         empty_title: Aucun appel externe enregistré pour l'instant
         filter_all_services: Tous les services
         filter_all_statuses: Tous les statuts
         filter_error: Erreurs uniquement
         filter_success: Succès uniquement
-        idle_services: "Aucune activité dans les dernières 24 heures : %{services}."
+        idle_services: 'Aucune activité dans les dernières 24 heures : %{services}.'
         last_24_hours: Dernières 24 heures
         services_heading: Services
         stat_calls: Appels (24h)
         stat_errors: Erreurs (24h)
         stat_issues: Services en difficulté
-        subtitle: Chaque appel de Campbooks vers des services externes, avec les erreurs et les temps de réponse.
+        subtitle: Chaque appel de Campbooks vers des services externes, avec les erreurs
+          et les temps de réponse.
         title: Santé du système
         window_24h: Dernières 24 heures
         window_30d: Derniers 30 jours
         window_7d: Derniers 7 jours
   components:
-    sparkline: {}
     system_health:
       call_row:
         no_operation: "(aucune opération)"
@@ -73,12 +63,31 @@ fr:
           other: "%{formatted} appels"
         error_rate: "%{rate}% erreurs"
         last_error_ago: Dernière erreur il y a %{time}
-        sparkline_label: "Activité sur les dernières 24 heures : %{total} appels, %{errors} erreurs"
+        sparkline_label: 'Activité sur les dernières 24 heures : %{total} appels,
+          %{errors} erreurs'
         state:
           degraded: Dégradé
           failing: En échec
           healthy: Opérationnel
           idle: Inactif
+  settings:
+    system_health:
+      show:
+        call_log_heading: Journal des appels
+        empty_description: Les appels apparaissent ici au fur et à mesure que les
+          boîtes aux lettres, calendriers, IA et intégrations de votre espace de travail
+          fonctionnent.
+        empty_title: Aucun appel externe pour l'instant
+        last_24_hours: Dernières 24 heures
+        not_allowed: Seuls les administrateurs de l'espace de travail peuvent voir
+          la santé du système.
+        services_heading: Services
+        stat_calls: Appels (24h)
+        stat_errors: Erreurs (24h)
+        stat_issues: Services en difficulté
+        subtitle: Les connexions de votre espace de travail aux fournisseurs de messagerie,
+          calendriers, IA et intégrations.
+        title: Santé du système
   system_health:
     services:
       ai_anthropic: Anthropic

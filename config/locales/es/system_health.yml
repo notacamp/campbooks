@@ -1,23 +1,10 @@
 ---
 es:
-  settings:
-    system_health:
-      show:
-        call_log_heading: "Registro de llamadas"
-        empty_description: "Las llamadas aparecen aquí a medida que los buzones, calendarios, IA e integraciones de su espacio de trabajo funcionan."
-        empty_title: "Aún no hay llamadas externas"
-        last_24_hours: "Últimas 24 horas"
-        not_allowed: Solo los administradores del espacio de trabajo pueden ver la salud del sistema.
-        services_heading: "Servicios"
-        stat_calls: "Llamadas (24h)"
-        stat_errors: "Errores (24h)"
-        stat_issues: "Servicios con problemas"
-        subtitle: "Las conexiones de su espacio de trabajo con proveedores de correo, calendarios, IA e integraciones."
-        title: "Salud del sistema"
   admin:
     system_health:
       call:
         ai_metadata: Metadatos de IA
+        back: Volver al registro de llamadas
         not_captured: "(no capturado)"
         request_body: Cuerpo de la solicitud
         request_headers: Cabeceras de la solicitud
@@ -25,7 +12,7 @@ es:
         response_headers: Cabeceras de la respuesta
         summary:
           ai_metadata: Modelo de IA / tokens
-          duration: "Duración"
+          duration: Duración
           error: Error
           service: Servicio
           status: Estado
@@ -37,25 +24,27 @@ es:
         no_matches: Ninguna llamada coincidió con sus filtros.
       show:
         call_log_heading: Registro de llamadas
-        empty_description: Las llamadas a proveedores de correo, calendarios, modelos de IA e integraciones aparecen aquí mientras Campbooks trabaja. Puede desactivar el registro configurando la variable de entorno DISABLE_SYSTEM_HEALTH.
+        empty_description: Las llamadas a proveedores de correo, calendarios, modelos
+          de IA e integraciones aparecen aquí mientras Campbooks trabaja. Puede desactivar
+          el registro configurando la variable de entorno DISABLE_SYSTEM_HEALTH.
         empty_title: Aún no se han registrado llamadas externas
         filter_all_services: Todos los servicios
         filter_all_statuses: Todos los estados
         filter_error: Solo errores
         filter_success: Solo exitosas
-        idle_services: "Sin actividad en las últimas 24 horas: %{services}."
+        idle_services: 'Sin actividad en las últimas 24 horas: %{services}.'
         last_24_hours: Últimas 24 horas
         services_heading: Servicios
         stat_calls: Llamadas (24h)
         stat_errors: Errores (24h)
         stat_issues: Servicios con problemas
-        subtitle: Todas las llamadas que Campbooks realiza a servicios externos, con errores y tiempos de respuesta.
+        subtitle: Todas las llamadas que Campbooks realiza a servicios externos, con
+          errores y tiempos de respuesta.
         title: Salud del sistema
         window_24h: Últimas 24 horas
         window_30d: Últimos 30 días
         window_7d: Últimos 7 días
   components:
-    sparkline: {}
     system_health:
       call_row:
         no_operation: "(sin operación)"
@@ -73,12 +62,30 @@ es:
           other: "%{formatted} llamadas"
         error_rate: "%{rate}% errores"
         last_error_ago: Último error hace %{time}
-        sparkline_label: "Actividad en las últimas 24 horas: %{total} llamadas, %{errors} errores"
+        sparkline_label: 'Actividad en las últimas 24 horas: %{total} llamadas, %{errors}
+          errores'
         state:
           degraded: Degradado
           failing: Con fallos
           healthy: Operativo
           idle: Inactivo
+  settings:
+    system_health:
+      show:
+        call_log_heading: Registro de llamadas
+        empty_description: Las llamadas aparecen aquí a medida que los buzones, calendarios,
+          IA e integraciones de su espacio de trabajo funcionan.
+        empty_title: Aún no hay llamadas externas
+        last_24_hours: Últimas 24 horas
+        not_allowed: Solo los administradores del espacio de trabajo pueden ver la
+          salud del sistema.
+        services_heading: Servicios
+        stat_calls: Llamadas (24h)
+        stat_errors: Errores (24h)
+        stat_issues: Servicios con problemas
+        subtitle: Las conexiones de su espacio de trabajo con proveedores de correo,
+          calendarios, IA e integraciones.
+        title: Salud del sistema
   system_health:
     services:
       ai_anthropic: Anthropic
