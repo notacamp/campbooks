@@ -38,6 +38,11 @@ major, minor, or patch change here.
 
 ### Fixed
 
+- **The "Report a bug" drawer opens right away.** It used to hang for a moment
+  before appearing, because it captured the page screenshot up front and that
+  work blocked the drawer's slide-in. The snapshot now happens just after the
+  drawer is open, so it slides in immediately (the screenshot is still attached
+  to the report exactly as before).
 - **Searching no longer hides your follow-ups.** The "Waiting on replies" band
   now takes part in search: threads you're waiting on that match the query stay
   visible in their own band at the top of the results (and are no longer
