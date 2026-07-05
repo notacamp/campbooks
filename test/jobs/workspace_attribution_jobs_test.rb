@@ -18,6 +18,59 @@ class WorkspaceAttributionJobsTest < ActiveSupport::TestCase
     Current.workspace = nil
   end
 
+  # ── Sweep job: EmailScanJob (Gmail full walk) ─────────────────────────────────
+  #
+  # The heavy Gmail baseline fetches every message individually; each of those
+  # HTTP calls must carry the account's workspace.
+
+  test "EmailScanJob full gmail walk attributes every recorded call to the account workspace" do
+    ws = Workspace.create!(name: "Mail Attr WS")
+    account = create(:email_account, workspace: ws, provider: :google)
+
+    stub_request(:post, "https://oauth2.googleapis.com/token")
+      .to_return(
+        status: 200,
+        body: { "access_token" => "test_token", "expires_in" => 3600 }.to_json,
+        headers: { "Content-Type" => "application/json" }
+      )
+
+    stub_request(:get, %r{\Ahttps://gmail\.googleapis\.com/}).to_return do |request|
+      body =
+        case request.uri.path
+        when %r{/messages/[^/]+\z}
+          {
+            "id" => request.uri.path.split("/").last, "threadId" => "t1",
+            "labelIds" => [ "INBOX" ], "internalDate" => (Time.current.to_i * 1000).to_s,
+            "snippet" => "hi",
+            "payload" => { "headers" => [
+              { "name" => "Subject", "value" => "Test" },
+              { "name" => "From", "value" => "a@example.com" },
+              { "name" => "Date", "value" => Time.current.rfc2822 }
+            ] }
+          }
+        when %r{/messages\z}
+          { "messages" => [ { "id" => "m1" }, { "id" => "m2" } ], "resultSizeEstimate" => 2 }
+        when %r{/profile\z}
+          { "emailAddress" => "a@example.com", "historyId" => "42" }
+        else
+          { "labels" => [] }
+        end
+      { status: 200, body: body.to_json, headers: { "Content-Type" => "application/json" } }
+    end
+
+    with_env("GOOGLE_CLIENT_ID" => "test_id", "GOOGLE_CLIENT_SECRET" => "test_secret") do
+      EmailScanJob.perform_now(account.id, "full")
+    end
+
+    mail_rows = ExternalServiceCall.where(service: "google_mail")
+    assert mail_rows.count.positive?, "expected the walk to record google_mail rows"
+    assert_equal [ ws.id ], mail_rows.distinct.pluck(:workspace_id),
+      "every google_mail row from the walk must carry the account workspace"
+    oauth_rows = ExternalServiceCall.where(service: "google_oauth")
+    assert_equal [ ws.id ], oauth_rows.distinct.pluck(:workspace_id) if oauth_rows.any?
+    assert_nil Current.workspace, "Current must not leak past perform"
+  end
+
   # ── Sweep job: CalendarScanJob ────────────────────────────────────────────────
   #
   # A full sweep iterates all active CalendarAccounts. Each account must be

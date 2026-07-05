@@ -18,6 +18,17 @@ major, minor, or patch change here.
 
 ### Changed
 
+- **System health: always-on request/response capture.** Every external call now
+  records its sanitized request and response headers and body (credentials
+  redacted, bodies capped at 10 KB, binary payloads as placeholders). AI provider
+  calls additionally store the model name and prompt/completion token counts in
+  row metadata. App admins can inspect any row at the new call detail page
+  (`/admin/system_health/calls/:id`); the workspace-facing view stays
+  metadata-only. Workspace deletion now purges the workspace's call rows.
+- **System health rows now attribute to the workspace through the account that
+  made the call**, not just the ambient job context — so mailbox, calendar,
+  Drive, and Notion traffic counts toward the right workspace even when
+  triggered from a console or maintenance task.
 - The inbox **"Waiting on replies"** band now shows only threads you've been
   waiting on for up to 30 days, always keeping at least three visible regardless
   of age. Anything older folds behind a **"Show older"** toggle, so a backlog of
