@@ -70,7 +70,7 @@ module Google
 
     def extract_color(label)
       bg = label.dig("color", "backgroundColor")
-      return "#ffd700" unless bg
+      return Tag.palette_color_for(label["name"] || label["id"]) unless bg
 
       r = (bg["red"].to_f * 255).round.clamp(0, 255)
       g = (bg["green"].to_f * 255).round.clamp(0, 255)

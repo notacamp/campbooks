@@ -15,7 +15,7 @@ module Zoho
       zoho_labels.each do |zl|
         external_id = zl["labelId"] || zl["tagId"]
         name = zl["displayName"]
-        color = zl["color"] || "#ffd700"
+        color = zl["color"].presence || Tag.palette_color_for(name)
         # Zoho exposes no system flag on /labels, so detect its built-in folders
         # by name (Inbox, Sent, …) — mirrors Gmail's system_label handling.
         sys = Labels::Classifier::ZOHO_SYSTEM_NAMES.include?(name.to_s.strip.downcase)
