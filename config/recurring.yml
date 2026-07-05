@@ -72,6 +72,11 @@ production:
     # once drained. See Contacts::PendingAnalysisCatchUp.
     class: ContactAnalysisBackfillJob
     schedule: every 15 minutes
+  digest_sweep:
+    # Fan-out: find scheduled digests that are due, advance their schedule, and
+    # enqueue one DigestRunJob per occurrence. No-op when ENABLE_DIGESTS is unset.
+    class: DigestSweepJob
+    schedule: every minute
 
 development:
   email_scan:
@@ -110,3 +115,6 @@ development:
   contact_analysis_backfill:
     class: ContactAnalysisBackfillJob
     schedule: every 15 minutes
+  digest_sweep:
+    class: DigestSweepJob
+    schedule: every minute

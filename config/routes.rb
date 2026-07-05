@@ -132,6 +132,13 @@ Rails.application.routes.draw do
     end
   end
 
+  # Scheduled digests — user-owned, workspace-scoped, multi-source + optional AI.
+  # ScheduledDigest.model_name = "Digest" so helpers resolve as digest_*/digests_*.
+  resources :digests do
+    member { post :run_now }
+    resources :issues, only: :show, controller: "digest_issues"
+  end
+
   # Global search (Cmd+K command palette)
   get "search", to: "search#index"
 

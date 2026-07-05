@@ -20,7 +20,8 @@ module NavigationHelper
     organizations: '<path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11m16-11v11M8 14v.01M12 14v.01M16 14v.01M8 18v.01M12 18v.01M16 18v.01"/>',
     contacts: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
     activity: '<path d="M3 12h4l2 6 4-13 2 7h6"/>',
-    tasks: '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/><path d="m9 14 2 2 4-4"/>'
+    tasks:   '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/><path d="m9 14 2 2 4-4"/>',
+    digests: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/>'
   }.freeze
   # Four-point spark, centered in the 24×24 box (tips at 12,5 · 19.5,12 · 12,19 ·
   # 4.5,12 → center 12,12) so it sits dead-center inside the Ember tile.
@@ -55,6 +56,8 @@ module NavigationHelper
       nav_item(:files, t("shared.nav.files"), files_path, badge: nav_attention.dot?(:files)),
       # Tasks is gated off by default until it's production-ready (Features.tasks?).
       (nav_item(:tasks, t("shared.nav.tasks"), tasks_path) if Features.tasks?),
+      # Digests is gated off by default until it's production-ready (Features.digests?).
+      (nav_item(:digests, t("shared.nav.digests"), digests_path) if Features.digests?),
       # Workflows is gated off by default until it's production-ready (Features.workflows?).
       (nav_item(:workflows, t("shared.nav.workflows"), workflows_path) if Features.workflows?),
       nav_item(:contacts, t("shared.nav.contacts"), contacts_path),

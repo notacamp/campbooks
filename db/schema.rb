@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_05_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_06_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -407,6 +407,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_05_120000) do
     t.index ["token"], name: "index_devices_on_token", unique: true
     t.index ["user_id", "platform"], name: "index_devices_on_user_id_and_platform"
     t.index ["user_id"], name: "index_devices_on_user_id"
+  end
+
+  create_table "digest_issues", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.boolean "ai_used", default: false, null: false
+    t.jsonb "content", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "email_sent_at"
+    t.string "error_message"
+    t.datetime "period_end", null: false
+    t.datetime "period_start", null: false
+    t.uuid "scheduled_digest_id", null: false
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["scheduled_digest_id", "period_end"], name: "index_digest_issues_on_digest_and_period_end", unique: true
+    t.index ["scheduled_digest_id"], name: "index_digest_issues_on_scheduled_digest_id"
+    t.index ["user_id", "created_at"], name: "index_digest_issues_on_user_and_created_at"
   end
 
   create_table "document_drive_uploads", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1223,6 +1241,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_05_120000) do
     t.index ["workspace_id"], name: "index_reminders_on_workspace_unviewed", where: "(viewed_at IS NULL)"
   end
 
+  create_table "scheduled_digests", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.boolean "ai_enabled", default: true, null: false
+    t.text "ai_instructions"
+    t.jsonb "config", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.boolean "deliver_by_email", default: true, null: false
+    t.boolean "enabled", default: true, null: false
+    t.datetime "last_run_at"
+    t.string "name", null: false
+    t.datetime "next_run_at", null: false
+    t.string "preset_key"
+    t.string "rrule", null: false
+    t.boolean "show_in_feed", default: true, null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["next_run_at"], name: "index_scheduled_digests_on_next_run_at_enabled", where: "enabled"
+    t.index ["user_id"], name: "index_scheduled_digests_on_user_id"
+    t.index ["workspace_id"], name: "index_scheduled_digests_on_workspace_id"
+  end
+
   create_table "scheduled_emails", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "bcc_address"
     t.text "body", null: false
@@ -1788,6 +1827,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_05_120000) do
   add_foreign_key "contacts", "people", column: "suggested_person_id"
   add_foreign_key "contacts", "workspaces"
   add_foreign_key "devices", "users"
+  add_foreign_key "digest_issues", "scheduled_digests"
   add_foreign_key "document_drive_uploads", "documents"
   add_foreign_key "document_drive_uploads", "zoho_drive_accounts"
   add_foreign_key "document_email_messages", "documents"
@@ -1871,6 +1911,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_05_120000) do
   add_foreign_key "reminders", "calendar_events"
   add_foreign_key "reminders", "users", column: "confirmed_by_id"
   add_foreign_key "reminders", "workspaces"
+  add_foreign_key "scheduled_digests", "users"
+  add_foreign_key "scheduled_digests", "workspaces"
   add_foreign_key "scheduled_emails", "email_accounts"
   add_foreign_key "scheduled_emails", "email_templates"
   add_foreign_key "scheduled_emails", "users", column: "created_by_id"

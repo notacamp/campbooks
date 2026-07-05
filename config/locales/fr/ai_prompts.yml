@@ -5,6 +5,14 @@ fr:
       les éléments ?
     ai_settings_link_cta: Personnaliser les instructions de l'IA
     catalog:
+      digest_generation:
+        description: Comment Scout regroupe et résume le contenu de vos récapitulatifs
+          programmés.
+        example: Titres de section de trois mots maximum. Mets les éléments financiers
+          en premier quand il y a des factures.
+        label: Génération des récapitulatifs
+        placeholder: 'ex. : Mets toujours les éléments financiers en premier. Notes
+          de moins de 80 caractères.'
       document_analysis:
         description: Comment Scout lit et classe les fichiers et pièces jointes que
           vous recevez.

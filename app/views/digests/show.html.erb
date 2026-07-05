@@ -1,0 +1,63 @@
+<%= render Campbooks::PageHeader.new(title: @digest.name) do |header| %>
+  <% header.with_actions do %>
+    <%= link_to t("shared.actions.edit"), edit_digest_path(@digest),
+        class: "inline-flex items-center gap-1.5 rounded-xl border border-border bg-background px-3.5 py-2 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-muted" %>
+    <%= button_to t("digests.show.run_now"), run_now_digest_path(@digest), method: :post,
+        class: "inline-flex items-center gap-1.5 rounded-xl bg-foreground px-3.5 py-2 text-sm font-semibold text-background shadow-sm transition-colors hover:bg-foreground/80",
+        form: { data: { turbo_stream: true } } %>
+  <% end %>
+<% end %>
+
+<div class="mb-6 flex flex-wrap gap-2">
+  <span class="inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs font-medium text-foreground/70">
+    <%= t("digests.show.cadence",
+          freq: t("digests.frequencies.#{@digest.frequency}"),
+          time: l(@digest.next_run_at, format: :short)) %>
+  </span>
+  <% if @digest.enabled? %>
+    <span class="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700 dark:bg-green-500/15 dark:text-green-300">
+      <%= t("digests.show.enabled") %>
+    </span>
+  <% else %>
+    <span class="inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+      <%= t("digests.show.disabled") %>
+    </span>
+  <% end %>
+</div>
+
+<% if @latest_issue %>
+  <div class="mb-8">
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <%= t("digests.show.latest_issue") %>
+    </h2>
+    <%= render Campbooks::Digests::IssueContent.new(issue: @latest_issue) %>
+  </div>
+<% end %>
+
+<% if @issues.size > 1 %>
+  <div>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <%= t("digests.show.past_issues") %>
+    </h2>
+    <div class="space-y-2">
+      <% @issues.drop(1).each do |issue| %>
+        <div class="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3">
+          <div class="flex items-center gap-3">
+            <span class="text-sm font-medium text-foreground"><%= l(issue.created_at, format: :long) %></span>
+            <span class="text-xs text-muted-foreground">
+              <%= t("digests.show.item_count", count: issue.item_count) %>
+            </span>
+          </div>
+          <%= link_to t("digests.show.view_issue"), digest_issue_path(@digest, issue),
+              class: "text-sm font-medium text-accent-600 hover:underline dark:text-accent-400" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<% if @issues.empty? %>
+  <div class="mt-8 rounded-2xl border border-border bg-card px-6 py-10 text-center">
+    <p class="text-sm text-muted-foreground"><%= t("digests.show.no_issues_yet") %></p>
+  </div>
+<% end %>
