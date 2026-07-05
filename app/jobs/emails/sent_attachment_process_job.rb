@@ -41,7 +41,7 @@ module Emails
       else
         document = Document.new(source: :sent_email, ai_status: :pending, review_status: :pending,
           document_type: :other, workspace: email.email_account.workspace, email_account: email.email_account,
-          email_message_id: email.provider_message_id, content_hash: content_hash, sender_name: email.to_address)
+          email_message_id: email.provider_message_id, content_hash: content_hash)
         document.original_file.attach(io: StringIO.new(raw_data), filename: blob.filename.to_s, content_type: blob.content_type)
         document.save!
         document.document_email_messages.create!(email_message: email)
