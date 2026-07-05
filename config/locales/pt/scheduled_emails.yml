@@ -65,6 +65,7 @@ pt:
       to: Para %{address}
     new:
       title: Agendar um email
+    not_allowed: Não tem permissão para alterar esse email agendado.
     recurrence:
       biweekly: A cada 2 semanas
       custom: Personalizado

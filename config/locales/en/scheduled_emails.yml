@@ -50,6 +50,7 @@ en:
       to: To %{address}
     new:
       title: Schedule an email
+    not_allowed: You don't have permission to change that scheduled email.
     recurrence:
       biweekly: Every 2 weeks
       custom: Custom

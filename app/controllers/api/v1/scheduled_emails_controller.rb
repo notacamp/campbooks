@@ -11,6 +11,7 @@ module Api
       before_action -> { doorkeeper_authorize! :"scheduled_emails:write" }, only: [ :create, :update, :destroy ]
       before_action -> { require_entitlement!(:email_scheduling) },         only: [ :create, :update, :destroy ]
       before_action :set_scheduled_email, only: [ :show, :update, :destroy ]
+      before_action :require_editable!, only: [ :update, :destroy ]
 
       def index
         scope = ScheduledEmail.accessible_to(Current.user)
@@ -62,6 +63,15 @@ module Api
 
       def set_scheduled_email
         @scheduled_email = ScheduledEmail.accessible_to(Current.user).find(params[:id])
+      end
+
+      # Reads admit mailbox readers; mutating needs the creator or send access
+      # on the account (403 — the record is visible, the action is denied).
+      def require_editable!
+        return if @scheduled_email.editable_by?(Current.user)
+
+        render_api_error("scheduled_email_not_editable",
+                         "You may not modify this scheduled email.", status: :forbidden)
       end
 
       # Mirrors the web ScheduledEmailsController: advance next_occurrence_at past

@@ -89,6 +89,21 @@ major, minor, or patch change here.
   can now come back if it genuinely needs you again — previously it was hidden
   forever.
 
+### Security
+
+- **Scheduled emails now follow the mailbox's sharing.** Queued sends were
+  visible to every workspace member — including the recipient, subject, and
+  body of mail scheduled on a teammate's private mailbox — and anyone in the
+  workspace could edit or cancel them. A scheduled email is now visible only to
+  its creator and to people the mailbox is shared with, and only the creator or
+  someone with send permission on that mailbox can change or cancel it (web,
+  API, and MCP alike).
+- **"Schedule send" now checks send permission.** The composer's Schedule
+  button accepted any account id, so someone with read-only access to a shared
+  mailbox (or a crafted request naming any account) could queue an email from
+  it. Scheduling now requires send permission on the account, exactly like
+  pressing Send.
+
 ## [0.11.0] - 2026-07-05
 
 ### Added
