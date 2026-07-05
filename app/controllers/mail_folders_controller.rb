@@ -44,6 +44,7 @@ class MailFoldersController < ApplicationController
         render turbo_stream: [
           turbo_stream.remove(helpers.dom_id(@mail_folder, :folder_chip)),
           turbo_stream.replace("pane_custom_folders", pane_custom_folders_html),
+          turbo_stream.replace("sheet_custom_folders", sheet_custom_folders_html),
           notify_stream(t(".removed", name: @mail_folder.name), severity: :success)
         ]
       end
@@ -122,6 +123,7 @@ class MailFoldersController < ApplicationController
       turbo_stream.replace(helpers.dom_id(@mail_folder, :folder_chip),
         partial: "email_messages/folder_chip", locals: { folder: @mail_folder, active: false }),
       turbo_stream.replace("pane_custom_folders", pane_custom_folders_html),
+      turbo_stream.replace("sheet_custom_folders", sheet_custom_folders_html),
       turbo_stream.update("new_folder_error", ""),
       notify_stream(t("mail_folders.update.updated", name: @mail_folder.name), severity: :success)
     ]
@@ -132,20 +134,43 @@ class MailFoldersController < ApplicationController
       turbo_stream.append("custom_folder_chips",
         partial: "email_messages/folder_chip", locals: { folder: @mail_folder, active: false }),
       turbo_stream.replace("pane_custom_folders", pane_custom_folders_html),
+      turbo_stream.replace("sheet_custom_folders", sheet_custom_folders_html),
       turbo_stream.update("new_folder_error", ""),
       notify_stream(created_message(result), severity: result[:failed].any? ? :warning : :success)
     ]
   end
 
-  # The folder pane's custom section (#pane_custom_folders) re-rendered from the
-  # current set, so the desktop pane stays in sync when the chip bar can't (the
-  # two surfaces share no DOM node — see FolderPaneCustomFolders).
+  # The desktop pane's custom-folder section (#pane_custom_folders) re-rendered
+  # from the current set, so the desktop pane stays in sync when the chip bar
+  # can't (the two surfaces share no DOM node — see FolderPaneCustomFolders).
   def pane_custom_folders_html
-    folders = Current.user.workspace.mail_folders.ordered.to_a
+    folders = custom_folder_list
     render_to_string(
       Campbooks::FolderPaneCustomFolders.new(custom_folders: folders, document_counts: MailFolder.document_counts(folders)),
       layout: false
     )
+  end
+
+  # The mobile bottom-sheet's custom-folder section (#sheet_custom_folders)
+  # re-rendered in sync with pane_custom_folders. Both sections exist in the
+  # DOM simultaneously (desktop pane is CSS-hidden on mobile, not removed), so
+  # they need distinct IDs and individual stream updates.
+  def sheet_custom_folders_html
+    folders = custom_folder_list
+    render_to_string(
+      Campbooks::FolderPaneCustomFolders.new(
+        custom_folders: folders,
+        document_counts: MailFolder.document_counts(folders),
+        section_id: "sheet_custom_folders",
+        dom_prefix: "sheet_",
+        list_param: true
+      ),
+      layout: false
+    )
+  end
+
+  def custom_folder_list
+    Current.user.workspace.mail_folders.ordered.to_a
   end
 
   # Absolute keys (not lazy) because this runs in a private helper, not the action

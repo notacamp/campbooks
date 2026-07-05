@@ -18,6 +18,12 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Mobile folder bottom-sheet.** Tapping "Folders" in the mobile chip bar slides
+  up a full-screen sheet with the complete folder list: system folders (Inbox, Sent,
+  Drafts, Archive, Spam, Trash) and custom folders with their icons, message counts,
+  collapsible nesting, and the rename/move/delete edit affordances that were previously
+  desktop-only. The chip bar stays for fast one-tap switching; the sheet is purely
+  additive. Custom folders stay live via turbo streams on create/update/delete.
 - **Search like you already know how.** The inbox search bar now understands
   Gmail-style modifiers — `from:`, `to:`, `subject:`, `has:attachment`,
   `is:unread/read/pinned`, `before:`/`after:`, `tag:`, `folder:`, `category:`,

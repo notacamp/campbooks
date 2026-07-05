@@ -40,6 +40,8 @@ es:
       toolbar_tag_title: Etiqueta
     mobile_folder_bar:
       all: Todo
+      folders: Carpetas
+      folders_trigger: Abrir navegación de carpetas
       new_folder: Nueva carpeta
     new:
       close_scout_aria: Cerrar Scout
