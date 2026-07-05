@@ -33,6 +33,8 @@ fr:
           other: Vous avez répondu il y a %{count} jours · toujours sans réponse
         dismiss: Ignorer
         draft_follow_up: Rédiger un suivi
+        show_sent: Voir le message envoyé
+        to: À %{name}
         waiting: En attente de leur réponse
       highlight_card:
         reason:

@@ -41,6 +41,31 @@ module Feed
       end
     end
 
+    test "resolves a follow-up card to the mail the user sent, not the one received" do
+      thread = @message.email_thread || @message.create_email_thread!(email_account: @account, subject: @message.subject)
+      @message.update!(email_thread: thread)
+      sent = @account.email_messages.create!(
+        provider_message_id: "s-#{SecureRandom.hex(4)}", provider_folder_id: "SENT",
+        from_address: @account.email_address, to_address: "anna@quietsender.example",
+        email_thread: thread, subject: "Re: Contract draft",
+        body: "<p>Just following up on the draft I sent.</p>",
+        received_at: 30.minutes.ago, read: true, has_attachment: false
+      )
+      # Anchored to the inbound message (addressing/gating), but the peek must show
+      # the sent one — Feed::Sources::FollowUp stamps its id for exactly this.
+      item = feed_item(kind: "follow_up", subject: @message)
+      item.update!(data: { "sent_message_id" => sent.id })
+
+      get preview_feed_item_path(item)
+
+      assert_response :success
+      assert_select "turbo-frame#feed_item_#{item.id}_preview" do
+        assert_select "iframe[sandbox]"
+      end
+      assert_match "following up on the draft", response.body
+      assert_no_match(/Attached is the draft/, response.body)
+    end
+
     test "resolves a reminder card to its source email" do
       reminder = Reminder.create!(
         workspace: @workspace, source: @message, title: "Pay the deposit",

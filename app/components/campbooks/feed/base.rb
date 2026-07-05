@@ -175,7 +175,13 @@ module Campbooks
       # Strip the noise the AI was supposed to handle: leading Re:/Fwd: and any
       # run of bracketed prefixes (ticket refs like "[## 3792 ##]", list tags).
       def clean_subject(message)
-        safe_text(message.subject)
+        clean_subject_text(message.subject)
+      end
+
+      # Same cleaning for a bare subject string (e.g. one stamped into a card's
+      # item data rather than read live off a record).
+      def clean_subject_text(subject)
+        safe_text(subject)
           .sub(/\A(?:(?:re|fwd?):\s*|\[[^\]]*\]\s*)+/i, "")
           .strip.presence || t("components.feed.shared.no_subject")
       end
