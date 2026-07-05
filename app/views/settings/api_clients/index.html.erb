@@ -21,11 +21,27 @@
           <% @applications.each do |application| %>
             <tr class="border-b last:border-0 align-top">
               <td class="py-3 pr-4 font-medium text-gray-900 whitespace-nowrap"><%= application.name %></td>
-              <td class="py-3 pr-4 text-gray-600 font-mono text-xs break-all"><%= application.uid %></td>
+              <td class="py-3 pr-4 whitespace-nowrap">
+                <span class="inline-flex items-center gap-1.5" data-controller="clipboard">
+                  <span class="font-mono text-xs text-gray-500" title="<%= application.uid %>"><%= application.uid.first(8) %>…</span>
+                  <input type="hidden" value="<%= application.uid %>" data-clipboard-target="source">
+                  <button type="button" data-clipboard-target="button" data-action="clipboard#copy"
+                          class="text-xs text-gray-400 hover:text-gray-700 cursor-pointer"><%= t(".copy") %></button>
+                </span>
+              </td>
               <td class="py-3 pr-4">
-                <div class="flex flex-wrap gap-1">
-                  <% application.scopes.to_a.each do |scope| %>
-                    <%= render(Campbooks::Badge.new(variant: :neutral, size: :sm)) { scope } %>
+                <% scopes = application.scopes.to_a
+                   families = scopes.map { |s| Api::Scopes.family_of(s) }.uniq %>
+                <div class="flex flex-wrap items-center gap-1" title="<%= scopes.join(" ") %>">
+                  <% if scopes.sort == Api::Scopes.all.sort %>
+                    <%= render(Campbooks::Badge.new(variant: :neutral, size: :sm)) { t(".all_scopes") } %>
+                  <% else %>
+                    <% families.first(4).each do |family| %>
+                      <%= render(Campbooks::Badge.new(variant: :neutral, size: :sm)) { t("settings.api_clients.scope_families.#{family}") } %>
+                    <% end %>
+                    <% if families.size > 4 %>
+                      <span class="text-xs text-gray-500"><%= t(".more_families", count: families.size - 4) %></span>
+                    <% end %>
                   <% end %>
                 </div>
               </td>

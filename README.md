@@ -61,6 +61,7 @@ The login form is at `/session/new`.
 - **Product vision:** [`PRODUCT.md`](PRODUCT.md), [`DESIGN.md`](DESIGN.md)
 - **Developer CLI:** [`docs/cli.md`](docs/cli.md) — `brew install notacamp/tap/campbooks`, then `campbooks login`
 - **REST API:** [`docs/api.md`](docs/api.md) ([`openapi.yaml`](openapi.yaml))
+- **AI agents & MCP:** [`docs/ai-agents.md`](docs/ai-agents.md) — connect Claude Code (`/plugin install campbooks@campbooks`), Cursor, Windsurf, or any MCP-capable agent to your inbox
 - **Feature & deployment guides:** [`docs/`](docs/)
 
 ## Contributing

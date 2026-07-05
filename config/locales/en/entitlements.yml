@@ -50,12 +50,14 @@ en:
       over_limit: You've reached your plan's limit for %{feature}. Upgrade for more.
     features:
       ai_model_access: AI models
+      digests: Digests
       document_templates: Document templates
       email_accounts: Email accounts
       email_scheduling: Email scheduling
       emails_synced: Emails synced
       managed_ai: Campbooks AI
       notifications: Notifications
+      organizations: Organizations
       pipelines: Pipelines
       scout: Scout
       tasks: Tasks

@@ -20,7 +20,8 @@ module NavigationHelper
     organizations: '<path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11m16-11v11M8 14v.01M12 14v.01M16 14v.01M8 18v.01M12 18v.01M16 18v.01"/>',
     contacts: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
     activity: '<path d="M3 12h4l2 6 4-13 2 7h6"/>',
-    tasks: '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/><path d="m9 14 2 2 4-4"/>'
+    tasks:   '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/><path d="m9 14 2 2 4-4"/>',
+    digests: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/>'
   }.freeze
   # Four-point spark, centered in the 24×24 box (tips at 12,5 · 19.5,12 · 12,19 ·
   # 4.5,12 → center 12,12) so it sits dead-center inside the Ember tile.
@@ -55,6 +56,8 @@ module NavigationHelper
       nav_item(:files, t("shared.nav.files"), files_path, badge: nav_attention.dot?(:files)),
       # Tasks is gated off by default until it's production-ready (Features.tasks?).
       (nav_item(:tasks, t("shared.nav.tasks"), tasks_path) if Features.tasks?),
+      # Digests is gated off by default until it's production-ready (Features.digests?).
+      (nav_item(:digests, t("shared.nav.digests"), digests_path) if Features.digests?),
       # Workflows is gated off by default until it's production-ready (Features.workflows?).
       (nav_item(:workflows, t("shared.nav.workflows"), workflows_path) if Features.workflows?),
       nav_item(:contacts, t("shared.nav.contacts"), contacts_path),
@@ -115,6 +118,7 @@ module NavigationHelper
         (hotwire_native_app? ? nil : [ settings_api_clients_path, %w[api_clients], t("navigation.settings.items.api_access"), "M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" ]),
         [ settings_data_privacy_path, %w[data_privacy], t("navigation.settings.items.data_privacy"), "M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" ]
       ].compact ],
+      inbox_settings_nav_group,
       [ t("navigation.settings.groups.ai_and_automation"), [
         [ settings_pipelines_path, %w[pipelines], t("navigation.settings.items.pipelines"), "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" ],
         # Document + email templates are readiness-gated (Features.*): their
@@ -132,6 +136,20 @@ module NavigationHelper
         [ settings_notifications_path, %w[notifications], t("navigation.settings.items.notifications"), "M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" ]
       ] ]
     ]
+  end
+
+  # The "Inbox" settings group: one sidebar item per inbox-settings panel, sourced
+  # from the shared InboxSettings::Sections catalog so it stays in lockstep with the
+  # inbox gear-icon modal. Each item is [path, active_keys, label, icon_path]; the
+  # active key is "inbox_<section>" (set by Settings::InboxController#current_section).
+  def inbox_settings_nav_group
+    items = InboxSettings::Sections::ALL.map do |section|
+      [ settings_inbox_section_path(section[:key]),
+        [ "inbox_#{section[:key]}" ],
+        t(InboxSettings::Sections.label_key(section[:key])),
+        InboxSettings::Sections::ICON_PATHS[section[:icon]] ]
+    end
+    [ t("navigation.settings.groups.inbox"), items ]
   end
 
   # Renders the section nav for the current area, or nothing when the current

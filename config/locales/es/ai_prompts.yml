@@ -4,6 +4,13 @@ es:
     ai_settings_link: "¿Quieres cambiar lo que extrae la IA o cómo etiqueta las cosas?"
     ai_settings_link_cta: Personalizar instrucciones de IA
     catalog:
+      digest_generation:
+        description: Cómo agrupa y resume Scout el contenido de tus resúmenes programados.
+        example: Títulos de sección de tres palabras como máximo. Pon primero los elementos
+          financieros cuando haya facturas.
+        label: Generación de resúmenes
+        placeholder: 'p. ej.: Pon siempre los elementos financieros primero. Notas
+          de menos de 80 caracteres.'
       document_analysis:
         description: Cómo lee y etiqueta Scout los archivos y adjuntos que recibes.
         example: En las facturas, extrae siempre el nombre del proveedor y el total.

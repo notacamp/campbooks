@@ -27,7 +27,8 @@ module Ai
       tasks:      "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01",
       documents:  "M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z",
       reminders:  "M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9",
-      inbox:      "M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+      inbox:      "M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z",
+      digests:    "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
     }.freeze
 
     ENTRIES = [
@@ -35,12 +36,20 @@ module Ai
       Entry.new(key: "document_analysis",    surface: :documents, icon: ICONS[:documents]),
       Entry.new(key: "reminder_extraction",  surface: :reminders, icon: ICONS[:reminders]),
       Entry.new(key: "email_analysis",       surface: :inbox,     icon: ICONS[:inbox]),
-      Entry.new(key: "email_classification", surface: :inbox,     icon: ICONS[:inbox])
+      Entry.new(key: "email_classification", surface: :inbox,     icon: ICONS[:inbox]),
+      Entry.new(key: "digest_generation",    surface: :digests,   icon: ICONS[:digests])
     ].freeze
 
     KEYS = ENTRIES.map(&:key).freeze
 
-    def self.all = ENTRIES
+    # The entries currently visible in the Settings → AI Prompts page. Omits
+    # digest_generation when the digests feature flag is off so the settings page
+    # never advertises a disabled feature. The full ENTRIES/KEYS catalog is kept
+    # intact so AiPrompt purpose validation always passes.
+    def self.all
+      ENTRIES.reject { |e| e.key == "digest_generation" && !Features.digests? }
+    end
+
     def self.find(key) = ENTRIES.find { |e| e.key == key.to_s }
     def self.key?(key) = KEYS.include?(key.to_s)
     def self.for_surface(surface) = ENTRIES.select { |e| e.surface == surface.to_sym }

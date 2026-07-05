@@ -27,7 +27,57 @@ class DigestMailer < ApplicationMailer
     end
   end
 
+  # Per-section item cap for the scheduled digest (slightly more than the
+  # needs_attention cap since sections are curated by AI or source grouping).
+  MAX_ISSUE_SECTION_ITEMS = 8
+
+  # Scheduled digest issue: one delivery per DigestIssue occurrence. Re-reads
+  # data inside the mailer (data may have changed since the job was enqueued).
+  # Renders sections with an "and N more" collapse and links every item to the
+  # appropriate resource page via Digests::ItemUrl.
+  def issue(digest_issue)
+    @issue   = digest_issue.reload
+    @digest  = @issue.scheduled_digest
+    @user    = @digest.user
+
+    with_recipient_locale(@user) do
+      @sections    = build_issue_sections
+      @manage_url  = digests_url
+      mail(to: @user.email_address, subject: t(".subject", name: @digest.name))
+    end
+  end
+
   private
+
+  def build_issue_sections
+    @issue.sections.map do |sec|
+      items = Array(sec["items"])
+      shown = items.first(MAX_ISSUE_SECTION_ITEMS)
+      overflow = items.size - shown.size
+
+      {
+        title: section_title(sec),
+        items: shown.map { |i| build_issue_item(i) },
+        overflow: overflow
+      }
+    end
+  end
+
+  def section_title(sec)
+    return sec["title"].to_s if sec["title"].present?
+
+    key = sec["key"].to_s
+    I18n.t("digests.sections.#{key}", default: key.humanize)
+  end
+
+  def build_issue_item(item_hash)
+    {
+      title:    item_hash["title"].to_s,
+      subtitle: item_hash["subtitle"].to_s,
+      note:     item_hash["note"].to_s.presence,
+      url:      Digests::ItemUrl.for(item_hash["source_type"], item_hash["source_id"])
+    }
+  end
 
   def build_follow_up_items(thread_ids)
     return [] if thread_ids.empty?

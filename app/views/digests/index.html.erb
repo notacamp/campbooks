@@ -1,0 +1,24 @@
+<%= render Campbooks::PageHeader.new(title: t(".title")) do |header| %>
+  <% header.with_actions do %>
+    <%= link_to t(".new_digest"), new_digest_path,
+        class: "inline-flex items-center gap-1.5 rounded-xl bg-foreground px-4 py-2 text-sm font-semibold text-background shadow-sm transition-colors hover:bg-foreground/80" %>
+  <% end %>
+<% end %>
+
+<% if @digests.empty? %>
+  <%= render Campbooks::EmptyState.new(
+    title: t(".empty_title"),
+    description: t(".empty_description")
+  ) do |state| %>
+    <% state.with_actions do %>
+      <%= link_to t(".browse_presets"), new_digest_path,
+          class: "inline-flex items-center gap-1.5 rounded-xl bg-foreground px-4 py-2 text-sm font-semibold text-background shadow-sm transition-colors hover:bg-foreground/80" %>
+    <% end %>
+  <% end %>
+<% else %>
+  <div class="space-y-3">
+    <% @digests.each do |digest| %>
+      <%= render Campbooks::Digests::DigestRow.new(digest: digest) %>
+    <% end %>
+  </div>
+<% end %>

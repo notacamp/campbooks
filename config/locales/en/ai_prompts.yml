@@ -4,6 +4,12 @@ en:
     ai_settings_link: Want to change what the AI extracts or how it labels things?
     ai_settings_link_cta: Customize AI prompts
     catalog:
+      digest_generation:
+        description: How Scout groups and summarizes your scheduled digest content.
+        example: Keep section titles to three words or fewer. Lead with money items
+          when invoices are present.
+        label: Digest generation
+        placeholder: e.g. Always put financial items first. Keep notes under 80 characters.
       document_analysis:
         description: How Scout reads and labels the files and attachments you receive.
         example: For invoices, always pull the supplier name and total. Treat documents

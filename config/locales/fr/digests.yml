@@ -1,0 +1,141 @@
+---
+fr:
+  activerecord:
+    models:
+      digest:
+        one: "Récapitulatif"
+        other: "Récapitulatifs"
+  components:
+    digests:
+      digest_row:
+        confirm_delete: "Supprimer ce récapitulatif et tous ses numéros ? Cette action est irréversible."
+        disable: "Désactiver"
+        disabled: "Désactivé"
+        enable: "Activer"
+        enabled: "Actif"
+        next_run: "Prochain : %{time}"
+      form:
+        ai_enabled: "Activer les résumés par IA"
+        ai_instructions_hint: "Langage simple. Précisez ce qu'il faut prioriser, regrouper ou ignorer."
+        ai_instructions_label: "Instructions personnalisées pour l'IA"
+        ai_instructions_placeholder: "ex. : Commencez toujours par les éléments financiers. Gardez les titres courts."
+        ai_section: "Résumé par IA"
+        computing_schedule: "Calcul de la prochaine livraison..."
+        create_button: "Créer le récapitulatif"
+        deliver_email: "Livrer par e-mail"
+        delivery_section: "Livraison"
+        document_types_label: "Types de documents"
+        emails_query_hint: "Remarque : le filtre folder: n'est pas pris en charge dans les récapitulatifs."
+        emails_query_label: "Requête"
+        emails_query_placeholder: "de:entreprise tag:factures category:important"
+        freq_daily: "Quotidien"
+        freq_monthly: "Mensuel"
+        freq_weekly: "Hebdomadaire"
+        frequency_label: "Fréquence"
+        include_overdue: "Inclure les éléments en retard"
+        name_label: "Nom"
+        name_placeholder: "ex. : Briefing hebdomadaire"
+        name_section: "Nom du récapitulatif"
+        next_run_preview: "Prochaine livraison : %{time}"
+        no_document_types: "Aucun type de document configuré pour l'instant."
+        schedule_section: "Planification"
+        show_in_feed: "Afficher dans le fil principal"
+        sources_section: "Sources"
+        time_label: "Heure"
+        update_button: "Enregistrer les modifications"
+        weekday_label: "Jour de la semaine"
+        window_days_label: "Fenêtre"
+        window_days_option:
+          one: "1 jour"
+          other: "%{count} jours"
+      issue_content:
+        empty: "Ce numéro ne contient aucun contenu."
+        untitled: "(sans titre)"
+      preset_card: {}
+    feed:
+      digest_card:
+        digest: "Récapitulatif"
+        item_count:
+          one: "1 élément"
+          other: "%{count} éléments"
+        label: "Récapitulatif"
+        not_now: "Pas maintenant"
+        view_digest: "Voir le récapitulatif"
+  digests:
+    create:
+      created: "Récapitulatif créé."
+    destroy:
+      deleted: "Récapitulatif supprimé."
+    edit:
+      title: "Modifier %{name}"
+    frequencies:
+      daily: "Quotidien"
+      monthly: "Mensuel"
+      weekly: "Hebdomadaire"
+    index:
+      browse_presets: "Parcourir les modèles"
+      empty_description: "Configurez votre premier récapitulatif pour recevoir un résumé régulier de votre boîte de réception, de votre calendrier, de vos tâches et bien plus encore."
+      empty_title: "Aucun récapitulatif pour l'instant"
+      new_digest: "Nouveau récapitulatif"
+      title: "Récapitulatifs"
+    issues:
+      back: "Retour au récapitulatif"
+      show:
+        subtitle: "Numéro du %{date}"
+    new:
+      subtitle: "Choisissez un modèle pour commencer ou créez un récapitulatif personnalisé."
+      title: "Nouveau récapitulatif"
+      title_form: "Configurer le récapitulatif"
+    no_subject: "(sans objet)"
+    presets:
+      client_pulse:
+        description: "Un résumé hebdomadaire des e-mails d'un domaine ou d'un client spécifique. Modifiez la requête après la configuration."
+        label: "Pouls client"
+      custom:
+        description: "Créez votre propre récapitulatif de zéro — choisissez les sources, la planification et les paramètres IA."
+        label: "Récapitulatif personnalisé"
+      invoice_tracker:
+        description: "Un résumé hebdomadaire des factures et reçus reçus dans votre boîte de réception."
+        label: "Suivi des factures"
+      newsletter_roundup:
+        description: "Un résumé sélectionné de vos e-mails de promotions et de mises à jour, à lire quand vous le souhaitez."
+        label: "Synthèse des newsletters"
+      upcoming_tasks:
+        description: "Une liste du lundi matin avec vos tâches pour la semaine à venir, y compris celles en retard."
+        label: "Tâches à venir"
+      week_ahead:
+        description: "Un aperçu du dimanche soir de vos événements du calendrier, rappels et tâches pour la semaine à venir."
+        label: "Semaine à venir"
+    run_now:
+      generating: "Génération du récapitulatif..."
+    sections:
+      calendar: "Calendrier"
+      documents: "Documents"
+      emails: "E-mails"
+      everything_else: "Tout le reste"
+      reminders: "Rappels"
+      tasks: "Tâches"
+    show:
+      cadence: "%{freq} \xB7 prochain à %{time}"
+      disabled: "Désactivé"
+      enabled: "Actif"
+      item_count:
+        one: "1 élément"
+        other: "%{count} éléments"
+      latest_issue: "Dernier numéro"
+      no_issues_yet: "Aucun numéro généré pour l'instant. Exécutez le récapitulatif pour voir les résultats ici."
+      past_issues: "Numéros précédents"
+      run_now: "Exécuter maintenant"
+      view_issue: "Voir"
+    update:
+      updated: "Récapitulatif mis à jour."
+  digest_mailer:
+    issue:
+      and_more:
+        one: "et 1 de plus"
+        other: "et %{count} de plus"
+      footer_html: "Vous recevez ceci car vous avez un récapitulatif programmé. Gérez vos récapitulatifs sur %{manage_link}."
+      footer_text: "Vous recevez ceci car vous avez un récapitulatif programmé. Gérez vos récapitulatifs sur %{manage_url}"
+      greeting: "Bonjour %{name},"
+      manage_link_label: "votre page de récapitulatifs"
+      subject: "Votre récapitulatif : %{name}"

@@ -1,0 +1,141 @@
+---
+es:
+  activerecord:
+    models:
+      digest:
+        one: Resumen
+        other: Resúmenes
+  components:
+    digests:
+      digest_row:
+        confirm_delete: "¿Eliminar este resumen y todos sus números? Esta acción no se puede deshacer."
+        disable: Desactivar
+        disabled: Desactivado
+        enable: Activar
+        enabled: Activo
+        next_run: "Siguiente: %{time}"
+      form:
+        ai_enabled: Activar resúmenes con IA
+        ai_instructions_hint: "Lenguaje sencillo. Indica qué priorizar, agrupar o ignorar."
+        ai_instructions_label: Instrucciones personalizadas para la IA
+        ai_instructions_placeholder: "ej.: Empieza siempre por los elementos financieros. Mantén los títulos breves."
+        ai_section: Resumen con IA
+        computing_schedule: Calculando la próxima entrega...
+        create_button: Crear resumen
+        deliver_email: Entregar por correo electrónico
+        delivery_section: Entrega
+        document_types_label: Tipos de documento
+        emails_query_hint: "Nota: el filtro folder: no es compatible con los resúmenes."
+        emails_query_label: Consulta
+        emails_query_placeholder: "de:empresa etiqueta:facturas category:important"
+        freq_daily: Diario
+        freq_monthly: Mensual
+        freq_weekly: Semanal
+        frequency_label: Frecuencia
+        include_overdue: Incluir elementos vencidos
+        name_label: Nombre
+        name_placeholder: "ej.: Resumen semanal"
+        name_section: Nombre del resumen
+        next_run_preview: "Próxima entrega: %{time}"
+        no_document_types: Aún no hay tipos de documento configurados.
+        schedule_section: Programación
+        show_in_feed: Mostrar en el feed principal
+        sources_section: Fuentes
+        time_label: Hora
+        update_button: Guardar cambios
+        weekday_label: Día de la semana
+        window_days_label: Ventana
+        window_days_option:
+          one: 1 día
+          other: "%{count} días"
+      issue_content:
+        empty: Este número no tiene contenido.
+        untitled: "(sin título)"
+      preset_card: {}
+    feed:
+      digest_card:
+        digest: Resumen
+        item_count:
+          one: 1 elemento
+          other: "%{count} elementos"
+        label: Resumen
+        not_now: Ahora no
+        view_digest: Ver resumen
+  digests:
+    create:
+      created: Resumen creado.
+    destroy:
+      deleted: Resumen eliminado.
+    edit:
+      title: "Editar %{name}"
+    frequencies:
+      daily: Diario
+      monthly: Mensual
+      weekly: Semanal
+    index:
+      browse_presets: Ver plantillas
+      empty_description: "Configura tu primer resumen para recibir un sumario periódico de tu bandeja de entrada, calendario, tareas y más."
+      empty_title: Aún no tienes resúmenes
+      new_digest: Nuevo resumen
+      title: Resúmenes
+    issues:
+      back: Volver al resumen
+      show:
+        subtitle: "Número del %{date}"
+    new:
+      subtitle: "Elige una plantilla para empezar o crea un resumen personalizado."
+      title: Nuevo resumen
+      title_form: Configurar el resumen
+    no_subject: "(sin asunto)"
+    presets:
+      client_pulse:
+        description: "Un resumen semanal de los correos de un dominio o cliente específico. Edita la consulta tras la configuración."
+        label: Pulso del cliente
+      custom:
+        description: "Crea tu propio resumen desde cero: elige fuentes, programación y ajustes de IA."
+        label: Resumen personalizado
+      invoice_tracker:
+        description: "Un resumen semanal de las facturas y recibos recibidos en tu bandeja de entrada."
+        label: Seguimiento de facturas
+      newsletter_roundup:
+        description: "Un resumen seleccionado de tus correos de promociones y actualizaciones, para leerlos cuando te venga bien."
+        label: Resumen de boletines
+      upcoming_tasks:
+        description: "Una lista del lunes con tus tareas para la semana siguiente, incluyendo lo que esté vencido."
+        label: Tareas próximas
+      week_ahead:
+        description: "Una vista previa del domingo con los eventos del calendario, recordatorios y tareas para la semana siguiente."
+        label: Semana por delante
+    run_now:
+      generating: Generando resumen...
+    sections:
+      calendar: Calendario
+      documents: Documentos
+      emails: Correos
+      everything_else: Todo lo demás
+      reminders: Recordatorios
+      tasks: Tareas
+    show:
+      cadence: "%{freq} \xB7 siguiente a las %{time}"
+      disabled: Desactivado
+      enabled: Activo
+      item_count:
+        one: 1 elemento
+        other: "%{count} elementos"
+      latest_issue: Número más reciente
+      no_issues_yet: "Aún no se han generado números. Ejecuta el resumen para ver los resultados aquí."
+      past_issues: Números anteriores
+      run_now: Ejecutar ahora
+      view_issue: Ver
+    update:
+      updated: Resumen actualizado.
+  digest_mailer:
+    issue:
+      and_more:
+        one: y 1 más
+        other: y %{count} más
+      footer_html: "Recibes esto porque tienes un resumen programado. Gestiona tus resúmenes en %{manage_link}."
+      footer_text: "Recibes esto porque tienes un resumen programado. Gestiona tus resúmenes en %{manage_url}"
+      greeting: "Hola %{name},"
+      manage_link_label: tu página de resúmenes
+      subject: "Tu resumen: %{name}"
