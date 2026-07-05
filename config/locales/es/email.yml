@@ -180,8 +180,12 @@ es:
       waiting_days:
         one: Esperando %{count} día
         other: Esperando %{count} días
+      waiting_hide_older: Ocultar más antiguas
       waiting_recent: Esperando su respuesta
       waiting_section: Esperando respuesta
+      waiting_show_older:
+        one: Mostrar %{count} más antigua
+        other: Mostrar %{count} más antiguas
   email_scans:
     show:
       account_label: Cuenta

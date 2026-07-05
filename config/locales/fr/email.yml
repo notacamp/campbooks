@@ -181,8 +181,12 @@ fr:
       waiting_days:
         one: En attente depuis %{count} jour
         other: En attente depuis %{count} jours
+      waiting_hide_older: Masquer les anciennes
       waiting_recent: En attente de leur réponse
       waiting_section: En attente de réponse
+      waiting_show_older:
+        one: Afficher %{count} ancienne
+        other: Afficher %{count} anciennes
   email_scans:
     show:
       account_label: Compte
