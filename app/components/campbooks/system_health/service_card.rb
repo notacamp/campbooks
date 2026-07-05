@@ -14,13 +14,14 @@ module Campbooks
         idle:     :neutral
       }.freeze
 
-      def initialize(entry:)
-        @entry = entry
+      def initialize(entry:, log_path:)
+        @entry    = entry
+        @log_path = log_path
       end
 
       def view_template
         a(
-          href: "#{helpers.admin_system_health_path(service: @entry.service)}#call-log",
+          href: "#{@log_path}?service=#{@entry.service}#call-log",
           class: "block focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
         ) do
           render(Campbooks::Card.new(padding: :md)) do

@@ -6,19 +6,19 @@ class SystemHealthComponentPreview < ViewComponent::Preview
   # ── ServiceCard variants ──────────────────────────────────────────────────
 
   def service_card_healthy
-    render Campbooks::SystemHealth::ServiceCard.new(entry: healthy_entry)
+    render Campbooks::SystemHealth::ServiceCard.new(entry: healthy_entry, log_path: "/admin/system_health")
   end
 
   def service_card_degraded
-    render Campbooks::SystemHealth::ServiceCard.new(entry: degraded_entry)
+    render Campbooks::SystemHealth::ServiceCard.new(entry: degraded_entry, log_path: "/admin/system_health")
   end
 
   def service_card_failing
-    render Campbooks::SystemHealth::ServiceCard.new(entry: failing_entry)
+    render Campbooks::SystemHealth::ServiceCard.new(entry: failing_entry, log_path: "/admin/system_health")
   end
 
   def service_card_with_last_error
-    render Campbooks::SystemHealth::ServiceCard.new(entry: entry_with_error)
+    render Campbooks::SystemHealth::ServiceCard.new(entry: entry_with_error, log_path: "/admin/system_health")
   end
 
   # ── CallRow variants ──────────────────────────────────────────────────────

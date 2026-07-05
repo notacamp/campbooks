@@ -13,8 +13,8 @@ class SystemHealth::SnapshotTest < ActiveSupport::TestCase
     )
   end
 
-  def snapshot(window: 24.hours)
-    SystemHealth::Snapshot.new(window: window)
+  def snapshot(window: 24.hours, workspace: nil)
+    SystemHealth::Snapshot.new(window: window, workspace: workspace)
   end
 
   def stat_for(snap, service)
@@ -168,6 +168,58 @@ class SystemHealth::SnapshotTest < ActiveSupport::TestCase
 
     assert google_pos < zoho_pos,
       "expected failing google_mail (#{google_pos}) before healthy zoho_mail (#{zoho_pos})"
+  end
+
+  # ── Workspace scoping ─────────────────────────────────────────────────────────
+
+  test "workspace-scoped snapshot counts only its own workspace rows" do
+    ws_a = Workspace.create!(name: "Snapshot WS A")
+    ws_b = Workspace.create!(name: "Snapshot WS B")
+
+    # ws_a: 3 successes + 1 error on google_mail
+    3.times { make_call(service: "google_mail", status: :success, workspace_id: ws_a.id) }
+    make_call(service: "google_mail", status: :error, workspace_id: ws_a.id)
+
+    # ws_b: 2 successes on zoho_mail
+    2.times { make_call(service: "zoho_mail", status: :success, workspace_id: ws_b.id) }
+
+    # nil workspace: 5 successes on smtp (instance-level, unattributed)
+    5.times { make_call(service: "smtp", status: :success, workspace_id: nil) }
+
+    snap_a = snapshot(workspace: ws_a)
+
+    assert_equal 4, snap_a.totals[:total],
+      "expected only ws_a rows in total (4), got #{snap_a.totals[:total]}"
+    assert_equal 1, snap_a.totals[:errors],
+      "expected 1 error from ws_a, got #{snap_a.totals[:errors]}"
+
+    # Scoped snapshot must NOT include ws_b or nil rows
+    services_seen = snap_a.services.map(&:service)
+    assert_includes services_seen, "google_mail"
+    assert_not_includes services_seen, "zoho_mail",
+      "ws_a snapshot must not include ws_b service zoho_mail"
+    assert_not_includes services_seen, "smtp",
+      "ws_a snapshot must not include nil-workspace smtp rows"
+  end
+
+  test "workspace-scoped snapshot lists only observed services (no registry zero-fill)" do
+    ws = Workspace.create!(name: "Snapshot Observed WS")
+    make_call(service: "google_mail", status: :success, workspace_id: ws.id)
+
+    snap = snapshot(workspace: ws)
+
+    assert_equal [ "google_mail" ], snap.services.map(&:service),
+      "workspace snapshot must only include services with activity, not the full registry"
+  end
+
+  test "instance snapshot (workspace nil) zero-fills all registry services" do
+    snap = snapshot(workspace: nil)
+    known = SystemHealth::SERVICES.keys
+
+    known.each do |svc|
+      assert snap.services.any? { |s| s.service == svc },
+        "instance snapshot must include idle registry service #{svc}"
+    end
   end
 
   # ── totals ────────────────────────────────────────────────────────────────────

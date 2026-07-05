@@ -365,6 +365,8 @@ Rails.application.routes.draw do
     end
 
     resources :pipelines, except: [ :show ]
+
+    resource :system_health, only: [ :show ], controller: "system_health"
   end
 
   # Pipelines kanban board (outside Settings).

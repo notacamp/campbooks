@@ -13,7 +13,9 @@ module Calendars
       event = CalendarEvent.find_by(id: event_id)
       return unless event
 
-      Calendars::EventWriter.new(event).call(operation, scope: scope.to_sym)
+      Current.set(workspace: event.calendar.workspace) do
+        Calendars::EventWriter.new(event).call(operation, scope: scope.to_sym)
+      end
     rescue Calendars::ConflictError => e
       # The writer already tried to resolve; if it still conflicts, stop spinning —
       # clear the flag and let the next inbound sync reconcile the row.

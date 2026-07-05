@@ -1,5 +1,19 @@
 ---
 en:
+  settings:
+    system_health:
+      show:
+        call_log_heading: Call log
+        empty_description: Calls appear here as your workspace's mailboxes, calendars, AI, and integrations work.
+        empty_title: No external calls yet
+        last_24_hours: Last 24 hours
+        not_allowed: Only workspace admins can view system health.
+        services_heading: Services
+        stat_calls: Calls (24h)
+        stat_errors: Errors (24h)
+        stat_issues: Services with issues
+        subtitle: Your workspace's connections to mail providers, calendars, AI, and integrations.
+        title: System health
   admin:
     system_health:
       calls:

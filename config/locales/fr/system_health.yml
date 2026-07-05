@@ -1,5 +1,19 @@
 ---
 fr:
+  settings:
+    system_health:
+      show:
+        call_log_heading: "Journal des appels"
+        empty_description: "Les appels apparaissent ici au fur et à mesure que les boîtes aux lettres, calendriers, IA et intégrations de votre espace de travail fonctionnent."
+        empty_title: "Aucun appel externe pour l'instant"
+        last_24_hours: "Dernières 24 heures"
+        not_allowed: Seuls les administrateurs de l'espace de travail peuvent voir la santé du système.
+        services_heading: "Services"
+        stat_calls: "Appels (24h)"
+        stat_errors: "Erreurs (24h)"
+        stat_issues: "Services en difficulté"
+        subtitle: "Les connexions de votre espace de travail aux fournisseurs de messagerie, calendriers, IA et intégrations."
+        title: "Santé du système"
   admin:
     system_health:
       calls:

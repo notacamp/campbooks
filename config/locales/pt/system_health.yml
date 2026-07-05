@@ -1,5 +1,19 @@
 ---
 pt:
+  settings:
+    system_health:
+      show:
+        call_log_heading: "Registo de chamadas"
+        empty_description: "As chamadas aparecem aqui à medida que as caixas de correio, calendários, IA e integrações do seu espaço de trabalho funcionam."
+        empty_title: "Ainda não há chamadas externas"
+        last_24_hours: "Últimas 24 horas"
+        not_allowed: Apenas os administradores do espaço de trabalho podem ver a saúde do sistema.
+        services_heading: "Serviços"
+        stat_calls: "Chamadas (24h)"
+        stat_errors: "Erros (24h)"
+        stat_issues: "Serviços com problemas"
+        subtitle: "As ligações do seu espaço de trabalho a fornecedores de correio, calendários, IA e integrações."
+        title: "Saúde do sistema"
   admin:
     system_health:
       calls:

@@ -10,8 +10,9 @@ module Campbooks
         Errno::ETIMEDOUT Timeout::Error
       ].freeze
 
-      def initialize(call:)
-        @call = call
+      def initialize(call:, show_workspace: true)
+        @call           = call
+        @show_workspace = show_workspace
       end
 
       def view_template
@@ -80,7 +81,7 @@ module Campbooks
           err_parts << @call.error_message if @call.error_message.present?
           parts << err_parts.join(": ")
         end
-        parts << "· #{@call.workspace.name}" if @call.workspace.present?
+        parts << "· #{@call.workspace.name}" if @show_workspace && @call.workspace.present?
 
         full_text = parts.join(" ")
         p(
@@ -90,7 +91,11 @@ module Campbooks
       end
 
       def show_error_line?
-        @call.status_error? && (@call.error_class.present? || @call.error_message.present? || @call.workspace.present?)
+        @call.status_error? && (
+          @call.error_class.present? ||
+          @call.error_message.present? ||
+          (@show_workspace && @call.workspace.present?)
+        )
       end
 
       def timeout?
