@@ -17,7 +17,8 @@ pt:
         integrations: Integrações
         members: Membros
         notifications: Notificações
-        security: Segurança
+        security: "Segurança"
+        system_health: "Saúde do sistema"
   statuses:
     approved: Aprovado
     completed: Concluído

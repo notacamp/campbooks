@@ -14,6 +14,7 @@ class RetentionSweepJob < ApplicationJob
   LOG_RETENTION = 90.days
   DISMISSED_FEED_RETENTION = 30.days
   AUDIT_EVENT_RETENTION = 12.months
+  SYSTEM_HEALTH_SUCCESS_RETENTION = 30.days
 
   def perform
     prune_operational_logs
@@ -49,6 +50,12 @@ class RetentionSweepJob < ApplicationJob
     # to be useful in the Settings → Security log, then pruned so the table doesn't
     # grow forever. Deleted-user rows (user_id NULL) age out the same way.
     AuditEvent.where(created_at: ..AUDIT_EVENT_RETENTION.ago).in_batches.delete_all
+
+    # System Health service-call log rows. Errors are retained on the standard
+    # 90-day window; successes get a shorter 30-day window since they are high-
+    # volume and the dashboard only needs recent trend data.
+    ExternalServiceCall.where(created_at: ..log_cutoff).in_batches.delete_all
+    ExternalServiceCall.status_success.where(created_at: ..SYSTEM_HEALTH_SUCCESS_RETENTION.ago).in_batches.delete_all
   end
 
   # Opt-in content retention: for each workspace that set email_retention_months,

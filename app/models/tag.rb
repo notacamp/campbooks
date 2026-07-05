@@ -65,6 +65,23 @@ class Tag < ApplicationRecord
     where(workspace: workspace).grouped.pluck(:group_name).uniq.sort
   end
 
+  # Deterministic fallback colour for provider labels that arrive without one.
+  # Same seed → same colour across processes and deploys (Zlib.crc32 is stable,
+  # unlike String#hash which is per-process randomised), so synced labels get a
+  # stable, distinguishable colour instead of every uncoloured label sharing one
+  # default (which made them impossible to tell apart at a glance).
+  PALETTE = %w[
+    #3b82f6 #f59e0b #8b5cf6 #06b6d4 #a855f7 #eab308 #14b8a6 #6366f1
+    #0ea5e9 #d946ef #fb923c #ef4444 #10b981 #ec4899 #22c55e #f97316
+  ].freeze
+
+  def self.palette_color_for(seed)
+    key = seed.to_s
+    return PALETTE.first if key.empty?
+
+    PALETTE[Zlib.crc32(key) % PALETTE.size]
+  end
+
   # Persist a classification decision (see Labels::Classifier / AiClassifier)
   # without firing the embedding callback — classification metadata isn't part of
   # the embedding content, so update_columns is the right tool here.

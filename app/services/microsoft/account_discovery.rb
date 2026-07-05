@@ -25,6 +25,7 @@ module Microsoft
 
     def connection
       @connection ||= Faraday.new do |f|
+        f.use SystemHealth::FaradayMiddleware, service: "microsoft_oauth"
         f.adapter Faraday.default_adapter
         f.headers["Authorization"] = "Bearer #{@access_token}"
       end

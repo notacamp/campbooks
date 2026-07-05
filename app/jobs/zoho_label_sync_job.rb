@@ -21,7 +21,11 @@ class ZohoLabelSyncJob < ApplicationJob
       count = service.new(account).sync_labels!
       Rails.logger.info("[LabelSyncJob] Synced #{count} labels for #{account.email_address}")
     rescue => e
+      # Isolate per-account failures so one bad mailbox doesn't abort the batch —
+      # but surface them to error tracking, not only the log. A silent rescue here
+      # is exactly how a mailbox's labels drift stale for months unnoticed.
       Rails.logger.error("[LabelSyncJob] Sync failed for account #{account.id}: #{e.message}")
+      Rails.error.report(e, handled: true, context: { account_id: account.id, job: "ZohoLabelSyncJob" })
     end
   end
 end

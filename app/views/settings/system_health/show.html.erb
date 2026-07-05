@@ -1,0 +1,58 @@
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+
+<% totals = @snapshot.totals %>
+<% all_services = @snapshot.services %>
+
+<% if totals[:total] > 0 %>
+  <%# ── Summary strip ── %>
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+    <%= render(Campbooks::Stat.new(
+          value: number_with_delimiter(totals[:total]),
+          label: t(".stat_calls"),
+          variant: :neutral)) %>
+    <%= render(Campbooks::Stat.new(
+          value: number_with_delimiter(totals[:errors]),
+          label: t(".stat_errors"),
+          variant: totals[:errors] > 0 ? :danger : :neutral)) %>
+    <% issues_count = totals[:services_failing] + totals[:services_degraded] %>
+    <%= render(Campbooks::Stat.new(
+          value: issues_count,
+          label: t(".stat_issues"),
+          variant: issues_count > 0 ? :attention : :neutral)) %>
+  </div>
+
+  <%# ── Service cards — workspace-scoped snapshot shows only observed services ── %>
+  <div class="flex items-center justify-between mb-3">
+    <span class="text-sm font-semibold"><%= t(".services_heading") %></span>
+    <span class="text-sm text-muted-foreground"><%= t(".last_24_hours") %></span>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+    <% all_services.each do |entry| %>
+      <%= render(Campbooks::SystemHealth::ServiceCard.new(entry: entry, log_path: settings_system_health_path)) %>
+    <% end %>
+  </div>
+
+<% else %>
+  <%# ── No calls yet for this workspace ── %>
+  <% es = Campbooks::EmptyState.new(variant: :card, title: t(".empty_title"), description: t(".empty_description")) %>
+  <% es.with_icon(svg: render(Campbooks::Icon.new("chart-bar", css_class: "w-6 h-6 text-muted-foreground"))) %>
+  <%= render(Campbooks::Card.new) do %>
+    <%= render(es) %>
+  <% end %>
+<% end %>
+
+<%# ── Call log ── %>
+<div class="mt-10" id="call-log">
+  <div class="flex items-center justify-between mb-3">
+    <span class="text-sm font-semibold"><%= t(".call_log_heading") %></span>
+  </div>
+
+  <%= render "shared/system_health/calls",
+        calls: @calls,
+        pagy: @pagy,
+        log_path: settings_system_health_path,
+        show_workspace: false %>
+</div>

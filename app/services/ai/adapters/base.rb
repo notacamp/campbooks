@@ -59,6 +59,12 @@ module Ai
         raise NotImplementedError
       end
 
+      # Returns the SystemHealth service key for this adapter. Overridden by
+      # Openai when the endpoint points at the DeepSeek API.
+      def system_health_service
+        "ai_#{self.class.name.demodulize.underscore}"
+      end
+
       private
 
       def post_json(url, body)
@@ -68,6 +74,7 @@ module Ai
 
       def connection
         @connection ||= Faraday.new(headers: default_headers) do |f|
+          f.use SystemHealth::FaradayMiddleware, service: system_health_service
           f.request :json
           f.response :raise_error
           f.response :logger, Rails.logger, headers: false, bodies: false do |logger|

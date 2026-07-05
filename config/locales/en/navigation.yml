@@ -18,6 +18,7 @@ en:
         members: Members
         notifications: Notifications
         security: Security
+        system_health: System health
   statuses:
     approved: Approved
     completed: Completed

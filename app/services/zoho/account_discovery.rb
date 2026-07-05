@@ -53,6 +53,7 @@ module Zoho
 
     def connection
       @connection ||= Faraday.new do |f|
+        f.use SystemHealth::FaradayMiddleware, service: "zoho_oauth"
         f.adapter Faraday.default_adapter
         f.headers["Authorization"] = "Zoho-oauthtoken #{@access_token}"
       end
