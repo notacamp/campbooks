@@ -143,6 +143,29 @@ pt:
       clear: Limpar pesquisa
       filters: Filtros
       placeholder: Pesquisar correio…
+      searching: A pesquisar…
+      suggest:
+        heading: Refinar pesquisa
+        from: mensagens de um remetente
+        to: enviadas a um destinatário
+        subject: palavras no assunto
+        has: mensagens com anexos
+        is: lida, não lida ou fixada
+        after: recebidas depois de uma data
+        before: recebidas antes de uma data
+        tag: mensagens com uma etiqueta
+        folder: mensagens numa pasta
+        category: mensagens numa categoria
+        priority: por prioridade de IA
+        account: numa conta ligada
+        values:
+          attachment: anexo
+          unread: não lida
+          read: lida
+          pinned: fixada
+          low: baixa
+          medium: média
+          high: alta
     email_search_result:
       no_subject: "(sem assunto)"
       sent_to: Para %{address}
