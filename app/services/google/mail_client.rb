@@ -643,6 +643,7 @@ module Google
       # Rebuilt per call so @oauth.access_token is re-read each request. Memoizing
       # froze a stale token into the Authorization header, 401-ing mid-scan.
       Faraday.new do |f|
+        f.use SystemHealth::FaradayMiddleware, service: "google_mail"
         f.request :url_encoded
         # Bound every call so a slow/hung provider response can't pin a scan open
         # for minutes (see Zoho::MailClient#connection).

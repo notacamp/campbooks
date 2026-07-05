@@ -53,6 +53,7 @@ module Push
 
     def connection
       @connection ||= Faraday.new(url: BASE_URL) do |f|
+        f.use SystemHealth::FaradayMiddleware, service: "push_fcm", expected_statuses: [ 404 ]
         f.options.timeout = 10
         f.options.open_timeout = 5
       end

@@ -31,6 +31,7 @@ class BugReportGithubSyncJob < ApplicationJob
     result = Workflows::HttpClient.call(
       method: :post,
       url: "#{GITHUB_API_BASE}/repos/#{self.class.repo}/issues",
+      service: "github",
       headers: {
         "Authorization" => "Bearer #{ENV.fetch('GITHUB_TOKEN')}",
         "Accept" => "application/vnd.github+json",

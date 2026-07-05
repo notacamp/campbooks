@@ -45,6 +45,7 @@ fr:
       dashboard: Tableau de bord
       invitations: Invitations
       signup_requests: Demandes d'inscription
+      system_health: Santé du système
       users: Utilisateurs
     signup_requests:
       index:

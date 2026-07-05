@@ -701,6 +701,7 @@ Rails.application.routes.draw do
     end
     resources :users, only: [ :index, :update ]
     resources :beta_codes, only: [ :index, :create, :destroy ]
+    resource :system_health, only: [ :show ], controller: "system_health"
   end
 
   mount MissionControl::Jobs::Engine, at: "/jobs"

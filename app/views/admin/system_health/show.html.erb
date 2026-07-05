@@ -1,0 +1,100 @@
+<% render "admin/sidebar" %>
+
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+
+<% totals = @snapshot.totals %>
+<% non_idle = @snapshot.services.reject { |e| e.state == :idle } %>
+<% idle     = @snapshot.services.select { |e| e.state == :idle } %>
+
+<% if totals[:total] > 0 %>
+  <%# ── Summary strip ── %>
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+    <%= render(Campbooks::Stat.new(
+          value: number_with_delimiter(totals[:total]),
+          label: t(".stat_calls"),
+          variant: :neutral)) %>
+    <%= render(Campbooks::Stat.new(
+          value: number_with_delimiter(totals[:errors]),
+          label: t(".stat_errors"),
+          variant: totals[:errors] > 0 ? :danger : :neutral)) %>
+    <% issues_count = totals[:services_failing] + totals[:services_degraded] %>
+    <%= render(Campbooks::Stat.new(
+          value: issues_count,
+          label: t(".stat_issues"),
+          variant: issues_count > 0 ? :attention : :neutral)) %>
+  </div>
+
+  <%# ── Service cards ── %>
+  <div class="flex items-center justify-between mb-3">
+    <span class="text-sm font-semibold"><%= t(".services_heading") %></span>
+    <span class="text-sm text-muted-foreground"><%= t(".last_24_hours") %></span>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+    <% non_idle.each do |entry| %>
+      <%= render(Campbooks::SystemHealth::ServiceCard.new(entry: entry)) %>
+    <% end %>
+  </div>
+
+  <% if idle.any? %>
+    <% idle_names = idle.map { |e| t("system_health.services.#{e.service}", default: e.service.humanize) } %>
+    <p class="text-xs text-muted-foreground mt-4">
+      <%= t(".idle_services", services: idle_names.join(", ")) %>
+    </p>
+  <% end %>
+
+<% else %>
+  <%# ── Fresh install / everything idle ── %>
+  <% es = Campbooks::EmptyState.new(variant: :card, title: t(".empty_title"), description: t(".empty_description")) %>
+  <% es.with_icon(svg: render(Campbooks::Icon.new("chart-bar", css_class: "w-6 h-6 text-muted-foreground"))) %>
+  <%= render(Campbooks::Card.new) do %>
+    <%= render(es) %>
+  <% end %>
+<% end %>
+
+<%# ── Call log ── %>
+<div class="mt-10" id="call-log">
+  <div class="flex items-center justify-between mb-3">
+    <span class="text-sm font-semibold"><%= t(".call_log_heading") %></span>
+  </div>
+
+  <%# Filter form: auto-submits on change via the auto-submit Stimulus controller %>
+  <%= form_with url: admin_system_health_path, method: :get,
+        data: { turbo_frame: "isc_list", controller: "auto-submit" } do |f| %>
+    <div class="flex flex-col sm:flex-row sm:items-end gap-2 flex-wrap mb-4">
+      <%= render(Campbooks::Select.new(
+            :service,
+            include_blank: t(".filter_all_services"),
+            options: SystemHealth::SERVICES.keys.map { |k|
+              [ t("system_health.services.#{k}", default: k.humanize), k ]
+            },
+            selected: params[:service],
+            data: { action: "change->auto-submit#submit" })) %>
+
+      <%= render(Campbooks::Select.new(
+            :status,
+            include_blank: t(".filter_all_statuses"),
+            options: [
+              [ t(".filter_success"), "success" ],
+              [ t(".filter_error"),   "error"   ]
+            ],
+            selected: params[:status],
+            data: { action: "change->auto-submit#submit" })) %>
+
+      <%= render(Campbooks::Select.new(
+            :window,
+            include_blank: nil,
+            options: [
+              [ t(".window_24h"), "24h" ],
+              [ t(".window_7d"),  "7d"  ],
+              [ t(".window_30d"), "30d" ]
+            ],
+            selected: params[:window].presence || "24h",
+            data: { action: "change->auto-submit#submit" })) %>
+    </div>
+  <% end %>
+
+  <%= turbo_frame_tag "isc_list" do %>
+    <%= render "admin/system_health/calls", calls: @calls, pagy: @pagy %>
+  <% end %>
+</div>

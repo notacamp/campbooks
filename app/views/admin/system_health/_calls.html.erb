@@ -1,0 +1,28 @@
+<%# locals: calls, pagy %>
+<%= render(Campbooks::Card.new(padding: :none, overflow: :hidden)) do %>
+  <div id="isc_rows" class="divide-y divide-border">
+    <% if calls.any? %>
+      <% calls.each do |call| %>
+        <%= render(Campbooks::SystemHealth::CallRow.new(call: call)) %>
+      <% end %>
+    <% else %>
+      <%= render(Campbooks::EmptyState.new(variant: :inline, title: t(".no_matches"))) %>
+    <% end %>
+  </div>
+<% end %>
+
+<% if pagy&.next %>
+  <%= turbo_frame_tag "isc_pagination",
+        src: admin_system_health_path(
+          page:    pagy.next,
+          service: params[:service].presence,
+          status:  params[:status].presence,
+          window:  params[:window].presence,
+          format:  :turbo_stream
+        ),
+        loading: :lazy do %>
+    <div class="flex justify-center py-4">
+      <%= render(Campbooks::Spinner.new(size: :sm)) %>
+    </div>
+  <% end %>
+<% end %>

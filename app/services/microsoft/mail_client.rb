@@ -394,6 +394,7 @@ module Microsoft
       # Rebuilt per call so @oauth.access_token is re-read each request. Memoizing
       # froze a stale token into the Authorization header, 401-ing mid-scan.
       Faraday.new do |f|
+        f.use SystemHealth::FaradayMiddleware, service: "microsoft_mail", expected_statuses: [ 410 ]
         # Bound every call so a slow/hung provider response can't pin a scan open
         # for minutes (see Zoho::MailClient#connection).
         f.options.open_timeout = 10

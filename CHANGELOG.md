@@ -16,6 +16,17 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+- **System health, for your workspace and the whole instance.** Campbooks now
+  records every call it makes to an outside service (mail providers, calendars,
+  storage, AI models, workflow webhooks, push, SMTP) with its outcome and
+  duration. Workspace admins get **Settings → System health**: their
+  workspace's services with error rates, hourly activity sparklines, the most
+  recent error, and a filterable call log. Instance operators get the sum of
+  all workspaces at `/admin/system_health`. Successes are kept 30 days, errors
+  90; set `DISABLE_SYSTEM_HEALTH=1` to opt out of recording entirely. See
+  `docs/system-health.md`.
+
 ### Changed
 
 - The home feed's Scout summary now caps at three lines with a "Read more"
