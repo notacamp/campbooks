@@ -97,21 +97,33 @@ class EmailMessagesController < ApplicationController
     @search_active = !blank_search?
 
     if @search_active
-      @folder_ids = resolve_search_folder_ids(@search_params[:folder])
+      parsed = Emails::SearchQuery.parse(@search_params[:q])
+      @folder_ids = resolve_search_folder_ids(parsed.filters[:folder].presence || @search_params[:folder])
       searcher = Emails::Search.new(user: Current.user, params: @search_params, folder_ids: @folder_ids)
 
       if searcher.text_query?
         # Free text → relevance ranking (embedding + keyword): a single bounded page.
         @messages = searcher.results
         @pagy = nil
+
+        # Waiting-on-replies band: threads whose messages appear in these results.
+        # Exclude those threads from the flat list so rows don't duplicate.
+        band_thread_ids = @messages.map(&:email_thread_id).compact.uniq
+        @waiting_threads = searched_waiting_threads(band_thread_ids)
+        band_ids = @waiting_threads.map(&:id).to_set
+        @messages = @messages.reject { |m| band_ids.include?(m.email_thread_id) }
       else
-        # Filters only → browse, paginated by recency.
-        @pagy, @messages = pagy_countless(searcher.scope, limit: SEARCH_PAGE_LIMIT)
+        # Filters only → browse, paginated by recency. Compute the waiting band
+        # once for the first-page html render; exclude those threads on every page.
+        @waiting_threads = searched_waiting_threads(searcher.scope.select(:email_thread_id))
+        base_scope = exclude_band_threads(searcher.scope, @waiting_threads)
+        @pagy, @messages = pagy_countless(base_scope, limit: SEARCH_PAGE_LIMIT)
       end
     else
       # Empty submit (cleared box, no filters) — restore the normal inbox list
       # inside the frame rather than 404/redirect.
       @current_group = nil
+      @waiting_threads = []
       @pagy, @threads = pagy_countless(build_thread_scope(nil, nil), limit: THREAD_PAGE_LIMIT)
     end
 
@@ -179,13 +191,20 @@ class EmailMessagesController < ApplicationController
     @search_active = !blank_search?
 
     if @search_active
-      @folder_ids = resolve_search_folder_ids(@search_params[:folder])
+      parsed = Emails::SearchQuery.parse(@search_params[:q])
+      @folder_ids = resolve_search_folder_ids(parsed.filters[:folder].presence || @search_params[:folder])
       searcher = Emails::Search.new(user: Current.user, params: @search_params, folder_ids: @folder_ids)
       if searcher.text_query?
         @messages = searcher.results
         @pagy = nil
+        band_thread_ids = @messages.map(&:email_thread_id).compact.uniq
+        @waiting_threads = searched_waiting_threads(band_thread_ids)
+        band_ids = @waiting_threads.map(&:id).to_set
+        @messages = @messages.reject { |m| band_ids.include?(m.email_thread_id) }
       else
-        @pagy, @messages = pagy_countless(searcher.scope, limit: SEARCH_PAGE_LIMIT)
+        @waiting_threads = searched_waiting_threads(searcher.scope.select(:email_thread_id))
+        base_scope = exclude_band_threads(searcher.scope, @waiting_threads)
+        @pagy, @messages = pagy_countless(base_scope, limit: SEARCH_PAGE_LIMIT)
       end
       # The folder-list view branches on these; keep them inert in search mode.
       @current_group = nil
@@ -194,7 +213,6 @@ class EmailMessagesController < ApplicationController
       @group_items = []
       @smart_group_items = []
       @pinned_threads = []
-      @waiting_threads = []
       @threads = []
     else
       # Build tag groups with per-group queries (powers the group chips in the sidebar)
@@ -315,8 +333,24 @@ class EmailMessagesController < ApplicationController
     message = EmailMessage.where(email_account: Current.user.readable_email_accounts).find(params[:id])
     message.email_thread&.update(follow_up_dismissed_at: Time.current)
 
+    @search_params = search_params
     @current_group = params[:group].presence
-    @waiting_threads = waiting_thread_scope(params[:folder_id], @current_group, folder_name: params[:folder_name].presence)
+
+    if !blank_search?
+      # Re-build the waiting band scoped to the active search so the replaced
+      # section stays consistent with what the search returned.
+      parsed = Emails::SearchQuery.parse(@search_params[:q])
+      @folder_ids = resolve_search_folder_ids(parsed.filters[:folder].presence || @search_params[:folder])
+      searcher = Emails::Search.new(user: Current.user, params: @search_params, folder_ids: @folder_ids)
+      thread_scope = if searcher.text_query?
+        searcher.results.map(&:email_thread_id).compact.uniq
+      else
+        searcher.scope.select(:email_thread_id)
+      end
+      @waiting_threads = searched_waiting_threads(thread_scope)
+    else
+      @waiting_threads = waiting_thread_scope(params[:folder_id], @current_group, folder_name: params[:folder_name].presence)
+    end
 
     respond_to do |format|
       format.turbo_stream do
@@ -561,6 +595,37 @@ class EmailMessagesController < ApplicationController
       .limit(PINNED_LIMIT)
       .to_a
   end
+
+  # Awaiting-reply threads whose messages match the current search — the band stays
+  # searchable instead of vanishing when a query is active.
+  def searched_waiting_threads(thread_ids_or_scope)
+    EmailThread.where(email_account_id: readable_account_ids)
+               .where(id: EmailThread.awaiting_reply)
+               .where(id: thread_ids_or_scope)
+               .where.not(id: EmailThread.pinned)
+               .includes(:email_account, email_messages: [ :email_account, :tags, :files_attachments, { documents: :classification } ])
+               .order(last_outbound_at: :desc)
+               .limit(PINNED_LIMIT)
+               .to_a
+  end
+
+  # Drop the band's threads from the flat search list so rows don't duplicate.
+  # NULL-safe: a plain NOT IN would silently drop unthreaded messages
+  # (email_thread_id IS NULL never passes NOT IN).
+  def exclude_band_threads(rel, waiting_threads)
+    ids = waiting_threads.map(&:id)
+    return rel if ids.empty?
+    rel.where("email_thread_id IS NULL OR email_thread_id NOT IN (?)", ids)
+  end
+
+  # The active search criteria, forwarded on band actions so a re-render keeps the
+  # searched subset (empty hash outside a search).
+  def search_context_params
+    keys = %i[q folder sender domain date_from date_to has_attachment unread category priority tag_match]
+    ctx = params.permit(*keys, account_ids: [], tag_ids: []).to_h.reject { |_, v| Array(v).all?(&:blank?) }
+    ctx.symbolize_keys
+  end
+  helper_method :search_context_params
 
   def build_tag_groups(readable_ids, folder_id)
     grouped = workspace_tags.select { |t| t.group_name.present? }.group_by(&:group_name)
