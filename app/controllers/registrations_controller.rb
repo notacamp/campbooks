@@ -173,6 +173,10 @@ class RegistrationsController < ApplicationController
         # A real, user-chosen password — distinguishes them from OAuth-only users
         # (synthetic random password) for Auth::OauthSignIn / sign-in-method counts.
         password_set_by_user: true,
+        # Whoever founds a workspace administers it; invited users join as
+        # members. The very first account on the instance also operates it.
+        role: (invitation ? :member : :admin),
+        app_admin: !User.exists?,
         terms_accepted_at: (state("terms_accepted_at").present? ? (Time.zone.parse(state("terms_accepted_at")) rescue Time.current) : Time.current)
       )
 

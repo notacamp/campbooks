@@ -85,6 +85,17 @@ class EmailComposeController < ApplicationController
     args = compose_params
     template = scheduled_email_template
 
+    # Resolve the target account through the send gate — mirrors
+    # ScheduledEmailsController#sendable_account. Read access to a shared inbox
+    # (or a tampered email_account_id) must not let someone queue mail from it.
+    account =
+      if params[:email_account_id].present?
+        Current.user.sendable_email_accounts.find_by(id: params[:email_account_id])
+      else
+        sendable_message_account
+      end
+    return error_response(t(".no_account")) unless account
+
     # Bake in the selected signature exactly like an immediate send, so the
     # queued message goes out identical to what "Send now" would have produced.
     # With a template, schedule its raw subject/body + the picked variables so
@@ -98,7 +109,7 @@ class EmailComposeController < ApplicationController
 
     scheduled = ScheduledEmail.new(
       workspace: Current.workspace,
-      email_account_id: params[:email_account_id] || @message&.email_account_id,
+      email_account: account,
       created_by: Current.user,
       email_template: template,
       to_address: args[:to_address],

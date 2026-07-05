@@ -161,10 +161,11 @@ class TasksController < ApplicationController
     added = member_ids - @task.assignee_ids
 
     @task.assignee_ids = member_ids
-    added.each do |uid|
-      TaskAssignment.where(task: @task, user_id: uid).update_all(assigned_by_id: current_user.id)
+    Current.workspace.users.where(id: added).each do |assignee|
+      TaskAssignment.where(task: @task, user_id: assignee.id).update_all(assigned_by_id: current_user.id)
       Events.publish("task.assigned", subject: @task, actor: current_user,
-                     payload: { title: @task.title, assignee_id: uid })
+                     payload: { title: @task.title, assignee_id: assignee.id })
+      Notifier.task_assigned(@task, assignee: assignee, assigned_by: current_user)
     end
 
     respond_with_change(t(".assigned"))

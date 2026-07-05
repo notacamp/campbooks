@@ -45,17 +45,30 @@
   <% if @members.any? %>
     <div class="divide-y divide-gray-100">
       <% @members.each do |member| %>
-        <div class="flex items-center justify-between px-5 py-3">
-          <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
+          <div class="flex min-w-0 items-center gap-3">
             <%= render(Campbooks::Avatar.new(name: member.name, size: :sm)) %>
-            <div>
-              <p class="text-sm font-medium text-gray-900"><%= member.name %></p>
-              <p class="text-xs text-gray-500"><%= member.email_address %></p>
+            <div class="min-w-0">
+              <p class="truncate text-sm font-medium text-gray-900"><%= member.name %></p>
+              <p class="truncate text-xs text-gray-500"><%= member.email_address %></p>
             </div>
           </div>
-          <% if member == Current.user %>
-            <%= render(Campbooks::Badge.new(variant: :accent, size: :sm)) { t(".you_badge") } %>
-          <% end %>
+          <div class="flex flex-wrap items-center gap-2">
+            <% if member == Current.user %>
+              <%= render(Campbooks::Badge.new(variant: :accent, size: :sm)) { t(".you_badge") } %>
+            <% end %>
+            <%= render(Campbooks::Badge.new(variant: member.admin? ? :accent : :neutral, size: :sm)) { human_enum(User, :role, member.role) } %>
+            <%# Workspace admins hand the admin role to teammates (never themselves). %>
+            <% if Current.user.admin? && member != Current.user %>
+              <% if member.admin? %>
+                <%= button_to t(".make_member"), settings_member_path(member, role: "member"), method: :patch,
+                      class: "text-xs text-gray-500 hover:text-gray-700 font-medium cursor-pointer" %>
+              <% else %>
+                <%= button_to t(".make_admin"), settings_member_path(member, role: "admin"), method: :patch,
+                      class: "text-xs text-accent-600 hover:text-accent-700 font-medium cursor-pointer" %>
+              <% end %>
+            <% end %>
+          </div>
         </div>
       <% end %>
     </div>
@@ -73,15 +86,23 @@
     </div>
     <div class="divide-y divide-gray-100">
       <% pending_invites.each do |invitation| %>
-        <div class="flex items-center justify-between px-5 py-3">
-          <div>
-            <p class="text-sm font-medium text-gray-900"><%= invitation.email %></p>
+        <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-3">
+          <div class="min-w-0">
+            <p class="truncate text-sm font-medium text-gray-900"><%= invitation.email %></p>
             <p class="text-xs text-gray-500">
               <%= t(".invited_by", name: invitation.invited_by.name) %>
               &middot; <%= t(".expires_in", time: time_ago_in_words(invitation.expires_at)) %>
             </p>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <%# Cloud: a member's invitation waits for a workspace admin to release it. %>
+            <% unless invitation.admin_approved? %>
+              <%= render(Campbooks::Badge.new(variant: :warning, size: :sm)) { t(".awaiting_approval") } %>
+              <% if Current.user.admin? %>
+                <%= button_to t(".approve"), approve_settings_invitation_path(invitation), method: :post,
+                      class: "text-xs text-accent-600 hover:text-accent-700 font-medium cursor-pointer" %>
+              <% end %>
+            <% end %>
             <%= button_to t(".resend"), resend_settings_invitation_path(invitation), method: :post,
                   class: "text-xs text-accent-600 hover:text-accent-700 font-medium cursor-pointer" %>
             <%= button_to t(".cancel_invitation"), settings_invitation_path(invitation), method: :delete,

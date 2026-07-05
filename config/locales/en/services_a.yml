@@ -120,6 +120,10 @@ en:
       title: Scout replied
     subject_label:
       fallback: your inbox
+    task_assigned:
+      title: "%{actor_name} assigned you a task"
+    task_mention:
+      title: "%{actor_name} mentioned you in a task"
     thread_activity:
       title: New comment from %{actor_name}
     thread_mention:

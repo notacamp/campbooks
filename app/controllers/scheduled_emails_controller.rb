@@ -7,6 +7,7 @@ class ScheduledEmailsController < ApplicationController
   # and stop schedules it created while subscribed.
   before_action -> { require_entitlement!(:email_scheduling) }, only: %i[new create edit update]
   before_action :load_scheduled_email, only: %i[show edit update destroy]
+  before_action :require_editable, only: %i[edit update destroy]
 
   def index
     @scheduled_emails = ScheduledEmail.accessible_to(Current.user)
@@ -68,6 +69,15 @@ class ScheduledEmailsController < ApplicationController
 
   def load_scheduled_email
     @scheduled_email = ScheduledEmail.accessible_to(Current.user).find(params[:id])
+  end
+
+  # Visibility (load_scheduled_email) admits mailbox readers; changing or
+  # cancelling the queued send is an action-level denial for them, so flash
+  # rather than 404 — the row itself is legitimately visible.
+  def require_editable
+    return if @scheduled_email.editable_by?(Current.user)
+
+    redirect_to scheduled_emails_path, error: t("scheduled_emails.not_allowed")
   end
 
   def scheduled_email_params

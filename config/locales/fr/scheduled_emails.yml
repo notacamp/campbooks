@@ -66,6 +66,7 @@ fr:
       to: À %{address}
     new:
       title: Programmer un e-mail
+    not_allowed: Vous n'avez pas la permission de modifier cet e-mail programmé.
     recurrence:
       biweekly: Toutes les 2 semaines
       custom: Personnalisé

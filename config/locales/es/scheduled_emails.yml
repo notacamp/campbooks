@@ -65,6 +65,7 @@ es:
       to: Para %{address}
     new:
       title: Programar un correo
+    not_allowed: No tienes permiso para modificar ese correo programado.
     recurrence:
       biweekly: Cada 2 semanas
       custom: Personalizado

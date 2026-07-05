@@ -126,6 +126,10 @@ fr:
       title: Scout a répondu
     subject_label:
       fallback: votre boîte de réception
+    task_assigned:
+      title: "%{actor_name} vous a assigné une tâche"
+    task_mention:
+      title: "%{actor_name} vous a mentionné dans une tâche"
     thread_activity:
       title: Nouveau commentaire de %{actor_name}
     thread_mention:

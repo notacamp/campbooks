@@ -37,9 +37,17 @@ RSpec.describe ScheduledEmail do
     let!(:my_email) { create(:scheduled_email, workspace: workspace, created_by: user) }
     let!(:other_email) { create(:scheduled_email, workspace: other_workspace, created_by: other_user) }
 
-    it "accessible_to scopes to user's workspace" do
+    it "accessible_to includes your own schedules and never another workspace's" do
       expect(described_class.accessible_to(user)).to include(my_email)
       expect(described_class.accessible_to(user)).not_to include(other_email)
+    end
+
+    it "accessible_to follows the mailbox share, not the workspace" do
+      bystander = create(:user, workspace: workspace)
+      expect(described_class.accessible_to(bystander)).not_to include(my_email)
+
+      create(:email_account_user, :viewer, user: bystander, email_account: my_email.email_account)
+      expect(described_class.accessible_to(bystander)).to include(my_email)
     end
 
     it "due returns pending items with past scheduled_at" do
