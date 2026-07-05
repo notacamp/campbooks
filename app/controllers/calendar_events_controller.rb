@@ -1,4 +1,6 @@
 class CalendarEventsController < ApplicationController
+  include ActionView::RecordIdentifier
+
   before_action :require_authentication
   before_action :set_event, only: [ :show, :edit, :update, :destroy, :rsvp, :reschedule ]
   before_action :require_writable_event, only: [ :update, :destroy, :rsvp ]
@@ -62,7 +64,14 @@ class CalendarEventsController < ApplicationController
     Calendars::EventWriteJob.perform_later(@event.id, "delete", recurrence_scope)
     Events.publish("calendar_event.deleted", subject: @event, workspace: @event.calendar.workspace, payload: { "title" => @event.title })
     respond_to do |format|
-      format.turbo_stream { flash[:success] = t(".deleted"); render_event_saved }
+      format.turbo_stream do
+        if params[:swipe].present?
+          render turbo_stream: [ turbo_stream.remove(dom_id(@event, :agenda_item)), notify_stream(t(".deleted")) ]
+        else
+          flash[:success] = t(".deleted")
+          render_event_saved
+        end
+      end
       format.html { redirect_to calendar_path(view: params[:view]), success: t(".deleted") }
     end
   end

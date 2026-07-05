@@ -27,6 +27,11 @@ module Documents
       # Step 3: Generate canonical filename
       @document.generate_canonical_filename!
 
+      # Step 4: Improve title when the AI result is still vague (email address, raw
+      # filename, single word, etc.).  Safe/idempotent — no-ops when the title is
+      # already descriptive, and swallows its own errors.
+      Documents::TitleGenerator.new(@document).call
+
       # AI did its part; every completed document now awaits human sign-off — surface it.
       Notifier.documents_need_review(@document.workspace) if @document.review_pending?
 
