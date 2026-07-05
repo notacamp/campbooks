@@ -21,16 +21,22 @@ RSpec.describe Feed::Sources::FollowUp do
   describe "#candidates" do
     it "emits one candidate per due thread, keyed on the thread, addressed to the other party" do
       thread = due_thread
-      create(:email_message, email_account: account, email_thread: thread, from_address: "me@example.com", provider_folder_id: "INBOX", received_at: 4.days.ago)
+      sent = create(:email_message, email_account: account, email_thread: thread, from_address: "me@example.com",
+                    subject: "Q3 proposal", body: "Hi Dana, attaching the Q3 proposal.", provider_folder_id: "SENT", received_at: 4.days.ago)
       inbound = create(:email_message, email_account: account, email_thread: thread, from_address: "dana@acme.com", provider_folder_id: "INBOX", received_at: 5.days.ago)
 
       candidates = source.candidates
       expect(candidates.size).to eq(1)
       c = candidates.first
+      # Anchored to the inbound message — that's what keeps the action addressed to
+      # the other party and subject to inbox/admission gating.
       expect(c[:subject]).to eq(inbound)
       expect(c[:dedupe_key]).to eq("follow_up:#{thread.id}")
       expect(c[:attention]).to be(true)
       expect(c[:data]["reason"]).to eq("Confirm the date")
+      # ...but the card SHOWS the mail the user sent and is chasing, not the inbound.
+      expect(c[:data]["sent_subject"]).to eq("Q3 proposal")
+      expect(c[:data]["sent_message_id"]).to eq(sent.id)
     end
 
     it "ignores threads that are not due (within grace, dismissed, or the AI said wait / no)" do

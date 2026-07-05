@@ -101,6 +101,13 @@ major, minor, or patch change here.
 
 ### Fixed
 
+- **Follow-up cards now show the email you sent, not the last one you got.** The
+  home-feed "Draft follow-up" card is a nudge about a message *you* sent and are
+  still waiting on — but it led with the other party's name, showed their subject,
+  and its "Show email" peek unfolded the mail you received, not the one you're
+  chasing. Cards now read "To <recipient>", show your sent subject, and peek into
+  the message you actually sent. The nudge still drafts and addresses correctly to
+  the other party.
 - **The mobile bottom nav hides itself while you scroll down** and glides back
   the moment you scroll up — reclaiming screen space during reading without
   making navigation hard to reach.

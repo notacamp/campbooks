@@ -36,6 +36,7 @@ module Feed
         message = representative(thread)
         return nil unless message && admitted_message?(message) && in_inbox?(message)
 
+        sent = outbound_representative(thread)
         {
           subject: message,
           dedupe_key: "follow_up:#{thread.id}",
@@ -45,13 +46,21 @@ module Feed
           data: {
             "reason" => thread.follow_up_reason.to_s,
             "since" => thread.last_outbound_at&.iso8601,
-            "age_days" => age_days(thread.last_outbound_at)
+            "age_days" => age_days(thread.last_outbound_at),
+            # The card is ANCHORED to the inbound `message` (so the action addresses
+            # the other party and inbox gating applies), but it SHOWS the user's own
+            # sent mail — the message actually awaiting a reply. Stamp its subject +
+            # id here, off the already-loaded thread, so the card's header and its
+            # "peek inside" preview render the sent email, not the received one.
+            "sent_subject" => sent&.subject.to_s,
+            "sent_message_id" => sent&.id
           }
         }
       end
 
       # The other party's most recent message — who we're nudging and what the card
-      # shows. nil for a cold outbound with no inbound message (nothing to surface).
+      # is ANCHORED to (link target + inbox/admission gating). nil for a cold
+      # outbound with no inbound message (nothing to surface).
       def representative(thread)
         addr = thread.email_account&.email_address.to_s.downcase
         return nil if addr.blank?
@@ -60,6 +69,19 @@ module Feed
               .sort_by { |m| m.received_at || Time.at(0) }
               .reverse
               .find { |m| !m.from_address.to_s.downcase.include?(addr) }
+      end
+
+      # The user's own most recent message in the thread — the email they sent and
+      # are now following up on. This is what the card DISPLAYS. Mirrors
+      # Tools::DraftFollowUp#latest_outbound (substring match, so provider-synced
+      # sent mail carrying a display name still counts as outbound).
+      def outbound_representative(thread)
+        addr = thread.email_account&.email_address.to_s.downcase
+        return nil if addr.blank?
+
+        thread.email_messages
+              .select { |m| m.from_address.to_s.downcase.include?(addr) }
+              .max_by { |m| m.received_at || Time.at(0) }
       end
 
       def age_days(time)

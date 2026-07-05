@@ -14,17 +14,22 @@ module Campbooks
           icon_circle
           div(class: "min-w-0 flex-1") do
             div(class: "text-[12.5px] text-muted-foreground") do
-              span(class: "font-semibold text-foreground") { sender_name(subject) }
+              # "To Ana", not "Ana": this card is the mail YOU sent and are chasing,
+              # so it leads with the recipient you're waiting on — never framed as a
+              # received email. sender_name(subject) is the other party (the inbound
+              # anchor's sender), i.e. exactly who you sent to.
+              span(class: "font-semibold text-foreground") { t(".to", name: sender_name(subject)) }
               plain " · "
               plain meta
             end
-            div(class: "mt-1 line-clamp-2 text-sm font-semibold leading-snug text-foreground") { clean_subject(subject) }
+            div(class: "mt-1 line-clamp-2 text-sm font-semibold leading-snug text-foreground") { sent_subject }
             if reason.present?
               p(class: "mt-1 line-clamp-2 text-[13px] leading-relaxed text-muted-foreground") { reason }
             end
-            # "Nudge or let it rest" is judged on what was last said — the collapsed
-            # preview reopens the conversation without leaving the feed.
-            render Campbooks::Feed::ExpandablePreview.new(item: item, class: "mt-1.5")
+            # The peek shows the message YOU sent (the one awaiting a reply), not the
+            # last inbound — Feed::ItemsController#preview resolves it from the card's
+            # stamped sent_message_id.
+            render Campbooks::Feed::ExpandablePreview.new(item: item, label: t(".show_sent"), class: "mt-1.5")
             div(class: "mt-2.5 flex items-center justify-end gap-2") do
               act_button(tool: "dismiss_follow_up", label: t(".dismiss"), variant: :ghost, key: "x", dismiss: true)
               link_button(href: helpers.email_message_path(subject, compose: "follow_up"), label: t(".draft_follow_up"), variant: :primary, key: "d")
@@ -36,6 +41,14 @@ module Campbooks
       private
 
       def reason = safe_text(item.data["reason"]).presence
+
+      # The subject of the message the user SENT (what they're following up on),
+      # stamped by Feed::Sources::FollowUp. Falls back to the anchored thread's
+      # subject when there's no distinct outbound to show.
+      def sent_subject
+        raw = item.data["sent_subject"].to_s
+        raw.strip.present? ? clean_subject_text(raw) : clean_subject(subject)
+      end
 
       # "You replied 4 days ago · no reply yet" — the aging is the spine of the nudge.
       def meta
