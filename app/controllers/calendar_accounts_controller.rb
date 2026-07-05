@@ -1,6 +1,7 @@
 class CalendarAccountsController < ApplicationController
   before_action :require_authentication
   before_action :set_calendar_account, only: [ :update, :destroy, :sharing, :refresh ]
+  helper_method :current_section
 
   # Re-pull the provider's calendar list on demand (the sidebar's "refresh"),
   # so a calendar created at Google/Zoho shows up without waiting for the
@@ -96,6 +97,13 @@ class CalendarAccountsController < ApplicationController
                  .sort_by { |m| [ m.owner? ? 0 : 1, m.user.name.to_s.downcase ] }
     member_ids = @members.map(&:user_id)
     @addable_users = Current.workspace.users.where.not(id: member_ids).order(:name)
+  end
+
+  # The sharing page renders inside the Settings chrome; the settings sidebar
+  # highlights by section, and "calendars" keeps Integrations active (the page
+  # is reached from Settings → Integrations → Calendars).
+  def current_section
+    "calendars"
   end
 
   def calendar_account_params

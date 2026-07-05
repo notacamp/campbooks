@@ -162,7 +162,7 @@ class NotificationTest < ActiveSupport::TestCase
     resolved = create(:notification, user: @user, read: false).tap(&:resolve!)
 
     visible = @user.notifications.badge_visible.to_a
-    assert_includes    visible, unread,   "unread active should be badge visible"
+    assert_includes visible, unread,   "unread active should be badge visible"
     assert_not_includes visible, read_one, "read notification should not be badge visible"
     assert_not_includes visible, archived, "archived notification should not be badge visible"
     assert_not_includes visible, resolved, "resolved notification should not be badge visible"
