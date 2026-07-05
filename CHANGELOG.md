@@ -18,6 +18,12 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Swipe actions on tasks and calendar events.** In the task list, swipe right
+  to complete a task or left to archive it (then deeper left to delete with a
+  confirmation). In the calendar agenda view, swipe left to delete a
+  non-recurring, writable event. Both actions slide the row out and show a
+  success toast — no page reload. Recurring events and read-only calendars are
+  deliberately excluded from swipe to avoid the recurrence-scope dialog gap.
 - **Feed cards open the email right there.** Cards that ask you to decide
   something — needs-attention mail, reply nudges, follow-ups, starred senders,
   and reminders or suggested tasks that came from an email — now carry a small
@@ -36,6 +42,7 @@ major, minor, or patch change here.
 
 ### Changed
 
+- **Organizations moves off the mobile bottom dock into the "More" menu.** On narrow screens the dock is five items wide; Organizations now collapses into the "More" burger alongside Tasks, Workflows, Contacts, and Activity, freeing a dock slot for the items you reach every day.
 - **The home feed now ranks by priority, not by section.** Every card gets one
   score blending what it is (a due reminder, a follow-up, actionable mail…),
   how relevant it is (starred and known contacts up, newsletters and other bulk
@@ -59,6 +66,13 @@ major, minor, or patch change here.
   same action as the inline × button) rather than Archive. The right side is
   empty — "Draft follow-up" is a full-page action and stays tap-only.
 
+- **Documents no longer show your email address as their title.** Attachments
+  pulled in from received or sent email were incorrectly stored with the raw
+  sender address (e.g. `you@example.com`) as their name. Any document whose AI
+  analysis hadn't finished would surface that address as its title in the Files
+  list. The creation paths now leave the name blank so the filename is shown
+  instead, and a migration clears the stale email-address values from existing
+  rows.
 - **The Skim rings are back.** In 0.10.0 the skim tray on the home feed and
   inbox rendered "Content missing" for most inboxes: the live categorizer's new
   Gmail-category rescue read a column (`provider_labels`) the tray's trimmed
