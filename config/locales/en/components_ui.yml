@@ -185,10 +185,15 @@ en:
     swipeable:
       approve: Approve
       archive: Archive
+      complete: Complete
       confirm_archive_message: It leaves your inbox. You can undo it.
       confirm_archive_title: Archive this thread?
       confirm_delete_message: This can't be undone.
       confirm_delete_title: Delete permanently?
+      confirm_event_delete_message: This can't be undone.
+      confirm_event_delete_title: Delete this event?
+      confirm_task_delete_message: This can't be undone.
+      confirm_task_delete_title: Delete this task?
       confirm_trash_message: You can restore it from Trash.
       confirm_trash_title: Move to trash?
       delete: Delete

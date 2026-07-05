@@ -1,19 +1,21 @@
 ---
 en:
   digest_mailer:
-    waiting_on_replies:
-      and_more: and %{count} more
-      cta: Open your inbox
-      footer_html: You're getting this because your waiting-on-replies digest is on. Manage it in your %{settings_link}.
-      footer_text: You're getting this because your waiting-on-replies digest is on. Manage it at %{settings_url}
+    needs_attention:
+      footer_html: You're getting this because your daily digest is on. Manage it in your %{settings_link}.
+      footer_text: You're getting this because your daily digest is on. Manage it at %{settings_url}
       greeting: Hi %{name},
-      intro:
-        one: You're still waiting to hear back on one conversation. Want to nudge them?
-        other: You're still waiting to hear back on %{count} conversations. Want to nudge them?
+      intro: Here's what needs your attention today.
+      overdue: Overdue
+      section_follow_ups: Follow-ups
+      section_reminders: Reminders
+      section_tasks: Tasks
       settings_link: notification settings
       subject:
-        one: 1 reply you're still waiting on
-        other: "%{count} replies you're still waiting on"
+        one: 1 thing needs your attention
+        other: "%{count} things need your attention"
+      task_high_priority: High priority
+      task_overdue: Overdue
       waiting_days:
         one: Waiting %{count} day
         other: Waiting %{count} days
