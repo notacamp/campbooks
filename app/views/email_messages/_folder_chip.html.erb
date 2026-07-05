@@ -1,7 +1,7 @@
 <%# A user-defined folder chip in the inbox folder bar. Doubles as a drag-and-drop
     / tap-to-move target (mail-folder-drop controller). Reused by the bar loop and
     appended on create. Locals: folder (MailFolder), active (bool). %>
-<%= link_to email_messages_path(folder_name: folder.name),
+<%= link_to email_messages_path(folder_name: folder.name, show_list: 1),
       id: dom_id(folder, :folder_chip),
       data: {
         turbo_frame: "_top",
@@ -10,7 +10,7 @@
         folder_active: active.to_s
       },
       class: class_names(
-        "flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
+        "flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-colors active:scale-95",
         active ? "bg-accent-600 text-white" : "bg-muted text-muted-foreground hover:bg-accent"
       ) do %>
   <%= render(Campbooks::Icon.new(folder.display_icon, css_class: "w-4 h-4")) %>

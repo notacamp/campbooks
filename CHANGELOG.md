@@ -62,6 +62,7 @@ major, minor, or patch change here.
 
 ### Fixed
 
+- **Tapping the inbox icon or a folder chip on mobile now shows the email list, not an already-open message.** The server redirect to the latest email is unchanged — on a phone or small tablet, tapping a nav item or a folder chip lands on the thread list first; tapping a row opens the reading pane as expected. Direct deep-links (push notifications, digest emails) still open straight to the email. Folder chips also gained a larger tap target and a press-down animation.
 - **Swipe actions in the "Waiting on replies" band now match the row's buttons.**
   Swiping left on a waiting-reply thread now reveals "Dismiss follow-up" (the
   same action as the inline × button) rather than Archive. The right side is
