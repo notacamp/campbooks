@@ -33,6 +33,8 @@ es:
           other: Respondiste hace %{count} días · sin respuesta aún
         dismiss: Descartar
         draft_follow_up: Redactar seguimiento
+        show_sent: Ver el mensaje que enviaste
+        to: Para %{name}
         waiting: Esperando su respuesta
       highlight_card:
         reason:
