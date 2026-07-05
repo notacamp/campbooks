@@ -18,6 +18,12 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Swipe actions on tasks and calendar events.** In the task list, swipe right
+  to complete a task or left to archive it (then deeper left to delete with a
+  confirmation). In the calendar agenda view, swipe left to delete a
+  non-recurring, writable event. Both actions slide the row out and show a
+  success toast — no page reload. Recurring events and read-only calendars are
+  deliberately excluded from swipe to avoid the recurrence-scope dialog gap.
 - **Feed cards open the email right there.** Cards that ask you to decide
   something — needs-attention mail, reply nudges, follow-ups, starred senders,
   and reminders or suggested tasks that came from an email — now carry a small
