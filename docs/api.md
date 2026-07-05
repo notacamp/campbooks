@@ -805,7 +805,7 @@ Tool error (tool was called successfully but the tool itself reports an error):
 ### Available tools
 
 For connection instructions, agent configuration examples, and per-tool descriptions,
-see [`docs/ai-agents.md`](../docs/ai-agents.md).
+see [`docs/ai-agents.md`](ai-agents.md).
 
 The 72 available tools, grouped by family (tools appear in `tools/list` only for the
 scopes the client holds):
