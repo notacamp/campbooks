@@ -26,6 +26,12 @@ major, minor, or patch change here.
   so the behavior is consistent regardless of whether a tag is local or
   provider-synced.
 
+### Fixed
+
+- Tag chips on an inbox thread row now update on every add/remove. Previously
+  the first change silently broke the row's chip area, so any later tag change
+  on the same thread didn't show until a reload.
+
 ### Removed
 
 - **Settings → Inbox → Labels panel removed.** Provider labels are now managed
