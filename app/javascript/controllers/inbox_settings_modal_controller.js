@@ -142,7 +142,9 @@ export default class extends Controller {
   }
 
   restore() {
-    this.apply("labels", localStorage.getItem("inbox_labels") !== "false")
+    // Fallback reads the legacy "inbox_labels" key so existing users keep their preference.
+    const tagsRaw = localStorage.getItem("inbox_tags") ?? localStorage.getItem("inbox_labels")
+    this.apply("tags", tagsRaw !== "false")
     this.apply("attachments", localStorage.getItem("inbox_attachments") !== "false")
     this.apply("chat", localStorage.getItem("inbox_chat") !== "false")
     this.apply("view_mode", localStorage.getItem("inbox_view_mode") || "breathable")
@@ -175,8 +177,8 @@ export default class extends Controller {
     }
 
     switch (key) {
-      case "labels":
-        document.querySelectorAll(".js-inbox-labels").forEach((el) => { el.style.display = value ? "" : "none" })
+      case "tags":
+        document.querySelectorAll(".js-inbox-tags").forEach((el) => { el.style.display = value ? "" : "none" })
         break
       case "attachments":
         document.querySelectorAll(".js-inbox-attachments").forEach((el) => { el.style.display = value ? "" : "none" })

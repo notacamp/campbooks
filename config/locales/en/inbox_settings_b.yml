@@ -30,19 +30,6 @@ en:
         subtitle: What documents Scout looks for and the data it extracts.
       update:
         success: Document type updated.
-    external_labels:
-      index:
-        account_label: Account
-        color_label: Color
-        heading: Labels
-        new_label_label: New label
-        new_label_placeholder: Label name
-        no_accounts: No email accounts connected yet.
-        subtitle: Provider labels synced with your mailbox.
-        sync: Sync
-      labels:
-        delete_confirm: Delete this label from your mailbox?
-        empty: No labels yet. Sync from your provider or add one above.
     signatures:
       form:
         assign_accounts_heading: Assign to accounts

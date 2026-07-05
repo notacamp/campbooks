@@ -9,7 +9,12 @@
           <%= render(Campbooks::Badge.new(variant: :neutral, size: :md)) { tag.group_name } %>
         <% end %>
       </div>
-      <% if tag.prompt.present? %>
+      <% if tag.external? %>
+        <div class="flex items-center gap-1 mt-0.5" title="<%= t(".synced_with_title", account: tag.email_account.display_name) %>">
+          <%= render(Campbooks::BrandLogo.new(brand: tag.email_account.google? ? :google : :zoho, size: :xs)) %>
+          <span class="text-xs text-muted-foreground truncate"><%= tag.email_account.display_name %></span>
+        </div>
+      <% elsif tag.prompt.present? %>
         <p class="text-xs text-muted-foreground truncate mt-0.5"><%= tag.prompt.truncate(90) %></p>
       <% end %>
     </div>

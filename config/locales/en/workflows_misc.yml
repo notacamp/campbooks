@@ -37,11 +37,6 @@ en:
       tagged_as: Tagged as '%{name}'
     destroy:
       tag_removed: Tag '%{name}' removed
-  email_message_zoho_labels:
-    create:
-      tag_applied: Tag '%{name}' applied
-    destroy:
-      tag_removed: Tag '%{name}' removed
   workflow_executions:
     index:
       back_to_workflow: Back to workflow

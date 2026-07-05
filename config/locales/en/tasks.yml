@@ -45,8 +45,8 @@ en:
         description_label: Description
         description_placeholder: Add details, links, or context…
         due_label: Due date
-        labels_label: Labels
-        no_labels: No labels in this workspace yet.
+        labels_label: Tags
+        no_labels: No tags in this workspace yet.
         priority_label: Priority
         save: Save changes
         status_label: Status
@@ -139,14 +139,14 @@ en:
       discussion_empty: Start the discussion. Tag @scout to bring in the AI.
       documents: Documents
       edit: Edit
-      labels: Labels
+      labels: Tags
       linked_emails: Linked emails
       mark_done: Mark done
       no_activity: No activity yet.
       no_assignees: Unassigned
       no_description: No description yet.
       no_documents: No documents attached.
-      no_labels: No labels.
+      no_labels: No tags.
       no_linked_emails: No linked emails.
       origin: Created from this email
       priority: 'Priority: %{level}'

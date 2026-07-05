@@ -1,5 +1,10 @@
 <%# locals: tag %>
 <% persisted = tag.persisted? %>
+<% if persisted && tag.external? %>
+  <p class="text-xs text-muted-foreground mb-3 px-1">
+    <%= t("inbox_settings.tags.form.external_tag_hint") %>
+  </p>
+<% end %>
 <%= form_with model: tag,
       url: (persisted ? inbox_settings_tag_path(tag) : inbox_settings_tags_path),
       method: (persisted ? :patch : :post),
