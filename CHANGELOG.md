@@ -48,6 +48,10 @@ major, minor, or patch change here.
   numeric id. Existing links are repaired automatically on upgrade: where the
   target is known they reopen the right document or Scout thread, and any that
   can't be recovered fall back to the relevant list instead of a dead end.  
+- **Settings no longer links to pages that aren't turned on.** The Document templates
+  and Email templates entries appeared in the Settings menu even in deployments where
+  those features are disabled, so clicking one opened a blank page. They're now hidden
+  unless the feature is enabled.
 
 ## [0.11.0] - 2026-07-05
 
