@@ -108,7 +108,7 @@ module Notion
 
     def json_connection
       @json_connection ||= Faraday.new do |f|
-        f.use SystemHealth::FaradayMiddleware, service: "notion"
+        f.use SystemHealth::FaradayMiddleware, service: "notion", workspace: -> { @integration.try(:workspace_id) }
         f.request :json
         f.response :raise_error
         f.options.open_timeout = 10
@@ -121,7 +121,7 @@ module Notion
 
     def multipart_connection
       @multipart_connection ||= Faraday.new do |f|
-        f.use SystemHealth::FaradayMiddleware, service: "notion"
+        f.use SystemHealth::FaradayMiddleware, service: "notion", workspace: -> { @integration.try(:workspace_id) }
         f.request :multipart
         f.response :raise_error
         f.options.open_timeout = 10

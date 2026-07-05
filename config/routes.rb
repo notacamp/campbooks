@@ -703,7 +703,9 @@ Rails.application.routes.draw do
     end
     resources :users, only: [ :index, :update ]
     resources :beta_codes, only: [ :index, :create, :destroy ]
-    resource :system_health, only: [ :show ], controller: "system_health"
+    resource :system_health, only: [ :show ], controller: "system_health" do
+      get "calls/:id", action: :call, as: :call
+    end
   end
 
   mount MissionControl::Jobs::Engine, at: "/jobs"

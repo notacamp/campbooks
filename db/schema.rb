@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_06_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_06_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -823,6 +823,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_120000) do
     t.integer "http_status"
     t.jsonb "metadata", default: {}, null: false
     t.string "operation"
+    t.text "request_body"
+    t.jsonb "request_headers"
+    t.text "response_body"
+    t.jsonb "response_headers"
     t.string "service", null: false
     t.integer "status", default: 0, null: false
     t.uuid "workspace_id"

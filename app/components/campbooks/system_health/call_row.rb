@@ -10,15 +10,25 @@ module Campbooks
         Errno::ETIMEDOUT Timeout::Error
       ].freeze
 
-      def initialize(call:, show_workspace: true)
+      def initialize(call:, show_workspace: true, href: nil)
         @call           = call
         @show_workspace = show_workspace
+        @href           = href
       end
 
       def view_template
-        div(class: "px-4 py-2.5") do
-          line_one
-          line_two if show_error_line?
+        if @href
+          # The row list lives inside the isc_list turbo frame; the detail page
+          # is a full page, so the link must break out of the frame.
+          a(href: @href, class: "block hover:bg-muted/50 px-4 py-2.5", data: { turbo_frame: "_top" }) do
+            line_one
+            line_two if show_error_line?
+          end
+        else
+          div(class: "px-4 py-2.5") do
+            line_one
+            line_two if show_error_line?
+          end
         end
       end
 
