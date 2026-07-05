@@ -41,6 +41,8 @@ fr:
       toolbar_tag_title: Étiquette
     mobile_folder_bar:
       all: Tous
+      folders: Dossiers
+      folders_trigger: Ouvrir la navigation des dossiers
       new_folder: Nouveau dossier
     new:
       close_scout_aria: Fermer Scout

@@ -41,6 +41,8 @@ en:
       toolbar_tag_title: Tag
     mobile_folder_bar:
       all: All
+      folders: Folders
+      folders_trigger: Open folder navigation
       new_folder: New folder
     new:
       close_scout_aria: Close Scout
