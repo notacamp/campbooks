@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-07-05
+
 ### Added
 
 - **Broader daily digest.** The "waiting on replies" email has been expanded into a unified "needs attention" digest. One daily email now groups three sections — follow-ups you're still waiting on, reminders that are due soon or overdue, and tasks that are overdue or high-priority — with empty sections omitted automatically. The preference toggle in Settings → Notifications gates all three sections. (#177)
@@ -41,12 +43,6 @@ major, minor, or patch change here.
   it, Campbooks lines up the next one — carrying the title, priority, labels, and
   assignees forward — so recurring chores never fall off your list.
 
-### Fixed
-
-- **The mobile bottom nav hides itself while you scroll down** and glides back
-  the moment you scroll up — reclaiming screen space during reading without
-  making navigation hard to reach.
-
 ### Changed
 
 - **Organizations moves off the mobile bottom dock into the "More" menu.** On narrow screens the dock is five items wide; Organizations now collapses into the "More" burger alongside Tasks, Workflows, Contacts, and Activity, freeing a dock slot for the items you reach every day.
@@ -68,12 +64,14 @@ major, minor, or patch change here.
 
 ### Fixed
 
+- **The mobile bottom nav hides itself while you scroll down** and glides back
+  the moment you scroll up — reclaiming screen space during reading without
+  making navigation hard to reach.
 - **Tapping the inbox icon or a folder chip on mobile now shows the email list, not an already-open message.** The server redirect to the latest email is unchanged — on a phone or small tablet, tapping a nav item or a folder chip lands on the thread list first; tapping a row opens the reading pane as expected. Direct deep-links (push notifications, digest emails) still open straight to the email. Folder chips also gained a larger tap target and a press-down animation.
 - **Swipe actions in the "Waiting on replies" band now match the row's buttons.**
   Swiping left on a waiting-reply thread now reveals "Dismiss follow-up" (the
   same action as the inline × button) rather than Archive. The right side is
   empty — "Draft follow-up" is a full-page action and stays tap-only.
-
 - **Documents no longer show your email address as their title.** Attachments
   pulled in from received or sent email were incorrectly stored with the raw
   sender address (e.g. `you@example.com`) as their name. Any document whose AI
