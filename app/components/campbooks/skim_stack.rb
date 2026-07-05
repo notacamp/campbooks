@@ -202,12 +202,16 @@ module Campbooks
               skim_pos: frame[:position],
               skim_total: frame[:total],
               skim_label: frame[:ring_label],
-              skim_theme: frame[:theme],
+              # .to_s the theme/action symbols: Phlex rewrites underscores in
+              # *symbol* data-attribute values to dashes (:follow_ups → "follow-ups"),
+              # which broke skim-mode's `currentTheme === "follow_ups"` check. A string
+              # is emitted verbatim, so the JS reads the canonical underscore name.
+              skim_theme: frame[:theme].to_s,
               skim_hue: Campbooks::SkimTheme.hue(frame[:theme]),
               skim_icon: Campbooks::SkimTheme.icon(frame[:theme]),
               skim_ids: Array(frame[:email_ids]).join(","),
               # Scout's learned pick for this stack — the Enter key applies it.
-              skim_suggested_action: frame.dig(:scout_suggestion, :action)
+              skim_suggested_action: frame.dig(:scout_suggestion, :action)&.to_s
             }
           ) do
             div(class: "mx-auto w-full max-w-lg sm:max-w-2xl") do

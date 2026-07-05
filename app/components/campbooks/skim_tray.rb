@@ -37,7 +37,9 @@ module Campbooks
             theme: ring[:theme],
             label: ring[:label],
             count: ring[:count],
-            data: { action: "click->skim-overlay#openTo", skim_overlay_theme_param: ring[:theme] }
+            # .to_s so the theme survives as "follow_ups" (a symbol param is dasherized
+            # to "follow-ups", which then fails SkimStack's start-frame theme match).
+            data: { action: "click->skim-overlay#openTo", skim_overlay_theme_param: ring[:theme].to_s }
           )
         end
       end
