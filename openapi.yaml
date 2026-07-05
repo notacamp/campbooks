@@ -912,6 +912,15 @@ paths:
       parameters:
         - $ref: "#/components/parameters/page"
         - $ref: "#/components/parameters/perPage"
+        - name: include_hidden
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: >-
+            When true, also return hidden provider/system labels (Gmail INBOX,
+            CATEGORY_*, and AI-judged low-value labels). Defaults to false.
       responses:
         "200":
           description: A page of tags.
@@ -2207,12 +2216,32 @@ components:
           nullable: true
         source:
           type: string
-          description: How the tag was created (e.g. user, ai).
+          enum: [local, external]
+          description: >-
+            How the tag originated — `local` (created in Campbooks) or `external`
+            (synced from a provider mailbox label).
+        kind:
+          type: string
+          enum: [user, system, category, low_value]
+          description: >-
+            Classification of the tag. Provider system statuses (`system`,
+            `category`) and AI-judged `low_value` labels are hidden by default.
+        hidden:
+          type: boolean
+          description: >-
+            When true the tag is a hidden provider/system label; hidden tags are
+            omitted from the default listing (pass `include_hidden=true` to see
+            them).
         email_account_id:
           type: string
           format: uuid
           nullable: true
           description: Set when the tag is scoped to a single email account.
+        email_count:
+          type: integer
+          description: >-
+            Number of emails the tag is applied to. Present on the tag list
+            endpoint (`GET /tags`).
 
     AgentThread:
       type: object
