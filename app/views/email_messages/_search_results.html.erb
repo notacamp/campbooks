@@ -23,6 +23,10 @@
   </div>
 </div>
 
+<% if local_assigns.key?(:waiting_threads) %>
+  <%= render "email_messages/waiting_section", waiting_threads: waiting_threads %>
+<% end %>
+
 <% if messages.any? %>
   <div id="email_search_list">
     <% messages.each do |message| %>
@@ -39,7 +43,9 @@
       </div>
     <% end %>
   <% end %>
-<% else %>
+<% elsif local_assigns[:waiting_threads].blank? %>
+  <%# Not shown when the band above has hits — "No matching emails" under a
+      matching Waiting section would read as a contradiction. %>
   <div class="px-6 py-12 text-center">
     <div class="w-10 h-10 rounded-full bg-card shadow-sm border border-gray-200 mx-auto flex items-center justify-center mb-2">
       <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
