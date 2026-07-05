@@ -1,0 +1,2 @@
+<%= render Campbooks::PageHeader.new(title: t(".title", name: @digest.name)) %>
+<%= render Campbooks::Digests::Form.new(digest: @digest, preset: nil) %>
