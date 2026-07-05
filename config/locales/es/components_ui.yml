@@ -186,10 +186,15 @@ es:
     swipeable:
       approve: Aprobar
       archive: Archivar
+      complete: Completar
       confirm_archive_message: Sale de tu bandeja. Puedes deshacerlo.
       confirm_archive_title: "¿Archivar esta conversación?"
       confirm_delete_message: Esta acción no se puede deshacer.
       confirm_delete_title: "¿Eliminar permanentemente?"
+      confirm_event_delete_message: Esta acción no se puede deshacer.
+      confirm_event_delete_title: "¿Eliminar este evento?"
+      confirm_task_delete_message: Esta acción no se puede deshacer.
+      confirm_task_delete_title: "¿Eliminar esta tarea?"
       confirm_trash_message: Puedes restaurarla desde la papelera.
       confirm_trash_title: "¿Mover a la papelera?"
       delete: Eliminar
