@@ -172,8 +172,7 @@ module Emails
         workspace:       @email.email_account.workspace,
         email_account:   @email.email_account,
         email_message_id: @email.provider_message_id,
-        content_hash:    content_hash,
-        sender_name:     @email.from_address
+        content_hash:    content_hash
       )
       document.original_file.attach(
         io:           StringIO.new(body_bytes),
