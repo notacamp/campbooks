@@ -158,11 +158,31 @@ fr:
           ci-dessous pour activer l'IA.
         switched_to_managed: Campbooks AI est maintenant activé.
     api_clients:
+      scope_families:
+        calendar: Calendrier
+        contacts: Contacts
+        document_types: Types de document
+        documents: Documents
+        email_accounts: Comptes email
+        emails: Email
+        folders: Dossiers
+        reminders: Rappels
+        scheduled_emails: Emails programmés
+        scout: Scout
+        tags: Étiquettes
+        tasks: Tâches
+        templates: "Modèles d'email"
+        workflows: Flux
       create:
         scopes_required: Sélectionnez au moins une autorisation.
       destroy:
         deleted: Le client « %{name} » a été supprimé.
       index:
+        all_scopes: Accès complet
+        copy: Copier
+        more_families:
+          one: "+%{count} de plus"
+          other: "+%{count} de plus"
         col_client_id: ID client
         col_created: Créé le
         col_name: Nom
@@ -184,6 +204,11 @@ fr:
           vos propres applications et scripts.
         title: Accès API
       new:
+        preset_agent: Agent IA (recommandé)
+        preset_clear: Effacer
+        preset_full: Accès complet
+        preset_read_only: Lecture seule
+        presets_label: "Sélection rapide :"
         cancel: Annuler
         create: Créer le client
         name_hint: Une étiquette pour reconnaître ce client plus tard.

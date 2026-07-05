@@ -804,38 +804,60 @@ Tool error (tool was called successfully but the tool itself reports an error):
 
 ### Available tools
 
-| Tool | Required scope | Description |
-|------|---------------|-------------|
-| `list_emails` | `emails:read` | List recent emails, filtered by unread/query |
-| `get_email` | `emails:read` | Fetch a single email by ID including its body |
-| `send_email` | `emails:send` | Send a new email from a connected account |
-| `reply_email` | `emails:send` | Reply to an existing email |
-| `mark_email_read` / `mark_email_unread` | `emails:write` | Toggle an email's read flag |
-| `add_email_tag` / `remove_email_tag` | `tags:write` | Attach/detach a tag on an email |
-| `list_documents` / `get_document` | `documents:read` | List documents / fetch one with fields + file info |
-| `upload_document` | `documents:write` | Upload a document from base64 content |
-| `update_document` | `documents:write` | Edit a document's extracted fields |
-| `approve_document` / `reject_document` / `reclassify_document` | `documents:write` | Change a document's review state |
-| `list_contacts` / `get_contact` | `contacts:read` | List/fetch contacts |
-| `update_contact` / `set_contact_state` | `contacts:write` | Edit a contact / star, block, allow |
-| `list_tags` | `tags:read` | List workspace tags |
-| `list_document_types` | `document_types:read` | List document types |
-| `list_workflows` / `list_workflow_executions` | `workflows:read` | List workflows / run history (feature-gated) |
-| `trigger_workflow` | `workflows:trigger` | Trigger a webhook workflow (feature-gated) |
-| `list_scout_threads` / `list_scout_messages` | `scout:read` | Read Scout chat |
-| `create_scout_thread` / `send_scout_message` | `scout:write` | Start a thread / post a message (async reply) |
-| `list_scheduled_emails` / `get_scheduled_email` | `scheduled_emails:read` | List/fetch scheduled emails |
-| `create_scheduled_email` / `update_scheduled_email` / `cancel_scheduled_email` | `scheduled_emails:write` | Schedule, edit, cancel |
-| `list_calendar_events` / `get_calendar_event` | `calendar:read` | List/fetch calendar events |
-| `create_calendar_event` / `update_calendar_event` / `delete_calendar_event` / `rsvp_calendar_event` | `calendar:write` | Create, edit, delete, RSVP |
-| `list_reminders` / `get_reminder` | `reminders:read` | List/fetch reminders |
-| `confirm_reminder` / `dismiss_reminder` / `snooze_reminder` | `reminders:write` | Act on a reminder |
-| `list_folders` / `get_folder` | `folders:read` | List folders / fetch a folder with its documents |
-| `file_document` / `unfile_document` | `folders:write` | File/unfile a document in a folder |
+For connection instructions, agent configuration examples, and per-tool descriptions,
+see [`docs/ai-agents.md`](../docs/ai-agents.md).
+
+The 72 available tools, grouped by family (tools appear in `tools/list` only for the
+scopes the client holds):
+
+**Meta** (no scope required) — `get_overview` · `get_setup_status` · `guide`
+
+**Email read** (`emails:read`) — `list_emails` · `search_emails` · `get_email`
+
+**Email act** (`emails:write` / `emails:send`) — `send_email` · `reply_email` ·
+`forward_email` · `mark_email_read` · `mark_email_unread` · `update_emails` ·
+`move_emails_to_folder`
+
+**Skim** (`emails:read` / `emails:write`) — `get_skim_deck` · `skim_decide`
+
+**Accounts** (`email_accounts:read` / `:write`) — `list_email_accounts` ·
+`connect_email_account`
+
+**Documents** (`documents:read` / `:write`) — `list_documents` · `get_document` ·
+`upload_document` · `update_document` · `approve_document` · `reject_document` ·
+`reclassify_document`
+
+**Contacts** (`contacts:read` / `:write`) — `list_contacts` · `get_contact` ·
+`update_contact` · `set_contact_state`
+
+**Tags, types & folders** — `list_tags` · `create_tag` · `add_email_tag` ·
+`remove_email_tag` · `tag_emails` · `list_document_types` · `create_document_type` ·
+`list_folders` · `get_folder` · `create_folder` · `file_document` · `unfile_document` ·
+`list_email_templates` *(requires `ENABLE_EMAIL_TEMPLATES`)*
+
+**Tasks** (`tasks:read` / `:write`) — `list_tasks` · `get_task` · `create_task` ·
+`update_task` · `complete_task` · `create_task_from_email`
+*(requires `ENABLE_TASKS`)*
+
+**Calendar** (`calendar:read` / `:write`) — `list_calendars` · `list_calendar_events` ·
+`get_calendar_event` · `create_calendar_event` · `update_calendar_event` ·
+`delete_calendar_event` · `rsvp_calendar_event` · `create_event_from_email`
+
+**Reminders** (`reminders:read` / `:write`) — `list_reminders` · `get_reminder` ·
+`confirm_reminder` · `dismiss_reminder` · `snooze_reminder`
+
+**Scheduled emails** (`scheduled_emails:read` / `:write`) — `list_scheduled_emails` ·
+`get_scheduled_email` · `create_scheduled_email` · `update_scheduled_email` ·
+`cancel_scheduled_email`
+
+**Scout** (`scout:read` / `:write`) — `list_scout_threads` · `list_scout_messages` ·
+`create_scout_thread` · `send_scout_message`
+
+**Workflows** (`workflows:read` / `workflows:trigger`) — `list_workflows` ·
+`list_workflow_executions` · `trigger_workflow` *(requires `ENABLE_WORKFLOWS`)*
 
 The MCP surface mirrors the REST API one-for-one — same auth, same scopes, same
-permission checks. Workflow tools appear in `tools/list` only when the Workflows
-feature is enabled server-side (`ENABLE_WORKFLOWS`).
+permission checks.
 
 ## Code samples
 

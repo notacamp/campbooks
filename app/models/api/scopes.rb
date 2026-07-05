@@ -47,6 +47,17 @@ module Api
       CATALOG.keys
     end
 
+    # Scope names grouped by resource family ("emails:read" → "emails"), in
+    # catalog order. The scope picker renders one group per family.
+    def families
+      CATALOG.keys.group_by { |key| key.split(":").first }
+    end
+
+    # The scope family of a single scope name.
+    def family_of(scope)
+      scope.to_s.split(":").first
+    end
+
     def description(scope)
       CATALOG[scope.to_s]
     end

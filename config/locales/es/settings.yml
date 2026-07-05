@@ -153,11 +153,31 @@ es:
           para activar la IA.
         switched_to_managed: Ahora usando Campbooks AI.
     api_clients:
+      scope_families:
+        calendar: Calendario
+        contacts: Contactos
+        document_types: Tipos de documento
+        documents: Documentos
+        email_accounts: Cuentas de correo
+        emails: Correo
+        folders: Carpetas
+        reminders: Recordatorios
+        scheduled_emails: Correos programados
+        scout: Scout
+        tags: Etiquetas
+        tasks: Tareas
+        templates: Plantillas de correo
+        workflows: Flujos
       create:
         scopes_required: Selecciona al menos un permiso.
       destroy:
         deleted: El cliente "%{name}" fue eliminado.
       index:
+        all_scopes: Acceso completo
+        copy: Copiar
+        more_families:
+          one: "+%{count} más"
+          other: "+%{count} más"
         col_client_id: ID de cliente
         col_created: Creado
         col_name: Nombre
@@ -179,6 +199,11 @@ es:
           tus propias apps y scripts.
         title: Acceso a la API
       new:
+        preset_agent: Agente de IA (recomendado)
+        preset_clear: Limpiar
+        preset_full: Acceso completo
+        preset_read_only: Solo lectura
+        presets_label: "Selección rápida:"
         cancel: Cancelar
         create: Crear cliente
         name_hint: Una etiqueta para reconocer este cliente más adelante.

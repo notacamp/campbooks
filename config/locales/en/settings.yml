@@ -150,11 +150,31 @@ en:
           AI.
         switched_to_managed: Now using Campbooks AI.
     api_clients:
+      scope_families:
+        calendar: Calendar
+        contacts: Contacts
+        document_types: Document types
+        documents: Documents
+        email_accounts: Email accounts
+        emails: Email
+        folders: Folders
+        reminders: Reminders
+        scheduled_emails: Scheduled emails
+        scout: Scout
+        tags: Tags
+        tasks: Tasks
+        templates: Email templates
+        workflows: Workflows
       create:
         scopes_required: Select at least one scope.
       destroy:
         deleted: Client "%{name}" was deleted.
       index:
+        all_scopes: Full access
+        copy: Copy
+        more_families:
+          one: "+%{count} more"
+          other: "+%{count} more"
         col_client_id: Client ID
         col_created: Created
         col_name: Name
@@ -176,6 +196,11 @@ en:
           apps and scripts.
         title: API access
       new:
+        preset_agent: AI agent (recommended)
+        preset_clear: Clear
+        preset_full: Full access
+        preset_read_only: Read only
+        presets_label: "Quick select:"
         cancel: Cancel
         create: Create client
         name_hint: A label to help you recognize this client later.
