@@ -144,6 +144,29 @@ fr:
       clear: Effacer la recherche
       filters: Filtres
       placeholder: Rechercher le courrier…
+      searching: Recherche en cours…
+      suggest:
+        heading: Affiner la recherche
+        from: e-mails d'un expéditeur
+        to: envoyés à un destinataire
+        subject: mots dans l'objet
+        has: e-mails avec des pièces jointes
+        is: lu, non lu ou épinglé
+        after: reçus après une date
+        before: reçus avant une date
+        tag: e-mails avec une étiquette
+        folder: e-mails dans un dossier
+        category: e-mails dans une catégorie
+        priority: par priorité IA
+        account: dans un compte connecté
+        values:
+          attachment: pièce jointe
+          unread: non lu
+          read: lu
+          pinned: épinglé
+          low: basse
+          medium: moyenne
+          high: haute
     email_search_result:
       no_subject: "(sans objet)"
       sent_to: À %{address}

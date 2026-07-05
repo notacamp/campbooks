@@ -16,6 +16,33 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Search like you already know how.** The inbox search bar now understands
+  Gmail-style modifiers — `from:`, `to:`, `subject:`, `has:attachment`,
+  `is:unread/read/pinned`, `before:`/`after:`, `tag:`, `folder:`, `category:`,
+  `priority:`, and `account:`. As you type, a suggestions dropdown under the
+  search box offers every modifier (with a plain-language description) and then
+  completes its values for you: contacts for `from:`/`to:`, your tags, folders,
+  and categories, all keyboard-navigable (arrows + Enter, Escape to dismiss).
+- **A quiet "searching…" signal.** While results are loading, the search icon
+  becomes a spinner and the current list dims slightly — no more wondering
+  whether the search actually ran.
+
+### Changed
+
+- **Search results are ranked by relevance, not just date.** Results now blend
+  how well a message matches (subject beats sender, sender beats summary,
+  semantic similarity counts too) with a light recency boost — a strong match
+  from last month now outranks a weak match from this morning.
+
+### Fixed
+
+- **Searching no longer hides your follow-ups.** The "Waiting on replies" band
+  now takes part in search: threads you're waiting on that match the query stay
+  visible in their own band at the top of the results (and are no longer
+  silently dropped from the view).
+
 ## [0.11.0] - 2026-07-05
 
 ### Added
