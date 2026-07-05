@@ -41,6 +41,12 @@ major, minor, or patch change here.
   it, Campbooks lines up the next one — carrying the title, priority, labels, and
   assignees forward — so recurring chores never fall off your list.
 
+### Fixed
+
+- **The mobile bottom nav hides itself while you scroll down** and glides back
+  the moment you scroll up — reclaiming screen space during reading without
+  making navigation hard to reach.
+
 ### Changed
 
 - **Organizations moves off the mobile bottom dock into the "More" menu.** On narrow screens the dock is five items wide; Organizations now collapses into the "More" burger alongside Tasks, Workflows, Contacts, and Activity, freeing a dock slot for the items you reach every day.
