@@ -58,6 +58,16 @@ module Feed
 
     attr_reader :user, :now
 
+    # Linear ramp, clamped at both ends: `at_from` when x is at `from`, `at_to`
+    # when x reaches `to`, interpolated between (and held flat beyond either
+    # end). The building block of the sources' continuous urgency curves —
+    # scores glide as a moment approaches instead of jumping between tiers,
+    # which made same-kind cards clump together in the feed.
+    def ramp(x, from:, to:, at_from:, at_to:)
+      t = ((x - from).to_f / (to - from)).clamp(0.0, 1.0)
+      (at_from + (at_to - at_from) * t).round
+    end
+
     # Collapse email candidates to one per thread (keeping the most recent
     # message) so a noisy thread doesn't spray near-identical cards, and stamp the
     # thread's message count into `data` for a disambiguating chip. Threadless

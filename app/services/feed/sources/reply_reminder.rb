@@ -38,16 +38,17 @@ module Feed
           next if replied?(m) # already answered — don't nag
 
           age = age_days(m.received_at)
-          overdue = age >= OVERDUE_DAYS
           {
             subject: m,
             dedupe_key: "reply_reminder:#{m.id}",
             sort_at: m.received_at,
-            # Overdue lands near the attention tier; Feed::Ranking's recency
-            # decay then fades it — a nag ignored for months goes quiet instead
-            # of climbing (aging used to *grow* this score).
-            score: overdue ? 75 : 35,
-            attention: overdue || m.ai_priority == "high",
+            # The nudge firms up as the silence stretches: 35 when it first
+            # qualifies, 75 (near the attention tier) once a week has passed.
+            # Feed::Ranking's recency decay then fades it — a nag ignored for
+            # months goes quiet instead of climbing.
+            score: ramp((now - m.received_at) / 1.day,
+                        from: AGED_DAYS, to: OVERDUE_DAYS, at_from: 35, at_to: 75),
+            attention: age >= OVERDUE_DAYS || m.ai_priority == "high",
             data: { reason: "no_reply", since: m.received_at.iso8601, age_days: age }
           }
         end

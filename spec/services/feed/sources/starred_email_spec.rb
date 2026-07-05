@@ -32,4 +32,15 @@ RSpec.describe Feed::Sources::StarredEmail do
     expect(source.still_valid?(nil, inbox)).to be(true)
     expect(source.still_valid?(nil, archived)).to be(false)
   end
+
+  it "nominates attention only while unread — or when Scout flags it urgent" do
+    unread = starred_email(provider_folder_id: "INBOX", read: false)
+    read = starred_email(provider_folder_id: "INBOX", read: true)
+    urgent_read = starred_email(provider_folder_id: "INBOX", read: true, ai_priority: :high)
+
+    by_id = source.candidates.index_by { |c| c[:subject].id }
+    expect(by_id[unread.id][:attention]).to be(true)
+    expect(by_id[read.id][:attention]).to be(false)
+    expect(by_id[urgent_read.id][:attention]).to be(true)
+  end
 end
