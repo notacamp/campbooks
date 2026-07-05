@@ -248,6 +248,15 @@ docker compose --profile search up -d
 - `SENTRY_DSN` — a Sentry-compatible DSN (e.g. self-hosted GlitchTip). Disabled if unset.
 - `APNS_*` / `FCM_*` — only needed if you build the native iOS/Android apps. Disabled if unset.
 
+### AI agents (MCP)
+
+The MCP endpoint (`POST /api/mcp`) ships enabled on every self-hosted instance — no extra
+flag or service needed. Any MCP-capable agent (Claude Code, Cursor, Windsurf, or any client
+that speaks streamable HTTP JSON-RPC) can connect by pointing at `https://<your-host>/api/mcp`
+with an MCP key from **Settings → API access**. Scopes, tool families, feature-gated tools
+(`ENABLE_TASKS`, `ENABLE_WORKFLOWS`), and step-by-step agent configuration are documented in
+[`docs/ai-agents.md`](ai-agents.md).
+
 ---
 
 ## Running in production

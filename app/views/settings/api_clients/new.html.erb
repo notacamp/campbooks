@@ -18,19 +18,47 @@
           required: true,
           hint: t(".name_hint"))) %>
 
-    <fieldset class="space-y-2">
+    <fieldset data-controller="scope-presets">
       <legend class="block text-sm font-medium text-gray-700"><%= t(".scopes_label") %></legend>
-      <p class="text-xs text-gray-500 mb-2"><%= t(".scopes_hint") %></p>
-      <% Api::Scopes::CATALOG.each do |scope, description| %>
-        <label class="flex items-start gap-3 rounded-lg border border-gray-200 p-3 hover:bg-gray-50 cursor-pointer">
-          <input type="checkbox" name="application[scopes][]" value="<%= scope %>"
-                 class="mt-0.5 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900">
-          <span class="min-w-0">
-            <span class="block font-mono text-xs text-gray-900"><%= scope %></span>
-            <span class="block text-xs text-gray-500"><%= description %></span>
-          </span>
-        </label>
-      <% end %>
+      <p class="mt-1 text-xs text-gray-500"><%= t(".scopes_hint") %></p>
+
+      <% all_scopes = Api::Scopes.all
+         agent_scopes = all_scopes.reject { |s| %w[workflows templates].include?(Api::Scopes.family_of(s)) }
+         read_scopes = all_scopes.select { |s| s.end_with?(":read") } %>
+      <div class="mt-3 flex flex-wrap items-center gap-1.5">
+        <span class="text-xs text-gray-500"><%= t(".presets_label") %></span>
+        <% { t(".preset_agent") => agent_scopes, t(".preset_full") => all_scopes,
+             t(".preset_read_only") => read_scopes, t(".preset_clear") => [] }.each do |label, list| %>
+          <button type="button"
+                  data-action="scope-presets#apply" data-scope-presets-list-param="<%= list.join(" ") %>"
+                  class="rounded-full border border-gray-200 px-2.5 py-1 text-xs text-gray-700 hover:border-gray-300 hover:bg-gray-50 cursor-pointer">
+            <%= label %>
+          </button>
+        <% end %>
+      </div>
+
+      <div class="mt-4 grid gap-x-10 gap-y-5 sm:grid-cols-2">
+        <% Api::Scopes.families.each do |family, scopes| %>
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              <%= t("settings.api_clients.scope_families.#{family}") %>
+            </p>
+            <div class="mt-1.5">
+              <% scopes.each do |scope| %>
+                <label class="-mx-2 flex cursor-pointer items-start gap-2.5 rounded-md px-2 py-1.5 hover:bg-gray-50">
+                  <input type="checkbox" name="application[scopes][]" value="<%= scope %>"
+                         data-scope-presets-target="checkbox"
+                         class="mt-0.5 h-4 w-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900">
+                  <span class="min-w-0">
+                    <span class="block font-mono text-xs text-gray-900"><%= scope %></span>
+                    <span class="block text-xs text-gray-500"><%= Api::Scopes.description(scope) %></span>
+                  </span>
+                </label>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
     </fieldset>
 
     <div class="flex items-center gap-3">
