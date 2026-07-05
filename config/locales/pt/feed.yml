@@ -33,6 +33,8 @@ pt:
           other: Respondeu há %{count} dias · sem resposta ainda
         dismiss: Dispensar
         draft_follow_up: Rascunho de acompanhamento
+        show_sent: Ver a mensagem que enviou
+        to: Para %{name}
         waiting: A aguardar resposta
       highlight_card:
         reason:

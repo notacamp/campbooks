@@ -93,13 +93,21 @@ module Feed
     # subject once, but access can be revoked later (account unshared), so the
     # body is only ever served through accessible_to. Nil (→ the frame's quiet
     # "unavailable" note) for non-email cards and revoked/gone messages.
+    #
+    # A follow-up card is anchored to the other party's inbound message (so its
+    # action addresses them), but the peek must show the mail the user SENT and is
+    # chasing — Feed::Sources::FollowUp stamps that message's id for exactly this.
     def preview_message
-      candidate =
-        case (subject = @item.subject)
-        when EmailMessage then subject
-        when Reminder, Task then subject.source_email
+      id =
+        if @item.kind == "follow_up" && @item.data["sent_message_id"].present?
+          @item.data["sent_message_id"]
+        else
+          case (subject = @item.subject)
+          when EmailMessage then subject.id
+          when Reminder, Task then subject.source_email&.id
+          end
         end
-      candidate && EmailMessage.accessible_to(current_user).find_by(id: candidate.id)
+      id && EmailMessage.accessible_to(current_user).find_by(id: id)
     end
 
     # Record the accept/reject so Feed::Sources::TagSuggestion learns to stop
