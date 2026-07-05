@@ -45,6 +45,7 @@ es:
       dashboard: Panel
       invitations: Invitaciones
       signup_requests: Solicitudes de registro
+      system_health: Salud del sistema
       users: Usuarios
     signup_requests:
       index:

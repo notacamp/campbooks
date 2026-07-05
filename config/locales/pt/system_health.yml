@@ -1,0 +1,78 @@
+---
+pt:
+  admin:
+    system_health:
+      calls:
+        no_matches: Nenhuma chamada correspondeu aos seus filtros.
+      show:
+        call_log_heading: Registo de chamadas
+        empty_description: As chamadas a fornecedores de correio, calendários, modelos de IA e integrações aparecem aqui enquanto o Campbooks trabalha. Pode desativar o registo definindo a variável de ambiente DISABLE_SYSTEM_HEALTH.
+        empty_title: Ainda não há chamadas externas registadas
+        filter_all_services: Todos os serviços
+        filter_all_statuses: Todos os estados
+        filter_error: Apenas erros
+        filter_success: Apenas sucessos
+        idle_services: "Sem atividade nas últimas 24 horas: %{services}."
+        last_24_hours: Últimas 24 horas
+        services_heading: Serviços
+        stat_calls: Chamadas (24h)
+        stat_errors: Erros (24h)
+        stat_issues: Serviços com problemas
+        subtitle: Todas as chamadas que o Campbooks faz a serviços externos, com erros e tempos de resposta.
+        title: Saúde do Sistema
+        window_24h: Últimas 24 horas
+        window_30d: Últimos 30 dias
+        window_7d: Últimos 7 dias
+  components:
+    sparkline: {}
+    system_health:
+      call_row:
+        no_operation: "(sem operação)"
+      service_card:
+        avg_duration: média %{ms} ms
+        bucket_calls:
+          one: 1 chamada
+          other: "%{count} chamadas"
+        bucket_errors:
+          one: 1 erro
+          other: "%{count} erros"
+        bucket_label: "%{time} · %{calls}, %{errors}"
+        calls:
+          one: "%{formatted} chamada"
+          other: "%{formatted} chamadas"
+        error_rate: "%{rate}% erros"
+        last_error_ago: Último erro há %{time}
+        sparkline_label: "Atividade nas últimas 24 horas: %{total} chamadas, %{errors} erros"
+        state:
+          degraded: Degradado
+          failing: Com falhas
+          healthy: Operacional
+          idle: Inativo
+  system_health:
+    services:
+      ai_anthropic: Anthropic
+      ai_deepseek: DeepSeek
+      ai_gemini: Gemini
+      ai_mistral: Mistral
+      ai_openai: OpenAI
+      connection: Ligações
+      discord: Discord
+      github: GitHub
+      google_calendar: Google Calendar
+      google_drive: Google Drive
+      google_mail: Google Mail
+      google_oauth: Autenticação e tokens Google
+      microsoft_mail: Microsoft Mail
+      microsoft_oauth: Autenticação e tokens Microsoft
+      notion: Notion
+      notion_oauth: OAuth do Notion
+      push_apns: Apple Push
+      push_fcm: Google Push (FCM)
+      slack: Slack
+      smtp: E-mail transacional (SMTP)
+      webhook: Webhooks
+      zoho_calendar: Zoho Calendar
+      zoho_drive: Zoho Drive
+      zoho_mail: Zoho Mail
+      zoho_oauth: Autenticação e tokens Zoho
+      google_drive_oauth: Tokens do Google Drive

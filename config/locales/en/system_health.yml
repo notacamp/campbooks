@@ -1,0 +1,78 @@
+---
+en:
+  admin:
+    system_health:
+      calls:
+        no_matches: No calls matched your filters.
+      show:
+        call_log_heading: Call log
+        empty_description: Calls to mail providers, calendars, AI models, and integrations appear here as Campbooks works. You can disable tracking by setting the DISABLE_SYSTEM_HEALTH environment variable.
+        empty_title: No external calls recorded yet
+        filter_all_services: All services
+        filter_all_statuses: All statuses
+        filter_error: Errors only
+        filter_success: Successes only
+        idle_services: "No activity in the last 24 hours: %{services}."
+        last_24_hours: Last 24 hours
+        services_heading: Services
+        stat_calls: Calls (24h)
+        stat_errors: Errors (24h)
+        stat_issues: Services with issues
+        subtitle: Every call Campbooks makes to outside services, with errors and response times.
+        title: System Health
+        window_24h: Last 24 hours
+        window_30d: Last 30 days
+        window_7d: Last 7 days
+  components:
+    sparkline: {}
+    system_health:
+      call_row:
+        no_operation: "(no operation)"
+      service_card:
+        avg_duration: avg %{ms} ms
+        bucket_calls:
+          one: 1 call
+          other: "%{count} calls"
+        bucket_errors:
+          one: 1 error
+          other: "%{count} errors"
+        bucket_label: "%{time} · %{calls}, %{errors}"
+        calls:
+          one: "%{formatted} call"
+          other: "%{formatted} calls"
+        error_rate: "%{rate}% errors"
+        last_error_ago: Last error %{time} ago
+        sparkline_label: "Activity over the last 24 hours: %{total} calls, %{errors} errors"
+        state:
+          degraded: Degraded
+          failing: Failing
+          healthy: Operational
+          idle: Idle
+  system_health:
+    services:
+      ai_anthropic: Anthropic
+      ai_deepseek: DeepSeek
+      ai_gemini: Gemini
+      ai_mistral: Mistral
+      ai_openai: OpenAI
+      connection: Connections
+      discord: Discord
+      github: GitHub
+      google_calendar: Google Calendar
+      google_drive: Google Drive
+      google_mail: Google Mail
+      google_oauth: Google sign-in and tokens
+      microsoft_mail: Microsoft Mail
+      microsoft_oauth: Microsoft sign-in and tokens
+      notion: Notion
+      notion_oauth: Notion OAuth
+      push_apns: Apple Push
+      push_fcm: Google Push (FCM)
+      slack: Slack
+      smtp: Transactional email (SMTP)
+      webhook: Webhooks
+      zoho_calendar: Zoho Calendar
+      zoho_drive: Zoho Drive
+      zoho_mail: Zoho Mail
+      zoho_oauth: Zoho sign-in and tokens
+      google_drive_oauth: Google Drive tokens

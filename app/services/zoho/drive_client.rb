@@ -63,6 +63,7 @@ module Zoho
 
     def connection
       @connection ||= Faraday.new do |f|
+        f.use SystemHealth::FaradayMiddleware, service: "zoho_drive"
         f.request :url_encoded
         f.request :multipart
         f.adapter Faraday.default_adapter
