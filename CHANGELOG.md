@@ -16,6 +16,16 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Reminders from a round-trip booking now cover every leg, not just the outbound.**
+  A flight or trip with a return date is read as two dated commitments, so the return
+  departure gets its own reminder (same-day connecting flights still collapse into one).
+  The same booking arriving as two emails — e.g. a booking confirmation and a separate
+  ticket email — no longer creates duplicate reminders: the de-dupe now matches a timed
+  reminder on its exact time and ignores a date the AI appends to the title.
+
+
 ### Changed
 
 - **System health: always-on request/response capture.** Every external call now
