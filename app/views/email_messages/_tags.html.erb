@@ -1,8 +1,7 @@
-<%# Unified tag picker: shows every visible tag (local + provider labels) in one
-    place. Adding/removing routes to the local tags endpoint or the provider-label
-    endpoint based on each tag's `external` flag, so provider labels still two-way
-    sync while local tags stay local. %>
-<% all_tags = Tag.visible_for(Current.workspace).by_name.map { |t| { id: t.id, name: t.name, color: t.color, external: t.external? } } %>
+<%# Tag picker: shows every visible tag (local + provider-synced) in one place.
+    All add/remove goes through EmailMessageTagsController, which handles the
+    provider sync for external tags server-side. %>
+<% all_tags = Tag.visible_for(Current.workspace).by_name.map { |t| { id: t.id, name: t.name, color: t.color } } %>
 
 <div id="<%= dom_id(message, :tags) %>"
      class="relative inline-flex items-center gap-1 flex-wrap"
@@ -15,8 +14,7 @@
     <%= render(Campbooks::TagChip.new(
           tag: tag, size: :md, removable: true,
           remove_data: { "action" => "email-tags#remove",
-                         "email-tags-tag-id-param" => tag.id,
-                         "email-tags-external-param" => tag.external?.to_s })) %>
+                         "email-tags-tag-id-param" => tag.id })) %>
   <% end %>
 
   <%= render(Campbooks::IconButton.new(aria_label: t(".add_tag_aria"), size: :md, class: "hover:text-accent-600", data: { action: "click->email-tags#open" })) do %>
