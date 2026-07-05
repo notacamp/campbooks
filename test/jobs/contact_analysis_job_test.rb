@@ -3,6 +3,8 @@
 require "test_helper"
 
 class ContactAnalysisJobTest < ActiveSupport::TestCase
+  include ActiveJob::TestHelper
+
   # A name odd enough that Contacts::Consolidator never fuzzy-matches it against
   # people created by other tests running in the same database.
   ANALYZED_NAME = "Zorbal Quexley"
@@ -71,6 +73,29 @@ class ContactAnalysisJobTest < ActiveSupport::TestCase
     assert org.organization_memberships.active.exists?(person_id: person.id)
 
     assert_nil Current.workspace, "job must reset Current.workspace"
+  end
+
+  test "throttles concurrency so a backlog can't storm the AI provider" do
+    assert_equal 2, ContactAnalysisJob.concurrency_limit
+    assert ContactAnalysisJob.concurrency_key.present?
+  end
+
+  test "a rate-limited attempt is retried with backoff instead of losing the contact" do
+    fake = Object.new
+    fake.define_singleton_method(:chat) { |**| raise Faraday::TooManyRequestsError, "429" }
+    original = AiAdapter.instance_method(:adapter_instance)
+    AiAdapter.send(:define_method, :adapter_instance) { fake }
+    original_key = ENV.delete("ANTHROPIC_API_KEY")
+
+    assert_enqueued_with(job: ContactAnalysisJob) do
+      ContactAnalysisJob.perform_now(@contact.id)
+    end
+
+    assert_nil @contact.reload.analyzed_at
+    assert_nil Current.workspace
+  ensure
+    AiAdapter.send(:define_method, :adapter_instance, original)
+    ENV["ANTHROPIC_API_KEY"] = original_key if original_key
   end
 
   test "resets Current.workspace even when the analyzer raises" do
