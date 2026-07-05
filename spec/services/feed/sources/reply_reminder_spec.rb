@@ -56,5 +56,16 @@ RSpec.describe Feed::Sources::ReplyReminder do
       expect(ids).to include(inbox.id)
       expect(ids).not_to include(archived.id)
     end
+
+    def curve_score(received_at)
+      m = aged_email(provider_folder_id: "INBOX", received_at: received_at)
+      source.candidates.find { |c| c[:subject].id == m.id }[:score]
+    end
+
+    it "firms the nudge from 35 when it first qualifies to 75 once a week has passed" do
+      expect(curve_score(74.hours.ago)).to be_within(2).of(35)
+      expect(curve_score(5.days.ago)).to be_within(2).of(55)
+      expect(curve_score(10.days.ago)).to eq(75)
+    end
   end
 end

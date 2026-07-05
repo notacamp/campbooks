@@ -46,7 +46,7 @@ RSpec.describe Feed::Generator do
     expect(items.first.kind).to eq("reply_reminder")
   end
 
-  it "reconciles: a card whose record is handled elsewhere is resolved on the next run" do
+  it "reconciles: a card whose record is handled elsewhere is expired on the next run" do
     msg = create(:email_message, email_account: account, ai_action_prompt: "Reply", received_at: 1.hour.ago)
     Feed::Generator.for_user(user)
     item = active_for(msg)
@@ -55,7 +55,51 @@ RSpec.describe Feed::Generator do
     msg.update!(skimmed_at: Time.current) # addressed in Skim, outside the feed
     Feed::Generator.for_user(user)
 
-    expect(item.reload).not_to be_active
+    item.reload
+    expect(item).not_to be_active
+    expect(item).to be_expired
+    expect(item.acted_at).to be_nil # system expiry, not a user action
+  end
+
+  it "revives an expired card when its record qualifies again" do
+    msg = create(:email_message, email_account: account, ai_action_prompt: "Reply", received_at: 1.hour.ago)
+    Feed::Generator.for_user(user)
+    item = active_for(msg)
+
+    msg.update!(skimmed_at: Time.current)
+    Feed::Generator.for_user(user)
+    expect(item.reload).to be_expired
+
+    msg.update!(skimmed_at: nil) # e.g. restored from Skim
+    Feed::Generator.for_user(user)
+
+    expect(item.reload).to be_active
+  end
+
+  it "anchors an un-analyzed follow-up on the send moment, stable across runs" do
+    thread = create(:email_thread, email_account: account,
+                    last_outbound_at: 4.days.ago, last_inbound_at: 5.days.ago)
+    create(:email_message, email_account: account, email_thread: thread,
+           from_address: "me@biz.example", received_at: 4.days.ago)
+    create(:email_message, email_account: account, email_thread: thread,
+           from_address: "dana@acme.com", received_at: 5.days.ago)
+
+    Feed::Generator.for_user(user)
+    item = user.feed_items.find_by!(dedupe_key: "follow_up:#{thread.id}")
+    expect(item.sort_at).to be_within(1.second).of(thread.last_outbound_at)
+
+    Feed::Generator.new(user, now: 2.hours.from_now).call # a later run must not re-date it
+
+    expect(item.reload.sort_at).to be_within(1.second).of(thread.last_outbound_at)
+  end
+
+  it "fences out fossils: a candidate decayed below MIN_SCORE is not materialized" do
+    create(:email_message, email_account: account, ai_action_prompt: "Reply",
+           ai_suggested_actions: [ { "tool" => "draft_reply" } ], received_at: 200.days.ago)
+
+    Feed::Generator.for_user(user)
+
+    expect(user.feed_items).to be_empty
   end
 
   it "never resurrects a dismissed card" do

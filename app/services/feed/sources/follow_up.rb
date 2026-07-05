@@ -12,7 +12,15 @@ module Feed
     # Registered before ReplyReminder/EmailAction so a follow-up thread is framed as
     # a follow-up, never re-surfaced as a generic action.
     class FollowUp < Feed::Source
-      SCORE = 80
+      # Urgency climbs with the other party's silence: a follow-up that just
+      # crossed the nudge threshold starts below fresh actionable mail and
+      # reaches full strength after two weeks unanswered. Feed::Ranking's decay
+      # (anchored on the stable sort_at below) then retires it — the combined
+      # curve peaks around the first week and fades past the generator's
+      # MIN_SCORE fence by roughly two months.
+      BASE_SCORE = 68
+      SILENCE_CLIMB = 12
+      SILENCE_CLIMB_DAYS = 14.0
 
       def self.key = "follow_up"
 
@@ -36,22 +44,34 @@ module Feed
         message = representative(thread)
         return nil unless message && admitted_message?(message) && in_inbox?(message)
 
+        sent = outbound_representative(thread)
         {
           subject: message,
           dedupe_key: "follow_up:#{thread.id}",
-          sort_at: thread.follow_up_at || now,
-          score: SCORE,
+          # A STABLE moment, never `now`: falling back to the run time would
+          # re-date the card on every generation, so decay could never bite and
+          # an ancient follow-up would pin the attention cluster forever.
+          sort_at: thread.follow_up_at || thread.last_outbound_at || now,
+          score: score_for(thread),
           attention: true,
           data: {
             "reason" => thread.follow_up_reason.to_s,
             "since" => thread.last_outbound_at&.iso8601,
-            "age_days" => age_days(thread.last_outbound_at)
+            "age_days" => age_days(thread.last_outbound_at),
+            # The card is ANCHORED to the inbound `message` (so the action addresses
+            # the other party and inbox gating applies), but it SHOWS the user's own
+            # sent mail — the message actually awaiting a reply. Stamp its subject +
+            # id here, off the already-loaded thread, so the card's header and its
+            # "peek inside" preview render the sent email, not the received one.
+            "sent_subject" => sent&.subject.to_s,
+            "sent_message_id" => sent&.id
           }
         }
       end
 
       # The other party's most recent message — who we're nudging and what the card
-      # shows. nil for a cold outbound with no inbound message (nothing to surface).
+      # is ANCHORED to (link target + inbox/admission gating). nil for a cold
+      # outbound with no inbound message (nothing to surface).
       def representative(thread)
         addr = thread.email_account&.email_address.to_s.downcase
         return nil if addr.blank?
@@ -62,10 +82,28 @@ module Feed
               .find { |m| !m.from_address.to_s.downcase.include?(addr) }
       end
 
+      # The user's own most recent message in the thread — the email they sent and
+      # are now following up on. This is what the card DISPLAYS. Mirrors
+      # Tools::DraftFollowUp#latest_outbound (substring match, so provider-synced
+      # sent mail carrying a display name still counts as outbound).
+      def outbound_representative(thread)
+        addr = thread.email_account&.email_address.to_s.downcase
+        return nil if addr.blank?
+
+        thread.email_messages
+              .select { |m| m.from_address.to_s.downcase.include?(addr) }
+              .max_by { |m| m.received_at || Time.at(0) }
+      end
+
       def age_days(time)
         return 0 unless time
 
         ((now - time) / 1.day).floor
+      end
+
+      def score_for(thread)
+        silence = age_days(thread.last_outbound_at)
+        (BASE_SCORE + (silence * SILENCE_CLIMB / SILENCE_CLIMB_DAYS).clamp(0, SILENCE_CLIMB)).round
       end
     end
   end

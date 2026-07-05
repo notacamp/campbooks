@@ -43,12 +43,16 @@ module Feed
       end
     end
 
-    # Collapse runs of like items so the timeline reads as clusters, not a wall of
-    # identical cards: adjacent tag_suggestion cards fold into one tight,
+    # Longest run of same-kind cards the timeline will show back to back.
+    MAX_KIND_RUN = 2
+
+    # Shape one timeline page for reading: interleave kinds so no source walls
+    # off the page, then collapse adjacent tag_suggestion cards into one tight,
     # divider-free tag_queue; every other card passes through individually.
     # Returns entries of { type: :card, pair: } or { type: :tag_queue, items: [pairs] }.
+    # Timeline-only — the attention cluster stays purely rank-ordered.
     def self.group_timeline(pairs)
-      pairs.each_with_object([]) do |pair, grouped|
+      interleave(pairs).each_with_object([]) do |pair, grouped|
         if pair[:item].kind == "tag_suggestion"
           if grouped.last&.dig(:type) == :tag_queue
             grouped.last[:items] << pair
@@ -59,6 +63,30 @@ module Feed
           grouped << { type: :card, pair: pair }
         end
       end
+    end
+
+    # Diversity pass over one page, preserving rank order except where a run of
+    # MAX_KIND_RUN same-kind cards would continue — then the next different-kind
+    # card is pulled forward (an all-one-kind page passes through unchanged).
+    # tag_suggestion cards sit out and rejoin at the tail: they gravitate there
+    # by score anyway, and group_timeline folds them into a single queue row.
+    # Page-local by design: each pagy page is shaped independently, so the DB
+    # rank order — what pagination pages over — is never contradicted, just
+    # locally reshuffled for reading rhythm.
+    def self.interleave(pairs)
+      cards, tags = pairs.partition { |pair| pair[:item].kind != "tag_suggestion" }
+
+      result = []
+      until cards.empty?
+        index = 0
+        run_kind = result.last&.dig(:item)&.kind
+        if run_kind && result.last(MAX_KIND_RUN).count { |p| p[:item].kind == run_kind } >= MAX_KIND_RUN
+          index = cards.index { |pair| pair[:item].kind != run_kind } || 0
+        end
+        result << cards.delete_at(index)
+      end
+
+      result + tags
     end
 
     # Has generation fallen behind? Drives a debounced background refresh.

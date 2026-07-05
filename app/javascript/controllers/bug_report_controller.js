@@ -46,6 +46,7 @@ export default class extends Controller {
     document.removeEventListener("pointerover", this.onPrefetch)
     document.removeEventListener("focusin", this.onPrefetch)
     if (this.closeTimeout) clearTimeout(this.closeTimeout)
+    this.cancelScheduledScreenshot()
     document.body.style.overflow = ""
   }
 
@@ -79,7 +80,7 @@ export default class extends Controller {
     // frame so the drawer slides in instead of snapping into place.
     requestAnimationFrame(() => requestAnimationFrame(() => this.setOpenState(true)))
     setTimeout(() => this.descriptionTarget.focus(), 150)
-    this.captureScreenshot()
+    this.scheduleScreenshot()
   }
 
   close(event) {
@@ -98,6 +99,7 @@ export default class extends Controller {
       this.overlayTarget.classList.add("hidden")
       if (this.hasFormTarget) this.formTarget.reset()
       this.showFormView()
+      this.cancelScheduledScreenshot()
       this.screenshotBlob = null
       this.screenshotPromise = null
     }
@@ -193,6 +195,37 @@ export default class extends Controller {
 
   // --- Screenshot ---------------------------------------------------------
 
+  // Kick off the capture only AFTER the drawer has slid in. html2canvas
+  // deep-clones the whole page and forces thousands of style recalcs, all
+  // synchronously on the main thread. The slide-in itself is compositor-driven,
+  // but the class flip that STARTS it (setOpenState, via rAF) runs on the main
+  // thread — so a capture on open blocks that flip and the drawer only appears
+  // once html2canvas finishes (~300ms+), which is the "takes ages to show up".
+  //
+  // We defer with a macrotask timer that outlasts the ~300ms slide. NOT
+  // requestIdleCallback: the compositor animation leaves the main thread idle,
+  // so idle fires immediately (~2ms) and we'd be right back to blocking the
+  // open. The timer can't fire early, guaranteeing the animation runs first.
+  // The capture still finishes long before a user types a report and submits;
+  // resolveScreenshot() starts one on demand if they somehow beat it. 450ms
+  // clears the slide (~300ms transition + its ~2-frame start delay).
+  scheduleScreenshot() {
+    this.cancelScheduledScreenshot()
+    this.screenshotBlob = null
+    this.screenshotPromise = null
+    this.screenshotTimer = setTimeout(() => {
+      this.screenshotTimer = null
+      // Bail if the drawer was closed before the capture got its turn.
+      if (this.overlayTarget.classList.contains("hidden")) return
+      if (!this.screenshotPromise) this.captureScreenshot()
+    }, 450)
+  }
+
+  cancelScheduledScreenshot() {
+    if (this.screenshotTimer) clearTimeout(this.screenshotTimer)
+    this.screenshotTimer = null
+  }
+
   captureScreenshot() {
     this.screenshotBlob = null
     this.screenshotPromise = this.takeScreenshot().catch(() => null)
@@ -223,7 +256,9 @@ export default class extends Controller {
 
   // Don't let a slow/large capture block submission indefinitely.
   async resolveScreenshot() {
-    if (!this.screenshotPromise) return null
+    // The deferred capture may not have fired yet (very fast submit) — the
+    // screenshot is opt-in and requested, so kick one off now rather than skip.
+    if (!this.screenshotPromise) this.captureScreenshot()
     try {
       return await Promise.race([
         this.screenshotPromise,

@@ -21,16 +21,22 @@ RSpec.describe Feed::Sources::FollowUp do
   describe "#candidates" do
     it "emits one candidate per due thread, keyed on the thread, addressed to the other party" do
       thread = due_thread
-      create(:email_message, email_account: account, email_thread: thread, from_address: "me@example.com", provider_folder_id: "INBOX", received_at: 4.days.ago)
+      sent = create(:email_message, email_account: account, email_thread: thread, from_address: "me@example.com",
+                    subject: "Q3 proposal", body: "Hi Dana, attaching the Q3 proposal.", provider_folder_id: "SENT", received_at: 4.days.ago)
       inbound = create(:email_message, email_account: account, email_thread: thread, from_address: "dana@acme.com", provider_folder_id: "INBOX", received_at: 5.days.ago)
 
       candidates = source.candidates
       expect(candidates.size).to eq(1)
       c = candidates.first
+      # Anchored to the inbound message — that's what keeps the action addressed to
+      # the other party and subject to inbox/admission gating.
       expect(c[:subject]).to eq(inbound)
       expect(c[:dedupe_key]).to eq("follow_up:#{thread.id}")
       expect(c[:attention]).to be(true)
       expect(c[:data]["reason"]).to eq("Confirm the date")
+      # ...but the card SHOWS the mail the user sent and is chasing, not the inbound.
+      expect(c[:data]["sent_subject"]).to eq("Q3 proposal")
+      expect(c[:data]["sent_message_id"]).to eq(sent.id)
     end
 
     it "ignores threads that are not due (within grace, dismissed, or the AI said wait / no)" do
@@ -61,6 +67,43 @@ RSpec.describe Feed::Sources::FollowUp do
       thread = due_thread
       create(:email_message, email_account: account, email_thread: thread, from_address: "me@example.com", provider_folder_id: "INBOX", received_at: 4.days.ago)
       expect(source.candidates).to be_empty
+    end
+  end
+
+  describe "anchoring and silence scoring" do
+    def thread_with_messages(**attrs)
+      thread = create(:email_thread, { email_account: account,
+                                       last_outbound_at: 4.days.ago, last_inbound_at: 5.days.ago }.merge(attrs))
+      create(:email_message, email_account: account, email_thread: thread,
+             from_address: "me@example.com", provider_folder_id: "INBOX", received_at: thread.last_outbound_at)
+      create(:email_message, email_account: account, email_thread: thread,
+             from_address: "dana@acme.com", provider_folder_id: "INBOX", received_at: thread.last_inbound_at)
+      thread
+    end
+
+    it "anchors sort_at on the AI nudge time when present" do
+      thread = thread_with_messages(follow_up_last_analyzed_at: 4.days.ago,
+                                    follow_up_expected: true, follow_up_at: 1.day.ago)
+
+      expect(source.candidates.first[:sort_at]).to be_within(1.second).of(thread.follow_up_at)
+    end
+
+    it "anchors an un-analyzed thread on the send moment — never the run time" do
+      thread = thread_with_messages(last_outbound_at: 10.days.ago, last_inbound_at: 11.days.ago)
+
+      expect(source.candidates.first[:sort_at]).to be_within(1.second).of(thread.last_outbound_at)
+    end
+
+    it "scores deeper silence higher, up to the climb ceiling" do
+      fresh = thread_with_messages
+      stale = thread_with_messages(last_outbound_at: 20.days.ago, last_inbound_at: 21.days.ago)
+
+      by_key = source.candidates.index_by { |c| c[:dedupe_key] }
+      fresh_score = by_key["follow_up:#{fresh.id}"][:score]
+      stale_score = by_key["follow_up:#{stale.id}"][:score]
+
+      expect(fresh_score).to be_within(1).of(71) # 68 + 4 days of climb
+      expect(stale_score).to eq(described_class::BASE_SCORE + described_class::SILENCE_CLIMB)
     end
   end
 

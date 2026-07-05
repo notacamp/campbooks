@@ -18,6 +18,12 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Mobile folder bottom-sheet.** Tapping "Folders" in the mobile chip bar slides
+  up a full-screen sheet with the complete folder list: system folders (Inbox, Sent,
+  Drafts, Archive, Spam, Trash) and custom folders with their icons, message counts,
+  collapsible nesting, and the rename/move/delete edit affordances that were previously
+  desktop-only. The chip bar stays for fast one-tap switching; the sheet is purely
+  additive. Custom folders stay live via turbo streams on create/update/delete.
 - **Inbox settings, now in the dashboard.** Everything from the inbox's gear
   menu — tags, document types, filtering, smart groups, labels, signatures,
   connected accounts, and display preferences — is now also reachable from the
@@ -41,9 +47,24 @@ major, minor, or patch change here.
   how well a message matches (subject beats sender, sender beats summary,
   semantic similarity counts too) with a light recency boost — a strong match
   from last month now outranks a weak match from this morning.
+- **The home feed now ranks by real urgency, not card type.** Every card kind
+  scores on one continuous "how much does this need you right now" scale —
+  reminders and tasks climb smoothly as their date approaches, reply nudges
+  firm up as the silence stretches — instead of jumping between per-type tiers
+  that made the feed read as sections. Ranking also learns from you: card kinds
+  you habitually dismiss drift down while kinds you act on rise, cards you've
+  been shown for days without touching yield to fresher ones, and mail from
+  senders whose messages historically run urgent gets a lift. The timeline
+  additionally interleaves card types (no more walls of one kind) and folds all
+  of a page's tag suggestions into a single queue row at the end.
 
 ### Fixed
 
+- **The "Report a bug" drawer opens right away.** It used to hang for a moment
+  before appearing, because it captured the page screenshot up front and that
+  work blocked the drawer's slide-in. The snapshot now happens just after the
+  drawer is open, so it slides in immediately (the screenshot is still attached
+  to the report exactly as before).
 - **Searching no longer hides your follow-ups.** The "Waiting on replies" band
   now takes part in search: threads you're waiting on that match the query stay
   visible in their own band at the top of the results (and are no longer
@@ -54,6 +75,25 @@ major, minor, or patch change here.
   numeric id. Existing links are repaired automatically on upgrade: where the
   target is known they reopen the right document or Scout thread, and any that
   can't be recovered fall back to the relevant list instead of a dead end.  
+- **Settings no longer links to pages that aren't turned on.** The Document templates
+  and Email templates entries appeared in the Settings menu even in deployments where
+  those features are disabled, so clicking one opened a blank page. They're now hidden
+  unless the feature is enabled.
+- **Stale follow-ups no longer haunt the feed.** A follow-up nudge without an
+  AI-scheduled time was re-dated to "now" on every refresh, so months-old,
+  clearly-irrelevant follow-ups could stay pinned in "Needs attention" forever.
+  They now age from the moment you sent the mail, retire from the feed once
+  truly stale (about two months), and proactive nudges stop for un-analyzed
+  threads silent past 60 days — the durable "waiting on replies" list in the
+  inbox is unaffected.
+- **Read starred-sender mail stops pinning "Needs attention".** Mail from
+  starred contacts used to hold a pinned spot for over a week even after being
+  read; now it pins only while unread (or flagged urgent) and otherwise ranks
+  high in the timeline.
+- **Fully stale cards leave the feed instead of piling up at the bottom**, and
+  a card resolved by the system (say, a snoozed thread whose snooze you extend)
+  can now come back if it genuinely needs you again — previously it was hidden
+  forever.
 
 ## [0.11.0] - 2026-07-05
 
@@ -103,6 +143,13 @@ major, minor, or patch change here.
 
 ### Fixed
 
+- **Follow-up cards now show the email you sent, not the last one you got.** The
+  home-feed "Draft follow-up" card is a nudge about a message *you* sent and are
+  still waiting on — but it led with the other party's name, showed their subject,
+  and its "Show email" peek unfolded the mail you received, not the one you're
+  chasing. Cards now read "To <recipient>", show your sent subject, and peek into
+  the message you actually sent. The nudge still drafts and addresses correctly to
+  the other party.
 - **The mobile bottom nav hides itself while you scroll down** and glides back
   the moment you scroll up — reclaiming screen space during reading without
   making navigation hard to reach.
