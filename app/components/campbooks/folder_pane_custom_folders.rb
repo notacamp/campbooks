@@ -12,20 +12,31 @@ module Campbooks
   #
   # @param custom_folders [Array<MailFolder>] the workspace's custom folders (flat)
   # @param current_folder [String, nil] active folder name (for the highlight)
+  # @param section_id [String] DOM id for the root div (defaults to "pane_custom_folders").
+  #   The mobile bottom sheet passes "sheet_custom_folders" so both surfaces can
+  #   coexist without duplicate IDs; MailFoldersController updates both via turbo.
   class FolderPaneCustomFolders < Campbooks::Base
     EDIT_SVG = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.931-8.931z"/></svg>'
     CLOSE_SVG = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>'
     CHEVRON_SVG = '<svg class="w-3.5 h-3.5 rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 5l7 7-7 7"/></svg>'
 
-    def initialize(custom_folders:, current_folder: nil, document_counts: {})
+    def initialize(custom_folders:, current_folder: nil, document_counts: {}, section_id: "pane_custom_folders", dom_prefix: "", list_param: false)
       @custom = custom_folders || []
       @current = current_folder
       @counts = document_counts || {}
       @children_by_parent = @custom.group_by(&:parent_id)
+      @section_id = section_id
+      # `dom_prefix` namespaces per-row and per-dialog IDs so two instances of this
+      # component (e.g. desktop pane + mobile sheet) can coexist without duplicate IDs.
+      # The desktop pane uses the default "" (no prefix); the sheet passes "sheet_".
+      @dom_prefix = dom_prefix
+      # The mobile sheet passes list_param: true so folder links carry show_list=1
+      # and land mobile taps on the thread list (no-op on desktop, so the pane omits it).
+      @list_param = list_param
     end
 
     def view_template
-      div(id: "pane_custom_folders", class: "space-y-0.5", data: { controller: "folder-edit" }) do
+      div(id: @section_id, class: "space-y-0.5", data: { controller: "folder-edit" }) do
         roots = @children_by_parent[nil] || []
         if roots.any?
           div(class: "mx-2 my-1.5 border-t border-border/60")
@@ -52,12 +63,12 @@ module Campbooks
 
     def folder_row(folder, depth, expandable:)
       active = @current == folder.name
-      dialog_id = "edit_#{helpers.dom_id(folder)}"
+      dialog_id = "#{@dom_prefix}edit_#{helpers.dom_id(folder)}"
       div(class: class_names("group relative flex items-center rounded-lg",
             active ? "bg-accent-50 dark:bg-accent-500/15" : "hover:bg-muted"),
-          id: helpers.dom_id(folder, :pane_folder), style: "padding-left: #{indent_for(depth)}") do
+          id: "#{@dom_prefix}#{helpers.dom_id(folder, :pane_folder)}", style: "padding-left: #{indent_for(depth)}") do
         disclosure(expandable)
-        a(href: helpers.email_messages_path(folder_name: folder.name),
+        a(href: helpers.email_messages_path(folder_name: folder.name, show_list: (1 if @list_param)),
           data: { turbo_frame: "_top", folder_name: folder.name, folder_active: active.to_s, mail_folder_drop_target: "chip" },
           class: class_names("flex min-w-0 flex-1 items-center gap-2.5 py-1.5 pr-8 text-[13px]",
             active ? "font-medium text-accent-700 dark:text-accent-200" : "text-gray-600 dark:text-gray-300")) do
@@ -84,9 +95,13 @@ module Campbooks
     end
 
     def edit_button(dialog_id)
+      # Below lg (the touch surface where the mobile folder sheet reuses this
+      # component) the edit affordance is always visible — touch has no hover, so a
+      # hover-gated button would be undiscoverable. At lg+ (the desktop pane) it
+      # stays hover/focus-revealed for a quiet resting state.
       button(type: "button", data: { action: "folder-edit#open", folder_edit_dialog_param: dialog_id },
         aria_label: t("shared.actions.edit"),
-        class: "absolute right-1 top-1/2 -translate-y-1/2 cursor-pointer rounded border-0 bg-transparent p-1 text-muted-foreground opacity-0 transition hover:bg-background/80 hover:text-foreground focus:opacity-100 group-hover:opacity-100") do
+        class: "absolute right-1 top-1/2 -translate-y-1/2 cursor-pointer rounded border-0 bg-transparent p-1 text-muted-foreground opacity-100 transition hover:bg-background/80 hover:text-foreground lg:opacity-0 lg:focus:opacity-100 lg:group-hover:opacity-100") do
         raw safe(EDIT_SVG)
       end
     end

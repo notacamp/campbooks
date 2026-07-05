@@ -33,6 +33,8 @@ en:
           other: You replied %{count} days ago · no reply yet
         dismiss: Dismiss
         draft_follow_up: Draft follow-up
+        show_sent: Show the message you sent
+        to: To %{name}
         waiting: Waiting on their reply
       highlight_card:
         reason:

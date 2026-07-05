@@ -116,6 +116,75 @@ RSpec.describe Feed::Ranking do
       c = rank("reminder", candidate(reminder, score: 60, sort_at: 1.day.from_now))
       expect(c[:score]).to eq(60)
     end
+
+    it "lifts mail from a sender whose mail runs urgent and sinks a low-urgency one" do
+      hot = message(contact: create(:contact, workspace: workspace, communication_patterns: { "urgency_level" => "high" }))
+      cool = message(contact: create(:contact, workspace: workspace, communication_patterns: { "urgency_level" => "low" }))
+      plain = message
+
+      a = rank("email_action", candidate(hot, score: 45, sort_at: 1.hour.ago))
+      b = rank("email_action", candidate(cool, score: 45, sort_at: 1.hour.ago))
+      p = rank("email_action", candidate(plain, score: 45, sort_at: 1.hour.ago))
+
+      expect(a[:score]).to eq(p[:score] + described_class::SENDER_URGENCY_BOOST["high"])
+      expect(b[:score]).to eq(p[:score] + described_class::SENDER_URGENCY_BOOST["low"])
+    end
+  end
+
+  describe "seen-but-ignored demotion" do
+    it "drifts a card down once it has been shown for days with no reaction" do
+      c = candidate(message, score: 45, sort_at: 1.hour.ago)
+      c[:seen_at] = 3.days.ago
+
+      expect(rank("email_action", c)[:score]).to eq(45 - described_class::SEEN_IGNORE_PENALTY)
+    end
+
+    it "leaves a recently seen card at full strength" do
+      c = candidate(message, score: 45, sort_at: 1.hour.ago)
+      c[:seen_at] = 1.day.ago
+
+      expect(rank("email_action", c)[:score]).to eq(45)
+    end
+  end
+
+  describe "engagement multiplier" do
+    def history_item(kind, **stamps)
+      m = message
+      FeedItem.create!({ user: user, workspace: workspace, kind: kind, subject: m,
+                         dedupe_key: "#{kind}:#{m.id}", sort_at: now,
+                         generated_at: now }.merge(stamps))
+    end
+
+    it "is exactly 1.0 with no history (cold start)" do
+      expect(rank("email_action", candidate(message, score: 45, sort_at: 1.hour.ago))[:score]).to eq(45)
+    end
+
+    it "discounts a kind the user habitually dismisses" do
+      12.times { history_item("tag_suggestion", dismissed_at: now) }
+
+      c = rank("tag_suggestion", candidate(message, score: 40, sort_at: 1.hour.ago))
+
+      # rate = 2/16 → multiplier 0.775
+      expect(c[:score]).to eq((40 * 0.775).round)
+    end
+
+    it "rewards a kind the user habitually acts on" do
+      12.times { history_item("reminder", acted_at: now) }
+      reminder = create(:reminder, workspace: workspace)
+
+      c = rank("reminder", candidate(reminder, score: 60, sort_at: 1.day.from_now))
+
+      # rate = 14/16 → 1.225, clamped to the ceiling
+      expect(c[:score]).to eq((60 * 1.2).round)
+    end
+
+    it "is blind to system expiries — churn is not disengagement" do
+      12.times { history_item("calendar_event", expired_at: now) }
+
+      c = rank("calendar_event", candidate(message, score: 60, sort_at: 1.hour.from_now))
+
+      expect(c[:score]).to eq(60)
+    end
   end
 
   describe "resilience" do
