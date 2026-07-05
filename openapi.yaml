@@ -1738,13 +1738,16 @@ components:
             emails:read: Read email messages, threads, and folders
             emails:write: Mark emails read/unread
             emails:send: Compose, send, and reply to email
+            email_accounts:read: List connected email accounts
+            email_accounts:write: Connect an email account (upload an OAuth refresh token)
             documents:read: List and download documents
             documents:write: Upload, update, approve, reject, and reclassify documents
             contacts:read: Read contacts
             contacts:write: Update contacts and change their state (star, block, allow)
             tags:read: List tags
-            tags:write: Add and remove tags on emails
+            tags:write: Create tags and add or remove them on emails
             document_types:read: List document types
+            document_types:write: Create document types
             scout:read: Read Scout chat threads and messages
             scout:write: Create Scout threads and send messages
             scheduled_emails:read: List and read scheduled emails
@@ -1756,7 +1759,7 @@ components:
             tasks:read: List and read tasks
             tasks:write: Create, update, and complete tasks
             folders:read: List folders and their contents
-            folders:write: File and unfile documents in folders
+            folders:write: Create folders and file or unfile documents
         authorizationCode:
           description: >-
             Browser SSO used by the Campbooks CLI (`campbooks login`). The
@@ -1770,13 +1773,16 @@ components:
             emails:read: Read email messages, threads, and folders
             emails:write: Mark emails read/unread
             emails:send: Compose, send, and reply to email
+            email_accounts:read: List connected email accounts
+            email_accounts:write: Connect an email account (upload an OAuth refresh token)
             documents:read: List and download documents
             documents:write: Upload, update, approve, reject, and reclassify documents
             contacts:read: Read contacts
             contacts:write: Update contacts and change their state (star, block, allow)
             tags:read: List tags
-            tags:write: Add and remove tags on emails
+            tags:write: Create tags and add or remove them on emails
             document_types:read: List document types
+            document_types:write: Create document types
             scout:read: Read Scout chat threads and messages
             scout:write: Create Scout threads and send messages
             scheduled_emails:read: List and read scheduled emails
@@ -1788,7 +1794,7 @@ components:
             tasks:read: List and read tasks
             tasks:write: Create, update, and complete tasks
             folders:read: List folders and their contents
-            folders:write: File and unfile documents in folders
+            folders:write: Create folders and file or unfile documents
 
   parameters:
     idPath:

@@ -152,11 +152,31 @@ pt:
           abaixo para ativar a IA.
         switched_to_managed: A usar agora o Campbooks AI.
     api_clients:
+      scope_families:
+        calendar: Calendário
+        contacts: Contactos
+        document_types: Tipos de documento
+        documents: Documentos
+        email_accounts: Contas de email
+        emails: Email
+        folders: Pastas
+        reminders: Lembretes
+        scheduled_emails: Emails agendados
+        scout: Scout
+        tags: Etiquetas
+        tasks: Tarefas
+        templates: Modelos de email
+        workflows: Fluxos
       create:
         scopes_required: Selecione pelo menos uma permissão.
       destroy:
         deleted: O cliente "%{name}" foi eliminado.
       index:
+        all_scopes: Acesso total
+        copy: Copiar
+        more_families:
+          one: "+%{count} mais"
+          other: "+%{count} mais"
         col_client_id: ID do cliente
         col_created: Criado
         col_name: Nome
@@ -178,6 +198,11 @@ pt:
           das suas próprias aplicações e scripts.
         title: Acesso à API
       new:
+        preset_agent: Agente de IA (recomendado)
+        preset_clear: Limpar
+        preset_full: Acesso total
+        preset_read_only: Só leitura
+        presets_label: "Seleção rápida:"
         cancel: Cancelar
         create: Criar cliente
         name_hint: Uma etiqueta para reconhecer este cliente mais tarde.
@@ -192,6 +217,9 @@ pt:
         client_secret_label: Segredo do cliente
         copy: Copiar
         done: Concluído
+        mcp_key_hint: "Para agentes de IA (MCP): use como credencial Bearer em /api/mcp —
+          não expira; rotacione o segredo para revogar."
+        mcp_key_label: Chave MCP
         next_steps_title: Troque-os por um token de acesso
         subtitle: Copie agora o segredo de "%{name}".
         title: Cliente criado

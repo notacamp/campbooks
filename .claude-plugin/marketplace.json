@@ -1,0 +1,16 @@
+{
+  "name": "campbooks",
+  "owner": {
+    "name": "Not A Camp"
+  },
+  "plugins": [
+    {
+      "name": "campbooks",
+      "source": "./integrations/claude-plugin",
+      "description": "Let AI agents run your Campbooks inbox — triage, skim, documents, tasks, calendar, and email over MCP.",
+      "version": "0.1.0",
+      "homepage": "https://campbooks.not-a-camp.com",
+      "keywords": ["email", "inbox", "mcp", "triage", "documents", "tasks", "calendar", "ai-agent"]
+    }
+  ]
+}

@@ -30,6 +30,26 @@ major, minor, or patch change here.
   settings sidebar, under a new **Inbox** group with a page per panel. The gear
   menu still works; this just gives the same controls a permanent home alongside
   your other settings.
+- **Let your AI agent run your inbox (MCP).** The MCP endpoint at `/api/mcp` grew from a
+  REST mirror into a full agent surface: `get_overview` / `get_setup_status` / `guide`
+  (on-demand knowledge topics so agents stay lean), `search_emails` (semantic + keyword),
+  bulk inbox actions (`update_emails`, `move_emails_to_folder`, `tag_emails`,
+  `forward_email`), Skim triage over MCP (`get_skim_deck` / `skim_decide`, wired into the
+  same learning loop as the UI), task tools, `list_calendars` / `create_event_from_email`,
+  taxonomy creation (`create_tag` / `create_document_type` / `create_folder`), and email
+  account tools — `list_email_accounts` plus `connect_email_account`, which can accept a
+  locally-minted OAuth refresh token for self-hosted setups. Three new scopes:
+  `email_accounts:read`, `email_accounts:write`, `document_types:write`.
+- **MCP keys — agent credentials that don't expire.** `/api/mcp` now also accepts
+  `Bearer <client-id>.<client-secret>` (and HTTP Basic) so agent configs need no token
+  refresh; the Settings → API access reveal page shows a ready-to-copy "MCP key".
+  Rotate the client secret (or delete the client) to revoke. REST tokens are unchanged.
+- **Claude Code plugin.** `/plugin marketplace add notacamp/campbooks` installs the
+  `campbooks` plugin: the MCP server preconfigured (prompts for your server URL and MCP
+  key — self-hosted friendly), a guided `/campbooks:setup` onboarding skill, a
+  `/campbooks:triage` daily-inbox skill, and a local OAuth helper script for connecting
+  mailboxes on self-hosted instances. Config snippets for Cursor, Windsurf, Codex CLI,
+  and Gemini CLI ship in the plugin README.
 - **Search like you already know how.** The inbox search bar now understands
   Gmail-style modifiers — `from:`, `to:`, `subject:`, `has:attachment`,
   `is:unread/read/pinned`, `before:`/`after:`, `tag:`, `folder:`, `category:`,
