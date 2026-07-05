@@ -38,11 +38,6 @@ pt:
       tagged_as: Etiquetado como '%{name}'
     destroy:
       tag_removed: Etiqueta '%{name}' removida
-  email_message_zoho_labels:
-    create:
-      tag_applied: Etiqueta '%{name}' aplicada
-    destroy:
-      tag_removed: Etiqueta '%{name}' removida
   workflow_executions:
     index:
       back_to_workflow: Voltar ao fluxo de trabalho

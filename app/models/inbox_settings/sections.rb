@@ -20,7 +20,6 @@ module InboxSettings
       { key: "document_types", path: :inbox_settings_document_types_path,  icon: :doc },
       { key: "filtering",      path: :inbox_settings_filtering_path,       icon: :filter },
       { key: "smart_groups",   path: :inbox_settings_smart_groups_path,    icon: :stack },
-      { key: "labels",         path: :inbox_settings_external_labels_path, icon: :label },
       { key: "signatures",     path: :inbox_settings_signatures_path,      icon: :pen },
       { key: "accounts",       path: :inbox_settings_accounts_path,        icon: :at },
       { key: "display",        path: :inbox_settings_display_path,         icon: :sliders }
@@ -35,7 +34,6 @@ module InboxSettings
       doc:     "M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z",
       filter:  "M3 6h18M6 12h12M10 18h4",
       stack:   "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4",
-      label:   "M7 7h.01M3 5a2 2 0 012-2h6l9 9-8 8-9-9V5z",
       pen:     "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z",
       at:      "M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.206",
       sliders: "M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"

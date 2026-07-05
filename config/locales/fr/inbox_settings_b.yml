@@ -32,20 +32,6 @@ fr:
         subtitle: Les documents que Scout recherche et les données qu'il extrait.
       update:
         success: Type de document mis à jour.
-    external_labels:
-      index:
-        account_label: Compte
-        color_label: Couleur
-        heading: Étiquettes
-        new_label_label: Nouvelle étiquette
-        new_label_placeholder: Nom de l'étiquette
-        no_accounts: Aucun compte e-mail connecté pour l'instant.
-        subtitle: Étiquettes du fournisseur synchronisées avec votre boîte aux lettres.
-        sync: Synchroniser
-      labels:
-        delete_confirm: Supprimer cette étiquette de votre boîte aux lettres ?
-        empty: Aucune étiquette pour l'instant. Synchronisez depuis votre fournisseur
-          ou ajoutez-en une ci-dessus.
     signatures:
       form:
         assign_accounts_heading: Assigner aux comptes
