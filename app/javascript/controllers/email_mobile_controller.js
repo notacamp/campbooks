@@ -17,6 +17,13 @@ export default class extends Controller {
   connect() {
     this.boundResize = this.#onResize.bind(this)
     window.addEventListener("resize", this.boundResize)
+    // The server always 302-redirects /email_messages to the latest email. When
+    // the nav item or a folder chip sends show_list=1, land on the list instead
+    // of the detail pane on mobile. Skipping the param means a direct deep-link
+    // (push notification, digest link) still opens the email as expected.
+    // frameLoad() flips back to detail after a row tap loads the email_detail frame.
+    const showList = new URLSearchParams(window.location.search).get("show_list") === "1"
+    if (window.innerWidth < this.breakpointValue && showList) this.showList()
   }
 
   disconnect() {
