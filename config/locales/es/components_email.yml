@@ -144,6 +144,29 @@ es:
       clear: Borrar búsqueda
       filters: Filtros
       placeholder: Buscar correo…
+      searching: Buscando…
+      suggest:
+        heading: Refinar búsqueda
+        from: correos de un remitente
+        to: enviados a un destinatario
+        subject: palabras en el asunto
+        has: correos con archivos adjuntos
+        is: leído, no leído o fijado
+        after: recibidos después de una fecha
+        before: recibidos antes de una fecha
+        tag: correos con una etiqueta
+        folder: correos en una carpeta
+        category: correos en una categoría
+        priority: por prioridad de IA
+        account: en una cuenta conectada
+        values:
+          attachment: adjunto
+          unread: no leído
+          read: leído
+          pinned: fijado
+          low: baja
+          medium: media
+          high: alta
     email_search_result:
       no_subject: "(sin asunto)"
       sent_to: Para %{address}

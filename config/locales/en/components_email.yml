@@ -144,6 +144,29 @@ en:
       clear: Clear search
       filters: Filters
       placeholder: Search mail…
+      searching: Searching…
+      suggest:
+        heading: Refine your search
+        from: emails from a sender
+        to: sent to a recipient
+        subject: words in the subject line
+        has: emails with attachments
+        is: read, unread or pinned
+        after: received after a date
+        before: received before a date
+        tag: emails with a tag
+        folder: emails in a folder
+        category: emails in a category
+        priority: by AI priority
+        account: in a connected account
+        values:
+          attachment: attachment
+          unread: unread
+          read: read
+          pinned: pinned
+          low: low
+          medium: medium
+          high: high
     email_search_result:
       no_subject: "(no subject)"
       sent_to: To %{address}

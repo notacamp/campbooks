@@ -1,19 +1,21 @@
 ---
 fr:
   digest_mailer:
-    waiting_on_replies:
-      and_more: et %{count} de plus
-      cta: Ouvrir votre boîte de réception
-      footer_html: Vous recevez ceci car votre récapitulatif des réponses en attente est activé. Gérez-le dans vos %{settings_link}.
-      footer_text: Vous recevez ceci car votre récapitulatif des réponses en attente est activé. Gérez-le sur %{settings_url}
+    needs_attention:
+      footer_html: Vous recevez ceci car votre récapitulatif quotidien est activé. Gérez-le dans vos %{settings_link}.
+      footer_text: Vous recevez ceci car votre récapitulatif quotidien est activé. Gérez-le sur %{settings_url}
       greeting: Bonjour %{name},
-      intro:
-        one: Vous attendez toujours une réponse sur une conversation. Envie de les relancer ?
-        other: Vous attendez toujours une réponse sur %{count} conversations. Envie de les relancer ?
+      intro: Voici ce qui nécessite votre attention aujourd'hui.
+      overdue: En retard
+      section_follow_ups: Suivis
+      section_reminders: Rappels
+      section_tasks: Tâches
       settings_link: paramètres de notification
       subject:
-        one: 1 réponse que vous attendez toujours
-        other: "%{count} réponses que vous attendez toujours"
+        one: 1 chose nécessite votre attention
+        other: "%{count} choses nécessitent votre attention"
+      task_high_priority: Haute priorité
+      task_overdue: En retard
       waiting_days:
         one: En attente depuis %{count} jour
         other: En attente depuis %{count} jours

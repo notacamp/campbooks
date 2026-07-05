@@ -6,35 +6,42 @@ module Campbooks
   # sidebar + reading pane stay put). Holds the text query, the keyword/meaning
   # toggle, and a Filters button that reveals the EmailFilterPanel. Active-filter
   # chips render inside the results frame (so they refresh with the results).
+  #
+  # The suggestions panel renders modifier-typeahead rows driven by the
+  # email-search Stimulus controller. The catalog is passed as a JSON value so
+  # the JS can build its own DOM without round-trips.
   class EmailSearchBar < Campbooks::Base
-    SEARCH_ICON = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>'
-    CLEAR_ICON  = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>'
-    FILTER_ICON = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4.5h18M6.75 9.75h10.5M10.5 15h3"/>'
+    SEARCH_ICON = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>'.freeze
+    CLEAR_ICON  = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>'.freeze
+    FILTER_ICON = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4.5h18M6.75 9.75h10.5M10.5 15h3"/>'.freeze
 
     def initialize(search_params: {}, folders: [], accounts: [], tags: [], **attrs)
       @search_params = normalize(search_params)
-      @folders = folders
+      @folders  = folders
       @accounts = accounts
-      @tags = tags
-      @attrs = attrs
+      @tags     = tags
+      @attrs    = attrs
     end
 
     def view_template
       form(
         method: "get",
         action: helpers.search_email_messages_path,
-        class: class_names("border-b border-gray-100", @attrs.delete(:class)),
+        class: class_names("border-b border-gray-100 relative", @attrs.delete(:class)),
         data: {
           controller: "email-search",
           turbo_frame: "email_search_results",
           # replace (not advance) so live typing updates the URL without spamming
           # one history entry per keystroke.
           turbo_action: "replace",
-          action: "change->email-search#submitNow"
+          action: "change->email-search#submitNow",
+          email_search_suggestions_value: catalog.to_json,
+          email_search_heading_text: t(".suggest.heading")
         },
         **@attrs
       ) do
         input_row
+        suggestions_panel
         panel
       end
     end
@@ -42,8 +49,22 @@ module Campbooks
     private
 
     def input_row
-      div(class: "flex items-center gap-1.5 px-2.5 py-1.5") do
-        icon(SEARCH_ICON, "w-3.5 h-3.5 text-gray-400 flex-shrink-0")
+      div(class: "flex items-center gap-1.5 px-2.5 py-1.5 relative") do
+        # Search icon — hidden when busy; spinner shown instead.
+        span(class: "flex-shrink-0", data: { email_search_target: "searchIcon" }) do
+          icon(SEARCH_ICON, "w-3.5 h-3.5 text-gray-400")
+        end
+        # Busy spinner — hidden by default, shown during frame fetch.
+        span(
+          class: "flex-shrink-0 hidden",
+          aria_live: "polite",
+          data: { email_search_target: "spinner" }
+        ) do
+          # Match the search icon footprint (arbitrary values so they reliably
+          # beat the size preset's w-4 h-4 in Tailwind's output order).
+          render(Campbooks::Spinner.new(size: :sm, class: "w-[0.875rem] h-[0.875rem]"))
+          span(class: "sr-only") { t(".searching") }
+        end
         div(class: "flex-1 min-w-0") do
           input(
             type: "text",
@@ -51,12 +72,36 @@ module Campbooks
             value: @search_params[:q],
             placeholder: t(".placeholder"),
             autocomplete: "off",
+            autocapitalize: "off",
+            spellcheck: "false",
+            role: "combobox",
+            aria_expanded: "false",
+            aria_controls: "email-search-suggestions",
+            aria_autocomplete: "list",
             class: "block w-full bg-transparent border-0 p-0 text-xs text-gray-700 dark:text-gray-200 placeholder:text-gray-400 focus:ring-0 focus:outline-none",
-            data: { email_search_target: "query", action: "input->email-search#scheduleSubmit keydown->email-search#handleKeydown" }
+            data: {
+              email_search_target: "query",
+              action: "input->email-search#scheduleSubmit keydown->email-search#handleKeydown focus->email-search#openSuggestions blur->email-search#closeSuggestionsSoon"
+            }
           )
         end
         clear_link if @search_params[:q].present?
         filters_button
+      end
+    end
+
+    # Modifier typeahead panel — rows rendered by the email-search controller.
+    def suggestions_panel
+      div(
+        id: "email-search-suggestions",
+        role: "listbox",
+        class: "absolute left-0 right-0 top-full z-30 mt-1 mx-1.5 hidden rounded-xl border border-gray-100 bg-card shadow-lg overflow-hidden",
+        data: { email_search_target: "suggestions" }
+      ) do
+        div(
+          class: "max-h-64 overflow-y-auto overscroll-contain py-1",
+          data: { email_search_target: "suggestionsList" }
+        )
       end
     end
 
@@ -101,6 +146,39 @@ module Campbooks
       count += 1 if @search_params[:has_attachment].to_s == "1"
       count += 1 if @search_params[:unread].to_s == "1"
       count
+    end
+
+    # Modifier catalog passed as a JSON Stimulus value. Each entry describes one
+    # modifier token and enough metadata for the JS to render typeahead rows.
+    def catalog
+      [
+        { token: "from:",     type: "remote", url: helpers.search_contacts_path, description: t(".suggest.from") },
+        { token: "to:",       type: "remote", url: helpers.search_contacts_path, description: t(".suggest.to") },
+        { token: "subject:",  type: "text",   description: t(".suggest.subject") },
+        { token: "has:",      type: "enum",   description: t(".suggest.has"),
+          values: [ { value: "attachment", label: t(".suggest.values.attachment") } ] },
+        { token: "is:",       type: "enum",   description: t(".suggest.is"),
+          values: %w[unread read pinned].map { |v| { value: v, label: t(".suggest.values.#{v}") } } },
+        { token: "after:",    type: "date",   description: t(".suggest.after"),  hint: "YYYY-MM-DD" },
+        { token: "before:",   type: "date",   description: t(".suggest.before"), hint: "YYYY-MM-DD" },
+        { token: "tag:",      type: "enum",   description: t(".suggest.tag"),
+          values: @tags.map { |tag| { value: tag.name, label: tag.name } } },
+        { token: "folder:",   type: "enum",   description: t(".suggest.folder"),
+          values: @folders.filter_map { |f|
+            name = (f[:name] || f["name"]).presence
+            { value: name, label: name } if name
+          } },
+        { token: "category:", type: "enum",   description: t(".suggest.category"),
+          values: Campbooks::CategoryChip::CATEGORIES.map { |c| { value: c.to_s, label: t("components.category_chip.labels.#{c}") } } },
+        { token: "priority:", type: "enum",   description: t(".suggest.priority"),
+          values: %w[low medium high].map { |v| { value: v, label: t(".suggest.values.#{v}") } } },
+        { token: "account:",  type: "enum",   description: t(".suggest.account"),
+          values: @accounts.map { |a| { value: account_value(a), label: account_value(a) } } }
+      ]
+    end
+
+    def account_value(account)
+      account.respond_to?(:email_address) ? account.email_address.to_s : account.to_s
     end
 
     def normalize(params)

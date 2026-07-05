@@ -1,5 +1,7 @@
-<%# Single inbox thread row, wrapped in Campbooks::Swipeable for swipe-to-act
-    (swipe left: Archive → Snooze; swipe right: Trash → Delete-with-confirm).
+<%# Single inbox thread row, wrapped in Campbooks::Swipeable for swipe-to-act.
+    Normal rows: swipe left → Archive → Snooze; swipe right → Trash → Delete.
+    Waiting-reply rows: swipe left → Dismiss follow-up; right side is empty
+    ("Draft follow-up" is a full-page navigation and cannot be a swipe action).
     The Swipeable WRAPPER carries the dom_id / data-active / data-email-account-id
     and the active-highlight classes, so every removal path (swipe, keyboard,
     Scout, bulk, reply-daemon) clears the whole row and email_shortcuts_controller's
@@ -27,29 +29,42 @@
 <% waiting_reply = local_assigns[:section_key] == "waiting_replies" %>
 <% waiting_days = (waiting_reply && thread.last_outbound_at) ? ((Time.current - thread.last_outbound_at) / 86_400).floor : nil %>
 
+<% if waiting_reply %>
+  <% swipe_left_stages = [
+       { key: "dismiss_follow_up",
+         label: t("email_messages.thread_list.dismiss_follow_up"),
+         icon: :dismiss, color: "green",
+         endpoint: dismiss_follow_up_email_message_path(latest, folder_id: params[:folder_id].presence, group: params[:group].presence, **search_context_params),
+         method: "post" }
+     ] %>
+  <% swipe_right_stages = [] %>
+<% else %>
+  <% swipe_left_stages = [
+       { key: "archive", label: t("components.swipeable.archive"), icon: :archive, color: "blue",
+         endpoint: tool_email_message_path(latest), params: { tool: "archive" },
+         confirm: { title: t("components.swipeable.confirm_archive_title"),
+                    message: t("components.swipeable.confirm_archive_message"), remember_key: "archive" } },
+       { key: "snooze", label: t("components.swipeable.snooze"), icon: :snooze, color: "amber",
+         endpoint: tool_email_message_path(latest), params: { tool: "snooze" }, picker: "snooze" }
+     ] %>
+  <% swipe_right_stages = [
+       { key: "trash", label: t("components.swipeable.trash"), icon: :trash, color: "orange",
+         endpoint: tool_email_message_path(latest), params: { tool: "trash" },
+         confirm: { title: t("components.swipeable.confirm_trash_title"),
+                    message: t("components.swipeable.confirm_trash_message"), remember_key: "trash" } },
+       { key: "delete", label: t("components.swipeable.delete"), icon: :delete, color: "red",
+         endpoint: bulk_email_messages_path,
+         params: { tool: "delete", "email_ids[]" => thread_messages.map(&:id) },
+         confirm: { title: t("components.swipeable.confirm_delete_title"),
+                    message: t("components.swipeable.confirm_delete_message") } }
+     ] %>
+<% end %>
 <%= render(Campbooks::Swipeable.new(
       id: dom_id(thread, :thread_item),
       class: "mx-1.5 rounded-xl transition-colors #{active ? 'bg-subtle' : 'hover:bg-muted'}",
       data: { email_account_id: account&.id }.merge(active ? { active: "true" } : {}),
-      left: [
-        { key: "archive", label: t("components.swipeable.archive"), icon: :archive, color: "blue",
-          endpoint: tool_email_message_path(latest), params: { tool: "archive" },
-          confirm: { title: t("components.swipeable.confirm_archive_title"),
-                     message: t("components.swipeable.confirm_archive_message"), remember_key: "archive" } },
-        { key: "snooze", label: t("components.swipeable.snooze"), icon: :snooze, color: "amber",
-          endpoint: tool_email_message_path(latest), params: { tool: "snooze" }, picker: "snooze" }
-      ],
-      right: [
-        { key: "trash", label: t("components.swipeable.trash"), icon: :trash, color: "orange",
-          endpoint: tool_email_message_path(latest), params: { tool: "trash" },
-          confirm: { title: t("components.swipeable.confirm_trash_title"),
-                     message: t("components.swipeable.confirm_trash_message"), remember_key: "trash" } },
-        { key: "delete", label: t("components.swipeable.delete"), icon: :delete, color: "red",
-          endpoint: bulk_email_messages_path,
-          params: { tool: "delete", "email_ids[]" => thread_messages.map(&:id) },
-          confirm: { title: t("components.swipeable.confirm_delete_title"),
-                     message: t("components.swipeable.confirm_delete_message") } }
-      ]
+      left: swipe_left_stages,
+      right: swipe_right_stages
     )) do %>
   <div class="flex items-center group">
     <!-- Drag handle (desktop) + checkbox area -->
@@ -163,7 +178,7 @@
               "aria-label": t("email_messages.thread_list.draft_follow_up") do %>
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
         <% end %>
-        <%= button_to dismiss_follow_up_email_message_path(latest, folder_id: params[:folder_id].presence, group: params[:group].presence),
+        <%= button_to dismiss_follow_up_email_message_path(latest, folder_id: params[:folder_id].presence, group: params[:group].presence, **search_context_params),
               method: :post,
               form: { class: "flex-shrink-0 self-stretch flex items-center", data: { no_swipe: true, turbo: true } },
               class: "flex items-center justify-center w-7 self-stretch cursor-pointer border-0 bg-transparent text-gray-300 hover:text-gray-600 transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100",

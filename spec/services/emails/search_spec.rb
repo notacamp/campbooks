@@ -205,5 +205,126 @@ RSpec.describe Emails::Search do
       allow(SearchService).to receive(:search).and_raise(StandardError, "boom")
       expect(run(q: "quarterly").results).to include(message)
     end
+
+    describe "ranking" do
+      # With no SearchRecord rows in the test DB, semantic_scores is nil so
+      # results degrade to keyword-only ranking. We can verify the keyword
+      # field-weight ordering without mocking the embedding pipeline.
+      before { record.destroy }
+
+      it "ranks a subject-matching message higher than a summary-only-matching one" do
+        # Both match "report", but one via subject (score 0.95) and one via summary (0.65)
+        by_subject = create(:email_message, email_account: account,
+          subject: "quarterly report", ai_summary: nil, received_at: 2.days.ago)
+        by_summary = create(:email_message, email_account: account,
+          subject: "Update", ai_summary: "a quarterly report on revenue",
+          received_at: 1.hour.ago) # newer but lower field weight
+
+        results = run(q: "report").results
+        expect(results.index(by_subject)).to be < results.index(by_summary)
+      end
+
+      it "orders two subject-matching messages by recency when field weights tie" do
+        older  = create(:email_message, email_account: account,
+          subject: "invoice overview", received_at: 10.days.ago)
+        newer  = create(:email_message, email_account: account,
+          subject: "invoice overview", received_at: 1.hour.ago)
+
+        results = run(q: "invoice").results
+        expect(results.first).to eq(newer)
+      end
+    end
+  end
+
+  describe "#scope with modifier-through-q integration" do
+    it "q:has:attachment filters to messages with attachments" do
+      with_att    = create(:email_message, email_account: account, has_attachment: true)
+      without_att = create(:email_message, email_account: account, has_attachment: false)
+      result = run(q: "has:attachment").scope
+      expect(result).to include(with_att)
+      expect(result).not_to include(without_att)
+    end
+
+    it "q:from:@x.com filters by domain" do
+      hit  = create(:email_message, email_account: account, from_address: "alice@x.com")
+      miss = create(:email_message, email_account: account, from_address: "alice@y.com")
+      result = run(q: "from:@x.com").scope
+      expect(result).to include(hit)
+      expect(result).not_to include(miss)
+    end
+
+    it "q:is:read filters to read messages" do
+      read_msg   = create(:email_message, email_account: account, read: true)
+      unread_msg = create(:email_message, email_account: account, read: false)
+      result = run(q: "is:read").scope
+      expect(result).to include(read_msg)
+      expect(result).not_to include(unread_msg)
+    end
+
+    it "q:is:pinned filters to pinned messages" do
+      pinned     = create(:email_message, email_account: account, pinned_at: 1.hour.ago)
+      unpinned   = create(:email_message, email_account: account, pinned_at: nil)
+      result = run(q: "is:pinned").scope
+      expect(result).to include(pinned)
+      expect(result).not_to include(unpinned)
+    end
+
+    it "q:subject:report filters by subject" do
+      hit  = create(:email_message, email_account: account, subject: "Monthly report")
+      miss = create(:email_message, email_account: account, subject: "Newsletter")
+      result = run(q: "subject:report").scope
+      expect(result).to include(hit)
+      expect(result).not_to include(miss)
+    end
+
+    it "q:to:bob filters by recipient address" do
+      hit  = create(:email_message, email_account: account, to_address: "bob@example.com")
+      miss = create(:email_message, email_account: account, to_address: "alice@example.com")
+      result = run(q: "to:bob").scope
+      expect(result).to include(hit)
+      expect(result).not_to include(miss)
+    end
+
+    it "q:priority:high filters by ai_priority" do
+      high = create(:email_message, email_account: account, ai_priority: :high)
+      low  = create(:email_message, email_account: account, ai_priority: :low)
+      result = run(q: "priority:high").scope
+      expect(result).to include(high)
+      expect(result).not_to include(low)
+    end
+
+    describe "tag: modifier" do
+      let!(:tag_urgent) { Tag.create!(workspace: workspace, name: "urgent", color: "#ef4444", source: :local) }
+
+      it "q:tag:urgent matches only messages with that tag" do
+        tagged   = create(:email_message, email_account: account).tap { |m| m.tags << tag_urgent }
+        untagged = create(:email_message, email_account: account)
+        result = run(q: "tag:urgent").scope
+        expect(result).to include(tagged)
+        expect(result).not_to include(untagged)
+      end
+
+      it "unknown tag name returns empty (rel.none)" do
+        create(:email_message, email_account: account)
+        expect(run(q: "tag:nonexistent").scope).to be_empty
+      end
+
+      it "matches ANY tag row sharing the name (provider tags duplicate names across accounts)" do
+        twin = Tag.create!(workspace: workspace, name: "urgent", color: "#f97316",
+                           source: :external, email_account: account)
+        tagged_with_twin = create(:email_message, email_account: account).tap { |m| m.tags << twin }
+
+        result = run(q: "tag:urgent").scope
+        expect(result).to include(tagged_with_twin)
+      end
+    end
+
+    it "text remainder is used for ILIKE, modifier is stripped from text" do
+      hit  = create(:email_message, email_account: account, from_address: "hello@acme.com", subject: "Greetings", ai_summary: "hello world")
+      miss = create(:email_message, email_account: account, from_address: "nobody@other.com", subject: "Other")
+      result = run(q: "hello from:acme").scope
+      expect(result).to include(hit)
+      expect(result).not_to include(miss)
+    end
   end
 end

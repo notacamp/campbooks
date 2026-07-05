@@ -18,6 +18,52 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Search like you already know how.** The inbox search bar now understands
+  Gmail-style modifiers — `from:`, `to:`, `subject:`, `has:attachment`,
+  `is:unread/read/pinned`, `before:`/`after:`, `tag:`, `folder:`, `category:`,
+  `priority:`, and `account:`. As you type, a suggestions dropdown under the
+  search box offers every modifier (with a plain-language description) and then
+  completes its values for you: contacts for `from:`/`to:`, your tags, folders,
+  and categories, all keyboard-navigable (arrows + Enter, Escape to dismiss).
+- **A quiet "searching…" signal.** While results are loading, the search icon
+  becomes a spinner and the current list dims slightly — no more wondering
+  whether the search actually ran.
+
+### Changed
+
+- **Search results are ranked by relevance, not just date.** Results now blend
+  how well a message matches (subject beats sender, sender beats summary,
+  semantic similarity counts too) with a light recency boost — a strong match
+  from last month now outranks a weak match from this morning.
+
+### Fixed
+
+- **Searching no longer hides your follow-ups.** The "Waiting on replies" band
+  now takes part in search: threads you're waiting on that match the query stay
+  visible in their own band at the top of the results (and are no longer
+  silently dropped from the view).
+- **Notifications no longer dead-end on a "not found" page.** Clicking an older
+  notification could land on a 404 — a leftover from the switch to UUID
+  identifiers, which left some notification links pointing at records by their old
+  numeric id. Existing links are repaired automatically on upgrade: where the
+  target is known they reopen the right document or Scout thread, and any that
+  can't be recovered fall back to the relevant list instead of a dead end.  
+- **Settings no longer links to pages that aren't turned on.** The Document templates
+  and Email templates entries appeared in the Settings menu even in deployments where
+  those features are disabled, so clicking one opened a blank page. They're now hidden
+  unless the feature is enabled.
+
+## [0.11.0] - 2026-07-05
+
+### Added
+
+- **Broader daily digest.** The "waiting on replies" email has been expanded into a unified "needs attention" digest. One daily email now groups three sections — follow-ups you're still waiting on, reminders that are due soon or overdue, and tasks that are overdue or high-priority — with empty sections omitted automatically. The preference toggle in Settings → Notifications gates all three sections. (#177)
+- **Swipe actions on tasks and calendar events.** In the task list, swipe right
+  to complete a task or left to archive it (then deeper left to delete with a
+  confirmation). In the calendar agenda view, swipe left to delete a
+  non-recurring, writable event. Both actions slide the row out and show a
+  success toast — no page reload. Recurring events and read-only calendars are
+  deliberately excluded from swipe to avoid the recurrence-scope dialog gap.
 - **Feed cards open the email right there.** Cards that ask you to decide
   something — needs-attention mail, reply nudges, follow-ups, starred senders,
   and reminders or suggested tasks that came from an email — now carry a small
@@ -36,6 +82,7 @@ major, minor, or patch change here.
 
 ### Changed
 
+- **Organizations moves off the mobile bottom dock into the "More" menu.** On narrow screens the dock is five items wide; Organizations now collapses into the "More" burger alongside Tasks, Workflows, Contacts, and Activity, freeing a dock slot for the items you reach every day.
 - **The home feed now ranks by priority, not by section.** Every card gets one
   score blending what it is (a due reminder, a follow-up, actionable mail…),
   how relevant it is (starred and known contacts up, newsletters and other bulk
@@ -61,7 +108,21 @@ major, minor, or patch change here.
   chasing. Cards now read "To <recipient>", show your sent subject, and peek into
   the message you actually sent. The nudge still drafts and addresses correctly to
   the other party.
-
+- **The mobile bottom nav hides itself while you scroll down** and glides back
+  the moment you scroll up — reclaiming screen space during reading without
+  making navigation hard to reach.
+- **Tapping the inbox icon or a folder chip on mobile now shows the email list, not an already-open message.** The server redirect to the latest email is unchanged — on a phone or small tablet, tapping a nav item or a folder chip lands on the thread list first; tapping a row opens the reading pane as expected. Direct deep-links (push notifications, digest emails) still open straight to the email. Folder chips also gained a larger tap target and a press-down animation.
+- **Swipe actions in the "Waiting on replies" band now match the row's buttons.**
+  Swiping left on a waiting-reply thread now reveals "Dismiss follow-up" (the
+  same action as the inline × button) rather than Archive. The right side is
+  empty — "Draft follow-up" is a full-page action and stays tap-only.
+- **Documents no longer show your email address as their title.** Attachments
+  pulled in from received or sent email were incorrectly stored with the raw
+  sender address (e.g. `you@example.com`) as their name. Any document whose AI
+  analysis hadn't finished would surface that address as its title in the Files
+  list. The creation paths now leave the name blank so the filename is shown
+  instead, and a migration clears the stale email-address values from existing
+  rows.
 - **The Skim rings are back.** In 0.10.0 the skim tray on the home feed and
   inbox rendered "Content missing" for most inboxes: the live categorizer's new
   Gmail-category rescue read a column (`provider_labels`) the tray's trimmed
