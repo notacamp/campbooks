@@ -8,7 +8,7 @@ module InboxSettings
       load_tag_groups
     end
 
-    # Flip a label between visible and hidden. The decision is remembered on the
+    # Flip a tag between visible and hidden. The decision is remembered on the
     # tag (it survives re-syncs because classified labels are never re-classified),
     # so this is how a user overrides an AI/provider hide — or hides a tag they
     # don't want as a chip.
@@ -36,6 +36,25 @@ module InboxSettings
     end
 
     def update
+      if @tag.external? && provider_fields_changed?
+        # Push the rename/recolor to the provider first; only save locally on success.
+        begin
+          result = @tag.email_account.mail_client.update_label(
+            @tag.external_label_id,
+            name: tag_params[:name] || @tag.name,
+            color: tag_params[:color] || @tag.color
+          )
+          unless result.dig("status", "code") == 200 || result["id"].present?
+            render turbo_stream: notify_stream(t(".provider_update_failed"), severity: :error)
+            return
+          end
+        rescue => e
+          Rails.logger.error("[InboxSettings::Tags] Provider update_label failed: #{e.message}")
+          render turbo_stream: notify_stream(t(".provider_update_failed"), severity: :error)
+          return
+        end
+      end
+
       if @tag.update(tag_params)
         # -> update.turbo_stream.erb
       else
@@ -48,6 +67,15 @@ module InboxSettings
         render turbo_stream: notify_stream(t(".cannot_delete"), severity: :warning)
         return
       end
+
+      if @tag.external?
+        begin
+          @tag.email_account.mail_client.delete_label(@tag.external_label_id)
+        rescue => e
+          Rails.logger.error("[InboxSettings::Tags] Provider delete_label failed: #{e.message}")
+        end
+      end
+
       @tag.destroy
       # -> destroy.turbo_stream.erb
     end
@@ -68,9 +96,16 @@ module InboxSettings
       @tag = Current.workspace.tags.find(params[:id])
     end
 
-    # Visible tags, plus the hidden labels grouped by why they're hidden:
+    # True when the submitted params would change the name or color — the two
+    # fields that need to be mirrored to the provider on external tags.
+    def provider_fields_changed?
+      (tag_params[:name].present? && tag_params[:name] != @tag.name) ||
+        (tag_params[:color].present? && tag_params[:color] != @tag.color)
+    end
+
+    # Visible tags, plus the hidden tags grouped by why they're hidden:
     # provider system/category statuses vs everything else (AI low-value + any
-    # label the user hid by hand).
+    # tag the user hid by hand).
     def load_tag_groups
       tags = Current.workspace.tags
       @visible_tags    = tags.visible.order(:name).to_a

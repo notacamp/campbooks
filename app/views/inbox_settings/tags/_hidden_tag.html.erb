@@ -11,7 +11,12 @@
           <%= render(Campbooks::Badge.new(variant: :neutral, size: :md)) { t("inbox_settings.tags.hidden_tag.ai_badge") } %>
         <% end %>
       </div>
-      <% if tag.classification_reason.present? %>
+      <% if tag.external? %>
+        <div class="flex items-center gap-1 mt-0.5" title="<%= t("inbox_settings.tags.tag.synced_with_title", account: tag.email_account.display_name) %>">
+          <%= render(Campbooks::BrandLogo.new(brand: tag.email_account.google? ? :google : :zoho, size: :xs)) %>
+          <span class="text-xs text-muted-foreground truncate"><%= tag.email_account.display_name %></span>
+        </div>
+      <% elsif tag.classification_reason.present? %>
         <p class="text-xs text-muted-foreground truncate mt-0.5"><%= tag.classification_reason %></p>
       <% end %>
     </div>

@@ -32,7 +32,7 @@ es:
         heading: Pantalla
         hide_account_hint: Oculte una cuenta para eliminar sus conversaciones de la
           lista.
-        labels_option: Etiquetas
+        tags_option: Etiquetas
         no_accounts: Aún no hay cuentas de correo conectadas.
         show_heading: Mostrar
         subheading: Cómo se ve su bandeja de entrada en este dispositivo. Guardado
@@ -80,6 +80,8 @@ es:
         cancel: Cancelar
         color_label: Color (hex)
         create_tag: Crear etiqueta
+        external_tag_hint: Cambiar el nombre o el color de esta etiqueta actualizará
+          el rótulo en el buzón conectado.
         group_label: Grupo
         group_placeholder: p. ej. Finanzas
       hidden_tag:
@@ -100,9 +102,12 @@ es:
         delete_confirm: "¿Eliminar %{name}?"
         edit: Editar
         hide: Ocultar
+        synced_with_title: Sincronizado con %{account}
         tagged_messages_title: Mensajes etiquetados
       toggle_hidden:
         hidden: "%{name} ocultada"
         shown: "%{name} ahora es visible"
       update:
+        provider_update_failed: No se pudo actualizar el rótulo en su buzón. Por
+          favor, inténtelo de nuevo.
         updated_toast: Etiqueta actualizada.
