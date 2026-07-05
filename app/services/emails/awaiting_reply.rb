@@ -21,6 +21,12 @@ module Emails
     # proactive nudge.
     DEFAULT_NUDGE_DAYS = 3
 
+    # …and how long until an un-analyzed silent thread stops being nudge-worthy:
+    # past this, a proactive prompt is stale noise. Only #due (the nudge subset)
+    # is capped — the thread stays on the durable waiting list (#threads), and
+    # an AI verdict with a future follow_up_at re-admits it.
+    MAX_NUDGE_AGE = 60.days
+
     def initialize(user, now: Time.current, grace: EmailThread::AWAITING_REPLY_GRACE)
       @user = user
       @now = now
@@ -99,8 +105,10 @@ module Emails
         # The AI has weighed in: nudge only if it judged a follow-up warranted.
         thread.follow_up_expected? && thread.follow_up_at.present? && thread.follow_up_at <= now
       elsif thread.last_outbound_at.present?
-        # No AI verdict — heuristic floor so proactive nudges still fire.
-        thread.last_outbound_at + DEFAULT_NUDGE_DAYS.days <= now
+        # No AI verdict — heuristic floor so proactive nudges still fire, capped
+        # so they eventually stop for threads that have gone quiet for good.
+        thread.last_outbound_at + DEFAULT_NUDGE_DAYS.days <= now &&
+          thread.last_outbound_at >= now - MAX_NUDGE_AGE
       else
         false
       end

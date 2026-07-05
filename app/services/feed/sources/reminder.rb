@@ -43,12 +43,20 @@ module Feed
 
       private
 
+      # Urgency glides up as the date approaches: 92 when due (today), easing
+      # through 75 at three days out and 60 at two weeks down to 30 at the far
+      # horizon — no tier cliffs.
       def score_for(reminder)
-        days = ((reminder.due_at - now) / 1.day).floor
-        return 90 if days <= 0    # overdue
-        return 80 if days <= 3    # imminent
-        return 60 if days <= 14
-        30
+        hours = (reminder.due_at - now) / 1.hour
+        return 92 if hours <= 0 # due earlier today
+
+        if hours <= 72
+          ramp(hours, from: 0, to: 72, at_from: 92, at_to: 75)
+        elsif hours <= 336
+          ramp(hours, from: 72, to: 336, at_from: 75, at_to: 60)
+        else
+          ramp(hours, from: 336, to: HORIZON.in_hours, at_from: 60, at_to: 30)
+        end
       end
     end
   end
