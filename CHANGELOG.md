@@ -18,6 +18,7 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Broader daily digest.** The "waiting on replies" email has been expanded into a unified "needs attention" digest. One daily email now groups three sections — follow-ups you're still waiting on, reminders that are due soon or overdue, and tasks that are overdue or high-priority — with empty sections omitted automatically. The preference toggle in Settings → Notifications gates all three sections. (#177)
 - **Swipe actions on tasks and calendar events.** In the task list, swipe right
   to complete a task or left to archive it (then deeper left to delete with a
   confirmation). In the calendar agenda view, swipe left to delete a

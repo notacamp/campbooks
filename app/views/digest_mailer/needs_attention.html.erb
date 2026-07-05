@@ -1,0 +1,84 @@
+<% colors = MailerStyleHelper::COLORS %>
+<p style="<%= email_text_greeting %>"><%= t("digest_mailer.needs_attention.greeting", name: @user.name) %></p>
+
+<p style="<%= email_text_body %>"><%= t("digest_mailer.needs_attention.intro") %></p>
+
+<%# ── Follow-ups section ──────────────────────────────────────────────────────── %>
+<% if @follow_ups.any? %>
+<p style="margin:0 0 8px; font-size:11px; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:<%= colors[:text_muted] %>;"><%= t("digest_mailer.needs_attention.section_follow_ups") %></p>
+
+<table cellpadding="0" cellspacing="0" role="presentation" width="100%" style="margin:0 0 24px; background-color:<%= colors[:white] %>; border-radius:8px; border:1px solid <%= colors[:border] %>;">
+  <tr>
+    <td style="padding:6px 20px;">
+      <% @follow_ups.each do |item| %>
+        <table cellpadding="0" cellspacing="0" role="presentation" width="100%" style="margin:10px 0;">
+          <tr>
+            <td>
+              <a href="<%= item[:url] %>" style="text-decoration:none; color:<%= colors[:text_heading] %>; font-size:15px; font-weight:600; line-height:1.3;"><%= item[:title] %></a>
+              <div style="margin-top:3px; color:<%= colors[:text_secondary] %>; font-size:13px; line-height:1.4;">
+                <% if item[:meta] %><span style="color:<%= colors[:accent] %>; font-weight:600;"><%= item[:meta] %></span><% end %><% if item[:reason] %> · <%= item[:reason] %><% end %>
+              </div>
+            </td>
+          </tr>
+        </table>
+      <% end %>
+    </td>
+  </tr>
+</table>
+<% end %>
+
+<%# ── Reminders section ──────────────────────────────────────────────────────── %>
+<% if @reminders.any? %>
+<p style="margin:0 0 8px; font-size:11px; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:<%= colors[:text_muted] %>;"><%= t("digest_mailer.needs_attention.section_reminders") %></p>
+
+<table cellpadding="0" cellspacing="0" role="presentation" width="100%" style="margin:0 0 24px; background-color:<%= colors[:white] %>; border-radius:8px; border:1px solid <%= colors[:border] %>;">
+  <tr>
+    <td style="padding:6px 20px;">
+      <% @reminders.each do |item| %>
+        <table cellpadding="0" cellspacing="0" role="presentation" width="100%" style="margin:10px 0;">
+          <tr>
+            <td>
+              <a href="<%= item[:url] %>" style="text-decoration:none; color:<%= colors[:text_heading] %>; font-size:15px; font-weight:600; line-height:1.3;"><%= item[:title] %></a>
+              <% if item[:meta] %>
+                <div style="margin-top:3px; font-size:13px; line-height:1.4;">
+                  <span style="color:<%= item[:overdue] ? colors[:accent] : colors[:text_secondary] %>; font-weight:<%= item[:overdue] ? '600' : 'normal' %>;"><%= item[:meta] %></span>
+                </div>
+              <% end %>
+            </td>
+          </tr>
+        </table>
+      <% end %>
+    </td>
+  </tr>
+</table>
+<% end %>
+
+<%# ── Tasks section ──────────────────────────────────────────────────────────── %>
+<% if @tasks.any? %>
+<p style="margin:0 0 8px; font-size:11px; font-weight:700; letter-spacing:0.07em; text-transform:uppercase; color:<%= colors[:text_muted] %>;"><%= t("digest_mailer.needs_attention.section_tasks") %></p>
+
+<table cellpadding="0" cellspacing="0" role="presentation" width="100%" style="margin:0 0 24px; background-color:<%= colors[:white] %>; border-radius:8px; border:1px solid <%= colors[:border] %>;">
+  <tr>
+    <td style="padding:6px 20px;">
+      <% @tasks.each do |item| %>
+        <table cellpadding="0" cellspacing="0" role="presentation" width="100%" style="margin:10px 0;">
+          <tr>
+            <td>
+              <a href="<%= item[:url] %>" style="text-decoration:none; color:<%= colors[:text_heading] %>; font-size:15px; font-weight:600; line-height:1.3;"><%= item[:title] %></a>
+              <% if item[:meta] %>
+                <div style="margin-top:3px; font-size:13px; line-height:1.4;">
+                  <span style="color:<%= item[:overdue] ? colors[:accent] : colors[:text_secondary] %>; font-weight:<%= item[:overdue] ? '600' : 'normal' %>;"><%= item[:meta] %></span>
+                </div>
+              <% end %>
+            </td>
+          </tr>
+        </table>
+      <% end %>
+    </td>
+  </tr>
+</table>
+<% end %>
+
+<p style="<%= email_text_muted %>">
+  <%= t("digest_mailer.needs_attention.footer_html", settings_link: link_to(t("digest_mailer.needs_attention.settings_link"), @settings_url, style: "color:#{colors[:text_secondary]}; text-decoration:underline;")) %>
+</p>

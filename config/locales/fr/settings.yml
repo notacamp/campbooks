@@ -508,8 +508,8 @@ fr:
         subtitle: Choisissez comment vous souhaitez être notifié des nouvelles activités.
         tags_title: Étiquettes
         title: Préférences de notification
-        waiting_digest_hint: Un e-mail quotidien des conversations dont vous attendez encore une réponse.
-        waiting_digest_label: Réponses en attente
+        waiting_digest_hint: Un récapitulatif quotidien de tout ce qui nécessite votre attention — suivis, rappels à venir et tâches en retard ou haute priorité.
+        waiting_digest_label: Récapitulatif quotidien d'attention
       section:
         email_label: E-mail
         in_app_label: Dans l'application
