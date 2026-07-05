@@ -1,60 +1,101 @@
 <%# Horizontally-scrollable folder chips shown at the top of the thread list on
-    every viewport (replaces the old desktop folder sidebar). Each chip jumps to
-    that folder's list view, and is also a drag-and-drop / tap-to-move target
-    (mail-folder-drop controller). The "+" opens the New Folder dialog (new-folder
-    controller). %>
-<%# In the native app there's no nav bar above the inbox (it's a tab root), so
+    mobile (hidden lg+, where FolderPane takes over). A non-scrolling "Folders"
+    trigger on the left opens the FolderBottomSheet for full desktop-parity
+    navigation and edit affordances. The chips stay for quick one-tap switching.
+    In the native app there's no nav bar above the inbox (it's a tab root), so
     the folder chips would sit flush against the status bar — give them extra
     top breathing room there. %>
 <%# `desktop_hidden` hides the bar on lg+ where the folder pane takes over; `with_modal`
     is false when an ancestor already renders the shared New Folder dialog + controller. %>
-<div id="folder_chip_bar"
-     class="flex<%= " lg:hidden" if local_assigns.fetch(:desktop_hidden, false) %> items-center gap-1.5 overflow-x-auto px-3 <%= hotwire_native_app? ? "pt-5" : "pt-2" %> pb-3 border-b border-gray-100 bg-card"
-     data-controller="mail-folder-drop<%= " new-folder" if local_assigns.fetch(:with_modal, true) %>"
-     data-action="dragover->mail-folder-drop#dragover drop->mail-folder-drop#drop dragleave->mail-folder-drop#dragleave click->mail-folder-drop#click">
-  <% @common_folders&.each do |folder| %>
-    <% active = (@current_folder == folder[:id]) || (folder[:id].nil? && @current_folder.nil?) %>
-    <%# Sent/Drafts are outbound/compose folders — moving received mail into them
-        makes no sense, so they get no drop-target attr (see EmailFolder.droppable_name?). %>
-    <% chip_data = { turbo_frame: "_top", folder_name: folder[:name], folder_active: active.to_s } %>
-    <% chip_data[:mail_folder_drop_target] = "chip" if EmailFolder.droppable_name?(folder[:name]) %>
-    <%= link_to email_messages_path(folder_id: folder[:id], show_list: 1),
-          data: chip_data,
-          class: class_names(
-            "flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-colors active:scale-95",
-            active ? "bg-accent-600 text-white" : "bg-muted text-muted-foreground hover:bg-accent"
-          ) do %>
-      <%= render(Campbooks::Icon.new(Campbooks::Icon.for_folder_name(folder[:name]), css_class: "w-4 h-4")) %>
-      <%= folder[:name] %>
-      <% if folder[:count].to_i > 0 %>
-        <span class="<%= active ? "text-white/80" : "text-muted-foreground/70" %>"><%= folder[:count] %></span>
+<%# The folder-bottom-sheet controller wraps both the trigger and the sheet so the
+    trigger's data-action can reach it. The new-folder controller + dialog also live on
+    this wrapper (when with_modal) so BOTH the chip "+" and the sheet's "New folder"
+    button — which sit in different subtrees — resolve to one shared dialog. %>
+<div class="<%= local_assigns.fetch(:desktop_hidden, false) ? "lg:hidden" : "" %> flex flex-col"
+     data-controller="folder-bottom-sheet<%= " new-folder" if local_assigns.fetch(:with_modal, true) %>">
+
+  <%# Bar: non-scrolling trigger | scrollable chips %>
+  <div class="flex items-stretch border-b border-gray-100 bg-card">
+
+    <%# "Folders" trigger — always visible, never scrolls with the chips.
+        A subtle pill with a list icon that lifts the bottom sheet. %>
+    <button type="button"
+            data-action="folder-bottom-sheet#open"
+            aria-haspopup="dialog"
+            aria-label="<%= t(".folders_trigger") %>"
+            class="flex flex-shrink-0 items-center gap-1.5 border-r border-gray-100 px-3 text-[11px] font-medium text-gray-500 hover:text-gray-800 transition-colors cursor-pointer">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M3 7h18M3 12h18M3 17h18"/>
+      </svg>
+      <span><%= t(".folders") %></span>
+      <svg class="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 15l7-7 7 7"/>
+      </svg>
+    </button>
+
+    <%# Scrollable chip strip. Only the drop controller lives here; new-folder is on
+        the wrapper above so the sheet's "New folder" button can reach it too. %>
+    <div id="folder_chip_bar"
+         class="flex flex-1 items-center gap-1.5 overflow-x-auto px-3 <%= hotwire_native_app? ? "pt-5" : "pt-2" %> pb-3"
+         data-controller="mail-folder-drop"
+         data-action="dragover->mail-folder-drop#dragover drop->mail-folder-drop#drop dragleave->mail-folder-drop#dragleave click->mail-folder-drop#click">
+      <% @common_folders&.each do |folder| %>
+        <% active = (@current_folder == folder[:id]) || (folder[:id].nil? && @current_folder.nil?) %>
+        <%# Sent/Drafts are outbound/compose folders — moving received mail into them
+            makes no sense, so they get no drop-target attr (see EmailFolder.droppable_name?). %>
+        <% chip_data = { turbo_frame: "_top", folder_name: folder[:name], folder_active: active.to_s } %>
+        <% chip_data[:mail_folder_drop_target] = "chip" if EmailFolder.droppable_name?(folder[:name]) %>
+        <%= link_to email_messages_path(folder_id: folder[:id], show_list: 1),
+              data: chip_data,
+              class: class_names(
+                "flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-colors active:scale-95",
+                active ? "bg-accent-600 text-white" : "bg-muted text-muted-foreground hover:bg-accent"
+              ) do %>
+          <%= render(Campbooks::Icon.new(Campbooks::Icon.for_folder_name(folder[:name]), css_class: "w-4 h-4")) %>
+          <%= folder[:name] %>
+          <% if folder[:count].to_i > 0 %>
+            <span class="<%= active ? "text-white/80" : "text-muted-foreground/70" %>"><%= folder[:count] %></span>
+          <% end %>
+        <% end %>
       <% end %>
-    <% end %>
-  <% end %>
 
-  <%# User-defined folders (drop targets); appended to on create. display:contents
-      so the span itself doesn't break the flex row. %>
-  <span id="custom_folder_chips" class="contents">
-    <% @mail_folders&.each do |folder| %>
-      <%= render partial: "email_messages/folder_chip", locals: { folder: folder, active: @current_folder == folder.name } %>
-    <% end %>
-  </span>
+      <%# User-defined folders (drop targets); appended to on create. display:contents
+          so the span itself doesn't break the flex row. %>
+      <span id="custom_folder_chips" class="contents">
+        <% @mail_folders&.each do |folder| %>
+          <%= render partial: "email_messages/folder_chip", locals: { folder: folder, active: @current_folder == folder.name } %>
+        <% end %>
+      </span>
 
-  <%# Add a folder — provisioned across every connected account. %>
-  <button type="button"
-          data-action="new-folder#open"
-          aria-label="<%= t(".new_folder") %>"
-          title="<%= t(".new_folder") %>"
-          class="flex-shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer">
-    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-  </button>
+      <%# Add a folder — provisioned across every connected account. %>
+      <button type="button"
+              data-action="new-folder#open"
+              aria-label="<%= t(".new_folder") %>"
+              title="<%= t(".new_folder") %>"
+              class="flex-shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      </button>
 
-  <%= link_to t(".all"), email_messages_path(folder_id: "all", show_list: 1),
-        data: { turbo_frame: "_top" },
-        class: class_names(
-          "flex-shrink-0 inline-flex items-center px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-colors active:scale-95",
-          @current_folder == "all" ? "bg-accent-600 text-white" : "bg-muted text-muted-foreground hover:bg-accent"
-        ) %>
+      <%= link_to t(".all"), email_messages_path(folder_id: "all", show_list: 1),
+            data: { turbo_frame: "_top" },
+            class: class_names(
+              "flex-shrink-0 inline-flex items-center px-3 py-2 rounded-full text-xs font-medium whitespace-nowrap transition-colors active:scale-95",
+              @current_folder == "all" ? "bg-accent-600 text-white" : "bg-muted text-muted-foreground hover:bg-accent"
+            ) %>
+    </div>
+  </div>
 
+  <%# Full-screen bottom sheet — renders backdrop + panel. %>
+  <%= render(Campbooks::FolderBottomSheet.new(
+    system_folders: @common_folders || [],
+    custom_folders: @mail_folders || [],
+    current_folder: @current_folder
+  )) %>
+
+  <%# Shared New Folder dialog — sits on the wrapper (not inside the chip strip) so
+      both the chip "+" and the sheet's "New folder" button reach the new-folder
+      controller. Only when with_modal; otherwise an ancestor shell provides it. %>
   <% if local_assigns.fetch(:with_modal, true) %><%= render(Campbooks::NewFolderModal.new) %><% end %>
+
 </div>
