@@ -68,7 +68,11 @@ module Ai
       private
 
       def post_json(url, body)
-        response = connection.post(url) { |req| req.body = body.to_json }
+        model = body[:model] || body["model"]
+        response = connection.post(url) do |req|
+          req.body = body.to_json
+          req.options.context = { model: model.to_s } if model
+        end
         JSON.parse(response.body)
       end
 

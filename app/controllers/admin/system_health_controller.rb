@@ -16,4 +16,8 @@ class Admin::SystemHealthController < Admin::BaseController
       format.turbo_stream
     end
   end
+
+  def call
+    @call = ExternalServiceCall.find(params[:id])
+  end
 end

@@ -16,6 +16,23 @@ fr:
         title: "Santé du système"
   admin:
     system_health:
+      call:
+        ai_metadata: "Métadonnées IA"
+        not_captured: "(non capturé)"
+        request_body: Corps de la requête
+        request_headers: "En-têtes de la requête"
+        response_body: Corps de la réponse
+        response_headers: "En-têtes de la réponse"
+        summary:
+          ai_metadata: "Modèle IA / tokens"
+          duration: "Durée"
+          error: Erreur
+          service: Service
+          status: Statut
+          tokens_in: "%{count} entrants"
+          tokens_out: "%{count} sortants"
+          workspace: "Espace de travail"
+        title_fallback: "Détail de l'appel"
       calls:
         no_matches: Aucun appel ne correspond à vos filtres.
       show:
