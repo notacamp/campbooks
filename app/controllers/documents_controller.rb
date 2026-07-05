@@ -308,7 +308,11 @@ class DocumentsController < ApplicationController
   end
 
   def set_document
-    @document = Current.workspace.documents.includes(:classification).find(params[:id])
+    # accessible_to = FolderAccessible: a document filed only into restricted
+    # folders the user can't read must 404 by direct URL too, not just vanish
+    # from the index (workspace admins bypass inside the scope).
+    @document = Current.workspace.documents.accessible_to(Current.user)
+                       .includes(:classification).find(params[:id])
   end
 
   # True when these params move the document to a different classification.

@@ -62,10 +62,13 @@ pt:
         update:
           mapping_saved: Mapeamento de pasta guardado.
     invitations:
+      approve:
+        approved: Convite para %{email} aprovado e enviado.
       create:
         pending_review: Convite para %{email} submetido para revisão pelo administrador.
         sent: Convite enviado para %{email}.
       destroy:
         cancelled: Convite cancelado.
+      not_allowed: Não tem permissão para gerir este convite.
       resend:
         resent: Convite reenviado para %{email}.

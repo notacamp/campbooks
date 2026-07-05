@@ -480,6 +480,8 @@ fr:
           title: Zoho Drive
     members:
       index:
+        approve: Approuver
+        awaiting_approval: En attente d'approbation
         cancel_confirm: Annuler cette invitation ?
         cancel_invitation: Annuler
         current_members_heading: Membres actuels (%{count})
@@ -489,6 +491,8 @@ fr:
         invite_button: Inviter un membre
         invite_modal_heading: Inviter un membre
         invited_by: Invité par %{name}
+        make_admin: Nommer administrateur
+        make_member: Rendre membre
         no_members: Aucun membre pour l'instant.
         past_heading: Invitations passées (%{count})
         pending_heading: Invitations en attente
@@ -497,6 +501,11 @@ fr:
         subtitle: Gérez les personnes ayant accès à cet espace de travail.
         title: Membres
         you_badge: vous
+      update:
+        invalid_role: Ce rôle n'existe pas.
+        not_allowed: Seuls les administrateurs de l'espace de travail peuvent changer les rôles.
+        own_role: Vous ne pouvez pas changer votre propre rôle.
+        updated: Le rôle de %{name} a été mis à jour.
     notifications:
       digest_preference:
         saved: Préférences de notification enregistrées.

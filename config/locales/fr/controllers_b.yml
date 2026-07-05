@@ -62,10 +62,13 @@ fr:
         update:
           mapping_saved: Correspondance de dossier enregistrée.
     invitations:
+      approve:
+        approved: Invitation pour %{email} approuvée et envoyée.
       create:
         pending_review: Invitation pour %{email} soumise pour validation par un administrateur.
         sent: Invitation envoyée à %{email}.
       destroy:
         cancelled: Invitation annulée.
+      not_allowed: Vous n'avez pas la permission de gérer cette invitation.
       resend:
         resent: Invitation renvoyée à %{email}.

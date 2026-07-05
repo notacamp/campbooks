@@ -111,13 +111,17 @@ class WorkspaceMembershipTest < ActionDispatch::IntegrationTest
 
   # ── Lifecycle: cancel and resend ─────────────────────────────────────────
 
-  # 7. Any authenticated workspace member (not only admins) can cancel a pending invitation.
-  test "cancel changes the invitation status to cancelled" do
+  # 7. The inviter (or a workspace admin) can cancel their invitation; an
+  #    unrelated member cannot.
+  test "the inviter can cancel their invitation; an unrelated member cannot" do
     invitation = create(:invitation, :pending, workspace: @workspace_a, invited_by: @admin_a)
+
     sign_in_as @member_a
-
     delete settings_invitation_path(invitation)
+    assert invitation.reload.pending?, "a member who didn't send the invitation must not cancel it"
 
+    sign_in_as @admin_a
+    delete settings_invitation_path(invitation)
     assert invitation.reload.cancelled?
   end
 
@@ -136,6 +140,56 @@ class WorkspaceMembershipTest < ActionDispatch::IntegrationTest
     invitation.reload
     assert invitation.admin_approved?, "resend by admin must set admin_approved: true"
     assert_not_equal original_token, invitation.token, "resend must regenerate the invitation token"
+  end
+
+  # ── Workspace-admin approval (cloud) ─────────────────────────────────────
+
+  # 8b. A workspace admin releases a teammate's pending invitation from
+  #     Settings → Members; a plain member cannot.
+  test "workspace admin can approve a pending invitation; plain member cannot" do
+    invitation = create(:invitation, :pending, workspace: @workspace_a, invited_by: @member_a,
+                        admin_approved: false)
+
+    sign_in_as create(:user, workspace: @workspace_a, name: "Bystander B")
+    post approve_settings_invitation_path(invitation)
+    assert_not invitation.reload.admin_approved?, "a plain member must not approve invitations"
+
+    sign_in_as @admin_a
+    assert_enqueued_emails 1 do
+      post approve_settings_invitation_path(invitation)
+    end
+    assert invitation.reload.admin_approved?
+  end
+
+  # ── Member role management ────────────────────────────────────────────────
+
+  # 8c. Workspace admins hand out or take back the workspace-admin role from
+  #     Settings → Members; plain members can't, and nobody edits their own.
+  test "workspace admin can change a teammate's role; member and self-change are denied" do
+    sign_in_as @member_a
+    patch settings_member_path(@admin_a), params: { role: "member" }
+    assert @admin_a.reload.admin?, "a plain member must not demote the admin"
+
+    sign_in_as @admin_a
+    patch settings_member_path(@member_a), params: { role: "admin" }
+    assert @member_a.reload.admin?
+
+    patch settings_member_path(@admin_a), params: { role: "member" }
+    assert @admin_a.reload.admin?, "you can't change your own role"
+
+    patch settings_member_path(@member_a), params: { role: "overlord" }
+    assert @member_a.reload.admin?, "unknown roles are rejected"
+  end
+
+  # 8d. Role management is workspace-scoped: an admin can't touch another
+  #     workspace's member.
+  test "workspace admin cannot change a role in another workspace" do
+    sign_in_as @admin_a
+
+    patch settings_member_path(@member_b), params: { role: "admin" }
+
+    assert_response :not_found
+    assert @member_b.reload.member?
   end
 
   # ── Public acceptance ─────────────────────────────────────────────────────

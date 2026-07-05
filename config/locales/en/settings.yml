@@ -454,6 +454,8 @@ en:
           title: Zoho Drive
     members:
       index:
+        approve: Approve
+        awaiting_approval: Awaiting approval
         cancel_confirm: Cancel this invitation?
         cancel_invitation: Cancel
         current_members_heading: Current Members (%{count})
@@ -463,6 +465,8 @@ en:
         invite_button: Invite member
         invite_modal_heading: Invite a member
         invited_by: Invited by %{name}
+        make_admin: Make admin
+        make_member: Make member
         no_members: No members yet.
         past_heading: Past invitations (%{count})
         pending_heading: Pending Invitations
@@ -471,6 +475,11 @@ en:
         subtitle: Manage who has access to this workspace.
         title: Members
         you_badge: you
+      update:
+        invalid_role: That role doesn't exist.
+        not_allowed: Only workspace admins can change member roles.
+        own_role: You can't change your own role.
+        updated: "%{name}'s role was updated."
     notifications:
       digest_preference:
         saved: Notification preferences saved.

@@ -103,7 +103,7 @@ module Notifier
           body: I18n.t("notifier.invitation_pending_approval.body",
                         invitee_email: invitation.email,
                         inviter_name: invitation.invited_by&.name),
-          link_url: "/admin/invitations",
+          link_url: "/settings/members",
           group_key: "invitation_approval/#{invitation.id}",
           notifiable: invitation,
           respect_preferences: false
@@ -114,6 +114,44 @@ module Notifier
 
   def invitation_resolved(invitation)
     Notification.resolve(notifiable: invitation, category: :system)
+  end
+
+  # --- Task assigned to you (task / awaiting) ---
+
+  def task_assigned(task, assignee:, assigned_by:)
+    return if assignee == assigned_by
+
+    I18n.with_locale(assignee.locale.presence || I18n.default_locale) do
+      Notification.notify(
+        user: assignee,
+        category: :task,
+        priority: :awaiting,
+        title: I18n.t("notifier.task_assigned.title", actor_name: assigned_by.name),
+        body: task.title.to_s.truncate(120),
+        link_url: "/tasks/#{task.id}",
+        group_key: "task_assigned/#{task.id}/#{assignee.id}",
+        notifiable: task,
+        respect_preferences: false
+      )
+    end
+  end
+
+  # --- @mention in a task discussion (mention / awaiting) ---
+
+  def task_mention(task, mentioned_user:, actor:)
+    I18n.with_locale(mentioned_user.locale.presence || I18n.default_locale) do
+      Notification.notify(
+        user: mentioned_user,
+        category: :mention,
+        priority: :awaiting,
+        title: I18n.t("notifier.task_mention.title", actor_name: actor.name),
+        body: task.title.to_s.truncate(120),
+        link_url: "/tasks/#{task.id}",
+        group_key: "task_mention/#{task.id}/#{mentioned_user.id}",
+        notifiable: task,
+        respect_preferences: false
+      )
+    end
   end
 
   # --- Scout AI reply while you were away (ai_reply / awaiting, bell-only) ---

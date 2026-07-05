@@ -11,7 +11,8 @@ class Notification < ApplicationRecord
     ai_reply: 4, # Scout chat reply
     contact:  5, # duplicate contacts
     mention:  6, # a teammate @mentioned you in a discussion
-    comment:  7  # new activity on a discussion thread you follow
+    comment:  7, # new activity on a discussion thread you follow
+    task:     8  # a task was assigned to you
   }, prefix: true
 
   # Urgency tier — drives sectioning, toasts and badge behaviour.

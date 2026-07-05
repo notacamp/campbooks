@@ -151,7 +151,8 @@ class OnboardingController < ApplicationController
   def org
     unless Current.workspace
       new_org = Workspace.create!(name: "#{Current.user.name}'s Workspace")
-      Current.user.update_column(:workspace_id, new_org.id)
+      # Founding a workspace makes you its admin (workspace role only).
+      Current.user.update_columns(workspace_id: new_org.id, role: User.roles[:admin])
       Current.user.reload
       Current.workspace = new_org
       # New workspaces default to managed "Campbooks AI" (cloud + best-effort).

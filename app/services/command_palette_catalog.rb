@@ -89,7 +89,7 @@ class CommandPaletteCatalog
   end
 
   def admin
-    return [] unless @user&.admin?
+    return [] unless @user&.app_admin?
 
     [
       cmd("admin", I18n.t("command_palette.commands.admin_dashboard"), I18n.t("command_palette.categories.admin"), "grid", admin_root_path),
