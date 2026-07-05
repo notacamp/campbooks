@@ -30,7 +30,7 @@ pt:
         email_accounts_heading: Contas de email
         heading: Visualização
         hide_account_hint: Oculte uma conta para remover as suas conversas da lista.
-        labels_option: Etiquetas
+        tags_option: Etiquetas
         no_accounts: Ainda não há contas de email ligadas.
         show_heading: Mostrar
         subheading: Como a sua caixa de entrada aparece neste dispositivo. Guardado
@@ -77,6 +77,8 @@ pt:
         cancel: Cancelar
         color_label: Cor (hex)
         create_tag: Criar etiqueta
+        external_tag_hint: Mudar o nome ou a cor desta etiqueta irá atualizar o
+          rótulo na caixa de correio ligada.
         group_label: Grupo
         group_placeholder: ex. Finanças
       hidden_tag:
@@ -87,7 +89,7 @@ pt:
         add_tag: Adicionar etiqueta
         filtered_group: Ocultadas pela IA ou por si
         heading: Etiquetas
-        hidden_heading: Rótulos ocultos
+        hidden_heading: Etiquetas ocultas
         hidden_hint: sistema e ocultados por IA
         no_tags: Ainda não há etiquetas. Adicione uma para começar a organizar a sua
           caixa de entrada.
@@ -98,9 +100,12 @@ pt:
         delete_confirm: Eliminar %{name}?
         edit: Editar
         hide: Ocultar
+        synced_with_title: Sincronizada com %{account}
         tagged_messages_title: Mensagens com etiqueta
       toggle_hidden:
         hidden: "%{name} ocultada"
         shown: "%{name} agora está visível"
       update:
+        provider_update_failed: Não foi possível atualizar o rótulo na sua caixa
+          de correio. Tente novamente.
         updated_toast: Etiqueta actualizada.

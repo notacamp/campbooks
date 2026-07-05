@@ -3,21 +3,45 @@ class EmailMessageTagsController < ApplicationController
   before_action :set_message
 
   def create
-    # `.visible` mirrors the provider-label endpoint: hidden labels are never chips
-    # and can't be assigned from the picker.
+    # `.visible` guards against assigning a hidden system/low-value tag (404 if
+    # a stale UI or a crafted request sends one) — hidden tags are never chips.
     @tag = Current.workspace.tags.visible.find(params[:tag_id])
-    @message.tags << @tag unless @message.tags.include?(@tag)
+
+    if @tag.external?
+      begin
+        label_assignment_service.new.apply(message: @message, tag: @tag)
+      rescue Zoho::LabelAssignmentService::Error, Google::LabelAssignmentService::Error => e
+        Rails.logger.error("[EmailMessageTags] Apply failed: #{e.message}")
+      end
+    else
+      @message.tags << @tag unless @message.tags.include?(@tag)
+    end
+
     dispatch_tag_notification(@tag)
     respond_to(&:turbo_stream)
   end
 
   def destroy
     @tag = @message.tags.find(params[:id])
-    @message.tags.delete(@tag)
+
+    if @tag.external?
+      begin
+        label_assignment_service.new.remove(message: @message, tag: @tag)
+      rescue Zoho::LabelAssignmentService::Error, Google::LabelAssignmentService::Error => e
+        Rails.logger.error("[EmailMessageTags] Remove failed: #{e.message}")
+      end
+    else
+      @message.tags.delete(@tag)
+    end
+
     respond_to(&:turbo_stream)
   end
 
   private
+
+  def label_assignment_service
+    @message.email_account.google? ? Google::LabelAssignmentService : Zoho::LabelAssignmentService
+  end
 
   def set_message
     @message = EmailMessage.where(email_account: Current.user.readable_email_accounts)

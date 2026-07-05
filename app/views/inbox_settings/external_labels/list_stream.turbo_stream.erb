@@ -1,7 +1,0 @@
-<%# locals: message, severity %>
-<%= turbo_stream.replace "inbox_settings_labels_rows" do %>
-  <%= render "inbox_settings/external_labels/labels", labels: @labels, account: @account %>
-<% end %>
-<%= turbo_stream.append "action_toasts" do %>
-  <%= render "shared/action_toast", message: message, variant: severity %>
-<% end %>

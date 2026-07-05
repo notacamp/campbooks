@@ -148,7 +148,7 @@
             </span>
           <% end %>
         </div>
-        <div class="mt-0.5 flex items-center gap-1.5 flex-wrap js-inbox-labels" id="<%= dom_id(latest, :thread_tags) %>">
+        <div class="mt-0.5 flex items-center gap-1.5 flex-wrap js-inbox-tags" id="<%= dom_id(latest, :thread_tags) %>">
           <%= render "email_messages/thread_tags", message: latest %>
         </div>
         <% if waiting_reply %>
