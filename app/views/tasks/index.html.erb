@@ -33,7 +33,23 @@
   <% else %>
     <div class="divide-y divide-hair">
       <% @tasks.each do |task| %>
-        <%= render Campbooks::Tasks::Row.new(task: task) %>
+        <%= render(Campbooks::Swipeable.new(
+              id: dom_id(task, :list_item),
+              right: [
+                { key: "complete", label: t("components.swipeable.complete"), icon: :approve, color: "green",
+                  endpoint: complete_task_path(task), method: "patch", params: { swipe: 1 }, removes: true }
+              ],
+              left: [
+                { key: "archive", label: t("components.swipeable.archive"), icon: :dismiss, color: "neutral",
+                  endpoint: archive_task_path(task), method: "patch", params: { swipe: 1 }, removes: true },
+                { key: "delete", label: t("components.swipeable.delete"), icon: :trash, color: "red",
+                  endpoint: task_path(task), method: "delete", params: { swipe: 1 }, removes: true,
+                  confirm: { title: t("components.swipeable.confirm_task_delete_title"),
+                             message: t("components.swipeable.confirm_task_delete_message") } }
+              ]
+            )) do %>
+          <%= render Campbooks::Tasks::Row.new(task: task) %>
+        <% end %>
       <% end %>
     </div>
   <% end %>

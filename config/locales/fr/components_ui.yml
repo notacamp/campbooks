@@ -187,10 +187,15 @@ fr:
     swipeable:
       approve: Approuver
       archive: Archiver
+      complete: Terminer
       confirm_archive_message: Elle quitte votre boîte. Vous pouvez annuler.
       confirm_archive_title: Archiver cette conversation ?
       confirm_delete_message: Cette action est irréversible.
       confirm_delete_title: Supprimer définitivement ?
+      confirm_event_delete_message: Cette action est irréversible.
+      confirm_event_delete_title: Supprimer cet événement ?
+      confirm_task_delete_message: Cette action est irréversible.
+      confirm_task_delete_title: Supprimer cette tâche ?
       confirm_trash_message: Vous pouvez la restaurer depuis la corbeille.
       confirm_trash_title: Mettre à la corbeille ?
       delete: Supprimer

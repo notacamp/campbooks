@@ -35,10 +35,9 @@ module Features
       flag?("ENABLE_EMAIL_BOARD")
     end
 
-    # Every Microsoft 365 surface: "Sign in with Microsoft", mailbox connect, the
-    # OAuth callbacks and the Settings → Security link/unlink. Honors the legacy
-    # ENABLE_MICROSOFT_MAILBOX so deployments that already enabled mailbox connect
-    # keep working after the flags were unified.
+    # AI-generated, reusable document templates: the Settings → Document templates
+    # manager plus the fill/preview/send surfaces. Gated until production-ready;
+    # orthogonal to the per-workspace `:document_templates` billing entitlement.
     def document_templates?
       flag?("ENABLE_DOCUMENT_TEMPLATES")
     end
@@ -50,6 +49,10 @@ module Features
       flag?("ENABLE_EMAIL_TEMPLATES")
     end
 
+    # Every Microsoft 365 surface: "Sign in with Microsoft", mailbox connect, the
+    # OAuth callbacks and the Settings → Security link/unlink. Honors the legacy
+    # ENABLE_MICROSOFT_MAILBOX so deployments that already enabled mailbox connect
+    # keep working after the flags were unified.
     def microsoft?
       flag?("ENABLE_MICROSOFT") || flag?("ENABLE_MICROSOFT_MAILBOX")
     end
