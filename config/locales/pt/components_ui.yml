@@ -186,10 +186,15 @@ pt:
     swipeable:
       approve: Aprovar
       archive: Arquivar
+      complete: Concluir
       confirm_archive_message: Sai da caixa de entrada. Pode anular.
       confirm_archive_title: Arquivar esta conversa?
       confirm_delete_message: Esta ação não pode ser anulada.
       confirm_delete_title: Eliminar permanentemente?
+      confirm_event_delete_message: Esta ação não pode ser anulada.
+      confirm_event_delete_title: Eliminar este evento?
+      confirm_task_delete_message: Esta ação não pode ser anulada.
+      confirm_task_delete_title: Eliminar esta tarefa?
       confirm_trash_message: Pode restaurá-la a partir do lixo.
       confirm_trash_title: Mover para o lixo?
       delete: Eliminar
