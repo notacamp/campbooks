@@ -16,6 +16,34 @@ RSpec.describe "API v1 tags", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.parsed_body["data"].map { |t| t["name"] }).to include("Invoices")
     end
+
+    it "excludes hidden provider labels by default, includes them with ?include_hidden" do
+      Tag.create!(workspace: workspace, name: "Invoices", color: "#ccc", source: :local)
+      Tag.create!(workspace: workspace, name: "CATEGORY_UPDATES", color: "#ccc", source: :external,
+                  email_account: account, external_label_id: "CATEGORY_UPDATES", kind: :category, hidden: true)
+      headers = api_auth_headers(workspace: workspace, user: user, scopes: "tags:read")
+
+      get api_v1_tags_path, headers: headers
+      names = response.parsed_body["data"].map { |t| t["name"] }
+      expect(names).to include("Invoices")
+      expect(names).not_to include("CATEGORY_UPDATES")
+
+      get api_v1_tags_path(include_hidden: true), headers: headers
+      names = response.parsed_body["data"].map { |t| t["name"] }
+      expect(names).to include("Invoices", "CATEGORY_UPDATES")
+    end
+
+    it "exposes kind, hidden, and email_count on each tag" do
+      tag = Tag.create!(workspace: workspace, name: "Invoices", color: "#ccc", source: :local)
+      create(:email_message, email_account: account).tags << tag
+
+      get api_v1_tags_path, headers: api_auth_headers(workspace: workspace, user: user, scopes: "tags:read")
+
+      row = response.parsed_body["data"].find { |t| t["name"] == "Invoices" }
+      expect(row["kind"]).to eq("user")
+      expect(row["hidden"]).to be(false)
+      expect(row["email_count"]).to eq(1)
+    end
   end
 
   describe "POST /api/v1/emails/:email_id/tags" do
