@@ -16,6 +16,24 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Tags and provider labels are one concept.** Renaming or recoloring a
+  synced tag now updates the label in the connected mailbox immediately;
+  previously those edits were silently overwritten by the next background sync.
+  Deleting a synced tag also removes it from the provider mailbox (best-effort,
+  same as before). All tag and label assignment goes through a single endpoint
+  so the behavior is consistent regardless of whether a tag is local or
+  provider-synced.
+
+### Removed
+
+- **Settings → Inbox → Labels panel removed.** Provider labels are now managed
+  through the unified Tags panel. The background label sync every 10 minutes
+  still runs; provider labels continue to appear in the Tags panel as
+  synced tags. Creating labels from within the app is no longer supported —
+  create them directly in Gmail or Zoho and they will sync automatically.
+
 ## [0.12.2] - 2026-07-05
 
 ### Fixed

@@ -53,14 +53,13 @@ Projected sets are **permission-filtered**, run **per-item**, and report **skip-
 
 | Action | kind | target | card | level | auto | dstr | today |
 |---|---|---|---|---|---|---|---|
-| `add_tag` / `remove_tag` | mut | message | 1+ | R | A | no | ✓reg · single/bulk/palette/scout/wf |
+| `add_tag` / `remove_tag` | mut | message | 1+ | R | A | no | ✓reg · single/bulk/palette/scout/wf (external tags sync to provider labels automatically) |
 | `archive` | mut | thread | 1+ | R | A | no | ✓reg · single/bulk/palette/scout/skim/wf |
 | `trash` | mut | thread | 1+ | R | S | no¹ | ✓reg · single/bulk/palette/scout/wf |
 | `delete` (permanent) | mut | thread | 1+ | M | S | **yes** | — bulk only (`BulkDelete`) |
 | `snooze` / `unsnooze` | mut | thread | 1+ | R | A | no | ✓reg · single/bulk/palette/scout/board |
 | `mark_read` / `mark_unread` | mut | thread | 1+ | R | A | no | — bulk only |
 | `move_to_folder` | mut | thread | 1+ | R | S | no | — bulk only |
-| `add_label` / `remove_label` | mut | message | 1+ | R | S | no | — (provider labels) |
 | `forward_email` | mut | thread | 1+ | **W** | S | no² | ✓reg · single/scout/wf |
 | `reply` / `reply_all` / `send_reply` | mut | message | 1 | **W** | S | no² | — `EmailComposeController` |
 | `draft_reply` (AI) | mut | thread | 1 | R | S | no | — `Tools::DraftReply` |
@@ -157,8 +156,6 @@ All settings Actions have autonomy ceiling **`F`** (forbidden to Scout — Cmd+K
 | `toggle_notification_preference` / `bulk_toggle` | no | per tag / doc-type, in-app + email |
 | `create_signature` / `update_signature` / `set_default_signature` | no | own signatures |
 | `delete_signature` | **yes** | |
-| `create_external_label` / `update_external_label` / `sync_external_labels` | no | per email account (can_read); mirrors to provider |
-| `delete_external_label` | **yes** | deletes from provider mailbox |
 | `trigger_manual_email_scan` | no | re-sync; `classification`-adjacent |
 
 ### D3. Account sharing — `target: email_account`, group `settings_sharing`
