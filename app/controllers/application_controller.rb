@@ -114,6 +114,10 @@ class ApplicationController < ActionController::Base
     head :not_found unless Features.tasks?
   end
 
+  def require_digests_enabled
+    head :not_found unless Features.digests?
+  end
+
   # ── Signup gating (see config/initializers/registration.rb) ──
 
   def signup_mode

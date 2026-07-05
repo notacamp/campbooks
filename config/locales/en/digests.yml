@@ -1,0 +1,141 @@
+---
+en:
+  activerecord:
+    models:
+      digest:
+        one: Digest
+        other: Digests
+  components:
+    digests:
+      digest_row:
+        confirm_delete: Delete this digest and all its issues? This cannot be undone.
+        disable: Disable
+        disabled: Disabled
+        enable: Enable
+        enabled: Enabled
+        next_run: "Next: %{time}"
+      form:
+        ai_enabled: Enable AI summaries
+        ai_instructions_hint: Plain language. Say what to prioritize, group, or ignore.
+        ai_instructions_label: Custom AI instructions
+        ai_instructions_placeholder: e.g. Always lead with financial items. Keep section titles short.
+        ai_section: AI summarization
+        computing_schedule: Computing next delivery time...
+        create_button: Create digest
+        deliver_email: Deliver by email
+        delivery_section: Delivery
+        document_types_label: Document types
+        emails_query_hint: "Note: folder: filter is not supported in digests."
+        emails_query_label: Query
+        emails_query_placeholder: "from:acme tag:invoices category:important"
+        freq_daily: Daily
+        freq_monthly: Monthly
+        freq_weekly: Weekly
+        frequency_label: Frequency
+        include_overdue: Include overdue items
+        name_label: Name
+        name_placeholder: e.g. Weekly briefing
+        name_section: Digest name
+        next_run_preview: "Next delivery: %{time}"
+        no_document_types: No document types configured yet.
+        schedule_section: Schedule
+        show_in_feed: Show in home feed
+        sources_section: Sources
+        time_label: Time
+        update_button: Save changes
+        weekday_label: Day of week
+        window_days_label: Window
+        window_days_option:
+          one: 1 day
+          other: "%{count} days"
+      issue_content:
+        empty: This issue has no content.
+        untitled: "(untitled)"
+      preset_card: {}
+    feed:
+      digest_card:
+        digest: Digest
+        item_count:
+          one: 1 item
+          other: "%{count} items"
+        label: Digest
+        not_now: Not now
+        view_digest: View digest
+  digests:
+    create:
+      created: Digest created.
+    destroy:
+      deleted: Digest deleted.
+    edit:
+      title: "Edit %{name}"
+    frequencies:
+      daily: Daily
+      monthly: Monthly
+      weekly: Weekly
+    index:
+      browse_presets: Browse presets
+      empty_description: Set up your first digest to get a regular summary of your inbox, calendar, tasks, and more.
+      empty_title: No digests yet
+      new_digest: New digest
+      title: Digests
+    issues:
+      back: Back to digest
+      show:
+        subtitle: "Issue from %{date}"
+    new:
+      subtitle: Choose a preset to get started, or build a custom digest.
+      title: New digest
+      title_form: Configure your digest
+    no_subject: "(no subject)"
+    presets:
+      client_pulse:
+        description: A weekly summary of emails from a specific domain or client. Edit the query after setup.
+        label: Client pulse
+      custom:
+        description: Build your own digest from scratch — pick sources, schedule, and AI settings.
+        label: Custom digest
+      invoice_tracker:
+        description: A weekly roundup of the invoices and receipts that landed in your inbox.
+        label: Invoice tracker
+      newsletter_roundup:
+        description: A curated summary of your promotions and updates emails, so you can read them when it suits you.
+        label: Newsletter roundup
+      upcoming_tasks:
+        description: A Monday-morning list of your tasks for the coming week, including anything overdue.
+        label: Upcoming tasks
+      week_ahead:
+        description: A Sunday-evening preview of your calendar events, reminders, and tasks for the week ahead.
+        label: Week ahead
+    run_now:
+      generating: Generating digest...
+    sections:
+      calendar: Calendar
+      documents: Documents
+      emails: Emails
+      everything_else: Everything else
+      reminders: Reminders
+      tasks: Tasks
+    show:
+      cadence: "%{freq} \xB7 next at %{time}"
+      disabled: Disabled
+      enabled: Enabled
+      item_count:
+        one: 1 item
+        other: "%{count} items"
+      latest_issue: Latest issue
+      no_issues_yet: No issues generated yet. Run the digest to see results here.
+      past_issues: Past issues
+      run_now: Run now
+      view_issue: View
+    update:
+      updated: Digest updated.
+  digest_mailer:
+    issue:
+      and_more:
+        one: and 1 more
+        other: and %{count} more
+      footer_html: You're getting this because you have a scheduled digest. Manage your digests at %{manage_link}.
+      footer_text: You're getting this because you have a scheduled digest. Manage your digests at %{manage_url}
+      greeting: Hi %{name},
+      manage_link_label: your digests page
+      subject: 'Your digest: %{name}'
