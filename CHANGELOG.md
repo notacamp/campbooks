@@ -42,6 +42,12 @@ major, minor, or patch change here.
   now takes part in search: threads you're waiting on that match the query stay
   visible in their own band at the top of the results (and are no longer
   silently dropped from the view).
+- **Notifications no longer dead-end on a "not found" page.** Clicking an older
+  notification could land on a 404 — a leftover from the switch to UUID
+  identifiers, which left some notification links pointing at records by their old
+  numeric id. Existing links are repaired automatically on upgrade: where the
+  target is known they reopen the right document or Scout thread, and any that
+  can't be recovered fall back to the relevant list instead of a dead end.  
 
 ## [0.11.0] - 2026-07-05
 
