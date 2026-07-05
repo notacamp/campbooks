@@ -61,6 +61,11 @@ major, minor, or patch change here.
 
 ### Fixed
 
+- **Swipe actions in the "Waiting on replies" band now match the row's buttons.**
+  Swiping left on a waiting-reply thread now reveals "Dismiss follow-up" (the
+  same action as the inline × button) rather than Archive. The right side is
+  empty — "Draft follow-up" is a full-page action and stays tap-only.
+
 - **Documents no longer show your email address as their title.** Attachments
   pulled in from received or sent email were incorrectly stored with the raw
   sender address (e.g. `you@example.com`) as their name. Any document whose AI
