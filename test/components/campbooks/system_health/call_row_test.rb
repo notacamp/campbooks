@@ -65,4 +65,34 @@ class Campbooks::SystemHealth::CallRowTest < ActiveSupport::TestCase
     html = render_row(call)
     assert_includes html, "—"
   end
+
+  # ── href kwarg ────────────────────────────────────────────────────────────────
+
+  test "without href renders a div (non-link)" do
+    call = ExternalServiceCall.new(
+      service: "google_mail", status: :success, operation: "GET /messages",
+      duration_ms: 100, created_at: 1.hour.ago
+    )
+    html = ApplicationController.render(
+      Campbooks::SystemHealth::CallRow.new(call: call),
+      layout: false
+    )
+    # Default (no href) renders as a block div, not an anchor
+    assert_includes html, "<div"
+    assert_not_includes html, "<a "
+  end
+
+  test "with href wraps the row content in a block link" do
+    call = ExternalServiceCall.new(
+      service: "google_mail", status: :success, operation: "GET /messages",
+      duration_ms: 100, created_at: 1.hour.ago
+    )
+    html = ApplicationController.render(
+      Campbooks::SystemHealth::CallRow.new(call: call, href: "/admin/system_health/calls/some-id"),
+      layout: false
+    )
+    assert_includes html, "<a "
+    assert_includes html, 'href="/admin/system_health/calls/some-id"'
+    assert_includes html, "block hover:bg-muted/50"
+  end
 end

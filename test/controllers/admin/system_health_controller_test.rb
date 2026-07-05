@@ -64,4 +64,40 @@ class Admin::SystemHealthControllerTest < ActionDispatch::IntegrationTest
     get admin_system_health_path, headers: { "Accept" => "text/vnd.turbo-stream.html" }
     assert_response :success
   end
+
+  # ── Call detail page ──────────────────────────────────────────────────────────
+
+  test "app_admin can GET call detail page (200) with a body snippet" do
+    call = create(:external_service_call,
+      service: "ai_openai",
+      request_body: '{"model":"gpt-4","messages":[]}',
+      response_body: '{"choices":[]}',
+      request_headers: { "Content-Type" => "application/json" },
+      response_headers: { "X-Request-Id" => "req-abc" })
+
+    sign_in_as @admin
+    get call_admin_system_health_path(id: call.id)
+    assert_response :success
+    assert_includes response.body, "gpt-4"        # from request_body
+    assert_includes response.body, "req-abc"      # from response_headers
+  end
+
+  test "workspace-role admin (non-app-admin) cannot access call detail page" do
+    call = create(:external_service_call)
+    sign_in_as @user
+    get call_admin_system_health_path(id: call.id)
+    assert_redirected_to root_path
+  end
+
+  test "call detail page renders fine for a row with all-nil capture columns" do
+    call = create(:external_service_call,
+      request_headers: nil, response_headers: nil,
+      request_body: nil, response_body: nil)
+
+    sign_in_as @admin
+    get call_admin_system_health_path(id: call.id)
+    assert_response :success
+    # Should show the "not captured" placeholder for each section
+    assert_includes response.body, "(not captured)"
+  end
 end

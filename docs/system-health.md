@@ -10,7 +10,7 @@ Campbooks talks to a lot of outside services: mail providers (Gmail, Zoho Mail, 
 - One card per service the workspace actually used: its state, an hourly activity sparkline with errors highlighted, call volume, error rate, average response time, and the most recent error. Clicking a card filters the log to that service.
 - A call log of the workspace's calls, filterable by service, outcome, and time window (24 hours, 7 or 30 days).
 
-Calls are attributed to a workspace through the account that made them (its mailboxes, calendars, AI runs, workflow actions). Instance-level calls that belong to no workspace — transactional email, for example — appear only in the instance view.
+Calls are attributed to a workspace through the account that made them (its mailboxes, calendars, AI runs, workflow actions) — account-bound clients carry their workspace directly, so attribution holds even for calls triggered outside a job or request (a console session, a maintenance task). Calls that belong to no workspace — transactional email, for example — appear only in the instance view.
 
 ## The instance view
 
@@ -29,9 +29,18 @@ Expected protocol responses (for example Google Calendar's 410 "sync token expir
 
 ## What is recorded
 
-One row per call: the service, a normalized operation (HTTP method plus the path with identifiers replaced by `:id`), success or error, the HTTP status, the duration, the error class, and a sanitized error message. Workspace context is attached when known.
+One row per call: the service, a normalized operation (HTTP method plus the path with identifiers replaced by `:id`), success or error, the HTTP status, the duration, the error class, a sanitized error message, and the full request and response headers and bodies (sanitized and capped). For AI provider calls, the model name and token counts are also stored in the row's metadata.
 
-What is deliberately **not** recorded: request or response bodies, headers, email addresses or recipients, and anything credential-shaped. Query strings are stripped from URLs, and `Bearer` tokens, `key=value` credential pairs, and API-key-shaped strings are redacted from error messages before storage.
+**Security and privacy:** captured bodies and headers are visible **only in the instance admin view** (`/admin/system_health` → call detail page). The workspace-facing System health view (Settings → System health) shows metadata only — no bodies, no headers — because captured content can include mailbox data that per-user permissions would otherwise protect.
+
+Credential safety is enforced before any data reaches the database:
+
+- The following request headers are dropped entirely (not even stored as `[REDACTED]`): `Authorization`, `Proxy-Authorization`, `Cookie`, `Set-Cookie`, `X-Api-Key`, `Api-Key`, `X-Auth-Token`, `X-Goog-Api-Key`.
+- Body credential fields are redacted: values of keys matching `api_key`, `access_token`, `refresh_token`, `client_secret`, `id_token`, `password`, `secret`, and `token` in JSON bodies become `"[FILTERED]"`. URL query strings, `Bearer` tokens, `key=value` pairs, and `sk-…` API-key strings are also redacted.
+- Bodies are capped at 10 KB; binary or non-UTF-8 payloads are stored as a placeholder (e.g. `[binary image/png, 45231 bytes]`).
+- Redaction always happens before truncation, so a secret never straddles the cut point.
+
+What is deliberately **not** recorded in any view: recipient email addresses and anything that identifies individuals.
 
 ## Retention
 
