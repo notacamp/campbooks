@@ -16,6 +16,15 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **A Groups panel in the inbox settings.** Create a group, pick which tags
+  belong to it with tap-to-toggle pills, and the inbox collapses their mail
+  into that group's row — no more editing tags one by one. Groups show their
+  member tags and how many conversations they currently collapse; renaming
+  keeps everything working, and ungrouping keeps the tags. While creating, the
+  group's name prefills from the first tag you add (until you type your own).
+
 ### Fixed
 
 - **Tag groups now actually collapse on the inbox you land on.** The inbox

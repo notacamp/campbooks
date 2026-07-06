@@ -1,0 +1,38 @@
+<%= turbo_frame_tag "inbox_settings_tag_group_form" do %>
+  <div class="mb-5 rounded-lg border border-border bg-muted/40 p-4"
+       data-controller="tag-group-name">
+    <h4 class="text-xs font-semibold text-foreground mb-3">
+      <%= @group_name ? t(".heading_edit", name: @group_name) : t(".heading_new") %>
+    </h4>
+
+    <%= form_with url: inbox_settings_tag_groups_path, method: (@group_name ? :patch : :post),
+          data: { turbo_frame: "inbox_settings_panel" } do |f| %>
+      <%= hidden_field_tag :original_name, @group_name if @group_name %>
+
+      <div class="mb-3">
+        <%= label_tag :name, t(".name_label"), class: "block text-xs font-medium text-foreground mb-1" %>
+        <%= text_field_tag :name, @group_name, required: true, placeholder: t(".name_placeholder"),
+              data: { tag_group_name_target: "name", action: "input->tag-group-name#typed" },
+              class: "block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500" %>
+      </div>
+
+      <div class="mb-4">
+        <span class="block text-xs font-medium text-foreground mb-1"><%= t(".tags_label") %></span>
+        <p class="text-[11px] text-muted-foreground mb-2"><%= t(".tags_hint") %></p>
+        <div data-action="change->tag-group-name#toggle">
+          <%= render(Campbooks::PillMultiSelect.new(name: "tag_ids[]",
+                options: @pickable_tags.map { |tag|
+                  { value: tag.id, label: tag.name, color: tag.color, checked: @member_ids.include?(tag.id) }
+                })) %>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <%= render(Campbooks::Button.new(variant: :primary, size: :sm, type: :submit)) { t(".save") } %>
+        <%= render(Campbooks::Button.new(variant: :ghost, size: :sm,
+              href: inbox_settings_tag_groups_path,
+              data: { turbo_frame: "inbox_settings_panel" })) { t(".cancel") } %>
+      </div>
+    <% end %>
+  </div>
+<% end %>
