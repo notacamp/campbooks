@@ -187,4 +187,15 @@ class ApplicationController < ActionController::Base
           .map { |part| part.split(";").first.to_s.strip.split("-").first&.downcase }
           .find { |lang| available.include?(lang) }&.to_sym
   end
+
+  # Best-effort provisioning of the four default tag groups for a freshly created
+  # workspace. Never blocks account creation — the category->tag bridge
+  # (EmailProcessJob) self-heals any workspace still missing them.
+  def provision_default_groups(workspace)
+    return unless workspace
+
+    Tags::DefaultGroups.provision!(workspace)
+  rescue StandardError => e
+    Rails.logger.error("[Tags::DefaultGroups] provision failed for workspace #{workspace&.id}: #{e.class}: #{e.message}")
+  end
 end

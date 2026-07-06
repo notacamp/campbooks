@@ -24,9 +24,8 @@ class EmailMessagesController < ApplicationController
       # next page as a turbo stream and appends it to the list.
       format.turbo_stream do
         @current_group = params[:group].presence
-        @current_smart_group = valid_smart_group_param
         @pagy, @threads = pagy_countless(
-          build_thread_scope(params[:folder_id], @current_group, folder_name: params[:folder_name].presence, exclude_pinned: true, exclude_waiting_reply: true, smart_group: @current_smart_group),
+          build_thread_scope(params[:folder_id], @current_group, folder_name: params[:folder_name].presence, exclude_pinned: true, exclude_waiting_reply: true),
           limit: THREAD_PAGE_LIMIT
         )
       rescue Pagy::OverflowError
@@ -36,6 +35,7 @@ class EmailMessagesController < ApplicationController
       end
 
       format.html do
+        @current_group = params[:group].presence
         scope = EmailMessage.where(email_account: Current.user.readable_email_accounts)
 
         if params[:folder_name].present?
@@ -50,36 +50,26 @@ class EmailMessagesController < ApplicationController
           scope = scope.where(provider_folder_id: inbox_ids) if inbox_ids.any?
         end
 
-        if (smart_group = valid_smart_group_param)
-          # Smart-group drill-in: land on a message inside the bucket.
-          bundled = smart_groups_service.bundled_scope_for(smart_group)
+        if params[:group].present?
+          # Group drill-in: land on a message inside that group.
+          bundled = tag_groups_service.group_scope(params[:group])
           scope = bundled ? scope.where(email_thread_id: bundled) : scope.none
-        elsif params[:group].present?
-          scope = scope.joins(:tags)
-                       .where(tags: { group_name: params[:group], workspace_id: Current.user.workspace_id })
-        else
-          # Skip threads hidden from the main list (grouped threads) so the redirect
-          # lands on a message that appears in the sidebar — otherwise no row is
-          # marked active and the keyboard shortcuts (x/e/#/mark) have nothing to act on.
-          if (hidden = grouped_thread_scope)
-            scope = scope.where.not(email_thread_id: hidden)
-          end
-          # Same for smart-bundled threads (inbox root only) — they surface as
-          # collapsed group rows, not inline.
-          if inbox_root? && (bundled = smart_groups_service.bundled_scope)
-            scope = scope.where.not(email_thread_id: bundled)
-          end
+        elsif inbox_root? && (hidden = tag_groups_service.excluded_scope)
+          # Skip threads collapsed out of the main list (grouped mail) so the
+          # redirect lands on a message that appears in the sidebar — otherwise no
+          # row is marked active and the keyboard shortcuts have nothing to act on.
+          scope = scope.where.not(email_thread_id: hidden)
         end
 
         latest = scope.order(received_at: :desc).first
         if latest
           folder_id = params[:folder_name].present? ? nil : (params[:folder_id].presence || inbox_folder_id)
-          redirect_to email_message_path(latest, folder_id: folder_id, folder_name: params[:folder_name].presence, group: params[:group].presence, smart_group: valid_smart_group_param, inbox_settings: params[:inbox_settings].presence, show_list: params[:show_list].presence)
+          redirect_to email_message_path(latest, folder_id: folder_id, folder_name: params[:folder_name].presence, group: params[:group].presence, inbox_settings: params[:inbox_settings].presence, show_list: params[:show_list].presence)
         else
           @accounts = Current.user.readable_email_accounts.ordered
-          # With everything bundled the main list is empty but the inbox isn't:
+          # With everything collapsed the main list is empty but the inbox isn't:
           # the empty state shows the group rows instead of "no mail yet".
-          @smart_group_items = inbox_root? && !valid_smart_group_param ? smart_groups_service.build_groups(inbox_folder_ids) : []
+          @group_items = inbox_root? && params[:group].blank? ? tag_groups_service.build_groups(inbox_folder_ids) : []
           render :empty
         end
       end
@@ -181,7 +171,6 @@ class EmailMessagesController < ApplicationController
     # Load thread list for sidebar (full page loads only — frame requests
     # returned above). Only the first page is loaded up front; the rest streams
     # in on scroll.
-    readable_ids = readable_account_ids
 
     # Keep any active inbox search/filter alive across opening an email: when the
     # result link carries search params, render the list pane as the *filtered*
@@ -208,22 +197,17 @@ class EmailMessagesController < ApplicationController
       end
       # The folder-list view branches on these; keep them inert in search mode.
       @current_group = nil
-      @current_smart_group = nil
-      @tag_groups = {}
       @group_items = []
-      @smart_group_items = []
       @pinned_threads = []
       @threads = []
     else
-      # Build tag groups with per-group queries (powers the group chips in the sidebar)
       @current_group = params[:group].presence
-      @current_smart_group = valid_smart_group_param
-      @tag_groups = build_tag_groups(readable_ids, params[:folder_id])
+      @current_group_color = @current_group && tag_groups_service.group_color(@current_group)
 
       # Pinned ("Priority") threads ride at the top in their own section, shown only
       # on this first page; the paginated stream below excludes them (exclude_pinned)
       # so each pinned thread appears exactly once.
-      @pinned_threads = build_thread_scope(params[:folder_id], @current_group, folder_name: params[:folder_name].presence, smart_group: @current_smart_group)
+      @pinned_threads = build_thread_scope(params[:folder_id], @current_group, folder_name: params[:folder_name].presence)
                           .where(id: EmailThread.pinned)
                           .limit(PINNED_LIMIT)
                           .to_a
@@ -234,20 +218,15 @@ class EmailMessagesController < ApplicationController
       @waiting_threads = waiting_thread_scope(params[:folder_id], @current_group, folder_name: params[:folder_name].presence)
 
       @pagy, @threads = pagy_countless(
-        build_thread_scope(params[:folder_id], @current_group, folder_name: params[:folder_name].presence, exclude_pinned: true, exclude_waiting_reply: true, smart_group: @current_smart_group),
+        build_thread_scope(params[:folder_id], @current_group, folder_name: params[:folder_name].presence, exclude_pinned: true, exclude_waiting_reply: true),
         limit: THREAD_PAGE_LIMIT
       )
 
-      @group_items = @tag_groups.filter_map do |name, data|
-        next unless data[:count] > 0
-        { label: name, count: data[:count], senders: data[:senders], color: data[:color] }
-      end
-
-      # Smart-group rows (bundled low-priority mail) — inbox root only, and not
-      # while drilled into a bucket.
-      @smart_group_items =
-        if inbox_root? && @current_smart_group.nil?
-          smart_groups_service.build_groups(inbox_folder_ids)
+      # Collapsed group rows (default + custom tag groups) — inbox root only, and
+      # not while drilled into a group.
+      @group_items =
+        if inbox_root? && @current_group.nil?
+          tag_groups_service.build_groups(inbox_folder_ids)
         else
           []
         end
@@ -492,36 +471,17 @@ class EmailMessagesController < ApplicationController
     @current_folder = @search_params[:folder]
   end
 
-  # Smart groups (bundled low-priority mail) — one service per request; its
-  # bundled scope is memoized inside, so the main-list exclusion and the group
-  # rows share the same computation.
-  def smart_groups_service
-    @smart_groups_service ||= Emails::SmartGroups.new(Current.user, readable_account_ids)
+  # The collapse engine (default + custom tag groups) — one service per request;
+  # its guarded scopes are memoized inside, so the main-list exclusion, the group
+  # rows, and the drill-in all share one computation.
+  def tag_groups_service
+    @tag_groups_service ||= Emails::TagGroups.new(Current.workspace, readable_account_ids)
   end
 
-  # The ?smart_group= param, but only when it names a real bucket — anything
-  # else reads as "not drilled in" rather than erroring.
-  def valid_smart_group_param
-    bucket = params[:smart_group].presence
-    bucket if bucket && User::SMART_GROUP_BUCKETS.include?(bucket)
-  end
-
-  # The unfiltered default inbox — the only view that bundles. Folder views
-  # (incl. "all") and custom folders show everything inline.
+  # The unfiltered default inbox — the only view that collapses groups. Folder
+  # views (incl. "all") and custom folders show everything inline.
   def inbox_root?
     params[:folder_id].blank? && params[:folder_name].blank?
-  end
-
-  # EmailThreads hidden from the main list because they belong to a tag group.
-  # Returns an AR relation usable as a `where.not(...)` subquery, or nil when no
-  # grouped tags exist. Shared by `index` (so the redirect lands on a message
-  # that actually appears in the sidebar) and `show` (which builds the list).
-  def grouped_thread_scope
-    grouped_tag_names = workspace_tags.select { |t| t.group_name.present? }.map(&:name)
-    return nil if grouped_tag_names.empty?
-
-    EmailThread.joins(email_messages: { email_message_tags: :tag })
-               .where(tags: { name: grouped_tag_names })
   end
 
   # The ordered EmailThread relation backing the sidebar list, with the same
@@ -529,7 +489,7 @@ class EmailMessagesController < ApplicationController
   # paginated `index` turbo stream so every page of the infinite scroll is
   # consistent. Returns a GROUP BY'd relation ordered by latest message — paginate
   # it with `pagy_countless` (a COUNT would return a hash here).
-  def build_thread_scope(folder_id, group, folder_name: nil, exclude_pinned: false, exclude_waiting_reply: false, smart_group: nil)
+  def build_thread_scope(folder_id, group, folder_name: nil, exclude_pinned: false, exclude_waiting_reply: false)
     scope = EmailThread.where(email_account_id: readable_account_ids)
                        .includes(:email_account, email_messages: [ :email_account, :tags, :files_attachments, { documents: :classification } ])
                        .joins(:email_messages)
@@ -550,28 +510,15 @@ class EmailMessagesController < ApplicationController
       inbox_view = true
     end
 
-    if smart_group.present?
-      # Smart-group drill-in: only the bucket's bundled threads. The inbox
-      # folder filter above still applies to the message JOIN — bundled threads
-      # have inbox messages by construction, so nothing valid is dropped.
-      bundled = smart_groups_service.bundled_scope_for(smart_group)
+    if group.present?
+      # Group drill-in: only that group's (guarded) threads. The inbox folder
+      # filter above still applies to the message JOIN.
+      bundled = tag_groups_service.group_scope(group)
       scope = bundled ? scope.where(id: bundled) : scope.none
-    elsif group.present?
-      # Filter to a specific tag group.
-      group_thread_ids = EmailThread.joins(email_messages: { email_message_tags: :tag })
-                                    .where(tags: { group_name: group, workspace_id: Current.user.workspace_id })
-                                    .distinct.pluck(:id)
-      scope = scope.where(id: group_thread_ids)
-    else
-      if (hidden = grouped_thread_scope)
-        # Exclude grouped threads from the main list (they surface as group chips).
-        scope = scope.where.not(id: hidden)
-      end
-      # Same for smart-bundled threads — collapsed into group rows on the inbox
-      # root; folder/search views stay untouched.
-      if inbox_view && (bundled = smart_groups_service.bundled_scope)
-        scope = scope.where.not(id: bundled)
-      end
+    elsif inbox_view && (hidden = tag_groups_service.excluded_scope)
+      # Collapse grouped mail out of the inbox list — it surfaces as group rows.
+      # Folder and search views stay untouched (everything shows inline).
+      scope = scope.where.not(id: hidden)
     end
 
     # The main date-sectioned list drops pinned threads so they show only once,
@@ -626,41 +573,6 @@ class EmailMessagesController < ApplicationController
     ctx.symbolize_keys
   end
   helper_method :search_context_params
-
-  def build_tag_groups(readable_ids, folder_id)
-    grouped = workspace_tags.select { |t| t.group_name.present? }.group_by(&:group_name)
-    return {} if grouped.empty?
-
-    base = EmailThread.where(email_account_id: readable_ids).joins(:email_messages)
-    if folder_id.present? && folder_id != "all"
-      folder_ids = equivalent_folder_ids(folder_id)
-      base = base.where(email_messages: { provider_folder_id: folder_ids })
-    end
-
-    grouped.transform_values do |tags|
-      tag_names = tags.map(&:name)
-      count = base.joins(email_messages: { email_message_tags: :tag })
-                  .where(tags: { name: tag_names })
-                  .distinct.count
-
-      # Collect up to 3 unique sender addresses for the group header
-      sender_rows = EmailMessage
-        .joins(:email_thread, email_message_tags: :tag)
-        .where(tags: { name: tag_names })
-        .where(email_thread: { email_account_id: readable_ids })
-        .order(received_at: :desc)
-        .limit(20)
-        .pluck(:from_address, :contact_id, :email_account_id)
-      top_rows = sender_rows.uniq { |r| r[0] }.first(3)
-      account_colors = EmailAccount.where(id: top_rows.map { |r| r[2] }.compact.uniq)
-                                   .pluck(:id, :color).to_h
-      senders = top_rows.map do |addr, contact_id, account_id|
-        { email: addr, contact_id: contact_id, sent: false, account_color: account_colors[account_id] }
-      end
-
-      { tags: tags, count: count, senders: senders, color: tags.first&.color }
-    end
-  end
 
   def inbox_folder_ids
     name_to_folder_ids("Inbox")

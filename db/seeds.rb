@@ -73,6 +73,9 @@ puts "Seeding email tags..."
 EMAIL_TAGS.each do |name, attrs|
   Tag.find_or_create_by!(name: name, workspace: org) { |t| t.color = attrs[:color]; t.prompt = attrs[:prompt] }
 end
+# The four built-in default tag groups (Notifications / Newsletters & promos /
+# Social / Updates) that ship with every workspace.
+Tags::DefaultGroups.provision!(org)
 puts "Email tags: #{Tag.count}"
 
 # ── Document Classifications ─────────────────────────────────

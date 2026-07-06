@@ -6,11 +6,15 @@ fr:
         heading: Tableau
     empty:
       add_account_button: Ajouter un compte e-mail
-      all_sorted_description: Il ne reste que du courrier secondaire, classé dans les groupes ci-dessous. Touchez-en un pour le passer en revue ou le vider.
+      all_sorted_description: Il ne reste que du courrier secondaire, classé dans
+        les groupes ci-dessous. Touchez-en un pour le passer en revue ou le vider.
       all_sorted_title: Votre boîte de réception est rangée
+      back_to_inbox_button: Retour à la boîte de réception
       connect_email_description: Liez un compte e-mail pour commencer à recevoir et
         traiter vos e-mails automatiquement.
       connect_email_title: Connectez votre e-mail
+      group_clear_description: Rien de %{group} n'attend dans votre boîte de réception.
+      group_clear_title: Ce groupe est à jour
       manage_accounts_button: Gérer les comptes e-mail
       no_mail_yet_description: Vos comptes e-mail sont connectés. Les messages apparaîtront
         ici après la prochaine analyse.
@@ -166,7 +170,7 @@ fr:
       search_tags_placeholder: Rechercher des étiquettes...
     thread_list:
       archive_all: Tout archiver
-      back_to_inbox: "— retour à la boîte de réception"
+      back_to_inbox_label: Boîte de réception
       dismiss_follow_up: Ignorer la relance
       draft_follow_up: Rédiger une relance
       drag_to_folder: Glisser vers un dossier

@@ -157,6 +157,9 @@ class OnboardingController < ApplicationController
       Current.workspace = new_org
       # New workspaces default to managed "Campbooks AI" (cloud + best-effort).
       Ai::ProviderSetup.apply_managed_default(new_org)
+      # Ship the four default tag groups so the inbox collapses low-priority mail
+      # from day one. Best-effort: the category->tag bridge self-heals if missed.
+      provision_default_groups(new_org)
     end
     Current.workspace
   end
