@@ -66,8 +66,8 @@ module Mcp
         # contacts / tags / document types
         list_contacts, get_contact, update_contact, set_contact_state,
         list_tags, list_document_types,
-        # taxonomy (create)
-        create_tag, create_document_type, create_folder,
+        # taxonomy (create + manage)
+        create_tag, update_tag, merge_tags, delete_tag, create_document_type, create_folder,
         # tasks (all gated on Features.tasks?)
         list_tasks, get_task, create_task, update_task, complete_task, create_task_from_email,
         # calendar helpers
@@ -1199,6 +1199,111 @@ module Mcp
       end
     end
 
+    def update_tag
+      build(
+        name: "update_tag",
+        description: "Rename or restyle a tag, or change its group heading / hidden state. " \
+                     "Use merge_tags to fold one tag into another and delete_tag to remove one.",
+        scope: "tags:write",
+        input_schema: object_schema(
+          properties: {
+            id: { type: "string", description: "Tag id or name" },
+            name: { type: "string", description: "New name" },
+            color: { type: "string", description: "Hex color" },
+            group_name: { type: "string", description: "Group heading; pass an empty string to ungroup" },
+            hidden: { type: "boolean", description: "Hide the tag as an inbox chip" }
+          },
+          required: %w[id]
+        )
+      ) do |args|
+        require_arg(args, "id")
+        tag = resolve_workspace_tag(args["id"])
+
+        attrs = {}
+        attrs[:name]       = args["name"] if args["name"].present?
+        attrs[:color]      = args["color"] if args["color"].present?
+        attrs[:group_name] = args["group_name"].presence if args.key?("group_name")
+        attrs[:hidden]     = args["hidden"] if [ true, false ].include?(args["hidden"])
+        tag.update!(attrs)
+
+        count = EmailMessageTag.where(tag_id: tag.id).count
+        { tag: Api::V1::TagSerializer.new(tag.reload, email_count: count).as_json }
+      rescue ActiveRecord::RecordInvalid => e
+        raise Mcp::ToolError, "A tag named '#{args["name"]}' already exists." if e.message =~ /unique|already taken/i
+
+        raise
+      end
+    end
+
+    def merge_tags
+      build(
+        name: "merge_tags",
+        description: "Merge one or more source tags into a target tag: every email (and task) tagged " \
+                     "with a source is re-tagged to the target, then each source tag is deleted. " \
+                     "Tags are resolved by id or name. This is the safe way to collapse duplicate tags " \
+                     "(e.g. fold 'notifications' into 'Notifications') without dropping any labels.",
+        scope: "tags:write",
+        input_schema: object_schema(
+          properties: {
+            target: { type: "string", description: "Surviving tag: id or name" },
+            sources: { type: "array", items: { type: "string" },
+                       description: "Tags to fold in and delete: ids or names" }
+          },
+          required: %w[target sources]
+        )
+      ) do |args|
+        require_arg(args, "target", "sources")
+        target = resolve_workspace_tag(args["target"])
+        source_refs = Array(args["sources"])
+        raise Mcp::RpcError.new(-32_602, "sources must be a non-empty array.") if source_refs.empty?
+
+        merged = 0
+        source_refs.each do |ref|
+          source = resolve_workspace_tag(ref)
+          next if source.id == target.id # ignore a tag merged into itself
+
+          Tags::MergeService.new(source: source, target: target).merge!
+          merged += 1
+        end
+
+        count = EmailMessageTag.where(tag_id: target.id).count
+        { merged_count: merged, target: Api::V1::TagSerializer.new(target.reload, email_count: count).as_json }
+      rescue Tags::MergeService::MergeError => e
+        raise Mcp::ToolError, "Merge failed: #{e.message}"
+      end
+    end
+
+    def delete_tag
+      build(
+        name: "delete_tag",
+        description: "Delete a workspace tag (by id or name). Refuses when the tag still labels emails " \
+                     "unless force: true — prefer merge_tags to preserve that labeling. The system " \
+                     "'security_flagged' tag can never be deleted.",
+        scope: "tags:write",
+        input_schema: object_schema(
+          properties: {
+            id: { type: "string", description: "Tag id or name" },
+            force: { type: "boolean", description: "Delete even if it still labels emails (default false)" }
+          },
+          required: %w[id]
+        )
+      ) do |args|
+        require_arg(args, "id")
+        tag = resolve_workspace_tag(args["id"])
+        raise Mcp::ToolError, "The 'security_flagged' tag can't be deleted." if tag.name == "security_flagged"
+
+        email_count = EmailMessageTag.where(tag_id: tag.id).count
+        if email_count.positive? && !args["force"]
+          raise Mcp::ToolError,
+                "Tag '#{tag.name}' still labels #{email_count} email(s). Merge it into another tag with " \
+                "merge_tags, or pass force: true to delete it and drop the label."
+        end
+
+        tag.destroy!
+        { ok: true, deleted_tag_id: tag.id, name: tag.name, dropped_email_count: email_count }
+      end
+    end
+
     def create_document_type
       build(
         name: "create_document_type",
@@ -2087,6 +2192,26 @@ module Mcp
       else
         raise Mcp::RpcError.new(-32_602, "Provide tag_id or name.")
       end
+    end
+
+    # Resolve a tag by id (UUID) or name, scoped to the workspace. The
+    # tag-management tools accept either form. An EXACT-case name match wins
+    # first, so case-variant duplicates ("Notifications" vs "notifications" —
+    # exactly what merge_tags exists to collapse) each resolve to their own tag;
+    # a case-insensitive match is only the fallback when no exact one exists. The
+    # UUID shape is checked before hitting the uuid column so a plain name can't
+    # raise a PG::InvalidTextRepresentation.
+    def resolve_workspace_tag(ref)
+      ref = ref.to_s.strip
+      raise Mcp::RpcError.new(-32_602, "A tag reference (id or name) is required.") if ref.empty?
+
+      scope = Current.workspace.tags
+      tag = scope.find_by(id: ref) if ref.match?(/\A\h{8}-\h{4}-\h{4}-\h{4}-\h{12}\z/)
+      tag ||= scope.find_by(name: ref)
+      tag ||= scope.find_by("LOWER(tags.name) = ?", ref.downcase)
+      raise Mcp::ToolError, "No tag matching '#{ref}'." unless tag
+
+      tag
     end
 
     def writable_calendars

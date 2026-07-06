@@ -26,6 +26,13 @@ major, minor, or patch change here.
   (reversible via `update_emails(action: unarchive)`). Requires the `emails:write`
   scope. The bulk-archive tag filter now matches case-insensitively, so a
   capitalized group tag (`Notifications`, `Social`, …) matches a lower-cased value.
+- **MCP: tag-taxonomy management tools — `update_tag`, `merge_tags`, `delete_tag`.**
+  Agents can now rename/recolour/regroup a tag, fold duplicate tags into one
+  (`merge_tags` re-tags every email and task from the sources to the target, then
+  deletes the sources — the safe way to collapse `notifications` into
+  `Notifications`), and delete a tag (guarded: refuses a tag that still labels
+  emails unless `force: true`, and never deletes the system `security_flagged`
+  tag). Tags resolve by id or name. All require the `tags:write` scope.
 
 ### Changed
 
