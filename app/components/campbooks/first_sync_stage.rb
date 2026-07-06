@@ -145,14 +145,14 @@ module Campbooks
           input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
 
           # 2-col grid of compact icon + name chips; collapses to 1 col at narrow widths
-          div(class: "grid grid-cols-1 gap-1.5 xs:grid-cols-2 sm:grid-cols-2") do
+          div(class: "grid grid-cols-1 gap-1.5 sm:grid-cols-2") do
             Onboarding::Templates.all.each do |tpl|
               key = tpl[:key]
               label(
                 class: "flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-background p-2.5 text-left transition-all hover:border-accent-300 hover:bg-accent-50/40 has-[:checked]:border-accent-500 has-[:checked]:bg-accent-50/60 dark:hover:bg-accent-900/10 dark:has-[:checked]:bg-accent-900/20"
               ) do
                 input(type: "checkbox", name: "template_keys[]", value: key, class: "sr-only")
-                span(class: "flex h-5 w-5 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground has-[:checked]:bg-accent-100 has-[:checked]:text-accent-700 dark:has-[:checked]:bg-accent-900/30 dark:has-[:checked]:text-accent-400") do
+                span(class: "flex h-5 w-5 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground") do
                   raw safe(%(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3" aria-hidden="true"><path d="#{tpl[:icon]}"/></svg>))
                 end
                 span(class: "min-w-0 flex-1 truncate text-xs font-medium text-foreground leading-snug") do

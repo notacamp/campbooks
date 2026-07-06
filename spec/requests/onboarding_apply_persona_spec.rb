@@ -26,8 +26,8 @@ RSpec.describe "POST /onboarding/apply_persona", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.content_type).to include("turbo-stream")
       expect(response.body).to include("first-sync-persona")
-      # The confirmation partial shows applied item names, not the template key
-      expect(response.body).to include("Clients").or include("Invoices")
+      # The confirmation partial shows applied item names (as stored), not the template key
+      expect(response.body).to include("clients").or include("invoices")
     end
 
     it "shows the success confirmation copy" do

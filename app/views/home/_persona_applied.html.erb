@@ -5,7 +5,9 @@
   exploring = keys.blank? || keys == ["just_exploring"]
   unless exploring
     all_items  = result[:tags].to_a + result[:document_types].to_a
-    item_names = all_items.first(4).map { |r| r.respond_to?(:name) ? r.name.titleize : r.to_s }.join(", ")
+    item_names = all_items.first(4).map { |r| r.respond_to?(:name) ? r.name : r.to_s }.join(", ")
+    # Idempotent re-apply creates nothing — fall back to the chosen templates' names.
+    item_names = keys.map { |k| t("onboarding.steps.template.templates.#{k}.name") }.join(", ") if item_names.blank?
   end
 %>
 <div id="first-sync-persona"

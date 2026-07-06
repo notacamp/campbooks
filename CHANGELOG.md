@@ -21,6 +21,19 @@ major, minor, or patch change here.
 - The first-sync wait screen now asks what you mostly deal with (persona setup applies mid-scan via a compact chip picker; a Turbo Stream swaps the card for a confirmation once submitted).
 - Skipping the first-sync stage via the escape hatch now actually skips it — a POST sets a session flag so home does not re-trap you in the stage on subsequent visits.
 
+### Changed
+
+- **Default inbox noise buckets now collapse even after you reply or when a
+  sibling message is important.** The four built-in tag groups (Notifications,
+  Newsletters & promos, Social, Updates) used to stay in the main inbox list
+  whenever the "a human cares about this thread" guards fired — including when
+  you'd once replied to the thread, or another message in it was categorized
+  `important` — which leaked automated mail back into the inbox. Those buckets now
+  honor only the explicit signals: pinning a thread or starring its sender still
+  keeps it inline, but a stray reply or important sibling no longer does. Custom
+  (user-defined) tag groups and rule-based groups are unchanged — they keep the
+  full guard set.
+
 ### Fixed
 
 - An in-progress inbox no longer claims "All caught up" when the user navigates away from the first-sync stage while a scan is still running. Home now shows an honest "Scout is reading your inbox" state.
