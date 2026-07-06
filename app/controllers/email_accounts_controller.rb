@@ -78,20 +78,25 @@ class EmailAccountsController < ApplicationController
   end
 
   def destroy
-    # Disconnecting deactivates the account for everyone it's shared with, so it
-    # is owner-only — a read/send sharee must not be able to sever access.
+    # Removing an account tears it down for everyone it's shared with, so it is
+    # owner-only — a read/send sharee must not be able to sever access.
     unless @email_account.owned_by?(Current.user)
       redirect_to email_messages_path(inbox_settings: "accounts"), error: t(".owner_only")
       return
     end
 
-    @email_account.deactivate!
+    name = @email_account.display_name
     Events.publish("email_account.disconnected", subject: @email_account, payload: { "email_address" => @email_account.email_address, "provider" => @email_account.provider })
-    # GDPR: sever the grant at the provider too — but not if a still-connected
-    # sibling (e.g. the calendar from the same OAuth grant) is using the token.
-    Accounts::TokenRevoker.revoke_if_unshared(@email_account)
 
-    redirect_to email_messages_path(inbox_settings: "accounts"), success: t(".disconnected", name: @email_account.display_name)
+    # Take it out of every active scope (account pickers, filters, the sync jobs)
+    # the instant the user clicks, then do the heavy teardown — messages,
+    # attachments, token revoke — off-request so a large mailbox can't time out
+    # the click. update_columns skips the after_update "disconnected" notifier:
+    # this is a permanent removal, not a transient reconnect-me disconnect.
+    @email_account.update_columns(active: false)
+    EmailAccountRemovalJob.perform_later(@email_account.id)
+
+    redirect_to email_messages_path(inbox_settings: "accounts"), success: t(".removed", name: name)
   end
 
   private

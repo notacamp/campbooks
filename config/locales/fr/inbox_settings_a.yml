@@ -5,7 +5,8 @@ fr:
       show:
         active: Actif
         connect_label: 'Connecter :'
-        disconnect_confirm: Déconnecter %{name} ?
+        remove: Supprimer
+        remove_confirm: "Supprimer %{name} ? Cette action supprime définitivement la boîte mail et ses e-mails. Les documents et contacts enregistrés sont conservés. Cette action est irréversible."
         heading: Comptes et synchronisation
         inactive: Inactif
         last_scan: 'Dernière analyse : %{time}'
