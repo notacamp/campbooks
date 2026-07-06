@@ -87,6 +87,7 @@ module Google
         end
 
         raise Emails::CursorExpired, "Gmail historyId #{start_history_id} expired" if response.status == 404
+        raise_if_mailbox_unavailable!(response)
         unless response.success?
           Rails.logger.error("[Google::MailClient] list_history failed: #{response.status} #{response.body[0..300]}")
           break
@@ -118,6 +119,7 @@ module Google
     # cursor after a full resync so the next incremental pull starts from "now".
     def current_history_id
       response = connection.get("#{BASE_URL}/profile")
+      raise_if_mailbox_unavailable!(response)
       return nil unless response.success?
 
       JSON.parse(response.body)["historyId"]
@@ -606,9 +608,21 @@ module Google
          CHAT SNOOZED].include?(label_id)
     end
 
+    # Raised by every users.* call for a Google identity with no Gmail mailbox:
+    # 400 FAILED_PRECONDITION "Mail service not enabled". Permanent — the scan
+    # pipeline catches Emails::MailboxUnavailable and deactivates the account
+    # instead of retrying every minute. Interactive callers (EmailAccount#folders)
+    # already `rescue`, so raising here is safe for them too.
+    def raise_if_mailbox_unavailable!(response)
+      return if response.success?
+      return unless response.status == 400 && response.body.to_s.include?("Mail service not enabled")
+      raise Emails::MailboxUnavailable, "Gmail is not enabled for this Google account"
+    end
+
     def list_labels_raw
       response = connection.get("#{BASE_URL}/labels")
 
+      raise_if_mailbox_unavailable!(response)
       unless response.success?
         Rails.logger.error("[Google::MailClient] list_labels failed: #{response.status} #{response.body[0..300]}")
         return []

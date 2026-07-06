@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_06_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_06_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -219,6 +219,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_130000) do
     t.boolean "active", default: true, null: false
     t.string "color", default: "#3b82f6", null: false
     t.datetime "created_at", null: false
+    t.string "deactivation_reason"
     t.string "email_address", null: false
     t.datetime "last_scanned_at"
     t.string "name"
@@ -615,6 +616,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_130000) do
     t.boolean "active", default: true, null: false
     t.string "color", default: "#3b82f6", null: false
     t.datetime "created_at", null: false
+    t.string "deactivation_reason"
     t.string "email_address", null: false
     t.string "history_id"
     t.datetime "last_scanned_at"
