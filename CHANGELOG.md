@@ -16,6 +16,17 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **MCP: `archive_emails` tool to clear inbox noise at scale.** Agents can now
+  archive every email matching a filter — a whole tag (e.g. `Notifications`), a
+  date range, a sender, or an AI priority — instead of being capped at
+  `update_emails`' 100-id batches. Call it with `preview: true` first to see how
+  many messages match without touching anything, then again to archive them
+  (reversible via `update_emails(action: unarchive)`). Requires the `emails:write`
+  scope. The bulk-archive tag filter now matches case-insensitively, so a
+  capitalized group tag (`Notifications`, `Social`, …) matches a lower-cased value.
+
 ### Changed
 
 - **Removing an email account now actually removes it — and the button works.** In
