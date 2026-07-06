@@ -1,0 +1,47 @@
+---
+es:
+  onboarding:
+    steps:
+      template:
+        heading: "¿Para qué usarás principalmente Campbooks?"
+        subheading: Elige la opción que mejor se adapte. Configuraremos las etiquetas y tipos de documentos adecuados de inmediato.
+        continue: Continuar
+        skip: Omitir por ahora
+        skip_hint: Puedes elegir una configuración más tarde en Ajustes.
+        templates:
+          freelancer:
+            name: Freelancer
+            description: Gestiona clientes, facturas, contratos y papeleo de proyectos en un solo lugar.
+          small_business:
+            name: Pequeña empresa
+            description: Controla facturas de proveedores, extractos bancarios, nóminas y comunicaciones del equipo.
+          personal_admin:
+            name: Administración personal
+            description: Organiza recibos, pólizas de seguro, cartas de organismos gubernamentales y papeleo del hogar.
+          job_hunt:
+            name: Búsqueda de empleo
+            description: Sigue candidaturas, invitaciones a entrevistas y ofertas sin que nada se pierda.
+          just_exploring:
+            name: Solo explorando
+            description: Echa un vistazo primero. Siempre puedes configurar etiquetas y tipos de documentos después.
+  settings:
+    setup_template:
+      show:
+        title: Configuración
+        subtitle: Revisa la configuración de tu espacio de trabajo y ajústala en cualquier momento.
+        current_heading: Configuración activa
+        no_template: Ninguna plantilla de configuración elegida todavía.
+        tags_added: Etiquetas añadidas
+        doc_types_added: Tipos de documentos añadidos
+        switch_heading: Cambiar configuración
+        switch_hint: Cambiar añade nuevas etiquetas y tipos de documentos de la plantilla elegida. Nada se elimina.
+        apply_button: Aplicar plantilla
+        non_destructive_note: Cambiar nunca elimina etiquetas, tipos de documentos ni correos existentes.
+        modules_heading: Visibilidad de módulos
+        modules_hint: Elige qué áreas aparecen en la navegación. Puedes cambiarlas en cualquier momento.
+        save_modules: Guardar
+      update:
+        applied: "Plantilla %{name} aplicada."
+        invalid_template: Plantilla desconocida. Por favor elige una de la lista.
+      update_modules:
+        modules_saved: Navegación actualizada.
