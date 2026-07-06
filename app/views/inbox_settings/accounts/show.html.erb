@@ -62,8 +62,13 @@
                           data: { turbo: false },
                           class: "px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded cursor-pointer transition-colors" %>
                     <% if account.owned_by?(Current.user) %>
-                      <%= button_to t("shared.actions.disconnect"), email_account_path(account), method: :delete,
-                            data: { turbo_confirm: t(".disconnect_confirm", name: account.display_name) },
+                      <%# turbo_frame: _top — the delete redirects to a full email_messages page %>
+                      <%# (a different layout) which Turbo can't swap into this frame, so without %>
+                      <%# breaking out the click silently no-renders. _top drives a full-page %>
+                      <%# navigation (like the recent-scans links below) while keeping Turbo on, %>
+                      <%# so the destructive-action turbo_confirm still fires. %>
+                      <%= button_to t(".remove"), email_account_path(account), method: :delete,
+                            data: { turbo_frame: "_top", turbo_confirm: t(".remove_confirm", name: account.display_name) },
                             class: "px-2 py-0.5 text-xs font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10 rounded cursor-pointer transition-colors" %>
                     <% end %>
                   </div>

@@ -18,6 +18,14 @@ major, minor, or patch change here.
 
 ### Changed
 
+- **Removing an email account now actually removes it — and the button works.** In
+  Inbox settings → Accounts, the account action is now labelled **Remove** and does
+  what it says: after a confirmation, it deletes the mailbox connection and everything
+  synced from it — emails, threads, folders, scan history, scheduled sends — and revokes
+  Campbooks' access at the provider (unless a still-connected calendar shares the same
+  sign-in). Documents you've filed and contacts you've saved are **kept**; they're just
+  detached from the removed mailbox. The button previously did nothing when clicked;
+  the teardown now runs in the background so even a large mailbox can't stall it.
 - **Default inbox noise buckets now collapse even after you reply or when a
   sibling message is important.** The four built-in tag groups (Notifications,
   Newsletters & promos, Social, Updates) used to stay in the main inbox list

@@ -11,17 +11,25 @@ RSpec.describe "EmailAccounts permissions", type: :request do
     create(:email_account_user, :collaborator, user: sharee, email_account: account)
   end
 
-  describe "DELETE /email_accounts/:id (disconnect)" do
-    it "lets the owner disconnect the account" do
+  describe "DELETE /email_accounts/:id (remove)" do
+    it "lets the owner remove the account: deactivates now, tears down off-request" do
       sign_in(owner)
-      delete email_account_path(account)
 
+      expect do
+        delete email_account_path(account)
+      end.to have_enqueued_job(EmailAccountRemovalJob).with(account.id)
+
+      # Dropped from the active set immediately for instant UI feedback; the
+      # heavy teardown runs in the enqueued job.
       expect(account.reload.active).to be(false)
     end
 
-    it "blocks a non-owner sharee from disconnecting" do
+    it "blocks a non-owner sharee from removing the account" do
       sign_in(sharee)
-      delete email_account_path(account)
+
+      expect do
+        delete email_account_path(account)
+      end.not_to have_enqueued_job(EmailAccountRemovalJob)
 
       expect(account.reload.active).to be(true)
     end
