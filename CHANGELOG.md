@@ -29,6 +29,8 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Scheduling emails now show the drafted event inline — one tap adds it to your calendar (Edit still opens the full form).** When Scout detects a time proposal in an email (e.g. "does 3pm work?"), a bordered event block appears below the thread with the extracted title and time range. Tap "Add to calendar" to confirm it in one step; tap "Edit" to open the prefilled calendar form. Scout drafts — you decide.
+
 - **MCP: `archive_emails` tool to clear inbox noise at scale.** Agents can now
   archive every email matching a filter — a whole tag (e.g. `Notifications`), a
   date range, a sender, or an AI priority — instead of being capped at
