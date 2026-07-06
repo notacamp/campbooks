@@ -69,6 +69,31 @@ fr:
         subheading: Décidez quels expéditeurs atteignent votre boîte de réception.
         unblock: Débloquer
         unstar: Retirer la mise en avant
+    tag_groups:
+      form:
+        cancel: Annuler
+        heading_edit: Modifier %{name}
+        heading_new: Nouveau groupe
+        name_label: Nom
+        name_placeholder: p. ex. Newsletters et promos
+        save: Enregistrer le groupe
+        tags_hint: Le courrier portant l'une de ces étiquettes est replié dans
+          la ligne du groupe. Une étiquette n'appartient qu'à un seul groupe.
+        tags_label: Étiquettes de ce groupe
+      index:
+        edit: Modifier
+        heading: Groupes
+        new_group: Nouveau groupe
+        no_groups: Aucun groupe pour l'instant. Créez-en un pour replier le courrier
+          secondaire en une seule ligne.
+        subheading: Regroupez des étiquettes ; la boîte de réception replie leur
+          courrier en une seule ligne.
+        threads_count:
+          one: "%{count} conversation"
+          other: "%{count} conversations"
+        ungroup: Dissocier
+        ungroup_confirm: Dissocier %{name} ? Les étiquettes restent ; leur courrier
+          cesse simplement d'être replié.
     tags:
       create:
         created_toast: Étiquette créée.

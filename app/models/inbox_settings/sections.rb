@@ -17,6 +17,7 @@ module InboxSettings
     # action renders into the `inbox_settings_panel` Turbo Frame.
     ALL = [
       { key: "tags",           path: :inbox_settings_tags_path,           icon: :tag },
+      { key: "tag_groups",     path: :inbox_settings_tag_groups_path,      icon: :stack },
       { key: "document_types", path: :inbox_settings_document_types_path,  icon: :doc },
       { key: "filtering",      path: :inbox_settings_filtering_path,       icon: :filter },
       { key: "signatures",     path: :inbox_settings_signatures_path,      icon: :pen },

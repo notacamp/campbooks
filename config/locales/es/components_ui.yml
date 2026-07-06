@@ -118,6 +118,7 @@ es:
         document_types: Tipos de documento
         filtering: Filtrado
         signatures: Firmas
+        tag_groups: Grupos
         tags: Etiquetas
       settings_sections_label: Secciones de configuración
       title: Configuración de la bandeja de entrada
