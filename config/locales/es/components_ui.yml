@@ -149,6 +149,14 @@ es:
         forward: Reenviar
         mark_read: Marcar como leído
         mark_unread: Marcar como no leído
+        nav_activity: Ir a Actividad
+        nav_calendar: Ir a Calendario
+        nav_contacts: Ir a Contactos
+        nav_files: Ir a Archivos
+        nav_home: Ir a Inicio
+        nav_mail: Ir a Correo
+        nav_organizations: Ir a Organizaciones
+        nav_scout: Ir a Scout
         navigate_threads: Navegar conversaciones
         reply: Responder
         reply_all: Responder a todos
