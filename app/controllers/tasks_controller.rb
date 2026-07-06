@@ -10,25 +10,16 @@ class TasksController < ApplicationController
   before_action :set_task, only: %i[show edit update destroy archive unarchive complete move assign email_picker link_email unlink_email document_picker attach_document detach_document remind accept dismiss]
   before_action :load_collections, only: %i[show new create edit update]
 
-  # The live work the user cares about: due-date first (nulls last), then most
-  # recently touched. AI-suggested tasks are hidden here — they're triaged in Skim.
+  # The tasks surface. Defaults to the status **board** (the kanban); `?view=list`
+  # switches to the flat list. AI-suggested tasks are excluded from both — they're
+  # triaged in Skim (surfaced by the triage banner).
   def index
+    @view = params[:view] == "list" ? "list" : "board"
     base = Task.accessible_to(current_user)
     @counts = base.not_archived.group(:status).count
     @triage_count = @counts["suggested"] || 0
-    @archived_count = base.archived.count
 
-    @status = params[:status].presence
-    scope = base.includes(:assignees, :tags, :created_by)
-    scope = if @status == "archived"
-      scope.archived
-    elsif @status && Task.statuses.key?(@status)
-      scope.not_archived.where(status: @status)
-    else
-      scope.not_archived.where.not(status: :suggested)
-    end
-
-    @tasks = scope.order(Arel.sql("due_at ASC NULLS LAST, updated_at DESC"))
+    @view == "list" ? load_list(base) : load_board(base)
   end
 
   def show
@@ -140,19 +131,6 @@ class TasksController < ApplicationController
     respond_with_change(t(".moved"))
   end
 
-  # Status kanban: the board columns with their tasks. Drag-to-move posts to #move.
-  def board
-    scope = Task.accessible_to(current_user).not_archived.where(status: Task::BOARD_STATUSES).includes(:assignees, :tags)
-    grouped = scope.group_by(&:status)
-    @columns = Task::BOARD_STATUSES.map do |status|
-      {
-        key:   status,
-        label: t("activerecord.attributes.task.statuses.#{status}"),
-        tasks: (grouped[status] || []).sort_by { |t| [ t.position, t.created_at ] }
-      }
-    end
-  end
-
   # Replace the task's assignees with the posted set (workspace members only),
   # recording who made each new assignment and publishing task.assigned for them.
   def assign
@@ -250,6 +228,36 @@ class TasksController < ApplicationController
     @task = Task.accessible_to(current_user).find(params[:id])
   rescue ActiveRecord::RecordNotFound
     head :not_found
+  end
+
+  # Flat list (?view=list): due-date first (nulls last), then most recently
+  # touched, filtered by the status chips. Excludes suggested unless asked.
+  def load_list(base)
+    @archived_count = base.archived.count
+    @status = params[:status].presence
+    scope = base.includes(:assignees, :tags, :created_by)
+    scope = if @status == "archived"
+      scope.archived
+    elsif @status && Task.statuses.key?(@status)
+      scope.not_archived.where(status: @status)
+    else
+      scope.not_archived.where.not(status: :suggested)
+    end
+    @tasks = scope.order(Arel.sql("due_at ASC NULLS LAST, updated_at DESC"))
+  end
+
+  # Status kanban (default): the board columns with their tasks. Drag-to-move
+  # posts to #move.
+  def load_board(base)
+    scope = base.not_archived.where(status: Task::BOARD_STATUSES).includes(:assignees, :tags)
+    grouped = scope.group_by(&:status)
+    @columns = Task::BOARD_STATUSES.map do |status|
+      {
+        key:   status,
+        label: t("activerecord.attributes.task.statuses.#{status}"),
+        tasks: (grouped[status] || []).sort_by { |t| [ t.position, t.created_at ] }
+      }
+    end
   end
 
   # Workspace members (assignee picker) + local, non-system labels (label picker).

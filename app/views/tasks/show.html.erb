@@ -175,12 +175,11 @@
     <aside class="w-full space-y-6 lg:w-56 lg:shrink-0">
       <section>
         <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".assignees") %></h2>
-        <%= form_with url: assign_task_path(@task), method: :post, data: { turbo: false }, class: "space-y-2.5" do %>
+        <%= form_with url: assign_task_path(@task), method: :post, data: { turbo: false }, class: "space-y-3" do %>
           <% if @members.any? %>
-            <%= hidden_field_tag "assignee_ids[]", "" %>
-            <% @members.each do |member| %>
-              <%= render Campbooks::Checkbox.new("assignee_ids[]", label: member.name, value: member.id, checked: @task.assignee_ids.include?(member.id)) %>
-            <% end %>
+            <%= render Campbooks::PillMultiSelect.new(
+                  name: "assignee_ids[]",
+                  options: @members.map { |m| { value: m.id, label: m.name, avatar: m.name, checked: @task.assignee_ids.include?(m.id) } }) %>
             <button type="submit" class="<%= task_btn(:outline) %>"><%= t(".update") %></button>
           <% else %>
             <p class="text-sm text-muted-foreground"><%= t(".no_assignees") %></p>

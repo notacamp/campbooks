@@ -46,6 +46,7 @@ es:
         description_placeholder: Añade detalles, enlaces o contexto…
         due_label: Fecha de entrega
         labels_label: Etiquetas
+        no_assignees: Aún no hay nadie a quien asignar en este espacio de trabajo.
         no_labels: No hay etiquetas en este espacio de trabajo.
         priority_label: Prioridad
         save: Guardar cambios
