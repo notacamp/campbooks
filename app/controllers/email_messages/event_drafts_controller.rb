@@ -19,6 +19,14 @@ class EmailMessages::EventDraftsController < ApplicationController
       return
     end
 
+    # Already added from this email? Show the confirmed state instead of
+    # offering the same draft again (and again) on every visit.
+    if (existing = CalendarEvent.accessible_to(Current.user).find_by(source_email_message_id: @message.id))
+      @confirmed_event = existing
+      render layout: false
+      return
+    end
+
     extractor = Ai::EventExtractor.new(@message)
     unless extractor.has_time_proposal?
       render_empty_frame

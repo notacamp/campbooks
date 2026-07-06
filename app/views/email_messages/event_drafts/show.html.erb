@@ -3,7 +3,9 @@
     this endpoint and swaps its content in. An empty frame (when @draft is nil)
     collapses to nothing — no loading state is left behind. %>
 <%= turbo_frame_tag "event_draft_#{@message.id}" do %>
-  <% if @draft %>
+  <% if @confirmed_event %>
+    <%= render Campbooks::EventDraftBlock.new(state: :confirmed, event: @confirmed_event) %>
+  <% elsif @draft %>
     <%= render Campbooks::EventDraftBlock.new(
           state:    :draft,
           title:    @draft.title,
