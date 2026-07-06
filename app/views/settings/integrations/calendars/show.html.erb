@@ -1,5 +1,5 @@
 <% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
-<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"), back_href: settings_integrations_root_path, back_label: t(".back"))) %>
 
 <!-- Connect a calendar -->
 <%= render(Campbooks::Card.new(padding: :lg, class: "mb-6")) do %>
