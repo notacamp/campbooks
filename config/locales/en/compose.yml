@@ -52,6 +52,14 @@ en:
         draft_saved: Draft saved
         resume_aria: Resume your draft
         untitled: Draft
+      context_rail:
+        attachments_heading: Attachments
+        chip_draft: Draft a reply from this
+        chip_summarize: Summarize the thread
+        chip_tone: Adjust the tone
+        original_email_heading: Original message
+        scout_body: Scout can help you draft a reply, adjust the tone, or summarize the thread.
+        scout_heading: Ask Scout
       scout_draft:
         ai_tag: AI
         drafted_label: drafted from this thread

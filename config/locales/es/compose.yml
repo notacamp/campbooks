@@ -52,6 +52,14 @@ es:
         draft_saved: Borrador guardado
         resume_aria: Retomar el borrador
         untitled: Borrador
+      context_rail:
+        attachments_heading: Adjuntos
+        chip_draft: Redactar una respuesta a partir de esto
+        chip_summarize: Resumir el hilo
+        chip_tone: Ajustar el tono
+        original_email_heading: Mensaje original
+        scout_body: Scout puede ayudarte a redactar una respuesta, ajustar el tono o resumir el hilo.
+        scout_heading: Preguntar a Scout
       scout_draft:
         ai_tag: IA
         drafted_label: redactado a partir de esta conversación

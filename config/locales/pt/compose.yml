@@ -52,6 +52,14 @@ pt:
         draft_saved: Rascunho guardado
         resume_aria: Retomar o rascunho
         untitled: Rascunho
+      context_rail:
+        attachments_heading: Anexos
+        chip_draft: Redigir uma resposta a partir disto
+        chip_summarize: Resumir a conversa
+        chip_tone: Ajustar o tom
+        original_email_heading: Mensagem original
+        scout_body: O Scout pode ajudá-lo a redigir uma resposta, ajustar o tom ou resumir a conversa.
+        scout_heading: Perguntar ao Scout
       scout_draft:
         ai_tag: IA
         drafted_label: redigido a partir desta conversa
