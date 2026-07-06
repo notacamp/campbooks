@@ -1,14 +1,7 @@
 module Tools
   class BulkArchive
     def self.call(args = {})
-      # Gate to the acting user's readable accounts before any provider mutation.
-      scope = EmailMessage.accessible_to(Current.user).where.not(status: :ignored)
-
-      if args["email_ids"].present?
-        scope = scope.where(id: args["email_ids"])
-      else
-        scope = apply_filters(scope, args)
-      end
+      scope = resolve_scope(args)
 
       # Move to archive folder on providers (grouped by account)
       scope.includes(:email_account).find_each.group_by(&:email_account).each do |account, messages|
@@ -44,12 +37,33 @@ module Tools
       { archived_count: count }
     end
 
+    # How many emails the given args would archive, without moving anything —
+    # backs the MCP archive_emails preview so a caller can size a filter first.
+    def self.count_for(args = {})
+      resolve_scope(args).count
+    end
+
+    # The archivable set for the given args: an explicit email_ids list, or a
+    # filter (see apply_filters). Always gated to the acting user's readable
+    # accounts, and never touches already-ignored mail.
+    def self.resolve_scope(args)
+      scope = EmailMessage.accessible_to(Current.user).where.not(status: :ignored)
+      if args["email_ids"].present?
+        scope.where(id: args["email_ids"])
+      else
+        apply_filters(scope, args)
+      end
+    end
+
     def self.apply_filters(scope, args)
       scope = scope.where(status: args["status"]) if args["status"].present?
       scope = scope.where(ai_priority: args["ai_priority"]) if args["ai_priority"].present?
 
       if args["tag_name"].present?
-        scope = scope.joins(:tags).where(tags: { name: args["tag_name"].to_s.downcase.strip })
+        # Case-insensitive: tag names are stored with their original case
+        # (e.g. the "Notifications" group tag), so a lower-cased filter value
+        # must still match. LOWER(name) mirrors resolve_tag's name lookup.
+        scope = scope.joins(:tags).where("LOWER(tags.name) = ?", args["tag_name"].to_s.downcase.strip)
       end
 
       if args["date_from"].present?

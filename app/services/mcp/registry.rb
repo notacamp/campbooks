@@ -55,7 +55,7 @@ module Mcp
         list_emails, search_emails, get_email, send_email, reply_email, mark_email_read, mark_email_unread,
         add_email_tag, remove_email_tag,
         # inbox actions
-        update_emails, move_emails_to_folder, tag_emails, forward_email,
+        update_emails, archive_emails, move_emails_to_folder, tag_emails, forward_email,
         # skim
         get_skim_deck, skim_decide,
         # accounts
@@ -575,6 +575,56 @@ module Mcp
         end
 
         result.merge(action: action)
+      end
+    end
+
+    def archive_emails
+      build(
+        name: "archive_emails",
+        description: "Archive every email matching a filter — the way to clear noise at scale " \
+                     "(a whole tag, or everything before a date), beyond update_emails' 100-id limit. " \
+                     "ALWAYS call with preview: true first to see how many emails match; then call " \
+                     "again without preview to archive them. Archiving moves messages to the provider " \
+                     "Archive folder and is reversible with update_emails(action: unarchive). For an " \
+                     "explicit id list, use update_emails(action: archive) instead.",
+        scope: "emails:write",
+        input_schema: object_schema(
+          properties: {
+            filter: {
+              type: "object",
+              description: "Match criteria (AND-combined). At least one key is required — " \
+                           "an empty filter is refused so you can't archive the whole inbox by accident.",
+              properties: {
+                tag: { type: "string", description: "Tag name, case-insensitive" },
+                date_from: { type: "string", description: "ISO-8601 date; only emails received on/after" },
+                date_to: { type: "string", description: "ISO-8601 date; only emails received on/before" },
+                sender: { type: "string", description: "Exact from-address match" },
+                ai_priority: { type: "string", enum: %w[low medium high] }
+              }
+            },
+            preview: { type: "boolean", description: "When true, return only the match count and archive nothing." }
+          },
+          required: %w[filter]
+        )
+      ) do |args|
+        filter = args["filter"].is_a?(Hash) ? args["filter"] : {}
+        svc_args = {
+          "tag_name"      => filter["tag"].presence,
+          "date_from"     => filter["date_from"].presence,
+          "date_to"       => filter["date_to"].presence,
+          "contact_email" => filter["sender"].presence,
+          "ai_priority"   => filter["ai_priority"].presence
+        }.compact
+
+        if svc_args.empty?
+          raise Mcp::RpcError.new(-32_602, "filter needs at least one of: tag, date_from, date_to, sender, ai_priority.")
+        end
+
+        if args["preview"]
+          { preview: true, match_count: Tools::BulkArchive.count_for(svc_args), filter: filter }
+        else
+          Tools::BulkArchive.call(svc_args).merge(preview: false)
+        end
       end
     end
 

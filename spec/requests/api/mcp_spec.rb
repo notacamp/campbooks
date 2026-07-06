@@ -299,6 +299,58 @@ RSpec.describe "API MCP endpoint", type: :request do
     end
   end
 
+  describe "archive_emails" do
+    let!(:noise_tag) { create(:tag, workspace: workspace, name: "Notifications") }
+    let!(:tagged) do
+      create(:email_message, email_account: account, provider_message_id: "arch-1",
+             provider_folder_id: "INBOX").tap { |m| m.tags << noise_tag }
+    end
+
+    it "preview returns the match count (case-insensitively) and archives nothing" do
+      expect(Tools::BulkArchive).not_to receive(:call)
+
+      rpc({ jsonrpc: "2.0", id: 60, method: "tools/call",
+            params: { name: "archive_emails",
+                      arguments: { filter: { tag: "notifications" }, preview: true } } },
+          scopes: "emails:write")
+
+      payload = JSON.parse(response.parsed_body["result"]["content"].first["text"])
+      expect(payload["preview"]).to be(true)
+      expect(payload["match_count"]).to eq(1)
+      expect(tagged.reload.provider_folder_id).to eq("INBOX") # unchanged — nothing archived
+    end
+
+    it "archives every email matching the filter" do
+      client = double("MailClient", archive_folder_id: "ARCH", move_to_folder: true)
+      allow_any_instance_of(EmailAccount).to receive(:mail_client).and_return(client)
+
+      rpc({ jsonrpc: "2.0", id: 61, method: "tools/call",
+            params: { name: "archive_emails",
+                      arguments: { filter: { tag: "Notifications" } } } },
+          scopes: "emails:write")
+
+      payload = JSON.parse(response.parsed_body["result"]["content"].first["text"])
+      expect(payload["preview"]).to be(false)
+      expect(payload["archived_count"]).to eq(1)
+      expect(tagged.reload.provider_folder_id).to eq("ARCH")
+    end
+
+    it "refuses an empty filter with a JSON-RPC invalid-params error" do
+      rpc({ jsonrpc: "2.0", id: 62, method: "tools/call",
+            params: { name: "archive_emails", arguments: { filter: {} } } },
+          scopes: "emails:write")
+
+      expect(response.parsed_body["error"]["code"]).to eq(-32_602)
+    end
+
+    it "is hidden from a token without emails:write" do
+      rpc({ jsonrpc: "2.0", id: 63, method: "tools/list" }, scopes: "emails:read")
+
+      names = response.parsed_body["result"]["tools"].map { |t| t["name"] }
+      expect(names).not_to include("archive_emails")
+    end
+  end
+
   describe "tag_emails" do
     it "returns isError when the tag does not exist" do
       email = create(:email_message, email_account: account)
