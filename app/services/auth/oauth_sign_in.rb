@@ -76,6 +76,7 @@ module Auth
     # who share a provider (e.g. two @gmail.com users) in one tenant.
     def create_account
       user = nil
+      workspace = nil
       ActiveRecord::Base.transaction do
         workspace = Workspace.create!(name: workspace_name, slug: "ws-#{SecureRandom.hex(4)}")
         user = workspace.users.create!(
@@ -90,6 +91,11 @@ module Auth
         )
         user.identities.create!(provider: @provider, uid: @uid, email: @email)
       end
+      # Mirror RegistrationsController#complete: provision the managed AI default
+      # and the four default tag groups so the new workspace is ready from the
+      # first sign-in. Both are best-effort (never block sign-in).
+      begin; Ai::ProviderSetup.apply_managed_default(workspace); rescue StandardError; end
+      begin; Tags::DefaultGroups.provision!(workspace); rescue StandardError; end
       sign_in(user)
     end
 
