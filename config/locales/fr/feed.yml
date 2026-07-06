@@ -112,7 +112,7 @@ fr:
       task_accepted: 'Ajoutée à vos tâches : %{title}'
       task_completed: 'Tâche terminée : %{title}'
       task_dismissed: Suggestion ignorée.
-      tag_filing_undone: Etiquette supprimée.
+      tag_filing_undone: Étiquette supprimée.
       unsupported: Cette action n'est pas prise en charge ici.
   home:
     index:
