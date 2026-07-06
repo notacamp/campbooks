@@ -31,10 +31,17 @@
                   </div>
                 <% end %>
                 <% if rules.any? %>
-                  <div class="mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                  <div class="mt-1.5 flex flex-wrap gap-1">
                     <% rules.each do |rule| %>
-                      <span class="text-[11px] text-muted-foreground">
-                        <%= t(".rule_summary.#{rule.rule_type}") %>: <span class="font-medium text-foreground/60"><%= rule.value.truncate(40) %></span>
+                      <%
+                        value_label = case rule.rule_type
+                                      when "organization"  then @org_names[rule.value]    || rule.value
+                                      when "document_type" then @doctype_names[rule.value] || rule.value
+                                      else rule.value
+                                      end
+                      %>
+                      <span class="inline-flex items-center rounded-full border border-border/50 bg-muted/60 px-2.5 py-0.5 text-[11px] text-muted-foreground">
+                        <%= t(".rule_sentence.#{rule.rule_type}", value: value_label.truncate(30)) %>
                       </span>
                     <% end %>
                   </div>

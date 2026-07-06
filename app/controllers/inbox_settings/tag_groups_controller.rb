@@ -138,6 +138,14 @@ module InboxSettings
       @group_thread_counts = @groups.to_h do |name, _tags, _rules|
         [ name, service.group_scope(name)&.count || 0 ]
       end
+
+      # Preload display names for org and document-type rules so the index
+      # view can render natural-language sentences without N+1 queries.
+      all_rules    = @groups.flat_map { |_, _, rules| rules }
+      org_ids      = all_rules.select { |r| r.rule_type == "organization" }.map(&:value).uniq
+      dt_ids       = all_rules.select { |r| r.rule_type == "document_type" }.map(&:value).uniq
+      @org_names      = org_ids.any? ? Organization.where(id: org_ids).pluck(:id, :name).to_h.transform_keys(&:to_s)   : {}
+      @doctype_names  = dt_ids.any?  ? DocumentType.where(id: dt_ids).pluck(:id, :name).to_h.transform_keys(&:to_s)    : {}
     end
 
     def load_pickable_tags

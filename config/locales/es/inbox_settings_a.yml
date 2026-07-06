@@ -71,21 +71,27 @@ es:
     tag_groups:
       form:
         add_rule: Agregar regla
+        add_rule_action: Agregar
         cancel: Cancelar
         heading_edit: Editar %{name}
         heading_new: Nuevo grupo
         name_label: Nombre
         name_placeholder: p. ej. Boletines y promociones
+        query_hint: "Modificadores: from:, tag:, is:, has:, after:, before:, category:, priority:"
         remove_rule: Eliminar regla
         rule_select_placeholder: Elegir…
+        rule_sentence:
+          document_type: "Tiene un documento %{value}"
+          organization: "Organización es %{value}"
+          query: "Coincide con %{value}"
+          sender: "Remitente es %{value}"
         rule_type:
           document_type: Tipo de documento
           organization: Organización
           query: Búsqueda
           sender: Remitente
+        rule_type_label: Tipo de regla
         rule_value_placeholder:
-          document_type: Elegir un tipo de documento
-          organization: Elegir una organización
           query: "ej.: from:newsletter has:attachment"
           sender: "ej.: facturacion@ejemplo.com o @ejemplo.com"
         rules_hint: Incluye mensajes que cumplan una regla, aunque no tengan etiqueta.
@@ -93,6 +99,7 @@ es:
           tag:, is:, has:, after:, before:, category:, priority:).
         rules_label: Reglas
         save: Guardar grupo
+        sender_hint: "nombre@dominio.com o @dominio.com"
         tags_hint: El correo con cualquiera de estas etiquetas se pliega en la
           fila del grupo. Cada etiqueta pertenece a un solo grupo.
         tags_label: Etiquetas en este grupo
@@ -102,11 +109,11 @@ es:
         new_group: Nuevo grupo
         no_groups: Aún no hay grupos. Crea uno para plegar el correo de baja prioridad
           en una sola fila.
-        rule_summary:
-          document_type: Documento
-          organization: Org
-          query: Búsqueda
-          sender: Remitente
+        rule_sentence:
+          document_type: "Tiene un documento %{value}"
+          organization: "Organización es %{value}"
+          query: "Coincide con %{value}"
+          sender: "Remitente es %{value}"
         subheading: Agrupa etiquetas o reglas; la bandeja de entrada pliega su correo
           en una sola fila.
         threads_count:
