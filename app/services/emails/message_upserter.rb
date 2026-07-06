@@ -84,6 +84,9 @@ module Emails
         # Raw provider label ids (Gmail labelIds; [] elsewhere) — feeds the
         # triage category hint.
         provider_labels: provider_labels(msg),
+        # Flag our OWN mail (digests, notifications) so EmailProcessJob skips the AI
+        # pipeline and the inbox can badge digests. nil for ordinary third-party mail.
+        self_generated_kind: Emails::SelfGeneratedDetector.kind_for(msg, mailer_from: ApplicationMailer.default[:from]),
         status: :fetched
       )
       EmailProcessJob.perform_later(email_message.id)
