@@ -16,6 +16,13 @@ RSpec.describe Emails::TagGroups do
     Tags::DefaultGroups.provision!(@workspace)
     @promo_tag = Tags::DefaultGroups.bucket_tag_for(@workspace, "promotions")
     @notif_tag = Tags::DefaultGroups.bucket_tag_for(@workspace, "notifications")
+    # A user-defined ("custom") tag group — grouped, but with no default_bucket,
+    # so it keeps the full engagement guards (replied / important) that the four
+    # built-in noise buckets deliberately drop.
+    @custom_tag = @workspace.tags.create!(
+      name: "Work", color: "#3b82f6", group_name: "Work",
+      source: :local, kind: :user, hidden: false
+    )
   end
 
   def service
@@ -74,11 +81,18 @@ RSpec.describe Emails::TagGroups do
 
   # ── guards: replied ─────────────────────────────────────────────────────────
 
-  it "guard: a replied thread (last_outbound_at set) is NOT in excluded_scope" do
+  it "guard: a replied thread in a CUSTOM group is NOT in excluded_scope" do
+    thread = create_thread(tags: [ @custom_tag ])
+    thread.update!(last_outbound_at: Time.current)
+    expect(service.excluded_scope.where(id: thread.id).exists?)
+      .to be(false), "Replied thread in a custom group must stay in the main list"
+  end
+
+  it "default bucket: a replied thread IS still collapsed (buckets drop the replied guard)" do
     thread = create_thread(tags: [ @promo_tag ])
     thread.update!(last_outbound_at: Time.current)
     expect(service.excluded_scope.where(id: thread.id).exists?)
-      .to be(false), "Replied thread must stay in the main list"
+      .to be(true), "A default-bucket thread collapses even when the owner replied"
   end
 
   # ── guards: pinned ──────────────────────────────────────────────────────────
@@ -104,10 +118,16 @@ RSpec.describe Emails::TagGroups do
 
   # ── guards: important message ───────────────────────────────────────────────
 
-  it "guard: a thread containing an important message is NOT in excluded_scope" do
+  it "guard: a CUSTOM-group thread with an important message is NOT in excluded_scope" do
+    thread = create_thread(tags: [ @custom_tag ], categories: [ "important" ])
+    expect(service.excluded_scope.where(id: thread.id).exists?)
+      .to be(false), "Custom-group thread with an important message must stay in the main list"
+  end
+
+  it "default bucket: a thread with an important message IS still collapsed" do
     thread = create_thread(tags: [ @promo_tag ], categories: [ "important" ])
     expect(service.excluded_scope.where(id: thread.id).exists?)
-      .to be(false), "Thread with an important message must stay in the main list"
+      .to be(true), "A default-bucket thread collapses even with an important sibling message"
   end
 
   # ── group_scope ─────────────────────────────────────────────────────────────
@@ -126,12 +146,20 @@ RSpec.describe Emails::TagGroups do
     expect(service.group_scope("Nonexistent Group")).to be_nil
   end
 
-  it "group_scope respects guards -- replied thread excluded from group scope" do
+  it "group_scope respects the engagement guards for a CUSTOM group -- replied thread excluded" do
+    thread = create_thread(tags: [ @custom_tag ])
+    thread.update!(last_outbound_at: Time.current)
+    scope = service.group_scope(@custom_tag.group_name)
+    expect(scope.where(id: thread.id).exists?)
+      .to be(false), "Replied thread must be excluded from a custom group_scope too"
+  end
+
+  it "group_scope for a default bucket INCLUDES a replied thread" do
     thread = create_thread(tags: [ @promo_tag ])
     thread.update!(last_outbound_at: Time.current)
     scope = service.group_scope(@promo_tag.group_name)
     expect(scope.where(id: thread.id).exists?)
-      .to be(false), "Replied thread must be excluded from group_scope too"
+      .to be(true), "A default-bucket drill-in still contains the replied thread"
   end
 
   # ── multi-membership ────────────────────────────────────────────────────────
@@ -163,6 +191,24 @@ RSpec.describe Emails::TagGroups do
     expect(notif_row[:count]).to eq(1), "Multi-tagged thread counted in notif group"
   end
 
+  # A replied thread that belongs to BOTH a default bucket and a custom group:
+  # the bucket's light guards win, so it collapses out of the main list and shows
+  # in the bucket drill-in — but the custom group still honors the replied guard,
+  # so it does NOT appear in the custom drill-in. Every collapsed thread thus
+  # still surfaces in at least one drill-in.
+  it "multi-membership: a replied bucket+custom thread collapses (bucket wins) but leaves the custom drill-in" do
+    thread = create_thread(tags: [ @promo_tag ])
+    thread.email_messages.first.email_message_tags.create!(tag: @custom_tag)
+    thread.update!(last_outbound_at: Time.current)
+
+    expect(service.excluded_scope.where(id: thread.id).exists?)
+      .to be(true), "Bucket membership must collapse a replied multi-tagged thread"
+    expect(service.group_scope(@promo_tag.group_name).where(id: thread.id).exists?)
+      .to be(true), "Replied multi-tagged thread appears in the bucket drill-in"
+    expect(service.group_scope(@custom_tag.group_name).where(id: thread.id).exists?)
+      .to be(false), "Replied thread stays out of the custom drill-in (full guards)"
+  end
+
   # ── build_groups ────────────────────────────────────────────────────────────
 
   it "build_groups returns label, count, senders, and color for each non-empty group" do
@@ -184,13 +230,23 @@ RSpec.describe Emails::TagGroups do
     expect(labels).not_to include(@notif_tag.group_name)
   end
 
-  it "build_groups excludes guarded threads from group counts" do
+  it "build_groups excludes engagement-guarded threads from CUSTOM group counts" do
+    replied = create_thread(tags: [ @custom_tag ])
+    replied.update!(last_outbound_at: Time.current)
+
+    groups = service.build_groups([ "INBOX" ])
+    custom = groups.find { |g| g[:label] == @custom_tag.group_name }
+    expect(custom).to be_nil, "Replied thread must not contribute to a custom group count"
+  end
+
+  it "build_groups counts a replied thread for a default bucket" do
     replied = create_thread(tags: [ @promo_tag ])
     replied.update!(last_outbound_at: Time.current)
 
     groups = service.build_groups([ "INBOX" ])
     promo = groups.find { |g| g[:label] == @promo_tag.group_name }
-    expect(promo).to be_nil, "Guarded (replied) thread must not contribute to group count"
+    expect(promo).not_to be_nil, "Default bucket must count the replied thread"
+    expect(promo[:count]).to eq(1)
   end
 
   it "build_groups senders list contains at most 3 entries" do
