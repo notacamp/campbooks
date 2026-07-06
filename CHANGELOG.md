@@ -20,6 +20,10 @@ major, minor, or patch change here.
 
 - **Gmail-style `g` navigation shortcuts for the left nav rail.** Press `g` to arm navigation mode (a 3-second window), then a second key to jump directly to any section: `h` Home, `m` Mail, `c` Calendar, `s` Scout, `f` Files, `p` Contacts, `o` Organizations, `a` Activity, `t` Tasks, `d` Digests, `w` Workflows. While armed, tiny keycap badges appear beside each nav icon (desktop rail and mobile bottom bar) so the map is self-documenting. Escaping, clicking, or navigating disarms automatically. All nine destination keys are listed in the keyboard shortcuts dialog (`?`). Works on desktop; suppressed in the native app shell.
 
+### Fixed
+
+- Tag picker in the email reading pane no longer shows the same tag name multiple times when a workspace has several email accounts that each sync a provider label with the same name (e.g. "Work" from both Gmail and Zoho). `Tag.visible_for` now correctly scopes to the supplied workspace, and the picker's tag list is deduplicated by name — preferring local tags over external ones when names collide.
+
 ## [0.16.0] - 2026-07-06
 
 ### Added
