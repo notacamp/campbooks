@@ -26,8 +26,10 @@ class HomeController < ApplicationController
 
     # A freshly-connected mailbox whose first scan hasn't completed gets the
     # full-screen "Scout is reading your inbox" stage instead of an empty feed.
+    # The skip flag is per-user (stores the user id) so it can't bleed across
+    # a re-login as someone else on the same browser.
     @first_sync = Onboarding::FirstSyncStatus.new(current_user)
-    if @first_sync.stage? && !session[:first_sync_skipped]
+    if @first_sync.stage? && session[:first_sync_skipped] != current_user.id.to_s
       render :first_sync and return
     end
 

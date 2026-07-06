@@ -213,11 +213,13 @@ module Campbooks
     def escape_hatch
       if @skip_url
         # The FORM carries the Stimulus target so JS can show/hide the whole unit.
+        # turbo: false — the redirect lands on the inbox (different layout), which
+        # a Turbo form submission silently refuses to render; full navigation works.
         form(
           action: @skip_url,
           method: "post",
           class: "mt-10 hidden",
-          data: { first_sync_target: "escape" }
+          data: { turbo: "false", first_sync_target: "escape" }
         ) do
           input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
           button(
