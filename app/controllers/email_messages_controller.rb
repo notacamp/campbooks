@@ -480,8 +480,15 @@ class EmailMessagesController < ApplicationController
 
   # The unfiltered default inbox — the only view that collapses groups. Folder
   # views (incl. "all") and custom folders show everything inline.
+  # The default inbox view — where grouped mail collapses into group rows.
+  # The index redirect puts the mapped inbox folder id in the URL (in prod the
+  # provider mapping always resolves), so "folder_id present" does NOT mean
+  # "browsing a folder": an inbox folder id still IS the inbox root.
   def inbox_root?
-    params[:folder_id].blank? && params[:folder_name].blank?
+    return false if params[:folder_name].present?
+
+    fid = params[:folder_id].presence
+    fid.nil? || inbox_folder_ids.include?(fid)
   end
 
   # The ordered EmailThread relation backing the sidebar list, with the same
@@ -504,6 +511,10 @@ class EmailMessagesController < ApplicationController
       # Show all folders — no filter
     elsif folder_id.present?
       scope = scope.where(email_messages: { provider_folder_id: equivalent_folder_ids(folder_id) })
+      # The landing redirect carries the mapped inbox folder id, so an explicit
+      # folder_id can still be the inbox root — grouped mail must collapse there
+      # too, or (with the provider mapping live) it never collapses anywhere.
+      inbox_view = inbox_folder_ids.include?(folder_id)
     else
       inbox_ids = inbox_folder_ids
       scope = scope.where(email_messages: { provider_folder_id: inbox_ids }) if inbox_ids.any?
