@@ -11,6 +11,11 @@ class PageHeaderComponentPreview < ViewComponent::Preview
     render(Campbooks::PageHeader.new(title: "Documents", subtitle: "Manage and review all documents in your workspace"))
   end
 
+  # Page header with a back link above the title (e.g. an integration detail page).
+  def with_back_link
+    render(Campbooks::PageHeader.new(title: "Google Drive", subtitle: "Push documents to Google Drive with per-type folder and naming rules", back_href: "#", back_label: "Back to integrations"))
+  end
+
   # Page header with title and action buttons.
   def with_actions
     render(Campbooks::PageHeader.new(title: "Contacts")) do |header|

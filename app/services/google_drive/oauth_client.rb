@@ -17,6 +17,14 @@ module GoogleDrive
       "https://www.googleapis.com/auth/userinfo.email"
     ].freeze
 
+    # Drive OAuth needs app-level client credentials. When they're unset (e.g. a
+    # self-hosted instance that hasn't set up the Drive integration) the connect
+    # flow can't run — callers gate on this so the UI hides the Connect button
+    # instead of 500ing on the ENV.fetch in #initialize. Mirrors Notion::OauthClient.
+    def self.configured?
+      ENV["GOOGLE_DRIVE_CLIENT_ID"].present? && ENV["GOOGLE_DRIVE_CLIENT_SECRET"].present?
+    end
+
     def initialize
       @client_id = ENV.fetch("GOOGLE_DRIVE_CLIENT_ID")
       @client_secret = ENV.fetch("GOOGLE_DRIVE_CLIENT_SECRET")

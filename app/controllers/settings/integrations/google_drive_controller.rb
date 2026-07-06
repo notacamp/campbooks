@@ -1,6 +1,7 @@
 class Settings::Integrations::GoogleDriveController < Settings::BaseController
   def show
     @account = Current.workspace.google_drive_accounts.connected.first
+    @oauth_configured = GoogleDrive::OauthClient.configured?
     @document_types = Current.workspace.document_types.order(:name)
     @configs = GoogleDriveConfig.includes(:document_type).index_by(&:document_type_id)
     @failed_count = Current.workspace.documents.where(google_drive_push_status: :failed).count if @account&.connected?
@@ -9,7 +10,7 @@ class Settings::Integrations::GoogleDriveController < Settings::BaseController
   def destroy
     account = Current.workspace.google_drive_accounts.connected.first
     account&.deactivate!
-    redirect_to settings_integrations_path, success: t(".disconnected")
+    redirect_to settings_integrations_root_path, success: t(".disconnected")
   end
 
   def retry_failed

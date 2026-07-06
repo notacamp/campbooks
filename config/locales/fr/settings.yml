@@ -256,6 +256,7 @@ fr:
       calendars:
         show:
           active: Actif
+          back: Retour aux intégrations
           calendars_heading: Calendriers
           calendars_pending: Les calendriers apparaîtront ici après la première synchronisation.
           connect_desc: Les calendriers accompagnent vos comptes e-mail connectés.
@@ -306,6 +307,7 @@ fr:
           username_placeholder: utilisateur
         index:
           add_connection: Ajouter une connexion
+          back: Retour aux intégrations
           col_auth: Authentification
           col_base_url: URL de base
           col_name: Nom
@@ -331,9 +333,9 @@ fr:
           col_subfolders: Sous-dossiers
           configure: Configurer
           connect_button: Connecter Google Drive
-          connect_desc_html: Connectez votre compte Google pour envoyer des documents
-            vers Google Drive. Campbooks n'accède qu'aux fichiers qu'il crée (portée
-            %{scope}).
+          back: Retour aux intégrations
+          connect_desc_html: Connectez votre compte Google pour créer des dossiers et envoyer des fichiers vers Google Drive (portée %{scope_name}, afin de pouvoir parcourir et choisir n'importe quel dossier).
+          not_configured: Google Drive n'est pas configuré sur cette instance. Demandez à votre administrateur de le configurer.
           connected_account_heading: Compte connecté
           connected_as: Connecté en tant que
           connected_label: Connecté
@@ -372,6 +374,7 @@ fr:
           select_my_drive: Utiliser la racine de Mon Drive
           select_this: Sélectionner « %{name} »
         edit:
+          back: Retour à Google Drive
           auto_push_default_note: L'envoi automatique est activé par défaut — les
             documents approuvés de ce type seront automatiquement envoyés vers Drive.
             Décochez la case ci-dessus pour le mettre en pause.
@@ -433,6 +436,7 @@ fr:
           zoho_drive_heading: Zoho Drive
       notion:
         show:
+          back: Retour aux intégrations
           col_database: Base de données Notion
           col_document_type: Type de document
           col_pull: Récupération
@@ -469,6 +473,7 @@ fr:
           token_placeholder: secret_...
       zoho_drive:
         show:
+          back: Retour aux intégrations
           active: Actif
           add_mapping_button: Ajouter l'association
           add_mapping_heading: Ajouter une association de dossier

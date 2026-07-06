@@ -1,5 +1,5 @@
 <% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
-<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"), back_href: settings_integrations_root_path, back_label: t(".back"))) %>
 
 <!-- Connection -->
 <%= render(Campbooks::Card.new(padding: :lg, class: "mb-6")) do %>
@@ -34,11 +34,13 @@
             method: :post, class: "mt-2 px-3 py-1.5 bg-amber-100 text-amber-700 text-sm font-medium rounded-md hover:bg-amber-200 dark:bg-amber-500/20 dark:text-amber-300 dark:hover:bg-amber-500/30 cursor-pointer" %>
       </div>
     <% end %>
-  <% else %>
+  <% elsif @oauth_configured %>
     <p class="text-sm text-gray-500 mb-4">
-      <%= t(".connect_desc_html", scope: content_tag(:code, "drive", class: "text-xs bg-gray-100 px-1 rounded")) %>
+      <%= t(".connect_desc_html", scope_name: content_tag(:code, "drive", class: "text-xs bg-gray-100 px-1 rounded")) %>
     </p>
     <%= render(Campbooks::Button.new(variant: :primary, size: :md, href: oauth_google_connect_path)) { t(".connect_button") } %>
+  <% else %>
+    <p class="text-sm text-gray-500"><%= t(".not_configured") %></p>
   <% end %>
 <% end %>
 

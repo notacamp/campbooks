@@ -65,6 +65,8 @@ pt:
       callback:
         error: 'Falha na ligação ao Google Drive: %{message}'
         success: Google Drive ligado como %{email}.
+      connect:
+        not_configured: O Google Drive não está configurado nesta instância. Peça ao seu administrador para o configurar.
     google_mail:
       callback:
         auth_failed: Autenticação falhou. Tente novamente.
