@@ -3,16 +3,25 @@ en:
   components:
     organization_card:
       members: "%{count} members"
+    organizations:
+      search_bar:
+        clear: Clear search
+        placeholder: Search organizations…
   organizations:
     backfill:
       backfilled: "%{count} organizations synced from contacts."
     emails:
       no_subject: "(no subject)"
     index:
+      count:
+        one: "%{count} organization"
+        other: "%{count} organizations"
       empty: No organizations yet
       empty_hint: Sync from your contacts to build your organization directory.
       heading: Organizations
-      subheading: "%{count} organizations"
+      no_matches: No organizations match your search. Try a different term or clear
+        it to see them all.
+      subheading: Your organization directory, built from your contacts.
       sync_from_contacts: Sync from contacts
     organization_card:
       members: "%{count} members"
