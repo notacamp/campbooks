@@ -3,16 +3,25 @@ es:
   components:
     organization_card:
       members: "%{count} miembros"
+    organizations:
+      search_bar:
+        clear: Borrar búsqueda
+        placeholder: Buscar organizaciones…
   organizations:
     backfill:
       backfilled: "%{count} organizaciones sincronizadas desde contactos."
     emails:
       no_subject: "(sin asunto)"
     index:
+      count:
+        one: "%{count} organización"
+        other: "%{count} organizaciones"
       empty: Aún no hay organizaciones
       empty_hint: Sincroniza desde tus contactos para crear tu directorio de organizaciones.
       heading: Organizaciones
-      subheading: "%{count} organizaciones"
+      no_matches: Ninguna organización coincide con tu búsqueda. Prueba otro término
+        o bórralo para verlas todas.
+      subheading: Tu directorio de organizaciones, creado a partir de tus contactos.
       sync_from_contacts: Sincronizar desde contactos
     organization_card:
       members: "%{count} miembros"

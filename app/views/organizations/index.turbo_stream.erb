@@ -1,0 +1,13 @@
+<%# Next page of the organizations directory: append the cards into the list, then
+    advance (or retire) the lazy sentinel. Mirrors home/index.turbo_stream. %>
+<%= turbo_stream.append "organizations_list" do %>
+  <%= render partial: "organization_card", collection: @organizations, as: :organization, locals: { email_counts: @email_counts } %>
+<% end %>
+
+<% if @pagy&.next %>
+  <%= turbo_stream.replace "organizations_pagination" do %>
+    <%= render "organizations_pagination", pagy: @pagy, query: @query %>
+  <% end %>
+<% else %>
+  <%= turbo_stream.remove "organizations_pagination" %>
+<% end %>
