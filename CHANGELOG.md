@@ -16,6 +16,19 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Default inbox noise buckets now collapse even after you reply or when a
+  sibling message is important.** The four built-in tag groups (Notifications,
+  Newsletters & promos, Social, Updates) used to stay in the main inbox list
+  whenever the "a human cares about this thread" guards fired — including when
+  you'd once replied to the thread, or another message in it was categorized
+  `important` — which leaked automated mail back into the inbox. Those buckets now
+  honor only the explicit signals: pinning a thread or starring its sender still
+  keeps it inline, but a stray reply or important sibling no longer does. Custom
+  (user-defined) tag groups and rule-based groups are unchanged — they keep the
+  full guard set.
+
 ## [0.17.0] - 2026-07-06
 
 ### Added
