@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-07-06
+
 ### Added
 
 - **Gmail-style `g` navigation shortcuts for the left nav rail.** Press `g` to arm navigation mode (a 3-second window), then a second key to jump directly to any section: `h` Home, `m` Mail, `c` Calendar, `s` Scout, `f` Files, `p` Contacts, `o` Organizations, `a` Activity, `t` Tasks, `d` Digests, `w` Workflows. While armed, tiny keycap badges appear beside each nav icon (desktop rail and mobile bottom bar) so the map is self-documenting. Escaping, clicking, or navigating disarms automatically. All nine destination keys are listed in the keyboard shortcuts dialog (`?`). Works on desktop; suppressed in the native app shell.
@@ -1254,7 +1256,8 @@ major, minor, or patch change here.
 
 - Initial public, source-available release of Campbooks.
 
-[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/notacamp/campbooks/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/notacamp/campbooks/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/notacamp/campbooks/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/notacamp/campbooks/compare/v0.13.0...v0.14.0
