@@ -182,32 +182,6 @@ class User < ApplicationRecord
     update_column(:hidden_calendar_ids, updated) unless updated == ids
   end
 
-  # ── Inbox smart groups ──────────────────────────────────────────────────────
-  # Per-user prefs for bundling low-priority mail into collapsed inbox group
-  # rows, stored in the inbox_smart_groups jsonb ({"enabled" => bool,
-  # "<bucket>" => bool}). A missing key means enabled, so the feature is ON by
-  # default with all buckets — the column only records opt-outs.
-  SMART_GROUP_BUCKETS = %w[notifications promotions social updates].freeze
-
-  def smart_groups_enabled?
-    inbox_smart_groups.fetch("enabled", true)
-  end
-
-  def smart_group_enabled?(bucket)
-    smart_groups_enabled? && inbox_smart_groups.fetch(bucket.to_s, true)
-  end
-
-  def enabled_smart_group_buckets
-    return [] unless smart_groups_enabled?
-
-    SMART_GROUP_BUCKETS.select { |bucket| inbox_smart_groups.fetch(bucket, true) }
-  end
-
-  def update_smart_group_prefs!(prefs)
-    merged = inbox_smart_groups.merge(prefs.slice("enabled", *SMART_GROUP_BUCKETS))
-    update!(inbox_smart_groups: merged)
-  end
-
   # ── Two-factor authentication ───────────────────────────────────────────────
   # True when the user has any second factor turned on. Gates the login challenge
   # (SessionsController#create): password-only login when false, second-factor

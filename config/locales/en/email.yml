@@ -9,9 +9,12 @@ en:
       all_sorted_description: Everything left is low-priority mail, sorted into the
         groups below. Tap one to review or clear it.
       all_sorted_title: Your inbox is sorted
+      back_to_inbox_button: Back to inbox
       connect_email_description: Link an email account to start receiving and processing
         emails automatically.
       connect_email_title: Connect your email
+      group_clear_description: Nothing from %{group} is waiting in your inbox.
+      group_clear_title: This group is clear
       manage_accounts_button: Manage email accounts
       no_mail_yet_description: Your email accounts are connected. Mail will appear
         here after the next scan.
@@ -164,7 +167,7 @@ en:
       search_tags_placeholder: Search tags...
     thread_list:
       archive_all: Archive all
-      back_to_inbox: "— back to inbox"
+      back_to_inbox_label: Inbox
       dismiss_follow_up: Dismiss follow-up
       draft_follow_up: Draft follow-up
       drag_to_folder: Drag to a folder

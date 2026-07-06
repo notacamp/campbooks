@@ -16,6 +16,35 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Default tag groups.** Every workspace now ships with four built-in groups —
+  **Notifications**, **Newsletters & promos**, **Social**, and **Updates** — that
+  are on by default. Mail the triage engine sorts into one of these buckets is
+  automatically tagged, so the inbox collapses it into a tappable group row
+  instead of scattering it through the list. Drilling into a group offers
+  **Mark all read** and **Archive all**. Groups are ordinary tags: rename,
+  recolor, regroup, or add your own tags to any group from **Settings → Tags** —
+  a tag with a group name collapses in the inbox, and a message shows in every
+  group its tags belong to.
+
+### Changed
+
+- ⚠️ **The inbox now collapses low-priority mail by tag, not by a separate
+  "smart groups" system.** A thread drops out of the main list when any of its
+  messages carries a tag that belongs to a group — but it always stays in the
+  list when you have replied to it, pinned it, starred the sender, or any message
+  is important. Grouped mail now shows inline inside a specific folder view (the
+  collapse applies to the inbox root only), and custom tag groups get the same
+  "keep it if it matters" guards.
+
+### Removed
+
+- ⚠️ **The Smart groups settings panel** and its per-user bucket on/off
+  preferences. Grouping is now configured entirely through Tags
+  (Settings → Tags → give a tag a group). All four default groups are on for
+  every workspace; existing categorized mail is tagged automatically on upgrade.
+
 ### Fixed
 
 - Connected Google accounts with no Gmail mailbox or no Google Calendar (a
@@ -67,6 +96,7 @@ major, minor, or patch change here.
   and every integration detail page — Google Drive, Notion, Zoho Drive, Connections,
   and Calendars — now has a **Back to integrations** link. Disconnecting Google Drive
   also returns you to the integrations list rather than erroring.
+
 
 ## [0.13.0] - 2026-07-05
 

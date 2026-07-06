@@ -394,10 +394,6 @@ Rails.application.routes.draw do
   namespace :inbox_settings do
     get "display", to: "display#show", as: :display
 
-    # Smart groups — which low-priority buckets collapse into inbox group rows.
-    get   "smart_groups", to: "smart_groups#show",   as: :smart_groups
-    patch "smart_groups", to: "smart_groups#update"
-
     # Inbox filtering strategy (whitelist/blacklist) + blocked/starred/allowed
     # sender management.
     get   "filtering",        to: "filtering#show",       as: :filtering
@@ -419,8 +415,10 @@ Rails.application.routes.draw do
   # Smart-group bulk actions — clear a bundled low-priority bucket in one tap
   # from its drill-in view. Mail actions, not settings, hence outside the
   # inbox_settings namespace.
-  post "smart_groups/:bucket/archive_all",   to: "smart_groups#archive_all",   as: :smart_group_archive_all
-  post "smart_groups/:bucket/mark_all_read", to: "smart_groups#mark_all_read", as: :smart_group_mark_all_read
+  # Group name travels as a form param (not a path segment) so names with spaces
+  # or "&" (e.g. "Newsletters & promos") round-trip cleanly.
+  post "tag_groups/archive_all",   to: "tag_groups#archive_all",   as: :tag_group_archive_all
+  post "tag_groups/mark_all_read", to: "tag_groups#mark_all_read", as: :tag_group_mark_all_read
 
   # Contacts — a first-class people directory + profile pages, plus the app-wide
   # hover card and the compose autocomplete/lookup endpoints. Promoted out of the

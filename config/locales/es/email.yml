@@ -6,11 +6,16 @@ es:
         heading: Tablero
     empty:
       add_account_button: Añadir cuenta de correo
-      all_sorted_description: Lo que queda es correo de baja prioridad, ordenado en los grupos de abajo. Toca uno para revisarlo o vaciarlo.
+      all_sorted_description: Lo que queda es correo de baja prioridad, ordenado en
+        los grupos de abajo. Toca uno para revisarlo o vaciarlo.
       all_sorted_title: Tu bandeja de entrada está ordenada
+      back_to_inbox_button: Volver a la bandeja de entrada
       connect_email_description: Vincule una cuenta de correo para empezar a recibir
         y procesar correos automáticamente.
       connect_email_title: Conecte su correo
+      group_clear_description: No hay nada de %{group} esperando en tu bandeja de
+        entrada.
+      group_clear_title: Este grupo está al día
       manage_accounts_button: Gestionar cuentas de correo
       no_mail_yet_description: Sus cuentas de correo están conectadas. El correo aparecerá
         aquí tras el próximo análisis.
@@ -165,7 +170,7 @@ es:
       search_tags_placeholder: Buscar etiquetas...
     thread_list:
       archive_all: Archivar todo
-      back_to_inbox: "— volver a la bandeja de entrada"
+      back_to_inbox_label: Bandeja de entrada
       dismiss_follow_up: Descartar seguimiento
       draft_follow_up: Redactar seguimiento
       drag_to_folder: Arrastra a una carpeta

@@ -1,44 +1,48 @@
 <% current_group = local_assigns[:current_group] %>
-<% current_smart_group = local_assigns[:current_smart_group] %>
 <% tag_groups = local_assigns[:tag_groups] || {} %>
-<%# Collapsed group rows injected into the list: smart groups (bundled
-    low-priority buckets) first, then custom tag groups. %>
-<% group_items = (local_assigns[:smart_group_items] || []) + (local_assigns[:group_items] || []) %>
+<%# Collapsed tag-group rows injected into the list (default + custom groups). %>
+<% group_items = local_assigns[:group_items] || [] %>
 <%# When this page continues an earlier one (infinite scroll), the previous page's
     last section label is passed in so we don't repeat its sticky header. %>
 <% continue_section = local_assigns[:continue_section] %>
 
-<%# Back button when inside a group / smart-group view (+ bulk clear actions
-    for a smart-group bucket) %>
-<% if current_group.present? || current_smart_group.present? %>
-  <div class="border-b border-gray-100 flex items-center justify-between gap-2 pr-2">
+<%# Group context band: back to the inbox + bulk clear actions. The group's
+    name lives in the list toolbar above (with its color dot), so this band
+    stays a single quiet row — same ghost-button vocabulary as the selection
+    toolbar. %>
+<% if current_group.present? %>
+  <div class="border-b border-gray-100 flex items-center justify-between gap-1 px-1.5 py-1">
+    <%# Icon-only back (like the selection-toolbar buttons) — the list pane can be
+        ~220px with the reading pane open, too tight for a label; the group header
+        directly above keeps the context and title/aria carry the name. %>
     <%= link_to email_messages_path(folder_id: params[:folder_id].presence),
-          class: "flex items-center gap-2 px-3 py-2 text-[11px] text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-colors min-w-0",
+          class: "flex items-center justify-center p-1.5 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors flex-shrink-0",
+          title: t(".back_to_inbox_label"),
+          "aria-label": t(".back_to_inbox_label"),
           data: { turbo_frame: "_top" } do %>
-      <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-      <span class="font-medium text-gray-700 truncate"><%= current_smart_group.present? ? t("components.category_chip.labels.#{current_smart_group}") : current_group %></span>
-      <span class="text-gray-400 truncate"><%= t(".back_to_inbox") %></span>
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
     <% end %>
-    <% if current_smart_group.present? %>
-      <%# data-turbo:false — a Turbo submit would carry its turbo-stream Accept
-          header through the redirect into `index`, which would answer with the
-          infinite-scroll APPEND and duplicate the section pills. Classic form
-          nav gets the normal full-page flow (cf. the drawer deep-link gotcha). %>
-      <div class="flex items-center gap-1 flex-shrink-0">
-        <%= button_to smart_group_mark_all_read_path(current_smart_group),
-              form: { data: { turbo: false } },
-              class: "inline-flex items-center gap-1 rounded-full border border-gray-200 px-2 py-0.5 text-[10px] font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-800 transition-colors cursor-pointer" do %>
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-          <%= t(".mark_all_read") %>
-        <% end %>
-        <%= button_to smart_group_archive_all_path(current_smart_group),
-              form: { data: { turbo: false } },
-              class: "inline-flex items-center gap-1 rounded-full border border-gray-200 px-2 py-0.5 text-[10px] font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-800 transition-colors cursor-pointer" do %>
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
-          <%= t(".archive_all") %>
-        <% end %>
-      </div>
-    <% end %>
+    <%# data-turbo:false — a Turbo submit would carry its turbo-stream Accept
+        header through the redirect into `index`, which would answer with the
+        infinite-scroll APPEND and duplicate the section pills. Classic form
+        nav gets the normal full-page flow (cf. the drawer deep-link gotcha).
+        The group name rides as a hidden `group` param so "&"/spaces survive. %>
+    <div class="flex items-center gap-0.5 flex-shrink-0">
+      <%= button_to tag_group_mark_all_read_path,
+            params: { group: current_group },
+            form: { data: { turbo: false } },
+            class: "inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors cursor-pointer border-0 bg-transparent" do %>
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+        <%= t(".mark_all_read") %>
+      <% end %>
+      <%= button_to tag_group_archive_all_path,
+            params: { group: current_group },
+            form: { data: { turbo: false } },
+            class: "inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors cursor-pointer border-0 bg-transparent" do %>
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+        <%= t(".archive_all") %>
+      <% end %>
+    </div>
   </div>
 <% end %>
 
@@ -117,9 +121,11 @@
   <% section_threads.each do |thread| %>
     <% thread_counter += 1 %>
 
-    <% if thread_counter == inject_at && group_items.any? && current_group.blank? && current_smart_group.blank? %>
+    <% if thread_counter == inject_at && group_items.any? && current_group.blank? %>
       <% group_items.each do |group| %>
-        <%= render "email_messages/group_row", group: group %>
+        <%= render(Campbooks::TagGroupRow.new(
+              label: group[:label], count: group[:count], color: group[:color], senders: group[:senders],
+              href: email_messages_path(folder_id: params[:folder_id].presence, group: group[:label]))) %>
       <% end %>
     <% end %>
 
@@ -130,8 +136,10 @@
 <% end %>
 
 <%# If there are fewer than 4 threads, still show groups at the end %>
-<% if thread_counter < inject_at && group_items.any? && current_group.blank? && current_smart_group.blank? %>
+<% if thread_counter < inject_at && group_items.any? && current_group.blank? %>
   <% group_items.each do |group| %>
-    <%= render "email_messages/group_row", group: group %>
+    <%= render(Campbooks::TagGroupRow.new(
+          label: group[:label], count: group[:count], color: group[:color], senders: group[:senders],
+          href: email_messages_path(folder_id: params[:folder_id].presence, group: group[:label]))) %>
   <% end %>
 <% end %>

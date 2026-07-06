@@ -78,7 +78,7 @@
           unfiltered default inbox, so a folder/group/search view never gets a row
           floated in where it doesn't belong. %>
       <%= turbo_stream_from "inbox_#{current_user.id}" %>
-      <% unless @search_active || @current_group.present? || @current_smart_group.present? || params[:folder_id].present? || params[:folder_name].present? %>
+      <% unless @search_active || @current_group.present? || params[:folder_id].present? || params[:folder_name].present? %>
         <%= turbo_stream_from "inbox_feed_#{current_user.id}" %>
       <% end %>
       <%# Skim tray, Search and Compose now live in the content-spanning top band
@@ -92,9 +92,16 @@
                    data-email-selection-select-all>
 
             <!-- Header -->
-            <div data-email-selection-target="header" class="flex items-center gap-2">
+            <div data-email-selection-target="header" class="flex items-center gap-2 min-w-0">
               <% if @current_group.present? %>
-                <%= render(Campbooks::SectionHeader.new) { @current_group } %>
+                <%# Group drill-in: the group's color dot + name, one line ("Newsletters
+                    & promos" would otherwise wrap under the checkbox). %>
+                <span class="flex items-center gap-1.5 min-w-0">
+                  <% if @current_group_color.present? %>
+                    <%= render(Campbooks::ColorDot.new(color: @current_group_color, size: :sm)) %>
+                  <% end %>
+                  <%= render(Campbooks::SectionHeader.new(class: "truncate")) { @current_group } %>
+                </span>
               <% else %>
                 <%= render(Campbooks::SectionHeader.new) { t(".inbox_heading") } %>
               <% end %>
@@ -236,7 +243,7 @@
           <% else %>
             <div id="email_threads" data-controller="email-thread" data-inbox-view-mode="breathable">
               <% if @threads.any? || @pinned_threads&.any? || @waiting_threads&.any? %>
-                <%= render partial: "thread_list", locals: { threads: @threads, current_group: @current_group, tag_groups: @tag_groups, pinned_threads: @pinned_threads, waiting_threads: @waiting_threads, group_items: @group_items, smart_group_items: @smart_group_items, current_smart_group: @current_smart_group } %>
+                <%= render partial: "thread_list", locals: { threads: @threads, current_group: @current_group, pinned_threads: @pinned_threads, waiting_threads: @waiting_threads, group_items: @group_items } %>
               <% else %>
                 <%= render(Campbooks::EmptyState.new(variant: :inline, class: "p-6")) do %>
                   <p class="text-[11px] text-gray-400"><%= t(".no_emails_yet") %></p>

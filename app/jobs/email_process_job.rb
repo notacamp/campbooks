@@ -74,6 +74,13 @@ class EmailProcessJob < ApplicationJob
       end
     end
 
+    # Bridge the rules-engine category onto a tag: mail sorted into a noise bucket
+    # (notifications/promotions/social/updates) gets the workspace's matching
+    # default group tag, so the inbox collapses it. Additive and idempotent — runs
+    # even when the message already carries other tags, and reads the persisted
+    # category on a re-process. Independent of the triage block above.
+    apply_bucket_tag(email)
+
     thread = find_or_create_thread(email)
 
     was_new_thread = !email.email_thread_id
@@ -164,6 +171,16 @@ class EmailProcessJob < ApplicationJob
   end
 
   private
+
+  # Attach the workspace's default group tag for this email's rules category, so
+  # low-priority mail collapses into its inbox group. Tolerant of failure so it
+  # never fails the ingest (Tags::DefaultGroups.tag_email! self-heals provisioning
+  # and no-ops for personal/important/unknown/nil categories).
+  def apply_bucket_tag(email)
+    Tags::DefaultGroups.tag_email!(email)
+  rescue => e
+    Rails.logger.error("[EmailProcessJob] bucket tag failed for email #{email.id}: #{e.message}")
+  end
 
   # Per-sender rules, applied once the Contact is resolved. Tolerant of failure so
   # a rule never fails the whole ingest.

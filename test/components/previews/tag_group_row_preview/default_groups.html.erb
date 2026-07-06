@@ -1,0 +1,14 @@
+<div class="max-w-md border border-gray-100 rounded-xl py-1">
+  <%= render(Campbooks::TagGroupRow.new(
+        label: "Notifications", count: 2, color: "#767988", href: "#",
+        senders: [ { email: "builds@ci.example" }, { email: "security@app.example" } ])) %>
+  <%= render(Campbooks::TagGroupRow.new(
+        label: "Newsletters & promos", count: 3, color: "#d44996", href: "#",
+        senders: [ { email: "deals@shop.example" }, { email: "news@daily.example" }, { email: "offers@store.example" } ])) %>
+  <%= render(Campbooks::TagGroupRow.new(
+        label: "Social", count: 1, color: "#0584da", href: "#",
+        senders: [ { email: "notify@social.example" } ])) %>
+  <%= render(Campbooks::TagGroupRow.new(
+        label: "Updates", count: 1, color: "#00a8a8", href: "#",
+        senders: [ { email: "orders@store.example" } ])) %>
+</div>
