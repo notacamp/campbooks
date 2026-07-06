@@ -69,7 +69,7 @@ module Reminders
       # NOTE: two extraction jobs racing can both pass this guard (no DB constraint) —
       # accepted until a (workspace, reminder_type, due_at::date, amount_cents) unique
       # index lands; in practice the document job lags the email job by seconds.
-      if !reminder.persisted? && (sibling = cross_source_sibling(reminder_type, due_at, item))
+      if !reminder.persisted? && (sibling = cross_source_sibling(reminder_type, due_at, all_day, item))
         return sibling
       end
 
@@ -103,21 +103,54 @@ module Reminders
       nil
     end
 
-    # A reminder for the same commitment already staged from a DIFFERENT source (e.g. the
-    # invoice email vs. its PDF). Same workspace + type + due date, not dismissed; matched
-    # on amount when the AI extracted one, else on the normalized title. nil ⇒ no sibling.
-    def cross_source_sibling(reminder_type, due_at, item)
+    # A reminder for the same commitment already staged from a DIFFERENT source: the invoice
+    # email vs. its PDF, or (the case this guards) an airline's booking-confirmation and
+    # ticket emails, which arrive seconds apart and each extract the same flight. Scoped to
+    # same workspace + type + due date, not dismissed, then matched in order of signal
+    # strength:
+    #   1. exact amount (bills/invoices);
+    #   2. exact timestamp for a TIMED event -- two same-type reminders at the same minute of
+    #      the same day are the same commitment (all-day reminders share a 9am default, so
+    #      they're excluded here and fall through to the title match);
+    #   3. date-stripped title, so the model appending "on 2026-12-20" to one of two
+    #      otherwise-identical titles doesn't split them into separate reminders.
+    # nil means genuinely no sibling.
+    def cross_source_sibling(reminder_type, due_at, all_day, item)
       scope = Reminder.where(workspace: @workspace, reminder_type: reminder_type)
                       .where.not(status: :dismissed)
                       .where("due_at::date = ?::date", due_at)
+
       amount = parse_amount(item["amount_cents"])
-      if amount
-        scope.find_by(amount_cents: amount)
-      else
-        title_key = Emails::SubjectNormalizer.key(item["title"].to_s)
-        return nil if title_key.blank?
-        scope.where(amount_cents: nil).detect { |r| Emails::SubjectNormalizer.key(r.title) == title_key }
+      return scope.find_by(amount_cents: amount) if amount
+
+      unless all_day
+        timed_match = scope.find_by(all_day: false, due_at: due_at)
+        return timed_match if timed_match
       end
+
+      title_key = dedup_title_key(item["title"])
+      return nil if title_key.blank?
+      scope.where(amount_cents: nil).detect { |r| dedup_title_key(r.title) == title_key }
+    end
+
+    # Trailing date/time noise the model tends to append to a title ("... on 2026-12-20",
+    # "... de 20/12/2026", "... at 16:10"), plus a directly-preceding connector word. A
+    # connector alone is never stripped, so this only collapses date-suffix variants and
+    # can't merge genuinely different titles.
+    DEDUP_TITLE_NOISE = %r{
+      \s*
+      (?:\b(?:on|at|em|de|le|el)\s+)?
+      (?:
+        \d{4}-\d{2}-\d{2} |
+        \d{1,2}[/.]\d{1,2}(?:[/.]\d{2,4})? |
+        \d{1,2}[:h]\d{2}
+      )
+    }xi
+
+    # De-dupe match key: the thread-subject key (Re:/Fwd: stripped, case/space folded) with
+    # trailing date/time tokens removed.
+    def dedup_title_key(title)
+      Emails::SubjectNormalizer.key(title.to_s).gsub(DEDUP_TITLE_NOISE, " ").squish
     end
 
     def parse_date(str)

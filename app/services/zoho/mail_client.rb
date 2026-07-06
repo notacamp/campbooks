@@ -383,7 +383,7 @@ module Zoho
       # Rebuilt per call so @oauth.access_token is re-read each request. Memoizing
       # froze a stale token into the Authorization header, 401-ing mid-scan.
       Faraday.new do |f|
-        f.use SystemHealth::FaradayMiddleware, service: "zoho_mail"
+        f.use SystemHealth::FaradayMiddleware, service: "zoho_mail", workspace: -> { @email_account.try(:workspace_id) }
         f.request :url_encoded
         # Bound every call so a slow/hung provider response can't pin a scan (and
         # the "Syncing your inbox" pill) open for minutes — scans have stalled for

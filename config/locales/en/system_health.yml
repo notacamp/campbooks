@@ -16,6 +16,23 @@ en:
         title: System health
   admin:
     system_health:
+      call:
+        ai_metadata: AI metadata
+        not_captured: "(not captured)"
+        request_body: Request body
+        request_headers: Request headers
+        response_body: Response body
+        response_headers: Response headers
+        summary:
+          ai_metadata: AI model / tokens
+          duration: Duration
+          error: Error
+          service: Service
+          status: Status
+          tokens_in: "%{count} in"
+          tokens_out: "%{count} out"
+          workspace: Workspace
+        title_fallback: Call detail
       calls:
         no_matches: No calls matched your filters.
       show:

@@ -179,8 +179,12 @@ en:
       waiting_days:
         one: Waiting %{count} day
         other: Waiting %{count} days
+      waiting_hide_older: Hide older
       waiting_recent: Waiting on their reply
       waiting_section: Waiting on replies
+      waiting_show_older:
+        one: Show %{count} older
+        other: Show %{count} older
   email_scans:
     show:
       account_label: Account
