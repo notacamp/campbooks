@@ -1,6 +1,11 @@
 <%= turbo_frame_tag "inbox_settings_tag_group_form" do %>
   <div class="mb-5 rounded-lg border border-border bg-muted/40 p-4"
-       data-controller="tag-group-name">
+       data-controller="tag-group-name group-rules"
+       data-group-rules-sentence-sender-value="<%= t('.rule_sentence.sender', value: '%{value}') %>"
+       data-group-rules-sentence-organization-value="<%= t('.rule_sentence.organization', value: '%{value}') %>"
+       data-group-rules-sentence-document-type-value="<%= t('.rule_sentence.document_type', value: '%{value}') %>"
+       data-group-rules-sentence-query-value="<%= t('.rule_sentence.query', value: '%{value}') %>"
+       data-group-rules-remove-label-value="<%= t('.remove_rule') %>">
     <h4 class="text-xs font-semibold text-foreground mb-3">
       <%= @group_name ? t(".heading_edit", name: @group_name) : t(".heading_new") %>
     </h4>
@@ -25,6 +30,145 @@
                   { value: tag.id, label: tag.name, color: tag.color, checked: @member_ids.include?(tag.id) }
                 })) %>
         </div>
+      </div>
+
+      <%# Rules section — committed sentence chips + add-rule panel. -%>
+      <div class="mb-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="block text-xs font-medium text-foreground"><%= t(".rules_label") %></span>
+          <%= render(Campbooks::Button.new(variant: :outline, size: :xs, type: :button,
+                data: { action: "group-rules#openPanel" })) { t(".add_rule") } %>
+        </div>
+
+        <%# flex-col wrapper holds the chip row and the add panel as siblings. -%>
+        <div class="flex flex-col gap-2">
+
+          <%# Committed rule chips — server-side for edit mode; JS appends new ones here. -%>
+          <div data-group-rules-target="chipsList" class="flex flex-wrap gap-1.5">
+            <% @rules.each_with_index do |rule, i| %>
+              <%
+                value_label = case rule.rule_type
+                              when "organization"
+                                @organizations.find { |o| o.id.to_s == rule.value }&.name || rule.value
+                              when "document_type"
+                                @document_types.find { |dt| dt.id.to_s == rule.value }&.name || rule.value
+                              else
+                                rule.value
+                              end
+                sentence = t(".rule_sentence.#{rule.rule_type}", value: value_label)
+              %>
+              <div data-group-rules-target="chip"
+                   class="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium text-foreground/70">
+                <input type="hidden" name="rules[<%= i %>][rule_type]" value="<%= rule.rule_type %>" />
+                <input type="hidden" name="rules[<%= i %>][value]" value="<%= rule.value %>" />
+                <span><%= sentence %></span>
+                <button type="button"
+                        data-action="group-rules#removeChip"
+                        aria-label="<%= t('.remove_rule') %>"
+                        class="ml-0.5 -mr-0.5 flex items-center text-foreground/30 hover:text-foreground/70 transition-colors cursor-pointer">
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+            <% end %>
+          </div>
+
+          <%# Add-rule panel — hidden until openPanel() is called. -%>
+          <div data-group-rules-target="addPanel"
+               class="hidden rounded-lg border border-dashed border-border/70 bg-muted/20 p-3">
+
+            <%# Type pill picker — radio group styled like PillMultiSelect. -%>
+            <fieldset class="mb-3">
+              <legend class="text-[11px] font-medium text-muted-foreground mb-1.5">
+                <%= t(".rule_type_label") %>
+              </legend>
+              <div class="flex flex-wrap gap-1.5">
+                <% InboxGroupRule::RULE_TYPES.each do |rt| %>
+                  <label class="cursor-pointer select-none">
+                    <input type="radio"
+                           name="_rule_type_picker"
+                           value="<%= rt %>"
+                           data-group-rules-target="ruleTypeRadio"
+                           data-action="change->group-rules#typeChanged"
+                           class="peer sr-only" />
+                    <span class="inline-flex cursor-pointer items-center rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors
+                                 border-border bg-background text-foreground/80 hover:border-foreground/40
+                                 peer-checked:border-foreground peer-checked:bg-foreground peer-checked:text-background">
+                      <%= t(".rule_type.#{rt}") %>
+                    </span>
+                  </label>
+                <% end %>
+              </div>
+            </fieldset>
+
+            <%# Value inputs — only one is shown at a time via Stimulus. -%>
+            <div class="mb-3">
+
+              <%# Sender — free text with hint. -%>
+              <div data-group-rules-target="senderGroup" class="hidden space-y-1">
+                <input type="text"
+                       placeholder="<%= t('.rule_value_placeholder.sender') %>"
+                       data-action="keydown->group-rules#handleKeydown"
+                       class="block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-accent-500 focus:ring-accent-500"
+                       disabled />
+                <p class="text-[10px] text-muted-foreground/70"><%= t(".sender_hint") %></p>
+              </div>
+
+              <%# Organization — pick from the workspace's org list. -%>
+              <div data-group-rules-target="orgGroup" class="hidden">
+                <select class="block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-accent-500 focus:ring-accent-500"
+                        disabled>
+                  <option value=""><%= t(".rule_select_placeholder") %></option>
+                  <% @organizations.each do |org| %>
+                    <option value="<%= org.id %>"><%= org.name %></option>
+                  <% end %>
+                </select>
+              </div>
+
+              <%# Document type — pick with a color dot indicator. -%>
+              <div data-group-rules-target="doctypeGroup" class="hidden">
+                <div class="flex items-center gap-2">
+                  <span data-group-rules-target="colorDot"
+                        class="hidden h-3 w-3 flex-shrink-0 rounded-full ring-1 ring-black/5"></span>
+                  <select class="flex-1 rounded-md border-gray-300 text-sm shadow-sm focus:border-accent-500 focus:ring-accent-500"
+                          data-action="change->group-rules#doctypeSelectChanged"
+                          disabled>
+                    <option value="" data-color=""><%= t(".rule_select_placeholder") %></option>
+                    <% @document_types.each do |dt| %>
+                      <option value="<%= dt.id %>" data-color="<%= dt.color %>"><%= dt.name %></option>
+                    <% end %>
+                  </select>
+                </div>
+              </div>
+
+              <%# Query — modifier-aware search query with hint. -%>
+              <div data-group-rules-target="queryGroup" class="hidden space-y-1">
+                <input type="text"
+                       placeholder="<%= t('.rule_value_placeholder.query') %>"
+                       data-action="keydown->group-rules#handleKeydown"
+                       class="block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-accent-500 focus:ring-accent-500"
+                       disabled />
+                <p class="text-[10px] text-muted-foreground/70"><%= t(".query_hint") %></p>
+              </div>
+
+            </div>
+
+            <%# Panel actions. -%>
+            <div class="flex items-center justify-end gap-3">
+              <button type="button"
+                      data-action="group-rules#closePanel"
+                      class="text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+                <%= t(".cancel") %>
+              </button>
+              <%= render(Campbooks::Button.new(variant: :primary, size: :xs, type: :button,
+                    data: { action: "group-rules#commitRule" })) { t(".add_rule_action") } %>
+            </div>
+
+          </div><%# /addPanel -%>
+        </div><%# /flex-col -%>
+
+        <p class="mt-2 text-[11px] text-muted-foreground/70"><%= t(".rules_hint") %></p>
       </div>
 
       <div class="flex items-center gap-2">

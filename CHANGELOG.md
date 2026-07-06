@@ -39,6 +39,17 @@ major, minor, or patch change here.
   mirrors the same guarded scope the drill-in view uses. Select-all includes
   group rows alongside thread rows.
 - **Onboarding setup templates.** New workspaces are greeted with a persona picker (Freelancer / Small business / Personal admin / Job hunt / Just exploring) as the first onboarding step. Selecting a template seeds the right tags and document types automatically and adjusts which nav modules are visible. Applying is fully idempotent and additive: existing tags and document types are never removed. A new Settings page (Settings > Setup) lets users review the active template, switch to a different one, and toggle individual module visibility at any time.
+- **Group rules for inbox groups.** Groups can now match threads not only
+  through tags, but also through rules: match by sender email or domain
+  (`@acme.com`), by organization (every contact belonging to that org), by
+  document type (threads that carry a document of that type), or via a
+  structured search query (`from:`, `tag:`, `is:`, `has:`, `category:`,
+  `priority:`, `after:`, `before:`). Rules-only groups (no tags required)
+  are fully supported. Additive multi-group membership is preserved: the same
+  thread can satisfy any number of groups simultaneously. The Groups panel
+  in inbox settings gains a dynamic Rules section for adding/removing rules,
+  and existing bulk-action flows (Mark all read, Archive all) work unchanged
+  because they go through the same engine. Exposed in all four UI languages.
 
 ### Changed
 
