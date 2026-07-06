@@ -45,10 +45,11 @@ class Tag < ApplicationRecord
 
   # The visibility gate used at every render site: hidden tags (provider system
   # statuses + AI-judged low-value labels) never render as chips. The decision is
-  # remembered per label and is overridable in Settings → Tags. (Workspace arg
-  # kept for call-site compatibility.)
-  def self.visible_for(_workspace = nil)
-    visible
+  # remembered per label and is overridable in Settings → Tags. Scopes to the
+  # given workspace when one is supplied so cross-tenant tags are never exposed.
+  def self.visible_for(workspace = nil)
+    scope = workspace.present? ? where(workspace: workspace) : all
+    scope.visible
   end
 
   validates :name, presence: true
