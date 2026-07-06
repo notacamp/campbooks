@@ -29,6 +29,7 @@ major, minor, or patch change here.
 
 ### Added
 
+- **First-run walkthrough rebuilt as an explanation-first slideshow.** What Campbooks is (with rotating Scout statements), then Inbox, Calendar, Tasks (feature-gated), Documents, and a "much more" close with docs link and connect CTA. Segmented progress bars with 0.4s fill animation, module label + slide counter, per-slide vignette animations (chips pop, group counter ticks, event and reminder buttons confirm, task ticks, document fields fade in), keyboard navigation, and click-to-jump segments. New registrations land on home where it auto-opens.
 - **Scheduling emails now show the drafted event inline — one tap adds it to your calendar (Edit still opens the full form).** When Scout detects a time proposal in an email (e.g. "does 3pm work?"), a bordered event block appears below the thread with the extracted title and time range. Tap "Add to calendar" to confirm it in one step; tap "Edit" to open the prefilled calendar form. Scout drafts — you decide.
 
 - **MCP: `archive_emails` tool to clear inbox noise at scale.** Agents can now

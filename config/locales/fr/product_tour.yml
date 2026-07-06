@@ -2,68 +2,84 @@
 fr:
   components:
     product_tour:
-      ai_tag: IA
       aria_label: Visite guidée
-      back: Retour
-      next: Suivant
-      s1_body: Campbooks est une boîte de réception qui se trie toute seule. En une
-        minute environ, je vais vous montrer les quatre choses qui font la différence
-        — essayez chacune au fur et à mesure.
-      s1_point_ask: Posez n'importe quelle question à votre boîte de réception
-      s1_point_remind: Les échéances ne passent jamais à la trappe
-      s1_point_skim: Traitez une pile entière en quelques secondes
-      s1_point_surface: Scout met en avant uniquement ce qui requiert votre attention
-      s1_title: Bienvenue sur Campbooks
-      s2_badge: Pour vous
-      s2_eyebrow: Votre accueil
-      s2_feedback: Voilà l'essentiel, sans ouvrir l'e-mail. La notification LinkedIn
-        ci-dessous n'était que du bruit, Scout l'a donc laissée de côté.
-      s2_summary: Un code à usage unique pour confirmer votre virement bancaire —
-        il expire dans 10 minutes, mieux vaut donc le regarder maintenant.
-      s2_task: Touchez le message signalé par Scout pour voir ce qu'il en a extrait.
-      s2_title: Scout met en avant ce qui requiert votre attention
-      s2_why: Scout lit chaque e-mail dès son arrivée et ne fait remonter que l'essentiel.
-        Tout le reste reste discrètement à l'écart.
-      s3_eyebrow: Skim
-      s3_feedback: Voilà toute la pile, réglée. Les e-mails archivés restent consultables
-        et chaque action peut être annulée.
-      s3_progress: "%{done} pile(s) sur %{total} traitée(s)"
-      s3_task: 'Parcourez les trois : archivez le bruit, gardez l''essentiel.'
-      s3_title: Traitez une pile en quelques secondes
-      s3_why: Skim regroupe votre boîte de réception en piles et les fait défiler
-        comme des Stories. Vous prenez une décision par pile — garder l'essentiel,
-        archiver le bruit — au lieu d'ouvrir des dizaines d'e-mails.
-      s4_dismiss: ou ignorer
-      s4_extracted: 'Scout a repéré une échéance : vendredi'
-      s4_eyebrow: Rappels
-      s4_feedback: C'est fait. Il réapparaîtra vendredi, et vous pouvez transformer
-        n'importe quel rappel en événement d'agenda d'un seul geste.
-      s4_remind_cta: Me le rappeler
-      s4_reminder_title: Payer la facture Acme — $248.00
-      s4_reminder_when: Rappel programmé · vendredi, 9 h 00
-      s4_task: Cette facture est due vendredi. Touchez « Me le rappeler » pour la
-        programmer.
-      s4_title: Les échéances ne passent jamais à la trappe
-      s4_why: Quand un e-mail comporte une échéance ou une promesse que vous avez
-        faite, Scout l'extrait pour qu'elle ne soit pas enfouie.
-      s5_eyebrow: Scout
-      s5_feedback: Scout fait cela dans votre vraie boîte de réception une fois qu'elle
-        est connectée — et peut aussi rédiger les réponses.
-      s5_greeting: Bonjour ! Je suis Scout. Posez-moi une question sur votre boîte
-        de réception — ou touchez une suggestion pour commencer.
-      s5_prompt: Qu'est-ce qui attend une réponse aujourd'hui ?
-      s5_reply_intro: 'Deux e-mails vous attendent :'
-      s5_reply_item_1: Sarah — elle a posé une question sur le déjeuner de jeudi
-      s5_reply_item_2: Acme Supply Co. — la facture due vendredi
-      s5_task: Touchez la question pour la poser à Scout.
-      s5_title: Posez n'importe quelle question à votre boîte de réception
-      s5_why: Scout peut chercher, résumer et agir dans vos e-mails et vos documents.
-        Il suffit de demander avec des mots simples.
-      s6_body: 'Voilà la boucle : Scout met en avant l''essentiel, vous traitez le
-        reste en quelques secondes avec Skim, les échéances sont tenues et vous pouvez
-        tout demander. Connectez votre boîte de réception pour passer à la réalité.'
-      s6_cta_connect: Connecter votre boîte de réception
-      s6_cta_explore: Explorer par moi-même
-      s6_title: Vous êtes prêt
+      progress_label: Progression de la visite
       skip: Passer la visite
-      step: "%{current} sur %{total}"
+      prev: Précédent
+      next: Suivant
+      nav_hint: appuyez pour avancer
+      segment_label: "Aller à la diapositive %{n}"
+      connect_cta: Connecter votre boîte de réception
+      done_cta: Retour à votre boîte de réception
+      docs_cta: Lire la documentation
+
+      # Diapositive 1 : Introduction
+      intro_mod: Campbooks
+      s1_title: "Voici Campbooks — la boîte de réception qui se trie toute seule."
+      s1_sub: Un client de messagerie avec un assistant intégré, pour ceux qui se noient dans les e-mails professionnels et la paperasse.
+      s1_rot_lead: "Scout, votre assistant,"
+      s1_r0_h: "lit chaque e-mail, pour que vous n'ayez pas à le faire."
+      s1_r0_p: "Chaque message reçoit une analyse en une ligne : ce que c'est, ce qu'il vous demande, s'il peut attendre."
+      s1_r1_h: "classe les factures, reçus et contrats."
+      s1_r1_p: Les pièces jointes deviennent des documents traçables et consultables — classés, étiquetés et prêts pour la déclaration fiscale.
+      s1_r2_h: repère les échéances avant qu'elles ne filent.
+      s1_r2_p: Les dates enfouies dans vos e-mails remontent en rappels — votre calendrier ne change que quand vous le validez.
+      s1_r3_h: fait taire les newsletters et les notifications.
+      s1_r3_p: Le bruit s'effondre en groupes bien rangés que vous pouvez parcourir en quelques secondes — annoncé, réversible, jamais perdu.
+      s1_r4_h: vous remet la liste courte qui a vraiment besoin de vous.
+      s1_r4_p: Vous ouvrez l'appli pour deux ou trois choses, pas pour deux cents.
+      s1_close_b: "Vous décidez. Scout fait la partie ennuyeuse."
+      s1_close: Tout ce qu'il fait est annoncé, réversible et soumis à votre approbation.
+
+      # Diapositive 2 : Boîte de réception
+      inbox_mod: Boîte de réception
+      s2_title: "Le courrier arrive déjà trié."
+      s2_body1_html: "Les newsletters, notifications et promotions <b>s'effondrent en groupes bien rangés</b> au lieu d'enterrer votre matinée — parcourez-les en quelques secondes ou ignorez-les entièrement. Ce qui requiert vraiment une réponse reste en avant avec l'analyse en une ligne de Scout."
+      s2_body2_html: "Les étiquettes s'appliquent seules à l'arrivée du courrier : <b>annoncées et réversibles</b>, sans question à répondre. Vos dossiers se classent enfin tout seuls."
+      s2_group_label: "Notifications et newsletters"
+
+      # Diapositive 3 : Agenda
+      calendar_mod: Agenda
+      s3_title: Votre boîte de réception et votre agenda se parlent enfin.
+      s3_body1_html: "Un e-mail 'ça te va jeudi ?' devient un <b>événement rédigé</b> — le bon titre, la bonne heure, un geste pour l'ajouter. Fini de tout retaper."
+      s3_body2_html: "Les engagements datés — une facture à payer, un renouvellement, un vol — remontent en tant que <b>rappels que vous validez</b> sur l'agenda. La synchronisation bidirectionnelle tient Google et Zoho à jour, dans les deux sens."
+      s3_ev_title: Réunion de lancement avec Dana
+      s3_ev_time: "Jeu . 14 h 30 - 15 h 00 . rédigé depuis son e-mail"
+      s3_ev_add: Ajouter à l'agenda
+      s3_ev_added: Ajouté
+      s3_rem_sender: "Paiement . dans 11 jours"
+      s3_rem_subj: "Facture Streamline n° 10-449 . 49,00 $"
+      s3_rem_add: Ajouter à l'agenda
+      s3_rem_added: Dans votre agenda
+
+      # Diapositive 4 : Tâches (contrôlée par indicateur)
+      tasks_mod: Tâches
+      s4_title: Transformez n'importe quel e-mail en tâche.
+      s4_body1_html: "Scout repère les demandes cachées dans vos e-mails — \"pouvez-vous envoyer le rapport avant vendredi ?\" — et propose de les transformer en tâches avec <b>une date d'échéance associée</b>."
+      s4_body2_html: "Traitez-les en liste ou en tableau ; cochez-les et <b>rien de promis ne se perd</b> trois réponses plus bas dans un fil."
+
+      # Diapositive 5 : Documents
+      docs_mod: Documents
+      s5_title: "La paperasse qui se classe toute seule."
+      s5_body1_html: "Chaque pièce jointe devient un <b>document traçable</b> : type reconnu, les champs clés — fournisseur, montant, date d'échéance — extraits et consultables dès le premier jour."
+      s5_body2_html: "Vous approuvez ou corrigez en un geste. <b>La déclaration fiscale cesse d'être de l'archéologie</b> — c'est une barre de recherche."
+      s5_doc_type: Facture de dépenses
+      s5_field_vendor_label: Fournisseur
+      s5_field_amount_label: Montant
+      s5_field_due_label: Date d'échéance
+      s5_reclassify: Reclassifier
+      s5_approve: Approuver
+      s5_approved: "Approuvé"
+
+      # Diapositive 6 : Bien plus encore
+      more_mod: Bien plus encore
+      s6_title: "Et ce n'est que la version courte."
+      s6_body: Parcourez votre boîte de réception comme des stories. Posez à Scout n'importe quelle question sur vos e-mails et fichiers, en langage naturel. Créez vos propres règles et groupes — ou allez plus loin avec des résumés, des modèles, une API REST et l'hébergement personnel.
+      s6_chip_skim: Stories Skim
+      s6_chip_scout: Chat Scout
+      s6_chip_rules: "Règles et groupes"
+      s6_chip_digests: "Résumés"
+      s6_chip_templates: "Modèles"
+      s6_chip_api: API REST
+      s6_chip_self: Hébergement personnel
+      s6_docs_note: "La documentation couvre tout — d'une visite de cinq minutes à l'exploitation de votre propre serveur."

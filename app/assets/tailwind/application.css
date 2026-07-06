@@ -472,6 +472,83 @@ html {
 }
 .tour-finale-ring { animation: tour-finale-ring 1.1s var(--ease-out-expo) both; }
 
+/* ── Walkthrough v2 slide transitions + vignette animations ──────────────── */
+
+/* Slide base state: invisible, slightly below. .tour-slide-in animates in from
+   below; .tour-slide-out exits upward. Pointer-events gated to only the active
+   slide so off-screen slides don't intercept clicks. */
+.tour-slide {
+  opacity: 0;
+  transform: translateY(14px);
+  pointer-events: none;
+}
+.tour-slide.tour-slide-in {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  transition: opacity 0.45s, transform 0.55s var(--ease-out-expo);
+}
+.tour-slide.tour-slide-out {
+  opacity: 0;
+  transform: translateY(-16px);
+  pointer-events: none;
+  transition: opacity 0.3s, transform 0.4s var(--ease-out-quint);
+}
+
+/* Stage elements on feature slides: stagger-in on each slide entry. */
+.tour-stage-el {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: none;
+}
+.tour-stage-el.on {
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.4s, transform 0.5s var(--ease-out-expo);
+}
+
+/* Rotating statement items on slide 1. */
+.tour-rot-item {
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+}
+.tour-rot-item.tour-rot-in {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+  transition: opacity 0.4s, transform 0.5s var(--ease-out-expo);
+}
+.tour-rot-item.tour-rot-out {
+  opacity: 0;
+  transform: translateY(-12px);
+  pointer-events: none;
+  transition: opacity 0.28s, transform 0.36s var(--ease-out-quint);
+}
+
+/* Tasks slide: tick checked state. */
+.tour-tick-done {
+  background-color: var(--foreground) !important;
+  border-color: var(--foreground) !important;
+  color: var(--background) !important;
+}
+
+/* Chip pop: used when inbox tags animate in. */
+@keyframes chip-pop {
+  0% { transform: scale(0.4); opacity: 0; }
+  65% { transform: scale(1.08); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-chip-pop { animation: chip-pop 0.38s var(--ease-out-expo) both; }
+
+/* Win pop: used when calendar / doc action buttons morph to confirmed state. */
+@keyframes win-pop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+.animate-win-pop { animation: win-pop 0.5s var(--ease-out-expo) both; }
+
 /* Markdown-rendered content in agent chat messages */
 .agent-message-content p {
   margin-bottom: 0.5rem;

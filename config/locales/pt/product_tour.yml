@@ -2,67 +2,84 @@
 pt:
   components:
     product_tour:
-      ai_tag: IA
       aria_label: Visita guiada
-      back: Voltar
-      next: Seguinte
-      s1_body: O Campbooks é uma caixa de entrada que se organiza sozinha. Em cerca
-        de um minuto, mostro-lhe as quatro coisas que o tornam diferente — experimente
-        cada uma à medida que avançamos.
-      s1_point_ask: Pergunte qualquer coisa à sua caixa de entrada
-      s1_point_remind: Os prazos nunca lhe escapam
-      s1_point_skim: Trate de uma pilha inteira em segundos
-      s1_point_surface: O Scout destaca apenas o que precisa de si
-      s1_title: Bem-vindo ao Campbooks
-      s2_badge: Precisa de si
-      s2_eyebrow: A sua página inicial
-      s2_feedback: É a ideia principal, sem abrir o email. A notificação do LinkedIn
-        em baixo era ruído, por isso o Scout deixou-a ficar.
-      s2_summary: Um código único para confirmar a sua transferência bancária — expira
-        em 10 minutos, por isso vale a pena ver agora.
-      s2_task: Toque na mensagem que o Scout assinalou para ver o que ele extraiu.
-      s2_title: O Scout destaca o que precisa de si
-      s2_why: O Scout lê cada email à medida que chega e traz para a frente apenas
-        o que importa. Tudo o resto fica discretamente fora do caminho.
-      s3_eyebrow: Skim
-      s3_feedback: É a pilha toda, tratada. O correio arquivado continua pesquisável
-        e todas as ações podem ser anuladas.
-      s3_progress: "%{done} de %{total} pilhas tratadas"
-      s3_task: 'Percorra as três: arquive o ruído, mantenha o que importa.'
-      s3_title: Trate de uma pilha em segundos
-      s3_why: O Skim agrupa a sua caixa de entrada em pilhas e reproduz-nas como Stories.
-        Toma uma decisão por pilha — manter o que importa, arquivar o ruído — em vez
-        de abrir dezenas de emails.
-      s4_dismiss: ou dispensar
-      s4_extracted: 'O Scout encontrou uma data-limite: sexta-feira'
-      s4_eyebrow: Lembretes
-      s4_feedback: Definido. Volta a aparecer na sexta-feira, e pode transformar qualquer
-        lembrete num evento de calendário com um toque.
-      s4_remind_cta: Lembrar-me
-      s4_reminder_title: Pagar fatura da Acme — $248.00
-      s4_reminder_when: Lembrete definido · sexta-feira, 9:00
-      s4_task: Esta fatura vence na sexta-feira. Toque em “Lembrar-me” para a definir.
-      s4_title: Os prazos nunca escapam
-      s4_why: Quando um email traz uma data-limite ou uma promessa que fez, o Scout
-        extrai-a para que não fique soterrada.
-      s5_eyebrow: Scout
-      s5_feedback: O Scout faz isto na sua caixa de entrada real assim que estiver
-        ligada — e também pode redigir as respostas.
-      s5_greeting: Olá! Sou o Scout. Pergunte-me sobre a sua caixa de entrada — ou
-        toque numa sugestão para começar.
-      s5_prompt: O que precisa de resposta hoje?
-      s5_reply_intro: 'Dois emails estão à sua espera:'
-      s5_reply_item_1: Sarah — perguntou sobre o almoço de quinta-feira
-      s5_reply_item_2: Acme Supply Co. — a fatura que vence na sexta-feira
-      s5_task: Toque na pergunta para perguntar ao Scout.
-      s5_title: Pergunte qualquer coisa à sua caixa de entrada
-      s5_why: O Scout consegue procurar, resumir e agir no seu correio e documentos.
-        Basta perguntar por palavras simples.
-      s6_body: 'É este o ciclo: o Scout destaca o que importa, você trata do resto
-        em segundos com o Skim, os prazos não escapam e pode perguntar qualquer coisa.
-        Ligue a sua caixa de entrada para o tornar real.'
-      s6_cta_connect: Ligar a sua caixa de entrada
-      s6_cta_explore: Explorar por minha conta
-      s6_title: Está tudo pronto
+      progress_label: Progresso da visita
       skip: Ignorar visita
-      step: "%{current} de %{total}"
+      prev: Anterior
+      next: Seguinte
+      nav_hint: toque para avançar
+      segment_label: "Ir para o diapositivo %{n}"
+      connect_cta: Ligar a sua caixa de entrada
+      done_cta: Voltar à sua caixa de entrada
+      docs_cta: Ler a documentação
+
+      # Diapositivo 1: Introdução
+      intro_mod: Campbooks
+      s1_title: "Isto é o Campbooks — a caixa de entrada que se organiza sozinha."
+      s1_sub: Um cliente de email com um assistente integrado, para quem está a afogar-se em email profissional e papelada.
+      s1_rot_lead: "Scout, o seu assistente,"
+      s1_r0_h: "lê todos os emails, para que não tenha de o fazer."
+      s1_r0_p: "Cada mensagem recebe uma análise de uma linha: o que é, o que pede de si, se pode esperar."
+      s1_r1_h: "arquiva as faturas, recibos e contratos."
+      s1_r1_p: Os anexos tornam-se documentos rastreados e pesquisáveis — classificados, etiquetados e prontos para a declaração fiscal.
+      s1_r2_h: apanha os prazos antes de escaparem.
+      s1_r2_p: As datas enterradas no email surgem como lembretes — o seu calendário só muda quando o autorizar.
+      s1_r3_h: silencia as newsletters e notificações.
+      s1_r3_p: O ruído colapsa em grupos organizados que pode percorrer em segundos — anunciado, reversível, nunca perdido.
+      s1_r4_h: entrega-lhe a lista curta que realmente precisa de si.
+      s1_r4_p: Abre a aplicação para duas ou três coisas, não para duzentas.
+      s1_close_b: "Você decide. Scout trata da parte aborrecida."
+      s1_close: Tudo o que faz é anunciado, reversível e seu para aprovar.
+
+      # Diapositivo 2: Caixa de entrada
+      inbox_mod: Caixa de entrada
+      s2_title: O email chega já organizado.
+      s2_body1_html: "Newsletters, notificações e promoções <b>colapsam em grupos organizados</b> em vez de enterrarem a sua manhã — percorra-os em segundos ou ignore-os por completo. O que realmente precisa de resposta fica em destaque com a análise de uma linha do Scout."
+      s2_body2_html: "As etiquetas aplicam-se à medida que o email chega: <b>anunciadas e reversíveis</b>, sem perguntas a responder. As suas pastas finalmente arquivam-se sozinhas."
+      s2_group_label: Notificações e newsletters
+
+      # Diapositivo 3: Calendário
+      calendar_mod: Calendário
+      s3_title: A sua caixa de entrada e o calendário finalmente comunicam.
+      s3_body1_html: "Um email 'funciona na quinta-feira?' torna-se um <b>evento rascunhado</b> — título certo, hora certa, um toque para adicionar. Acabou de reescrever quem e quando."
+      s3_body2_html: "Compromissos com data — uma fatura a pagar, uma renovação, um voo — surgem como <b>lembretes que confirma</b> no calendário. A sincronização bidirecional mantém o Google e o Zoho honestos, em ambas as direções."
+      s3_ev_title: Reunião de arranque com a Dana
+      s3_ev_time: "Qui . 14:30 - 15:00 . rascunhado do email dela"
+      s3_ev_add: Adicionar ao calendário
+      s3_ev_added: Adicionado
+      s3_rem_sender: "Pagamento . em 11 dias"
+      s3_rem_subj: "Fatura Streamline #10-449 . $49,00"
+      s3_rem_add: Adicionar ao calendário
+      s3_rem_added: No seu calendário
+
+      # Diapositivo 4: Tarefas (controlado por funcionalidade)
+      tasks_mod: Tarefas
+      s4_title: Transforme qualquer email numa tarefa.
+      s4_body1_html: "O Scout detecta os pedidos escondidos no seu email — \"pode enviar o relatório até sexta?\" — e oferece-se para os transformar em tarefas com <b>datas de entrega associadas</b>."
+      s4_body2_html: "Trabalhe-as em lista ou em painel; marque-as como concluídas e <b>nada prometido se perde</b> três respostas abaixo num fio de conversa."
+
+      # Diapositivo 5: Documentos
+      docs_mod: Documentos
+      s5_title: A papelada que se arquiva sozinha.
+      s5_body1_html: "Cada anexo torna-se um <b>documento rastreado</b>: tipo reconhecido, os campos-chave — fornecedor, montante, data de vencimento — extraídos e pesquisáveis desde o primeiro dia."
+      s5_body2_html: "Aprova ou corrige com um toque. <b>O IRS deixa de ser arqueologia</b> — é uma caixa de pesquisa."
+      s5_doc_type: Fatura de despesa
+      s5_field_vendor_label: Fornecedor
+      s5_field_amount_label: Montante
+      s5_field_due_label: Data de vencimento
+      s5_reclassify: Reclassificar
+      s5_approve: Aprovar
+      s5_approved: Aprovado
+
+      # Diapositivo 6: Muito mais
+      more_mod: Muito mais
+      s6_title: "E esta é a versão curta."
+      s6_body: Percorra a sua caixa de entrada como stories. Pergunte ao Scout qualquer coisa sobre o seu email e ficheiros, em linguagem natural. Crie as suas próprias regras e grupos — ou explore mais com resumos, modelos, uma API REST e alojamento próprio.
+      s6_chip_skim: Stories Skim
+      s6_chip_scout: Chat Scout
+      s6_chip_rules: Regras e grupos
+      s6_chip_digests: Resumos
+      s6_chip_templates: Modelos
+      s6_chip_api: API REST
+      s6_chip_self: Alojamento próprio
+      s6_docs_note: A documentação cobre tudo — desde uma visita de cinco minutos até correr o seu próprio servidor.
