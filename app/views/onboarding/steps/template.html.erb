@@ -1,7 +1,8 @@
 <%# Setup template picker — the very first question for a new workspace.
-    One question, tappable persona cards, prominent skip.
-    Selecting applies the template immediately (tags, doc types, module visibility). %>
-<% content_for :main_class, "mx-auto flex w-full max-w-[30rem] flex-col justify-center px-5 py-10 min-h-svh" %>
+    Multi-select persona cards. "Just exploring" is exclusive (clears others
+    when tapped; tapping any other card clears it). A Continue button applies
+    all selected templates; Skip proceeds without applying any. %>
+<% content_for :main_class, "mx-auto flex w-full max-w-[46rem] flex-col justify-center px-5 py-10 min-h-svh" %>
 
 <div class="flex flex-col items-center text-center animate-stage-in">
   <h1 class="text-[1.6rem] font-semibold leading-tight tracking-[-0.02em] text-foreground text-balance">
@@ -12,27 +13,35 @@
   </p>
 </div>
 
-<%= form_with url: onboarding_path, method: :patch, class: "mt-8 w-full animate-stage-in", style: "--stage-delay: .08s", data: { controller: "auto-submit" } do |f| %>
+<%= form_with url: onboarding_path, method: :patch,
+              class: "mt-8 w-full animate-stage-in flex flex-col",
+              style: "--stage-delay: .08s",
+              id: "template-form",
+              data: { controller: "template-picker" } do |f| %>
   <%= hidden_field_tag :step, "template" %>
 
-  <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+  <%# 3-col grid on desktop, 2-col on tablet, 1-col on mobile — 9 cards fit comfortably. %>
+  <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
     <% @templates.each_with_index do |tpl, i| %>
       <%
         key     = tpl[:key]
-        chosen  = (@chosen_key == key)
-        delay   = "#{(i * 0.05).round(2)}s"
+        chosen  = @chosen_keys.include?(key)
+        is_exclusive = (key == "just_exploring")
+        delay   = "#{(i * 0.04).round(2)}s"
       %>
       <label class="group relative flex cursor-pointer flex-col gap-2.5 rounded-2xl border p-4 transition-all has-[:checked]:border-accent-500 has-[:checked]:bg-accent-50/60 dark:has-[:checked]:bg-accent-900/20 <%= chosen ? 'border-accent-500 bg-accent-50/60 dark:bg-accent-900/20' : 'border-border bg-card hover:border-gray-300 dark:hover:border-gray-600' %> animate-stage-in"
-             style="--stage-delay: <%= delay %>">
-        <input type="radio" name="template_key" value="<%= key %>"
+             style="--stage-delay: <%= delay %>"
+             data-template-picker-target="card">
+        <input type="checkbox" name="template_keys[]" value="<%= key %>"
                <%= "checked" if chosen %>
                class="sr-only"
-               data-action="change->auto-submit#submit">
+               data-exclusive="<%= is_exclusive %>"
+               data-action="change->template-picker#toggle">
 
         <div class="flex items-start gap-3">
           <%# Icon %>
           <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-ink/[.06] text-ink/70 dark:bg-white/10 dark:text-white/70 group-has-[:checked]:bg-accent-100 group-has-[:checked]:text-accent-700 dark:group-has-[:checked]:bg-accent-900/30 dark:group-has-[:checked]:text-accent-400 transition-colors">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="h-4.5 w-4.5 h-[18px] w-[18px]" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="h-[18px] w-[18px]" aria-hidden="true">
               <path d="<%= tpl[:icon] %>"/>
             </svg>
           </span>
@@ -68,23 +77,21 @@
     <% end %>
   </div>
 
-  <%# Fallback submit for non-JS (JS auto-submits on radio change) %>
-  <noscript>
-    <div class="mt-4">
-      <%= render(Campbooks::Button.new(variant: :primary, type: :submit, class: "w-full justify-center")) { t(".continue") } %>
-    </div>
-  </noscript>
-<% end %>
+  <div class="mt-6 flex items-center justify-between gap-4">
+    <%= render(Campbooks::Button.new(variant: :primary, type: :submit,
+                                    class: "px-8 justify-center",
+                                    data: { "template-picker-target" => "continueBtn" })) do %>
+      <%= t(".continue") %>
+    <% end %>
 
-<div class="mt-8 flex flex-col items-center gap-2 animate-stage-in" style="--stage-delay: .32s">
-  <%# Skip sends an empty template_key — update_template is a no-op in that case. %>
-  <%= form_with url: onboarding_path, method: :patch, class: "w-full sm:w-auto" do |f| %>
-    <%= hidden_field_tag :step, "template" %>
-    <%= hidden_field_tag :template_key, "" %>
-    <%= render(Campbooks::Button.new(variant: :ghost, type: :submit, class: "w-full sm:w-auto text-muted-foreground")) { t(".skip") } %>
-  <% end %>
+    <%# Skip — posts with no template_keys — update_template is a no-op %>
+    <%= form_with url: onboarding_path, method: :patch, class: "inline" do |sf| %>
+      <%= hidden_field_tag :step, "template" %>
+      <%= render(Campbooks::Button.new(variant: :ghost, type: :submit, class: "text-muted-foreground")) { t(".skip") } %>
+    <% end %>
+  </div>
 
-  <p class="text-xs text-muted-foreground/60">
+  <p class="mt-3 text-xs text-muted-foreground/60 text-center">
     <%= t(".skip_hint") %>
   </p>
-</div>
+<% end %>

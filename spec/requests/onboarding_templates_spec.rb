@@ -20,12 +20,16 @@ RSpec.describe "Onboarding template step", type: :request do
       expect(response.body).to include("What will you mostly use Campbooks for")
     end
 
-    it "shows all template names" do
+    it "shows all 9 template names" do
       get onboarding_path(step: "template")
       expect(response.body).to include("Freelancer")
       expect(response.body).to include("Small business")
       expect(response.body).to include("Personal admin")
       expect(response.body).to include("Job hunt")
+      expect(response.body).to include("Accountant")
+      expect(response.body).to include("Landlord")
+      expect(response.body).to include("Frequent traveler")
+      expect(response.body).to include("Online seller")
       expect(response.body).to include("Just exploring")
     end
 
@@ -35,31 +39,44 @@ RSpec.describe "Onboarding template step", type: :request do
     end
   end
 
-  describe "PATCH /onboarding with step=template" do
+  describe "PATCH /onboarding with step=template (single key)" do
     it "applies the selected template and redirects to next step" do
-      patch onboarding_path, params: { step: "template", template_key: "freelancer" }
+      patch onboarding_path, params: { step: "template", template_keys: [ "freelancer" ] }
       expect(response).to redirect_to(onboarding_path(step: "welcome"))
-      expect(workspace.reload.setting("setup_template")).to eq("freelancer")
+      expect(workspace.reload.settings["setup_templates"]).to eq([ "freelancer" ])
     end
 
     it "creates tags when a template is selected" do
       expect {
-        patch onboarding_path, params: { step: "template", template_key: "freelancer" }
+        patch onboarding_path, params: { step: "template", template_keys: [ "freelancer" ] }
       }.to change { workspace.tags.reload.count }.by(3)
     end
 
-    it "skips template application when template_key is blank" do
+    it "skips template application when template_keys is blank" do
       expect {
-        patch onboarding_path, params: { step: "template", template_key: "" }
+        patch onboarding_path, params: { step: "template", template_keys: [] }
       }.not_to change { workspace.tags.reload.count }
       expect(response).to redirect_to(onboarding_path(step: "welcome"))
     end
 
-    it "skips template application when template_key is unknown" do
+    it "skips unknown keys silently" do
       expect {
-        patch onboarding_path, params: { step: "template", template_key: "hacker" }
+        patch onboarding_path, params: { step: "template", template_keys: [ "hacker" ] }
       }.not_to change { workspace.tags.reload.count }
       expect(response).to redirect_to(onboarding_path(step: "welcome"))
+    end
+  end
+
+  describe "PATCH /onboarding with step=template (multi-select)" do
+    it "applies the union of selected templates" do
+      expect {
+        patch onboarding_path, params: { step: "template", template_keys: [ "freelancer", "job_hunt" ] }
+      }.to change { workspace.tags.reload.count }.by(6)  # 3 + 3 (no overlap)
+    end
+
+    it "stores all selected keys in settings" do
+      patch onboarding_path, params: { step: "template", template_keys: [ "freelancer", "job_hunt" ] }
+      expect(workspace.reload.settings["setup_templates"]).to contain_exactly("freelancer", "job_hunt")
     end
   end
 end
@@ -77,8 +94,8 @@ RSpec.describe "Settings::SetupTemplateController", type: :request do
       expect(response.body).to include("Setup")
     end
 
-    it "shows the current template when one is set" do
-      workspace.settings["setup_template"] = "freelancer"
+    it "shows active templates when setup_templates is set" do
+      workspace.settings["setup_templates"] = [ "freelancer" ]
       workspace.save!
 
       get settings_setup_template_path
@@ -94,21 +111,28 @@ RSpec.describe "Settings::SetupTemplateController", type: :request do
   end
 
   describe "PATCH /settings/setup_template" do
-    it "applies a new template and redirects back" do
-      patch settings_setup_template_path, params: { template_key: "job_hunt" }
+    it "applies selected templates and redirects back" do
+      patch settings_setup_template_path, params: { template_keys: [ "job_hunt" ] }
       expect(response).to redirect_to(settings_setup_template_path)
       follow_redirect!
       expect(response.body).to include("applied")
     end
 
+    it "applies multiple templates together" do
+      patch settings_setup_template_path, params: { template_keys: [ "freelancer", "job_hunt" ] }
+      expect(response).to redirect_to(settings_setup_template_path)
+      names = workspace.reload.settings["setup_templates"]
+      expect(names).to contain_exactly("freelancer", "job_hunt")
+    end
+
     it "adds new tags without removing existing ones" do
       create(:tag, workspace: workspace, name: "my-existing-tag", color: "#000000")
-      patch settings_setup_template_path, params: { template_key: "job_hunt" }
+      patch settings_setup_template_path, params: { template_keys: [ "job_hunt" ] }
       expect(workspace.tags.reload.pluck(:name)).to include("my-existing-tag")
     end
 
-    it "rejects an unknown template key" do
-      patch settings_setup_template_path, params: { template_key: "bad-key" }
+    it "rejects an empty selection" do
+      patch settings_setup_template_path, params: { template_keys: [] }
       expect(response).to redirect_to(settings_setup_template_path)
     end
   end
