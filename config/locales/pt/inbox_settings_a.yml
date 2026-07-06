@@ -67,11 +67,28 @@ pt:
         unstar: Remover destaque
     tag_groups:
       form:
+        add_rule: Adicionar regra
         cancel: Cancelar
         heading_edit: Editar %{name}
         heading_new: Novo grupo
         name_label: Nome
         name_placeholder: p. ex. Newsletters e promoções
+        remove_rule: Remover regra
+        rule_select_placeholder: Escolher…
+        rule_type:
+          document_type: Tipo de documento
+          organization: Organização
+          query: Pesquisa
+          sender: Remetente
+        rule_value_placeholder:
+          document_type: Escolher um tipo de documento
+          organization: Escolher uma organização
+          query: "ex.: from:newsletter has:attachment"
+          sender: "ex.: faturacao@exemplo.pt ou @exemplo.pt"
+        rules_hint: Inclui mensagens que satisfaçam uma regra, mesmo sem etiqueta.
+          Texto livre numa pesquisa é ignorado; use apenas modificadores (from:,
+          tag:, is:, has:, after:, before:, category:, priority:).
+        rules_label: Regras
         save: Guardar grupo
         tags_hint: O correio com qualquer destas etiquetas é recolhido na linha
           do grupo. Cada etiqueta pertence a um só grupo.
@@ -82,14 +99,19 @@ pt:
         new_group: Novo grupo
         no_groups: Ainda sem grupos. Crie um para recolher o correio de baixa
           prioridade numa única linha.
-        subheading: Junte etiquetas em grupos; a caixa de entrada recolhe o correio
-          delas numa linha única.
+        rule_summary:
+          document_type: Documento
+          organization: Org
+          query: Pesquisa
+          sender: Remetente
+        subheading: Agrupe etiquetas ou regras; a caixa de entrada recolhe o correio
+          numa linha única.
         threads_count:
           one: "%{count} conversa"
           other: "%{count} conversas"
         ungroup: Desagrupar
-        ungroup_confirm: Desagrupar %{name}? As etiquetas mantêm-se; o correio
-          delas apenas deixa de ser recolhido.
+        ungroup_confirm: Desagrupar %{name}? As etiquetas e regras são removidas;
+          o correio deixa de ser recolhido.
     tags:
       create:
         created_toast: Etiqueta criada.

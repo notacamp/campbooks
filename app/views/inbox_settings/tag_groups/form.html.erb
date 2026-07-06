@@ -1,6 +1,8 @@
 <%= turbo_frame_tag "inbox_settings_tag_group_form" do %>
   <div class="mb-5 rounded-lg border border-border bg-muted/40 p-4"
-       data-controller="tag-group-name">
+       data-controller="tag-group-name group-rules"
+       data-group-rules-query-placeholder-value="<%= t('.rule_value_placeholder.query') %>"
+       data-group-rules-sender-placeholder-value="<%= t('.rule_value_placeholder.sender') %>">
     <h4 class="text-xs font-semibold text-foreground mb-3">
       <%= @group_name ? t(".heading_edit", name: @group_name) : t(".heading_new") %>
     </h4>
@@ -25,6 +27,112 @@
                   { value: tag.id, label: tag.name, color: tag.color, checked: @member_ids.include?(tag.id) }
                 })) %>
         </div>
+      </div>
+
+      <%# Rules section: one row per rule, add/remove via Stimulus. %>
+      <div class="mb-4">
+        <div class="flex items-center justify-between mb-1">
+          <span class="block text-xs font-medium text-foreground"><%= t(".rules_label") %></span>
+          <button type="button"
+                  data-action="group-rules#addRule"
+                  class="text-[11px] font-medium text-accent-600 hover:text-accent-700 transition-colors">
+            + <%= t(".add_rule") %>
+          </button>
+        </div>
+        <p class="text-[11px] text-muted-foreground mb-2"><%= t(".rules_hint") %></p>
+
+        <div data-group-rules-target="list" class="space-y-2">
+          <% @rules.each_with_index do |rule, i| %>
+            <div data-group-rules-target="row" class="flex items-center gap-2">
+              <select name="rules[<%= i %>][rule_type]"
+                      data-action="change->group-rules#typeChanged"
+                      data-group-rules-target="typeSelect"
+                      class="rounded-md border-gray-300 text-sm shadow-sm focus:border-accent-500 focus:ring-accent-500 flex-shrink-0 w-36">
+                <%= options_for_select(
+                  InboxGroupRule::RULE_TYPES.map { |rt| [ t(".rule_type.#{rt}"), rt ] },
+                  rule.rule_type
+                ) %>
+              </select>
+
+              <input type="text"
+                     name="rules[<%= i %>][value]"
+                     value="<%= rule.value if %w[sender query].include?(rule.rule_type) %>"
+                     placeholder="<%= t(".rule_value_placeholder.#{rule.rule_type}") %>"
+                     data-group-rules-target="textValue"
+                     class="<%= 'hidden' unless %w[sender query].include?(rule.rule_type) %> flex-1 min-w-0 rounded-md border-gray-300 text-sm shadow-sm focus:border-accent-500 focus:ring-accent-500" />
+
+              <select name="rules[<%= i %>][value]"
+                      data-group-rules-target="orgValue"
+                      class="<%= 'hidden' unless rule.rule_type == 'organization' %> flex-1 min-w-0 rounded-md border-gray-300 text-sm shadow-sm focus:border-accent-500 focus:ring-accent-500">
+                <option value=""><%= t(".rule_select_placeholder") %></option>
+                <%= options_for_select(
+                  @organizations.map { |o| [ o.name, o.id ] },
+                  rule.rule_type == "organization" ? rule.value : nil
+                ) %>
+              </select>
+
+              <select name="rules[<%= i %>][value]"
+                      data-group-rules-target="doctypeValue"
+                      class="<%= 'hidden' unless rule.rule_type == 'document_type' %> flex-1 min-w-0 rounded-md border-gray-300 text-sm shadow-sm focus:border-accent-500 focus:ring-accent-500">
+                <option value=""><%= t(".rule_select_placeholder") %></option>
+                <%= options_for_select(
+                  @document_types.map { |dt| [ dt.name, dt.id ] },
+                  rule.rule_type == "document_type" ? rule.value : nil
+                ) %>
+              </select>
+
+              <button type="button"
+                      data-action="group-rules#removeRule"
+                      aria-label="<%= t('.remove_rule') %>"
+                      class="flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors p-0.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+          <% end %>
+        </div>
+
+        <%# Hidden template cloned by Stimulus for new rows %>
+        <template data-group-rules-target="template">
+          <div data-group-rules-target="row" class="flex items-center gap-2">
+            <select name="rules[__IDX__][rule_type]"
+                    data-action="change->group-rules#typeChanged"
+                    data-group-rules-target="typeSelect"
+                    class="rounded-md border-gray-300 text-sm shadow-sm focus:border-accent-500 focus:ring-accent-500 flex-shrink-0 w-36">
+              <%= options_for_select(InboxGroupRule::RULE_TYPES.map { |rt| [ t(".rule_type.#{rt}"), rt ] }) %>
+            </select>
+
+            <input type="text"
+                   name="rules[__IDX__][value]"
+                   placeholder="<%= t('.rule_value_placeholder.sender') %>"
+                   data-group-rules-target="textValue"
+                   class="flex-1 min-w-0 rounded-md border-gray-300 text-sm shadow-sm focus:border-accent-500 focus:ring-accent-500" />
+
+            <select name="rules[__IDX__][value]"
+                    data-group-rules-target="orgValue"
+                    class="hidden flex-1 min-w-0 rounded-md border-gray-300 text-sm shadow-sm focus:border-accent-500 focus:ring-accent-500">
+              <option value=""><%= t(".rule_select_placeholder") %></option>
+              <%= options_for_select(@organizations.map { |o| [ o.name, o.id ] }) %>
+            </select>
+
+            <select name="rules[__IDX__][value]"
+                    data-group-rules-target="doctypeValue"
+                    class="hidden flex-1 min-w-0 rounded-md border-gray-300 text-sm shadow-sm focus:border-accent-500 focus:ring-accent-500">
+              <option value=""><%= t(".rule_select_placeholder") %></option>
+              <%= options_for_select(@document_types.map { |dt| [ dt.name, dt.id ] }) %>
+            </select>
+
+            <button type="button"
+                    data-action="group-rules#removeRule"
+                    aria-label="<%= t('.remove_rule') %>"
+                    class="flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors p-0.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        </template>
       </div>
 
       <div class="flex items-center gap-2">

@@ -70,11 +70,28 @@ es:
         unstar: Quitar destacado
     tag_groups:
       form:
+        add_rule: Agregar regla
         cancel: Cancelar
         heading_edit: Editar %{name}
         heading_new: Nuevo grupo
         name_label: Nombre
         name_placeholder: p. ej. Boletines y promociones
+        remove_rule: Eliminar regla
+        rule_select_placeholder: Elegir…
+        rule_type:
+          document_type: Tipo de documento
+          organization: Organización
+          query: Búsqueda
+          sender: Remitente
+        rule_value_placeholder:
+          document_type: Elegir un tipo de documento
+          organization: Elegir una organización
+          query: "ej.: from:newsletter has:attachment"
+          sender: "ej.: facturacion@ejemplo.com o @ejemplo.com"
+        rules_hint: Incluye mensajes que cumplan una regla, aunque no tengan etiqueta.
+          El texto libre en una búsqueda se ignora; use solo modificadores (from:,
+          tag:, is:, has:, after:, before:, category:, priority:).
+        rules_label: Reglas
         save: Guardar grupo
         tags_hint: El correo con cualquiera de estas etiquetas se pliega en la
           fila del grupo. Cada etiqueta pertenece a un solo grupo.
@@ -85,14 +102,19 @@ es:
         new_group: Nuevo grupo
         no_groups: Aún no hay grupos. Crea uno para plegar el correo de baja prioridad
           en una sola fila.
-        subheading: Agrupa etiquetas; la bandeja de entrada pliega su correo en
-          una sola fila.
+        rule_summary:
+          document_type: Documento
+          organization: Org
+          query: Búsqueda
+          sender: Remitente
+        subheading: Agrupa etiquetas o reglas; la bandeja de entrada pliega su correo
+          en una sola fila.
         threads_count:
           one: "%{count} conversación"
           other: "%{count} conversaciones"
         ungroup: Desagrupar
-        ungroup_confirm: ¿Desagrupar %{name}? Las etiquetas se conservan; su correo
-          simplemente deja de plegarse.
+        ungroup_confirm: ¿Desagrupar %{name}? Las etiquetas y reglas se eliminan;
+          el correo deja de plegarse.
     tags:
       create:
         created_toast: Etiqueta creada.
