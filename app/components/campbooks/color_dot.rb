@@ -23,7 +23,10 @@ module Campbooks
       custom_class = @attrs.delete(:class)
       classes = class_names(BASE_CLASSES, SIZE_CLASSES[@size], custom_class)
 
-      if @color.start_with?("#")
+      if @color.blank?
+        # No color (e.g. a rules-only inbox group) — a neutral dot, never a crash.
+        span(class: "#{classes} bg-subtle ring-1 ring-border", **@attrs)
+      elsif @color.start_with?("#")
         span(class: classes, style: "background-color: #{@color}", **@attrs)
       else
         span(class: "#{classes} bg-#{@color}", **@attrs)
