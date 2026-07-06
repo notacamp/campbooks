@@ -402,6 +402,15 @@ Rails.application.routes.draw do
     resources :tags, except: [ :show ] do
       member { patch :toggle_hidden }
     end
+    # The Groups panel. Collection-style verbs on purpose: a group is identified
+    # by its name ("Newsletters & promos" — spaces and an ampersand), which
+    # travels as a form/query param, never a path segment.
+    get    "tag_groups",      to: "tag_groups#index",  as: :tag_groups
+    get    "tag_groups/new",  to: "tag_groups#new",    as: :new_tag_group
+    get    "tag_groups/edit", to: "tag_groups#edit",   as: :edit_tag_group
+    post   "tag_groups",      to: "tag_groups#create"
+    patch  "tag_groups",      to: "tag_groups#update"
+    delete "tag_groups",      to: "tag_groups#destroy"
     resources :document_types, except: [ :show ]
     resources :signatures, except: [ :show ] do
       member { post :set_default }

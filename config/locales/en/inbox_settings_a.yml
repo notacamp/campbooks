@@ -64,6 +64,31 @@ en:
         subheading: Decide whose email reaches your inbox.
         unblock: Unblock
         unstar: Unstar
+    tag_groups:
+      form:
+        cancel: Cancel
+        heading_edit: Edit %{name}
+        heading_new: New group
+        name_label: Name
+        name_placeholder: e.g. Newsletters & promos
+        save: Save group
+        tags_hint: Mail carrying any of these tags collapses into the group's row.
+          A tag belongs to one group.
+        tags_label: Tags in this group
+      index:
+        edit: Edit
+        heading: Groups
+        new_group: New group
+        no_groups: No groups yet. Create one to collapse low-priority mail into
+          a single row.
+        subheading: Bundle tags into groups; the inbox collapses their mail into
+          one tappable row.
+        threads_count:
+          one: "%{count} conversation"
+          other: "%{count} conversations"
+        ungroup: Ungroup
+        ungroup_confirm: Ungroup %{name}? Its tags stay; their mail just stops
+          collapsing.
     tags:
       create:
         created_toast: Tag created.

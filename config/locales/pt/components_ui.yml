@@ -118,6 +118,7 @@ pt:
         document_types: Tipos de documento
         filtering: Filtragem
         signatures: Assinaturas
+        tag_groups: Grupos
         tags: Etiquetas
       settings_sections_label: Secções de definições
       title: Definições da caixa de entrada
