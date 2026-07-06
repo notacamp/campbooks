@@ -6,10 +6,12 @@ class OnboardingController < ApplicationController
   # the welcome screen and Settings but never forced on a new user.
   STEPS = %w[template welcome workspace email_accounts ai_configuration classification review].freeze
 
-  before_action :load_templates, except: :first_sync_status
-  before_action :set_step, except: :first_sync_status
-  before_action :ensure_valid_step!, except: :first_sync_status
-  before_action :set_previous_step, except: :first_sync_status
+  STEP_FREE_ACTIONS = %i[first_sync_status apply_persona skip_first_sync].freeze
+
+  before_action :load_templates, except: STEP_FREE_ACTIONS
+  before_action :set_step, except: STEP_FREE_ACTIONS
+  before_action :ensure_valid_step!, except: STEP_FREE_ACTIONS
+  before_action :set_previous_step, except: STEP_FREE_ACTIONS
   before_action :clear_onboarding_snooze, only: [ :update ]
 
   def show
@@ -47,6 +49,30 @@ class OnboardingController < ApplicationController
   # Polled by the first-sync stage on home while Scout's first scan runs.
   def first_sync_status
     render json: Onboarding::FirstSyncStatus.new(Current.user).as_json
+  end
+
+  # Applies persona setup templates mid-scan and swaps the stage's persona card
+  # for a confirmation via Turbo Stream.
+  def apply_persona
+    keys = Array(params[:template_keys]).map(&:to_s) & Onboarding::Templates.keys
+    result = keys.any? ? Onboarding::TemplateApplier.new(org, keys).apply! : { tags: [], document_types: [] }
+    respond_to do |format|
+      format.turbo_stream do
+        render turbo_stream: turbo_stream.replace(
+          "first-sync-persona",
+          partial: "home/persona_applied",
+          locals: { keys: keys, result: result }
+        )
+      end
+    end
+  end
+
+  # Marks this session as having skipped the first-sync stage, then redirects
+  # the user to the inbox. Home will no longer re-trap them in the stage even
+  # while the scan is still running.
+  def skip_first_sync
+    session[:first_sync_skipped] = true
+    redirect_to email_messages_path
   end
 
   # ── AI suggestion endpoints ──────────────────────────────

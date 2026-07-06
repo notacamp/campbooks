@@ -73,6 +73,11 @@ en:
       error_cta: Check the account connection
       error_title: Scout couldn't reach your inbox
       escape: Watch the inbox fill instead
+      persona_heading: While Scout reads — what do you mostly deal with?
+      persona_skip: Skip for now
+      persona_subheading: Pick one or more. Scout files documents and tags email accordingly
+        from the start.
+      persona_submit: Apply
       subtitle_done: "%{needs_you} things are waiting on you. Everything else is sorted
         and out of the way."
       subtitle_done_calm: Nothing is waiting on you right now. Everything is sorted

@@ -27,7 +27,7 @@ class HomeController < ApplicationController
     # A freshly-connected mailbox whose first scan hasn't completed gets the
     # full-screen "Scout is reading your inbox" stage instead of an empty feed.
     @first_sync = Onboarding::FirstSyncStatus.new(current_user)
-    if @first_sync.stage?
+    if @first_sync.stage? && !session[:first_sync_skipped]
       render :first_sync and return
     end
 
@@ -56,7 +56,9 @@ class HomeController < ApplicationController
     if @attention.empty? && @timeline.empty?
       accounts = Current.workspace&.email_accounts
       @inbox_state =
-        if accounts&.active&.exists?
+        if accounts&.active&.exists? && @first_sync.stage?
+          :syncing          # scan is still running but user skipped the wait screen
+        elsif accounts&.active&.exists?
           :caught_up        # a live inbox; the queue is genuinely clear
         elsif accounts&.exists?
           :disconnected     # connected before, but every inbox is disconnected

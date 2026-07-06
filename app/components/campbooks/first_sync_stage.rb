@@ -11,16 +11,26 @@ module Campbooks
   # polls `status_url` and owns every transition (scanning → done / empty /
   # error). All copy lives here as data-template strings so the JS stays
   # translation-free.
+  #
+  # Optional persona card: when `persona_url` is given, a compact persona
+  # question appears below the counters while the scan runs. Submitting applies
+  # the setup templates mid-scan via Turbo Stream. Pass `skip_url` to turn the
+  # escape-hatch link into a POST that sets a session flag so home won't
+  # re-trap the user in this stage.
   class FirstSyncStage < Campbooks::Base
     # @param status [Hash] {state:, found:, sorted:, needs_you:} — initial values
     # @param status_url [String] JSON endpoint the controller polls
     # @param inbox_path [String] escape hatch ("watch the inbox fill instead")
     # @param feed_path [String] where the done CTA lands (home)
-    def initialize(status:, status_url:, inbox_path: "/email_messages", feed_path: "/", **attrs)
+    # @param persona_url [String, nil] POST endpoint for persona selection (nil = feature off)
+    # @param skip_url [String, nil] POST endpoint for skipping the stage (nil = link fallback)
+    def initialize(status:, status_url:, inbox_path: "/email_messages", feed_path: "/", persona_url: nil, skip_url: nil, **attrs)
       @status = status
       @status_url = status_url
       @inbox_path = inbox_path
       @feed_path = feed_path
+      @persona_url = persona_url
+      @skip_url = skip_url
       @attrs = attrs
     end
 
@@ -40,6 +50,7 @@ module Campbooks
         stage_mark
         headline
         counters
+        persona_card if @persona_url
         done_cta
         error_note
         escape_hatch
@@ -115,6 +126,60 @@ module Campbooks
       end
     end
 
+    # Compact persona question shown while the scan runs. NOT a Stimulus target —
+    # Turbo replace owns the entire wrapper when the user submits. The polling
+    # controller hides it when the scan finishes via document.getElementById.
+    def persona_card
+      state = @status[:state]&.to_sym
+      return if %i[done empty error].include?(state)
+
+      div(
+        id: "first-sync-persona",
+        class: "mt-9 w-full max-w-sm rounded-2xl border border-border bg-card p-4 text-left animate-stage-in",
+        style: "--stage-delay: .22s"
+      ) do
+        h2(class: "text-[13px] font-semibold text-foreground") { t(".persona_heading") }
+        p(class: "mt-0.5 text-xs text-muted-foreground") { t(".persona_subheading") }
+
+        form(action: @persona_url, method: "post", class: "mt-3", data: { turbo_stream: true }) do
+          input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
+
+          # 2-col grid of compact icon + name chips; collapses to 1 col at narrow widths
+          div(class: "grid grid-cols-1 gap-1.5 xs:grid-cols-2 sm:grid-cols-2") do
+            Onboarding::Templates.all.each do |tpl|
+              key = tpl[:key]
+              label(
+                class: "flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-background p-2.5 text-left transition-all hover:border-accent-300 hover:bg-accent-50/40 has-[:checked]:border-accent-500 has-[:checked]:bg-accent-50/60 dark:hover:bg-accent-900/10 dark:has-[:checked]:bg-accent-900/20"
+              ) do
+                input(type: "checkbox", name: "template_keys[]", value: key, class: "sr-only")
+                span(class: "flex h-5 w-5 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground has-[:checked]:bg-accent-100 has-[:checked]:text-accent-700 dark:has-[:checked]:bg-accent-900/30 dark:has-[:checked]:text-accent-400") do
+                  raw safe(%(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3" aria-hidden="true"><path d="#{tpl[:icon]}"/></svg>))
+                end
+                span(class: "min-w-0 flex-1 truncate text-xs font-medium text-foreground leading-snug") do
+                  plain t("onboarding.steps.template.templates.#{key}.name")
+                end
+              end
+            end
+          end
+
+          div(class: "mt-3 flex items-center gap-3") do
+            button(
+              type: "submit",
+              class: "rounded-xl bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 active:scale-[0.98]"
+            ) { t(".persona_submit") }
+          end
+        end
+
+        # Skip: separate form posting empty keys — returns the "exploring" confirmation
+        form(action: @persona_url, method: "post", class: "mt-1.5 inline-block", data: { turbo_stream: true }) do
+          input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
+          button(type: "submit", class: "text-xs text-muted-foreground transition-colors hover:text-foreground focus:outline-none") do
+            t(".persona_skip")
+          end
+        end
+      end
+    end
+
     def done_cta
       div(class: "mt-9 hidden w-full max-w-xs flex-col items-center gap-3", data: { first_sync_target: "doneCta" }) do
         button(
@@ -143,12 +208,30 @@ module Campbooks
     end
 
     # Appears after a while for slow scans — the stage never traps anyone.
+    # When skip_url is provided, posting skips out and prevents re-entrapment on
+    # the next home visit. Falls back to a plain anchor when skip_url is nil.
     def escape_hatch
-      a(
-        href: @inbox_path,
-        class: "mt-10 hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground",
-        data: { first_sync_target: "escape" }
-      ) { t(".escape") }
+      if @skip_url
+        # The FORM carries the Stimulus target so JS can show/hide the whole unit.
+        form(
+          action: @skip_url,
+          method: "post",
+          class: "mt-10 hidden",
+          data: { first_sync_target: "escape" }
+        ) do
+          input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
+          button(
+            type: "submit",
+            class: "text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus:outline-none"
+          ) { t(".escape") }
+        end
+      else
+        a(
+          href: @inbox_path,
+          class: "mt-10 hidden text-sm font-medium text-muted-foreground transition-colors hover:text-foreground",
+          data: { first_sync_target: "escape" }
+        ) { t(".escape") }
+      end
     end
 
     def check_svg

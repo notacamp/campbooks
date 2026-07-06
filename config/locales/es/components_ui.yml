@@ -74,6 +74,11 @@ es:
       error_cta: Comprobar la conexión de la cuenta
       error_title: Scout no pudo acceder a su buzón
       escape: Ver cómo se llena la bandeja
+      persona_heading: Mientras Scout lee — ¿con qué trata principalmente?
+      persona_skip: Omitir por ahora
+      persona_subheading: Elija una o varias. Scout archivara documentos y etiquetara
+        correos en consecuencia desde el principio.
+      persona_submit: Aplicar
       subtitle_done: "%{needs_you} cosas le esperan. Todo lo demás está ordenado y
         fuera del camino."
       subtitle_done_calm: Nada le espera ahora mismo. Todo está ordenado y fuera del
