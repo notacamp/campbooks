@@ -27,6 +27,10 @@ major, minor, or patch change here.
   recolor, regroup, or add your own tags to any group from **Settings → Tags** —
   a tag with a group name collapses in the inbox, and a message shows in every
   group its tags belong to.
+- **Search your Organizations directory, and scroll it endlessly.** The
+  Organizations page now has a search box that filters the directory by company
+  name or email domain as you type, and the list loads more as you scroll instead
+  of paging through it.
 
 ### Changed
 

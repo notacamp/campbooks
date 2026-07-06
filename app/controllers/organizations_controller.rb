@@ -1,12 +1,39 @@
+require "pagy/extras/countless"
+
 class OrganizationsController < ApplicationController
   before_action :require_authentication
   before_action -> { require_entitlement!(:organizations) }
   before_action :set_organization, only: %i[show update emails documents]
 
+  PER_PAGE = 30
+
   def index
-    @organizations = Current.workspace.organizations.includes(:people).ordered
-    @pagy, @organizations = pagy(@organizations, items: 30)
+    @query = params[:q].to_s.strip
+    scope = Current.workspace.organizations.includes(:people).ordered
+    scope = scope.search(@query) if @query.present?
+    @total_count = scope.count
+    # pagy_countless drives the infinite scroll (no COUNT per page); the header
+    # count above is a single cheap tally over the small directory table.
+    @pagy, @organizations = pagy_countless(scope, limit: PER_PAGE)
     @email_counts = accessible_email_counts(@organizations)
+
+    respond_to do |format|
+      format.html
+      format.turbo_stream
+    end
+  rescue Pagy::OverflowError
+    # The lazy infinite-scroll sentinel asked for a page past the end (the
+    # directory can shrink between requests). Retire the sentinel for the stream
+    # fetch; a direct ?page=N over-scroll just returns to the first page.
+    respond_to do |format|
+      format.turbo_stream do
+        @organizations = []
+        @email_counts = {}
+        @pagy = nil
+        render :index
+      end
+      format.html { redirect_to organizations_path(q: @query.presence) }
+    end
   end
 
   def show
