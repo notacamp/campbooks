@@ -280,6 +280,9 @@ Rails.application.routes.draw do
   namespace :settings do
     root to: "general#show"
     resource :general, only: [ :show, :update ], controller: "general"
+    resource :setup_template, only: [ :show, :update ], controller: "setup_template" do
+      patch :update_modules, on: :member
+    end
     # Inbox settings — one dashboard page per inbox-settings panel, grouped under
     # "Inbox" in the sidebar. Each page embeds the matching InboxSettings::* panel
     # via the shared inbox_settings_panel Turbo Frame. Bare /settings/inbox

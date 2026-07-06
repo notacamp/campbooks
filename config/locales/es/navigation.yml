@@ -18,7 +18,14 @@ es:
         members: Miembros
         notifications: Notificaciones
         security: Seguridad
+        setup: "Configuración"
         system_health: "Salud del sistema"
+      module_visibility:
+        activity: Actividad
+        calendar: Calendario
+        contacts: Contactos
+        files: Archivos
+        organizations: Organizaciones
   statuses:
     approved: Aprobado
     completed: Completado

@@ -78,9 +78,9 @@ module NavigationHelper
       (nav_item(:digests, t("shared.nav.digests"), digests_path) if Features.digests?),
       # Workflows is gated off by default until it's production-ready (Features.workflows?).
       (nav_item(:workflows, t("shared.nav.workflows"), workflows_path) if Features.workflows?),
-      nav_item(:contacts, t("shared.nav.contacts"), contacts_path),
-      (nav_item(:organizations, t("shared.nav.organizations"), organizations_path) if current_entitlements.feature?(:organizations)),
-      nav_item(:activity, t("shared.nav.activity"), activity_path)
+      (nav_item(:contacts, t("shared.nav.contacts"), contacts_path) if workspace_module_visible?(:contacts)),
+      (nav_item(:organizations, t("shared.nav.organizations"), organizations_path) if current_entitlements.feature?(:organizations) && workspace_module_visible?(:organizations)),
+      (nav_item(:activity, t("shared.nav.activity"), activity_path) if workspace_module_visible?(:activity))
     ].compact
   end
 
@@ -120,6 +120,15 @@ module NavigationHelper
     %(<svg class="#{css_class}" #{attrs} aria-hidden="true">#{inner}</svg>).html_safe
   end
 
+  # Whether the given module key is visible for the current workspace.
+  # Returns true when the workspace has no template setting, or when the module
+  # is explicitly enabled. Used by primary_nav_items to honour template-driven
+  # visibility choices without blocking non-templated workspaces.
+  def workspace_module_visible?(key)
+    return true unless current_user&.workspace
+    current_user.workspace.module_visible?(key)
+  end
+
   # Grouped settings navigation, shared by the settings sidebar
   # (app/views/settings/_sidebar.html.erb) and the topbar user menu
   # (app/views/shared/_user_menu.html.erb) so both expose the same sections in
@@ -131,6 +140,7 @@ module NavigationHelper
     [
       [ t("navigation.settings.groups.workspace"), [
         [ settings_root_path, %w[general], t("navigation.settings.items.general"), "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" ],
+        [ settings_setup_template_path, %w[setup_template], t("navigation.settings.items.setup"), "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" ],
         [ settings_plan_path, %w[plan], t("navigation.settings.items.plan"), "M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 18.75z" ],
         [ settings_members_path, %w[members], t("navigation.settings.items.members"), "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" ],
         [ settings_integrations_root_path, %w[integrations notion google_drive zoho_drive calendars], t("navigation.settings.items.integrations"), "M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" ],

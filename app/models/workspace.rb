@@ -110,6 +110,14 @@ class Workspace < ApplicationRecord
     inbox_filter_strategy == "whitelist"
   end
 
+  # Whether a nav module is visible for this workspace. Defaults to true for any
+  # module not explicitly set — existing workspaces without settings are unaffected.
+  # Used by NavigationHelper to honour template-driven module visibility choices.
+  def module_visible?(key)
+    visibility = settings&.dig("module_visibility") || {}
+    visibility.fetch(key.to_s, true) != false
+  end
+
   private
 
   def inbox_filter_strategy_valid
