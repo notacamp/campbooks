@@ -3,15 +3,20 @@
 module Campbooks
   module Compose
     # The right-hand context rail shown next to the full-page composer (Desk
-    # shell). Stacks three cards:
+    # shell). Stacks up to three cards:
     #
     # 1. Original message — sender meta + sandboxed iframe of the email being
     #    replied to or forwarded (only when a source message is present).
     # 2. Attachments — a drop-target card wired to the compose form via the
     #    HTML5 `form` attribute so the inputs submit even though the card lives
-    #    outside the <form> element.
+    #    outside the <form> element. Includes an "Attach from Files" affordance
+    #    that opens the workspace's file picker and inserts a shareable link into
+    #    the message body (reuses the existing FileLinkPicker / file-link-picker
+    #    Stimulus controller; no binary-attachment seam exists for stored files).
     # 3. Scout — suggestion chips that prefill the adjacent Scout chat input;
-    #    shown only when an AI text provider is configured.
+    #    shown when an AI text provider is configured. Chips adapt to mode:
+    #    reply/forward surfaces thread-aware suggestions; new-message surfaces
+    #    drafting / tone prompts.
     #
     # Desktop (lg+): fixed-width column to the right of the editor.
     # Mobile (<lg):  stacks below the editor in the scrollable compose surface.
@@ -44,6 +49,10 @@ module Campbooks
 
       def show_original_email?
         @message && REPLY_MODES.include?(@mode)
+      end
+
+      def reply_mode?
+        REPLY_MODES.include?(@mode)
       end
 
       # ── 1. Original message ─────────────────────────────────────
@@ -144,7 +153,10 @@ module Campbooks
 
       def attachments_section
         div(class: "flex flex-col gap-2") do
-          rail_label { t(".attachments_heading") }
+          div(class: "flex items-center justify-between") do
+            rail_label { t(".attachments_heading") }
+            attach_from_files_button
+          end
           render(ComposeAttachments.new(
             upload_url: @upload_url,
             field_name: "attachments[]",
@@ -152,6 +164,23 @@ module Campbooks
             form_id: @form_id,
             variant: :card
           ))
+        end
+      end
+
+      # Delegates to the FileLinkPicker already rendered inside the Engine form
+      # (id: compose_file_link_trigger). Opens that dialog via compose-chat#openFilePicker,
+      # which inserts a public shareable link into the TipTap body.
+      # No binary-attachment seam exists for stored workspace files — intentional;
+      # documented in the PR.
+      def attach_from_files_button
+        button(
+          type: "button",
+          class: "inline-flex items-center gap-1 text-[11px] font-medium " \
+                 "text-muted-foreground hover:text-foreground transition-colors cursor-pointer",
+          data: { action: "click->compose-chat#openFilePicker" }
+        ) do
+          raw safe('<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>')
+          plain t(".attach_from_files")
         end
       end
 
@@ -171,13 +200,27 @@ module Campbooks
               end
               span(class: "text-[12.5px] font-semibold text-foreground") { t(".scout_heading") }
             end
-            p(class: "text-[12px] text-muted-foreground leading-relaxed mb-3") { t(".scout_body") }
+            p(class: "text-[12px] text-muted-foreground leading-relaxed mb-3") { scout_body_text }
             div(class: "flex flex-wrap gap-1.5") do
-              scout_chip(t(".chip_draft")) if @message
-              scout_chip(t(".chip_tone"))
-              scout_chip(t(".chip_summarize")) if @message
+              scout_chips_for_mode.each { |label| scout_chip(label) }
             end
           end
+        end
+      end
+
+      def scout_body_text
+        reply_mode? ? t(".scout_body_reply") : t(".scout_body_new")
+      end
+
+      def scout_chips_for_mode
+        if reply_mode?
+          chips = []
+          chips << t(".chip_draft") if @message
+          chips << t(".chip_tone")
+          chips << t(".chip_summarize") if @message
+          chips
+        else
+          [ t(".chip_new_draft"), t(".chip_tone") ]
         end
       end
 
