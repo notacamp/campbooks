@@ -2,30 +2,51 @@
 
 module Campbooks
   module Feed
-    # The lightest unit: a compact, borderless one-line filing suggestion —
-    # "File <subject> under #tag" with a one-tap action. Tighter than every other
-    # card so a run of them reads as a quick filing queue, not a wall of cards.
+    # Compact one-line feed card for a tag filing.
+    #
+    # **Notice mode** (data["applied"] = true, the norm from this release):
+    #   Scout auto-filed the email at generation time; the card informs and offers
+    #   a single "Undo" escape. Sentence: "Filed <subject> under #tag".
+    #
+    # **Legacy ask-mode** (data["applied"] absent/false, in-flight items only):
+    #   The card still asks "File <subject> under #tag" with "File it" / "Not now".
+    #   A data migration expires pending legacy items on deploy; this branch is a
+    #   belt-and-braces fallback for any that survive.
     class TagSuggestionCard < Campbooks::Feed::Base
       def view_template
         div(class: "-mx-3 flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-colors duration-150 hover:bg-muted/50") do
           icon_circle
           div(class: "min-w-0 flex-1 text-sm text-muted-foreground") do
-            plain t(".prefix")
+            if applied?
+              plain t(".filed_prefix")
+            else
+              plain t(".prefix")
+            end
             whitespace
-            span(class: "font-medium text-foreground") { clean_subject(subject).truncate(44, separator: " ") }
+            span(class: "font-medium text-foreground truncate inline-block max-w-[44ch] align-bottom") do
+              clean_subject(subject).truncate(44, separator: " ")
+            end
             whitespace
             plain t(".under")
             whitespace
             tag_chip
           end
           div(class: "flex flex-shrink-0 items-center gap-1.5") do
-            act_button(tool: "add_tag", args: { tag_name: tag_name }, label: t(".file_it"), variant: :primary, size: :xs, key: "c", primary: true)
-            dismiss_button(label: t(".not_now"), variant: :ghost, size: :xs, key: "x")
+            if applied?
+              act_button(tool: "undo_tag_filing", args: { tag_name: tag_name }, label: t(".undo"),
+                         variant: :ghost, size: :xs, key: "z", primary: true)
+            else
+              act_button(tool: "add_tag", args: { tag_name: tag_name }, label: t(".file_it"),
+                         variant: :primary, size: :xs, key: "c", primary: true)
+              dismiss_button(label: t(".not_now"), variant: :ghost, size: :xs, key: "x")
+            end
           end
         end
       end
 
       private
+
+      def applied? = item.data["applied"] == true
 
       def tag_name = item.data["tag_name"].to_s
 
@@ -36,9 +57,19 @@ module Campbooks
       end
 
       def icon_circle
-        span(class: "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground") do
-          raw safe(tag_icon)
+        if applied?
+          span(class: "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground") do
+            raw safe(check_icon)
+          end
+        else
+          span(class: "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground") do
+            raw safe(tag_icon)
+          end
         end
+      end
+
+      def check_icon
+        %(<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><polyline points="20 6 9 17 4 12"/></svg>)
       end
 
       def tag_icon

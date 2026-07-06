@@ -76,10 +76,12 @@ fr:
         starred: Mis en avant
         unstar: Retirer la mise en avant
       tag_suggestion_card:
+        filed_prefix: Classé
         file_it: Classer
         not_now: Pas maintenant
         prefix: Classer
         under: sous
+        undo: Annuler
       task_card:
         accept: Ajouter aux tâches
         complete: Terminer
@@ -110,6 +112,7 @@ fr:
       task_accepted: 'Ajoutée à vos tâches : %{title}'
       task_completed: 'Tâche terminée : %{title}'
       task_dismissed: Suggestion ignorée.
+      tag_filing_undone: Etiquette supprimée.
       unsupported: Cette action n'est pas prise en charge ici.
   home:
     index:

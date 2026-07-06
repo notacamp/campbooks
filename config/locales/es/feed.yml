@@ -76,10 +76,12 @@ es:
         starred: Destacado
         unstar: Quitar destacado
       tag_suggestion_card:
+        filed_prefix: Archivado
         file_it: Etiquetar
         not_now: Ahora no
         prefix: Etiquetar
         under: como
+        undo: Deshacer
       task_card:
         accept: Añadir a tareas
         complete: Completar
@@ -110,6 +112,7 @@ es:
       task_accepted: 'Añadida a tus tareas: %{title}'
       task_completed: 'Tarea completada: %{title}'
       task_dismissed: Sugerencia descartada.
+      tag_filing_undone: Etiqueta eliminada.
       unsupported: Esa acción no es compatible aquí.
   home:
     index:
