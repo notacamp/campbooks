@@ -18,6 +18,7 @@ major, minor, or patch change here.
 
 ### Added
 
+- **First-run walkthrough rebuilt as an explanation-first slideshow.** What Campbooks is (with rotating Scout statements), then Inbox, Calendar, Tasks (feature-gated), Documents, and a "much more" close with docs link and connect CTA. Segmented progress bars with 0.4s fill animation, module label + slide counter, per-slide vignette animations (chips pop, group counter ticks, event and reminder buttons confirm, task ticks, document fields fade in), keyboard navigation, and click-to-jump segments. New registrations land on home where it auto-opens.
 - **MCP: `archive_emails` tool to clear inbox noise at scale.** Agents can now
   archive every email matching a filter — a whole tag (e.g. `Notifications`), a
   date range, a sender, or an AI priority — instead of being capped at
