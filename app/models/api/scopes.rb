@@ -19,7 +19,7 @@ module Api
       "contacts:read"        => "Read contacts",
       "contacts:write"       => "Update contacts and change their state (star, block, allow)",
       "tags:read"            => "List tags",
-      "tags:write"           => "Create tags and add or remove them on emails",
+      "tags:write"           => "Create, edit, merge, and delete tags, and add or remove them on emails",
       "document_types:read"  => "List document types",
       "document_types:write" => "Create document types",
       "workflows:read"       => "List workflows and their run history",
