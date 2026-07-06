@@ -81,8 +81,8 @@ fr:
     create:
       microsoft_unavailable: Les connexions Microsoft 365 ne sont pas encore disponibles.
     destroy:
-      disconnected: "%{name} déconnecté."
       owner_only: Seul le propriétaire du compte peut déconnecter ce compte.
+      removed: "%{name} supprimé. Vos documents et contacts enregistrés ont été conservés."
     sharing:
       owner_only: Seul le propriétaire du compte peut gérer l'accès.
     update:
@@ -171,6 +171,9 @@ fr:
       dismissed: Relance ignorée
     dismiss_todo:
       dismissed: Tâche ignorée
+    event_drafts:
+      create:
+        error_generic: Impossible de créer l'événement. Veuillez réessayer.
   email_threads:
     show:
       no_access: Vous n'avez pas accès à cette discussion.

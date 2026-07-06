@@ -5,7 +5,8 @@ es:
       show:
         active: Activo
         connect_label: 'Conectar:'
-        disconnect_confirm: "¿Desconectar %{name}?"
+        remove: Eliminar
+        remove_confirm: "¿Eliminar %{name}? Esto borra permanentemente el buzón y sus correos. Los documentos y contactos guardados se conservan. Esta acción no se puede deshacer."
         heading: Cuentas y sincronización
         inactive: Inactivo
         last_scan: 'Último análisis: %{time}'

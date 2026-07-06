@@ -5,7 +5,8 @@ en:
       show:
         active: Active
         connect_label: 'Connect:'
-        disconnect_confirm: Disconnect %{name}?
+        remove: Remove
+        remove_confirm: "Remove %{name}? This permanently deletes the mailbox and its emails. Documents and contacts you've saved are kept. This can't be undone."
         heading: Accounts & sync
         inactive: Inactive
         last_scan: 'Last scan: %{time}'

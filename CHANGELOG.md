@@ -16,13 +16,50 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Campbooks' own digest emails are no longer mined by the AI pipeline.** Digests
+  are delivered to your mailbox, so the email scanner re-ingests them; previously the
+  reminder / task / contact extractors ran on them, so a digest that *lists* your
+  reminders could spawn duplicate ones. Campbooks-generated mail is now recognised at
+  ingest — via an `X-Campbooks-Kind` header we stamp on the way out, with a
+  sender-address fallback for providers (e.g. Zoho) that strip custom headers — and
+  skips all AI analysis while staying fully readable in the inbox. Digests are
+  marked with a **Digest** badge so you know they're ours to read.
+- An in-progress inbox no longer claims "All caught up" when the user navigates away from the first-sync stage while a scan is still running. Home now shows an honest "Scout is reading your inbox" state.
+
 ### Added
 
 - The first-sync wait screen now asks what you mostly deal with (persona setup applies mid-scan via a compact chip picker; a Turbo Stream swaps the card for a confirmation once submitted).
 - Skipping the first-sync stage via the escape hatch now actually skips it — a POST sets a session flag so home does not re-trap you in the stage on subsequent visits.
+- **Scheduling emails now show the drafted event inline — one tap adds it to your calendar (Edit still opens the full form).** When Scout detects a time proposal in an email (e.g. "does 3pm work?"), a bordered event block appears below the thread with the extracted title and time range. Tap "Add to calendar" to confirm it in one step; tap "Edit" to open the prefilled calendar form. Scout drafts — you decide.
+
+- **MCP: `archive_emails` tool to clear inbox noise at scale.** Agents can now
+  archive every email matching a filter — a whole tag (e.g. `Notifications`), a
+  date range, a sender, or an AI priority — instead of being capped at
+  `update_emails`' 100-id batches. Call it with `preview: true` first to see how
+  many messages match without touching anything, then again to archive them
+  (reversible via `update_emails(action: unarchive)`). Requires the `emails:write`
+  scope. The bulk-archive tag filter now matches case-insensitively, so a
+  capitalized group tag (`Notifications`, `Social`, …) matches a lower-cased value.
+- **MCP: tag-taxonomy management tools — `update_tag`, `merge_tags`, `delete_tag`.**
+  Agents can now rename/recolour/regroup a tag, fold duplicate tags into one
+  (`merge_tags` re-tags every email and task from the sources to the target, then
+  deletes the sources — the safe way to collapse `notifications` into
+  `Notifications`), and delete a tag (guarded: refuses a tag that still labels
+  emails unless `force: true`, and never deletes the system `security_flagged`
+  tag). Tags resolve by id or name. All require the `tags:write` scope.
 
 ### Changed
 
+- **Removing an email account now actually removes it — and the button works.** In
+  Inbox settings → Accounts, the account action is now labelled **Remove** and does
+  what it says: after a confirmation, it deletes the mailbox connection and everything
+  synced from it — emails, threads, folders, scan history, scheduled sends — and revokes
+  Campbooks' access at the provider (unless a still-connected calendar shares the same
+  sign-in). Documents you've filed and contacts you've saved are **kept**; they're just
+  detached from the removed mailbox. The button previously did nothing when clicked;
+  the teardown now runs in the background so even a large mailbox can't stall it.
 - **Default inbox noise buckets now collapse even after you reply or when a
   sibling message is important.** The four built-in tag groups (Notifications,
   Newsletters & promos, Social, Updates) used to stay in the main inbox list
@@ -33,10 +70,6 @@ major, minor, or patch change here.
   keeps it inline, but a stray reply or important sibling no longer does. Custom
   (user-defined) tag groups and rule-based groups are unchanged — they keep the
   full guard set.
-
-### Fixed
-
-- An in-progress inbox no longer claims "All caught up" when the user navigates away from the first-sync stage while a scan is still running. Home now shows an honest "Scout is reading your inbox" state.
 
 ## [0.17.0] - 2026-07-06
 

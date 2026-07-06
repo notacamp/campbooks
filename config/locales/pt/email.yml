@@ -134,6 +134,7 @@ pt:
       collapse_discussion_aria: Recolher discussão
       collapse_sidebar_aria: Recolher barra lateral
       compose_label: Compor
+      digest_badge: Resumo
       discussion_button_label: Discussão
       discussion_empty_body: Deixe uma nota para a sua equipa, ou mencione %{scout_mention}
         para perguntar à IA sobre este email.
