@@ -365,6 +365,71 @@ RSpec.describe "API MCP endpoint", type: :request do
     end
   end
 
+  describe "tag management" do
+    it "update_tag renames and regroups a tag" do
+      tag = create(:tag, workspace: workspace, name: "oldname")
+
+      rpc({ jsonrpc: "2.0", id: 70, method: "tools/call",
+            params: { name: "update_tag",
+                      arguments: { id: tag.id, name: "newname", group_name: "Money" } } },
+          scopes: "tags:write")
+
+      payload = JSON.parse(response.parsed_body["result"]["content"].first["text"])
+      expect(payload["tag"]["name"]).to eq("newname")
+      expect(payload["tag"]["group_name"]).to eq("Money")
+      expect(tag.reload.name).to eq("newname")
+    end
+
+    it "merge_tags folds a source tag into the target (by name) and deletes the source" do
+      target = create(:tag, workspace: workspace, name: "Notifications")
+      source = create(:tag, workspace: workspace, name: "notifications")
+      email = create(:email_message, email_account: account)
+      email.tags << source
+
+      rpc({ jsonrpc: "2.0", id: 71, method: "tools/call",
+            params: { name: "merge_tags",
+                      arguments: { target: "Notifications", sources: [ "notifications" ] } } },
+          scopes: "tags:write")
+
+      payload = JSON.parse(response.parsed_body["result"]["content"].first["text"])
+      expect(payload["merged_count"]).to eq(1)
+      expect(Tag.exists?(source.id)).to be(false)
+      expect(email.reload.tags).to include(target)
+    end
+
+    it "delete_tag refuses a tag that still labels emails, then deletes with force" do
+      tag = create(:tag, workspace: workspace, name: "temp")
+      email = create(:email_message, email_account: account)
+      email.tags << tag
+
+      rpc({ jsonrpc: "2.0", id: 72, method: "tools/call",
+            params: { name: "delete_tag", arguments: { id: "temp" } } }, scopes: "tags:write")
+      expect(response.parsed_body.dig("result", "isError")).to be(true)
+      expect(Tag.exists?(tag.id)).to be(true)
+
+      rpc({ jsonrpc: "2.0", id: 73, method: "tools/call",
+            params: { name: "delete_tag", arguments: { id: "temp", force: true } } }, scopes: "tags:write")
+      expect(response.parsed_body.dig("result", "isError")).to be_falsey
+      expect(Tag.exists?(tag.id)).to be(false)
+    end
+
+    it "delete_tag refuses the security_flagged system tag" do
+      create(:tag, workspace: workspace, name: "security_flagged")
+
+      rpc({ jsonrpc: "2.0", id: 74, method: "tools/call",
+            params: { name: "delete_tag", arguments: { id: "security_flagged" } } }, scopes: "tags:write")
+
+      expect(response.parsed_body.dig("result", "isError")).to be(true)
+    end
+
+    it "tag-management tools are hidden without tags:write" do
+      rpc({ jsonrpc: "2.0", id: 75, method: "tools/list" }, scopes: "tags:read")
+
+      names = response.parsed_body["result"]["tools"].map { |t| t["name"] }
+      expect(names).not_to include("update_tag", "merge_tags", "delete_tag")
+    end
+  end
+
   describe "get_skim_deck" do
     it "returns rings and a hint" do
       # Stub SkimDeck.for to avoid needing real email records with all columns
