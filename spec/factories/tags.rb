@@ -13,6 +13,8 @@ FactoryBot.define do
     sequence(:name) { |n| "Tag #{n}" }
     color { "#3b82f6" }
     source { :local }
+    kind { :user }
+    hidden { false }
 
     trait :external do
       email_account
@@ -33,14 +35,5 @@ FactoryBot.define do
     sequence(:provider_label_id) { |n| "label-#{n}" }
     provider_label_name { "Imported Label" }
     decision { :pending }
-  end
-
-  factory :tag do
-    workspace
-    sequence(:name) { |n| "tag-#{n}" }
-    color { "#0584da" }
-    source { :local }
-    kind { :user }
-    hidden { false }
   end
 end
