@@ -3,3 +3,7 @@
 
 ignore:
   - CVE-THAT-DOES-NOT-APPLY
+  # webrick is a transitive dev/test-only dependency — production serves via Puma,
+  # never WEBrick. CVE-2026-38969 concerns WEBrick's HTTP trailer reparsing, a path
+  # the app never runs. No patched webrick is released yet; drop this when one ships.
+  - CVE-2026-38969
