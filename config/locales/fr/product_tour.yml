@@ -15,17 +15,17 @@ fr:
 
       # Diapositive 1 : Introduction
       intro_mod: Campbooks
-      s1_title: "Voici Campbooks -- la boîte de réception qui se trie toute seule."
+      s1_title: "Voici Campbooks — la boîte de réception qui se trie toute seule."
       s1_sub: Un client de messagerie avec un assistant intégré, pour ceux qui se noient dans les e-mails professionnels et la paperasse.
       s1_rot_lead: "Scout, votre assistant,"
       s1_r0_h: "lit chaque e-mail, pour que vous n'ayez pas à le faire."
       s1_r0_p: "Chaque message reçoit une analyse en une ligne : ce que c'est, ce qu'il vous demande, s'il peut attendre."
       s1_r1_h: "classe les factures, reçus et contrats."
-      s1_r1_p: Les pièces jointes deviennent des documents traçables et consultables -- classés, étiquetés et prêts pour la déclaration fiscale.
+      s1_r1_p: Les pièces jointes deviennent des documents traçables et consultables — classés, étiquetés et prêts pour la déclaration fiscale.
       s1_r2_h: repère les échéances avant qu'elles ne filent.
-      s1_r2_p: Les dates enfouies dans vos e-mails remontent en rappels -- votre calendrier ne change que quand vous le validez.
+      s1_r2_p: Les dates enfouies dans vos e-mails remontent en rappels — votre calendrier ne change que quand vous le validez.
       s1_r3_h: fait taire les newsletters et les notifications.
-      s1_r3_p: Le bruit s'effondre en groupes bien rangés que vous pouvez parcourir en quelques secondes -- annoncé, réversible, jamais perdu.
+      s1_r3_p: Le bruit s'effondre en groupes bien rangés que vous pouvez parcourir en quelques secondes — annoncé, réversible, jamais perdu.
       s1_r4_h: vous remet la liste courte qui a vraiment besoin de vous.
       s1_r4_p: Vous ouvrez l'appli pour deux ou trois choses, pas pour deux cents.
       s1_close_b: "Vous décidez. Scout fait la partie ennuyeuse."
@@ -34,15 +34,15 @@ fr:
       # Diapositive 2 : Boîte de réception
       inbox_mod: Boîte de réception
       s2_title: "Le courrier arrive déjà trié."
-      s2_body1_html: "Les newsletters, notifications et promotions <b>s'effondrent en groupes bien rangés</b> au lieu d'enterrer votre matinée -- parcourez-les en quelques secondes ou ignorez-les entièrement. Ce qui requiert vraiment une réponse reste en avant avec l'analyse en une ligne de Scout."
+      s2_body1_html: "Les newsletters, notifications et promotions <b>s'effondrent en groupes bien rangés</b> au lieu d'enterrer votre matinée — parcourez-les en quelques secondes ou ignorez-les entièrement. Ce qui requiert vraiment une réponse reste en avant avec l'analyse en une ligne de Scout."
       s2_body2_html: "Les étiquettes s'appliquent seules à l'arrivée du courrier : <b>annoncées et réversibles</b>, sans question à répondre. Vos dossiers se classent enfin tout seuls."
       s2_group_label: "Notifications et newsletters"
 
       # Diapositive 3 : Agenda
       calendar_mod: Agenda
       s3_title: Votre boîte de réception et votre agenda se parlent enfin.
-      s3_body1_html: "Un e-mail 'ça te va jeudi ?' devient un <b>événement rédigé</b> -- le bon titre, la bonne heure, un geste pour l'ajouter. Fini de tout retaper."
-      s3_body2_html: "Les engagements datés -- une facture à payer, un renouvellement, un vol -- remontent en tant que <b>rappels que vous validez</b> sur l'agenda. La synchronisation bidirectionnelle tient Google et Zoho à jour, dans les deux sens."
+      s3_body1_html: "Un e-mail 'ça te va jeudi ?' devient un <b>événement rédigé</b> — le bon titre, la bonne heure, un geste pour l'ajouter. Fini de tout retaper."
+      s3_body2_html: "Les engagements datés — une facture à payer, un renouvellement, un vol — remontent en tant que <b>rappels que vous validez</b> sur l'agenda. La synchronisation bidirectionnelle tient Google et Zoho à jour, dans les deux sens."
       s3_ev_title: Réunion de lancement avec Dana
       s3_ev_time: "Jeu . 14 h 30 - 15 h 00 . rédigé depuis son e-mail"
       s3_ev_add: Ajouter à l'agenda
@@ -55,14 +55,14 @@ fr:
       # Diapositive 4 : Tâches (contrôlée par indicateur)
       tasks_mod: Tâches
       s4_title: Transformez n'importe quel e-mail en tâche.
-      s4_body1_html: "Scout repère les demandes cachées dans vos e-mails -- \"pouvez-vous envoyer le rapport avant vendredi ?\" -- et propose de les transformer en tâches avec <b>une date d'échéance associée</b>."
+      s4_body1_html: "Scout repère les demandes cachées dans vos e-mails — \"pouvez-vous envoyer le rapport avant vendredi ?\" — et propose de les transformer en tâches avec <b>une date d'échéance associée</b>."
       s4_body2_html: "Traitez-les en liste ou en tableau ; cochez-les et <b>rien de promis ne se perd</b> trois réponses plus bas dans un fil."
 
       # Diapositive 5 : Documents
       docs_mod: Documents
       s5_title: "La paperasse qui se classe toute seule."
-      s5_body1_html: "Chaque pièce jointe devient un <b>document traçable</b> : type reconnu, les champs clés -- fournisseur, montant, date d'échéance -- extraits et consultables dès le premier jour."
-      s5_body2_html: "Vous approuvez ou corrigez en un geste. <b>La déclaration fiscale cesse d'être de l'archéologie</b> -- c'est une barre de recherche."
+      s5_body1_html: "Chaque pièce jointe devient un <b>document traçable</b> : type reconnu, les champs clés — fournisseur, montant, date d'échéance — extraits et consultables dès le premier jour."
+      s5_body2_html: "Vous approuvez ou corrigez en un geste. <b>La déclaration fiscale cesse d'être de l'archéologie</b> — c'est une barre de recherche."
       s5_doc_type: Facture de dépenses
       s5_field_vendor_label: Fournisseur
       s5_field_amount_label: Montant
@@ -74,7 +74,7 @@ fr:
       # Diapositive 6 : Bien plus encore
       more_mod: Bien plus encore
       s6_title: "Et ce n'est que la version courte."
-      s6_body: Parcourez votre boîte de réception comme des stories. Posez à Scout n'importe quelle question sur vos e-mails et fichiers, en langage naturel. Créez vos propres règles et groupes -- ou allez plus loin avec des résumés, des modèles, une API REST et l'hébergement personnel.
+      s6_body: Parcourez votre boîte de réception comme des stories. Posez à Scout n'importe quelle question sur vos e-mails et fichiers, en langage naturel. Créez vos propres règles et groupes — ou allez plus loin avec des résumés, des modèles, une API REST et l'hébergement personnel.
       s6_chip_skim: Stories Skim
       s6_chip_scout: Chat Scout
       s6_chip_rules: "Règles et groupes"
@@ -82,4 +82,4 @@ fr:
       s6_chip_templates: "Modèles"
       s6_chip_api: API REST
       s6_chip_self: Hébergement personnel
-      s6_docs_note: "La documentation couvre tout -- d'une visite de cinq minutes à l'exploitation de votre propre serveur."
+      s6_docs_note: "La documentation couvre tout — d'une visite de cinq minutes à l'exploitation de votre propre serveur."

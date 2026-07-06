@@ -54,7 +54,10 @@ module Campbooks
         **@attrs
       ) do
         div(
-          class: "w-full max-w-[620px] bg-background border border-border rounded-[26px] shadow-2xl flex flex-col p-6 sm:p-8 max-h-[88vh]"
+          # A real height (not just max-h): the slides area is flex-1 with
+          # absolutely-positioned slides inside, so without a definite height
+          # the card collapses to its chrome and every slide renders 0-tall.
+          class: "w-full max-w-[620px] bg-background border border-border rounded-[26px] shadow-2xl flex flex-col p-6 sm:p-8 h-[min(88dvh,760px)]"
         ) do
           progress_bars
           deck_head

@@ -15,17 +15,17 @@ en:
 
       # Slide 1: Intro
       intro_mod: Campbooks
-      s1_title: "This is Campbooks -- the inbox that sorts itself."
+      s1_title: "This is Campbooks — the inbox that sorts itself."
       s1_sub: An email client with an assistant inside, for people drowning in business email and paperwork.
       s1_rot_lead: "Scout, your assistant,"
       s1_r0_h: "reads every email, so you don't have to."
       s1_r0_p: "Each message gets a one-line take: what it is, what it wants from you, whether it can wait."
       s1_r1_h: "files the invoices, receipts, and contracts."
-      s1_r1_p: Attachments become tracked, searchable documents -- typed, tagged, and ready for tax time.
+      s1_r1_p: Attachments become tracked, searchable documents — typed, tagged, and ready for tax time.
       s1_r2_h: catches deadlines before they slip.
-      s1_r2_p: Due dates buried in email surface as reminders -- your calendar only changes when you say so.
+      s1_r2_p: Due dates buried in email surface as reminders — your calendar only changes when you say so.
       s1_r3_h: quiets the newsletters and notifications.
-      s1_r3_p: The noise collapses into tidy groups you can skim in seconds -- announced, undoable, never lost.
+      s1_r3_p: The noise collapses into tidy groups you can skim in seconds — announced, undoable, never lost.
       s1_r4_h: hands you the short list that actually needs you.
       s1_r4_p: You open the app to two or three things, not two hundred.
       s1_close_b: "You decide. Scout does the boring part."
@@ -34,15 +34,15 @@ en:
       # Slide 2: Inbox
       inbox_mod: Inbox
       s2_title: Mail arrives already sorted.
-      s2_body1_html: "Newsletters, notifications, and promos <b>collapse into tidy groups</b> instead of burying your morning -- skim them in seconds or ignore them entirely. What actually needs a reply stays up front with Scout's one-line take on it."
+      s2_body1_html: "Newsletters, notifications, and promos <b>collapse into tidy groups</b> instead of burying your morning — skim them in seconds or ignore them entirely. What actually needs a reply stays up front with Scout's one-line take on it."
       s2_body2_html: "Tags apply themselves as mail lands: <b>announced and undoable</b>, never a question to answer. Your folders finally file themselves."
       s2_group_label: Notifications & newsletters
 
       # Slide 3: Calendar
       calendar_mod: Calendar
       s3_title: Your inbox and calendar finally talk.
-      s3_body1_html: "A 'does Thursday work?' email becomes a <b>drafted event</b> -- right title, right time, one tap to add. No more retyping who-and-when."
-      s3_body2_html: "Dated commitments -- an invoice due, a renewal, a flight -- surface as <b>reminders you confirm</b> onto the calendar. Two-way sync keeps Google and Zoho honest, both directions."
+      s3_body1_html: "A 'does Thursday work?' email becomes a <b>drafted event</b> — right title, right time, one tap to add. No more retyping who-and-when."
+      s3_body2_html: "Dated commitments — an invoice due, a renewal, a flight — surface as <b>reminders you confirm</b> onto the calendar. Two-way sync keeps Google and Zoho honest, both directions."
       s3_ev_title: Kickoff call with Dana
       s3_ev_time: "Thu . 2:30 - 3:00 PM . drafted from her email"
       s3_ev_add: Add to calendar
@@ -55,14 +55,14 @@ en:
       # Slide 4: Tasks (feature-gated)
       tasks_mod: Tasks
       s4_title: Turn any email into a task.
-      s4_body1_html: "Scout spots the asks hiding in your mail -- \"can you send the report by Friday?\" -- and offers to turn them into tasks with <b>due dates attached</b>."
+      s4_body1_html: "Scout spots the asks hiding in your mail — \"can you send the report by Friday?\" — and offers to turn them into tasks with <b>due dates attached</b>."
       s4_body2_html: "Work them as a list or a board; check things off and <b>nothing promised gets lost</b> three replies deep in a thread."
 
       # Slide 5: Documents
       docs_mod: Documents
       s5_title: Paperwork that files itself.
-      s5_body1_html: "Every attachment becomes a <b>tracked document</b>: type recognized, the key fields -- vendor, amount, due date -- extracted and searchable from day one."
-      s5_body2_html: "You approve or fix in one tap. <b>Tax time stops being archaeology</b> -- it's a search box."
+      s5_body1_html: "Every attachment becomes a <b>tracked document</b>: type recognized, the key fields — vendor, amount, due date — extracted and searchable from day one."
+      s5_body2_html: "You approve or fix in one tap. <b>Tax time stops being archaeology</b> — it's a search box."
       s5_doc_type: Expense invoice
       s5_field_vendor_label: Vendor
       s5_field_amount_label: Amount
@@ -74,7 +74,7 @@ en:
       # Slide 6: Much more
       more_mod: Much more
       s6_title: "And that's the short version."
-      s6_body: Skim your inbox like stories. Ask Scout anything about your mail and files, in plain language. Build your own rules and groups -- or go deeper with digests, templates, a REST API, and full self-hosting.
+      s6_body: Skim your inbox like stories. Ask Scout anything about your mail and files, in plain language. Build your own rules and groups — or go deeper with digests, templates, a REST API, and full self-hosting.
       s6_chip_skim: Skim stories
       s6_chip_scout: Scout chat
       s6_chip_rules: Rules & groups
@@ -82,4 +82,4 @@ en:
       s6_chip_templates: Templates
       s6_chip_api: REST API
       s6_chip_self: Self-hosting
-      s6_docs_note: The docs cover all of it -- from a five-minute tour to running your own server.
+      s6_docs_note: The docs cover all of it — from a five-minute tour to running your own server.

@@ -15,17 +15,17 @@ pt:
 
       # Diapositivo 1: Introdução
       intro_mod: Campbooks
-      s1_title: "Isto é o Campbooks -- a caixa de entrada que se organiza sozinha."
+      s1_title: "Isto é o Campbooks — a caixa de entrada que se organiza sozinha."
       s1_sub: Um cliente de email com um assistente integrado, para quem está a afogar-se em email profissional e papelada.
       s1_rot_lead: "Scout, o seu assistente,"
       s1_r0_h: "lê todos os emails, para que não tenha de o fazer."
       s1_r0_p: "Cada mensagem recebe uma análise de uma linha: o que é, o que pede de si, se pode esperar."
       s1_r1_h: "arquiva as faturas, recibos e contratos."
-      s1_r1_p: Os anexos tornam-se documentos rastreados e pesquisáveis -- classificados, etiquetados e prontos para a declaração fiscal.
+      s1_r1_p: Os anexos tornam-se documentos rastreados e pesquisáveis — classificados, etiquetados e prontos para a declaração fiscal.
       s1_r2_h: apanha os prazos antes de escaparem.
-      s1_r2_p: As datas enterradas no email surgem como lembretes -- o seu calendário só muda quando o autorizar.
+      s1_r2_p: As datas enterradas no email surgem como lembretes — o seu calendário só muda quando o autorizar.
       s1_r3_h: silencia as newsletters e notificações.
-      s1_r3_p: O ruído colapsa em grupos organizados que pode percorrer em segundos -- anunciado, reversível, nunca perdido.
+      s1_r3_p: O ruído colapsa em grupos organizados que pode percorrer em segundos — anunciado, reversível, nunca perdido.
       s1_r4_h: entrega-lhe a lista curta que realmente precisa de si.
       s1_r4_p: Abre a aplicação para duas ou três coisas, não para duzentas.
       s1_close_b: "Você decide. Scout trata da parte aborrecida."
@@ -34,15 +34,15 @@ pt:
       # Diapositivo 2: Caixa de entrada
       inbox_mod: Caixa de entrada
       s2_title: O email chega já organizado.
-      s2_body1_html: "Newsletters, notificações e promoções <b>colapsam em grupos organizados</b> em vez de enterrarem a sua manhã -- percorra-os em segundos ou ignore-os por completo. O que realmente precisa de resposta fica em destaque com a análise de uma linha do Scout."
+      s2_body1_html: "Newsletters, notificações e promoções <b>colapsam em grupos organizados</b> em vez de enterrarem a sua manhã — percorra-os em segundos ou ignore-os por completo. O que realmente precisa de resposta fica em destaque com a análise de uma linha do Scout."
       s2_body2_html: "As etiquetas aplicam-se à medida que o email chega: <b>anunciadas e reversíveis</b>, sem perguntas a responder. As suas pastas finalmente arquivam-se sozinhas."
       s2_group_label: Notificações e newsletters
 
       # Diapositivo 3: Calendário
       calendar_mod: Calendário
       s3_title: A sua caixa de entrada e o calendário finalmente comunicam.
-      s3_body1_html: "Um email 'funciona na quinta-feira?' torna-se um <b>evento rascunhado</b> -- título certo, hora certa, um toque para adicionar. Acabou de reescrever quem e quando."
-      s3_body2_html: "Compromissos com data -- uma fatura a pagar, uma renovação, um voo -- surgem como <b>lembretes que confirma</b> no calendário. A sincronização bidirecional mantém o Google e o Zoho honestos, em ambas as direções."
+      s3_body1_html: "Um email 'funciona na quinta-feira?' torna-se um <b>evento rascunhado</b> — título certo, hora certa, um toque para adicionar. Acabou de reescrever quem e quando."
+      s3_body2_html: "Compromissos com data — uma fatura a pagar, uma renovação, um voo — surgem como <b>lembretes que confirma</b> no calendário. A sincronização bidirecional mantém o Google e o Zoho honestos, em ambas as direções."
       s3_ev_title: Reunião de arranque com a Dana
       s3_ev_time: "Qui . 14:30 - 15:00 . rascunhado do email dela"
       s3_ev_add: Adicionar ao calendário
@@ -55,14 +55,14 @@ pt:
       # Diapositivo 4: Tarefas (controlado por funcionalidade)
       tasks_mod: Tarefas
       s4_title: Transforme qualquer email numa tarefa.
-      s4_body1_html: "O Scout detecta os pedidos escondidos no seu email -- \"pode enviar o relatório até sexta?\" -- e oferece-se para os transformar em tarefas com <b>datas de entrega associadas</b>."
+      s4_body1_html: "O Scout detecta os pedidos escondidos no seu email — \"pode enviar o relatório até sexta?\" — e oferece-se para os transformar em tarefas com <b>datas de entrega associadas</b>."
       s4_body2_html: "Trabalhe-as em lista ou em painel; marque-as como concluídas e <b>nada prometido se perde</b> três respostas abaixo num fio de conversa."
 
       # Diapositivo 5: Documentos
       docs_mod: Documentos
       s5_title: A papelada que se arquiva sozinha.
-      s5_body1_html: "Cada anexo torna-se um <b>documento rastreado</b>: tipo reconhecido, os campos-chave -- fornecedor, montante, data de vencimento -- extraídos e pesquisáveis desde o primeiro dia."
-      s5_body2_html: "Aprova ou corrige com um toque. <b>O IRS deixa de ser arqueologia</b> -- é uma caixa de pesquisa."
+      s5_body1_html: "Cada anexo torna-se um <b>documento rastreado</b>: tipo reconhecido, os campos-chave — fornecedor, montante, data de vencimento — extraídos e pesquisáveis desde o primeiro dia."
+      s5_body2_html: "Aprova ou corrige com um toque. <b>O IRS deixa de ser arqueologia</b> — é uma caixa de pesquisa."
       s5_doc_type: Fatura de despesa
       s5_field_vendor_label: Fornecedor
       s5_field_amount_label: Montante
@@ -74,7 +74,7 @@ pt:
       # Diapositivo 6: Muito mais
       more_mod: Muito mais
       s6_title: "E esta é a versão curta."
-      s6_body: Percorra a sua caixa de entrada como stories. Pergunte ao Scout qualquer coisa sobre o seu email e ficheiros, em linguagem natural. Crie as suas próprias regras e grupos -- ou explore mais com resumos, modelos, uma API REST e alojamento próprio.
+      s6_body: Percorra a sua caixa de entrada como stories. Pergunte ao Scout qualquer coisa sobre o seu email e ficheiros, em linguagem natural. Crie as suas próprias regras e grupos — ou explore mais com resumos, modelos, uma API REST e alojamento próprio.
       s6_chip_skim: Stories Skim
       s6_chip_scout: Chat Scout
       s6_chip_rules: Regras e grupos
@@ -82,4 +82,4 @@ pt:
       s6_chip_templates: Modelos
       s6_chip_api: API REST
       s6_chip_self: Alojamento próprio
-      s6_docs_note: A documentação cobre tudo -- desde uma visita de cinco minutos até correr o seu próprio servidor.
+      s6_docs_note: A documentação cobre tudo — desde uma visita de cinco minutos até correr o seu próprio servidor.
