@@ -299,6 +299,58 @@ RSpec.describe "API MCP endpoint", type: :request do
     end
   end
 
+  describe "archive_emails" do
+    let!(:noise_tag) { create(:tag, workspace: workspace, name: "Notifications") }
+    let!(:tagged) do
+      create(:email_message, email_account: account, provider_message_id: "arch-1",
+             provider_folder_id: "INBOX").tap { |m| m.tags << noise_tag }
+    end
+
+    it "preview returns the match count (case-insensitively) and archives nothing" do
+      expect(Tools::BulkArchive).not_to receive(:call)
+
+      rpc({ jsonrpc: "2.0", id: 60, method: "tools/call",
+            params: { name: "archive_emails",
+                      arguments: { filter: { tag: "notifications" }, preview: true } } },
+          scopes: "emails:write")
+
+      payload = JSON.parse(response.parsed_body["result"]["content"].first["text"])
+      expect(payload["preview"]).to be(true)
+      expect(payload["match_count"]).to eq(1)
+      expect(tagged.reload.provider_folder_id).to eq("INBOX") # unchanged — nothing archived
+    end
+
+    it "archives every email matching the filter" do
+      client = double("MailClient", archive_folder_id: "ARCH", move_to_folder: true)
+      allow_any_instance_of(EmailAccount).to receive(:mail_client).and_return(client)
+
+      rpc({ jsonrpc: "2.0", id: 61, method: "tools/call",
+            params: { name: "archive_emails",
+                      arguments: { filter: { tag: "Notifications" } } } },
+          scopes: "emails:write")
+
+      payload = JSON.parse(response.parsed_body["result"]["content"].first["text"])
+      expect(payload["preview"]).to be(false)
+      expect(payload["archived_count"]).to eq(1)
+      expect(tagged.reload.provider_folder_id).to eq("ARCH")
+    end
+
+    it "refuses an empty filter with a JSON-RPC invalid-params error" do
+      rpc({ jsonrpc: "2.0", id: 62, method: "tools/call",
+            params: { name: "archive_emails", arguments: { filter: {} } } },
+          scopes: "emails:write")
+
+      expect(response.parsed_body["error"]["code"]).to eq(-32_602)
+    end
+
+    it "is hidden from a token without emails:write" do
+      rpc({ jsonrpc: "2.0", id: 63, method: "tools/list" }, scopes: "emails:read")
+
+      names = response.parsed_body["result"]["tools"].map { |t| t["name"] }
+      expect(names).not_to include("archive_emails")
+    end
+  end
+
   describe "tag_emails" do
     it "returns isError when the tag does not exist" do
       email = create(:email_message, email_account: account)
@@ -310,6 +362,71 @@ RSpec.describe "API MCP endpoint", type: :request do
 
       expect(response.parsed_body.dig("result", "isError")).to be(true)
       expect(response.parsed_body.dig("result", "content", 0, "text")).to include("create_tag")
+    end
+  end
+
+  describe "tag management" do
+    it "update_tag renames and regroups a tag" do
+      tag = create(:tag, workspace: workspace, name: "oldname")
+
+      rpc({ jsonrpc: "2.0", id: 70, method: "tools/call",
+            params: { name: "update_tag",
+                      arguments: { id: tag.id, name: "newname", group_name: "Money" } } },
+          scopes: "tags:write")
+
+      payload = JSON.parse(response.parsed_body["result"]["content"].first["text"])
+      expect(payload["tag"]["name"]).to eq("newname")
+      expect(payload["tag"]["group_name"]).to eq("Money")
+      expect(tag.reload.name).to eq("newname")
+    end
+
+    it "merge_tags folds a source tag into the target (by name) and deletes the source" do
+      target = create(:tag, workspace: workspace, name: "Notifications")
+      source = create(:tag, workspace: workspace, name: "notifications")
+      email = create(:email_message, email_account: account)
+      email.tags << source
+
+      rpc({ jsonrpc: "2.0", id: 71, method: "tools/call",
+            params: { name: "merge_tags",
+                      arguments: { target: "Notifications", sources: [ "notifications" ] } } },
+          scopes: "tags:write")
+
+      payload = JSON.parse(response.parsed_body["result"]["content"].first["text"])
+      expect(payload["merged_count"]).to eq(1)
+      expect(Tag.exists?(source.id)).to be(false)
+      expect(email.reload.tags).to include(target)
+    end
+
+    it "delete_tag refuses a tag that still labels emails, then deletes with force" do
+      tag = create(:tag, workspace: workspace, name: "temp")
+      email = create(:email_message, email_account: account)
+      email.tags << tag
+
+      rpc({ jsonrpc: "2.0", id: 72, method: "tools/call",
+            params: { name: "delete_tag", arguments: { id: "temp" } } }, scopes: "tags:write")
+      expect(response.parsed_body.dig("result", "isError")).to be(true)
+      expect(Tag.exists?(tag.id)).to be(true)
+
+      rpc({ jsonrpc: "2.0", id: 73, method: "tools/call",
+            params: { name: "delete_tag", arguments: { id: "temp", force: true } } }, scopes: "tags:write")
+      expect(response.parsed_body.dig("result", "isError")).to be_falsey
+      expect(Tag.exists?(tag.id)).to be(false)
+    end
+
+    it "delete_tag refuses the security_flagged system tag" do
+      create(:tag, workspace: workspace, name: "security_flagged")
+
+      rpc({ jsonrpc: "2.0", id: 74, method: "tools/call",
+            params: { name: "delete_tag", arguments: { id: "security_flagged" } } }, scopes: "tags:write")
+
+      expect(response.parsed_body.dig("result", "isError")).to be(true)
+    end
+
+    it "tag-management tools are hidden without tags:write" do
+      rpc({ jsonrpc: "2.0", id: 75, method: "tools/list" }, scopes: "tags:read")
+
+      names = response.parsed_body["result"]["tools"].map { |t| t["name"] }
+      expect(names).not_to include("update_tag", "merge_tags", "delete_tag")
     end
   end
 

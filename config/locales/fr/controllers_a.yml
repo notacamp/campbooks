@@ -81,8 +81,8 @@ fr:
     create:
       microsoft_unavailable: Les connexions Microsoft 365 ne sont pas encore disponibles.
     destroy:
-      disconnected: "%{name} déconnecté."
       owner_only: Seul le propriétaire du compte peut déconnecter ce compte.
+      removed: "%{name} supprimé. Vos documents et contacts enregistrés ont été conservés."
     sharing:
       owner_only: Seul le propriétaire du compte peut gérer l'accès.
     update:

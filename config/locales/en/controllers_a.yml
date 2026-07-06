@@ -78,8 +78,8 @@ en:
     create:
       microsoft_unavailable: Microsoft 365 connections aren't available yet.
     destroy:
-      disconnected: "%{name} disconnected."
       owner_only: Only the account owner can disconnect this account.
+      removed: "%{name} removed. Your saved documents and contacts were kept."
     sharing:
       owner_only: Only the account owner can manage access.
     update:
