@@ -43,6 +43,9 @@
       can_send: @can_send
     )) do %>
       <div class="flex items-center gap-2 text-[11px] text-gray-400">
+        <% if @message.digest? %>
+          <span class="text-[10px] font-semibold text-accent-700 bg-accent-100 dark:bg-accent-500/15 dark:text-accent-200 rounded px-1.5 py-0.5"><%= t("email_messages.show.digest_badge") %></span>
+        <% end %>
         <% if @message.ai_processed? %>
           <span class="text-[10px] font-semibold text-accent-600 bg-accent-100 rounded px-1.5 py-0.5"><%= t("email_messages.show.ai_processed_badge") %></span>
         <% end %>
