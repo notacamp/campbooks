@@ -11,6 +11,11 @@
     </header>
 
     <div class="px-6 py-5">
+      <% if @pending_review_count&.> 0 %>
+        <%= render "inbox_settings/tags/pending_review_banner",
+                   count: @pending_review_count %>
+      <% end %>
+
       <%= turbo_frame_tag "inbox_settings_tag_form" %>
 
       <div id="inbox_settings_tags_list">

@@ -39,4 +39,25 @@ RSpec.describe Zoho::LabelSyncService, type: :service do
     expect(client).to have_received(:list_messages_by_label).with("z-inv", limit: 200)
     expect(client).not_to have_received(:list_messages_by_label).with("z-inbox", limit: 200)
   end
+
+  it "records a pending LabelImportDecision for user labels" do
+    service.sync_labels!
+    expect(LabelImportDecision.where(email_account: account, provider_label_id: "z-inv",
+                                     decision: :pending)).to exist
+  end
+
+  it "does not record decisions for system labels" do
+    service.sync_labels!
+    expect(LabelImportDecision.where(email_account: account,
+                                     provider_label_id: "z-inbox")).to be_empty
+  end
+
+  it "is idempotent — re-syncing does not overwrite a resolved decision" do
+    existing = LabelImportDecision.create!(
+      email_account: account, provider_label_id: "z-inv",
+      provider_label_name: "Invoices", decision: :mapped
+    )
+    service.sync_labels!
+    expect(existing.reload.decision).to eq("mapped")
+  end
 end

@@ -121,12 +121,29 @@ es:
         hidden_hint: sistema y ocultadas por IA
         no_tags: Aún no hay etiquetas. Añada una para empezar a ordenar su bandeja
           de entrada.
+        pending_review_banner:
+          one: "%{count} etiqueta importada espera su revisión."
+          other: "%{count} etiquetas importadas esperan su revisión."
+        review_now: Revisar ahora
         subheading: Las etiquetas ayudan a Scout a ordenar su bandeja de entrada automáticamente.
         system_group: Sistema del proveedor
+      commit_merge:
+        merged: Fusionado "%{source}" con "%{target}".
+        tag_not_found: Etiqueta no encontrada.
+      merge:
+        heading: Fusionar "%{name}" con otra etiqueta
+        hint: Todos los mensajes y enlaces de cuenta se mueven a la etiqueta de destino.
+          Esta etiqueta se elimina. La fusión no se puede deshacer.
+        merge_into_label: Fusionar con
+        select_placeholder: Seleccionar una etiqueta...
+        submit: Fusionar etiqueta
+        warning: La etiqueta seleccionada absorberá todos los mensajes de esta etiqueta.
+          Esta acción no se puede deshacer.
       tag:
         delete_confirm: "¿Eliminar %{name}?"
         edit: Editar
         hide: Ocultar
+        merge: Fusionar
         synced_with_title: Sincronizada con %{account}
         tagged_messages_title: Mensajes etiquetados
       toggle_hidden:
@@ -136,3 +153,23 @@ es:
         provider_update_failed: No se pudo actualizar el rótulo en su buzón. Por
           favor, inténtelo de nuevo.
         updated_toast: Etiqueta actualizada.
+    label_reviews:
+      bulk_decide:
+        all_done: Todas las etiquetas revisadas.
+        saved_count:
+          one: Decisión guardada.
+          other: "%{count} decisiones guardadas."
+      index:
+        back_to_tags: Volver a etiquetas
+        empty_heading: Todo al día
+        empty_hint: No hay etiquetas del proveedor pendientes de revisión.
+        heading: Revisar etiquetas importadas
+        instructions: Elija qué hacer con cada etiqueta importada de su buzón. Las
+          etiquetas ignoradas se dejan sin cambios en el proveedor.
+        option_ignore: Ignorar (sin etiqueta de espacio de trabajo)
+        option_keep: Conservar como etiqueta propia
+        option_map: Asignar a etiqueta existente
+        save_decisions: Guardar decisiones
+        select_tag_placeholder: Elegir etiqueta...
+        subheading: Asigne, conserve o ignore etiquetas sincronizadas desde sus buzones
+          conectados.

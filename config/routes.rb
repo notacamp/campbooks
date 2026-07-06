@@ -400,7 +400,17 @@ Rails.application.routes.draw do
     post  "filtering/sender", to: "filtering#set_sender", as: :filtering_sender
 
     resources :tags, except: [ :show ] do
-      member { patch :toggle_hidden }
+      member do
+        patch :toggle_hidden
+        get   :merge
+        post  :commit_merge
+      end
+    end
+
+    # Label-import review — surfaces pending provider labels for the user to
+    # map to existing tags, keep as new tags, or ignore.
+    resources :label_reviews, only: [ :index ] do
+      collection { patch :bulk_decide }
     end
     # The Groups panel. Collection-style verbs on purpose: a group is identified
     # by its name ("Newsletters & promos" — spaces and an ampersand), which

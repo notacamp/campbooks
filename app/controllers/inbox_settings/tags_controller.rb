@@ -2,10 +2,13 @@ module InboxSettings
   # Tags management panel. Mirrors the queries of the old Settings::TagsController
   # but renders into the modal frame and responds to CRUD with Turbo Streams.
   class TagsController < BaseController
-    before_action :set_tag, only: [ :edit, :update, :destroy ]
+    before_action :set_tag, only: [ :edit, :update, :destroy, :merge ]
 
     def index
       load_tag_groups
+      @pending_review_count = LabelImportDecision
+                              .for_workspace(Current.workspace)
+                              .pending_review.count
     end
 
     # Flip a tag between visible and hidden. The decision is remembered on the
@@ -80,6 +83,34 @@ module InboxSettings
       # -> destroy.turbo_stream.erb
     end
 
+    # Show a form to select a merge target. Renders into the inbox_settings_tag_form
+    # frame so it shares the same inline-panel slot as new/edit.
+    def merge
+      @other_tags = Current.workspace.tags.where.not(id: @tag.id).order(:name)
+    end
+
+    # POST /inbox_settings/tags/:id/merge — commit the merge.
+    def commit_merge
+      @tag = Current.workspace.tags.find(params[:id])
+      target = Current.workspace.tags.find(params[:into_tag_id])
+
+      Tags::MergeService.new(source: @tag, target: target).merge!
+
+      load_tag_groups
+      @pending_review_count = LabelImportDecision
+                              .for_workspace(Current.workspace)
+                              .pending_review.count
+      render turbo_stream: [
+        turbo_stream.update("inbox_settings_tags_list", partial: "inbox_settings/tags/list"),
+        turbo_stream.update("inbox_settings_tag_form", ""),
+        notify_stream(t(".merged", source: @tag.name, target: target.name))
+      ]
+    rescue Tags::MergeService::MergeError => e
+      render turbo_stream: notify_stream(e.message, severity: :error)
+    rescue ActiveRecord::RecordNotFound
+      render turbo_stream: notify_stream(t(".tag_not_found"), severity: :error)
+    end
+
     private
 
     # Validation errors re-render the form inside its frame. Done explicitly as a
@@ -113,6 +144,9 @@ module InboxSettings
       @hidden_filtered = tags.hidden_labels.where.not(kind: [ :system, :category ]).order(:name).to_a
       ids = (@visible_tags + @hidden_system + @hidden_filtered).map(&:id)
       @tag_message_counts = EmailMessageTag.where(tag_id: ids).group(:tag_id).count
+      @pending_review_count ||= LabelImportDecision
+                                .for_workspace(Current.workspace)
+                                .pending_review.count
     end
 
     def tag_params
