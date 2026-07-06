@@ -112,9 +112,18 @@ class EmailProcessJob < ApplicationJob
       end
     end
 
-    result = Contacts::Identifier.new(email).identify!
-    if result == :threshold_reached && text_ai_available
-      ContactAnalysisJob.perform_later(email.contact_id)
+    Contacts::Identifier.new(email).identify!
+
+    # Profile the sender when they're someone worth profiling — a real person or
+    # vendor — instead of after an arbitrary email count. Contacts::AnalysisGate is
+    # a cheap, LLM-free deny-list over the triage category + bulk/automated headers
+    # already resolved above; needs_analysis? keeps it to never-profiled (or
+    # 30-day-stale) contacts so an active sender doesn't re-enqueue a no-op job per
+    # message. (The count threshold still gates the backlog catch-up — see
+    # Contacts::PendingAnalysisCatchUp — until that's type-gated too.)
+    contact = email.contact
+    if text_ai_available && contact&.needs_analysis? && Contacts::AnalysisGate.analyze?(email)
+      ContactAnalysisJob.perform_later(contact.id)
     end
 
     apply_sender_rules(email)
