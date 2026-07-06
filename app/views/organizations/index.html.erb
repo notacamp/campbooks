@@ -1,18 +1,35 @@
-<%= render(Campbooks::PageHeader.new(title: t(".heading"), subtitle: t(".subheading", count: @pagy.count), spacing: :lg)) do |header| %>
+<%= render(Campbooks::PageHeader.new(title: t(".heading"), subtitle: t(".subheading"), spacing: :lg)) do |header| %>
   <% header.with_actions do %>
     <%= form_tag backfill_organizations_path, method: :post, style: "display:inline" do %>
       <%= render Campbooks::Button.new(variant: :outline, type: :submit, size: :sm) { t(".sync_from_contacts") } %>
     <% end %>
   <% end %>
 <% end %>
-<div class="space-y-2">
+
+<%# Live, debounced search — navigates the results frame (below), so the header and
+    the input's focus stay put while the list filters in place. %>
+<%= render Campbooks::Organizations::SearchBar.new(q: @query) %>
+
+<%# Everything the search + infinite scroll touch lives inside this frame: the
+    search form targets it (whole-list swap), while the lazy sentinel streams the
+    next page into #organizations_list and swaps itself out. %>
+<%= turbo_frame_tag "organizations_results" do %>
   <% if @organizations.any? %>
-    <%= render partial: "organization_card", collection: @organizations, as: :organization, locals: { email_counts: @email_counts } %>
+    <p class="mb-3 text-sm text-muted-foreground" role="status"><%= t(".count", count: @total_count) %></p>
+    <div id="organizations_list" class="space-y-2">
+      <%= render partial: "organization_card", collection: @organizations, as: :organization, locals: { email_counts: @email_counts } %>
+    </div>
+    <% if @pagy&.next %>
+      <%= render "organizations_pagination", pagy: @pagy, query: @query %>
+    <% end %>
+  <% elsif @query.present? %>
+    <div class="rounded-xl border border-border bg-card p-8 text-center">
+      <p class="text-sm text-muted-foreground"><%= t(".no_matches") %></p>
+    </div>
   <% else %>
     <div class="rounded-xl border border-border bg-card p-8 text-center">
       <p class="text-sm text-muted-foreground"><%= t(".empty") %></p>
       <p class="text-xs text-muted-foreground mt-2"><%= t(".empty_hint") %></p>
     </div>
   <% end %>
-</div>
-<% if @pagy.pages > 1 %><div class="mt-4"><%== pagy_nav(@pagy) %></div><% end %>
+<% end %>

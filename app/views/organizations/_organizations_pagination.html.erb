@@ -1,0 +1,11 @@
+<%# Infinite-scroll sentinel for the organizations directory. A lazy turbo frame
+    that streams the next page (carrying the current search query) when it scrolls
+    into view. Rendered only when `pagy.next` is present. `pagy` and `query` are
+    required locals. %>
+<%= turbo_frame_tag "organizations_pagination",
+      src: organizations_path(q: query.presence, page: pagy.next, format: :turbo_stream),
+      loading: :lazy do %>
+  <div class="flex items-center justify-center py-6">
+    <%= render(Campbooks::Spinner.new(size: :sm)) %>
+  </div>
+<% end %>

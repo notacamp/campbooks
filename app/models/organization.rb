@@ -13,6 +13,11 @@ class Organization < ApplicationRecord
 
   scope :ordered, -> { order(:name) }
   scope :by_name, ->(name) { where("name ILIKE ?", "%#{sanitize_sql_like(name)}%") }
+  # Directory search: match the org name or its email domain (case-insensitive).
+  scope :search, ->(term) {
+    like = "%#{sanitize_sql_like(term.to_s.strip)}%"
+    where("name ILIKE :like OR domain ILIKE :like", like: like)
+  }
 
   def member_count = people.size
   def active_member_count = active_people.count
