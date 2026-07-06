@@ -58,6 +58,7 @@ module Campbooks
       attachments_section
       notion_export_section
       scout_section
+      event_draft_section
       thread_messages_section(show_selected: true)
     end
 
@@ -157,6 +158,23 @@ module Campbooks
           end
         end
       end
+    end
+
+    # Inline drafted event block: a lazy turbo-frame loaded only in the full
+    # detail context (not the compact drawer). The frame's src calls the
+    # EventDraftsController, which runs the heuristic extractor and renders the
+    # block if a concrete time is found, or returns an empty frame. The block is
+    # therefore hidden for emails with no time mentions, self-sent mail, or users
+    # without a writable calendar — all without blocking the page render.
+    def event_draft_section
+      return unless @context == :full
+
+      raw(helpers.turbo_frame_tag(
+        "event_draft_#{@message.id}",
+        src: helpers.event_draft_email_message_path(@message),
+        loading: "lazy",
+        class: "block"
+      ).to_s)
     end
 
     def thread_messages_section(show_selected: false)

@@ -171,6 +171,9 @@ fr:
       dismissed: Relance ignorée
     dismiss_todo:
       dismissed: Tâche ignorée
+    event_drafts:
+      create:
+        error_generic: Impossible de créer l'événement. Veuillez réessayer.
   email_threads:
     show:
       no_access: Vous n'avez pas accès à cette discussion.
