@@ -13,6 +13,14 @@ module Campbooks
     def shortcuts
       [
         { key: "↓ ↑", label: t(".shortcuts.navigate_threads"), context: t(".contexts.navigation") },
+        { key: "g h",   label: t(".shortcuts.nav_home"),         context: t(".contexts.navigation") },
+        { key: "g m",   label: t(".shortcuts.nav_mail"),         context: t(".contexts.navigation") },
+        { key: "g c",   label: t(".shortcuts.nav_calendar"),     context: t(".contexts.navigation") },
+        { key: "g s",   label: t(".shortcuts.nav_scout"),        context: t(".contexts.navigation") },
+        { key: "g f",   label: t(".shortcuts.nav_files"),        context: t(".contexts.navigation") },
+        { key: "g p",   label: t(".shortcuts.nav_contacts"),     context: t(".contexts.navigation") },
+        { key: "g o",   label: t(".shortcuts.nav_organizations"), context: t(".contexts.navigation") },
+        { key: "g a",   label: t(".shortcuts.nav_activity"),     context: t(".contexts.navigation") },
         { key: "↑↓ / j k", label: t(".shortcuts.feed_navigate"), context: t(".contexts.feed") },
         { key: "→ / ⏎",    label: t(".shortcuts.feed_primary"),  context: t(".contexts.feed") },
         { key: "←",         label: t(".shortcuts.feed_dismiss"),  context: t(".contexts.feed") },

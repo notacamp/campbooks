@@ -70,9 +70,12 @@ module Campbooks
     end
 
     def nav_item(item)
+      sk = item[:shortcut]
       a(
         href: item[:path],
         aria_current: item[:active] ? "page" : nil,
+        aria_keyshortcuts: sk ? "g #{sk}" : nil,
+        data: sk ? { nav_shortcut_key: sk } : {},
         class: class_names(
           "relative flex w-12 flex-col items-center justify-center gap-1 rounded-xl py-1.5",
           "text-[9px] font-semibold tracking-tight transition-colors",
@@ -82,6 +85,7 @@ module Campbooks
         span(class: "relative inline-flex") do
           raw(safe(helpers.nav_icon_svg(item[:key], css_class: "w-[22px] h-[22px]")))
           badge_dot if item[:badge]
+          shortcut_badge(sk) if sk
         end
         span { item[:label] }
         span(class: "sr-only") { helpers.t("shared.nav.new_items") } if item[:badge]
@@ -92,10 +96,13 @@ module Campbooks
     # set apart only by its icon on an Ember-gradient chip and an Ember-ink label.
     # Mirrors the mobile bottom nav.
     def scout_item(item)
+      sk = item[:shortcut]
       a(
         href: item[:path],
         aria_label: scout_aria_label(item),
         aria_current: item[:active] ? "page" : nil,
+        aria_keyshortcuts: sk ? "g #{sk}" : nil,
+        data: sk ? { nav_shortcut_key: sk } : {},
         class: class_names(
           "relative flex w-12 flex-col items-center justify-center gap-1 rounded-xl py-1.5",
           "text-[9px] font-semibold tracking-tight text-ember transition-colors",
@@ -105,6 +112,7 @@ module Campbooks
         span(class: "relative flex size-[22px] items-center justify-center rounded-lg bg-ember-gradient text-white") do
           raw(safe(helpers.nav_icon_svg(:scout, css_class: "w-4 h-4")))
           badge_dot(scout: true) if item[:badge]
+          shortcut_badge(sk, scout: true) if sk
         end
         span { item[:label] }
       end
@@ -121,6 +129,25 @@ module Campbooks
         ),
         aria_hidden: "true"
       )
+    end
+
+    # Tiny keycap showing the second key of the `g <key>` navigation chord.
+    # Hidden by default (.nav-shortcut-badge { display: none }) and revealed via
+    # CSS when the nav-shortcuts controller arms the body:
+    #   body[data-nav-armed] .nav-shortcut-badge { display: inline-flex }
+    # Positioned at the bottom-right of the icon span; the ring separates it
+    # cleanly from the icon background (mirrors badge_dot's ring-sidebar).
+    def shortcut_badge(key, scout: false)
+      span(
+        class: class_names(
+          "nav-shortcut-badge absolute -right-[9px] -bottom-[5px]",
+          "inline-flex items-center justify-center",
+          "h-[14px] min-w-[14px] px-[3px] rounded",
+          "border border-border text-[8px] font-mono font-semibold leading-none",
+          scout ? "bg-sidebar text-muted-foreground ring-1 ring-sidebar" : "bg-muted text-muted-foreground"
+        ),
+        aria_hidden: "true"
+      ) { key }
     end
 
     # Scout's icon carries no visible label text (the link is aria-labelled), so

@@ -70,12 +70,17 @@ module Campbooks
     end
 
     def tab(item)
+      sk = item[:shortcut]
       a(
         href: item[:path],
         # In the native app, switch tabs (replace) instead of stacking screens,
         # so each tab is a root with no spurious native back button.
-        data: { turbo_action: helpers.hotwire_native_app? ? "replace" : nil },
         aria_current: item[:active] ? "page" : nil,
+        aria_keyshortcuts: sk ? "g #{sk}" : nil,
+        data: {
+          turbo_action: helpers.hotwire_native_app? ? "replace" : nil,
+          nav_shortcut_key: sk
+        }.compact,
         class: class_names(
           "relative flex flex-1 flex-col items-center justify-center gap-1 rounded-xl",
           "text-[10px] font-semibold tracking-tight transition-colors",
@@ -85,6 +90,7 @@ module Campbooks
         span(class: "relative inline-flex") do
           raw(safe(helpers.nav_icon_svg(item[:key], css_class: "w-[23px] h-[23px]")))
           badge_dot if item[:badge]
+          shortcut_badge(sk) if sk
         end
         span { item[:label] }
         span(class: "sr-only") { helpers.t("shared.nav.new_items") } if item[:badge]
@@ -94,13 +100,19 @@ module Campbooks
     # Scout: same shape and size as a regular tab, set apart only by its icon
     # sitting on an Ember-gradient chip — present, but no longer shouting.
     def scout_tab(item)
+      sk = item[:shortcut]
       a(
         href: item[:path],
         # Anchor for the Scout coachmark (NavigationHelper marks Scout :ember); the
         # home composer pill carries the same marker for the desktop layout.
-        data: { turbo_action: helpers.hotwire_native_app? ? "replace" : nil, scout_coach_anchor: "" },
         aria_label: scout_aria_label(item),
         aria_current: item[:active] ? "page" : nil,
+        aria_keyshortcuts: sk ? "g #{sk}" : nil,
+        data: {
+          turbo_action: helpers.hotwire_native_app? ? "replace" : nil,
+          scout_coach_anchor: "",
+          nav_shortcut_key: sk
+        }.compact,
         class: class_names(
           "relative flex flex-1 flex-col items-center justify-center gap-1 rounded-xl",
           "text-[10px] font-semibold tracking-tight text-ember transition-colors"
@@ -109,6 +121,7 @@ module Campbooks
         span(class: "relative flex size-[23px] items-center justify-center rounded-lg bg-ember-gradient text-white") do
           raw(safe(helpers.nav_icon_svg(:scout, css_class: "w-4 h-4")))
           badge_dot(scout: true) if item[:badge]
+          shortcut_badge(sk, scout: true) if sk
         end
         span { item[:label] }
       end
@@ -159,12 +172,17 @@ module Campbooks
     end
 
     # One row in the "More" popover: nav icon + label, lit when it's the current
-    # page (mirrors the dock/rail active treatment).
+    # page (mirrors the dock/rail active treatment). Carries the shortcut data
+    # attribute so the nav-shortcuts controller can click it even when the
+    # popover is closed (it navigates via Turbo regardless of visibility).
     def more_menu_link(item)
+      sk = item[:shortcut]
       a(
         href: item[:path],
         role: "menuitem",
         aria_current: item[:active] ? "page" : nil,
+        aria_keyshortcuts: sk ? "g #{sk}" : nil,
+        data: sk ? { nav_shortcut_key: sk } : {},
         class: class_names(
           "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
           item[:active] ? "bg-muted font-semibold text-foreground" : "text-foreground hover:bg-muted"
@@ -173,7 +191,17 @@ module Campbooks
         span(class: item[:active] ? "text-foreground" : "text-muted-foreground") do
           raw(safe(helpers.nav_icon_svg(item[:key], css_class: "w-5 h-5")))
         end
-        span { item[:label] }
+        span(class: "flex-1") { item[:label] }
+        if sk
+          span(
+            class: class_names(
+              "nav-shortcut-badge inline-flex items-center justify-center",
+              "h-[14px] min-w-[14px] px-[3px] rounded",
+              "border border-border bg-muted text-[8px] font-mono font-semibold leading-none text-muted-foreground"
+            ),
+            aria_hidden: "true"
+          ) { sk }
+        end
       end
     end
 
@@ -188,6 +216,22 @@ module Campbooks
         ),
         aria_hidden: "true"
       )
+    end
+
+    # Tiny keycap showing the second key of the `g <key>` navigation chord.
+    # Hidden by default and revealed via CSS when navigation mode is armed
+    # (body[data-nav-armed] .nav-shortcut-badge { display: inline-flex }).
+    def shortcut_badge(key, scout: false)
+      span(
+        class: class_names(
+          "nav-shortcut-badge absolute -right-[9px] -bottom-[5px]",
+          "inline-flex items-center justify-center",
+          "h-[14px] min-w-[14px] px-[3px] rounded",
+          "border border-border text-[8px] font-mono font-semibold leading-none",
+          scout ? "bg-sidebar text-muted-foreground ring-1 ring-sidebar" : "bg-muted text-muted-foreground"
+        ),
+        aria_hidden: "true"
+      ) { key }
     end
 
     # Scout's icon carries no visible label text (the tab is aria-labelled), so

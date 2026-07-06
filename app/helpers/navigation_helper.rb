@@ -7,6 +7,24 @@ module NavigationHelper
   # area no longer needs a contextual tab bar. Kept as an extension point.
   SECTION_AREAS = [].freeze
 
+  # Gmail-style two-step keyboard shortcut keys for the primary nav destinations.
+  # Press `g` to arm navigation mode, then the key below to navigate. Both
+  # Campbooks::NavRail and Campbooks::BottomNav read this map to render their
+  # key-badge chips and aria-keyshortcuts attributes.
+  NAV_SHORTCUT_KEYS = {
+    home:          "h",
+    mail:          "m",
+    calendar:      "c",
+    scout:         "s",
+    files:         "f",
+    tasks:         "t",
+    digests:       "d",
+    workflows:     "w",
+    contacts:      "p",
+    organizations: "o",
+    activity:      "a"
+  }.freeze
+
   # Inline SVG bodies for the primary nav icons (rendered raw, mirroring the
   # Campbooks::Logo component's approach). Scout is a filled spark; the rest are
   # stroked line icons sharing one visual weight.
@@ -74,11 +92,14 @@ module NavigationHelper
 
   # One nav item with its computed active state. Active matching mirrors the
   # legacy nav_link: exact for Home (every path starts with "/"), prefix for the
-  # rest (so /email_messages/123 keeps Mail lit).
+  # rest (so /email_messages/123 keeps Mail lit). The :shortcut field carries the
+  # single-key letter for the two-step `g <key>` navigation shortcut (nil when
+  # the destination has no shortcut assignment).
   def nav_item(key, label, path, ember: false, exact: false, also_active_for: [], badge: false)
     candidates = [ path ] + Array(also_active_for)
     active = exact ? candidates.include?(request.path) : candidates.any? { |p| request.path.start_with?(p) }
-    { key: key, label: label, path: path, ember: ember, active: active, badge: badge }
+    { key: key, label: label, path: path, ember: ember, active: active, badge: badge,
+      shortcut: NAV_SHORTCUT_KEYS[key.to_sym] }
   end
 
   # html_safe inline SVG for a nav icon. Scout is filled; the rest are stroked.

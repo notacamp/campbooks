@@ -14,7 +14,7 @@
   </head>
 
   <body class="h-full <%= "hotwire-native" if hotwire_native_app? %>"
-        data-controller="<%= "command-palette " unless hotwire_native_app? %>email-shortcuts theme skim-overlay product-tour"
+        data-controller="<%= "command-palette " unless hotwire_native_app? %>email-shortcuts theme skim-overlay product-tour<%= " nav-shortcuts" if authenticated? && !hotwire_native_app? %>"
         data-command-palette-context-value="<%= content_for?(:cp_context) ? yield(:cp_context) : '' %>"
         data-command-palette-message-id-value="<%= content_for?(:cp_message_id) ? yield(:cp_message_id) : '' %>"
         data-command-palette-folders-value="<%= content_for?(:cp_folders) ? yield(:cp_folders) : '[]' %>"
