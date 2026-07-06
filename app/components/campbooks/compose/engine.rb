@@ -285,7 +285,7 @@ module Campbooks
               dock? ? "px-4 py-3" : "py-3 mt-2"
             )) do
           scout_spark_button if @message && helpers.ai_provider_available?(:text)
-          render(Campbooks::Files::FileLinkPicker.new)
+          render(Campbooks::Files::FileLinkPicker.new(trigger_id: "compose_file_link_trigger"))
           if helpers.email_templates_enabled? && helpers.current_entitlements.feature?(:email_templates)
             render(EmailTemplatePicker.new(frame_id: "etp_#{@message&.id || @draft&.id || 'new'}"))
           end

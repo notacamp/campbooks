@@ -96,6 +96,15 @@ export default class extends Controller {
     setTimeout(() => input.focus(), 150)
   }
 
+  // Opens the FileLinkPicker (compose toolbar "Insert file link") from the
+  // context-rail "Attach from Files" button. The picker lives in the engine
+  // form; clicking its trigger button opens the dialog and eventually inserts
+  // a public FileShareLink into the TipTap body.
+  openFilePicker(event) {
+    event.preventDefault()
+    document.getElementById("compose_file_link_trigger")?.click()
+  }
+
   // ── Form-filling bridge ───────────────────────────────────
 
   setRecipients(event) {

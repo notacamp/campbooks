@@ -53,12 +53,15 @@ fr:
         resume_aria: Reprendre le brouillon
         untitled: Brouillon
       context_rail:
+        attach_from_files: "Joindre depuis les Fichiers"
         attachments_heading: "Pièces jointes"
         chip_draft: "Rédiger une réponse à partir de ceci"
+        chip_new_draft: "Rédiger cet email à partir d'un prompt"
         chip_summarize: "Résumer le fil"
         chip_tone: "Ajuster le ton"
         original_email_heading: Message original
-        scout_body: "Scout peut vous aider à rédiger une réponse, ajuster le ton ou résumer le fil."
+        scout_body_new: "Scout peut vous aider à rédiger cet email à partir d'un prompt ou ajuster le ton."
+        scout_body_reply: "Scout peut vous aider à rédiger une réponse, ajuster le ton ou résumer le fil."
         scout_heading: Demander à Scout
       scout_draft:
         ai_tag: IA
