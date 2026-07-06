@@ -48,6 +48,14 @@ major, minor, or patch change here.
   pickers — on the task form and on a task's page — are now tap-to-toggle pills
   (showing a teammate's initials or the tag's color) instead of a column of
   checkboxes, and you can set assignees right from the new-task form.
+- **New senders are now profiled by AI based on who they are, not how many times
+  they've emailed.** A real person or vendor is profiled from their first message
+  — so they show up under their organisation in the Contacts / Organizations
+  directory right away — while machine and bulk senders (notifications,
+  newsletters, no-reply and auto-submitted mailboxes) are skipped as noise. This
+  replaces the previous "5 emails from this address" volume threshold on the live
+  ingest path. (The one-off backlog catch-up still uses the old volume floor for
+  now.)
 
 ### Removed
 
