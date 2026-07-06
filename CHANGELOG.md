@@ -49,6 +49,8 @@ major, minor, or patch change here.
 ### Fixed
 
 - Tag picker in the email reading pane no longer shows the same tag name multiple times when a workspace has several email accounts that each sync a provider label with the same name (e.g. "Work" from both Gmail and Zoho). `Tag.visible_for` now correctly scopes to the supplied workspace, and the picker's tag list is deduplicated by name — preferring local tags over external ones when names collide.
+- Full-page composer (Desk) now uses its right-hand space with a context rail: original message preview (sandboxed iframe), an attachments drop-zone card, and Scout suggestion chips that prefill the chat input. Rail stacks below the editor on mobile.
+
 
 ## [0.16.0] - 2026-07-06
 

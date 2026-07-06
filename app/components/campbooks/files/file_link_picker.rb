@@ -7,6 +7,12 @@ module Campbooks
     # FileShareLink and inserts an <a> into the TipTap body. Driven by the
     # file-link-picker Stimulus controller, which talks to the sibling tiptap-editor.
     class FileLinkPicker < Campbooks::Base
+      # trigger_id: optional DOM id for the trigger button (so external elements
+      # can click it via document.getElementById(id)?.click()).
+      def initialize(trigger_id: nil)
+        @trigger_id = trigger_id
+      end
+
       def view_template
         div(class: "inline-block", data: { controller: "file-link-picker" }) do
           trigger_button
@@ -27,8 +33,10 @@ module Campbooks
       private
 
       def trigger_button
-        button(type: "button", data: { action: "file-link-picker#open" },
-          class: "inline-flex items-center gap-1 px-3 py-1.5 text-xs text-gray-500 transition-colors hover:text-gray-700 dark:hover:text-gray-300") do
+        attrs = { type: "button", data: { action: "file-link-picker#open" },
+          class: "inline-flex items-center gap-1 px-3 py-1.5 text-xs text-gray-500 transition-colors hover:text-gray-700 dark:hover:text-gray-300" }
+        attrs[:id] = @trigger_id if @trigger_id
+        button(**attrs) do
           raw(safe('<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 11-5.656-5.656l1.5-1.5m6.328-1.328a4 4 0 010-5.656l3-3a4 4 0 115.656 5.656l-1.5 1.5"/></svg>'))
           plain t(".button")
         end

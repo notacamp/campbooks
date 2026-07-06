@@ -17,10 +17,17 @@ module Campbooks
     class Engine < Campbooks::Base
       # scout_draft: raw text of a Scout-generated reply, shown as an Ember-glass
       # ghost block above the canvas until the user takes ownership (Probe 02).
+      #
+      # form_id: when the Desk context rail is present, give the <form> this id
+      #   so rails sitting outside it can associate their hidden inputs via the
+      #   HTML5 `form` attribute.
+      # show_attachments: set to false when the context rail already renders the
+      #   ComposeAttachments card (avoids duplicate upload UI on the Desk).
       def initialize(shell:, mode:, action_url:, message: nil, draft: nil,
                      to: "", cc: "", bcc: "", subject: "", body: "", quoted_body: "",
                      signatures: [], signature_id: nil, account: nil, accounts: [],
-                     attachment_entries: [], scout_draft: nil)
+                     attachment_entries: [], scout_draft: nil,
+                     form_id: nil, show_attachments: true)
         @shell = shell
         @mode = mode.to_sym
         @action_url = action_url
@@ -38,27 +45,33 @@ module Campbooks
         @accounts = accounts
         @attachment_entries = attachment_entries
         @scout_draft = scout_draft
+        @form_id = form_id
+        @show_attachments = show_attachments
       end
 
       def view_template
-        form(action: @action_url, method: "post", class: "flex flex-col min-h-0 flex-1",
-             data: {
-               controller: "compose-engine compose-autosave",
-               action: "submit->compose-engine#validate submit->compose-autosave#suspend " \
-                       "input->compose-autosave#changed input->compose-engine#changedAnywhere " \
-                       "keydown->compose-engine#keydown turbo:submit-end->compose-engine#restoreButton",
-               # The Dock stays on the page (Turbo Stream clears it); the Desk
-               # leaves the page after send, and a Turbo submit would swallow
-               # the cross-layout redirect (known gotcha) — full request there.
-               turbo: dock? ? "true" : "false",
-               compose_engine_message_id_value: @message&.id.to_s,
-               compose_autosave_url_value: helpers.draft_emails_path,
-               compose_autosave_draft_id_value: @draft&.id.to_s,
-               compose_autosave_mode_value: @mode.to_s,
-               compose_autosave_in_reply_to_id_value: @message&.id.to_s,
-               compose_autosave_saving_text_value: t(".saving"),
-               compose_autosave_saved_text_value: t(".draft_saved")
-             }) do
+        form_data = {
+          controller: "compose-engine compose-autosave",
+          action: "submit->compose-engine#validate submit->compose-autosave#suspend " \
+                  "input->compose-autosave#changed input->compose-engine#changedAnywhere " \
+                  "keydown->compose-engine#keydown turbo:submit-end->compose-engine#restoreButton",
+          # The Dock stays on the page (Turbo Stream clears it); the Desk
+          # leaves the page after send, and a Turbo submit would swallow
+          # the cross-layout redirect (known gotcha) — full request there.
+          turbo: dock? ? "true" : "false",
+          compose_engine_message_id_value: @message&.id.to_s,
+          compose_autosave_url_value: helpers.draft_emails_path,
+          compose_autosave_draft_id_value: @draft&.id.to_s,
+          compose_autosave_mode_value: @mode.to_s,
+          compose_autosave_in_reply_to_id_value: @message&.id.to_s,
+          compose_autosave_saving_text_value: t(".saving"),
+          compose_autosave_saved_text_value: t(".draft_saved")
+        }
+        form_attrs = { action: @action_url, method: "post",
+                       class: "flex flex-col min-h-0 flex-1", data: form_data }
+        form_attrs[:id] = @form_id if @form_id.present?
+
+        form(**form_attrs) do
           input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
           input(type: "hidden", name: "draft_email_id", value: @draft&.id,
                 data: { compose_autosave_target: "draftIdInput" })
@@ -68,9 +81,11 @@ module Campbooks
 
           envelope
           editor_block
-          div(class: dock? ? "px-5" : nil) do
-            render(ComposeAttachments.new(upload_url: helpers.compose_attachments_path,
-                                          entries: @attachment_entries))
+          if @show_attachments
+            div(class: dock? ? "px-5" : nil) do
+              render(ComposeAttachments.new(upload_url: helpers.compose_attachments_path,
+                                            entries: @attachment_entries))
+            end
           end
           footer
         end
@@ -270,7 +285,7 @@ module Campbooks
               dock? ? "px-4 py-3" : "py-3 mt-2"
             )) do
           scout_spark_button if @message && helpers.ai_provider_available?(:text)
-          render(Campbooks::Files::FileLinkPicker.new)
+          render(Campbooks::Files::FileLinkPicker.new(trigger_id: "compose_file_link_trigger"))
           if helpers.email_templates_enabled? && helpers.current_entitlements.feature?(:email_templates)
             render(EmailTemplatePicker.new(frame_id: "etp_#{@message&.id || @draft&.id || 'new'}"))
           end
