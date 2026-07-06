@@ -96,4 +96,14 @@ RSpec.describe DigestMailer, type: :mailer do
 
     expect(mail.text_part.decoded).to match("Voici ce qui")
   end
+
+  # The digest is delivered to the user's own mailbox and re-ingested by the scanner;
+  # this header is what lets Emails::SelfGeneratedDetector recognise it and skip the
+  # AI pipeline (see EmailProcessJob) rather than mining it for its own contents.
+  it "stamps X-Campbooks-Kind: digest on the outgoing mail" do
+    thread = waiting_thread(subject: "Q3 budget", sent_ago: 3.days.ago)
+    mail = described_class.needs_attention(user: user, thread_ids: [ thread.id ])
+
+    expect(mail["X-Campbooks-Kind"]&.value).to eq("digest")
+  end
 end

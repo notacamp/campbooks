@@ -95,4 +95,30 @@ RSpec.describe Emails::MessageUpserter do
       expect(described_class.new(account, scan_log: scan_log).upsert(msg)).to eq(:error)
     end
   end
+
+  describe "self-generated mail (our own digests / notifications)" do
+    # Whatever MAILER_FROM resolves to in this environment — keeps the test honest
+    # against the same source the detector reads.
+    let(:our_from) { Mail::Address.new(ApplicationMailer.default[:from]).address }
+
+    it "flags mail from our own mailer address and still enqueues processing" do
+      outcome = nil
+      expect { outcome = upserter.upsert(msg("fromAddress" => our_from)) }
+        .to have_enqueued_job(EmailProcessJob)
+      expect(outcome).to eq(:created)
+      expect(EmailMessage.last.self_generated_kind).to eq("campbooks")
+    end
+
+    it "records the 'digest' kind from the X-Campbooks-Kind header" do
+      upserter.upsert(msg("fromAddress" => our_from, "header_campbooks_kind" => "digest"))
+      expect(EmailMessage.last.self_generated_kind).to eq("digest")
+      expect(EmailMessage.last.digest?).to be true
+    end
+
+    it "leaves ordinary third-party mail unflagged" do
+      upserter.upsert(msg) # fromAddress: sender@test.com
+      expect(EmailMessage.last.self_generated_kind).to be_nil
+      expect(EmailMessage.last.self_generated?).to be false
+    end
+  end
 end
