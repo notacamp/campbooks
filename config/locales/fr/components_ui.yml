@@ -150,6 +150,14 @@ fr:
         forward: Transférer
         mark_read: Marquer comme lu
         mark_unread: Marquer comme non lu
+        nav_activity: Aller à Activité
+        nav_calendar: Aller au Calendrier
+        nav_contacts: Aller aux Contacts
+        nav_files: Aller aux Fichiers
+        nav_home: Aller à l'accueil
+        nav_mail: Aller au Courrier
+        nav_organizations: Aller aux Organisations
+        nav_scout: Aller à Scout
         navigate_threads: Naviguer dans les conversations
         reply: Répondre
         reply_all: Répondre à tous

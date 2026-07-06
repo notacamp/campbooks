@@ -371,6 +371,14 @@
   [data-feed-focus-unit][data-focused] [data-feed-swipe-hint] { display: flex; }
 }
 
+/* ── Nav-rail keyboard shortcut badges (g <key> navigation mode). ──────────
+   Badges are always in the DOM so screen readers see aria-keyshortcuts, but
+   the visual keycap only surfaces when the nav-shortcuts controller arms the
+   body (press g). Restoring the display rule in the armed state overrides the
+   default hidden rule below. ─────────────────────────────────────────────── */
+.nav-shortcut-badge { display: none; }
+body[data-nav-armed] .nav-shortcut-badge { display: inline-flex; }
+
 @keyframes new-message-glow {
   0% { background-color: color-mix(in oklch, var(--ember-solid) 16%, transparent); }
   100% { background-color: transparent; }

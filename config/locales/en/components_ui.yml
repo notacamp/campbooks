@@ -149,6 +149,14 @@ en:
         forward: Forward
         mark_read: Mark read
         mark_unread: Mark unread
+        nav_activity: Go to Activity
+        nav_calendar: Go to Calendar
+        nav_contacts: Go to Contacts
+        nav_files: Go to Files
+        nav_home: Go to Home
+        nav_mail: Go to Mail
+        nav_organizations: Go to Organizations
+        nav_scout: Go to Scout
         navigate_threads: Navigate threads
         reply: Reply
         reply_all: Reply All
