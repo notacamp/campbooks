@@ -16,6 +16,15 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Tag groups now actually collapse on the inbox you land on.** The inbox
+  landing URL carries the mapped inbox folder id, and the group logic treated
+  any folder id as "browsing a folder" — so with a live provider connection the
+  group rows never appeared and nothing collapsed. The inbox root now recognizes
+  its own folder id; specific (non-inbox) folder views still show grouped mail
+  inline.
+
 ## [0.15.0] - 2026-07-06
 
 ### Added
