@@ -2,19 +2,23 @@
 
 module Emails
   # The single source of truth for which inbox threads collapse out of the main
-  # list into per-group rows. A group is any set of tags sharing a `group_name`
-  # (the four built-in default groups — Notifications / Newsletters & promos /
-  # Social / Updates — plus anything the user groups themselves). Replaces the old
-  # category-driven Emails::SmartGroups.
+  # list into per-group rows. A group's membership is the UNION of:
+  #   1. Tag-based: threads carrying a tag whose group_name matches.
+  #   2. Rule-based: threads matched by InboxGroupRule rows for that group.
+  #      Rule types: sender (email / @domain), organization (org uuid),
+  #      document_type (doc-type uuid), query (structured-filter search string).
   #
-  # A thread collapses if ANY of its messages carries a tag in an enabled group,
-  # and it surfaces in EVERY group it qualifies for (additive multi-membership).
-  # It is NEVER collapsed — it stays inline — when a human clearly cares about it:
-  # the owner replied (last_outbound_at), it is pinned, the sender is starred, or
-  # any message is classified `important`. The same guards feed both the main-list
-  # exclusion and the group rows/counts, so the numbers always agree. The caller
-  # applies the exclusion on the inbox root only; folder and search views show
-  # everything inline.
+  # The four built-in default groups (Notifications / Newsletters & promos /
+  # Social / Updates) use tag-based membership only; custom groups can mix tags
+  # and rules freely, or be rules-only (no tags required). Additive
+  # multi-membership is preserved: the same thread can satisfy multiple groups.
+  #
+  # A thread is NEVER collapsed when a human clearly cares about it:
+  # the owner replied (last_outbound_at), it is pinned, the sender is starred,
+  # or any message is classified `important`. The same guards feed both the
+  # main-list exclusion and the group rows/counts so the numbers always agree.
+  # The caller applies the exclusion on the inbox root only; folder and search
+  # views show everything inline.
   class TagGroups
     def initialize(workspace, readable_account_ids)
       @workspace = workspace
@@ -22,27 +26,28 @@ module Emails
     end
 
     # Guarded EmailThread relation of every grouped thread, for excluding them
-    # from the main list. nil when the workspace has no grouped tags.
+    # from the main list. nil when the workspace has neither grouped tags nor
+    # group rules.
     def excluded_scope
       return @excluded_scope if defined?(@excluded_scope)
 
-      ids = grouped_tag_ids
-      return @excluded_scope = nil if ids.empty?
+      subqueries = all_tag_subqueries + all_rule_subqueries
+      return @excluded_scope = nil if subqueries.empty?
 
-      @excluded_scope = guarded(threads_with_tags(ids))
+      @excluded_scope = guarded_union(subqueries)
     end
 
-    # Guarded EmailThread relation for one group's drill-in view, or nil when the
-    # group name matches no tags.
+    # Guarded EmailThread relation for one group's drill-in view, or nil when
+    # the group name matches neither tags nor rules.
     def group_scope(group_name)
-      ids = tag_ids_for_group(group_name)
-      return nil if ids.empty?
+      subqueries = tag_subqueries_for(group_name) + rule_subqueries_for(group_name)
+      return nil if subqueries.empty?
 
-      guarded(threads_with_tags(ids))
+      guarded_union(subqueries)
     end
 
-    # The group's display color (its first tag's color), for the identity dot
-    # next to the group name. nil when the group name matches no tags.
+    # The group's display color: first grouped tag's color, or nil for a
+    # rules-only group. Callers already render a neutral dot when color is nil.
     def group_color(group_name)
       name = group_name.to_s
       grouped_tags.find { |t| t.group_name == name }&.color
@@ -51,40 +56,51 @@ module Emails
     # Row data for the collapsed group rows: one hash per non-empty group
     # ({ label:, count:, senders:, color: }). Counts are restricted to threads
     # with a message in an inbox folder so the number matches the drill-in view.
+    # Includes groups defined only by rules (no tags required).
     def build_groups(inbox_folder_ids)
-      grouped_tags_by_name.filter_map do |group_name, tags|
-        scope = guarded(threads_with_tags(tags.map(&:id)))
+      all_group_names.filter_map do |group_name|
+        subqueries = tag_subqueries_for(group_name) + rule_subqueries_for(group_name)
+        next if subqueries.empty?
+
+        scope   = guarded_union(subqueries)
         counted = scope.joins(:email_messages)
         counted = counted.where(email_messages: { provider_folder_id: inbox_folder_ids }) if inbox_folder_ids.present?
-        count = counted.distinct.count
+        count   = counted.distinct.count
         next if count.zero?
 
-        { label: group_name, count: count, senders: senders_for(scope), color: tags.first&.color }
+        color = grouped_tags_by_name[group_name]&.first&.color
+        { label: group_name, count: count, senders: senders_for(scope), color: color }
       end
     end
 
     private
 
-    # Visible, grouped tags for this workspace (the default bucket tags plus any
-    # the user has grouped). Loaded once; the row/scope helpers slice this array.
+    # -------------------------------------------------------------------------
+    # Tag-based helpers (unchanged semantics)
+    # -------------------------------------------------------------------------
+
     def grouped_tags
       @grouped_tags ||= Tag.where(workspace_id: @workspace&.id).visible.grouped.by_name.to_a
     end
 
     def grouped_tags_by_name
-      grouped_tags.group_by(&:group_name)
+      @grouped_tags_by_name ||= grouped_tags.group_by(&:group_name)
     end
 
-    def grouped_tag_ids
-      grouped_tags.map(&:id)
+    def all_tag_subqueries
+      ids = grouped_tags.map(&:id)
+      return [] if ids.empty?
+
+      [ threads_with_tags(ids) ]
     end
 
-    def tag_ids_for_group(group_name)
-      name = group_name.to_s
-      grouped_tags.select { |t| t.group_name == name }.map(&:id)
+    def tag_subqueries_for(group_name)
+      ids = (grouped_tags_by_name[group_name.to_s] || []).map(&:id)
+      ids.any? ? [ threads_with_tags(ids) ] : []
     end
 
-    # email_thread_ids with at least one message carrying one of `tag_ids`.
+    # email_thread_ids subquery for threads with at least one message carrying
+    # one of tag_ids.
     def threads_with_tags(tag_ids)
       EmailMessage.where(email_account_id: @readable_account_ids)
                   .where.not(email_thread_id: nil)
@@ -93,16 +109,156 @@ module Emails
                   .select(:email_thread_id)
     end
 
-    # The "never collapse" guards — a human cares about this thread regardless of
-    # its tags: the owner replied, it is pinned, the sender is starred, or a
-    # message is important.
-    def guarded(thread_id_subquery)
-      EmailThread.where(email_account_id: @readable_account_ids)
-                 .where(id: thread_id_subquery)
-                 .where(last_outbound_at: nil)
-                 .where.not(id: EmailThread.pinned)
-                 .where.not(id: starred_sender_thread_ids)
-                 .where.not(id: important_message_thread_ids)
+    # -------------------------------------------------------------------------
+    # Rule-based helpers
+    # -------------------------------------------------------------------------
+
+    def all_rules
+      @all_rules ||= InboxGroupRule.where(workspace: @workspace).to_a
+    end
+
+    def all_rule_subqueries
+      all_rules.filter_map { |rule| thread_id_subquery_for_rule(rule) }
+    end
+
+    def rule_subqueries_for(group_name)
+      all_rules
+        .select { |r| r.group_name == group_name.to_s }
+        .filter_map { |rule| thread_id_subquery_for_rule(rule) }
+    end
+
+    def thread_id_subquery_for_rule(rule)
+      case rule.rule_type
+      when "sender"       then threads_matching_sender(rule.value)
+      when "organization" then threads_matching_organization(rule.value)
+      when "document_type" then threads_matching_document_type(rule.value)
+      when "query"        then threads_matching_query(rule.value)
+      end
+    end
+
+    # Sender rule: bare email address (ILIKE match) or @domain prefix.
+    def threads_matching_sender(value)
+      base = base_messages
+      clause =
+        if value.start_with?("@")
+          domain = value.delete_prefix("@")
+          base.where("from_address ILIKE ?", "%@#{sanitize_like(domain)}")
+        else
+          base.where("from_address ILIKE ?", "%#{sanitize_like(value)}%")
+        end
+      clause.select(:email_thread_id)
+    end
+
+    # Organization rule: follows the org -> organization_membership -> person ->
+    # contact -> email_message chain entirely in SQL via JOINs.
+    def threads_matching_organization(org_id)
+      base_messages
+        .joins(contact: { person: :organization_memberships })
+        .where(organization_memberships: { organization_id: org_id })
+        .select(:email_thread_id)
+    end
+
+    # Document-type rule: EXISTS subquery via document_email_messages.
+    def threads_matching_document_type(doc_type_id)
+      base_messages
+        .where(
+          "EXISTS (" \
+          "SELECT 1 FROM document_email_messages dem " \
+          "INNER JOIN documents d ON d.id = dem.document_id " \
+          "WHERE dem.email_message_id = email_messages.id " \
+          "AND d.document_type_id = ?)",
+          doc_type_id
+        )
+        .select(:email_thread_id)
+    end
+
+    # Query rule: parse the stored query string; apply only its structured
+    # filters (free text has no ranking context here and is silently skipped).
+    # Returns nil when the query has no applicable filters.
+    def threads_matching_query(query_string)
+      parsed = Emails::SearchQuery.parse(query_string)
+      return nil unless parsed.filters?
+
+      filtered = apply_query_filters(base_messages, parsed.filters)
+      filtered.select(:email_thread_id)
+    end
+
+    # Apply Emails::SearchQuery structured filters to an EmailMessage scope.
+    # Intentionally excludes free-text (no ILIKE on body/summary) and the
+    # account: modifier (no user object available in this context).
+    def apply_query_filters(rel, filters) # rubocop:disable Metrics/MethodLength
+      (filters[:sender] || []).each do |v|
+        rel = rel.where("from_address ILIKE ?", "%#{sanitize_like(v)}%")
+      end
+
+      (filters[:domain] || []).each do |v|
+        domain = v.sub(/\A@/, "")
+        rel = rel.where("from_address ILIKE ?", "%@#{sanitize_like(domain)}")
+      end
+
+      (filters[:to] || []).each do |v|
+        like = "%#{sanitize_like(v)}%"
+        rel = rel.where("to_address ILIKE :q OR cc_address ILIKE :q", q: like)
+      end
+
+      (filters[:subject] || []).each do |v|
+        rel = rel.where("subject ILIKE ?", "%#{sanitize_like(v)}%")
+      end
+
+      rel = rel.where(has_attachment: true) if filters[:has_attachment]
+      rel = rel.where(read: false) if filters[:unread]
+      rel = rel.where(read: true) if filters[:read]
+      rel = rel.where.not(pinned_at: nil) if filters[:pinned]
+
+      if (from_str = filters[:date_from]) && (from = parse_date(from_str))
+        rel = rel.where("received_at >= ?", from.beginning_of_day)
+      end
+      if (to_str = filters[:date_to]) && (to = parse_date(to_str))
+        rel = rel.where("received_at <= ?", to.end_of_day)
+      end
+
+      (filters[:category] || []).each { |v| rel = rel.where(category: v) }
+
+      (filters[:priority] || []).each do |v|
+        rel = rel.where(ai_priority: v) if EmailMessage.ai_priorities.key?(v)
+      end
+
+      (filters[:tag_names] || []).each do |name|
+        ids = Tag.where(workspace: @workspace).where("LOWER(name) = ?", name.downcase).ids
+        if ids.any?
+          rel = rel.where(
+            "EXISTS (SELECT 1 FROM email_message_tags emt " \
+            "WHERE emt.email_message_id = email_messages.id AND emt.tag_id IN (?))",
+            ids
+          )
+        else
+          rel = rel.none
+        end
+      end
+
+      rel
+    end
+
+    # -------------------------------------------------------------------------
+    # Guards (the "a human cares about this thread" gates)
+    # -------------------------------------------------------------------------
+
+    # Applies all guards to a union of multiple email_thread_id subqueries,
+    # returning an EmailThread scope. Each subquery is an EmailMessage relation
+    # selecting :email_thread_id; they are OR-combined at the WHERE level so no
+    # per-row N+1 occurs.
+    def guarded_union(subqueries)
+      combined = subqueries.reduce(nil) do |base, sq|
+        candidate = EmailThread.where(id: sq)
+        base ? base.or(candidate) : candidate
+      end
+
+      combined
+        .where(email_account_id: @readable_account_ids)
+        .where(last_outbound_at: nil)
+        .where.not(id: EmailThread.pinned)
+        .where.not(id: starred_sender_thread_ids)
+        .where.not(id: important_message_thread_ids)
     end
 
     def starred_sender_thread_ids
@@ -120,6 +276,23 @@ module Emails
                   .select(:email_thread_id)
     end
 
+    # -------------------------------------------------------------------------
+    # Shared helpers
+    # -------------------------------------------------------------------------
+
+    # All group names across tags AND rules, sorted for stable row order.
+    def all_group_names
+      tag_names  = grouped_tags_by_name.keys
+      rule_names = all_rules.map(&:group_name).uniq
+      (tag_names + rule_names).uniq.sort
+    end
+
+    # Base scope for EmailMessage subqueries: account-scoped + has a thread.
+    def base_messages
+      EmailMessage.where(email_account_id: @readable_account_ids)
+                  .where.not(email_thread_id: nil)
+    end
+
     # Up to 3 distinct recent sender addresses for the row's avatar stack.
     def senders_for(thread_scope)
       sender_rows = EmailMessage.where(email_thread_id: thread_scope.select(:id))
@@ -132,6 +305,17 @@ module Emails
       top_rows.map do |address, contact_id, account_id|
         { email: address, contact_id: contact_id, sent: false, account_color: account_colors[account_id] }
       end
+    end
+
+    def sanitize_like(str)
+      EmailMessage.sanitize_sql_like(str.to_s)
+    end
+
+    def parse_date(value)
+      return nil if value.blank?
+      Date.parse(value.to_s.tr("/", "-"))
+    rescue ArgumentError, TypeError
+      nil
     end
   end
 end

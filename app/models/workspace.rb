@@ -7,6 +7,7 @@ class Workspace < ApplicationRecord
   has_many :authored_documents, dependent: :restrict_with_error
   has_many :document_types, dependent: :restrict_with_error
   has_many :tags, dependent: :restrict_with_error
+  has_many :inbox_group_rules, dependent: :destroy
   has_many :ai_adapters, dependent: :destroy
   has_many :ai_configurations, dependent: :destroy
   has_many :ai_prompts, dependent: :destroy

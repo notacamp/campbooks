@@ -71,11 +71,28 @@ fr:
         unstar: Retirer la mise en avant
     tag_groups:
       form:
+        add_rule: Ajouter une règle
         cancel: Annuler
         heading_edit: Modifier %{name}
         heading_new: Nouveau groupe
         name_label: Nom
         name_placeholder: p. ex. Newsletters et promos
+        remove_rule: Supprimer la règle
+        rule_select_placeholder: Choisir…
+        rule_type:
+          document_type: Type de document
+          organization: Organisation
+          query: Recherche
+          sender: Expéditeur
+        rule_value_placeholder:
+          document_type: Choisir un type de document
+          organization: Choisir une organisation
+          query: "ex. : from:newsletter has:attachment"
+          sender: "ex. : facturation@exemple.fr ou @exemple.fr"
+        rules_hint: Inclut les messages correspondant à une règle, même sans étiquette.
+          Le texte libre dans une recherche est ignoré ; utilisez uniquement des
+          modificateurs (from:, tag:, is:, has:, after:, before:, category:, priority:).
+        rules_label: Règles
         save: Enregistrer le groupe
         tags_hint: Le courrier portant l'une de ces étiquettes est replié dans
           la ligne du groupe. Une étiquette n'appartient qu'à un seul groupe.
@@ -86,14 +103,19 @@ fr:
         new_group: Nouveau groupe
         no_groups: Aucun groupe pour l'instant. Créez-en un pour replier le courrier
           secondaire en une seule ligne.
-        subheading: Regroupez des étiquettes ; la boîte de réception replie leur
-          courrier en une seule ligne.
+        rule_summary:
+          document_type: Document
+          organization: Org
+          query: Recherche
+          sender: Expéditeur
+        subheading: Regroupez des étiquettes ou des règles ; la boîte de réception
+          replie leur courrier en une seule ligne.
         threads_count:
           one: "%{count} conversation"
           other: "%{count} conversations"
         ungroup: Dissocier
-        ungroup_confirm: Dissocier %{name} ? Les étiquettes restent ; leur courrier
-          cesse simplement d'être replié.
+        ungroup_confirm: Dissocier %{name} ? Les étiquettes et règles sont supprimées ;
+          le courrier cesse d'être replié.
     tags:
       create:
         created_toast: Étiquette créée.

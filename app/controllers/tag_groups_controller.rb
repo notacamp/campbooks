@@ -22,9 +22,16 @@ class TagGroupsController < ApplicationController
   private
 
   def validate_group!
-    return if params[:group].present? &&
-              Tag.where(workspace_id: Current.user.workspace_id, group_name: params[:group]).exists?
+    return if params[:group].present? && group_exists?
 
     head :bad_request
+  end
+
+  # A group is valid if it has at least one member tag OR at least one rule.
+  def group_exists?
+    ws_id = Current.user.workspace_id
+    name  = params[:group]
+    Tag.where(workspace_id: ws_id, group_name: name).exists? ||
+      InboxGroupRule.where(workspace_id: ws_id, group_name: name).exists?
   end
 end

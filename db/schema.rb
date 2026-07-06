@@ -927,6 +927,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_160100) do
     t.index ["user_id"], name: "index_identities_on_user_id"
   end
 
+  create_table "inbox_group_rules", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "group_name", null: false
+    t.jsonb "params", default: {}, null: false
+    t.string "rule_type", null: false
+    t.datetime "updated_at", null: false
+    t.string "value", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["workspace_id", "group_name"], name: "idx_inbox_group_rules_on_workspace_and_group"
+    t.index ["workspace_id"], name: "index_inbox_group_rules_on_workspace_id"
+  end
+
   create_table "invitations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "accepted_at"
     t.uuid "accepted_by_id"
@@ -1929,6 +1941,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_160100) do
   add_foreign_key "google_drive_accounts", "workspaces"
   add_foreign_key "google_drive_configs", "document_types"
   add_foreign_key "identities", "users"
+  add_foreign_key "inbox_group_rules", "workspaces"
   add_foreign_key "invitations", "users", column: "accepted_by_id"
   add_foreign_key "invitations", "users", column: "invited_by_id"
   add_foreign_key "invitations", "workspaces"
