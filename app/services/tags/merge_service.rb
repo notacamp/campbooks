@@ -15,8 +15,8 @@ module Tags
   #   - LabelImportDecision: linked decisions are re-pointed to A.
   #
   # default_bucket preservation: if A has no default_bucket and B does, A adopts
-  # B's bucket (keeps the default group tag semantics intact). If both have one,
-  # A's bucket wins.
+  # B's bucket (keeps the auto-tagging bridge key intact). If both have one,
+  # A's bucket wins. group_name is never touched — merge does not affect grouping.
   class MergeService
     class MergeError < StandardError; end
 
@@ -54,16 +54,19 @@ module Tags
     # clear the source's bucket first inside the transaction to satisfy the
     # unique partial index (workspace_id, default_bucket) before setting it on
     # the target. The source will be destroyed at the end of the same transaction.
+    #
+    # NOTE: group_name is intentionally NOT touched here. Merging is about
+    # consolidating tag identity (message links + account pointers + the
+    # auto-tagging bucket key). Grouping is a separate, user-controlled
+    # classification axis. If the surviving target ends up bucketed but ungrouped,
+    # that is correct — the user can add it to a group themselves.
     def adopt_default_bucket!
       return if @target.default_bucket.present?
       return if @source.default_bucket.blank?
 
       bucket = @source.default_bucket
       @source.update_columns(default_bucket: nil)
-      @target.update_columns(
-        default_bucket: bucket,
-        group_name: @target.group_name.presence || @source.group_name
-      )
+      @target.update_columns(default_bucket: bucket)
     end
 
     # Move all EmailMessageTag rows from source to target, skipping duplicates
