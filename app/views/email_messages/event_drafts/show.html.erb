@@ -1,0 +1,16 @@
+<%# Lazy turbo-frame content for the inline event-draft block on the email show
+    page. The parent page emits a <turbo-frame src=...> placeholder; Turbo fetches
+    this endpoint and swaps its content in. An empty frame (when @draft is nil)
+    collapses to nothing — no loading state is left behind. %>
+<%= turbo_frame_tag "event_draft_#{@message.id}" do %>
+  <% if @draft %>
+    <%= render Campbooks::EventDraftBlock.new(
+          state:    :draft,
+          title:    @draft.title,
+          start_at: @draft.start_at,
+          end_at:   @draft.end_at,
+          edit_url: @edit_url,
+          add_url:  @add_url
+        ) %>
+  <% end %>
+<% end %>
