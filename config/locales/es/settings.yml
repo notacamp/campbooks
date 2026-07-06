@@ -249,6 +249,7 @@ es:
       calendars:
         show:
           active: Activo
+          back: Volver a integraciones
           calendars_heading: Calendarios
           calendars_pending: Los calendarios aparecerán aquí tras la primera sincronización.
           connect_desc: Los calendarios vienen con tus cuentas de correo conectadas.
@@ -298,6 +299,7 @@ es:
           username_placeholder: usuario
         index:
           add_connection: Añadir conexión
+          back: Volver a integraciones
           col_auth: Autenticación
           col_base_url: URL base
           col_name: Nombre
@@ -323,8 +325,9 @@ es:
           col_subfolders: Subcarpetas
           configure: Configurar
           connect_button: Conectar Google Drive
-          connect_desc_html: Conecte su cuenta de Google para enviar documentos a
-            Google Drive. Campbooks solo accede a los archivos que crea (ámbito %{scope}).
+          back: Volver a integraciones
+          connect_desc_html: Conecte su cuenta de Google para crear carpetas y subir archivos a Google Drive (ámbito %{scope_name}, para que pueda explorar y elegir cualquier carpeta).
+          not_configured: Google Drive no está configurado en esta instancia. Pida a su administrador que lo configure.
           connected_account_heading: Cuenta conectada
           connected_as: Conectado como
           connected_label: Conectado
@@ -363,6 +366,7 @@ es:
           select_my_drive: Usar la raíz de Mi Drive
           select_this: Seleccionar "%{name}"
         edit:
+          back: Volver a Google Drive
           auto_push_default_note: El envío automático está activado por defecto —
             los documentos aprobados de este tipo se enviarán automáticamente a Drive.
             Desmarque la casilla anterior para pausarlo.
@@ -421,6 +425,7 @@ es:
           zoho_drive_heading: Zoho Drive
       notion:
         show:
+          back: Volver a integraciones
           col_database: Base de datos de Notion
           col_document_type: Tipo de documento
           col_pull: Recibir
@@ -457,6 +462,7 @@ es:
           token_placeholder: secret_...
       zoho_drive:
         show:
+          back: Volver a integraciones
           active: Activa
           add_mapping_button: Añadir mapeo
           add_mapping_heading: Añadir mapeo de carpeta

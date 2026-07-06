@@ -23,6 +23,17 @@ major, minor, or patch change here.
   of age. Anything older folds behind a **"Show older"** toggle, so a backlog of
   long-forgotten sends no longer buries the replies still worth chasing.
 
+### Fixed
+
+- **The integration settings pages read cleanly and are easier to leave.** The Google
+  Drive page showed a raw "Connect Desc Html" placeholder where its description should
+  be, and on an instance where Google Drive isn't set up, clicking **Connect** hit an
+  error page. The description now renders properly, an unconfigured instance explains
+  that an administrator needs to set it up (instead of offering a button that errors),
+  and every integration detail page — Google Drive, Notion, Zoho Drive, Connections,
+  and Calendars — now has a **Back to integrations** link. Disconnecting Google Drive
+  also returns you to the integrations list rather than erroring.
+
 ## [0.13.0] - 2026-07-05
 
 ### Added

@@ -2,6 +2,11 @@ class Oauth::GoogleController < ApplicationController
   before_action :require_authentication
 
   def connect
+    unless GoogleDrive::OauthClient.configured?
+      redirect_to settings_integrations_google_drive_path, warning: t(".not_configured")
+      return
+    end
+
     oauth = GoogleDrive::OauthClient.new
     redirect_to oauth.authorization_url(oauth_google_callback_url), allow_other_host: true
   end

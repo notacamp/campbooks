@@ -1,6 +1,6 @@
 <% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
 
-<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) do |header| %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"), back_href: settings_integrations_root_path, back_label: t(".back"))) do |header| %>
   <% header.with_actions do %>
     <%= render(Campbooks::Button.new(variant: :primary, size: :md, href: new_zoho_drive_account_path)) { t(".connect_account") } %>
   <% end %>
