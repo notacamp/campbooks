@@ -44,8 +44,8 @@ RSpec.describe RegistrationsController, type: :controller do
       }.to change(User, :count).by(1).and change(Workspace, :count).by(1)
 
       expect(User.order(:created_at).last).to be_admin # founders administer their workspace
-      # Straight to the Scout welcome screen (the onboarding-overhaul flow).
-      expect(response).to redirect_to(onboarding_path)
+      # Home with the two-minute walkthrough auto-opening (walkthrough v2 flow).
+      expect(response).to redirect_to(root_path)
     end
 
     it "creates new org when invitation token email does not match" do
@@ -169,7 +169,7 @@ RSpec.describe RegistrationsController, type: :controller do
 
       expect(code.reload).to be_redeemed
       expect(code.redeemed_by).to eq(User.find_by(email_address: "beta@example.com"))
-      expect(response).to redirect_to(onboarding_path)
+      expect(response).to redirect_to(root_path)
     end
 
     it "refuses to create an account when the stored code is gone" do

@@ -129,6 +129,7 @@ en:
       beta_code_unavailable: That invite code is no longer available — please start
         over with a new one.
       password_too_short: Password must be at least 8 characters.
+      welcome_home: "Welcome to Campbooks -- here's the two-minute tour."
       welcome_workspace: Welcome to %{workspace}!
     create:
       code_sent: We sent a verification code to %{email}.

@@ -131,6 +131,7 @@ es:
       beta_code_unavailable: Ese código de invitación ya no está disponible — empiece
         de nuevo con uno nuevo.
       password_too_short: La contraseña debe tener al menos 8 caracteres.
+      welcome_home: "Bienvenido a Campbooks -- aquí está la visita de dos minutos."
       welcome_workspace: "¡Bienvenido a %{workspace}!"
     create:
       code_sent: Hemos enviado un código de verificación a %{email}.

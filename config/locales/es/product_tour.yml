@@ -2,67 +2,84 @@
 es:
   components:
     product_tour:
-      ai_tag: IA
       aria_label: Visita guiada
-      back: Atrás
-      next: Siguiente
-      s1_body: 'Campbooks es una bandeja de entrada que se ordena sola. En aproximadamente
-        un minuto, te mostraré las cuatro cosas que la hacen diferente: prueba cada
-        una a medida que avanzamos.'
-      s1_point_ask: Pregúntale lo que quieras a tu bandeja
-      s1_point_remind: Los plazos nunca se escapan
-      s1_point_skim: Despeja un montón entero en segundos
-      s1_point_surface: Scout destaca solo lo que te necesita
-      s1_title: Te damos la bienvenida a Campbooks
-      s2_badge: Te necesita
-      s2_eyebrow: Tu inicio
-      s2_feedback: Esa es la idea, sin abrir el correo. La notificación de LinkedIn
-        de abajo era ruido, así que Scout la dejó estar.
-      s2_summary: Un código de un solo uso para confirmar tu transferencia bancaria;
-        caduca en 10 minutos, así que conviene mirarlo ahora.
-      s2_task: Toca el mensaje que Scout marcó para ver lo que extrajo.
-      s2_title: Scout destaca lo que te necesita
-      s2_why: Scout lee cada correo en cuanto llega y trae al frente solo lo que importa.
-        Todo lo demás se queda discretamente a un lado.
-      s3_eyebrow: Skim
-      s3_feedback: Ese es todo el montón, resuelto. El correo archivado sigue siendo
-        buscable y cada acción se puede deshacer.
-      s3_progress: "%{done} de %{total} pilas despejadas"
-      s3_task: 'Recorre las tres: archiva el ruido, conserva lo que importa.'
-      s3_title: Despeja un montón en segundos
-      s3_why: Skim agrupa tu bandeja en pilas y las reproduce como Stories. Tomas
-        una decisión por pila —quedarte con lo que importa, archivar el ruido— en
-        vez de abrir decenas de correos.
-      s4_dismiss: o descartar
-      s4_extracted: 'Scout detectó una fecha límite: viernes'
-      s4_eyebrow: Recordatorios
-      s4_feedback: Listo. Reaparecerá el viernes, y puedes convertir cualquier recordatorio
-        en un evento de calendario con un toque.
-      s4_remind_cta: Recordármelo
-      s4_reminder_title: 'Pagar factura de Acme: $248.00'
-      s4_reminder_when: Recordatorio programado · viernes, 9:00
-      s4_task: Esta factura vence el viernes. Toca “Recordármelo” para programarlo.
-      s4_title: Los plazos nunca se escapan
-      s4_why: Cuando un correo trae una fecha límite o una promesa que hiciste, Scout
-        la extrae para que no quede enterrada.
-      s5_eyebrow: Scout
-      s5_feedback: Scout hace esto en tu bandeja real en cuanto la conectes, y también
-        puede redactar las respuestas.
-      s5_greeting: "¡Hola! Soy Scout. Pregúntame sobre tu bandeja de entrada, o toca
-        una sugerencia para empezar."
-      s5_prompt: "¿Qué necesita respuesta hoy?"
-      s5_reply_intro: 'Dos correos te están esperando:'
-      s5_reply_item_1: 'Sarah: preguntó por la comida del jueves'
-      s5_reply_item_2: 'Acme Supply Co.: la factura que vence el viernes'
-      s5_task: Toca la pregunta para preguntarle a Scout.
-      s5_title: Pregúntale lo que quieras a tu bandeja
-      s5_why: Scout puede buscar, resumir y actuar en tu correo y tus documentos.
-        Solo tienes que pedírselo con palabras normales.
-      s6_body: 'Ese es el ciclo: Scout destaca lo que importa, tú despejas el resto
-        en segundos con Skim, los plazos no se escapan y puedes preguntar lo que quieras.
-        Conecta tu bandeja para hacerlo realidad.'
-      s6_cta_connect: Conecta tu bandeja de entrada
-      s6_cta_explore: Explorar por mi cuenta
-      s6_title: Todo listo
+      progress_label: Progreso de la visita
       skip: Omitir visita
-      step: "%{current} de %{total}"
+      prev: Anterior
+      next: Siguiente
+      nav_hint: toca para avanzar
+      segment_label: "Ir a la diapositiva %{n}"
+      connect_cta: Conecta tu bandeja de entrada
+      done_cta: Volver a tu bandeja de entrada
+      docs_cta: Leer la documentación
+
+      # Diapositiva 1: Introducción
+      intro_mod: Campbooks
+      s1_title: "Esto es Campbooks — la bandeja de entrada que se ordena sola."
+      s1_sub: Un cliente de correo con un asistente integrado, para quienes se ahogan en correo profesional y papeleo.
+      s1_rot_lead: "Scout, tu asistente,"
+      s1_r0_h: "lee cada correo, para que tú no tengas que hacerlo."
+      s1_r0_p: "Cada mensaje recibe un análisis de una línea: qué es, qué te pide, si puede esperar."
+      s1_r1_h: "archiva las facturas, recibos y contratos."
+      s1_r1_p: Los adjuntos se convierten en documentos rastreados y buscables — clasificados, etiquetados y listos para la declaración fiscal.
+      s1_r2_h: detecta los plazos antes de que se escapen.
+      s1_r2_p: Las fechas enterradas en el correo aparecen como recordatorios — tu calendario solo cambia cuando lo autorizas.
+      s1_r3_h: acalla los boletines y las notificaciones.
+      s1_r3_p: El ruido se colapsa en grupos ordenados que puedes revisar en segundos — anunciado, reversible, nunca perdido.
+      s1_r4_h: te entrega la lista corta que realmente te necesita.
+      s1_r4_p: Abres la app para dos o tres cosas, no para doscientas.
+      s1_close_b: "Tú decides. Scout hace la parte aburrida."
+      s1_close: Todo lo que hace está anunciado, es reversible y tuyo para aprobar.
+
+      # Diapositiva 2: Bandeja de entrada
+      inbox_mod: Bandeja de entrada
+      s2_title: El correo llega ya ordenado.
+      s2_body1_html: "Los boletines, notificaciones y promociones <b>se agrupan en pilas ordenadas</b> en lugar de enterrar tu mañana — revísalas en segundos o ignóralas por completo. Lo que realmente necesita respuesta permanece en primer plano con el análisis de una línea de Scout."
+      s2_body2_html: "Las etiquetas se aplican solas cuando llega el correo: <b>anunciadas y reversibles</b>, sin preguntas que responder. Tus carpetas por fin se archivan solas."
+      s2_group_label: Notificaciones y boletines
+
+      # Diapositiva 3: Calendario
+      calendar_mod: Calendario
+      s3_title: Tu bandeja y tu calendario por fin se hablan.
+      s3_body1_html: "Un correo '¿funciona el jueves?' se convierte en un <b>evento borrador</b> — título correcto, hora correcta, un toque para añadir. No más reescribir quién y cuándo."
+      s3_body2_html: "Los compromisos con fecha — una factura a pagar, una renovación, un vuelo — aparecen como <b>recordatorios que confirmas</b> en el calendario. La sincronización bidireccional mantiene a Google y Zoho en orden, en ambas direcciones."
+      s3_ev_title: Reunión de inicio con Dana
+      s3_ev_time: "Jue . 14:30 - 15:00 . borrador del correo de ella"
+      s3_ev_add: Añadir al calendario
+      s3_ev_added: Añadido
+      s3_rem_sender: "Pago . en 11 días"
+      s3_rem_subj: "Factura Streamline #10-449 . $49,00"
+      s3_rem_add: Añadir al calendario
+      s3_rem_added: En tu calendario
+
+      # Diapositiva 4: Tareas (con bandera de funcionalidad)
+      tasks_mod: Tareas
+      s4_title: Convierte cualquier correo en una tarea.
+      s4_body1_html: "Scout detecta las peticiones ocultas en tu correo — \"¿puedes enviar el informe antes del viernes?\" — y se ofrece a convertirlas en tareas con <b>fechas de entrega asociadas</b>."
+      s4_body2_html: "Trabájalas en lista o en tablero; márcalas como completadas y <b>nada prometido se pierde</b> tres respuestas más abajo en un hilo."
+
+      # Diapositiva 5: Documentos
+      docs_mod: Documentos
+      s5_title: El papeleo que se archiva solo.
+      s5_body1_html: "Cada adjunto se convierte en un <b>documento rastreado</b>: tipo reconocido, los campos clave — proveedor, importe, fecha de vencimiento — extraídos y buscables desde el primer día."
+      s5_body2_html: "Apruebas o corriges con un toque. <b>La declaración de impuestos deja de ser arqueología</b> — es un cuadro de búsqueda."
+      s5_doc_type: Factura de gastos
+      s5_field_vendor_label: Proveedor
+      s5_field_amount_label: Importe
+      s5_field_due_label: Fecha de vencimiento
+      s5_reclassify: Reclasificar
+      s5_approve: Aprobar
+      s5_approved: Aprobado
+
+      # Diapositiva 6: Mucho más
+      more_mod: Mucho más
+      s6_title: "Y eso es solo la versión corta."
+      s6_body: Revisa tu bandeja como stories. Pregúntale a Scout cualquier cosa sobre tu correo y archivos, en lenguaje natural. Crea tus propias reglas y grupos — o profundiza con resúmenes, plantillas, una API REST y alojamiento propio.
+      s6_chip_skim: Stories Skim
+      s6_chip_scout: Chat Scout
+      s6_chip_rules: Reglas y grupos
+      s6_chip_digests: Resúmenes
+      s6_chip_templates: Plantillas
+      s6_chip_api: API REST
+      s6_chip_self: Alojamiento propio
+      s6_docs_note: La documentación lo cubre todo — desde una visita de cinco minutos hasta montar tu propio servidor.
