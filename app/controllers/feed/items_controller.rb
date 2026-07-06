@@ -16,7 +16,12 @@ module Feed
       result = perform_action
       if result[:success]
         @item.mark_acted!
-        record_tag_suggestion_learning(:accepted) if tag_suggestion_item?
+        if tag_suggestion_item?
+          # undo_tag_filing means the user rejected the auto-filing; all other
+          # successful acts on a tag card (the legacy "File it") are accepted.
+          verdict = params[:tool].to_s == "undo_tag_filing" ? :rejected : :accepted
+          record_tag_suggestion_learning(verdict)
+        end
       end
 
       respond_to do |format|
@@ -191,8 +196,19 @@ module Feed
     # can't archive/send beyond their grant even from the feed.
     def run_email_action(email_message)
       return dismiss_follow_up(email_message) if params[:tool].to_s == "dismiss_follow_up"
+      return undo_tag_filing(email_message) if params[:tool].to_s == "undo_tag_filing"
 
       EmailActions.run(params[:tool], email_message: email_message, args: params[:args] || {}, user: current_user)
+    end
+
+    # Undo an auto-filing: remove the tag and resolve the notice card. Uses the
+    # same remove_tag path as the existing tag undo (REVERSIBLE add_tag) so all
+    # permission and tenancy checks are identical.
+    def undo_tag_filing(email_message)
+      result = EmailActions.run("remove_tag", email_message: email_message, args: params[:args] || {}, user: current_user)
+      return result unless result[:success]
+
+      { success: true, message: t("feed.items.tag_filing_undone") }
     end
 
     # Retire a follow-up on the thread itself (not just this card) so a later feed
