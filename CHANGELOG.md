@@ -18,6 +18,8 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Tag filing is now do-and-tell: Scout files the email and tells you in the feed — one tap undoes it.** (Previously the feed asked before filing.)
+
 - **MCP: `archive_emails` tool to clear inbox noise at scale.** Agents can now
   archive every email matching a filter — a whole tag (e.g. `Notifications`), a
   date range, a sender, or an AI priority — instead of being capped at
