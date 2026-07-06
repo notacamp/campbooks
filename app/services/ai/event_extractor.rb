@@ -16,6 +16,15 @@ module Ai
       Result.new(title: title, start_at: start_at, end_at: start_at + 3600, all_day: false, location: guess_location)
     end
 
+    # Returns true when the email text contains an explicit time mention (e.g.
+    # "2:30 PM", "3pm", "14:00"). Used as a cheap gate before showing the inline
+    # event-draft block on the email page — avoids surfacing the block on every
+    # email just because the extractor always returns a default.
+    def has_time_proposal?
+      text.match?(/\b\d{1,2}:\d{2}\s*(?:am|pm)?\b/i) ||
+        text.match?(/\b\d{1,2}\s*(?:am|pm)\b/i)
+    end
+
     private
 
     def text

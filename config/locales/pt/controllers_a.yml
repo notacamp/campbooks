@@ -171,6 +171,9 @@ pt:
       dismissed: Seguimento dispensado
     dismiss_todo:
       dismissed: Tarefa ignorada
+    event_drafts:
+      create:
+        error_generic: Não foi possível criar o evento. Tente novamente.
   email_threads:
     show:
       no_access: Não tem acesso a essa discussão.
