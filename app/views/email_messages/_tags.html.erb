@@ -1,7 +1,11 @@
 <%# Tag picker: shows every visible tag (local + provider-synced) in one place.
     All add/remove goes through EmailMessageTagsController, which handles the
     provider sync for external tags server-side. %>
-<% all_tags = Tag.visible_for(Current.workspace).by_name.map { |t| { id: t.id, name: t.name, color: t.color } } %>
+<%# uniq(&:name) deduplicates provider labels that fan out when the workspace
+    has multiple email accounts with the same label name (e.g. a "Work" label
+    on both a Gmail and a Zoho account). Order by name then source so local
+    tags (source=0) win over external (source=1) when names collide. %>
+<% all_tags = Tag.visible_for(Current.workspace).order(:name, :source).to_a.uniq(&:name).map { |t| { id: t.id, name: t.name, color: t.color } } %>
 
 <div id="<%= dom_id(message, :tags) %>"
      class="relative inline-flex items-center gap-1 flex-wrap"
