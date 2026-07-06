@@ -52,6 +52,17 @@ pt:
         draft_saved: Rascunho guardado
         resume_aria: Retomar o rascunho
         untitled: Rascunho
+      context_rail:
+        attach_from_files: Anexar dos Ficheiros
+        attachments_heading: Anexos
+        chip_draft: Redigir uma resposta a partir disto
+        chip_new_draft: Redigir este email a partir de um prompt
+        chip_summarize: Resumir a conversa
+        chip_tone: Ajustar o tom
+        original_email_heading: Mensagem original
+        scout_body_new: O Scout pode ajudá-lo a redigir este email a partir de um prompt ou ajustar o tom.
+        scout_body_reply: O Scout pode ajudá-lo a redigir uma resposta, ajustar o tom ou resumir a conversa.
+        scout_heading: Perguntar ao Scout
       scout_draft:
         ai_tag: IA
         drafted_label: redigido a partir desta conversa

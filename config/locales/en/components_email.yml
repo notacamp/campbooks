@@ -62,6 +62,7 @@ en:
       toolbar_undo: Undo
     compose_attachments:
       attach: Attach files
+      drop_hint: Drop files or click to add
       remove: Remove attachment
       upload_failed: Upload failed
     contact_avatar:

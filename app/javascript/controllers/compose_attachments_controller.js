@@ -1,15 +1,40 @@
 import { Controller } from "@hotwired/stimulus"
 
-// Drives the composer's attachment tray. On file pick it uploads each file to
-// the upload endpoint, shows a chip while uploading, and on success drops a
-// hidden `attachments[]` signed-id input into the chip so the compose form
-// submits the attachment set. Removing a chip removes its hidden input.
+// Drives the composer's attachment tray. On file pick (or drag-and-drop) it
+// uploads each file to the upload endpoint, shows a chip while uploading, and
+// on success drops a hidden `attachments[]` signed-id input into the chip so
+// the compose form submits the attachment set. Removing a chip removes its
+// hidden input.
+//
+// When the tray lives outside the <form> element (context rail / card variant),
+// pass `data-compose-attachments-form-id-value="<form-id>"` — the controller
+// adds `form="<form-id>"` to every signed-id input so the browser still
+// associates them with the correct form (HTML5 form-association).
 export default class extends Controller {
-  static targets = ["fileInput", "tray"]
+  static targets = ["fileInput", "tray", "dropHint"]
   static values = {
     uploadUrl: String,
     fieldName: { type: String, default: "attachments[]" },
-    errorText: { type: String, default: "Upload failed" }
+    errorText: { type: String, default: "Upload failed" },
+    formId: { type: String, default: "" }
+  }
+
+  connect() {
+    this._onDragOver = this._handleDragOver.bind(this)
+    this._onDragLeave = this._handleDragLeave.bind(this)
+    this._onDrop = this._handleDrop.bind(this)
+
+    this.element.addEventListener("dragover", this._onDragOver)
+    this.element.addEventListener("dragleave", this._onDragLeave)
+    this.element.addEventListener("drop", this._onDrop)
+
+    this._syncDropHint()
+  }
+
+  disconnect() {
+    this.element.removeEventListener("dragover", this._onDragOver)
+    this.element.removeEventListener("dragleave", this._onDragLeave)
+    this.element.removeEventListener("drop", this._onDrop)
   }
 
   pick(event) {
@@ -21,6 +46,7 @@ export default class extends Controller {
   // remove button here instead of the addEventListener path used for uploads.
   removeChip(event) {
     event.currentTarget.closest(".attachment-chip")?.remove()
+    this._syncDropHint()
     this._announce()
   }
 
@@ -29,6 +55,28 @@ export default class extends Controller {
     event.target.value = ""
     for (const file of files) await this._uploadOne(file)
   }
+
+  // ── Drag-and-drop ─────────────────────────────────────────
+
+  _handleDragOver(event) {
+    if (!Array.from(event.dataTransfer.types).includes("Files")) return
+    event.preventDefault()
+    this.element.classList.add("is-drag-over")
+  }
+
+  _handleDragLeave(event) {
+    if (this.element.contains(event.relatedTarget)) return
+    this.element.classList.remove("is-drag-over")
+  }
+
+  _handleDrop(event) {
+    event.preventDefault()
+    this.element.classList.remove("is-drag-over")
+    const files = Array.from(event.dataTransfer.files || [])
+    files.forEach(file => this._uploadOne(file))
+  }
+
+  // ── Upload pipeline ───────────────────────────────────────
 
   async _uploadOne(file) {
     const chip = this._addChip(file.name, file.size)
@@ -64,11 +112,13 @@ export default class extends Controller {
     remove.textContent = "✕"
     remove.addEventListener("click", () => {
       chip.remove()
+      this._syncDropHint()
       this._announce()
     })
 
     chip.append(label, remove)
     this.trayTarget.appendChild(chip)
+    this._syncDropHint()
     return chip
   }
 
@@ -78,6 +128,8 @@ export default class extends Controller {
     input.type = "hidden"
     input.name = this.fieldNameValue
     input.value = signedId
+    // Associate with an out-of-form tray via HTML5 form attribute.
+    if (this.formIdValue) input.setAttribute("form", this.formIdValue)
     chip.appendChild(input)
     this._announce()
   }
@@ -94,6 +146,13 @@ export default class extends Controller {
     const label = chip.querySelector(".attachment-chip-name")
     if (label) label.textContent = message || this.errorTextValue
     setTimeout(() => chip.remove(), 4000)
+  }
+
+  // Show the drop-hint placeholder only when no chips are present.
+  _syncDropHint() {
+    if (!this.hasDropHintTarget) return
+    const hasChips = this.trayTarget.querySelector(".attachment-chip") != null
+    this.dropHintTarget.style.display = hasChips ? "none" : ""
   }
 
   _humanSize(bytes) {

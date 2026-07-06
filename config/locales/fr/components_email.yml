@@ -60,6 +60,7 @@ fr:
       toolbar_undo: Annuler
     compose_attachments:
       attach: Joindre des fichiers
+      drop_hint: "Déposez des fichiers ou cliquez pour ajouter"
       remove: Retirer la pièce jointe
       upload_failed: Échec du téléversement
     contact_avatar:
