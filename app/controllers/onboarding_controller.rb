@@ -69,9 +69,10 @@ class OnboardingController < ApplicationController
 
   # Marks this session as having skipped the first-sync stage, then redirects
   # the user to the inbox. Home will no longer re-trap them in the stage even
-  # while the scan is still running.
+  # while the scan is still running. Stores the user id (not `true`) so the
+  # cookie flag can't leak across a re-login as a different user.
   def skip_first_sync
-    session[:first_sync_skipped] = true
+    session[:first_sync_skipped] = Current.user.id.to_s
     redirect_to email_messages_path
   end
 
