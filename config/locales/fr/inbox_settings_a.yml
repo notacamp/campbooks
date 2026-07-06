@@ -122,12 +122,30 @@ fr:
         hidden_hint: système et masqués par IA
         no_tags: Aucune étiquette pour l'instant. Ajoutez-en une pour commencer à
           trier votre boîte de réception.
+        pending_review_banner:
+          one: "%{count} libellé importé attend votre examen."
+          other: "%{count} libellés importés attendent votre examen."
+        review_now: Examiner maintenant
         subheading: Les étiquettes aident Scout à trier votre boîte de réception automatiquement.
         system_group: Système du fournisseur
+      commit_merge:
+        merged: Fusionné "%{source}" avec "%{target}".
+        tag_not_found: Étiquette introuvable.
+      merge:
+        heading: Fusionner "%{name}" avec une autre étiquette
+        hint: Tous les messages et liens de compte sont transférés vers l'étiquette
+          cible. Cette étiquette est ensuite supprimée. La fusion ne peut pas être
+          annulée.
+        merge_into_label: Fusionner avec
+        select_placeholder: Sélectionner une étiquette...
+        submit: Fusionner l'étiquette
+        warning: L'étiquette sélectionnée absorbera tous les messages de cette étiquette.
+          Cette action est irréversible.
       tag:
         delete_confirm: Supprimer %{name} ?
         edit: Modifier
         hide: Masquer
+        merge: Fusionner
         synced_with_title: Synchronisée avec %{account}
         tagged_messages_title: Messages étiquetés
       toggle_hidden:
@@ -137,3 +155,23 @@ fr:
         provider_update_failed: Impossible de mettre à jour le libellé dans votre
           boîte aux lettres. Veuillez réessayer.
         updated_toast: Étiquette mise à jour.
+    label_reviews:
+      bulk_decide:
+        all_done: Tous les libellés examinés.
+        saved_count:
+          one: Décision enregistrée.
+          other: "%{count} décisions enregistrées."
+      index:
+        back_to_tags: Retour aux étiquettes
+        empty_heading: Tout est à jour
+        empty_hint: Aucun libellé de fournisseur n'attend d'être examiné.
+        heading: Examiner les libellés importés
+        instructions: Choisissez quoi faire avec chaque libellé importé de votre boîte
+          aux lettres. Les libellés ignorés sont laissés inchangés chez le fournisseur.
+        option_ignore: Ignorer (pas d'étiquette d'espace de travail)
+        option_keep: Conserver comme étiquette propre
+        option_map: Associer à une étiquette existante
+        save_decisions: Enregistrer les décisions
+        select_tag_placeholder: Choisir une étiquette...
+        subheading: Associez, conservez ou ignorez les libellés synchronisés depuis
+          vos boîtes aux lettres connectées.

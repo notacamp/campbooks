@@ -27,6 +27,12 @@ module Google
                               workspace: @account.workspace, system_label: sys)
         tag.save!
         Labels::ClassifyLabelJob.classify(tag)
+        # Record a pending import decision only for user-visible labels — skip
+        # any label that inline classification already hid (system / category).
+        # We reload to pick up hidden/classified_at set by update_columns inside
+        # apply_classification!, which doesn't touch the in-memory record.
+        tag.reload
+        record_pending_decision(tag, name: name) unless tag.hidden?
       end
 
       @account.external_tags.where.not(external_label_id: google_label_ids).destroy_all
@@ -85,6 +91,21 @@ module Google
         reconcile_tag_assignments(tag)
         sleep(0.3)
       end
+    end
+
+    # Create a pending LabelImportDecision for a new user label so the workspace
+    # review banner surfaces it. Uses find_or_create_by so repeated syncs are
+    # idempotent and never overwrite a resolved decision.
+    def record_pending_decision(tag, name:)
+      LabelImportDecision.find_or_create_by!(
+        email_account_id: @account.id,
+        provider_label_id: tag.external_label_id
+      ) do |dec|
+        dec.provider_label_name = name
+        dec.decision            = :pending
+      end
+    rescue => e
+      Rails.logger.warn("[Google::LabelSyncService] decision record failed for #{tag.external_label_id}: #{e.message}")
     end
 
     def reconcile_tag_assignments(tag)

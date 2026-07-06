@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_06_150100) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_06_160100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -947,6 +947,22 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_150100) do
     t.index ["workspace_id"], name: "index_invitations_on_workspace_id"
   end
 
+  create_table "label_import_decisions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "decision", default: 0, null: false
+    t.uuid "email_account_id", null: false
+    t.string "provider_label_id", null: false
+    t.string "provider_label_name", null: false
+    t.datetime "reviewed_at"
+    t.uuid "reviewed_by_id"
+    t.uuid "tag_id"
+    t.datetime "updated_at", null: false
+    t.index ["email_account_id", "provider_label_id"], name: "idx_label_import_decisions_account_label", unique: true
+    t.index ["email_account_id"], name: "index_label_import_decisions_on_email_account_id"
+    t.index ["reviewed_by_id"], name: "index_label_import_decisions_on_reviewed_by_id"
+    t.index ["tag_id"], name: "index_label_import_decisions_on_tag_id"
+  end
+
   create_table "learning_decisions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "category"
     t.uuid "contact_id"
@@ -1552,6 +1568,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_150100) do
     t.index ["key"], name: "index_solid_queue_semaphores_on_key", unique: true
   end
 
+  create_table "tag_account_links", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "email_account_id", null: false
+    t.string "provider_label_id", null: false
+    t.string "provider_label_name"
+    t.uuid "tag_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email_account_id", "provider_label_id"], name: "idx_tag_account_links_account_label", unique: true
+    t.index ["email_account_id"], name: "index_tag_account_links_on_email_account_id"
+    t.index ["tag_id", "email_account_id"], name: "idx_tag_account_links_tag_account", unique: true
+    t.index ["tag_id"], name: "index_tag_account_links_on_tag_id"
+  end
+
   create_table "tags", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.float "classification_confidence"
     t.string "classification_reason", limit: 255
@@ -1903,6 +1932,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_150100) do
   add_foreign_key "invitations", "users", column: "accepted_by_id"
   add_foreign_key "invitations", "users", column: "invited_by_id"
   add_foreign_key "invitations", "workspaces"
+  add_foreign_key "label_import_decisions", "email_accounts"
+  add_foreign_key "label_import_decisions", "tags"
+  add_foreign_key "label_import_decisions", "users", column: "reviewed_by_id"
   add_foreign_key "learning_decisions", "contacts"
   add_foreign_key "learning_decisions", "users"
   add_foreign_key "learning_decisions", "workspaces"
@@ -1959,6 +1991,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_150100) do
   add_foreign_key "solid_queue_ready_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_recurring_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_scheduled_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "tag_account_links", "email_accounts"
+  add_foreign_key "tag_account_links", "tags"
   add_foreign_key "tags", "workspaces"
   add_foreign_key "task_assignments", "tasks"
   add_foreign_key "task_assignments", "users"

@@ -1,0 +1,32 @@
+<%# locals: pending, workspace_tags %>
+<% if pending.empty? %>
+  <div class="py-12 text-center">
+    <svg class="mx-auto w-10 h-10 text-muted-foreground/40 mb-3" fill="none" stroke="currentColor"
+         viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <p class="text-sm font-medium text-foreground"><%= t("inbox_settings.label_reviews.index.empty_heading") %></p>
+    <p class="text-xs text-muted-foreground mt-1"><%= t("inbox_settings.label_reviews.index.empty_hint") %></p>
+  </div>
+<% else %>
+  <%= form_with url: bulk_decide_inbox_settings_label_reviews_path, method: :patch,
+                data: { turbo_frame: "_top" } do |f| %>
+    <p class="text-xs text-muted-foreground mb-4">
+      <%= t("inbox_settings.label_reviews.index.instructions") %>
+    </p>
+
+    <div class="divide-y divide-border">
+      <% pending.each do |decision| %>
+        <%= render "inbox_settings/label_reviews/decision_row",
+                   decision: decision, workspace_tags: workspace_tags %>
+      <% end %>
+    </div>
+
+    <div class="mt-5 flex items-center gap-2">
+      <%= f.submit t("inbox_settings.label_reviews.index.save_decisions"),
+            class: "px-4 py-2 text-sm font-semibold rounded-md bg-foreground text-background
+                    hover:bg-foreground/90 transition-colors cursor-pointer" %>
+    </div>
+  <% end %>
+<% end %>

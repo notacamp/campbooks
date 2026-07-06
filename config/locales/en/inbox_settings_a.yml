@@ -116,12 +116,29 @@ en:
         hidden_heading: Hidden tags
         hidden_hint: system & AI-hidden
         no_tags: No tags yet. Add one to start sorting your inbox.
+        pending_review_banner:
+          one: "%{count} imported label is waiting for your review."
+          other: "%{count} imported labels are waiting for your review."
+        review_now: Review now
         subheading: Tags help Scout sort your inbox automatically.
         system_group: Provider system
+      commit_merge:
+        merged: Merged "%{source}" into "%{target}".
+        tag_not_found: Tag not found.
+      merge:
+        heading: Merge "%{name}" into another tag
+        hint: All messages and account links move to the target tag. This tag is then
+          deleted. The merge cannot be undone.
+        merge_into_label: Merge into
+        select_placeholder: Select a tag...
+        submit: Merge tag
+        warning: The selected tag will absorb all of this tag's messages. This cannot
+          be undone.
       tag:
         delete_confirm: Delete %{name}?
         edit: Edit
         hide: Hide
+        merge: Merge
         synced_with_title: Synced with %{account}
         tagged_messages_title: Tagged messages
       toggle_hidden:
@@ -131,3 +148,22 @@ en:
         provider_update_failed: Could not update the label in your mailbox. Please
           try again.
         updated_toast: Tag updated.
+    label_reviews:
+      bulk_decide:
+        all_done: All labels reviewed.
+        saved_count:
+          one: Decision saved.
+          other: "%{count} decisions saved."
+      index:
+        back_to_tags: Back to tags
+        empty_heading: All caught up
+        empty_hint: No provider labels are waiting for review.
+        heading: Review imported labels
+        instructions: Choose what to do with each label your mailbox imported. Ignored
+          labels are left on the provider unchanged.
+        option_ignore: Ignore (no workspace tag)
+        option_keep: Keep as its own tag
+        option_map: Map to existing tag
+        save_decisions: Save decisions
+        select_tag_placeholder: Choose tag...
+        subheading: Map, keep, or ignore labels synced from your connected mailboxes.
