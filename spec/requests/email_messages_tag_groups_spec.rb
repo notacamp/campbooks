@@ -66,11 +66,15 @@ RSpec.describe "Email messages tag groups", type: :request do
                                  "Drill-in must redirect to the grouped message"
   end
 
-  # ── guard: replied thread stays in the main list ────────────────────────────
+  # ── guard: replied thread — custom group stays, default bucket collapses ─────
 
-  # A replied thread is guarded -- it must NOT be excluded from the main list
-  # even if it carries a bucket tag.
-  it "a replied tagged thread is not excluded from the inbox root" do
+  # A replied thread in a CUSTOM (user-defined) group is guarded -- it must NOT
+  # be excluded from the main list even though it is grouped.
+  it "a replied thread in a custom group is not excluded from the inbox root" do
+    custom_tag = @workspace.tags.create!(
+      name: "Work", color: "#3b82f6", group_name: "Work",
+      source: :local, kind: :user, hidden: false
+    )
     replied_thread = @account.email_threads.create!(
       subject: "Replied", last_outbound_at: Time.current
     )
@@ -85,6 +89,36 @@ RSpec.describe "Email messages tag groups", type: :request do
       read: false,
       has_attachment: false
     )
+    replied_msg.email_message_tags.create!(tag: custom_tag)
+
+    plain_msg = create_message(subject: "Plain", received_at: 2.hours.ago)
+
+    get email_messages_path
+
+    expect(response).to be_redirect
+    # replied_msg is newer AND is guarded (custom group) -> it wins the redirect
+    expect(response.location).to include(replied_msg.id.to_s),
+                                 "Replied thread in a custom group must remain in the main list"
+    expect(response.location).not_to include(plain_msg.id.to_s)
+  end
+
+  # A replied thread in a DEFAULT bucket is machine noise: it collapses out of
+  # the main list even though the owner replied (buckets drop the replied guard).
+  it "a replied bucket thread IS excluded from the inbox root" do
+    replied_thread = @account.email_threads.create!(
+      subject: "Replied bucket", last_outbound_at: Time.current
+    )
+    replied_msg = @account.email_messages.create!(
+      email_thread: replied_thread,
+      provider_message_id: "m-#{SecureRandom.hex(4)}",
+      provider_folder_id: "INBOX",
+      from_address: "sender@example.com",
+      to_address: @account.email_address,
+      subject: "Replied bucket",
+      received_at: 1.hour.ago,
+      read: false,
+      has_attachment: false
+    )
     replied_msg.email_message_tags.create!(tag: @promo_tag)
 
     plain_msg = create_message(subject: "Plain", received_at: 2.hours.ago)
@@ -92,10 +126,10 @@ RSpec.describe "Email messages tag groups", type: :request do
     get email_messages_path
 
     expect(response).to be_redirect
-    # replied_msg is newer AND is guarded -> it wins the redirect
-    expect(response.location).to include(replied_msg.id.to_s),
-                                 "Replied+tagged thread must remain in the main list (guarded)"
-    expect(response.location).not_to include(plain_msg.id.to_s)
+    # replied_msg is newer but its bucket collapses -> the plain msg wins.
+    expect(response.location).to include(plain_msg.id.to_s),
+                                 "Plain thread must win once the replied bucket thread collapses"
+    expect(response.location).not_to include(replied_msg.id.to_s)
   end
 
   # ── folder view -- grouped thread shows inline ───────────────────────────────

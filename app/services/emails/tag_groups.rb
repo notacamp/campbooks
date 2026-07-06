@@ -13,12 +13,20 @@ module Emails
   # and rules freely, or be rules-only (no tags required). Additive
   # multi-membership is preserved: the same thread can satisfy multiple groups.
   #
-  # A thread is NEVER collapsed when a human clearly cares about it:
-  # the owner replied (last_outbound_at), it is pinned, the sender is starred,
-  # or any message is classified `important`. The same guards feed both the
-  # main-list exclusion and the group rows/counts so the numbers always agree.
-  # The caller applies the exclusion on the inbox root only; folder and search
-  # views show everything inline.
+  # A thread is kept inline (not collapsed) when a human clearly cares about it.
+  # Two guard sets apply, depending on the group:
+  #   - The four built-in default buckets (Notifications / Newsletters & promos /
+  #     Social / Updates) are pure machine noise: they collapse even when the
+  #     owner replied or a sibling message is `important`. Only an explicit pin
+  #     or a starred sender keeps them inline (the "base" guards).
+  #   - Custom tag groups and rule-based groups additionally respect the
+  #     "engagement" guards: the owner replied (last_outbound_at) or any message
+  #     is classified `important` — either keeps the thread inline.
+  # Default buckets are identified by their stable `default_bucket` tag key, so a
+  # rename/recolor/regroup does not change which guard set applies. The same
+  # guards feed the main-list exclusion, the group rows, and the counts, so the
+  # numbers always agree. The caller applies the exclusion on the inbox root
+  # only; folder and search views show everything inline.
   class TagGroups
     def initialize(workspace, readable_account_ids)
       @workspace = workspace
@@ -31,19 +39,19 @@ module Emails
     def excluded_scope
       return @excluded_scope if defined?(@excluded_scope)
 
-      subqueries = all_tag_subqueries + all_rule_subqueries
-      return @excluded_scope = nil if subqueries.empty?
-
-      @excluded_scope = guarded_union(subqueries)
+      @excluded_scope = collapse_scope(
+        tag_ids: grouped_tags.map(&:id),
+        rule_subqueries: all_rule_subqueries
+      )
     end
 
     # Guarded EmailThread relation for one group's drill-in view, or nil when
     # the group name matches neither tags nor rules.
     def group_scope(group_name)
-      subqueries = tag_subqueries_for(group_name) + rule_subqueries_for(group_name)
-      return nil if subqueries.empty?
-
-      guarded_union(subqueries)
+      collapse_scope(
+        tag_ids: tag_ids_for(group_name),
+        rule_subqueries: rule_subqueries_for(group_name)
+      )
     end
 
     # The group's display color: first grouped tag's color, or nil for a
@@ -59,10 +67,12 @@ module Emails
     # Includes groups defined only by rules (no tags required).
     def build_groups(inbox_folder_ids)
       all_group_names.filter_map do |group_name|
-        subqueries = tag_subqueries_for(group_name) + rule_subqueries_for(group_name)
-        next if subqueries.empty?
+        scope = collapse_scope(
+          tag_ids: tag_ids_for(group_name),
+          rule_subqueries: rule_subqueries_for(group_name)
+        )
+        next if scope.nil?
 
-        scope   = guarded_union(subqueries)
         counted = scope.joins(:email_messages)
         counted = counted.where(email_messages: { provider_folder_id: inbox_folder_ids }) if inbox_folder_ids.present?
         count   = counted.distinct.count
@@ -76,7 +86,7 @@ module Emails
     private
 
     # -------------------------------------------------------------------------
-    # Tag-based helpers (unchanged semantics)
+    # Tag-based helpers
     # -------------------------------------------------------------------------
 
     def grouped_tags
@@ -87,16 +97,44 @@ module Emails
       @grouped_tags_by_name ||= grouped_tags.group_by(&:group_name)
     end
 
-    def all_tag_subqueries
-      ids = grouped_tags.map(&:id)
-      return [] if ids.empty?
-
-      [ threads_with_tags(ids) ]
+    def tag_ids_for(group_name)
+      (grouped_tags_by_name[group_name.to_s] || []).map(&:id)
     end
 
-    def tag_subqueries_for(group_name)
-      ids = (grouped_tags_by_name[group_name.to_s] || []).map(&:id)
-      ids.any? ? [ threads_with_tags(ids) ] : []
+    # The grouped tags tied to a built-in default bucket (their stable
+    # `default_bucket` key is set). These collapse under the lighter "base"
+    # guards; every other grouped tag (custom groups) and all rules keep the
+    # full engagement guards.
+    def default_bucket_tag_ids
+      @default_bucket_tag_ids ||= grouped_tags.select { |t| t.default_bucket.present? }.map(&:id)
+    end
+
+    # Builds the guarded exclusion relation for a set of grouped tag ids plus
+    # rule subqueries, splitting them by guard strength: default-bucket tags get
+    # the base guards (pinned + starred only), while custom-group tags and rules
+    # get the full guards (base + replied + important). The two guarded unions
+    # are OR-combined at the thread-id level. nil when nothing is grouped here.
+    def collapse_scope(tag_ids:, rule_subqueries:)
+      bucket_ids = tag_ids & default_bucket_tag_ids   # default noise buckets
+      custom_ids = tag_ids - default_bucket_tag_ids   # user-defined tag groups
+
+      base_subqueries = bucket_ids.any? ? [ threads_with_tags(bucket_ids) ] : []
+      full_subqueries = custom_ids.any? ? [ threads_with_tags(custom_ids) ] : []
+      full_subqueries += rule_subqueries
+
+      base_scope = base_subqueries.any? ? guarded_union(base_subqueries, engagement_guards: false) : nil
+      full_scope = full_subqueries.any? ? guarded_union(full_subqueries, engagement_guards: true) : nil
+
+      or_scopes(base_scope, full_scope)
+    end
+
+    # OR two EmailThread relations, either of which may be nil. nil when both
+    # are nil (the workspace has nothing grouped).
+    def or_scopes(first, second)
+      return first if second.nil?
+      return second if first.nil?
+
+      first.or(second)
     end
 
     # email_thread_ids subquery for threads with at least one message carrying
@@ -243,21 +281,28 @@ module Emails
     # Guards (the "a human cares about this thread" gates)
     # -------------------------------------------------------------------------
 
-    # Applies all guards to a union of multiple email_thread_id subqueries,
+    # Applies the guards to a union of multiple email_thread_id subqueries,
     # returning an EmailThread scope. Each subquery is an EmailMessage relation
     # selecting :email_thread_id; they are OR-combined at the WHERE level so no
-    # per-row N+1 occurs.
-    def guarded_union(subqueries)
+    # per-row N+1 occurs. The base guards (pinned, starred sender) always apply;
+    # the engagement guards (replied, important message) apply only to custom
+    # groups and rules — default noise buckets pass engagement_guards: false so
+    # they collapse even when the owner replied or a sibling is important.
+    def guarded_union(subqueries, engagement_guards: true)
       combined = subqueries.reduce(nil) do |base, sq|
         candidate = EmailThread.where(id: sq)
         base ? base.or(candidate) : candidate
       end
 
-      combined
+      scope = combined
         .where(email_account_id: @readable_account_ids)
-        .where(last_outbound_at: nil)
         .where.not(id: EmailThread.pinned)
         .where.not(id: starred_sender_thread_ids)
+
+      return scope unless engagement_guards
+
+      scope
+        .where(last_outbound_at: nil)
         .where.not(id: important_message_thread_ids)
     end
 
