@@ -100,19 +100,74 @@ RSpec.describe "Email messages tag groups", type: :request do
 
   # ── folder view -- grouped thread shows inline ───────────────────────────────
 
-  # When a folder_id param is present the inbox_root? guard is false, so no
-  # exclusion is applied and grouped threads appear alongside regular ones.
+  # A folder_id that is NOT the mapped inbox (here the provider folder mapping is
+  # empty, so no id maps to the inbox) is a folder view: no exclusion is applied
+  # and grouped threads appear alongside regular ones.
   it "grouped thread appears inline in a specific folder view" do
     grouped_msg = create_message(subject: "Grouped", received_at: 1.hour.ago, tags: [ @promo_tag ])
     _plain_msg  = create_message(subject: "Plain",   received_at: 2.hours.ago)
 
-    # folder_id: "INBOX" makes inbox_root? false -> no exclusion.
     get email_messages_path(folder_id: "INBOX")
 
     expect(response).to be_redirect
     # With exclusion disabled the newest message (grouped) is the redirect target.
     expect(response.location).to include(grouped_msg.id.to_s),
                                  "Grouped thread must appear inline in the folder view"
+  end
+
+  # ── inbox root with a mapped folder id (the prod landing URL) ────────────────
+
+  # In production the provider folder mapping resolves, so the index redirect puts
+  # the mapped inbox folder id in the URL. That view is still the inbox root:
+  # grouped mail must collapse and the group rows must render — a blank folder_id
+  # never happens with a live mapping. Regression: v0.15.0 treated any folder_id
+  # as a folder view, so nothing ever collapsed in prod.
+  context "when the provider folder mapping resolves (as in prod)" do
+    before do
+      mapping = {
+        name_to_ids: { "Inbox" => [ "INBOX" ] },
+        id_to_name: { "INBOX" => "Inbox" },
+        id_to_account: {}
+      }
+      allow_any_instance_of(EmailMessagesController).to receive(:folder_mappings).and_return(mapping)
+    end
+
+    it "still excludes grouped threads when folder_id is the mapped inbox folder" do
+      grouped_msg = create_message(subject: "Grouped", received_at: 1.hour.ago, tags: [ @promo_tag ])
+      plain_msg   = create_message(subject: "Plain",   received_at: 2.hours.ago)
+
+      get email_messages_path(folder_id: "INBOX")
+
+      expect(response).to be_redirect
+      expect(response.location).to include(plain_msg.id.to_s),
+                                   "Inbox-folder-id view must still collapse grouped mail"
+      expect(response.location).not_to include(grouped_msg.id.to_s)
+    end
+
+    it "lands on the inbox with the folder id in the URL and renders the group rows" do
+      _grouped   = create_message(subject: "Grouped", received_at: 1.hour.ago, tags: [ @promo_tag ])
+      _plain_msg = create_message(subject: "Plain",   received_at: 2.hours.ago)
+
+      get email_messages_path
+      expect(response).to be_redirect
+      expect(response.location).to include("folder_id=INBOX"),
+                                   "The landing redirect carries the mapped inbox folder id"
+
+      get response.location
+      expect(response).to have_http_status(:success)
+      expect(response.body).to include('data-testid="tag-group-row"'),
+                               "Group rows must render on the landing inbox view"
+    end
+
+    it "renders the sorted empty state when every inbox thread is grouped" do
+      create_message(subject: "Grouped", tags: [ @promo_tag ])
+
+      get email_messages_path(folder_id: "INBOX")
+
+      expect(response).to have_http_status(:success)
+      expect(response.body).to include('data-testid="tag-group-row"'),
+                               "The empty state offers the group rows"
+    end
   end
 
   private
