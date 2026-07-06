@@ -54,4 +54,17 @@ class TagGroupRowPreview < ViewComponent::Preview
   def select_mode
     render_with_template
   end
+
+  # A rules-only group (no tags at all) — color dot is omitted, group still
+  # collapses mail via sender/org/query/doc-type rules in Settings.
+  def rules_only
+    render Campbooks::TagGroupRow.new(
+      label: "Acme Corp", count: 7, href: "#",
+      senders: [
+        { email: "billing@acme.example" },
+        { email: "invoices@acme.example" },
+        { email: "support@acme.example" }
+      ]
+    )
+  end
 end

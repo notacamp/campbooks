@@ -72,21 +72,27 @@ fr:
     tag_groups:
       form:
         add_rule: Ajouter une règle
+        add_rule_action: Ajouter
         cancel: Annuler
         heading_edit: Modifier %{name}
         heading_new: Nouveau groupe
         name_label: Nom
         name_placeholder: p. ex. Newsletters et promos
+        query_hint: "Modificateurs : from:, tag:, is:, has:, after:, before:, category:, priority:"
         remove_rule: Supprimer la règle
         rule_select_placeholder: Choisir…
+        rule_sentence:
+          document_type: "A un document %{value}"
+          organization: "Organisation est %{value}"
+          query: "Correspond à %{value}"
+          sender: "Expéditeur est %{value}"
         rule_type:
           document_type: Type de document
           organization: Organisation
           query: Recherche
           sender: Expéditeur
+        rule_type_label: Type de règle
         rule_value_placeholder:
-          document_type: Choisir un type de document
-          organization: Choisir une organisation
           query: "ex. : from:newsletter has:attachment"
           sender: "ex. : facturation@exemple.fr ou @exemple.fr"
         rules_hint: Inclut les messages correspondant à une règle, même sans étiquette.
@@ -94,6 +100,7 @@ fr:
           modificateurs (from:, tag:, is:, has:, after:, before:, category:, priority:).
         rules_label: Règles
         save: Enregistrer le groupe
+        sender_hint: "nom@domaine.fr ou @domaine.fr"
         tags_hint: Le courrier portant l'une de ces étiquettes est replié dans
           la ligne du groupe. Une étiquette n'appartient qu'à un seul groupe.
         tags_label: Étiquettes de ce groupe
@@ -103,11 +110,11 @@ fr:
         new_group: Nouveau groupe
         no_groups: Aucun groupe pour l'instant. Créez-en un pour replier le courrier
           secondaire en une seule ligne.
-        rule_summary:
-          document_type: Document
-          organization: Org
-          query: Recherche
-          sender: Expéditeur
+        rule_sentence:
+          document_type: "A un document %{value}"
+          organization: "Organisation est %{value}"
+          query: "Correspond à %{value}"
+          sender: "Expéditeur est %{value}"
         subheading: Regroupez des étiquettes ou des règles ; la boîte de réception
           replie leur courrier en une seule ligne.
         threads_count:

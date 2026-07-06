@@ -68,21 +68,27 @@ pt:
     tag_groups:
       form:
         add_rule: Adicionar regra
+        add_rule_action: Adicionar
         cancel: Cancelar
         heading_edit: Editar %{name}
         heading_new: Novo grupo
         name_label: Nome
         name_placeholder: p. ex. Newsletters e promoções
+        query_hint: "Modificadores: from:, tag:, is:, has:, after:, before:, category:, priority:"
         remove_rule: Remover regra
         rule_select_placeholder: Escolher…
+        rule_sentence:
+          document_type: "Tem um documento %{value}"
+          organization: "Organização é %{value}"
+          query: "Corresponde a %{value}"
+          sender: "Remetente é %{value}"
         rule_type:
           document_type: Tipo de documento
           organization: Organização
           query: Pesquisa
           sender: Remetente
+        rule_type_label: Tipo de regra
         rule_value_placeholder:
-          document_type: Escolher um tipo de documento
-          organization: Escolher uma organização
           query: "ex.: from:newsletter has:attachment"
           sender: "ex.: faturacao@exemplo.pt ou @exemplo.pt"
         rules_hint: Inclui mensagens que satisfaçam uma regra, mesmo sem etiqueta.
@@ -90,6 +96,7 @@ pt:
           tag:, is:, has:, after:, before:, category:, priority:).
         rules_label: Regras
         save: Guardar grupo
+        sender_hint: "nome@dominio.pt ou @dominio.pt"
         tags_hint: O correio com qualquer destas etiquetas é recolhido na linha
           do grupo. Cada etiqueta pertence a um só grupo.
         tags_label: Etiquetas neste grupo
@@ -99,11 +106,11 @@ pt:
         new_group: Novo grupo
         no_groups: Ainda sem grupos. Crie um para recolher o correio de baixa
           prioridade numa única linha.
-        rule_summary:
-          document_type: Documento
-          organization: Org
-          query: Pesquisa
-          sender: Remetente
+        rule_sentence:
+          document_type: "Tem um documento %{value}"
+          organization: "Organização é %{value}"
+          query: "Corresponde a %{value}"
+          sender: "Remetente é %{value}"
         subheading: Agrupe etiquetas ou regras; a caixa de entrada recolhe o correio
           numa linha única.
         threads_count:

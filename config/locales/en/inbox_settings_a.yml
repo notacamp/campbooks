@@ -67,21 +67,27 @@ en:
     tag_groups:
       form:
         add_rule: Add rule
+        add_rule_action: Add
         cancel: Cancel
         heading_edit: Edit %{name}
         heading_new: New group
         name_label: Name
         name_placeholder: e.g. Newsletters & promos
+        query_hint: "Modifiers: from:, tag:, is:, has:, after:, before:, category:, priority:"
         remove_rule: Remove rule
         rule_select_placeholder: Choose one…
+        rule_sentence:
+          document_type: "Has a %{value} document"
+          organization: "Organization is %{value}"
+          query: "Matches %{value}"
+          sender: "Sender is %{value}"
         rule_type:
           document_type: Document type
           organization: Organization
           query: Search query
           sender: Sender
+        rule_type_label: Rule type
         rule_value_placeholder:
-          document_type: Choose a document type
-          organization: Choose an organization
           query: "e.g. from:newsletter has:attachment"
           sender: "e.g. billing@example.com or @example.com"
         rules_hint: Match any message that meets a rule, even without a tag. Free
@@ -89,6 +95,7 @@ en:
           has:, after:, before:, category:, priority:).
         rules_label: Rules
         save: Save group
+        sender_hint: "name@domain.com or @domain.com"
         tags_hint: Mail carrying any of these tags collapses into the group's row.
           A tag belongs to one group.
         tags_label: Tags in this group
@@ -98,11 +105,11 @@ en:
         new_group: New group
         no_groups: No groups yet. Create one to collapse low-priority mail into
           a single row.
-        rule_summary:
-          document_type: Document
-          organization: Org
-          query: Query
-          sender: Sender
+        rule_sentence:
+          document_type: "Has a %{value} document"
+          organization: "Organization is %{value}"
+          query: "Matches %{value}"
+          sender: "Sender is %{value}"
         subheading: Bundle tags or rules into groups; the inbox collapses their mail
           into one tappable row.
         threads_count:
