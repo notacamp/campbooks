@@ -16,9 +16,21 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Campbooks' own digest emails are no longer mined by the AI pipeline.** Digests
+  are delivered to your mailbox, so the email scanner re-ingests them; previously the
+  reminder / task / contact extractors ran on them, so a digest that *lists* your
+  reminders could spawn duplicate ones. Campbooks-generated mail is now recognised at
+  ingest — via an `X-Campbooks-Kind` header we stamp on the way out, with a
+  sender-address fallback for providers (e.g. Zoho) that strip custom headers — and
+  skips all AI analysis while staying fully readable in the inbox. Digests are
+  marked with a **Digest** badge so you know they're ours to read.
+
 ### Added
 
 - **Tag filing is now do-and-tell: Scout files the email and tells you in the feed — one tap undoes it.** (Previously the feed asked before filing.)
+- **Scheduling emails now show the drafted event inline — one tap adds it to your calendar (Edit still opens the full form).** When Scout detects a time proposal in an email (e.g. "does 3pm work?"), a bordered event block appears below the thread with the extracted title and time range. Tap "Add to calendar" to confirm it in one step; tap "Edit" to open the prefilled calendar form. Scout drafts — you decide.
 
 - **MCP: `archive_emails` tool to clear inbox noise at scale.** Agents can now
   archive every email matching a filter — a whole tag (e.g. `Notifications`), a

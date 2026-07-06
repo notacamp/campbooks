@@ -484,8 +484,11 @@ module Google
         req.params["format"] = "metadata"
         # The last three are bulk/automated-mail signals consumed by
         # Emails::Categorizer to keep newsletters and machine mail out of "personal".
+        # X-Campbooks-Kind is our own outbound-mail marker (DigestMailer); surfacing it
+        # lets the ingest pipeline recognise a re-ingested digest and skip AI analysis.
         req.params["metadataHeaders"] = [ "From", "Subject", "To", "Content-Type",
-                                          "List-Unsubscribe", "Precedence", "Auto-Submitted" ]
+                                          "List-Unsubscribe", "Precedence", "Auto-Submitted",
+                                          "X-Campbooks-Kind" ]
       end
       data = JSON.parse(response.body)
 
@@ -512,6 +515,7 @@ module Google
         "header_list_unsubscribe" => headers["List-Unsubscribe"],
         "header_precedence" => headers["Precedence"],
         "header_auto_submitted" => headers["Auto-Submitted"],
+        "header_campbooks_kind" => headers["X-Campbooks-Kind"],
         "flagid" => nil
       }
     rescue => e

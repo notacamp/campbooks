@@ -125,6 +125,9 @@
           <span class="text-gray-400 flex-shrink-0 <%= 'font-medium text-gray-600' if unread && !active %>" style="font-size:var(--thread-meta-size,10px);line-height:1.3"><%= thread_date_label(latest.received_at) %></span>
         </div>
         <div class="flex items-center gap-1.5">
+          <% if latest.digest? %>
+            <span class="inline-flex items-center flex-shrink-0 rounded-full bg-accent-100 text-accent-700 dark:bg-accent-500/15 dark:text-accent-200 font-semibold px-1.5" style="font-size:var(--thread-label-size,9px);line-height:1.6"><%= t("email_messages.show.digest_badge") %></span>
+          <% end %>
           <% if is_sent %>
             <span class="text-blue-500 dark:text-blue-400 flex-shrink-0" style="font-size:var(--thread-label-size,9px)"><%= t("email_messages.thread_list.sent_to_prefix") %></span>
             <% to_name = latest.to_address.presence %>

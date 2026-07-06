@@ -173,6 +173,9 @@ es:
       dismissed: Seguimiento descartado
     dismiss_todo:
       dismissed: Tarea descartada
+    event_drafts:
+      create:
+        error_generic: No se pudo crear el evento. Inténtalo de nuevo.
   email_threads:
     show:
       no_access: No tiene acceso a esa conversación.
