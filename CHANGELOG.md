@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-07-06
+
 ### Fixed
 
 - **Campbooks' own digest emails are no longer mined by the AI pipeline.** Digests
