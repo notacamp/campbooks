@@ -149,5 +149,18 @@ pt:
         single: Só uma coisa precisa de si — o Scout arquivou o resto.
         some: "%{n} coisas precisam de si — o Scout empilhou-as. Uma folheada rápida
           e está despachado."
+        syncing: O Scout está a ler a sua caixa de entrada — o correio ordenado chegará
+          aqui quando estiver pronto.
+      syncing_body: O correio ordenado chega aqui quando estiver pronto. Caixas grandes
+        podem demorar alguns minutos.
+      syncing_cta: Ver a encher
+      syncing_title: O Scout está a ler a sua caixa de entrada
       take_tour: Fazer a visita guiada
       your_feed: O seu feed
+    persona_applied:
+      body_html: O Scout ficará atento a <strong>%{items}</strong> à medida que o
+        seu correio chega.
+      exploring_body: O Scout utilizará configurações inteligentes por defeito. Pode
+        adicionar tipos de documentos a qualquer momento nas Definições.
+      heading: Recebido
+      settings_link: Ajustar nas Definições

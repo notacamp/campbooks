@@ -16,6 +16,15 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- The first-sync wait screen now asks what you mostly deal with (persona setup applies mid-scan via a compact chip picker; a Turbo Stream swaps the card for a confirmation once submitted).
+- Skipping the first-sync stage via the escape hatch now actually skips it — a POST sets a session flag so home does not re-trap you in the stage on subsequent visits.
+
+### Fixed
+
+- An in-progress inbox no longer claims "All caught up" when the user navigates away from the first-sync stage while a scan is still running. Home now shows an honest "Scout is reading your inbox" state.
+
 ## [0.17.0] - 2026-07-06
 
 ### Added

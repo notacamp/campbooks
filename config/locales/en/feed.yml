@@ -148,5 +148,18 @@ en:
         single: Just one thing needs you — Scout filed the rest.
         some: "%{n} things need you — Scout stacked them. A quick skim and you're
           done."
+        syncing: Scout is reading your inbox — sorted email will land here as it's
+          ready.
+      syncing_body: Sorted email lands here as it's ready. Big inboxes can take a
+        few minutes.
+      syncing_cta: Watch it fill
+      syncing_title: Scout is reading your inbox
       take_tour: Take the tour
       your_feed: Your feed
+    persona_applied:
+      body_html: Scout will watch for <strong>%{items}</strong> as your mail comes
+        in.
+      exploring_body: Scout will use smart defaults. Add document types anytime in
+        Settings.
+      heading: Got it
+      settings_link: Adjust in Settings

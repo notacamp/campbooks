@@ -51,6 +51,8 @@ Rails.application.routes.draw do
       post :suggest_document_types
       post :suggest_tags
       get :first_sync_status
+      post :apply_persona
+      post :skip_first_sync
     end
   end
 

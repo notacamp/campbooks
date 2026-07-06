@@ -14,7 +14,9 @@
   pending = @pending_count.to_i
   greeting_subtitle =
     if @inbox_state == :none
-      t(".subtitle.fresh")   # pre-connect: don't claim "all clear" over an unconnected inbox
+      t(".subtitle.fresh")    # pre-connect: don't claim "all clear" over an unconnected inbox
+    elsif @inbox_state == :syncing
+      t(".subtitle.syncing")  # scan running but user skipped the wait stage
     elsif pending.zero?
       t(".subtitle.clear")
     elsif pending == 1
@@ -157,6 +159,11 @@
   <div class="mt-16 flex flex-col items-center text-center">
     <%= render Campbooks::ScoutAvatar.new(size: :xl) %>
     <% case @inbox_state %>
+    <% when :syncing %>
+      <%# Scan is still running but the user skipped the wait screen — honest state. %>
+      <h2 class="mt-4 text-lg font-semibold text-foreground"><%= t(".syncing_title") %></h2>
+      <p class="mt-1 max-w-xs text-sm text-muted-foreground"><%= t(".syncing_body") %></p>
+      <%= render(Campbooks::Button.new(variant: :primary, href: email_messages_path, class: "mt-5")) { t(".syncing_cta") } %>
     <% when :caught_up %>
       <h2 class="mt-4 text-lg font-semibold text-foreground"><%= t(".empty_title") %></h2>
       <p class="mt-1 max-w-xs text-sm text-muted-foreground"><%= t(".empty_body") %></p>

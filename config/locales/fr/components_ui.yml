@@ -74,6 +74,11 @@ fr:
       error_cta: Vérifier la connexion du compte
       error_title: Scout n'a pas pu joindre votre boîte
       escape: Regarder la boîte se remplir
+      persona_heading: Pendant que Scout lit — avec quoi travaillez-vous surtout ?
+      persona_skip: Ignorer pour l'instant
+      persona_subheading: Choisissez une ou plusieurs options. Scout classe les documents
+        et etiquette les e-mails en consequence des le debut.
+      persona_submit: Appliquer
       subtitle_done: "%{needs_you} choses vous attendent. Tout le reste est trié et
         hors du chemin."
       subtitle_done_calm: Rien ne vous attend pour le moment. Tout est trié et hors
