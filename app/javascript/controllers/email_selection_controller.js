@@ -243,11 +243,11 @@ export default class extends Controller {
     const count = this.totalCount()
     if (count > 0) {
       this.toolbarTarget.classList.remove("hidden")
-      this.headerTarget.classList.add("hidden")
-      this.countTarget.textContent = count
+      if (this.hasHeaderTarget) this.headerTarget.classList.add("hidden")
+      this.countTarget.textContent = `${count} selected`
     } else {
       this.toolbarTarget.classList.add("hidden")
-      this.headerTarget.classList.remove("hidden")
+      if (this.hasHeaderTarget) this.headerTarget.classList.remove("hidden")
     }
     this.syncSectionToggles()
   }

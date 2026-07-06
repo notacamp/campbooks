@@ -6,6 +6,8 @@ en:
         heading: Board
     empty:
       add_account_button: Add email account
+      toolbar_archive_title: Archive
+      toolbar_mark_read_title: Mark read
       all_sorted_description: Everything left is low-priority mail, sorted into the
         groups below. Tap one to review or clear it.
       all_sorted_title: Your inbox is sorted
