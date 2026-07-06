@@ -5,6 +5,10 @@ require "rails_helper"
 # /session/:provider redirect made Hotwire Native both URLSession-preflight and
 # WebView-navigate the link, opening the system browser twice.
 RSpec.describe "Native OAuth login links", type: :request do
+  # The native sign-in page builds the Microsoft authorize URL from the app
+  # credentials; supply dummies (CI has no real keys).
+  around { |example| with_env("MICROSOFT_CLIENT_ID" => "test-id", "MICROSOFT_CLIENT_SECRET" => "test-secret") { example.run } }
+
   let(:native_ua) { "Campbooks/1.0 Hotwire Native iOS" }
 
   it "links OAuth buttons straight to the provider authorize URL in the native app" do

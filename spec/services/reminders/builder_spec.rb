@@ -83,4 +83,62 @@ RSpec.describe Reminders::Builder do
       }.to change(Reminder, :count).by(1)
     end
   end
+
+  # ── Cross-source de-dupe across separate emails (title normalisation) ──────────
+  #
+  # Focused on Builder#cross_source_sibling. Guards the "same commitment, two
+  # emails" collapse that lets a round-trip booking avoid duplicate reminders.
+  # Sources are User records to keep the test free of email-account fixtures.
+
+  describe "cross-source de-dupe across separate email sources" do
+    let(:ws2) { Workspace.create!(name: "Reminders Builder WS") }
+    let(:src_a) { ws2.users.create!(name: "A", email_address: "a-rem-builder@example.com", password: "password123") }
+    let(:src_b) { ws2.users.create!(name: "B", email_address: "b-rem-builder@example.com", password: "password123") }
+    let(:due) { 6.months.from_now.to_date }
+
+    def travel_item(overrides = {})
+      { "reminder_type" => "travel", "title" => "Flight to Clermont Ferrand",
+        "due_date" => due.iso8601, "due_time" => "16:10", "all_day" => false,
+        "confidence" => 1.0 }.merge(overrides)
+    end
+
+    def build_for(source, overrides = {})
+      Reminders::Builder.call(workspace: ws2, source: source, raw_items: [ travel_item(overrides) ], anchor_tz: Time.zone)
+    end
+
+    it "collapses the same timed flight from two emails even when the titles differ" do
+      build_for(src_a)
+      # The ticket email titled it with the date appended; the confirmation email did not.
+      expect { build_for(src_b, "title" => "Flight to Clermont Ferrand on #{due.iso8601}") }
+        .not_to change(Reminder, :count)
+      expect(Reminder.where(workspace: ws2).count).to eq(1)
+    end
+
+    it "collapses an all-day reminder whose title only differs by an appended date" do
+      base = { "reminder_type" => "delivery", "all_day" => true, "due_time" => nil }
+      build_for(src_a, base.merge("title" => "Amazon parcel"))
+      expect { build_for(src_b, base.merge("title" => "Amazon parcel on #{due.iso8601}")) }
+        .not_to change(Reminder, :count)
+    end
+
+    it "keeps two same-day timed events of the same type at different times" do
+      build_for(src_a, "reminder_type" => "appointment", "due_time" => "10:00", "title" => "Dentist")
+      expect { build_for(src_b, "reminder_type" => "appointment", "due_time" => "14:00", "title" => "Physio") }
+        .to change(Reminder, :count).by(1)
+    end
+
+    it "keeps two genuinely different all-day reminders on the same day" do
+      base = { "reminder_type" => "delivery", "all_day" => true, "due_time" => nil }
+      build_for(src_a, base.merge("title" => "Amazon parcel"))
+      expect { build_for(src_b, base.merge("title" => "IKEA parcel")) }
+        .to change(Reminder, :count).by(1)
+    end
+
+    it "collapses two same-amount bills on the same day from different sources" do
+      base = { "reminder_type" => "payment_due", "all_day" => true, "due_time" => nil, "amount_cents" => 5000 }
+      build_for(src_a, base.merge("title" => "Bill"))
+      expect { build_for(src_b, base.merge("title" => "Invoice")) }
+        .not_to change(Reminder, :count)
+    end
+  end
 end

@@ -52,6 +52,38 @@ RSpec.describe RetentionSweepJob, type: :job do
     expect(AuditEvent.exists?(recent_event.id)).to be(true)
   end
 
+  # ── ExternalServiceCall pruning ───────────────────────────────────────────────
+
+  describe "ExternalServiceCall pruning" do
+    def make_call(service: "google_mail", status:, created_at:)
+      ExternalServiceCall.create!(service: service, status: status, created_at: created_at)
+    end
+
+    it "success rows older than 30 days are pruned" do
+      old_success = make_call(status: :success, created_at: 31.days.ago)
+      described_class.new.perform
+      expect { old_success.reload }.to raise_error(ActiveRecord::RecordNotFound)
+    end
+
+    it "error rows at 31 days are kept (below 90-day threshold)" do
+      recent_error = make_call(status: :error, created_at: 31.days.ago)
+      described_class.new.perform
+      expect { recent_error.reload }.not_to raise_error
+    end
+
+    it "error rows older than 90 days are pruned" do
+      old_error = make_call(status: :error, created_at: 91.days.ago)
+      described_class.new.perform
+      expect { old_error.reload }.to raise_error(ActiveRecord::RecordNotFound)
+    end
+
+    it "recent success rows are not pruned" do
+      fresh_success = make_call(status: :success, created_at: 1.day.ago)
+      described_class.new.perform
+      expect { fresh_success.reload }.not_to raise_error
+    end
+  end
+
   describe "opt-in content retention" do
     it "deletes email older than the window for an opted-in workspace, keeps recent" do
       workspace.update!(email_retention_months: 12)

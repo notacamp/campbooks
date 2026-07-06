@@ -115,7 +115,7 @@ jobs:
           ACTIVE_RECORD_PRIMARY_KEY: ci_dummy_primary_key_not_used_in_production
           ACTIVE_RECORD_DETERMINISTIC_KEY: ci_dummy_deterministic_key_not_for_prod
           ACTIVE_RECORD_KEY_DERIVATION_SALT: ci_dummy_key_derivation_salt_not_prod
-        run: bin/rails db:test:prepare test
+        run: bin/rails db:test:prepare && bundle exec rspec
 
   # Duplicate of `test`, WITHOUT the :cloud group — the open-source / self-host
   # path. No token needed, so it runs everywhere, including fork PRs. This is the
@@ -152,7 +152,7 @@ jobs:
           ACTIVE_RECORD_PRIMARY_KEY: ci_dummy_primary_key_not_used_in_production
           ACTIVE_RECORD_DETERMINISTIC_KEY: ci_dummy_deterministic_key_not_for_prod
           ACTIVE_RECORD_KEY_DERIVATION_SALT: ci_dummy_key_derivation_salt_not_prod
-        run: bin/rails db:test:prepare test
+        run: bin/rails db:test:prepare && bundle exec rspec
 
   # Security guard — the private :cloud engine must NOT be installable without the
   # secret. Runs WITHOUT a token and asserts `bundle install --with cloud` FAILS,

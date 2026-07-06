@@ -127,4 +127,56 @@ RSpec.describe "Feed::Items", type: :request do
     expect(response).to have_http_status(:not_found)
     expect(item.reload.dismissed_at).to be_nil
   end
+
+  # -- task feed items (from feed/items_controller_test.rb) -------------------
+
+  context "with task feed items" do
+    let(:task) do
+      Task.create!(
+        workspace: workspace, title: "Send the signed statements",
+        status: :suggested, priority: :normal, ai_suggested: true, confidence: 0.9
+      )
+    end
+    let(:task_item) do
+      FeedItem.create!(
+        user: user, workspace: workspace, kind: "task", subject: task,
+        dedupe_key: "task_suggestion:#{task.id}", sort_at: Time.current
+      )
+    end
+
+    before { sign_in(user) }
+
+    it "accept promotes the suggestion to todo and resolves the card" do
+      post act_feed_item_path(task_item, format: :turbo_stream), params: { tool: "accept" }
+
+      expect(response).to have_http_status(:ok)
+      expect(task.reload.todo?).to be true
+      expect(task_item.reload.acted?).to be true
+    end
+
+    it "dismiss_task cancels the suggestion" do
+      post act_feed_item_path(task_item, format: :turbo_stream), params: { tool: "dismiss_task" }
+
+      expect(response).to have_http_status(:ok)
+      expect(task.reload.cancelled?).to be true
+      expect(task_item.reload.acted?).to be true
+    end
+
+    it "another user's task item 404s" do
+      other = workspace.users.create!(
+        name: "Other",
+        email_address: "other-#{SecureRandom.hex(4)}@example.com",
+        password: "password123"
+      )
+      foreign = FeedItem.create!(
+        user: other, workspace: workspace, kind: "task", subject: task,
+        dedupe_key: "task_suggestion:other", sort_at: Time.current
+      )
+
+      post act_feed_item_path(foreign, format: :turbo_stream), params: { tool: "accept" }
+
+      expect(response).to have_http_status(:not_found)
+      expect(task.reload.suggested?).to be true
+    end
+  end
 end

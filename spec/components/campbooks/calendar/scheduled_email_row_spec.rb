@@ -6,7 +6,7 @@ RSpec.describe Campbooks::Calendar::ScheduledEmailRow, type: :component do
   end
 
   it "shows the recipient without double-escaping angle brackets" do
-    se = ScheduledEmail.new(id: 7, subject: "Re: Kickoff",
+    se = ScheduledEmail.new(id: SecureRandom.uuid, subject: "Re: Kickoff",
                             to_address: "Jordan Lee <jordan@acme.com>",
                             scheduled_at: Time.current.change(hour: 16))
     html = render_for(se)
@@ -16,7 +16,7 @@ RSpec.describe Campbooks::Calendar::ScheduledEmailRow, type: :component do
   end
 
   it "renders the recurring glyph only for recurring schedules" do
-    attrs = { id: 8, subject: "Weekly", to_address: "x@example.com", scheduled_at: Time.current.change(hour: 9) }
+    attrs = { id: SecureRandom.uuid, subject: "Weekly", to_address: "x@example.com", scheduled_at: Time.current.change(hour: 9) }
 
     expect(render_for(ScheduledEmail.new(**attrs, rrule: "FREQ=WEEKLY"))).to include("M17 2l4 4")
     expect(render_for(ScheduledEmail.new(**attrs))).not_to include("M17 2l4 4")

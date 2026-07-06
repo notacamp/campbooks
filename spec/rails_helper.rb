@@ -66,6 +66,7 @@ RSpec.configure do |config|
   # config.infer_spec_type_from_file_location!
 
   config.include FactoryBot::Syntax::Methods
+  config.include ActiveSupport::Testing::TimeHelpers
 
   # Disable Searchkick callbacks globally in tests to avoid OpenSearch connection errors.
   # Tests that specifically need search indexing can re-enable with Searchkick.enable_callbacks.

@@ -298,10 +298,13 @@ class DocumentsController < ApplicationController
   # parse it into the [year, month] integer pair `for_month` expects. Returns nil
   # when absent or unparseable. Shared by the list, the reanalyze-all action and
   # the export so the month filter behaves identically everywhere.
+  # Uses Date.strptime with an explicit format so Rails' lenient Date.parse doesn't
+  # silently convert strings like "garbage" into valid dates (it would interpret
+  # "garbage-01" as the 1st of the current month, applying a wrong filter).
   def month_filter
     return if params[:month].blank?
 
-    date = Date.parse("#{params[:month]}-01")
+    date = Date.strptime(params[:month], "%Y-%m")
     [ date.year, date.month ]
   rescue ArgumentError
     nil

@@ -63,4 +63,64 @@ RSpec.describe Tools::CreateCalendarEvent do
       expect(result).to be_nil
     end
   end
+
+  context "with a writable calendar and a threaded email (Scout announcement)" do
+    let(:workspace) { Workspace.create!(name: "Create Event WS") }
+    let(:user) do
+      User.create!(
+        workspace: workspace, email_address: "owner@example.com", name: "owner",
+        password: "password123", password_confirmation: "password123"
+      )
+    end
+    let(:account) do
+      acct = EmailAccount.create!(
+        workspace: workspace, email_address: "mailbox@example.com",
+        provider: :google, refresh_token: "tok", active: true
+      )
+      acct.email_account_users.create!(user: user, owner: true, can_read: true)
+      acct
+    end
+    let(:thread) { account.email_threads.create!(subject: "Project kickoff") }
+    let(:message) do
+      account.email_messages.create!(
+        email_thread: thread, provider_message_id: "m-1", provider_folder_id: "INBOX",
+        from_address: "pm@acme.test", to_address: "mailbox@example.com",
+        subject: "Project kickoff", received_at: Time.current, read: false, has_attachment: false
+      )
+    end
+
+    before do
+      # trigger lazy lets
+      message
+      cal_account = workspace.calendar_accounts.create!(email_address: "mailbox@example.com", refresh_token: "tok")
+      cal_account.calendar_account_users.create!(user: user, can_read: true, can_write: true)
+      cal_account.calendars.create!(
+        provider_calendar_id: "pc-1", name: "Primary",
+        is_writable: true, syncing: true, is_primary: true
+      )
+    end
+
+    it "creates the event and posts a Scout message linking to it" do
+      event = nil
+      expect {
+        event = described_class.call(message, { title: "Kickoff", start_time: 2.days.from_now.iso8601 }, user: user)
+      }.to change(AgentMessage, :count).by(1)
+
+      expect(event).not_to be_nil
+      scout_msg = thread.reload.agent_thread.agent_messages.last
+      expect(scout_msg).to be_from_ai
+      expect(scout_msg.content).to include("Kickoff")
+      expect(scout_msg.content).to include("/calendar_events/#{event.id}")
+    end
+
+    it "does not break when the email has no discussion-capable thread" do
+      message.update!(email_thread: nil)
+
+      event = nil
+      expect {
+        event = described_class.call(message, { title: "Kickoff" }, user: user)
+      }.not_to change(AgentMessage, :count)
+      expect(event).not_to be_nil, "event should still be created even if no discussion post happens"
+    end
+  end
 end

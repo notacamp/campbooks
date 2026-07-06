@@ -77,7 +77,7 @@ jobs:
           ACTIVE_RECORD_PRIMARY_KEY: ci_dummy_primary_key_not_used_in_production
           ACTIVE_RECORD_DETERMINISTIC_KEY: ci_dummy_deterministic_key_not_for_prod
           ACTIVE_RECORD_KEY_DERIVATION_SALT: ci_dummy_key_derivation_salt_not_prod
-        run: bin/rails db:test:prepare test
+        run: bin/rails db:test:prepare && bundle exec rspec
 
   # Fan-out: one job per architecture, each on its OWN native runner (no QEMU).
   # Builds the image for its single platform and pushes it BY DIGEST (no tag) —

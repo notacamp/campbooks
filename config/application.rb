@@ -27,7 +27,10 @@ module Campbooks
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
     # Common ones are `templates`, `generators`, or `middleware`, for example.
-    config.autoload_lib(ignore: %w[assets tasks])
+    # `rubocop` holds a custom cop (lib/rubocop/cop/**) that references RuboCop
+    # constants only loaded by the linter, never at app runtime — eager-loading it
+    # (prod boot) would raise NameError, so keep it out of the autoload paths.
+    config.autoload_lib(ignore: %w[assets tasks rubocop])
 
     config.active_record.encryption.primary_key = ENV.fetch("ACTIVE_RECORD_PRIMARY_KEY")
     config.active_record.encryption.deterministic_key = ENV.fetch("ACTIVE_RECORD_DETERMINISTIC_KEY")
