@@ -173,6 +173,14 @@ en:
       switch_link: Use my own keys instead
       text_role: Email & chat
       title: Campbooks AI
+    event_draft_block:
+      add: Add to calendar
+      added: "On your calendar"
+      drafted_from: drafted from this email
+      edit: Edit
+      error_generic: Could not create the event. Please try again.
+      retry: Try again
+      view: View
     markdown_editor:
       preview_tab: Preview
       write_tab: Write

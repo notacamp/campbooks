@@ -132,6 +132,7 @@ en:
       collapse_discussion_aria: Collapse discussion
       collapse_sidebar_aria: Collapse sidebar
       compose_label: Compose
+      digest_badge: Digest
       discussion_button_label: Discussion
       discussion_empty_body: Leave a note for your team, or tag %{scout_mention} to
         ask the AI about this email.
