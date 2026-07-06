@@ -1,7 +1,8 @@
 require "rails_helper"
 
-# The post-signup golden path: /onboarding opens on the Scout welcome screen
-# (connect an inbox, one optional toggle), the legacy wizard steps stay
+# The post-signup golden path: /onboarding now opens on the template picker
+# (step 0 — "What will you mostly use Campbooks for?"). The Scout welcome screen
+# (connect an inbox) is still reachable as step=welcome. Legacy wizard steps stay
 # reachable, and the first-sync status endpoint feeds the live stage on home.
 RSpec.describe "Onboarding welcome flow", type: :request do
   let(:user) { create(:user) }
@@ -9,9 +10,22 @@ RSpec.describe "Onboarding welcome flow", type: :request do
   before { sign_in(user) }
 
   describe "GET /onboarding" do
-    it "renders the welcome step by default" do
+    it "renders the template picker by default (step 0)" do
       get onboarding_path
       expect(response).to have_http_status(:ok)
+      # Distinctive heading from the template step
+      expect(response.body).to include("What will you mostly use Campbooks for")
+      # All five persona cards are present
+      expect(response.body).to include("Freelancer")
+      expect(response.body).to include("Just exploring")
+      # Prominent skip is present
+      expect(response.body).to include("Skip for now")
+    end
+
+    it "renders the welcome step when step=welcome" do
+      get onboarding_path(step: :welcome)
+      expect(response).to have_http_status(:ok)
+      # The welcome screen has the Scout avatar and inbox connect buttons
       expect(response.body).to include("Scout")
       expect(response.body).to include(email_accounts_path(provider: :google))
     end

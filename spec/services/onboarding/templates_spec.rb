@@ -15,10 +15,15 @@ RSpec.describe Onboarding::Templates do
   end
 
   describe ".keys" do
-    it "returns all template keys" do
+    it "returns all 9 template keys" do
       expect(described_class.keys).to match_array(%w[
-        freelancer small_business personal_admin job_hunt just_exploring
+        freelancer small_business personal_admin job_hunt
+        accountant landlord traveler ecommerce just_exploring
       ])
+    end
+
+    it "has no duplicate keys" do
+      expect(described_class.keys).to eq(described_class.keys.uniq)
     end
   end
 

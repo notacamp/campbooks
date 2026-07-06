@@ -4,34 +4,36 @@ class Settings::SetupTemplateController < Settings::BaseController
   before_action :set_workspace
 
   def show
-    @chosen_key   = @workspace.setting("setup_template")
-    @chosen        = Onboarding::Templates.find(@chosen_key) if @chosen_key
+    # Read the array of active template keys (new format).
+    @chosen_keys   = Array(@workspace.settings["setup_templates"]).compact
+    @chosen_templates = @chosen_keys.filter_map { |k| Onboarding::Templates.find(k) }
     @templates     = Onboarding::Templates.all
     @applied_tags  = applied_tags
     @applied_types = applied_doc_types
     @module_keys   = %w[calendar files contacts organizations activity]
   end
 
-  # PATCH /settings/setup_template — switch or re-apply a template.
+  # PATCH /settings/setup_template — apply (or add to) one or more templates.
   # Non-destructive: only adds, never removes.
   def update
-    key = params[:template_key].to_s
+    keys = Array(params[:template_keys]).map(&:to_s).select { |k| Onboarding::Templates.keys.include?(k) }
 
-    unless Onboarding::Templates.keys.include?(key)
+    if keys.empty?
       redirect_to settings_setup_template_path, error: t(".invalid_template")
       return
     end
 
-    Onboarding::TemplateApplier.new(@workspace, key).apply!
+    Onboarding::TemplateApplier.new(@workspace, keys).apply!
 
-    redirect_to settings_setup_template_path, success: t(".applied", name: template_name_for(key))
+    names = keys.map { |k| template_name_for(k) }.to_sentence
+    redirect_to settings_setup_template_path, success: t(".applied", name: names)
   end
 
   # PATCH /settings/setup_template/modules — toggle individual module visibility.
   def update_modules
     # The checkbox form sends only checked keys. Build the full visibility map
     # from all known module keys so unchecked ones resolve to false.
-    known_keys = Onboarding::Templates::CATALOG.flat_map { |t| t[:module_visibility].keys }.uniq
+    known_keys   = Onboarding::Templates::CATALOG.flat_map { |t| t[:module_visibility].keys }.uniq
     checked_keys = params[:module_visibility].respond_to?(:keys) ? params[:module_visibility].keys.map(&:to_s) : []
     new_visibility = known_keys.index_with { |k| checked_keys.include?(k) }
 
@@ -49,17 +51,19 @@ class Settings::SetupTemplateController < Settings::BaseController
     @workspace = Current.workspace || current_user&.workspace
   end
 
-  # Tags provisioned by the currently active template (if any).
+  # Tags provisioned by any of the currently active templates.
   def applied_tags
-    return [] unless @chosen
-    names = @chosen[:tags].map { |t| t[:name] }
+    return [] if @chosen_templates.empty?
+
+    names = @chosen_templates.flat_map { |t| t[:tags].map { |tag| tag[:name] } }.uniq
     @workspace.tags.where(name: names).order(:name)
   end
 
-  # Document types provisioned by the currently active template (if any).
+  # Document types provisioned by any of the currently active templates.
   def applied_doc_types
-    return [] unless @chosen
-    names = @chosen[:document_types].map { |t| t[:name] }
+    return [] if @chosen_templates.empty?
+
+    names = @chosen_templates.flat_map { |t| t[:document_types].map { |dt| dt[:name] } }.uniq
     @workspace.document_types.where(name: names).order(:name)
   end
 

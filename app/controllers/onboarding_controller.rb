@@ -169,15 +169,13 @@ class OnboardingController < ApplicationController
   def prepare_template
     org # ensure org exists
     @templates = Onboarding::Templates.all
-    @chosen_key = org.setting("setup_template")
+    @chosen_keys = Array(org.settings["setup_templates"]).compact
   end
 
   def update_template
-    key = params[:template_key].to_s
-    if Onboarding::Templates.keys.include?(key)
-      Onboarding::TemplateApplier.new(org, key).apply!
-    end
-    # "just_exploring" or no selection → skip silently; skip button lands here too
+    keys = Array(params[:template_keys]).map(&:to_s).select { |k| Onboarding::Templates.keys.include?(k) }
+    Onboarding::TemplateApplier.new(org, keys).apply! if keys.any?
+    # Empty selection (skip) → proceed with no template applied
   end
 
   # ── Step 1: Welcome (the golden path) ────────────────────
