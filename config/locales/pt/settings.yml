@@ -248,6 +248,7 @@ pt:
       calendars:
         show:
           active: Ativo
+          back: Voltar às integrações
           calendars_heading: Calendários
           calendars_pending: Os calendários aparecerão aqui após a primeira sincronização.
           connect_desc: Os calendários acompanham as suas contas de e-mail ligadas.
@@ -297,6 +298,7 @@ pt:
           username_placeholder: utilizador
         index:
           add_connection: Adicionar ligação
+          back: Voltar às integrações
           col_auth: Autenticação
           col_base_url: URL base
           col_name: Nome
@@ -322,9 +324,9 @@ pt:
           col_subfolders: Subpastas
           configure: Configurar
           connect_button: Ligar o Google Drive
-          connect_desc_html: Ligue a sua conta Google para enviar documentos para
-            o Google Drive. O Campbooks apenas acede aos ficheiros que cria (âmbito
-            %{scope}).
+          back: Voltar às integrações
+          connect_desc_html: Ligue a sua conta Google para criar pastas e enviar ficheiros para o Google Drive (âmbito %{scope_name}, para poder navegar e escolher qualquer pasta).
+          not_configured: O Google Drive não está configurado nesta instância. Peça ao seu administrador para o configurar.
           connected_account_heading: Conta ligada
           connected_as: Ligado como
           connected_label: Ligado
@@ -361,6 +363,7 @@ pt:
           select_my_drive: Usar a raiz do Meu Drive
           select_this: Selecionar "%{name}"
         edit:
+          back: Voltar ao Google Drive
           auto_push_default_note: O envio automático está ativo por padrão — documentos
             aprovados deste tipo serão enviados automaticamente para o Drive. Desmarque
             a caixa acima para pausar.
@@ -419,6 +422,7 @@ pt:
           zoho_drive_heading: Zoho Drive
       notion:
         show:
+          back: Voltar às integrações
           col_database: Base de dados Notion
           col_document_type: Tipo de documento
           col_pull: Receber
@@ -455,6 +459,7 @@ pt:
           token_placeholder: secret_...
       zoho_drive:
         show:
+          back: Voltar às integrações
           active: Ativa
           add_mapping_button: Adicionar mapeamento
           add_mapping_heading: Adicionar mapeamento de pasta
