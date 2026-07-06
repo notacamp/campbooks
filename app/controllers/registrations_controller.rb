@@ -218,9 +218,10 @@ class RegistrationsController < ApplicationController
     if invitation
       redirect_to root_path, success: t(".welcome_workspace", workspace: invitation.workspace.name)
     else
-      # Straight to the welcome screen: meet Scout, connect an inbox. The full
-      # wizard stays reachable from there as "set up more".
-      redirect_to onboarding_path
+      # Land on home where the two-minute walkthrough auto-opens, so the user
+      # sees what Campbooks does before being asked to connect an inbox. The
+      # connect CTA on the walkthrough's last slide points to /onboarding.
+      redirect_to root_path, success: t(".welcome_home")
     end
   rescue ActiveRecord::RecordInvalid => e
     flash.now[:error] = e.message
