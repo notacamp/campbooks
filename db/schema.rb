@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_06_140000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_06_150100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -1558,6 +1558,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_140000) do
     t.datetime "classified_at"
     t.string "color"
     t.datetime "created_at", null: false
+    t.string "default_bucket"
     t.uuid "email_account_id"
     t.string "external_label_id"
     t.string "group_name"
@@ -1575,6 +1576,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_140000) do
     t.index ["external_label_id"], name: "index_tags_on_external_label_id"
     t.index ["hidden"], name: "index_tags_on_hidden", where: "(hidden = true)"
     t.index ["system_label"], name: "index_tags_on_system_label", where: "(system_label = true)"
+    t.index ["workspace_id", "default_bucket"], name: "idx_tags_on_workspace_and_default_bucket", unique: true, where: "(default_bucket IS NOT NULL)"
     t.index ["workspace_id", "group_name"], name: "index_tags_on_workspace_id_and_group_name"
     t.index ["workspace_id"], name: "index_tags_on_workspace_id"
   end

@@ -28,6 +28,14 @@ class EmailRetagJob < ApplicationJob
       Rails.logger.error("[EmailRetagJob] Triage failed for email #{email.id}, falling back to classifier: #{e.message}")
       Ai::EmailClassifier.new(email).classify!
     end
+
+    # Bridge the rules category onto the workspace's default group tag, so
+    # low-priority mail collapses into its inbox group (see Tags::DefaultGroups).
+    begin
+      Tags::DefaultGroups.tag_email!(email)
+    rescue => e
+      Rails.logger.error("[EmailRetagJob] bucket tag failed for email #{email.id}: #{e.message}")
+    end
   ensure
     Current.workspace = nil
   end
