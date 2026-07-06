@@ -38,6 +38,18 @@ RSpec.describe "Email message event drafts", type: :request do
       expect(response.body).to include("Edit")
     end
 
+    it "renders the confirmed state when an event was already created from this email" do
+      event = create(:calendar_event, calendar: calendar, title: "Kickoff",
+                     start_at: 1.day.from_now, end_at: 1.day.from_now + 1.hour,
+                     source_email_message: message)
+
+      get event_draft_email_message_path(message)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("Add to calendar")
+      expect(response.body).to include(calendar_event_path(event))
+    end
+
     it "returns an empty turbo-frame when the email has no time mention" do
       no_time_msg = create(:email_message,
                            email_account: account,
