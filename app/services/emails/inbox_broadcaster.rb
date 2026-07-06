@@ -78,10 +78,9 @@ module Emails
       # — a sent-only or still-archived thread is never injected (a reload wouldn't
       # show it there either).
       return unless inbox_thread?
-      # A smart-bundled thread (all-noise categories, never replied/starred/
-      # pinned) lives in a collapsed group row, not the main list — don't float
-      # it in. Assumes the default all-buckets-on prefs: for a user who disabled
-      # a bucket the new thread just doesn't live-prepend (it appears on reload).
+      # A thread collapsed into a tag group (it carries a grouped tag and no guard
+      # applies) lives in a group row, not the main list — don't float it in; it
+      # appears under its group on reload.
       return if bundled_thread?
 
       each_user do |user|
@@ -115,16 +114,24 @@ module Emails
       ).find_by(id: @thread.id) || @thread
     end
 
-    # Mirrors Emails::SmartGroups' bundling predicate on the already-loaded
-    # thread: every message in a noise bucket, no reply from the user, no
-    # starred sender, not pinned.
+    # Mirrors Emails::TagGroups' collapse predicate on the already-loaded thread:
+    # a message carries a tag that belongs to a group, and no guard applies (the
+    # owner replied, it's pinned, the sender is starred, or a message is important).
     def bundled_thread?
       messages = @thread.email_messages.to_a
       return false if messages.empty?
-      return false unless messages.all? { |m| User::SMART_GROUP_BUCKETS.include?(m.category.to_s) }
+
+      grouped_tag_ids = Tag.where(workspace_id: @thread.email_account.workspace_id)
+                           .visible.grouped.pluck(:id).to_set
+      return false if grouped_tag_ids.empty?
+
+      on_thread = messages.flat_map { |m| m.tags.map(&:id) }.to_set
+      return false unless on_thread.intersect?(grouped_tag_ids)
+
       return false if @thread.last_outbound_at.present?
       return false if messages.any? { |m| m.pinned_at.present? }
       return false if messages.any? { |m| m.contact&.starred? }
+      return false if messages.any? { |m| m.category.to_s == "important" }
 
       true
     end

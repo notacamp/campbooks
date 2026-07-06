@@ -6,11 +6,15 @@ pt:
         heading: Quadro
     empty:
       add_account_button: Adicionar conta de email
-      all_sorted_description: O que resta é correio de baixa prioridade, organizado nos grupos abaixo. Toque num deles para o rever ou limpar.
+      all_sorted_description: O que resta é correio de baixa prioridade, organizado
+        nos grupos abaixo. Toque num deles para o rever ou limpar.
       all_sorted_title: A sua caixa de entrada está arrumada
+      back_to_inbox_button: Voltar à caixa de entrada
       connect_email_description: Ligue uma conta de email para começar a receber e
         processar emails automaticamente.
       connect_email_title: Ligar o seu email
+      group_clear_description: Não há nada de %{group} à espera na sua caixa de entrada.
+      group_clear_title: Este grupo está arrumado
       manage_accounts_button: Gerir contas de email
       no_mail_yet_description: As suas contas de email estão ligadas. O correio aparecerá
         aqui após a próxima sincronização.
@@ -165,7 +169,7 @@ pt:
       search_tags_placeholder: Pesquisar etiquetas...
     thread_list:
       archive_all: Arquivar tudo
-      back_to_inbox: "— voltar à caixa de entrada"
+      back_to_inbox_label: Caixa de entrada
       dismiss_follow_up: Dispensar seguimento
       draft_follow_up: Escrever seguimento
       drag_to_folder: Arrastar para uma pasta

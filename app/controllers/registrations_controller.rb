@@ -202,6 +202,9 @@ class RegistrationsController < ApplicationController
     # account has working text + document AI from the first sign-in, even if the
     # user skips the onboarding AI step. Cloud-only + best-effort (never blocks signup).
     Ai::ProviderSetup.apply_managed_default(new_workspace) if new_workspace
+    # Four default tag groups (Notifications / Newsletters & promos / Social /
+    # Updates) so the inbox collapses low-priority mail from the first sync.
+    provision_default_groups(new_workspace)
 
     session.delete(:registration_state)
     session.delete(:invitation_token)

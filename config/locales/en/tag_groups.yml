@@ -1,0 +1,21 @@
+---
+en:
+  components:
+    tag_group_row:
+      aria_label:
+        one: "%{label}, %{count} conversation"
+        other: "%{label}, %{count} conversations"
+  tag_groups:
+    archive_all:
+      archived:
+        one: Archived %{count} email
+        other: Archived %{count} emails
+    default_names:
+      notifications: Notifications
+      promotions: Newsletters & promos
+      social: Social
+      updates: Updates
+    mark_all_read:
+      marked_read:
+        one: Marked %{count} email as read
+        other: Marked %{count} emails as read

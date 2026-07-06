@@ -19,7 +19,6 @@ module InboxSettings
       { key: "tags",           path: :inbox_settings_tags_path,           icon: :tag },
       { key: "document_types", path: :inbox_settings_document_types_path,  icon: :doc },
       { key: "filtering",      path: :inbox_settings_filtering_path,       icon: :filter },
-      { key: "smart_groups",   path: :inbox_settings_smart_groups_path,    icon: :stack },
       { key: "signatures",     path: :inbox_settings_signatures_path,      icon: :pen },
       { key: "accounts",       path: :inbox_settings_accounts_path,        icon: :at },
       { key: "display",        path: :inbox_settings_display_path,         icon: :sliders }
