@@ -260,5 +260,37 @@ RSpec.describe EmailProcessJob, type: :job do
         expect(email_message.reload.provider_folder_id).to eq("ARCHIVE")
       end
     end
+
+    # Our own digests are delivered to the user's mailbox and re-ingested here. They
+    # must stay readable but skip the whole AI pipeline — even with a provider set up,
+    # so this proves the self_generated flag (not the AI gate) does the skipping.
+    context "when the email is self-generated (our own digest)" do
+      let(:email_message) do
+        create(:email_message,
+          email_account: account,
+          email_scan_log: scan_log,
+          status: :fetched,
+          has_attachment: false,
+          self_generated_kind: "digest")
+      end
+
+      before { allow(Ai::ProviderSetup).to receive(:configured?).and_return(true) }
+
+      it "stays readable and visible but runs none of the AI pipeline" do
+        expect(Emails::Triage).not_to receive(:new)
+        expect(Contacts::Identifier).not_to receive(:new)
+
+        expect { described_class.perform_now(email_message.id) }
+          .not_to have_enqueued_job(Reminders::EmailExtractionJob)
+
+        email_message.reload
+        # Readable: body fetched, marked processed, threaded into the inbox.
+        expect(email_message.status).to eq("processed")
+        expect(email_message.body).to eq("<html>Email body</html>")
+        expect(email_message.email_thread).to be_present
+        # Not mined: no triage tags applied.
+        expect(email_message.tags).to be_empty
+      end
+    end
   end
 end

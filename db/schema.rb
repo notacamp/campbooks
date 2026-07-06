@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_06_160100) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_06_170000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -688,6 +688,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_160100) do
     t.string "provider_thread_id"
     t.boolean "read", default: false, null: false
     t.datetime "received_at"
+    t.string "self_generated_kind", comment: "Campbooks-generated mail re-ingested from the mailbox (e.g. 'digest'); nil for third-party mail. Skips the AI pipeline."
     t.datetime "skimmed_at"
     t.integer "status", default: 0, null: false
     t.string "subject"
