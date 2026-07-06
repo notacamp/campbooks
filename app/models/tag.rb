@@ -23,6 +23,8 @@ class Tag < ApplicationRecord
   has_many :task_tags, dependent: :destroy
   has_many :tasks, through: :task_tags
   has_many :notification_preferences, dependent: :destroy
+  has_many :tag_account_links, dependent: :destroy
+  has_many :label_import_decisions, dependent: :nullify
 
   after_save_commit :enqueue_tag_embedding
 

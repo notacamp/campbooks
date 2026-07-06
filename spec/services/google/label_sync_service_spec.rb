@@ -48,4 +48,25 @@ RSpec.describe Google::LabelSyncService, type: :service do
     expect(client).not_to have_received(:list_messages_by_label).with("INBOX", limit: 200)
     expect(client).not_to have_received(:list_messages_by_label).with("CATEGORY_UPDATES", limit: 200)
   end
+
+  it "records a pending LabelImportDecision for user labels only" do
+    service.sync_labels!
+    expect(LabelImportDecision.where(email_account: account, provider_label_id: "Label_42",
+                                     decision: :pending)).to exist
+  end
+
+  it "does not record decisions for system or category labels" do
+    service.sync_labels!
+    expect(LabelImportDecision.where(email_account: account,
+                                     provider_label_id: [ "INBOX", "CATEGORY_UPDATES" ])).to be_empty
+  end
+
+  it "is idempotent — re-syncing does not overwrite a resolved decision" do
+    existing = LabelImportDecision.create!(
+      email_account: account, provider_label_id: "Label_42",
+      provider_label_name: "Invoices", decision: :kept
+    )
+    service.sync_labels!
+    expect(existing.reload.decision).to eq("kept")
+  end
 end

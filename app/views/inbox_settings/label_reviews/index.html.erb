@@ -1,0 +1,21 @@
+<%= turbo_frame_tag "inbox_settings_panel" do %>
+  <div data-section="label_reviews">
+    <header class="sticky top-0 z-10 bg-background/95 backdrop-blur px-6 py-4 border-b border-border flex items-center justify-between gap-4">
+      <div class="min-w-0">
+        <h3 class="text-sm font-semibold text-foreground"><%= t(".heading") %></h3>
+        <p class="text-xs text-muted-foreground mt-0.5"><%= t(".subheading") %></p>
+      </div>
+      <%= link_to t(".back_to_tags"),
+            inbox_settings_tags_path,
+            data: { turbo_frame: "inbox_settings_panel" },
+            class: "text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0" %>
+    </header>
+
+    <div class="px-6 py-5">
+      <div id="label_reviews_list">
+        <%= render "inbox_settings/label_reviews/list",
+                   pending: @pending, workspace_tags: @workspace_tags %>
+      </div>
+    </div>
+  </div>
+<% end %>

@@ -118,13 +118,30 @@ pt:
         hidden_hint: sistema e ocultados por IA
         no_tags: Ainda não há etiquetas. Adicione uma para começar a organizar a sua
           caixa de entrada.
+        pending_review_banner:
+          one: "%{count} rótulo importado aguarda a sua revisão."
+          other: "%{count} rótulos importados aguardam a sua revisão."
+        review_now: Rever agora
         subheading: As etiquetas ajudam o Scout a organizar a sua caixa de entrada
           automaticamente.
         system_group: Sistema do fornecedor
+      commit_merge:
+        merged: Fundiu "%{source}" em "%{target}".
+        tag_not_found: Etiqueta não encontrada.
+      merge:
+        heading: Fundir "%{name}" noutra etiqueta
+        hint: Todas as mensagens e ligações de conta passam para a etiqueta de destino.
+          Esta etiqueta é depois eliminada. A fusão não pode ser desfeita.
+        merge_into_label: Fundir em
+        select_placeholder: Selecionar uma etiqueta...
+        submit: Fundir etiqueta
+        warning: A etiqueta selecionada absorverá todas as mensagens desta etiqueta.
+          Esta ação não pode ser desfeita.
       tag:
         delete_confirm: Eliminar %{name}?
         edit: Editar
         hide: Ocultar
+        merge: Fundir
         synced_with_title: Sincronizada com %{account}
         tagged_messages_title: Mensagens com etiqueta
       toggle_hidden:
@@ -134,3 +151,23 @@ pt:
         provider_update_failed: Não foi possível atualizar o rótulo na sua caixa
           de correio. Tente novamente.
         updated_toast: Etiqueta actualizada.
+    label_reviews:
+      bulk_decide:
+        all_done: Todos os rótulos revistos.
+        saved_count:
+          one: Decisão guardada.
+          other: "%{count} decisões guardadas."
+      index:
+        back_to_tags: Voltar às etiquetas
+        empty_heading: Tudo em dia
+        empty_hint: Não há rótulos do fornecedor a aguardar revisão.
+        heading: Rever rótulos importados
+        instructions: Escolha o que fazer com cada rótulo importado da sua caixa de
+          correio. Os rótulos ignorados são deixados inalterados no fornecedor.
+        option_ignore: Ignorar (sem etiqueta no espaço de trabalho)
+        option_keep: Manter como etiqueta própria
+        option_map: Mapear para etiqueta existente
+        save_decisions: Guardar decisões
+        select_tag_placeholder: Escolher etiqueta...
+        subheading: Mapeie, mantenha ou ignore rótulos sincronizados das suas caixas
+          de correio ligadas.
