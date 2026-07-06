@@ -2,66 +2,84 @@
 en:
   components:
     product_tour:
-      ai_tag: AI
       aria_label: Product tour
-      back: Back
-      next: Next
-      s1_body: Campbooks is an inbox that sorts itself. In about a minute, I'll show
-        you the four things that make it different — try each one as we go.
-      s1_point_ask: Ask your inbox anything
-      s1_point_remind: Deadlines never slip
-      s1_point_skim: Skim a whole pile in seconds
-      s1_point_surface: Scout surfaces only what needs you
-      s1_title: Welcome to Campbooks
-      s2_badge: Needs you
-      s2_eyebrow: Your home
-      s2_feedback: That's the gist, without opening the email. The LinkedIn notification
-        below was noise, so Scout left it be.
-      s2_summary: A one-time code to confirm your bank transfer — it expires in 10
-        minutes, so it's worth a look now.
-      s2_task: Tap the message Scout flagged to see what it pulled out.
-      s2_title: Scout surfaces what needs you
-      s2_why: Scout reads every email as it arrives and brings forward only what matters.
-        Everything else stays quietly out of your way.
-      s3_eyebrow: Skim
-      s3_feedback: That's the whole pile, handled. Archived mail stays searchable,
-        and every action can be undone.
-      s3_progress: "%{done} of %{total} stacks cleared"
-      s3_task: 'Work through all three: Archive the noise, Keep what matters.'
-      s3_title: Clear a pile in seconds
-      s3_why: Skim groups your inbox into stacks and plays them like Stories. You
-        make one decision per stack — keep what matters, archive the noise — instead
-        of opening dozens of emails.
-      s4_dismiss: or dismiss
-      s4_extracted: 'Scout spotted a due date: Friday'
-      s4_eyebrow: Reminders
-      s4_feedback: Set. It'll resurface on Friday, and you can turn any reminder into
-        a calendar event with one tap.
-      s4_remind_cta: Remind me
-      s4_reminder_title: Pay Acme invoice — $248.00
-      s4_reminder_when: Reminder set · Friday, 9:00
-      s4_task: This invoice is due Friday. Tap “Remind me” to set it.
-      s4_title: Deadlines never slip
-      s4_why: When an email carries a due date or a promise you made, Scout pulls
-        it out so it doesn't get buried.
-      s5_eyebrow: Scout
-      s5_feedback: Scout does this across your real inbox once it's connected — and
-        can draft the replies too.
-      s5_greeting: Hi! I'm Scout. Ask me about your inbox — or tap a suggestion to
-        start.
-      s5_prompt: What needs a reply today?
-      s5_reply_intro: 'Two emails are waiting on you:'
-      s5_reply_item_1: Sarah — she asked about lunch on Thursday
-      s5_reply_item_2: Acme Supply Co. — the invoice due Friday
-      s5_task: Tap the question to ask Scout.
-      s5_title: Ask your inbox anything
-      s5_why: Scout can search, summarise, and take action across your mail and documents.
-        Just ask in plain words.
-      s6_body: 'That''s the loop: Scout surfaces what matters, you Skim the rest in
-        seconds, deadlines stay caught, and you can ask anything. Connect your inbox
-        to make it real.'
-      s6_cta_connect: Connect your inbox
-      s6_cta_explore: Explore on my own
-      s6_title: You're ready
+      progress_label: Tour progress
       skip: Skip tour
-      step: "%{current} of %{total}"
+      prev: Previous
+      next: Next
+      nav_hint: tap through
+      segment_label: "Go to slide %{n}"
+      connect_cta: Connect your inbox
+      done_cta: Back to your inbox
+      docs_cta: Read the docs
+
+      # Slide 1: Intro
+      intro_mod: Campbooks
+      s1_title: "This is Campbooks -- the inbox that sorts itself."
+      s1_sub: An email client with an assistant inside, for people drowning in business email and paperwork.
+      s1_rot_lead: "Scout, your assistant,"
+      s1_r0_h: "reads every email, so you don't have to."
+      s1_r0_p: "Each message gets a one-line take: what it is, what it wants from you, whether it can wait."
+      s1_r1_h: "files the invoices, receipts, and contracts."
+      s1_r1_p: Attachments become tracked, searchable documents -- typed, tagged, and ready for tax time.
+      s1_r2_h: catches deadlines before they slip.
+      s1_r2_p: Due dates buried in email surface as reminders -- your calendar only changes when you say so.
+      s1_r3_h: quiets the newsletters and notifications.
+      s1_r3_p: The noise collapses into tidy groups you can skim in seconds -- announced, undoable, never lost.
+      s1_r4_h: hands you the short list that actually needs you.
+      s1_r4_p: You open the app to two or three things, not two hundred.
+      s1_close_b: "You decide. Scout does the boring part."
+      s1_close: Everything it does is announced, reversible, and yours to approve.
+
+      # Slide 2: Inbox
+      inbox_mod: Inbox
+      s2_title: Mail arrives already sorted.
+      s2_body1_html: "Newsletters, notifications, and promos <b>collapse into tidy groups</b> instead of burying your morning -- skim them in seconds or ignore them entirely. What actually needs a reply stays up front with Scout's one-line take on it."
+      s2_body2_html: "Tags apply themselves as mail lands: <b>announced and undoable</b>, never a question to answer. Your folders finally file themselves."
+      s2_group_label: Notifications & newsletters
+
+      # Slide 3: Calendar
+      calendar_mod: Calendar
+      s3_title: Your inbox and calendar finally talk.
+      s3_body1_html: "A 'does Thursday work?' email becomes a <b>drafted event</b> -- right title, right time, one tap to add. No more retyping who-and-when."
+      s3_body2_html: "Dated commitments -- an invoice due, a renewal, a flight -- surface as <b>reminders you confirm</b> onto the calendar. Two-way sync keeps Google and Zoho honest, both directions."
+      s3_ev_title: Kickoff call with Dana
+      s3_ev_time: "Thu . 2:30 - 3:00 PM . drafted from her email"
+      s3_ev_add: Add to calendar
+      s3_ev_added: "✓ Added"
+      s3_rem_sender: "Payment . in 11 days"
+      s3_rem_subj: "Streamline invoice #10-449 . $49.00"
+      s3_rem_add: Add to calendar
+      s3_rem_added: On your calendar
+
+      # Slide 4: Tasks (feature-gated)
+      tasks_mod: Tasks
+      s4_title: Turn any email into a task.
+      s4_body1_html: "Scout spots the asks hiding in your mail -- \"can you send the report by Friday?\" -- and offers to turn them into tasks with <b>due dates attached</b>."
+      s4_body2_html: "Work them as a list or a board; check things off and <b>nothing promised gets lost</b> three replies deep in a thread."
+
+      # Slide 5: Documents
+      docs_mod: Documents
+      s5_title: Paperwork that files itself.
+      s5_body1_html: "Every attachment becomes a <b>tracked document</b>: type recognized, the key fields -- vendor, amount, due date -- extracted and searchable from day one."
+      s5_body2_html: "You approve or fix in one tap. <b>Tax time stops being archaeology</b> -- it's a search box."
+      s5_doc_type: Expense invoice
+      s5_field_vendor_label: Vendor
+      s5_field_amount_label: Amount
+      s5_field_due_label: Due date
+      s5_reclassify: Reclassify
+      s5_approve: Approve
+      s5_approved: "✓ Approved"
+
+      # Slide 6: Much more
+      more_mod: Much more
+      s6_title: "And that's the short version."
+      s6_body: Skim your inbox like stories. Ask Scout anything about your mail and files, in plain language. Build your own rules and groups -- or go deeper with digests, templates, a REST API, and full self-hosting.
+      s6_chip_skim: Skim stories
+      s6_chip_scout: Scout chat
+      s6_chip_rules: Rules & groups
+      s6_chip_digests: Digests
+      s6_chip_templates: Templates
+      s6_chip_api: REST API
+      s6_chip_self: Self-hosting
+      s6_docs_note: The docs cover all of it -- from a five-minute tour to running your own server.

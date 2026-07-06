@@ -130,6 +130,7 @@ pt:
       beta_code_unavailable: Esse código de convite já não está disponível — recomece
         com um novo.
       password_too_short: A palavra-passe deve ter pelo menos 8 caracteres.
+      welcome_home: "Bem-vindo ao Campbooks -- aqui está a visita de dois minutos."
       welcome_workspace: Bem-vindo a %{workspace}!
     create:
       code_sent: Enviámos um código de verificação para %{email}.

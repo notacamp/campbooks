@@ -124,5 +124,33 @@ RSpec.describe Auth::OauthSignIn do
       expect(result.user).to be_admin
       expect(result.user.app_admin?).to be(false)
     end
+
+    it "provisions the managed AI default for the new workspace" do
+      allow(Ai::ProviderSetup).to receive(:apply_managed_default)
+      call(email: "ai-provision@corp.com", name: "AI User")
+      expect(Ai::ProviderSetup).to have_received(:apply_managed_default).with(
+        an_object_having_attributes(slug: starting_with("ws-"))
+      )
+    end
+
+    it "provisions default tag groups for the new workspace" do
+      allow(Tags::DefaultGroups).to receive(:provision!)
+      call(email: "tags-provision@corp.com", name: "Tags User")
+      expect(Tags::DefaultGroups).to have_received(:provision!).with(
+        an_object_having_attributes(slug: starting_with("ws-"))
+      )
+    end
+
+    it "still signs the user in even when AI provisioning raises" do
+      allow(Ai::ProviderSetup).to receive(:apply_managed_default).and_raise(StandardError, "provider down")
+      result = call(email: "resilient@corp.com")
+      expect(result).to be_signed_in
+    end
+
+    it "still signs the user in even when tag provisioning raises" do
+      allow(Tags::DefaultGroups).to receive(:provision!).and_raise(StandardError, "groups down")
+      result = call(email: "resilient-tags@corp.com")
+      expect(result).to be_signed_in
+    end
   end
 end
