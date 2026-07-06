@@ -20,9 +20,12 @@ module Ai
     # "2:30 PM", "3pm", "14:00"). Used as a cheap gate before showing the inline
     # event-draft block on the email page — avoids surfacing the block on every
     # email just because the extractor always returns a default.
+    # Quoted reply chains and "On … wrote:" attribution lines are excluded:
+    # their timestamps would otherwise trigger the block on every threaded reply.
     def has_time_proposal?
-      text.match?(/\b\d{1,2}:\d{2}\s*(?:am|pm)?\b/i) ||
-        text.match?(/\b\d{1,2}\s*(?:am|pm)\b/i)
+      scan = text.lines.reject { |l| l.lstrip.start_with?(">") || l.match?(/\bwrote:\s*$/i) }.join
+      scan.match?(/\b\d{1,2}:\d{2}\s*(?:am|pm)?\b/i) ||
+        scan.match?(/\b\d{1,2}\s*(?:am|pm)\b/i)
     end
 
     private
