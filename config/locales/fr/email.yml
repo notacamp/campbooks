@@ -135,6 +135,7 @@ fr:
       collapse_discussion_aria: Réduire la discussion
       collapse_sidebar_aria: Réduire la barre latérale
       compose_label: Composer
+      digest_badge: "Récapitulatif"
       discussion_button_label: Discussion
       discussion_empty_body: Laissez une note à votre équipe, ou mentionnez %{scout_mention}
         pour interroger l'IA sur cet e-mail.

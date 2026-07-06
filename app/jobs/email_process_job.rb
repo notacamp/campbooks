@@ -44,6 +44,17 @@ class EmailProcessJob < ApplicationJob
       email.update!(body: new_body) if new_body != email.body
     end
 
+    # Our OWN outbound mail (digests, notifications, transactional) is delivered to
+    # the user's mailbox and so gets re-ingested here. Keep it readable — the body is
+    # fetched above and it stays a visible inbox row below — but run NONE of the AI
+    # pipeline on it: extracting reminders/tasks/contacts from a digest that itself
+    # lists the user's reminders just manufactures duplicates, and firing workflow /
+    # event triggers on our own mail is wrong. Flagged at ingest by MessageUpserter.
+    if email.self_generated?
+      finalize_without_analysis(email, was_already_processed)
+      return
+    end
+
     if email.has_attachment? && email.files.blank? && email.provider_folder_id.present?
       process_attachments(email, mail_client)
     end
@@ -180,6 +191,17 @@ class EmailProcessJob < ApplicationJob
   end
 
   private
+
+  # A readable, threaded inbox row for self-generated mail (so the user can read the
+  # digest) without any AI analysis, tagging, contact profiling, or workflow / event
+  # triggers. Mirrors only the minimal "make it exist and stay visible" slice of the
+  # normal path; every extractor and trigger in #perform is deliberately skipped.
+  def finalize_without_analysis(email, was_already_processed)
+    thread = find_or_create_thread(email)
+    email.update!(email_thread: thread)
+    email.processed! unless was_already_processed
+    Emails::InboxBroadcaster.upsert(thread) if thread && !was_already_processed
+  end
 
   # Attach the workspace's default group tag for this email's rules category, so
   # low-priority mail collapses into its inbox group. Tolerant of failure so it
