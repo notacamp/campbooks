@@ -65,4 +65,34 @@ RSpec.describe Campbooks::SystemHealth::CallRow, type: :component do
     html = render_row(call)
     expect(html).to include("—")
   end
+
+  # ── href kwarg ────────────────────────────────────────────────────────────────
+
+  it "without href renders a div (non-link)" do
+    call = ExternalServiceCall.new(
+      service: "google_mail", status: :success, operation: "GET /messages",
+      duration_ms: 100, created_at: 1.hour.ago
+    )
+    html = ApplicationController.render(
+      Campbooks::SystemHealth::CallRow.new(call: call),
+      layout: false
+    )
+    # Default (no href) renders as a block div, not an anchor
+    expect(html).to include("<div")
+    expect(html).not_to include("<a ")
+  end
+
+  it "with href wraps the row content in a block link" do
+    call = ExternalServiceCall.new(
+      service: "google_mail", status: :success, operation: "GET /messages",
+      duration_ms: 100, created_at: 1.hour.ago
+    )
+    html = ApplicationController.render(
+      Campbooks::SystemHealth::CallRow.new(call: call, href: "/admin/system_health/calls/some-id"),
+      layout: false
+    )
+    expect(html).to include("<a ")
+    expect(html).to include('href="/admin/system_health/calls/some-id"')
+    expect(html).to include("block hover:bg-muted/50")
+  end
 end

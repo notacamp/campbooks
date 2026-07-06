@@ -1,4 +1,5 @@
-<%# locals: calls, pagy, log_path, show_workspace: true %>
+<%# locals: calls, pagy, log_path, show_workspace: true, row_href: nil %>
+<% row_href = local_assigns.fetch(:row_href, nil) %>
 <%# Filter form: auto-submits on change via the auto-submit Stimulus controller. %>
 <%= form_with url: log_path, method: :get,
       data: { turbo_frame: "isc_list", controller: "auto-submit" } do |f| %>
@@ -40,7 +41,7 @@
     <div id="isc_rows" class="divide-y divide-border">
       <% if calls.any? %>
         <% calls.each do |call| %>
-          <%= render(Campbooks::SystemHealth::CallRow.new(call: call, show_workspace: show_workspace)) %>
+          <%= render(Campbooks::SystemHealth::CallRow.new(call: call, show_workspace: show_workspace, href: row_href&.call(call))) %>
         <% end %>
       <% else %>
         <%= render(Campbooks::EmptyState.new(variant: :inline, title: t("admin.system_health.calls.no_matches"))) %>

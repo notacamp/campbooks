@@ -62,4 +62,40 @@ RSpec.describe "Admin::SystemHealthController", type: :request do
     get admin_system_health_path, headers: { "Accept" => "text/vnd.turbo-stream.html" }
     expect(response).to have_http_status(:ok)
   end
+
+  # ── Call detail page ──────────────────────────────────────────────────────────
+
+  it "app_admin can GET call detail page (200) with a body snippet" do
+    call = create(:external_service_call,
+      service: "ai_openai",
+      request_body: '{"model":"gpt-4","messages":[]}',
+      response_body: '{"choices":[]}',
+      request_headers: { "Content-Type" => "application/json" },
+      response_headers: { "X-Request-Id" => "req-abc" })
+
+    sign_in_as admin
+    get call_admin_system_health_path(id: call.id)
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("gpt-4")        # from request_body
+    expect(response.body).to include("req-abc")      # from response_headers
+  end
+
+  it "workspace-role admin (non-app-admin) cannot access call detail page" do
+    call = create(:external_service_call)
+    sign_in_as user
+    get call_admin_system_health_path(id: call.id)
+    expect(response).to redirect_to(root_path)
+  end
+
+  it "call detail page renders fine for a row with all-nil capture columns" do
+    call = create(:external_service_call,
+      request_headers: nil, response_headers: nil,
+      request_body: nil, response_body: nil)
+
+    sign_in_as admin
+    get call_admin_system_health_path(id: call.id)
+    expect(response).to have_http_status(:ok)
+    # Should show the "not captured" placeholder for each section
+    expect(response.body).to include("(not captured)")
+  end
 end

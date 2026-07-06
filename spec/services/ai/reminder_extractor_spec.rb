@@ -46,4 +46,46 @@ RSpec.describe Ai::ReminderExtractor do
     expect(Ai::Configuration).not_to receive(:for_any)
     expect(extract(content: "   ")).to eq([])
   end
+
+  # ── round-trip itinerary splitting ────────────────────────────────────────────
+  #
+  # The parse/validation paths are covered above; these guard the per-leg
+  # behaviour added alongside the per-leg prompt instruction: a multi-leg
+  # itinerary must yield one reminder item per dated leg, not collapse to one.
+
+  context "round-trip itinerary" do
+    def stub_with_json(json)
+      adapter = double("ai_adapter")
+      allow(adapter).to receive(:chat).and_return(json)
+      allow(Ai::Configuration).to receive(:for_any).and_return(
+        adapter: adapter, model: "m", max_tokens: 100, temperature: 0.0
+      )
+    end
+
+    it "keeps every dated leg of a round-trip itinerary" do
+      json = {
+        "reminders" => [
+          { "reminder_type" => "travel", "title" => "Flight to Clermont Ferrand",
+            "due_date" => "2026-12-20", "due_time" => "16:10", "all_day" => false, "confidence" => 1.0 },
+          { "reminder_type" => "travel", "title" => "Return flight to Lisbon",
+            "due_date" => "2026-12-24", "due_time" => "11:15", "all_day" => false, "confidence" => 1.0 }
+        ]
+      }.to_json
+
+      stub_with_json(json)
+      round_trip_email = EmailMessage.new(subject: "Trip", body: "round trip LIS <-> CFE")
+      items = described_class.new(source: round_trip_email, content: "round trip LIS <-> CFE",
+        anchor_date: Date.new(2026, 7, 5), time_zone: Time.zone).extract
+
+      expect(items.size).to eq(2)
+      expect(items.map { |i| i["due_date"] }.sort).to eq(%w[2026-12-20 2026-12-24])
+    end
+
+    it "the system prompt tells the model to split a round-trip into per-leg reminders" do
+      extractor = described_class.new(source: EmailMessage.new(subject: "x", body: "y"), content: "y")
+      prompt = extractor.send(:system_prompt)
+      expect(prompt).to match(/round trip/i)
+      expect(prompt).to match(/return departure/i)
+    end
+  end
 end
