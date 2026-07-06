@@ -1,0 +1,41 @@
+<%# Merge form — renders in the inbox_settings_tag_form frame %>
+<%= turbo_frame_tag "inbox_settings_tag_form" do %>
+  <div class="rounded-lg border border-border bg-surface p-4 mb-4">
+    <h4 class="text-sm font-semibold text-foreground mb-1">
+      <%= t(".heading", name: @tag.name) %>
+    </h4>
+    <p class="text-xs text-muted-foreground mb-4">
+      <%= t(".hint") %>
+    </p>
+
+    <%= form_with url: commit_merge_inbox_settings_tag_path(@tag), method: :post do |f| %>
+      <div class="mb-4">
+        <label class="block text-xs font-medium text-foreground mb-1.5" for="into_tag_id">
+          <%= t(".merge_into_label") %>
+        </label>
+        <select name="into_tag_id" id="into_tag_id" required
+                class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground
+                       focus:outline-none focus:ring-2 focus:ring-ring">
+          <option value=""><%= t(".select_placeholder") %></option>
+          <% @other_tags.each do |t_opt| %>
+            <option value="<%= t_opt.id %>"><%= t_opt.name %></option>
+          <% end %>
+        </select>
+      </div>
+
+      <p class="text-xs text-muted-foreground mb-4 italic">
+        <%= t(".warning") %>
+      </p>
+
+      <div class="flex items-center gap-2">
+        <%= f.submit t(".submit"),
+              class: "px-3 py-1.5 text-xs font-semibold rounded-md bg-foreground text-background
+                      hover:bg-foreground/90 transition-colors cursor-pointer" %>
+        <%= link_to t("inbox_settings.tags.form.cancel"),
+              inbox_settings_tags_path,
+              data: { turbo_frame: "inbox_settings_tag_form" },
+              class: "px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors" %>
+      </div>
+    <% end %>
+  </div>
+<% end %>

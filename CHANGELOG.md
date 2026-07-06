@@ -19,6 +19,23 @@ major, minor, or patch change here.
 ### Added
 
 - **Gmail-style `g` navigation shortcuts for the left nav rail.** Press `g` to arm navigation mode (a 3-second window), then a second key to jump directly to any section: `h` Home, `m` Mail, `c` Calendar, `s` Scout, `f` Files, `p` Contacts, `o` Organizations, `a` Activity, `t` Tasks, `d` Digests, `w` Workflows. While armed, tiny keycap badges appear beside each nav icon (desktop rail and mobile bottom bar) so the map is self-documenting. Escaping, clicking, or navigating disarms automatically. All nine destination keys are listed in the keyboard shortcuts dialog (`?`). Works on desktop; suppressed in the native app shell.
+- **Workspace-owned tags with provider-label pointers.** Each tag can now be
+  linked to a provider label (Gmail / Zoho) in each connected account via a new
+  `tag_account_links` table, decoupling workspace tags from any single mailbox.
+- **Label-import review flow.** When a label sync discovers new non-system
+  labels, they appear in a review panel (Settings > Tags > "Review now"). Users
+  choose per label: map to an existing workspace tag, keep it as its own tag, or
+  ignore it. Decisions are remembered across re-syncs. Provider-side labels are
+  never deleted.
+- **Tag merge.** From the Tags panel, merge tag B into tag A with one click. All
+  messages and account links move to the target tag; the source is deleted. A
+  cross-workspace guard prevents accidental merges across tenants.
+
+### Changed
+
+- Label sync services (Google, Zoho) now record a pending `LabelImportDecision`
+  for every user-visible label discovered during sync, in addition to the
+  existing external-tag creation flow (fully backward compatible).
 
 ### Fixed
 

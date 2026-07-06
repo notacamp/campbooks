@@ -15,6 +15,8 @@ class EmailAccount < ApplicationRecord
   has_many :email_scan_logs, dependent: :restrict_with_error
   has_many :email_folders, dependent: :destroy
   has_many :external_tags, -> { external }, class_name: "Tag", dependent: :destroy
+  has_many :tag_account_links, dependent: :destroy
+  has_many :label_import_decisions, dependent: :destroy
   has_many :email_account_users, dependent: :destroy
   has_many :users, through: :email_account_users
   has_many :email_account_signatures, dependent: :destroy
