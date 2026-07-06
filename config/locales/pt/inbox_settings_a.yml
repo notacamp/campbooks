@@ -5,7 +5,8 @@ pt:
       show:
         active: Activa
         connect_label: 'Ligar:'
-        disconnect_confirm: Desligar %{name}?
+        remove: Remover
+        remove_confirm: "Remover %{name}? Isto elimina permanentemente a caixa de correio e os seus emails. Os documentos e contactos guardados são mantidos. Esta ação não pode ser anulada."
         heading: Contas e sincronização
         inactive: Inactiva
         last_scan: 'Última pesquisa: %{time}'
