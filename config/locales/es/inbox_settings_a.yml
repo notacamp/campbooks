@@ -68,6 +68,31 @@ es:
         subheading: Decida qué remitentes llegan a su bandeja de entrada.
         unblock: Desbloquear
         unstar: Quitar destacado
+    tag_groups:
+      form:
+        cancel: Cancelar
+        heading_edit: Editar %{name}
+        heading_new: Nuevo grupo
+        name_label: Nombre
+        name_placeholder: p. ej. Boletines y promociones
+        save: Guardar grupo
+        tags_hint: El correo con cualquiera de estas etiquetas se pliega en la
+          fila del grupo. Cada etiqueta pertenece a un solo grupo.
+        tags_label: Etiquetas en este grupo
+      index:
+        edit: Editar
+        heading: Grupos
+        new_group: Nuevo grupo
+        no_groups: Aún no hay grupos. Crea uno para plegar el correo de baja prioridad
+          en una sola fila.
+        subheading: Agrupa etiquetas; la bandeja de entrada pliega su correo en
+          una sola fila.
+        threads_count:
+          one: "%{count} conversación"
+          other: "%{count} conversaciones"
+        ungroup: Desagrupar
+        ungroup_confirm: ¿Desagrupar %{name}? Las etiquetas se conservan; su correo
+          simplemente deja de plegarse.
     tags:
       create:
         created_toast: Etiqueta creada.

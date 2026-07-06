@@ -65,6 +65,31 @@ pt:
         subheading: Decida quais remetentes chegam à sua caixa de entrada.
         unblock: Desbloquear
         unstar: Remover destaque
+    tag_groups:
+      form:
+        cancel: Cancelar
+        heading_edit: Editar %{name}
+        heading_new: Novo grupo
+        name_label: Nome
+        name_placeholder: p. ex. Newsletters e promoções
+        save: Guardar grupo
+        tags_hint: O correio com qualquer destas etiquetas é recolhido na linha
+          do grupo. Cada etiqueta pertence a um só grupo.
+        tags_label: Etiquetas neste grupo
+      index:
+        edit: Editar
+        heading: Grupos
+        new_group: Novo grupo
+        no_groups: Ainda sem grupos. Crie um para recolher o correio de baixa
+          prioridade numa única linha.
+        subheading: Junte etiquetas em grupos; a caixa de entrada recolhe o correio
+          delas numa linha única.
+        threads_count:
+          one: "%{count} conversa"
+          other: "%{count} conversas"
+        ungroup: Desagrupar
+        ungroup_confirm: Desagrupar %{name}? As etiquetas mantêm-se; o correio
+          delas apenas deixa de ser recolhido.
     tags:
       create:
         created_toast: Etiqueta criada.
