@@ -13,6 +13,8 @@ FactoryBot.define do
     sequence(:name) { |n| "Tag #{n}" }
     color { "#3b82f6" }
     source { :local }
+    kind { :user }
+    hidden { false }
 
     trait :external do
       email_account

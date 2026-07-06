@@ -1,0 +1,59 @@
+---
+pt:
+  onboarding:
+    steps:
+      template:
+        heading: Para que vai usar o Campbooks principalmente?
+        subheading: Escolha tudo o que se aplica. Vamos configurar as etiquetas e tipos de documentos certos de imediato.
+        continue: Continuar
+        skip: Ignorar por agora
+        skip_hint: Pode escolher uma configuração mais tarde nas Definições.
+        templates:
+          freelancer:
+            name: Freelancer
+            description: Gerencie clientes, faturas, contratos e papelada de projetos num único lugar.
+          small_business:
+            name: Pequena empresa
+            description: Controle faturas de fornecedores, extratos bancários, recibos de vencimento e comunicações da equipa.
+          personal_admin:
+            name: Administração pessoal
+            description: Organize contas, apólices de seguro, cartas de entidades governamentais e papelada doméstica.
+          job_hunt:
+            name: À procura de emprego
+            description: Acompanhe candidaturas, convites para entrevistas e ofertas sem perder nada.
+          accountant:
+            name: Contabilista / técnico oficial de contas
+            description: Gira as declarações, e-faturas e IVA de vários clientes. O diretório de Organizações mantém os documentos de cada cliente à mão.
+          landlord:
+            name: Senhorio / gestor de imóveis
+            description: Arquive contratos de arrendamento, recibos de renda e faturas de serviços por imóvel. Os lembretes de IA avisam-no antes de prazos de renovação.
+          traveler:
+            name: Viajante frequente
+            description: O Campbooks extrai cada trecho de viagem e liga-o automaticamente ao calendário para nunca perder uma ligação ou um prazo de renovação.
+          ecommerce:
+            name: Vendedor online
+            description: O ruído de pedidos colapsa num único grupo para a caixa de entrada ficar organizada. Faturas, ordens de compra e devoluções são arquivadas mal chegam.
+          just_exploring:
+            name: Só a explorar
+            description: Dê uma vista de olhos primeiro. Pode sempre configurar etiquetas e tipos de documentos depois.
+  settings:
+    setup_template:
+      show:
+        title: Configuração
+        subtitle: Reveja a configuração do seu espaço de trabalho e ajuste-a a qualquer momento.
+        current_heading: Configuração activa
+        no_template: Nenhum modelo de configuração escolhido ainda.
+        tags_added: Etiquetas adicionadas
+        doc_types_added: Tipos de documentos adicionados
+        switch_heading: Ajustar configuração
+        switch_hint: Seleccionar um modelo adiciona as suas etiquetas e tipos de documentos. Nada é eliminado.
+        apply_button: Aplicar modelos seleccionados
+        non_destructive_note: Aplicar modelos nunca elimina etiquetas, tipos de documentos ou e-mails existentes.
+        modules_heading: Visibilidade dos módulos
+        modules_hint: Escolha quais as áreas que aparecem na navegação. Pode alterá-las a qualquer momento.
+        save_modules: Guardar
+      update:
+        applied: "%{name} aplicado."
+        invalid_template: Modelo desconhecido. Por favor escolha um da lista.
+      update_modules:
+        modules_saved: Navegação actualizada.

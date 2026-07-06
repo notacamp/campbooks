@@ -18,7 +18,14 @@ en:
         members: Members
         notifications: Notifications
         security: Security
+        setup: Setup
         system_health: System health
+      module_visibility:
+        activity: Activity
+        calendar: Calendar
+        contacts: Contacts
+        files: Files
+        organizations: Organizations
   statuses:
     approved: Approved
     completed: Completed

@@ -4,7 +4,7 @@ class OnboardingController < ApplicationController
   # "welcome" is the golden path: one screen — meet Scout, connect an inbox.
   # The remaining steps are the optional "set up more" wizard, reachable from
   # the welcome screen and Settings but never forced on a new user.
-  STEPS = %w[welcome workspace email_accounts ai_configuration classification review].freeze
+  STEPS = %w[template welcome workspace email_accounts ai_configuration classification review].freeze
 
   before_action :load_templates, except: :first_sync_status
   before_action :set_step, except: :first_sync_status
@@ -164,7 +164,21 @@ class OnboardingController < ApplicationController
     Current.workspace
   end
 
-  # ── Step 0: Welcome (the golden path) ────────────────────
+  # ── Step 0: Template picker ──────────────────────────────
+
+  def prepare_template
+    org # ensure org exists
+    @templates = Onboarding::Templates.all
+    @chosen_keys = Array(org.settings["setup_templates"]).compact
+  end
+
+  def update_template
+    keys = Array(params[:template_keys]).map(&:to_s).select { |k| Onboarding::Templates.keys.include?(k) }
+    Onboarding::TemplateApplier.new(org, keys).apply! if keys.any?
+    # Empty selection (skip) → proceed with no template applied
+  end
+
+  # ── Step 1: Welcome (the golden path) ────────────────────
 
   def prepare_welcome
     org # ensure org exists

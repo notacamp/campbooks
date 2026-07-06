@@ -1,0 +1,59 @@
+---
+fr:
+  onboarding:
+    steps:
+      template:
+        heading: Quel sera votre usage principal de Campbooks ?
+        subheading: "Choisissez tout ce qui s'applique. Nous configurerons les étiquettes et types de documents adaptés immédiatement."
+        continue: Continuer
+        skip: Ignorer pour l'instant
+        skip_hint: Vous pourrez choisir une configuration plus tard dans les Réglages.
+        templates:
+          freelancer:
+            name: Freelance
+            description: "Gérez clients, factures, contrats et documents de projet en un seul endroit."
+          small_business:
+            name: Petite entreprise
+            description: "Suivez les factures fournisseurs, relevés bancaires, bulletins de paie et communications d'équipe."
+          personal_admin:
+            name: Administration personnelle
+            description: "Organisez factures, polices d'assurance, courriers officiels et paperasse du quotidien."
+          job_hunt:
+            name: "Recherche d'emploi"
+            description: "Suivez candidatures, invitations aux entretiens et offres sans rien laisser passer."
+          accountant:
+            name: Comptable / expert-comptable
+            description: "Gérez les déclarations, e-factures et TVA de plusieurs clients. Le répertoire Organisations garde les documents de chaque client à portée de main."
+          landlord:
+            name: Propriétaire / gestionnaire immobilier
+            description: "Classez baux, quittances de loyer et factures par bien. Les rappels IA vous alertent avant les échéances de renouvellement."
+          traveler:
+            name: Grand voyageur
+            description: Campbooks extrait chaque étape du voyage et la relie automatiquement à votre calendrier pour ne jamais manquer une correspondance ni une date de renouvellement.
+          ecommerce:
+            name: Vendeur en ligne
+            description: "Le bruit des commandes se regroupe pour que la boîte de réception reste calme. Factures, bons de commande et retours sont classés dès leur arrivée."
+          just_exploring:
+            name: Juste explorer
+            description: "Regardez d'abord. Vous pouvez toujours configurer les étiquettes et types de documents plus tard."
+  settings:
+    setup_template:
+      show:
+        title: Configuration
+        subtitle: "Révisez la configuration de votre espace de travail et ajustez-la à tout moment."
+        current_heading: Configuration active
+        no_template: "Aucun modèle de configuration choisi pour l'instant."
+        tags_added: "Étiquettes ajoutées"
+        doc_types_added: Types de documents ajoutés
+        switch_heading: Ajuster la configuration
+        switch_hint: "Sélectionner un modèle ajoute ses étiquettes et types de documents. Rien n'est supprimé."
+        apply_button: Appliquer les modèles sélectionnés
+        non_destructive_note: "Appliquer des modèles ne supprime jamais les étiquettes, types de documents ou e-mails existants."
+        modules_heading: "Visibilité des modules"
+        modules_hint: "Choisissez quelles zones apparaissent dans la navigation. Vous pouvez les modifier à tout moment."
+        save_modules: Enregistrer
+      update:
+        applied: "%{name} appliqué."
+        invalid_template: "Modèle inconnu. Veuillez en choisir un dans la liste."
+      update_modules:
+        modules_saved: Navigation mise à jour.

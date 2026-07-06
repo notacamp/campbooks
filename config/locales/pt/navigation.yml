@@ -18,7 +18,14 @@ pt:
         members: Membros
         notifications: Notificações
         security: "Segurança"
+        setup: "Configuração"
         system_health: "Saúde do sistema"
+      module_visibility:
+        activity: Actividade
+        calendar: "Calendário"
+        contacts: Contactos
+        files: Ficheiros
+        organizations: "Organizações"
   statuses:
     approved: Aprovado
     completed: Concluído

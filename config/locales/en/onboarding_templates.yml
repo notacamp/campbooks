@@ -1,0 +1,59 @@
+---
+en:
+  onboarding:
+    steps:
+      template:
+        heading: What will you mostly use Campbooks for?
+        subheading: Pick everything that applies. We will set up the right tags and document types straight away.
+        continue: Continue
+        skip: Skip for now
+        skip_hint: You can choose a setup later in Settings.
+        templates:
+          freelancer:
+            name: Freelancer
+            description: Manage clients, invoices, contracts, and project paperwork all in one place.
+          small_business:
+            name: Small business
+            description: Keep on top of supplier invoices, bank statements, staff payslips, and team communications.
+          personal_admin:
+            name: Personal admin
+            description: Stay organised with bills, insurance policies, government letters, and household paperwork.
+          job_hunt:
+            name: Job hunt
+            description: Track applications, interview invitations, and offers without anything slipping through.
+          accountant:
+            name: Accountant / bookkeeper
+            description: Handle multiple clients' filings, e-invoices, and VAT returns. The Organizations directory keeps every client's documents at your fingertips.
+          landlord:
+            name: Landlord / property manager
+            description: File leases, rent receipts, and utility bills by property. AI reminders catch contract renewals and inspection dates before they creep up.
+          traveler:
+            name: Frequent traveler
+            description: Campbooks extracts every travel leg and links it to your calendar automatically, so you never miss a connection or a renewal deadline.
+          ecommerce:
+            name: Online seller
+            description: Order noise collapses into a single group so your inbox stays calm. Invoices, purchase orders, and returns are filed the moment they land.
+          just_exploring:
+            name: Just exploring
+            description: Have a look around first. You can always configure tags and document types later.
+  settings:
+    setup_template:
+      show:
+        title: Setup
+        subtitle: Review your workspace setup and adjust it at any time.
+        current_heading: Active setup
+        no_template: No setup template chosen yet.
+        tags_added: Tags added
+        doc_types_added: Document types added
+        switch_heading: Adjust setup
+        switch_hint: Selecting a template adds its tags and document types. Nothing is ever deleted.
+        apply_button: Apply selected templates
+        non_destructive_note: Applying templates never deletes existing tags, document types, or emails.
+        modules_heading: Module visibility
+        modules_hint: Choose which areas appear in the navigation. You can toggle them any time.
+        save_modules: Save
+      update:
+        applied: "%{name} applied."
+        invalid_template: Unknown template. Please choose one from the list.
+      update_modules:
+        modules_saved: Navigation updated.

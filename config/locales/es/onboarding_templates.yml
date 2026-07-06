@@ -1,0 +1,59 @@
+---
+es:
+  onboarding:
+    steps:
+      template:
+        heading: "¿Para qué usarás principalmente Campbooks?"
+        subheading: "Elige todo lo que aplique. Configuraremos las etiquetas y tipos de documentos adecuados de inmediato."
+        continue: Continuar
+        skip: Omitir por ahora
+        skip_hint: Puedes elegir una configuración más tarde en Ajustes.
+        templates:
+          freelancer:
+            name: Freelancer
+            description: Gestiona clientes, facturas, contratos y papeleo de proyectos en un solo lugar.
+          small_business:
+            name: Pequeña empresa
+            description: Controla facturas de proveedores, extractos bancarios, nóminas y comunicaciones del equipo.
+          personal_admin:
+            name: Administración personal
+            description: "Organiza recibos, pólizas de seguro, cartas de organismos gubernamentales y papeleo del hogar."
+          job_hunt:
+            name: "Búsqueda de empleo"
+            description: "Sigue candidaturas, invitaciones a entrevistas y ofertas sin que nada se pierda."
+          accountant:
+            name: Contable / asesor fiscal
+            description: "Gestiona declaraciones, facturas electrónicas e IVA de varios clientes. El directorio de Organizaciones mantiene los documentos de cada cliente a mano."
+          landlord:
+            name: Propietario / administrador de inmuebles
+            description: Archiva contratos de arrendamiento, recibos de alquiler y facturas por inmueble. Los recordatorios de IA avisan antes de vencimientos de contratos.
+          traveler:
+            name: Viajero frecuente
+            description: Campbooks extrae cada tramo del viaje y lo vincula automáticamente al calendario para que nunca pierdas una conexión ni un plazo de renovación.
+          ecommerce:
+            name: Vendedor online
+            description: El ruido de pedidos se colapsa en un grupo para que la bandeja de entrada se mantenga ordenada. Facturas, órdenes de compra y devoluciones se archivan en cuanto llegan.
+          just_exploring:
+            name: Solo explorando
+            description: "Echa un vistazo primero. Siempre puedes configurar etiquetas y tipos de documentos después."
+  settings:
+    setup_template:
+      show:
+        title: "Configuración"
+        subtitle: Revisa la configuración de tu espacio de trabajo y ajústala en cualquier momento.
+        current_heading: "Configuración activa"
+        no_template: Ninguna plantilla de configuración elegida todavía.
+        tags_added: "Etiquetas añadidas"
+        doc_types_added: Tipos de documentos añadidos
+        switch_heading: Ajustar configuración
+        switch_hint: "Seleccionar una plantilla añade sus etiquetas y tipos de documentos. Nada se elimina."
+        apply_button: Aplicar plantillas seleccionadas
+        non_destructive_note: Aplicar plantillas nunca elimina etiquetas, tipos de documentos ni correos existentes.
+        modules_heading: Visibilidad de módulos
+        modules_hint: "Elige qué áreas aparecen en la navegación. Puedes cambiarlas en cualquier momento."
+        save_modules: Guardar
+      update:
+        applied: "%{name} aplicado."
+        invalid_template: "Plantilla desconocida. Por favor elige una de la lista."
+      update_modules:
+        modules_saved: "Navegación actualizada."
