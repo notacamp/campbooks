@@ -8,6 +8,10 @@ module Campbooks
   # (the same vocabulary as document types in thread rows) — the row itself
   # stays on the canvas, never a tinted band.
   #
+  # A checkbox appears on hover (or permanently in select mode), wired to the
+  # email-selection controller so every bulk-action toolbar tool works on the
+  # whole group without navigating into the drill-in view first.
+  #
   #   render Campbooks::TagGroupRow.new(
   #     label: "Newsletters & promos", count: 3, color: "#d44996",
   #     href: email_messages_path(group: "Newsletters & promos"),
@@ -33,13 +37,60 @@ module Campbooks
     end
 
     def view_template
+      # Outer container — not a link, so clicking the checkbox does not navigate.
+      # group/grouprow: named group for hover-reveal of chevron + checkbox.
+      div(
+        class: "group/grouprow flex items-center mx-1.5 rounded-xl transition-colors hover:bg-muted",
+        data: { testid: "tag-group-row" }
+      ) do
+        checkbox_area
+        drill_in_link
+      end
+    end
+
+    private
+
+    # Checkbox area — same animated w-0 → w-6 pattern as thread rows.
+    # Hidden by default; revealed on hover or when select-mode is active on
+    # the email-selection ancestor (group/select + data-select-mode="on").
+    # Checked state persists the width (via [&:has(input:checked)]:w-6).
+    def checkbox_area
+      div(
+        class: "flex-shrink-0 w-0 " \
+               "group-hover/grouprow:w-6 " \
+               "[&:has(input:checked)]:w-6 " \
+               "group-data-[select-mode=on]/select:w-6 " \
+               "overflow-hidden transition-all duration-150 flex items-center pl-1.5 self-stretch relative z-10"
+      ) do
+        input(
+          type: "checkbox",
+          class: "w-3.5 h-3.5 rounded border-gray-300 text-accent-600 focus:ring-accent-500 " \
+                 "cursor-pointer " \
+                 "opacity-0 group-hover/grouprow:opacity-100 checked:opacity-100 " \
+                 "group-data-[select-mode=on]/select:opacity-100 " \
+                 "transition-opacity bg-transparent",
+          data: {
+            action: "change->email-selection#toggleGroup",
+            email_selection_target: "groupCheckbox",
+            group_name: @label,
+            group_count: @count
+          },
+          aria_label: t(".select_group_aria", label: @label)
+        )
+      end
+    end
+
+    # The drill-in link covers the rest of the row. Clicking the label, facepile,
+    # or count navigates into the group's filtered view. The link is a flex child
+    # of the outer div, not a full-row wrapper, so the checkbox above stays outside.
+    def drill_in_link
       a(
         href: @href,
-        class: "group/grouprow flex items-center mx-1.5 rounded-xl px-3 transition-colors hover:bg-muted " \
+        class: "flex items-center flex-1 min-w-0 rounded-xl pr-3 " \
                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-500",
         style: "padding-top:var(--thread-py,0.625rem);padding-bottom:var(--thread-py,0.625rem);gap:var(--thread-gap,0.875rem)",
         aria_label: t(".aria_label", label: @label, count: @count),
-        data: { turbo_frame: "_top", testid: "tag-group-row" }
+        data: { turbo_frame: "_top" }
       ) do
         facepile
         div(class: "min-w-0 flex-1") do
@@ -54,8 +105,6 @@ module Campbooks
             fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", aria_hidden: "true") { raw(safe(CHEVRON)) }
       end
     end
-
-    private
 
     # Recent senders as the standard facepile (ring cutouts, "+N" overflow).
     # Sits on the thread rows' avatar gutter — min-w matches the single :lg

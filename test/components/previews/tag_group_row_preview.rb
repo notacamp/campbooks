@@ -47,4 +47,11 @@ class TagGroupRowPreview < ViewComponent::Preview
       senders: [ { email: "store@shop.example" } ]
     )
   end
+
+  # Select-mode active — the checkbox is permanently visible (no hover needed).
+  # Wrap in a group/select div with data-select-mode="on" to simulate the
+  # email-selection controller root that drives the Tailwind modifier.
+  def select_mode
+    render_with_template
+  end
 end

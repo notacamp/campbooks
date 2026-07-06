@@ -6,6 +6,8 @@ fr:
         heading: Tableau
     empty:
       add_account_button: Ajouter un compte e-mail
+      toolbar_archive_title: Archiver
+      toolbar_mark_read_title: Marquer comme lu
       all_sorted_description: Il ne reste que du courrier secondaire, classé dans
         les groupes ci-dessous. Touchez-en un pour le passer en revue ou le vider.
       all_sorted_title: Votre boîte de réception est rangée

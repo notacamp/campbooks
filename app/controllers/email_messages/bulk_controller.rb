@@ -3,6 +3,14 @@ class EmailMessages::BulkController < ApplicationController
 
   def create
     email_ids = Array(params[:email_ids]).map(&:to_s).reject(&:blank?).uniq
+    group_names = Array(params[:groups]).map(&:to_s).reject(&:blank?).uniq
+
+    # Expand collapsed group rows to their constituent inbox message IDs, using
+    # the same guarded scope as the drill-in view so the permission boundary and
+    # the "never collapse this" guards are consistent. Merged with explicit ids.
+    group_message_ids = expand_groups_to_message_ids(group_names)
+    email_ids = (email_ids + group_message_ids).uniq
+
     return render_error(t(".no_emails_selected")) if email_ids.empty?
 
     # Expand to all messages in the selected threads
@@ -178,6 +186,26 @@ class EmailMessages::BulkController < ApplicationController
     base = EmailMessage.accessible_to(Current.user)
     thread_ids = base.where(id: email_ids).where.not(email_thread_id: nil).pluck(:email_thread_id).uniq
     base.where(email_thread_id: thread_ids).pluck(:id)
+  end
+
+  # Resolve each group name to the inbox message IDs that belong to it, using
+  # the same guarded TagGroups scope as the drill-in view and BulkAction. The
+  # inbox-folder constraint mirrors Emails::TagGroupBulkAction#message_ids so
+  # the permission boundary is identical regardless of which tool is called.
+  # Returns an array of string IDs (matching the email_ids convention).
+  def expand_groups_to_message_ids(group_names)
+    return [] if group_names.empty?
+
+    accounts = Current.user.readable_email_accounts.to_a
+    tag_groups = Emails::TagGroups.new(Current.user.workspace, accounts.map(&:id))
+
+    group_names.flat_map do |group_name|
+      threads = tag_groups.group_scope(group_name)
+      next [] unless threads
+
+      messages = EmailMessage.where(email_thread_id: threads.select(:id))
+      Emails::InboxFolders.constrain(messages, accounts).pluck(:id).map(&:to_s)
+    end.uniq
   end
 
   # Push the bulk change to every reader's open inbox, one broadcast per affected
