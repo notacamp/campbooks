@@ -87,6 +87,19 @@ RSpec.describe Tags::MergeService, type: :service do
         service.merge!
         expect(target.reload.default_bucket).to eq("updates")
       end
+
+      it "does NOT copy source group_name when target is ungrouped" do
+        source.update!(default_bucket: "promotions", group_name: "Noise")
+        service.merge!
+        expect(target.reload.group_name).to be_nil
+      end
+
+      it "does NOT change target group_name when target is already grouped" do
+        source.update!(default_bucket: "promotions", group_name: "Noise")
+        target.update!(group_name: "Important")
+        service.merge!
+        expect(target.reload.group_name).to eq("Important")
+      end
     end
 
     context "import decision re-pointing" do
