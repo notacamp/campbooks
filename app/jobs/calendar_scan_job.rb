@@ -87,6 +87,12 @@ class CalendarScanJob < ApplicationJob
     end
   rescue AuthenticationError
     raise
+  rescue Calendars::ServiceUnavailable => e
+    # This Google identity has no Calendar provisioned. Stop re-listing it every
+    # minute (which 403s forever) — deactivate with a reason the settings page and
+    # notification can explain. Reconnecting a real Calendar account clears it.
+    Rails.logger.info("[CalendarScanJob] #{account.email_address}: #{e.message} — disabling calendar sync")
+    account.deactivate_for!(:calendar_service_unavailable)
   rescue => e
     Rails.logger.error("[CalendarScanJob] calendar_list refresh failed for #{account.email_address}: #{e.message}")
   end

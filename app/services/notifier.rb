@@ -18,7 +18,9 @@ module Notifier
           category: :system,
           priority: :action_required,
           title: I18n.t("notifier.account_disconnected.title", email_address: account.email_address),
-          body: I18n.t("notifier.account_disconnected.body"),
+          # A service-unavailable deactivation (no Gmail/Calendar behind the login)
+          # explains itself; a plain token disconnect falls back to "re-authenticate".
+          body: account.deactivation_reason_label || I18n.t("notifier.account_disconnected.body"),
           link_url: "/email_messages?inbox_settings=accounts",
           group_key: "account_disconnected/#{account.id}",
           notifiable: account,

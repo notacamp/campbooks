@@ -8,4 +8,10 @@ module Calendars
   # A write lost its etag precondition (HTTP 412): the event changed remotely
   # since we loaded it. EventWriter re-fetches, re-applies, and retries.
   class ConflictError < StandardError; end
+
+  # The connected account has no Google Calendar provisioned (403 "The user must
+  # be signed up for Google Calendar") — a login-only / mail-only identity. A
+  # permanent condition, so CalendarScanJob deactivates the account instead of
+  # re-listing every minute.
+  class ServiceUnavailable < StandardError; end
 end

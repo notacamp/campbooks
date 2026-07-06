@@ -18,7 +18,12 @@ module Zoho
 
     def calendar_list
       response = connection.get("#{BASE_URL}/calendars")
-      return [] unless response.success?
+      unless response.success?
+        # Reads stay defensive (return empty), but log the body — the Zoho path is
+        # unverified against a live grant, and a silent 400 here is undiagnosable.
+        Rails.logger.error("[Zoho::CalendarClient] calendar_list failed: #{response.status} #{response.body.to_s[0..300]}")
+        return []
+      end
       data = JSON.parse(response.body)
       Array(data["calendars"]).map { |c| normalize_calendar(c) }
     rescue JSON::ParserError => e
@@ -38,7 +43,10 @@ module Zoho
     def list_events_full(calendar, time_min:, time_max:)
       range = { start: zoho_time(time_min), end: zoho_time(time_max) }.to_json
       response = connection.get("#{BASE_URL}/calendars/#{calendar.provider_calendar_id}/events", range: range)
-      return { events: [], next_sync_token: nil } unless response.success?
+      unless response.success?
+        Rails.logger.error("[Zoho::CalendarClient] list_events failed: #{response.status} #{response.body.to_s[0..300]}")
+        return { events: [], next_sync_token: nil }
+      end
       data = JSON.parse(response.body)
       events = Array(data["events"]).map { |e| normalize_event(e) }
       { events: events, next_sync_token: nil }
