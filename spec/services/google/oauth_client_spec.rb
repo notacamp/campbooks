@@ -1,6 +1,10 @@
 require "rails_helper"
 
 RSpec.describe Google::OauthClient do
+  # The client ENV.fetches its app credentials at construction; supply dummies
+  # for the duration of each example (CI has no real keys).
+  around { |example| with_env("GOOGLE_CLIENT_ID" => "test-id", "GOOGLE_CLIENT_SECRET" => "test-secret") { example.run } }
+
   describe "#revoke_token" do
     subject(:client) { described_class.new(refresh_token: "rt-123") }
 

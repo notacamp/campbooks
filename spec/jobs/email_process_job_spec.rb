@@ -9,6 +9,9 @@ RSpec.describe EmailProcessJob, type: :job do
     before do
       allow(Zoho::MailClient).to receive(:new).with(account).and_return(mail_client)
       allow(mail_client).to receive(:get_message_content).and_return("<html>Email body</html>")
+      # Categorization now resolves inbox folder ids via the client; these fixtures
+      # have no inbox folder, so return an empty list (matches pre-folder behavior).
+      allow(mail_client).to receive(:list_folders).and_return([])
     end
 
     context "with attachments" do

@@ -99,7 +99,9 @@ RSpec.describe "Email tools (Scout suggested actions)", type: :request do
     it "renders the editable preview into the surface's compose slot" do
       post tool_email_message_path(message, surface: "detail"), params: { tool: "draft_reply" }, as: :turbo_stream
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("thread_compose_target")
+      # The compose slot moved from thread_compose_target to the global compose_dock
+      # (dock_with_scout_stream — called when surface="detail" has a slot defined).
+      expect(response.body).to include("compose_dock")
       expect(response.body).to include("Sure thing")
     end
 

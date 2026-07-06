@@ -49,7 +49,7 @@ RSpec.describe Emails::SkimBuilder do
     end
 
     it "labels themes for the menu" do
-      expect(rings_for(emails).map { |r| r[:label] }).to eq([ "People", "Notifications", "Promotions" ])
+      expect(rings_for(emails).map { |r| r[:label] }).to eq([ "People", "Notifications", "Newsletters & promos" ])
     end
   end
 

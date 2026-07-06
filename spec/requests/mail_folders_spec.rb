@@ -94,4 +94,65 @@ RSpec.describe "MailFolders", type: :request do
       expect(response).to have_http_status(:not_found)
     end
   end
+
+  # ── Dual-surface folder sync (pane + mobile sheet) — MailFoldersControllerTest ──
+  #
+  # Guards the dual-surface folder sync introduced with the mobile folder
+  # bottom-sheet. create / update / destroy must re-render BOTH the desktop
+  # pane's #pane_custom_folders AND the mobile sheet's #sheet_custom_folders,
+  # so the two folder lists (both live in the DOM at once — the pane is CSS-hidden
+  # on mobile, not removed) never drift out of sync.
+  describe "dual-surface sync (pane + mobile sheet)" do
+    include ActionView::RecordIdentifier
+
+    # provision: false keeps the request hermetic (no provider API calls); with no
+    # connected accounts provisioning is a no-op anyway, but this is explicit.
+    it "create re-renders both the pane and the sheet custom-folder sections" do
+      expect {
+        post mail_folders_path,
+             params: { mail_folder: { name: "Receipts" }, provision: false },
+             as: :turbo_stream
+      }.to change { workspace.mail_folders.count }.by(1)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to match(/target="custom_folder_chips"/)
+      expect(response.body).to match(/target="pane_custom_folders"/)
+      expect(response.body).to match(/target="sheet_custom_folders"/)
+    end
+
+    it "update re-renders both the pane and the sheet custom-folder sections" do
+      folder = workspace.mail_folders.create!(name: "Clients", position: 1)
+
+      patch mail_folder_path(folder),
+            params: { mail_folder: { name: "Client Work" } },
+            as: :turbo_stream
+
+      expect(response).to have_http_status(:ok)
+      expect(folder.reload.name).to eq("Client Work")
+      expect(response.body).to match(/target="pane_custom_folders"/)
+      expect(response.body).to match(/target="sheet_custom_folders"/)
+    end
+
+    it "destroy removes the chip and re-renders both custom-folder sections" do
+      folder = workspace.mail_folders.create!(name: "Travel", position: 1)
+
+      expect {
+        delete mail_folder_path(folder), as: :turbo_stream
+      }.to change { workspace.mail_folders.count }.by(-1)
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to match(/target="#{dom_id(folder, :folder_chip)}"/)
+      expect(response.body).to match(/target="pane_custom_folders"/)
+      expect(response.body).to match(/target="sheet_custom_folders"/)
+    end
+
+    it "create requires authentication" do
+      delete session_path
+      post mail_folders_path,
+           params: { mail_folder: { name: "Nope" }, provision: false },
+           as: :turbo_stream
+
+      expect(response).to have_http_status(:found)
+    end
+  end
 end

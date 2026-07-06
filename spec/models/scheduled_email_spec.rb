@@ -98,6 +98,57 @@ RSpec.describe ScheduledEmail do
     end
   end
 
+  # ── From ScheduledEmailTest (Minitest migration) ─────────────────────────────
+
+  describe "accessible_to and editable_by (extended coverage)" do
+    before do
+      @workspace = create(:workspace)
+      @creator   = create(:user, workspace: @workspace)
+      @account   = create(:email_account, workspace: @workspace)
+      create(:email_account_user, :owner, user: @creator, email_account: @account)
+      @scheduled = create(:scheduled_email, workspace: @workspace, email_account: @account, created_by: @creator)
+    end
+
+    it "accessible_to includes the creator even without a mailbox share" do
+      other_account = create(:email_account, workspace: @workspace)
+      orphaned = create(:scheduled_email, workspace: @workspace, email_account: other_account, created_by: @creator)
+
+      expect(ScheduledEmail.accessible_to(@creator)).to include(orphaned)
+    end
+
+    it "accessible_to includes mailbox readers" do
+      reader = create(:user, workspace: @workspace)
+      create(:email_account_user, :viewer, user: reader, email_account: @account)
+
+      expect(ScheduledEmail.accessible_to(reader)).to include(@scheduled)
+    end
+
+    it "accessible_to excludes workspace members with no share on the mailbox" do
+      bystander = create(:user, workspace: @workspace)
+
+      expect(ScheduledEmail.accessible_to(bystander)).to be_empty
+    end
+
+    it "accessible_to excludes users from another workspace and nil users" do
+      outsider = create(:user)
+
+      expect(ScheduledEmail.accessible_to(outsider)).to be_empty
+      expect(ScheduledEmail.accessible_to(nil)).to be_empty
+    end
+
+    it "editable_by the creator and by senders, not by read-only sharees" do
+      reader = create(:user, workspace: @workspace)
+      create(:email_account_user, :viewer, user: reader, email_account: @account)
+      sender = create(:user, workspace: @workspace)
+      create(:email_account_user, :collaborator, user: sender, email_account: @account)
+
+      expect(@scheduled.editable_by?(@creator)).to be_truthy
+      expect(@scheduled.editable_by?(sender)).to be_truthy
+      expect(@scheduled.editable_by?(reader)).to be_falsey
+      expect(@scheduled.editable_by?(nil)).to be_falsey
+    end
+  end
+
   describe "#recurrence_key" do
     {
       "FREQ=DAILY" => :daily,

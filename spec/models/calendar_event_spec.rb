@@ -138,6 +138,82 @@ RSpec.describe CalendarEvent, type: :model do
     end
   end
 
+  # ── From CalendarEventTest (Minitest migration) ──────────────────────────────
+
+  describe "display_color (direct creation)" do
+    before do
+      @ws      = Workspace.create!(name: "CalEvent Test WS")
+      account  = @ws.calendar_accounts.create!(email_address: "cal@example.com", refresh_token: "tok")
+      @calendar = account.calendars.create!(provider_calendar_id: "pc1", name: "Primary", color: "#123456")
+      @event   = @calendar.calendar_events.create!(
+        provider_event_id: "e1", title: "X",
+        start_at: Time.current, end_at: Time.current + 1.hour
+      )
+    end
+
+    it "display_color is always the owning calendar's color" do
+      expect(@event.display_color).to eq("#123456")
+    end
+
+    it "an assigned event type never changes the color (only its icon marks the event)" do
+      type = @ws.event_types.create!(name: "Meeting", icon: "users")
+      @event.update!(event_type: type)
+      expect(@event.display_color).to eq("#123456")
+      expect(@event.event_type.icon).to eq("users")
+    end
+
+    it "a calendar without its own color falls back to the account color" do
+      @event.calendar.update!(color: nil)
+      expect(@event.display_color).to eq(@event.calendar_account.color)
+    end
+
+    it "type_status defaults to pending" do
+      expect(@event).to be_type_status_pending
+    end
+  end
+
+  # ── From CalendarEventRecurrenceTest (Minitest migration) ────────────────────
+
+  describe "recurrence predicates" do
+    it "recurring? is true for a local/Zoho master (rrule only)" do
+      event = CalendarEvent.new(rrule: "FREQ=WEEKLY")
+      expect(event).to be_recurring
+      expect(event).to be_series_master
+      expect(event).not_to be_series_instance
+    end
+
+    it "recurring? is true for a provider-materialized instance (series id only)" do
+      event = CalendarEvent.new(recurring_event_provider_id: "series-1")
+      expect(event).to be_recurring
+      expect(event).not_to be_series_master
+      expect(event).to be_series_instance
+    end
+
+    it "a plain event is neither master nor instance" do
+      event = CalendarEvent.new
+      expect(event).not_to be_recurring
+      expect(event).not_to be_series_master
+      expect(event).not_to be_series_instance
+    end
+
+    it "a blank rrule normalizes to nil so master/instance queries stay NULL-clean" do
+      event = CalendarEvent.new(rrule: "")
+      event.valid? # triggers before_validation
+      expect(event.rrule).to be_nil
+      expect(event).not_to be_series_master
+    end
+
+    it "an unparseable rrule is rejected" do
+      event = CalendarEvent.new(provider_event_id: "x", rrule: "not a rule")
+      expect(event).not_to be_valid
+      expect(event.errors[:rrule]).to be_present
+    end
+
+    it "recurrence exposes the value object" do
+      expect(CalendarEvent.new(rrule: "FREQ=WEEKLY").recurrence.preset_key).to eq(:weekly)
+    end
+  end
+
   describe ".duplicate_for" do
     let(:calendar) { create(:calendar) }
     let(:email)    { create(:email_message) }
