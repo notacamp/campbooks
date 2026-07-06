@@ -20,6 +20,11 @@ class ZohoLabelSyncJob < ApplicationJob
       end
       count = service.new(account).sync_labels!
       Rails.logger.info("[LabelSyncJob] Synced #{count} labels for #{account.email_address}")
+    rescue Emails::MailboxUnavailable => e
+      # No Gmail mailbox behind this Google identity — deactivate rather than
+      # retry the doomed label fetch every cycle (see EmailScanJob).
+      Rails.logger.info("[LabelSyncJob] #{account.email_address}: #{e.message} — disabling sync")
+      account.deactivate_for!(:mail_service_unavailable)
     rescue => e
       # Isolate per-account failures so one bad mailbox doesn't abort the batch —
       # but surface them to error tracking, not only the log. A silent rescue here

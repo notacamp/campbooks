@@ -271,8 +271,16 @@ module Google
     def raise_for_status!(response, context)
       return if response.success?
       raise AuthenticationError, "Google Calendar #{context} unauthorized" if response.status == 401
+      raise Calendars::ServiceUnavailable, "Google account is not signed up for Google Calendar" if calendar_not_provisioned?(response)
       Rails.logger.error("[Google::CalendarClient] #{context} failed: #{response.status} #{response.body.to_s[0..300]}")
       raise "Google Calendar #{context} failed: #{response.status}"
+    end
+
+    # Google answers 403 "The user must be signed up for Google Calendar." for a
+    # Google identity that has no Calendar provisioned (a login-only / mail-only
+    # account). Permanent — the caller stops re-scanning rather than retrying.
+    def calendar_not_provisioned?(response)
+      response.status == 403 && response.body.to_s.include?("must be signed up for Google Calendar")
     end
 
     def connection

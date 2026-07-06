@@ -1,4 +1,6 @@
 class EmailAccount < ApplicationRecord
+  include ProviderSyncDeactivation
+
   belongs_to :workspace
 
   encrypts :refresh_token

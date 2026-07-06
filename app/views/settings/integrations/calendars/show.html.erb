@@ -34,6 +34,9 @@
             <p class="text-xs text-gray-500 mt-0.5 truncate">
               <%= account.email_address %> &middot; <%= human_enum(CalendarAccount, :provider, account.provider) %>
             </p>
+            <% if account.deactivated_for_service? && account.deactivation_reason_label %>
+              <p class="text-xs text-red-600 dark:text-red-400 mt-1"><%= account.deactivation_reason_label %></p>
+            <% end %>
           </div>
           <div class="flex flex-wrap items-center gap-1 sm:flex-shrink-0">
             <% if account.owned_by?(Current.user) %>

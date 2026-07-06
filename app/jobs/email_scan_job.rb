@@ -101,6 +101,14 @@ class EmailScanJob < ApplicationJob
       # failure: close the log cleanly so the sync dashboard reads true.
       scan_log&.update!(status: :completed, completed_at: Time.current)
       Emails::FullResyncJob.perform_later(account.id)
+    rescue Emails::MailboxUnavailable => e
+      # This Google identity has no Gmail mailbox. Stop re-scanning it every minute
+      # (the API 400s "Mail service not enabled" forever) — deactivate with a reason
+      # the accounts panel and disconnect notification can explain. Reconnecting a
+      # real mailbox clears it. Not a retryable failure, so don't re-raise.
+      scan_log&.update!(status: :failed, completed_at: Time.current,
+                        error_messages: [ { error: e.message } ])
+      account.deactivate_for!(:mail_service_unavailable)
     rescue => e
       scan_log&.update!(
         status: :failed,

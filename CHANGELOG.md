@@ -16,6 +16,18 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Connected Google accounts with no Gmail mailbox or no Google Calendar (a
+  sign-in-only / non-Gmail identity) no longer retry their sync every minute
+  forever — the scan now detects the provider's "service not enabled" response,
+  turns that account's sync off, and explains why on the accounts/calendars
+  settings page and in the disconnect notification (instead of a generic
+  "reconnect"). Stops the recurring 400/403 noise on the System Health dashboard.
+- Zoho Calendar read failures now log the response status and body. The reads
+  previously swallowed errors silently, making a live-grant 400 impossible to
+  diagnose from the logs.
+
 ## [0.14.0] - 2026-07-06
 
 ### Fixed
@@ -26,7 +38,6 @@ major, minor, or patch change here.
   The same booking arriving as two emails — e.g. a booking confirmation and a separate
   ticket email — no longer creates duplicate reminders: the de-dupe now matches a timed
   reminder on its exact time and ignores a date the AI appends to the title.
-
 
 ### Changed
 

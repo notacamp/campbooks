@@ -1,0 +1,5 @@
+pt:
+  accounts:
+    deactivation_reasons:
+      mail_service_unavailable: "Esta conta Google não tem caixa de correio do Gmail, por isso o correio não pode ser sincronizado. Ligue a conta onde este endereço recebe realmente o correio."
+      calendar_service_unavailable: "Esta conta Google não está registada no Google Calendar, por isso não há nada para sincronizar aqui."
