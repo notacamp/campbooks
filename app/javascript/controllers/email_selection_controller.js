@@ -1,10 +1,12 @@
 import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
-  static targets = ["toolbar", "header", "count", "checkbox", "sectionToggle", "selectToggle", "tagMenu", "folderMenu", "snoozeMenu"]
+  static targets = ["toolbar", "header", "count", "checkbox", "groupCheckbox", "sectionToggle", "selectToggle", "tagMenu", "folderMenu", "snoozeMenu"]
 
   connect() {
     this.selected = new Set()
+    // Map<groupName, collapsedCount> — groups selected via their row checkbox.
+    this.selectedGroups = new Map()
     this.selectMode = this.element.dataset.selectMode === "on"
   }
 
@@ -20,6 +22,21 @@ export default class extends Controller {
     this.updateUI()
   }
 
+  // Toggle a collapsed group row checkbox. The group name and its collapsed
+  // count come from data attributes on the checkbox; the count is summed into
+  // the toolbar counter so the user can see how many emails will be acted on.
+  toggleGroup(event) {
+    const cb = event.target
+    const name = cb.dataset.groupName
+    const count = parseInt(cb.dataset.groupCount || "0", 10)
+    if (cb.checked) {
+      this.selectedGroups.set(name, count)
+    } else {
+      this.selectedGroups.delete(name)
+    }
+    this.updateUI()
+  }
+
   toggleAll(event) {
     const checked = event.target.checked
     this.checkboxTargets.forEach(cb => {
@@ -30,10 +47,21 @@ export default class extends Controller {
         this.selected.delete(cb.value)
       }
     })
+    this.groupCheckboxTargets.forEach(gcb => {
+      gcb.checked = checked
+      const name = gcb.dataset.groupName
+      const count = parseInt(gcb.dataset.groupCount || "0", 10)
+      if (checked) {
+        this.selectedGroups.set(name, count)
+      } else {
+        this.selectedGroups.delete(name)
+      }
+    })
     this.updateUI()
   }
 
   // Select/deselect every row in one date section (Today / This Week / Priority …).
+  // Group rows are not part of any date section so they are unaffected here.
   toggleSection(event) {
     const checked = event.target.checked
     this.sectionCheckboxes(event.target.dataset.section).forEach(cb => {
@@ -49,7 +77,9 @@ export default class extends Controller {
 
   clear() {
     this.selected.clear()
+    this.selectedGroups.clear()
     this.checkboxTargets.forEach(cb => cb.checked = false)
+    this.groupCheckboxTargets.forEach(gcb => gcb.checked = false)
     const selectAll = this.element.querySelector("[data-email-selection-select-all]")
     if (selectAll) selectAll.checked = false
     this.updateUI()
@@ -103,12 +133,13 @@ export default class extends Controller {
     if (!tool) return
 
     if (tool === "delete") {
-      if (!confirm(`Delete ${this.selected.size} email thread(s)? This cannot be undone.`)) return
+      if (!confirm(`Delete ${this.totalCount()} email thread(s)? This cannot be undone.`)) return
     }
 
     const body = new FormData()
     body.append("tool", tool)
     this.selected.forEach(id => body.append("email_ids[]", id))
+    this.selectedGroups.forEach((_, name) => body.append("groups[]", name))
 
     const csrfToken = document.querySelector("meta[name='csrf-token']")?.content
     fetch("/email_messages/bulk", {
@@ -142,6 +173,7 @@ export default class extends Controller {
     const body = new FormData()
     body.append("tool", tool)
     this.selected.forEach(id => body.append("email_ids[]", id))
+    this.selectedGroups.forEach((_, name) => body.append("groups[]", name))
     if (tagName) body.append("tag_name", tagName)
     if (tagAction) body.append("tag_action", tagAction)
     if (folderId) body.append("folder_id", folderId)
@@ -199,11 +231,20 @@ export default class extends Controller {
 
   // --- UI ---
 
+  // Total count shown in the toolbar: individual message IDs + the collapsed
+  // counts from every selected group row. This is the number of emails that
+  // will be acted on, not the number of checkboxes checked.
+  totalCount() {
+    const groupTotal = [...this.selectedGroups.values()].reduce((sum, n) => sum + n, 0)
+    return this.selected.size + groupTotal
+  }
+
   updateUI() {
-    if (this.selected.size > 0) {
+    const count = this.totalCount()
+    if (count > 0) {
       this.toolbarTarget.classList.remove("hidden")
       this.headerTarget.classList.add("hidden")
-      this.countTarget.textContent = this.selected.size
+      this.countTarget.textContent = count
     } else {
       this.toolbarTarget.classList.add("hidden")
       this.headerTarget.classList.remove("hidden")

@@ -1,0 +1,13 @@
+<%# Simulate the email-selection controller root so the Tailwind modifier
+    group-data-[select-mode=on]/select: activates and the checkbox is visible
+    without requiring a hover. In the real app this outer div is rendered by
+    the email_messages/show view. %>
+<div class="group/select max-w-md border border-gray-100 rounded-xl py-1"
+     data-select-mode="on">
+  <%= render(Campbooks::TagGroupRow.new(
+        label: "Notifications", count: 2, color: "#767988", href: "#",
+        senders: [ { email: "builds@ci.example" }, { email: "security@app.example" } ])) %>
+  <%= render(Campbooks::TagGroupRow.new(
+        label: "Newsletters & promos", count: 8, color: "#d44996", href: "#",
+        senders: [ { email: "deals@shop.example" }, { email: "news@daily.example" } ])) %>
+</div>
