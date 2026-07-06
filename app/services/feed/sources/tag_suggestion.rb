@@ -1,13 +1,15 @@
 module Feed
   module Sources
-    # Filing suggestions: Scout proposes a tag and no reply is expected. Rendered
-    # as a compact one-tap "file it" chip-row. Excludes anything with a
+    # Filing suggestions: Scout proposes a tag and auto-applies it, then shows a
+    # notice card ("Filed … under #tag — Undo"). Excludes anything with a
     # draft_reply suggestion so reply-worthy mail stays an action/reminder.
     class TagSuggestion < Feed::Source
       def self.key = "tag_suggestion"
 
       def candidates
         mem = tag_memory
+        workspace_cache = {}
+
         collapse_by_thread(
           base_scope.reorder(:id).find_each.filter_map do |m|
             tag_name = suggested_tag_name(m)
@@ -18,6 +20,12 @@ module Feed
             verdict = learned_verdict(mem, m, tag_name)
             next if verdict == "rejected"
 
+            # Auto-apply: apply the tag now so the card becomes an informative
+            # notice ("Filed") rather than a question ("File it?"). Idempotent —
+            # re-running the generator won't fire events a second time.
+            ws = workspace_cache[m.email_account_id] ||= m.email_account&.workspace
+            applied = auto_apply_tag(m, tag_name, ws)
+
             {
               subject: m,
               dedupe_key: "tag_suggestion:#{m.id}",
@@ -26,7 +34,7 @@ module Feed
               # always-accepted tag floats above the rest.
               score: verdict == "accepted" ? 25 : 15,
               attention: false,
-              data: { tag_name: tag_name }
+              data: { "tag_name" => tag_name, "applied" => applied }
             }
           end
         )
@@ -37,8 +45,15 @@ module Feed
         return false unless in_inbox?(m)
         tag_name = item.data["tag_name"].to_s
         return false if tag_name.blank?
-        # Valid only while Scout still suggests it and it isn't already applied.
-        suggested_tag_name(m) == tag_name && m.tags.none? { |t| t.name.to_s.casecmp?(tag_name) }
+
+        if item.data["applied"]
+          # Notice mode: valid while Scout still suggests the tag AND it is still
+          # applied (guards against manual removal via another surface).
+          suggested_tag_name(m) == tag_name && m.tags.any? { |t| t.name.to_s.casecmp?(tag_name) }
+        else
+          # Legacy ask-mode: valid while the tag is not yet applied.
+          suggested_tag_name(m) == tag_name && m.tags.none? { |t| t.name.to_s.casecmp?(tag_name) }
+        end
       end
 
       private
@@ -73,7 +88,7 @@ module Feed
             .where.not("ai_suggested_actions @> ?", draft_reply_json)
             .where(ai_todo_dismissed: false, skimmed_at: nil)
             .select(:id, :received_at, :created_at, :ai_suggested_actions, :category,
-                    :email_account_id, :email_thread_id, :contact_id, :from_address)
+                    :email_account_id, :email_thread_id, :contact_id, :from_address, :subject)
         ))
       end
 
@@ -84,6 +99,27 @@ module Feed
 
       def add_tag_json = [ { tool: "add_tag" } ].to_json
       def draft_reply_json = [ { tool: "draft_reply" } ].to_json
+
+      # Apply the tag immediately at generation time via the shared EmailActions tool
+      # so the card becomes a notice rather than a question.
+      # Idempotency: checks whether the tag is already applied before calling the
+      # tool, so re-running the generator does not re-publish the "email.tagged"
+      # event for an email that was filed on a previous cycle.
+      # Returns true if the tag is (or just became) applied; false on any failure.
+      def auto_apply_tag(m, tag_name, workspace)
+        return false unless workspace
+
+        tag = workspace.tags.find_by("LOWER(name) = ?", tag_name.downcase.strip)
+        return false unless tag
+
+        # Already applied — no need to fire the tool (and its event) again.
+        return true if m.email_message_tags.where(tag_id: tag.id).exists?
+
+        Tools::AddTag.call(m, { "tag_name" => tag_name }).present?
+      rescue => e
+        Rails.logger.warn("[Feed::Sources::TagSuggestion] auto_apply_tag failed (m=#{m.id}): #{e.class}: #{e.message}")
+        false
+      end
     end
   end
 end
