@@ -46,6 +46,7 @@ en:
         description_placeholder: Add details, links, or context…
         due_label: Due date
         labels_label: Tags
+        no_assignees: No one to assign in this workspace yet.
         no_labels: No tags in this workspace yet.
         priority_label: Priority
         save: Save changes

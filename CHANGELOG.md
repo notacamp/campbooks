@@ -41,6 +41,13 @@ major, minor, or patch change here.
   is important. Grouped mail now shows inline inside a specific folder view (the
   collapse applies to the inbox root only), and custom tag groups get the same
   "keep it if it matters" guards.
+- **Tasks open on the Board view by default** (was the list), so you land on the
+  status board — To do · In progress · Blocked · Done — at a glance. Switch to the
+  flat list any time from the toggle, or link straight to it with `/tasks?view=list`.
+- **Assigning people and tags to a task feels more modern.** The assignee and tag
+  pickers — on the task form and on a task's page — are now tap-to-toggle pills
+  (showing a teammate's initials or the tag's color) instead of a column of
+  checkboxes, and you can set assignees right from the new-task form.
 
 ### Removed
 

@@ -46,6 +46,7 @@ fr:
         description_placeholder: Ajoutez des détails, des liens ou du contexte…
         due_label: Date d'échéance
         labels_label: Étiquettes
+        no_assignees: Personne à assigner dans cet espace de travail pour l'instant.
         no_labels: Aucune étiquette dans cet espace de travail.
         priority_label: Priorité
         save: Enregistrer les modifications
