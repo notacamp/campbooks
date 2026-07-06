@@ -76,10 +76,12 @@ pt:
         starred: Destacado
         unstar: Remover destaque
       tag_suggestion_card:
+        filed_prefix: Etiquetado
         file_it: Etiquetar
         not_now: Agora não
         prefix: Etiquetar
         under: como
+        undo: Anular
       task_card:
         accept: Adicionar às tarefas
         complete: Concluir
@@ -110,6 +112,7 @@ pt:
       task_accepted: 'Adicionada às suas tarefas: %{title}'
       task_completed: 'Tarefa concluída: %{title}'
       task_dismissed: Sugestão dispensada.
+      tag_filing_undone: Etiqueta removida.
       unsupported: Essa ação não é suportada aqui.
   home:
     index:

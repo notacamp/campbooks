@@ -76,10 +76,12 @@ en:
         starred: Starred
         unstar: Unstar
       tag_suggestion_card:
+        filed_prefix: Filed
         file_it: File it
         not_now: Not now
         prefix: File
         under: under
+        undo: Undo
       task_card:
         accept: Add to tasks
         complete: Complete
@@ -110,6 +112,7 @@ en:
       task_accepted: 'Added to your tasks: %{title}'
       task_completed: 'Task completed: %{title}'
       task_dismissed: Suggestion dismissed.
+      tag_filing_undone: Tag removed.
       unsupported: That action is not supported here.
   home:
     index:
