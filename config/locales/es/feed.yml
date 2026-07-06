@@ -76,7 +76,7 @@ es:
         starred: Destacado
         unstar: Quitar destacado
       tag_suggestion_card:
-        filed_prefix: Archivado
+        filed_prefix: Etiquetado
         file_it: Etiquetar
         not_now: Ahora no
         prefix: Etiquetar
