@@ -1,53 +1,78 @@
 <%# The Desk — writing gets the whole screen. No folder rail, no thread list:
     a minimal top bar, one centered column hosting the shared compose engine,
-    and Scout waiting in a collapsible rail on the right. %>
+    a context rail (original message / attachments / Scout chips) on the right,
+    and Scout waiting in a collapsible rail further right.
+    Desktop (lg+): three columns side-by-side. Mobile: editor then rail stacked. %>
 <%= turbo_frame_tag "email_detail", class: "block h-full" do %>
   <div class="flex h-full flex-col bg-card" data-controller="scout-mobile">
-    <div class="flex flex-1 min-h-0" data-controller="compose-chat">
-      <!-- Writing column -->
-      <div class="flex-1 flex flex-col min-w-0">
-        <% if @account %>
-          <!-- Top bar -->
-          <div class="flex items-center gap-3 px-4 sm:px-6 py-3 border-b border-gray-100 flex-shrink-0">
-            <%= link_to email_messages_path, data: { turbo_frame: "_top" },
-                  class: "inline-flex items-center gap-2 text-[13px] font-semibold text-gray-600 hover:text-gray-900 transition-colors" do %>
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-              <%= t(".heading_#{@mode}") %>
-            <% end %>
-            <div class="flex-1"></div>
-            <button type="button" data-action="click->scout-mobile#open"
-                    class="lg:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 cursor-pointer flex-shrink-0">
-              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5z" clip-rule="evenodd"/></svg>
-              <%= t(".scout_label") %>
-            </button>
-          </div>
+    <%# compose-chat drives the Cmd+Shift+E mode toggle and the Scout draft bridge %>
+    <div class="flex flex-1 min-h-0 overflow-y-auto lg:overflow-hidden" data-controller="compose-chat">
 
-          <!-- Centered writing surface -->
-          <div class="flex-1 min-h-0 overflow-y-auto">
-            <div class="max-w-[680px] mx-auto w-full px-4 sm:px-6 pt-6 pb-10 flex flex-col min-h-full">
-              <%= render(Campbooks::Compose::Engine.new(
-                    shell: :desk,
-                    mode: @mode,
-                    action_url: @reply_source ? send_message_email_message_path(@reply_source) : send_new_email_messages_path,
-                    message: @reply_source,
-                    draft: @draft,
-                    to: @to, cc: @cc, bcc: @bcc,
-                    subject: @subject, body: @body, quoted_body: @quoted_body,
-                    signatures: @signatures,
-                    signature_id: @signature_id,
-                    accounts: @reply_source ? [] : @sendable_accounts.to_a,
-                    attachment_entries: @attachment_entries
-                  )) %>
+      <%# Writing column + context rail — flex-col on mobile (stacked), flex-row at lg+ %>
+      <div class="flex flex-col lg:flex-row lg:flex-1 lg:min-h-0 min-w-0">
+
+        <%# ── Writing column ────────────────────────────────────── %>
+        <div class="flex flex-col lg:flex-1 lg:min-h-0 min-w-0">
+          <% if @account %>
+            <%# Top bar — sticky so it doesn't scroll off on mobile %>
+            <div class="sticky top-0 z-10 flex items-center gap-3 px-4 sm:px-6 py-3 border-b border-gray-100 flex-shrink-0 bg-card">
+              <%= link_to email_messages_path, data: { turbo_frame: "_top" },
+                    class: "inline-flex items-center gap-2 text-[13px] font-semibold text-gray-600 hover:text-gray-900 transition-colors" do %>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                <%= t(".heading_#{@mode}") %>
+              <% end %>
+              <div class="flex-1"></div>
+              <%# Mobile-only Scout button (opens overlay) %>
+              <button type="button" data-action="click->scout-mobile#open"
+                      class="lg:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 cursor-pointer flex-shrink-0">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5z" clip-rule="evenodd"/></svg>
+                <%= t(".scout_label") %>
+              </button>
             </div>
-          </div>
-        <% else %>
-          <div class="flex items-center justify-center flex-1">
-            <%= render(Campbooks::EmptyState.new(variant: :card, title: t(".no_sendable_accounts_title"), description: t(".no_sendable_accounts_description"))) %>
-          </div>
-        <% end %>
-      </div>
 
-      <!-- Chat panel (Scout AI) — hidden on mobile; opened as overlay -->
+            <%# Centered writing surface. On desktop: constrained, scrollable.
+                On mobile: natural height (outer div handles scrolling). %>
+            <div class="lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+              <div class="max-w-[680px] mx-auto w-full px-4 sm:px-6 pt-6 pb-10 flex flex-col min-h-full">
+                <%= render(Campbooks::Compose::Engine.new(
+                      shell: :desk,
+                      mode: @mode,
+                      action_url: @reply_source ? send_message_email_message_path(@reply_source) : send_new_email_messages_path,
+                      message: @reply_source,
+                      draft: @draft,
+                      to: @to, cc: @cc, bcc: @bcc,
+                      subject: @subject, body: @body, quoted_body: @quoted_body,
+                      signatures: @signatures,
+                      signature_id: @signature_id,
+                      accounts: @reply_source ? [] : @sendable_accounts.to_a,
+                      attachment_entries: @attachment_entries,
+                      form_id: "compose_desk_form",
+                      show_attachments: false
+                    )) %>
+              </div>
+            </div>
+          <% else %>
+            <div class="flex items-center justify-center flex-1">
+              <%= render(Campbooks::EmptyState.new(variant: :card, title: t(".no_sendable_accounts_title"), description: t(".no_sendable_accounts_description"))) %>
+            </div>
+          <% end %>
+        </div>
+
+        <%# ── Context rail (stacks below editor on mobile, side column at lg+) %>
+        <% if @account %>
+          <%= render(Campbooks::Compose::ContextRail.new(
+                message: @reply_source,
+                mode: @mode,
+                upload_url: compose_attachments_path,
+                form_id: "compose_desk_form",
+                attachment_entries: @attachment_entries,
+                ai_available: ai_provider_available?(:text)
+              )) %>
+        <% end %>
+
+      </div><%# end writing + rail wrapper %>
+
+      <%# ── Scout chat panel (desktop side column / mobile overlay) ── %>
       <div class="hidden lg:flex flex-shrink-0 border-l border-gray-200 flex-col bg-card transition-all duration-200 w-96"
            data-controller="chat-panel"
            data-scout-mobile-target="panel">
@@ -78,9 +103,10 @@
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Scout mobile overlay backdrop -->
+    </div><%# end compose-chat %>
+
+    <%# Scout mobile overlay backdrop %>
     <div data-scout-mobile-target="backdrop" data-action="click->scout-mobile#close"
          class="hidden lg:hidden fixed inset-0 top-14 z-40 bg-black/40"></div>
 

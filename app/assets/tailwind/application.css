@@ -1002,6 +1002,15 @@ dialog[open] {
   background: var(--color-red-50, #fef2f2);
   border-color: var(--color-red-200, #fecaca);
 }
+/* Card variant (context rail drop zone) */
+.compose-attachments--card {
+  border-color: var(--color-gray-200);
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.compose-attachments--card.is-drag-over {
+  border-color: var(--color-amber-400, #fbbf24);
+  background-color: var(--color-amber-50, #fffbeb);
+}
 
 /* ── Thread list view modes ──────────────────────────── */
 #email_threads {

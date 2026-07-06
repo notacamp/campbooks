@@ -64,6 +64,38 @@ export default class extends Controller {
     }
   }
 
+  // ── Context-rail chip bridge ──────────────────────────────
+
+  // Called by Scout suggestion chips in the Compose::ContextRail. Prefills the
+  // chat input with the chip text, opens the panel if collapsed, and focuses.
+  prefillChat(event) {
+    const text = event.params?.text || event.currentTarget.dataset.composeChatTextParam
+    if (!text) return
+
+    // Open the desktop chat panel if it is currently collapsed.
+    const panelEl = document.querySelector("[data-controller~='chat-panel']")
+    if (panelEl && window.innerWidth >= 1024) {
+      const ctrl = this.application.getControllerForElementAndIdentifier(panelEl, "chat-panel")
+      if (ctrl && !ctrl.open) ctrl.toggle()
+    }
+
+    // Surface the Scout overlay on mobile.
+    if (window.innerWidth < 1024) {
+      const scoutEl = document.querySelector("[data-controller~='scout-mobile']")
+      if (scoutEl) {
+        const ctrl = this.application.getControllerForElementAndIdentifier(scoutEl, "scout-mobile")
+        ctrl?.open()
+      }
+    }
+
+    // Fill the input and enable the submit button.
+    const input = document.getElementById("compose_chat_input")
+    if (!input) return
+    input.value = text
+    input.dispatchEvent(new Event("input", { bubbles: true }))
+    setTimeout(() => input.focus(), 150)
+  }
+
   // ── Form-filling bridge ───────────────────────────────────
 
   setRecipients(event) {
