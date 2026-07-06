@@ -42,6 +42,9 @@
                       <% end %>
                     </div>
                     <p class="text-xs text-muted-foreground mt-0.5 truncate"><%= account.email_address %></p>
+                    <% if account.deactivated_for_service? && account.deactivation_reason_label %>
+                      <p class="text-xs text-red-600 dark:text-red-400 mt-1"><%= account.deactivation_reason_label %></p>
+                    <% end %>
                     <p class="text-xs text-muted-foreground mt-0.5">
                       <% if account.scanning? %>
                         <span class="inline-flex items-center gap-1 text-accent-600"><%= render(Campbooks::Spinner.new(size: :sm)) %> <%= t(".scanning") %></span> &middot;

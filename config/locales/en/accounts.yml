@@ -1,0 +1,5 @@
+en:
+  accounts:
+    deactivation_reasons:
+      mail_service_unavailable: "This Google account has no Gmail mailbox, so its mail can't be synced. Connect the account where this address actually receives email."
+      calendar_service_unavailable: "This Google account isn't signed up for Google Calendar, so there's nothing here to sync."

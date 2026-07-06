@@ -38,6 +38,7 @@ ignore_unused:
   - 'recurrence.*'          # shared recurrence labels resolved dynamically (recurrence.presets.<key>) + in Campbooks::RecurrencePicker (components/* excluded from scan)
   - 'contacts.skim.*'       # skim deck copy; `emails` is rendered by Campbooks::ContactSkimCard (components/* excluded from scan)
   - 'events.*'              # activity-feed labels: resolved dynamically (events.names.<key>) and in Campbooks::Activity::EventRow (components/* excluded from scan)
+  - 'accounts.deactivation_reasons.*' # resolved dynamically by deactivation_reason column (ProviderSyncDeactivation#deactivation_reason_label)
 
 # Enum value keys are built dynamically (human_enum_name), so don't flag them as
 # missing from the static scan — parity across locales still covers them.
