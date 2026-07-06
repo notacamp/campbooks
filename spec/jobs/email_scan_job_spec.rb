@@ -147,4 +147,43 @@ RSpec.describe EmailScanJob, type: :job do
       expect(account.reload.scanning).to be true
     end
   end
+
+  # Converted from test/jobs/email_scan_job_test.rb — MailboxUnavailable
+  # handling when a Google identity has no Gmail mailbox provisioned.
+  describe "Emails::MailboxUnavailable handling" do
+    before do
+      allow(strategy).to receive(:full_resync!)
+        .and_raise(Emails::MailboxUnavailable, "Gmail is not enabled for this Google account")
+    end
+
+    it "deactivates the account with mail_service_unavailable and does not re-raise" do
+      expect { described_class.perform_now(account.id, "full") }.not_to raise_error
+      account.reload
+      expect(account.active?).to be(false)
+      expect(account.deactivation_reason).to eq("mail_service_unavailable")
+      expect(account.deactivated_for_service?).to be(true)
+    end
+
+    it "marks the scan log as failed and records the error" do
+      described_class.perform_now(account.id, "full")
+      log = account.email_scan_logs.order(created_at: :asc).last
+      expect(log).to be_present
+      expect(log.failed?).to be(true)
+      expect(log.completed_at).to be_present
+      expect(log.error_messages).not_to be_empty
+    end
+
+    it "does not re-raise Emails::MailboxUnavailable out of the job" do
+      expect { described_class.perform_now(account.id, "full") }.not_to raise_error
+    end
+
+    context "when the account is already inactive" do
+      before { account.deactivate_for!(:mail_service_unavailable) }
+
+      it "is skipped by the active scope so full_resync! is never called" do
+        described_class.perform_now(account.id, "full")
+        expect(strategy).not_to have_received(:full_resync!)
+      end
+    end
+  end
 end
