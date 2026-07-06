@@ -76,7 +76,7 @@ es:
       escape: Ver cómo se llena la bandeja
       persona_heading: Mientras Scout lee — ¿con qué trata principalmente?
       persona_skip: Omitir por ahora
-      persona_subheading: Elija una o varias. Scout archivara documentos y etiquetara
+      persona_subheading: Elija una o varias. Scout archivará documentos y etiquetará
         correos en consecuencia desde el principio.
       persona_submit: Aplicar
       subtitle_done: "%{needs_you} cosas le esperan. Todo lo demás está ordenado y
