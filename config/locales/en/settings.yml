@@ -245,6 +245,7 @@ en:
       calendars:
         show:
           active: Active
+          back: Back to integrations
           calendars_heading: Calendars
           calendars_pending: Calendars will appear here after the first sync.
           connect_desc: Calendars come with your connected mail accounts. Connect
@@ -293,6 +294,7 @@ en:
           username_placeholder: user
         index:
           add_connection: Add connection
+          back: Back to integrations
           col_auth: Auth
           col_base_url: Base URL
           col_name: Name
@@ -317,9 +319,9 @@ en:
           col_subfolders: Subfolders
           configure: Configure
           connect_button: Connect Google Drive
-          connect_desc_html: Connect your Google account to create folders and upload
-            files to Google Drive (%{scope} scope, so you can browse and pick any
-            folder).
+          back: Back to integrations
+          connect_desc_html: Connect your Google account to create folders and upload files to Google Drive (%{scope_name} scope, so you can browse and pick any folder).
+          not_configured: Google Drive isn't set up on this instance. Ask your administrator to configure it.
           connected_account_heading: Connected Account
           connected_as: Connected as
           connected_label: Connected
@@ -354,6 +356,7 @@ en:
           select_my_drive: Use My Drive root
           select_this: Select "%{name}"
         edit:
+          back: Back to Google Drive
           auto_push_default_note: Auto-push is on by default — approved documents
             of this type will be uploaded to Drive automatically. Uncheck the box
             above to pause it.
@@ -409,6 +412,7 @@ en:
           zoho_drive_heading: Zoho Drive
       notion:
         show:
+          back: Back to integrations
           col_database: Notion Database
           col_document_type: Document Type
           col_pull: Pull
@@ -445,6 +449,7 @@ en:
           token_placeholder: secret_...
       zoho_drive:
         show:
+          back: Back to integrations
           active: Active
           add_mapping_button: Add Mapping
           add_mapping_heading: Add Folder Mapping
