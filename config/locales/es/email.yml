@@ -6,6 +6,8 @@ es:
         heading: Tablero
     empty:
       add_account_button: Añadir cuenta de correo
+      toolbar_archive_title: Archivar
+      toolbar_mark_read_title: Marcar como leído
       all_sorted_description: Lo que queda es correo de baja prioridad, ordenado en
         los grupos de abajo. Toca uno para revisarlo o vaciarlo.
       all_sorted_title: Tu bandeja de entrada está ordenada

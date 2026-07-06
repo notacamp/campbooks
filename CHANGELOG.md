@@ -30,6 +30,14 @@ major, minor, or patch change here.
 - **Tag merge.** From the Tags panel, merge tag B into tag A with one click. All
   messages and account links move to the target tag; the source is deleted. A
   cross-workspace guard prevents accidental merges across tenants.
+- **Group-row bulk selection.** Collapsed tag-group rows in the inbox now show a
+  checkbox on hover (and permanently in select mode), wired to the selection
+  toolbar. Checking a group row adds all its collapsed emails to the current
+  selection; the toolbar count reflects the total emails, not the number of
+  checkboxes. Every toolbar action (archive, mark read/unread, tag, move, snooze,
+  delete, Send to Scout) works on groups via a shared server-side expansion that
+  mirrors the same guarded scope the drill-in view uses. Select-all includes
+  group rows alongside thread rows.
 
 ### Changed
 

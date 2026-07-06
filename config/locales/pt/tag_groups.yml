@@ -5,6 +5,7 @@ pt:
       aria_label:
         one: "%{label}, %{count} conversa"
         other: "%{label}, %{count} conversas"
+      select_group_aria: Selecionar grupo %{label}
   tag_groups:
     archive_all:
       archived:

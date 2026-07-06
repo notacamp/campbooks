@@ -6,6 +6,8 @@ pt:
         heading: Quadro
     empty:
       add_account_button: Adicionar conta de email
+      toolbar_archive_title: Arquivar
+      toolbar_mark_read_title: Marcar como lida
       all_sorted_description: O que resta é correio de baixa prioridade, organizado
         nos grupos abaixo. Toque num deles para o rever ou limpar.
       all_sorted_title: A sua caixa de entrada está arrumada
