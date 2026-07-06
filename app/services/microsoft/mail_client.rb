@@ -338,6 +338,9 @@ module Microsoft
         "header_list_unsubscribe" => headers["list-unsubscribe"],
         "header_precedence" => headers["precedence"],
         "header_auto_submitted" => headers["auto-submitted"],
+        # Our own outbound-mail marker (DigestMailer), surfaced from the wholesale
+        # internetMessageHeaders — lets the pipeline skip AI analysis of a re-ingested digest.
+        "header_campbooks_kind" => headers["x-campbooks-kind"],
         "flagid" => nil
       }
     end

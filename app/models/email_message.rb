@@ -218,6 +218,20 @@ class EmailMessage < ApplicationRecord
   end
   alias outbound? sent?
 
+  # Campbooks' own outbound mail (a digest, notification, etc.) that was re-ingested
+  # from the mailbox. Stamped at ingest by Emails::SelfGeneratedDetector; the AI
+  # pipeline is skipped for these (EmailProcessJob) so we don't mine our own mail for
+  # the reminders / tasks / contacts it already lists.
+  def self_generated?
+    self_generated_kind.present?
+  end
+
+  # A Campbooks digest specifically — surfaced with a "Digest" badge so the reader
+  # knows to read it, rather than expecting it to have been triaged like inbound mail.
+  def digest?
+    self_generated_kind == "digest"
+  end
+
   def external_tags
     tags.external
   end

@@ -543,6 +543,11 @@ Rails.application.routes.draw do
       patch :dismiss_todo
       # Dismiss the "waiting on reply" nudge for this thread from the inbox section.
       post :dismiss_follow_up
+      # Inline scheduled-event draft block: lazy-loaded turbo frame (GET) and
+      # one-tap "Add to calendar" (POST). Both go through the same named route;
+      # the frame's src uses GET and the Add button POSTs to the same path.
+      get  :event_draft, to: "email_messages/event_drafts#show"
+      post :event_draft, to: "email_messages/event_drafts#create"
       post   "follow", to: "thread_follows#create", as: :follow
       delete "follow", to: "thread_follows#destroy"
       post :compose, to: "email_compose#create"
