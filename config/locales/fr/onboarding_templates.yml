@@ -1,0 +1,47 @@
+---
+fr:
+  onboarding:
+    steps:
+      template:
+        heading: Quel sera votre usage principal de Campbooks ?
+        subheading: Choisissez l'option qui vous correspond le mieux. Nous configurerons les étiquettes et types de documents adaptés immédiatement.
+        continue: Continuer
+        skip: Ignorer pour l'instant
+        skip_hint: Vous pourrez choisir une configuration plus tard dans les Réglages.
+        templates:
+          freelancer:
+            name: Freelance
+            description: Gérez clients, factures, contrats et documents de projet en un seul endroit.
+          small_business:
+            name: Petite entreprise
+            description: Suivez les factures fournisseurs, relevés bancaires, bulletins de paie et communications d'équipe.
+          personal_admin:
+            name: Administration personnelle
+            description: Organisez factures, polices d'assurance, courriers officiels et paperasse du quotidien.
+          job_hunt:
+            name: Recherche d'emploi
+            description: Suivez candidatures, invitations aux entretiens et offres sans rien laisser passer.
+          just_exploring:
+            name: Juste explorer
+            description: Regardez d'abord. Vous pouvez toujours configurer les étiquettes et types de documents plus tard.
+  settings:
+    setup_template:
+      show:
+        title: Configuration
+        subtitle: Révisez la configuration de votre espace de travail et ajustez-la à tout moment.
+        current_heading: Configuration active
+        no_template: Aucun modèle de configuration choisi pour l'instant.
+        tags_added: Étiquettes ajoutées
+        doc_types_added: Types de documents ajoutés
+        switch_heading: Changer de configuration
+        switch_hint: Changer ajoute de nouvelles étiquettes et types de documents du modèle choisi. Rien n'est supprimé.
+        apply_button: Appliquer le modèle
+        non_destructive_note: Changer ne supprime jamais les étiquettes, types de documents ou e-mails existants.
+        modules_heading: Visibilité des modules
+        modules_hint: Choisissez quelles zones apparaissent dans la navigation. Vous pouvez les modifier à tout moment.
+        save_modules: Enregistrer
+      update:
+        applied: "Modèle %{name} appliqué."
+        invalid_template: Modèle inconnu. Veuillez en choisir un dans la liste.
+      update_modules:
+        modules_saved: Navigation mise à jour.

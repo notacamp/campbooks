@@ -1,0 +1,47 @@
+---
+en:
+  onboarding:
+    steps:
+      template:
+        heading: What will you mostly use Campbooks for?
+        subheading: Pick the option that fits best. We will set up the right tags and document types for you straight away.
+        continue: Continue
+        skip: Skip for now
+        skip_hint: You can choose a setup later in Settings.
+        templates:
+          freelancer:
+            name: Freelancer
+            description: Manage clients, invoices, contracts, and project paperwork all in one place.
+          small_business:
+            name: Small business
+            description: Keep on top of supplier invoices, bank statements, staff payslips, and team communications.
+          personal_admin:
+            name: Personal admin
+            description: Stay organised with bills, insurance policies, government letters, and household paperwork.
+          job_hunt:
+            name: Job hunt
+            description: Track applications, interview invitations, and offers without anything slipping through.
+          just_exploring:
+            name: Just exploring
+            description: Have a look around first. You can always configure tags and document types later.
+  settings:
+    setup_template:
+      show:
+        title: Setup
+        subtitle: Review your workspace setup and adjust it at any time.
+        current_heading: Active setup
+        no_template: No setup template chosen yet.
+        tags_added: Tags added
+        doc_types_added: Document types added
+        switch_heading: Switch setup
+        switch_hint: Switching adds new tags and document types from the chosen template. Nothing is deleted.
+        apply_button: Apply template
+        non_destructive_note: Switching never deletes existing tags, document types, or emails.
+        modules_heading: Module visibility
+        modules_hint: Choose which areas appear in the navigation. You can toggle them any time.
+        save_modules: Save
+      update:
+        applied: "%{name} template applied."
+        invalid_template: Unknown template. Please choose one from the list.
+      update_modules:
+        modules_saved: Navigation updated.

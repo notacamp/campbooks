@@ -1,0 +1,90 @@
+<%# Setup template picker — the very first question for a new workspace.
+    One question, tappable persona cards, prominent skip.
+    Selecting applies the template immediately (tags, doc types, module visibility). %>
+<% content_for :main_class, "mx-auto flex w-full max-w-[30rem] flex-col justify-center px-5 py-10 min-h-svh" %>
+
+<div class="flex flex-col items-center text-center animate-stage-in">
+  <h1 class="text-[1.6rem] font-semibold leading-tight tracking-[-0.02em] text-foreground text-balance">
+    <%= t(".heading") %>
+  </h1>
+  <p class="mt-2 max-w-sm text-[15px] leading-relaxed text-muted-foreground text-pretty">
+    <%= t(".subheading") %>
+  </p>
+</div>
+
+<%= form_with url: onboarding_path, method: :patch, class: "mt-8 w-full animate-stage-in", style: "--stage-delay: .08s", data: { controller: "auto-submit" } do |f| %>
+  <%= hidden_field_tag :step, "template" %>
+
+  <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+    <% @templates.each_with_index do |tpl, i| %>
+      <%
+        key     = tpl[:key]
+        chosen  = (@chosen_key == key)
+        delay   = "#{(i * 0.05).round(2)}s"
+      %>
+      <label class="group relative flex cursor-pointer flex-col gap-2.5 rounded-2xl border p-4 transition-all has-[:checked]:border-accent-500 has-[:checked]:bg-accent-50/60 dark:has-[:checked]:bg-accent-900/20 <%= chosen ? 'border-accent-500 bg-accent-50/60 dark:bg-accent-900/20' : 'border-border bg-card hover:border-gray-300 dark:hover:border-gray-600' %> animate-stage-in"
+             style="--stage-delay: <%= delay %>">
+        <input type="radio" name="template_key" value="<%= key %>"
+               <%= "checked" if chosen %>
+               class="sr-only"
+               data-action="change->auto-submit#submit">
+
+        <div class="flex items-start gap-3">
+          <%# Icon %>
+          <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-ink/[.06] text-ink/70 dark:bg-white/10 dark:text-white/70 group-has-[:checked]:bg-accent-100 group-has-[:checked]:text-accent-700 dark:group-has-[:checked]:bg-accent-900/30 dark:group-has-[:checked]:text-accent-400 transition-colors">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="h-4.5 w-4.5 h-[18px] w-[18px]" aria-hidden="true">
+              <path d="<%= tpl[:icon] %>"/>
+            </svg>
+          </span>
+
+          <div class="min-w-0 flex-1 text-left">
+            <p class="text-sm font-semibold text-foreground">
+              <%= t(".templates.#{key}.name") %>
+            </p>
+            <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground line-clamp-2">
+              <%= t(".templates.#{key}.description") %>
+            </p>
+          </div>
+
+          <%# Checkmark badge when selected %>
+          <span class="pointer-events-none hidden h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-600 text-white group-has-[:checked]:flex">
+            <svg viewBox="0 0 12 12" fill="none" class="h-3 w-3" aria-hidden="true">
+              <path d="M2.5 6L5 8.5L9.5 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </div>
+
+        <% if tpl[:tags].any? || tpl[:document_types].any? %>
+          <div class="flex flex-wrap gap-1 pl-12">
+            <% (tpl[:tags].first(2) + tpl[:document_types].first(2)).each do |item| %>
+              <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ring-ink/10 dark:ring-white/10">
+                <span class="h-1.5 w-1.5 rounded-full shrink-0" style="background-color: <%= item[:color] %>"></span>
+                <%= item[:name].titleize %>
+              </span>
+            <% end %>
+          </div>
+        <% end %>
+      </label>
+    <% end %>
+  </div>
+
+  <%# Fallback submit for non-JS (JS auto-submits on radio change) %>
+  <noscript>
+    <div class="mt-4">
+      <%= render(Campbooks::Button.new(variant: :primary, type: :submit, class: "w-full justify-center")) { t(".continue") } %>
+    </div>
+  </noscript>
+<% end %>
+
+<div class="mt-8 flex flex-col items-center gap-2 animate-stage-in" style="--stage-delay: .32s">
+  <%# Skip sends an empty template_key — update_template is a no-op in that case. %>
+  <%= form_with url: onboarding_path, method: :patch, class: "w-full sm:w-auto" do |f| %>
+    <%= hidden_field_tag :step, "template" %>
+    <%= hidden_field_tag :template_key, "" %>
+    <%= render(Campbooks::Button.new(variant: :ghost, type: :submit, class: "w-full sm:w-auto text-muted-foreground")) { t(".skip") } %>
+  <% end %>
+
+  <p class="text-xs text-muted-foreground/60">
+    <%= t(".skip_hint") %>
+  </p>
+</div>

@@ -34,4 +34,13 @@ FactoryBot.define do
     provider_label_name { "Imported Label" }
     decision { :pending }
   end
+
+  factory :tag do
+    workspace
+    sequence(:name) { |n| "tag-#{n}" }
+    color { "#0584da" }
+    source { :local }
+    kind { :user }
+    hidden { false }
+  end
 end
