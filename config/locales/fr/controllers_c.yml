@@ -65,6 +65,8 @@ fr:
       callback:
         error: 'Échec de la connexion à Google Drive : %{message}'
         success: Google Drive connecté en tant que %{email}.
+      connect:
+        not_configured: Google Drive n'est pas configuré sur cette instance. Demandez à votre administrateur de le configurer.
     google_mail:
       callback:
         auth_failed: Authentification échouée. Veuillez réessayer.

@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-07-06
+
 ### Fixed
 
 - **Reminders from a round-trip booking now cover every leg, not just the outbound.**
@@ -43,6 +45,17 @@ major, minor, or patch change here.
   waiting on for up to 30 days, always keeping at least three visible regardless
   of age. Anything older folds behind a **"Show older"** toggle, so a backlog of
   long-forgotten sends no longer buries the replies still worth chasing.
+
+### Fixed
+
+- **The integration settings pages read cleanly and are easier to leave.** The Google
+  Drive page showed a raw "Connect Desc Html" placeholder where its description should
+  be, and on an instance where Google Drive isn't set up, clicking **Connect** hit an
+  error page. The description now renders properly, an unconfigured instance explains
+  that an administrator needs to set it up (instead of offering a button that errors),
+  and every integration detail page — Google Drive, Notion, Zoho Drive, Connections,
+  and Calendars — now has a **Back to integrations** link. Disconnecting Google Drive
+  also returns you to the integrations list rather than erroring.
 
 ## [0.13.0] - 2026-07-05
 
@@ -1112,7 +1125,9 @@ major, minor, or patch change here.
 
 - Initial public, source-available release of Campbooks.
 
-[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.12.2...HEAD
+[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/notacamp/campbooks/compare/v0.13.0...v0.14.0
+[0.13.0]: https://github.com/notacamp/campbooks/compare/v0.12.2...v0.13.0
 [0.12.2]: https://github.com/notacamp/campbooks/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/notacamp/campbooks/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/notacamp/campbooks/compare/v0.11.0...v0.12.0
