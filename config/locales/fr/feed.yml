@@ -152,5 +152,18 @@ fr:
         single: Un seul élément requiert votre attention — Scout a classé le reste.
         some: "%{n} éléments requièrent votre attention — Scout les a empilés. Un
           coup d'œil et c'est plié."
+        syncing: Scout lit votre boîte — les e-mails triés apparaîtront ici dès qu'ils
+          seront prêts.
+      syncing_body: Les e-mails triés apparaissent ici au fur et à mesure. Les grandes
+        boîtes peuvent prendre quelques minutes.
+      syncing_cta: Regarder la boîte se remplir
+      syncing_title: Scout lit votre boîte de réception
       take_tour: Faire la visite
       your_feed: Votre fil
+    persona_applied:
+      body_html: Scout surveillera <strong>%{items}</strong> à mesure que votre courrier
+        arrive.
+      exploring_body: Scout utilisera des paramètres intelligents par défaut. Vous
+        pouvez ajouter des types de documents à tout moment dans les Paramètres.
+      heading: Compris
+      settings_link: Modifier dans les Paramètres

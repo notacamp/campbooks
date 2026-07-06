@@ -150,5 +150,18 @@ es:
         lots: "%{n} cosas te necesitan. Scout las apiló para que hojees sin agobios."
         single: Solo una cosa te necesita — Scout archivó el resto.
         some: "%{n} cosas te necesitan — Scout las apiló. Un hojeo rápido y listo."
+        syncing: Scout está leyendo tu bandeja — el correo ordenado aparecerá aquí
+          en cuanto esté listo.
+      syncing_body: El correo ordenado aparece aquí en cuanto esté listo. Las bandejas
+        grandes pueden tardar unos minutos.
+      syncing_cta: Ver cómo se llena
+      syncing_title: Scout está leyendo tu bandeja de entrada
       take_tour: Hacer la visita
       your_feed: Tu feed
+    persona_applied:
+      body_html: Scout prestará atención a <strong>%{items}</strong> a medida que
+        llegue tu correo.
+      exploring_body: Scout usará configuraciones inteligentes por defecto. Puedes
+        agregar tipos de documentos cuando quieras en Ajustes.
+      heading: Entendido
+      settings_link: Ajustar en Ajustes
