@@ -254,4 +254,56 @@ RSpec.describe CalendarScanJob, type: :job do
       expect(account.reload.scanning).to be(false)
     end
   end
+
+  # Converted from test/jobs/calendar_scan_job_test.rb — ServiceUnavailable
+  # handling when a Google identity has no Calendar provisioned.
+  describe "Calendars::ServiceUnavailable handling" do
+    # The account starts with no calendars, so refresh_calendar_list is called
+    # even on an incremental scope (account.calendars.empty? == true).
+
+    context "when calendar_list raises Calendars::ServiceUnavailable" do
+      before do
+        allow(client).to receive(:calendar_list)
+          .and_raise(Calendars::ServiceUnavailable, "Google account is not signed up for Google Calendar")
+      end
+
+      it "deactivates the account with calendar_service_unavailable and does not re-raise" do
+        expect { described_class.perform_now(account.id, "incremental") }.not_to raise_error
+        account.reload
+        expect(account.active?).to be(false)
+        expect(account.deactivation_reason).to eq("calendar_service_unavailable")
+        expect(account.deactivated_for_service?).to be(true)
+      end
+
+      it "does not re-raise Calendars::ServiceUnavailable out of the job" do
+        expect { described_class.perform_now(account.id, "incremental") }.not_to raise_error
+      end
+    end
+
+    context "when calendar_list returns normally" do
+      before do
+        allow(client).to receive(:calendar_list).and_return([])
+      end
+
+      it "does not deactivate the account" do
+        described_class.perform_now(account.id, "incremental")
+        account.reload
+        expect(account.active?).to be(true)
+        expect(account.deactivation_reason).to be_nil
+      end
+    end
+
+    context "when the account is already inactive" do
+      before do
+        account.deactivate_for!(:calendar_service_unavailable)
+        allow(client).to receive(:calendar_list).and_return([])
+      end
+
+      it "is skipped by the active scope so calendar_list is never called" do
+        described_class.perform_now(account.id, "incremental")
+        expect(client).not_to have_received(:calendar_list)
+        expect(account.reload.deactivation_reason).to eq("calendar_service_unavailable")
+      end
+    end
+  end
 end
