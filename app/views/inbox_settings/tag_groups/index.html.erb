@@ -15,19 +15,37 @@
 
       <div id="inbox_settings_tag_groups_list">
         <% if @groups.any? %>
-          <% @groups.each do |name, tags| %>
+          <% @groups.each do |name, tags, rules| %>
             <div class="flex items-start gap-3 py-3 border-b border-hair last:border-b-0">
-              <span class="mt-1"><%= render(Campbooks::ColorDot.new(color: tags.first.color, size: :sm)) %></span>
+              <span class="mt-1"><%= render(Campbooks::ColorDot.new(color: tags.first&.color, size: :sm)) %></span>
               <div class="min-w-0 flex-1">
                 <div class="flex items-center gap-2 min-w-0">
                   <span class="text-[13px] font-medium text-foreground truncate"><%= name %></span>
                   <span class="text-[11px] text-muted-foreground flex-shrink-0"><%= t(".threads_count", count: @group_thread_counts[name] || 0) %></span>
                 </div>
-                <div class="mt-1.5 flex items-center gap-1 flex-wrap">
-                  <% tags.each do |tag| %>
-                    <%= render(Campbooks::TagChip.new(tag: tag, size: :sm)) %>
-                  <% end %>
-                </div>
+                <% if tags.any? %>
+                  <div class="mt-1.5 flex items-center gap-1 flex-wrap">
+                    <% tags.each do |tag| %>
+                      <%= render(Campbooks::TagChip.new(tag: tag, size: :sm)) %>
+                    <% end %>
+                  </div>
+                <% end %>
+                <% if rules.any? %>
+                  <div class="mt-1.5 flex flex-wrap gap-1">
+                    <% rules.each do |rule| %>
+                      <%
+                        value_label = case rule.rule_type
+                                      when "organization"  then @org_names[rule.value]    || rule.value
+                                      when "document_type" then @doctype_names[rule.value] || rule.value
+                                      else rule.value
+                                      end
+                      %>
+                      <span class="inline-flex items-center rounded-full border border-border/50 bg-muted/60 px-2.5 py-0.5 text-[11px] text-muted-foreground">
+                        <%= t(".rule_sentence.#{rule.rule_type}", value: value_label.truncate(30)) %>
+                      </span>
+                    <% end %>
+                  </div>
+                <% end %>
               </div>
               <div class="flex items-center gap-0.5 flex-shrink-0">
                 <%= link_to t(".edit"), inbox_settings_edit_tag_group_path(group: name),
