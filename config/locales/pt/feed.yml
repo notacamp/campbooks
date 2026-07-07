@@ -89,6 +89,7 @@ pt:
         in_days:
           one: Entrega em %{count} dia
           other: Entrega em %{count} dias
+        missed: Pode ter passado despercebido
         overdue: Em atraso
         suggested: Tarefa sugerida
         today: Entrega hoje

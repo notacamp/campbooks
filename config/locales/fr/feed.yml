@@ -89,6 +89,7 @@ fr:
         in_days:
           one: Dans %{count} jour
           other: Dans %{count} jours
+        missed: Vous l'avez peut-être oublié
         overdue: En retard
         suggested: Tâche suggérée
         today: À rendre aujourd'hui
