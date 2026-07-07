@@ -89,6 +89,7 @@ es:
         in_days:
           one: Entrega en %{count} día
           other: Entrega en %{count} días
+        missed: Puede que se te haya pasado
         overdue: Atrasada
         suggested: Tarea sugerida
         today: Entrega hoy

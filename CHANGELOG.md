@@ -16,6 +16,10 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A mailbox backfill no longer floods your feed with stale suggestions from old email.** When a full resync or a newly-connected account ingested months- or years-old mail, the AI task/reminder extractors ran on every message and — because a task suggestion had no recency check — could mint hundreds of suggestions at once, many dated to the wrong year (an invoice "due in 2024", a relative date rolled forward into this year). Suggestions are now staged only while still temporally live: a **future-dated** action is always kept; an **overdue or undated** one only when its source email is still recent. A genuinely forgotten recent action still surfaces — framed as **"You may have missed this"** on the feed — while a long-dead ask from a backfill is dropped. Drafting a calendar event from an old email now anchors to the email's own date instead of always defaulting to tomorrow.
+
 ## [0.18.0] - 2026-07-06
 
 ### Fixed
