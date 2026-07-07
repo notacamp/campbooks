@@ -38,10 +38,14 @@ module Ai
       @email.subject.to_s.sub(/^(?:re|fwd?|fw)\s*:\s*/i, "").strip.presence || "Event"
     end
 
-    # Default to tomorrow 09:00; nudge the day/time when the email clearly says so.
+    # Default to the day after the email arrived, at 09:00 — anchored to the email's
+    # own date, not "now", so drafting an event from a months-old email doesn't
+    # silently land it in the current year. "today" in the text pins it to the
+    # email's day. The user refines the date on the calendar afterwards.
     def guess_start
-      day = Date.current + 1
-      day = Date.current if text.match?(/\btoday\b/i)
+      base = @email.received_at&.in_time_zone&.to_date || Date.current
+      day = base + 1
+      day = base if text.match?(/\btoday\b/i)
       hour, min = guess_time
       Time.zone.local(day.year, day.month, day.day, hour, min)
     end

@@ -12,6 +12,13 @@ module Tasks
   class Builder
     MIN_CONFIDENCE = 0.5    # safety net; the extractor already drops below this
     DEFAULT_HOUR = 9        # tasks with a date but no time get a 9am local slot
+    # A future-dated action is always actionable; an overdue or undated one is kept
+    # only when its SOURCE is still this recent — so a "you forgot this" from last
+    # week's mail surfaces, but a resync of years-old mail can't spray hundreds of
+    # long-dead asks (an invoice due in 2024, a thread closed a year ago). Widens
+    # Reminders::Builder's past-due floor to admit recently-overdue actions: a
+    # reminder can't be honoured late, but a task can still be done.
+    STALE_SOURCE_AFTER = 30.days
 
     def self.call(workspace:, source:, raw_items:, anchor_tz: Time.zone, fingerprint_source: nil, learning_memory: nil)
       new(workspace: workspace, source: source, anchor_tz: anchor_tz,
@@ -36,6 +43,13 @@ module Tasks
       return nil unless item.is_a?(Hash)
       return nil if item["title"].blank?
       return nil if item["confidence"].to_f < MIN_CONFIDENCE
+
+      # Temporal actionability: stage a suggestion only while it's still worth
+      # surfacing. Future-dated is always kept; overdue/undated is kept only when the
+      # source message is still recent. Stops a backfill of old mail from minting a
+      # flood of long-dead suggestions, without hiding a genuinely forgotten action.
+      due_at = assemble_due_at(item["due_date"], item["due_time"])
+      return nil unless temporally_actionable?(due_at)
 
       # Learning ConfidenceGuard: when this workspace strongly and specifically dismisses
       # this sender's AI-suggested tasks, don't stage another. Sender-specific tiers only,
@@ -65,7 +79,7 @@ module Tasks
         description:    item["description"].presence,
         status:         :suggested,
         priority:       priority_for(item["priority"]),
-        due_at:         assemble_due_at(item["due_date"], item["due_time"]),
+        due_at:         due_at,
         ai_suggested:   true,
         confidence:     item["confidence"].to_f.clamp(0.0, 1.0),
         justification:  item["justification"].presence,
@@ -104,6 +118,24 @@ module Tasks
       Date.iso8601(str.to_s)
     rescue ArgumentError, TypeError
       Date.parse(str.to_s) rescue nil
+    end
+
+    # Keep future-dated actions always; keep overdue/undated ones only while their
+    # source is still recent (see STALE_SOURCE_AFTER). A source with no date signal
+    # at all — an in-app record, a provider that dropped the timestamp — can't be
+    # judged stale, so it falls through as actionable.
+    def temporally_actionable?(due_at)
+      return true if due_at && due_at >= Time.current.beginning_of_day
+
+      dated_at = source_dated_at
+      dated_at.nil? || dated_at >= STALE_SOURCE_AFTER.ago
+    end
+
+    # When the source message actually dates from — the email's received_at or the
+    # document's own date. Deliberately NOT created_at: for a backfilled message
+    # that's the recent ingest time, which would mask a years-old email as fresh.
+    def source_dated_at
+      (@source.try(:received_at) || @source.try(:document_date))&.to_time
     end
 
     # The learned accept/dismiss consensus for this sender, or nil. Same for every

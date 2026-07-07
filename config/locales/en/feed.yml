@@ -89,6 +89,7 @@ en:
         in_days:
           one: Due in %{count} day
           other: Due in %{count} days
+        missed: You may have missed this
         overdue: Overdue
         suggested: Suggested task
         today: Due today
