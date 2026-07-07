@@ -146,6 +146,20 @@ class FeedTimelineCardPreview < ViewComponent::Preview
     )
   end
 
+  # AI-suggested task whose date has already slipped by: framed as "You may have
+  # missed this" (amber) instead of a silent to-do, so a forgotten action still
+  # gets a gentle nudge rather than vanishing.
+  def task_suggested_missed
+    render Campbooks::Feed::Card.new(
+      item: feed_item(id: 14, kind: "task"),
+      subject: task_subject(
+        status: "suggested", due_at: 5.days.ago,
+        title: "Confirm the interview time with the recruiter",
+        justification: "The message asks: “let me know if the proposed slot still works”."
+      )
+    )
+  end
+
   # @label Focused — keyboard shortcut chips
   #
   # The card the reader is on (the scroll-highlight feed-keyboard acts on). On
