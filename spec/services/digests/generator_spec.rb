@@ -55,9 +55,13 @@ RSpec.describe Digests::Generator do
     Current.workspace = nil
   end
 
-  def period_end
-    Time.zone.parse("2026-07-06 10:00:00")
-  end
+  # "Now", truncated to whole seconds so the exact value round-trips through the DB
+  # for the re-run / idempotency specs. Must track the wall clock: examples place
+  # records relative to now (e.g. an email received 1.day.ago) and expect them
+  # inside the lookback window. A hardcoded date here silently drifted into the
+  # past, so once the clock passed it those in-window records fell outside the
+  # period and the digest came back empty.
+  let(:period_end) { Time.current.change(usec: 0) }
 
   def generator
     described_class.new(digest)
