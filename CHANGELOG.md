@@ -55,6 +55,19 @@ major, minor, or patch change here.
   (user-defined) tag groups and rule-based groups are unchanged — they keep the
   full guard set.
 
+### Fixed
+
+- **Inbox search now shows it's working.** A free-text search runs a semantic
+  (embedding) lookup that can take a second or two, but the only cue was a tiny
+  corner spinner and a faint dim of the old results — so the pane looked frozen.
+  Running a search now shows a progress bar under the search field and skeleton
+  placeholder rows in the results area the moment the request fires, so the wait
+  is legible instead of dead air.
+- **Clearing the search box takes you back to your inbox.** Emptying the query
+  (when no filters are still active) now returns you to the real inbox — grouped
+  list, layout switcher and all — instead of leaving you stranded on a bare
+  results list at the `/search` URL.
+
 ## [0.17.0] - 2026-07-06
 
 ### Added

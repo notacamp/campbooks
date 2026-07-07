@@ -171,6 +171,8 @@ es:
     email_search_result:
       no_subject: "(sin asunto)"
       sent_to: Para %{address}
+    email_search_skeleton:
+      searching: Buscando en tu bandeja de entrada…
     inbox_view_switcher:
       aria_label: Disposición de la bandeja
       board: Vista de tablero

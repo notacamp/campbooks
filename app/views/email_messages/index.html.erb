@@ -35,8 +35,8 @@
       </label>
       <%= render(Campbooks::InboxViewSwitcher.new(board: false)) %>
     </div>
-    <div class="lg:flex-1 lg:overflow-y-auto">
-      <%= turbo_frame_tag "email_search_results", class: "block transition-opacity duration-150 [&[busy]]:opacity-50 [&[busy]]:pointer-events-none" do %>
+    <div id="email_search_pane" class="group/search lg:flex-1 lg:overflow-y-auto">
+      <%= turbo_frame_tag "email_search_results", class: "block group-data-[searching=on]/search:hidden" do %>
         <% if @search_active %>
           <%= render partial: "search_results", locals: { messages: @messages, search_params: @search_params, pagy: @pagy, waiting_threads: @waiting_threads || [] } %>
         <% else %>
@@ -60,6 +60,7 @@
           </div>
         <% end %>
       <% end %>
+      <%= render(Campbooks::EmailSearchSkeleton.new(class: "hidden group-data-[searching=on]/search:block")) %>
     </div>
   </div>
 

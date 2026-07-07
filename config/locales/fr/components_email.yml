@@ -171,6 +171,8 @@ fr:
     email_search_result:
       no_subject: "(sans objet)"
       sent_to: À %{address}
+    email_search_skeleton:
+      searching: Recherche dans votre boîte de réception…
     inbox_view_switcher:
       aria_label: Disposition de la boîte
       board: Vue tableau

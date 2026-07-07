@@ -171,6 +171,8 @@ en:
     email_search_result:
       no_subject: "(no subject)"
       sent_to: To %{address}
+    email_search_skeleton:
+      searching: Searching your inbox…
     inbox_view_switcher:
       aria_label: Inbox layout
       board: Board view

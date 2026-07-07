@@ -236,8 +236,8 @@
           <% end %>
         </div>
       </div>
-      <div class="lg:flex-1 lg:overflow-y-auto lg:min-h-0">
-        <%= turbo_frame_tag "email_search_results" do %>
+      <div id="email_search_pane" class="group/search lg:flex-1 lg:overflow-y-auto lg:min-h-0">
+        <%= turbo_frame_tag "email_search_results", class: "block group-data-[searching=on]/search:hidden" do %>
           <% if @search_active %>
             <%= render partial: "search_results", locals: { messages: @messages, search_params: @search_params, pagy: @pagy } %>
           <% else %>
@@ -255,6 +255,7 @@
             <% end %>
           <% end %>
         <% end %>
+        <%= render(Campbooks::EmailSearchSkeleton.new(class: "hidden group-data-[searching=on]/search:block")) %>
       </div>
     </div>
 
