@@ -159,8 +159,13 @@ module Campbooks
       def doc_row(doc)
         manual_url = helpers.manual_match_reconciliation_bank_transaction_path(@reconciliation, @transaction)
         helpers.tag.div(class: "flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-muted/40") do
-          helpers.tag.div(class: "min-w-0 flex-1") do
-            helpers.tag.p(class: "text-xs font-medium truncate") { doc.display_title } +
+          # The title links to the document so users can inspect the invoice
+          # BEFORE attaching. target=_blank is required: a bare link inside the
+          # search turbo-frame would navigate the frame, not open the page.
+          helpers.link_to(helpers.document_path(doc), target: "_blank", rel: "noopener",
+                          title: t(".open_document"),
+                          class: "min-w-0 flex-1 group/doc") do
+            helpers.tag.p(class: "text-xs font-medium truncate group-hover/doc:underline") { doc.display_title } +
             helpers.tag.p(class: "text-[10px] text-muted-foreground") { doc_meta(doc) }
           end +
           helpers.button_to(
