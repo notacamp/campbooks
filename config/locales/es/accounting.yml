@@ -30,6 +30,10 @@ es:
     destroy_confirm: ¿Eliminar esta conciliación? Se eliminarán todas las transacciones analizadas.
     parse_job:
       pdf_not_yet_supported: El análisis de PDF llegará en la próxima versión. Por favor, exporte el extracto como CSV por ahora.
+      no_ai_for_pdf: "El análisis de PDF requiere un proveedor de IA configurado para el análisis de documentos. Configure uno en Ajustes → Proveedores de IA."
+      pdf_unparseable: "No se pudieron extraer transacciones de este PDF. El archivo puede estar escaneado, cifrado o en un formato no compatible."
+      pdf_ai_error: "Error en el análisis de IA: %{message}"
+      unsupported_format: "Formato de archivo no compatible. Por favor, suba un extracto bancario en CSV o PDF."
       integrity_mismatch: "Error en la verificación de saldo: se esperaba saldo de cierre %{expected} pero el extracto muestra %{actual}."
     index:
       title: Contabilidad
@@ -74,5 +78,94 @@ es:
       col_counterparty: Contraparte
       col_amount: Importe
       col_match: Asociación
+    confirm_all_suggestions:
+      confirmed:
+        one: "1 asociación confirmada"
+        other: "%{count} asociaciones confirmadas"
+    bank_transactions:
+      row:
+        confirm: Confirmar
+        reject: Rechazar
+        not_this_one: No es este
+        no_invoice: Factura no encontrada
+        resolve: Resolver
+        requested: Factura solicitada
+      exclusion_reasons:
+        bank_fee: Comisión bancaria
+        salary: Salario
+        transfer: Transferencia interna
+        tax: Pago de impuestos
+        other: Otro
+      confirm:
+        confirmed: Asociación confirmada
+      reject:
+        rejected: Asociación rechazada
+      exclude:
+        excluded: "Marcado como excluido: %{reason}"
+        invalid_reason: Motivo de exclusión no válido.
+      reset:
+        reset: Asociación eliminada
+      manual_match:
+        matched: "Asociado con %{title}"
+        document_not_found: Documento no encontrado.
+      resolve_panel:
+        attach: Asociar
+        no_docs_found: No se encontraron documentos coincidentes.
     destroy:
       destroyed: Conciliación eliminada.
+
+  components:
+    accounting:
+      summary_bar:
+        matched:
+          one: asociado
+          other: asociados
+        to_review:
+          one: para revisar
+          other: para revisar
+        unmatched:
+          one: sin asociar
+          other: sin asociar
+        excluded:
+          one: excluido
+          other: excluidos
+        requested:
+          one: solicitado
+          other: solicitados
+        nif_exceptions_title: Transacciones con problemas de NIF
+        nif_exceptions:
+          one: problema de NIF
+          other: problemas de NIF
+        confirm_all_confirm:
+          one: "¿Confirmar 1 asociación sugerida?"
+          other: "¿Confirmar %{count} asociaciones sugeridas?"
+        confirm_all:
+          one: Confirmar 1 asociación
+          other: "Confirmar %{count} asociaciones"
+      match_chip:
+        nif_mismatch: NIF no coincide
+        nif_missing: NIF ausente en el documento
+      confidence_badge:
+        strong: Coincidencia sólida
+        possible: Coincidencia posible
+        weak: Coincidencia débil
+        reason_amount_exact: Importe exacto
+        reason_amount_close: Importe dentro del 2%
+        reason_date:
+          one: 1 día de diferencia
+          other: "%{count} días de diferencia"
+        reason_name: "Similitud de nombre: %{pct}%"
+        reason_cross_reconciliation: "Ya asociado en otro extracto"
+      resolve_panel:
+        suggestions_title: "Sugerencias de Scout"
+        checked_documents:
+          one: Revisado 1 documento candidato
+          other: "Revisados %{count} documentos candidatos"
+        use_this_match: Usar esta asociación
+        not_this_one: No es este
+        search_title: Buscar sus documentos
+        search_placeholder: "Buscar por nombre, n.º factura…"
+        attach: Asociar
+        exclude_title: Sin documento necesario
+        exclude_hint: Marque esta transacción como un gasto que no requiere factura.
+        mark_excluded: Marcar como excluido

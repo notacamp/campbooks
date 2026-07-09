@@ -30,6 +30,10 @@ en:
     destroy_confirm: Delete this reconciliation? All parsed transactions will be removed.
     parse_job:
       pdf_not_yet_supported: PDF parsing is coming in the next release. Please export your statement as CSV for now.
+      no_ai_for_pdf: "PDF parsing requires an AI provider configured for document analysis. Please set one up in Settings → AI providers."
+      pdf_unparseable: "Could not extract transactions from this PDF. The file may be scanned, encrypted, or in an unsupported format."
+      pdf_ai_error: "AI parsing failed: %{message}"
+      unsupported_format: "Unsupported file format. Please upload a CSV or PDF bank statement."
       integrity_mismatch: "Balance check failed: expected closing balance %{expected} but statement shows %{actual}."
     index:
       title: Accounting
@@ -74,5 +78,94 @@ en:
       col_counterparty: Counterparty
       col_amount: Amount
       col_match: Match
+    confirm_all_suggestions:
+      confirmed:
+        one: "1 match confirmed"
+        other: "%{count} matches confirmed"
+    bank_transactions:
+      row:
+        confirm: Confirm
+        reject: Reject
+        not_this_one: Not this one
+        no_invoice: No invoice found
+        resolve: Resolve
+        requested: Invoice requested
+      exclusion_reasons:
+        bank_fee: Bank fee
+        salary: Salary
+        transfer: Internal transfer
+        tax: Tax payment
+        other: Other
+      confirm:
+        confirmed: Match confirmed
+      reject:
+        rejected: Match rejected
+      exclude:
+        excluded: "Marked as excluded: %{reason}"
+        invalid_reason: Invalid exclusion reason.
+      reset:
+        reset: Match cleared
+      manual_match:
+        matched: "Matched with %{title}"
+        document_not_found: Document not found.
+      resolve_panel:
+        attach: Attach
+        no_docs_found: No matching documents found.
     destroy:
       destroyed: Reconciliation deleted.
+
+  components:
+    accounting:
+      summary_bar:
+        matched:
+          one: matched
+          other: matched
+        to_review:
+          one: to review
+          other: to review
+        unmatched:
+          one: unmatched
+          other: unmatched
+        excluded:
+          one: excluded
+          other: excluded
+        requested:
+          one: requested
+          other: requested
+        nif_exceptions_title: Transactions with NIF issues
+        nif_exceptions:
+          one: NIF issue
+          other: NIF issues
+        confirm_all_confirm:
+          one: "Confirm 1 suggested match?"
+          other: "Confirm %{count} suggested matches?"
+        confirm_all:
+          one: Confirm 1 match
+          other: "Confirm %{count} matches"
+      match_chip:
+        nif_mismatch: NIF does not match
+        nif_missing: NIF missing on document
+      confidence_badge:
+        strong: Strong match
+        possible: Possible match
+        weak: Weak match
+        reason_amount_exact: Exact amount match
+        reason_amount_close: Amount within 2%
+        reason_date:
+          one: 1 day apart
+          other: "%{count} days apart"
+        reason_name: "Name similarity: %{pct}%"
+        reason_cross_reconciliation: "Already matched in another statement"
+      resolve_panel:
+        suggestions_title: "Scout's suggestions"
+        checked_documents:
+          one: Checked 1 candidate document
+          other: "Checked %{count} candidate documents"
+        use_this_match: Use this match
+        not_this_one: Not this one
+        search_title: Search your documents
+        search_placeholder: "Search by name, invoice no…"
+        attach: Attach
+        exclude_title: No document needed
+        exclude_hint: Mark this transaction as an expense that doesn't require an invoice.
+        mark_excluded: Mark as excluded

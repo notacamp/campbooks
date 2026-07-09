@@ -1,0 +1,30 @@
+<%# turbo_stream response for the document search within the resolve panel.
+    Turbo Frame navigation (form with data-turbo-frame) sends here via format.turbo_stream
+    and updates the inner doc-list frame only. %>
+<%= turbo_stream.update "resolve_doc_search_#{@transaction.id}" do %>
+  <% if @candidate_documents.any? %>
+    <% @candidate_documents.each do |doc| %>
+      <%# Simple list item — matches what ResolvePanel#doc_row renders on initial load %>
+      <% manual_url = manual_match_reconciliation_bank_transaction_path(@reconciliation, @transaction) %>
+      <div class="flex items-center justify-between gap-2 px-2 py-1.5 rounded hover:bg-muted/40">
+        <div class="min-w-0 flex-1">
+          <p class="text-xs font-medium truncate"><%= doc.display_title %></p>
+          <p class="text-[10px] text-muted-foreground">
+            <%= [doc.classification&.name || doc.document_type.humanize,
+                 (number_to_currency(doc.amount_cents / 100.0, unit: "", precision: 2) if doc.amount_cents.present?),
+                 (l(doc.document_date, format: :date) if doc.document_date.present?)].compact.join(" · ") %>
+          </p>
+        </div>
+        <%= button_to t("reconciliations.bank_transactions.resolve_panel.attach"),
+              manual_url,
+              method: :post,
+              params: { document_id: doc.id },
+              class: "shrink-0 text-xs font-medium text-accent-600 hover:text-accent-700" %>
+      </div>
+    <% end %>
+  <% else %>
+    <p class="px-2 py-3 text-xs text-muted-foreground">
+      <%= t("reconciliations.bank_transactions.resolve_panel.no_docs_found") %>
+    </p>
+  <% end %>
+<% end %>

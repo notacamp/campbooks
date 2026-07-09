@@ -20,6 +20,7 @@ es:
       save: Guardar
       save_changes: Guardar cambios
       search: Buscar
+      undo: Deshacer
       send: Enviar
       skip_for_now: Omitir por ahora
       update: Actualizar
