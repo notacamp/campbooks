@@ -66,6 +66,8 @@ es:
       file_upload_failed: Error al subir el archivo. Por favor, inténtelo de nuevo.
       no_source: Por favor, seleccione o suba un extracto bancario.
     show:
+      statement_chip: "Ver extracto"
+      view_statement: "Previsualizar el extracto bancario de esta reconciliación"
       title: Conciliación
       delete: Eliminar
       integrity_warning: Discrepancia de saldo detectada
@@ -112,6 +114,7 @@ es:
         matched: "Asociado con %{title}"
         document_not_found: Documento no encontrado.
       resolve_panel:
+        open_document: "Previsualizar el documento — Ctrl/Cmd+clic abre la página completa"
         attach: Asociar
         no_docs_found: No se encontraron documentos coincidentes.
       request_invoice:
@@ -176,8 +179,13 @@ es:
         confirm_all:
           one: Confirmar 1 asociación
           other: "Confirmar %{count} asociaciones"
+      document_preview_drawer:
+        aria_label: "Vista previa del documento"
+        iframe_title: "Vista previa del archivo"
+        open_full_page: "Abrir página completa"
+        close: "Cerrar vista previa"
       match_chip:
-        open_document: "Abrir el documento en una pestaña nueva"
+        open_document: "Previsualizar el documento — Ctrl/Cmd+clic abre la página completa"
         nif_mismatch: NIF no coincide
         nif_missing: NIF ausente en el documento
       confidence_badge:
@@ -192,6 +200,7 @@ es:
         reason_name: "Similitud de nombre: %{pct}%"
         reason_cross_reconciliation: "Ya asociado en otro extracto"
       resolve_panel:
+        open_document: "Previsualizar el documento — Ctrl/Cmd+clic abre la página completa"
         suggestions_title: "Sugerencias de Scout"
         checked_documents:
           one: Revisado 1 documento candidato

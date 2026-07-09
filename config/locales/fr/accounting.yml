@@ -66,6 +66,8 @@ fr:
       file_upload_failed: Échec du téléchargement du fichier. Veuillez réessayer.
       no_source: Veuillez sélectionner ou télécharger un relevé bancaire.
     show:
+      statement_chip: "Voir le relevé"
+      view_statement: "Prévisualiser le relevé bancaire de cette réconciliation"
       title: Rapprochement
       delete: Supprimer
       integrity_warning: Écart de solde détecté
@@ -112,6 +114,7 @@ fr:
         matched: "Associé à %{title}"
         document_not_found: Document introuvable.
       resolve_panel:
+        open_document: "Prévisualiser le document — Ctrl/Cmd+clic ouvre la page complète"
         attach: Associer
         no_docs_found: Aucun document correspondant trouvé.
       request_invoice:
@@ -176,8 +179,13 @@ fr:
         confirm_all:
           one: Confirmer 1 association
           other: "Confirmer %{count} associations"
+      document_preview_drawer:
+        aria_label: "Aperçu du document"
+        iframe_title: "Aperçu du fichier"
+        open_full_page: "Ouvrir la page complète"
+        close: "Fermer l'aperçu"
       match_chip:
-        open_document: "Ouvrir le document dans un nouvel onglet"
+        open_document: "Prévisualiser le document — Ctrl/Cmd+clic ouvre la page complète"
         nif_mismatch: Le NIF ne correspond pas
         nif_missing: NIF absent du document
       confidence_badge:
@@ -192,6 +200,7 @@ fr:
         reason_name: "Similarité de nom : %{pct} %"
         reason_cross_reconciliation: "Déjà associé dans un autre relevé"
       resolve_panel:
+        open_document: "Prévisualiser le document — Ctrl/Cmd+clic ouvre la page complète"
         suggestions_title: "Suggestions de Scout"
         checked_documents:
           one: 1 document candidat vérifié
