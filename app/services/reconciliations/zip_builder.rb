@@ -42,29 +42,45 @@ module Reconciliations
 
       filename = sanitize(blob.filename.to_s)
       zip.put_next_entry("statement/#{filename}")
-      zip.write(blob.download)
+      # Stream the download to avoid loading the whole file into memory at once.
+      blob.download { |chunk| zip.write(chunk) }
     end
 
     # ── Transaction document files ──────────────────────────────────────────────
 
+    # Compute and store the full zip path for each (txn, doc) pair ONCE here so
+    # add_index_csv can read from the same map without re-calling unique_name.
+    # Re-running unique_name on the same input appends a spurious "-2" suffix that
+    # points to a non-existent entry in the archive (phantom CSV filenames fix).
     def add_transaction_files(zip)
-      @used_names = {}
+      @used_names  = {}
+      @entry_paths = {}  # [txn_id, doc_id] => "debits/filename.pdf"
 
       ordered_transactions.each do |txn|
         confirmed_matches = txn.transaction_matches.select(&:confirmed?).sort_by { |m| -m.confidence.to_f }
         confirmed_matches.each do |match|
           doc  = match.document
-          dir  = txn.debit? ? "debits" : "credits"
-          name = entry_filename(txn, doc)
+          blob = doc_blob(doc)
+          # Skip gracefully when the attachment has been purged.
+          next unless blob
 
-          zip.put_next_entry("#{dir}/#{name}")
-          zip.write(doc_blob(doc).download)
+          dir       = txn.debit? ? "debits" : "credits"
+          name      = entry_filename(txn, doc)
+          full_path = "#{dir}/#{name}"
+          @entry_paths[[ txn.id, doc.id ]] = full_path
+
+          zip.put_next_entry(full_path)
+          # Stream the download to avoid loading the whole blob into memory.
+          blob.download { |chunk| zip.write(chunk) }
         end
       end
     end
 
     def doc_blob(doc)
-      doc.processed_pdf.attached? ? doc.processed_pdf.blob : doc.original_file.blob
+      return doc.processed_pdf.blob if doc.processed_pdf.attached?
+      return doc.original_file.blob if doc.original_file.attached?
+
+      nil
     end
 
     # Filename: YYYY-MM-DD ±amount CUR Counterparty InvoiceNo.ext
@@ -146,10 +162,12 @@ module Reconciliations
       zip.write(csv_data)
     end
 
+    # Read the path that was stored during add_transaction_files so we never
+    # call unique_name a second time (which would produce a spurious "-2" suffix).
+    # Falls back to a "file missing" marker when the blob was purged and skipped.
     def entry_filename_for_csv(txn, doc)
-      dir  = txn.debit? ? "debits" : "credits"
-      name = entry_filename(txn, doc)
-      "#{dir}/#{name}"
+      @entry_paths&.dig([ txn.id, doc.id ]) ||
+        I18n.t("reconciliations.zip_builder.file_missing")
     end
 
     def nif_column(txn, confirmed_matches, company_nif)

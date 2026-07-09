@@ -146,7 +146,16 @@ RSpec.describe "Reconciliations", type: :request do
       expect(response).to have_http_status(:ok)
     end
 
-    it "returns an info message when already generating" do
+    it "transitions to :export_generating synchronously before enqueue" do
+      allow(Reconciliations::ExportJob).to receive(:perform_later)
+
+      post "/reconciliations/#{reconciliation.id}/export",
+           headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+      expect(reconciliation.reload.export_status).to eq("export_generating")
+    end
+
+    it "returns an info message when already generating (prevents duplicate jobs)" do
       reconciliation.update!(export_status: :export_generating)
 
       expect(Reconciliations::ExportJob).not_to receive(:perform_later)
@@ -155,6 +164,19 @@ RSpec.describe "Reconciliations", type: :request do
            headers: { "Accept" => "text/vnd.turbo-stream.html" }
 
       expect(response).to have_http_status(:ok)
+    end
+
+    it "two rapid POSTs enqueue exactly one job" do
+      job_count = 0
+      allow(Reconciliations::ExportJob).to receive(:perform_later) { job_count += 1 }
+
+      post "/reconciliations/#{reconciliation.id}/export",
+           headers: { "Accept" => "text/vnd.turbo-stream.html" }
+      # Second POST sees :export_generating (set by the first) → blocked.
+      post "/reconciliations/#{reconciliation.id}/export",
+           headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+      expect(job_count).to eq(1)
     end
 
     it "returns 404 for a reconciliation from another workspace" do
@@ -176,14 +198,32 @@ RSpec.describe "Reconciliations", type: :request do
 
     before { sign_in(user) }
 
-    context "when zip is not yet attached" do
+    context "when zip is not yet attached (status export_none)" do
       it "redirects back to the reconciliation page" do
         get "/reconciliations/#{reconciliation.id}/download"
         expect(response).to redirect_to(reconciliation_path(reconciliation))
       end
     end
 
-    context "when zip is attached" do
+    # Fix 3: during regeneration the old blob is still attached but the status
+    # is :export_generating — the download must not serve the stale blob.
+    context "when zip is attached but status is :export_generating (stale blob)" do
+      before do
+        reconciliation.export_zip.attach(
+          io:           StringIO.new("PK\x03\x04stale zip"),
+          filename:     "reconciliation-stale.zip",
+          content_type: "application/zip"
+        )
+        reconciliation.update!(export_status: :export_generating)
+      end
+
+      it "redirects to the reconciliation page with an info flash" do
+        get "/reconciliations/#{reconciliation.id}/download"
+        expect(response).to redirect_to(reconciliation_path(reconciliation))
+      end
+    end
+
+    context "when zip is attached and export_generated" do
       before do
         reconciliation.export_zip.attach(
           io:           StringIO.new("PK\x03\x04fake zip"),
@@ -197,6 +237,22 @@ RSpec.describe "Reconciliations", type: :request do
         get "/reconciliations/#{reconciliation.id}/download"
         expect(response).to have_http_status(:redirect)
         expect(response.location).to include("reconciliation-test.zip")
+      end
+
+      # Fix 3: billing gate on download.
+      it "returns 402 for a free-plan user even with a generated zip" do
+        free_user = create(:user, workspace: create(:workspace, plan: "free"))
+        sign_in_as(free_user)
+        free_recon = create(:reconciliation, :ready, workspace: free_user.workspace, created_by: free_user)
+        free_recon.export_zip.attach(
+          io: StringIO.new("PK\x03\x04zip"), filename: "r.zip", content_type: "application/zip"
+        )
+        free_recon.update!(export_status: :export_generated)
+
+        get "/reconciliations/#{free_recon.id}/download",
+            headers: { "Accept" => "application/json" }
+
+        expect(response).to have_http_status(:payment_required)
       end
     end
   end

@@ -136,6 +136,7 @@ fr:
       nif_missing: "absent"
       nif_mismatch: "non concordant"
       cross_reconciliation_note: Également associé dans un autre relevé
+      file_missing: "[fichier absent dans Campbooks]"
     destroy:
       destroyed: Rapprochement supprimé.
     nif_banner:

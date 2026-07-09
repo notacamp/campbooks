@@ -132,6 +132,23 @@ RSpec.describe Reconciliations::ZipBuilder, type: :service do
         expect(csv_content).to include("FT2024/001")
         expect(csv_content).to include("yes")
       end
+
+      # Fix 1: every path listed in index.csv matched_documents must exist as
+      # an actual zip entry — phantom "-2" suffix from re-calling unique_name.
+      it "every path in index.csv matched_documents column exists as a zip entry" do
+        data    = build_zip
+        entries = zip_entries(data).to_set
+
+        csv_content = zip_read(data, "index.csv")
+        csv = CSV.parse(csv_content, headers: true)
+        paths = csv.flat_map { |row| row["matched_documents"].to_s.split("; ").map(&:strip) }
+                   .reject(&:empty?)
+
+        paths.each do |path|
+          expect(entries).to include(path),
+            "index.csv references '#{path}' but it is not a zip entry (have: #{entries.to_a.inspect})"
+        end
+      end
     end
 
     context "with a matched doc missing the buyer NIF" do
@@ -149,6 +166,50 @@ RSpec.describe Reconciliations::ZipBuilder, type: :service do
       it "marks nif column as missing in index.csv" do
         csv_content = zip_read(build_zip, "index.csv")
         expect(csv_content).to include("missing")
+      end
+    end
+
+    # Fix 6: when a confirmed document's blob has been purged, the builder should
+    # skip the file gracefully and mark the index.csv row with a "file missing" note.
+    context "with a purged document attachment" do
+      let(:purged_doc) do
+        d = workspace.documents.build(
+          document_type: :expense_invoice,
+          ai_status:     :completed,
+          review_status: :approved,
+          source:        :manual_upload,
+          vendor_name:   "Purged Corp",
+          amount_cents:  50000,
+          currency:      "EUR",
+          document_date: Date.new(2024, 1, 5)
+        )
+        # Intentionally do NOT attach any file — simulates a purged blob.
+        d.save!(validate: false)
+        d
+      end
+
+      before do
+        create(:transaction_match,
+               bank_transaction: debit_txn,
+               document:         purged_doc,
+               status:           :confirmed,
+               matched_by:       :ai,
+               confidence:       0.80,
+               match_reasons:    {})
+      end
+
+      it "builds the zip without raising" do
+        expect { build_zip }.not_to raise_error
+      end
+
+      it "marks the matched_documents column as file missing in index.csv" do
+        csv_content = zip_read(build_zip, "index.csv")
+        expect(csv_content).to include("[file missing from Campbooks]")
+      end
+
+      it "does not add any file under debits/ for the purged document" do
+        entries = zip_entries(build_zip)
+        expect(entries.any? { |e| e.start_with?("debits/") }).to be false
       end
     end
 

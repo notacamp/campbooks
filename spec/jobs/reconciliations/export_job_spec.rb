@@ -18,6 +18,8 @@ RSpec.describe Reconciliations::ExportJob, type: :job do
       content_type: "text/csv"
     )
     doc.save!
+    # The controller sets :export_generating synchronously before enqueuing;
+    # the job picks it up already in that state.
     create(:reconciliation,
            workspace:,
            created_by:         user,
@@ -27,7 +29,7 @@ RSpec.describe Reconciliations::ExportJob, type: :job do
            period_start:       Date.new(2024, 1, 1),
            period_end:         Date.new(2024, 1, 31),
            status:             :ready,
-           export_status:      :export_none)
+           export_status:      :export_generating)
   end
 
   before do
