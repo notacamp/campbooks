@@ -177,6 +177,7 @@ en:
           one: Confirm 1 match
           other: "Confirm %{count} matches"
       match_chip:
+        open_document: "Open the document in a new tab"
         nif_mismatch: NIF does not match
         nif_missing: NIF missing on document
       confidence_badge:
