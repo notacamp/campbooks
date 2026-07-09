@@ -5,7 +5,8 @@ module Reconciliations
   # bank transactions, then sets status :ready and broadcasts the final state.
   #
   # Error handling:
-  #   TRANSIENT errors (rate-limit, network)     → re-raise; retry_on fires
+  #   TRANSIENT errors (rate-limit, network)     → log + re-raise only; status stays :matching;
+  #                                                retry_on reschedules the attempt
   #   Anything else (bug, data error)            → status :failed, broadcast, re-raise
   class MatchJob < ApplicationJob
     queue_as :default
@@ -26,12 +27,6 @@ module Reconciliations
 
     rescue *Ai::Adapters::Base::TRANSIENT_ERRORS => e
       Rails.logger.warn("[Reconciliations::MatchJob] Transient error for #{reconciliation_id}: #{e.class}: #{e.message}")
-      @reconciliation&.update_columns(
-        status:      Reconciliation.statuses[:failed],
-        parse_error: "Matching: #{e.class}: #{e.message.first(400)}",
-        updated_at:  Time.current
-      )
-      broadcast_update!
       raise
 
     rescue StandardError => e
