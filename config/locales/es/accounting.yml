@@ -34,6 +34,9 @@ es:
       pdf_ai_error: "Error en el análisis de IA: %{message}"
       unsupported_format: "Formato de archivo no compatible. Por favor, suba un extracto bancario en CSV o PDF."
       integrity_mismatch: "Error en la verificación de saldo: se esperaba saldo de cierre %{expected} pero el extracto muestra %{actual}."
+    bank_statement_parser:
+      pages_unreadable: "No pudimos procesar ninguna página de este extracto PDF. Intenta exportarlo de nuevo desde tu banco o sube un CSV."
+      no_transactions: "No pudimos leer ningún movimiento de este extracto. Si no es una imagen escaneada, intenta exportar un CSV desde tu banco."
     index:
       title: Contabilidad
       new_reconciliation: Nueva conciliación
