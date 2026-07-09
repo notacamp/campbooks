@@ -13,6 +13,7 @@ module Reconciliations
   # - Multilingual header aliases (pt / en / es / fr)
   # - Three amount layouts: signed single / debit+credit columns / amount+direction
   # - EU and US decimal formatting (1.234,56 and 1,234.56)
+  # - EU integer thousands grouping (1.200 → 120000 cents)
   # - Multiple date formats, day-first for ambiguous
   # - Footer / blank row skipping
   #
@@ -62,6 +63,12 @@ module Reconciliations
       ]
     }.freeze
 
+    # Finding 21: precomputed inverse of COLUMN_ALIASES (alias → semantic key),
+    # built once at load time so build_mapping is O(headers) not O(aliases × headers).
+    ALIAS_TO_KEY = COLUMN_ALIASES.each_with_object({}) do |(key, aliases), h|
+      aliases.each { |a| h[a] = key }
+    end.freeze
+
     # ── Positive/negative direction hints ──────────────────────────────────────
     # Single "c" is intentionally absent from DEBIT_HINTS: the D=Debit / C=Credit
     # convention is near-universal in banking exports, and "c" alone must default
@@ -76,8 +83,7 @@ module Reconciliations
     # Returns Array of row hashes; raises ParseError on fatal failure.
     def call
       text    = clean_encoding(@data)
-      sep     = detect_delimiter(text)
-      table   = parse_csv(text, sep)
+      table   = parse_csv(text)            # Finding 21: delimiter detected lazily inside
       headers = normalize_headers(table.headers)
       mapping = build_mapping(headers)
 
@@ -122,7 +128,10 @@ module Reconciliations
 
     # ── CSV parsing ───────────────────────────────────────────────────────────
 
-    def parse_csv(text, sep)
+    # Finding 21: detect the delimiter lazily here so the text is only
+    # traversed once (detect + parse share the same pass through `text`).
+    def parse_csv(text)
+      sep = detect_delimiter(text)
       CSV.parse(text, col_sep: sep, headers: true, skip_blanks: true)
     rescue CSV::MalformedCSVError => e
       raise ParseError, "Could not parse the CSV file: #{e.message}"
@@ -139,37 +148,39 @@ module Reconciliations
       str.downcase.strip.gsub(/\s+/, "_").unicode_normalize(:nfd).gsub(/\p{Mn}/, "")
     end
 
-    # Build { semantic_key => column_index } from COLUMN_ALIASES
+    # Finding 21: use ALIAS_TO_KEY for O(headers) build instead of O(aliases × headers).
     def build_mapping(normalized_headers)
       mapping = {}
-      COLUMN_ALIASES.each do |key, aliases|
-        normalized_headers.each_with_index do |h, i|
-          if aliases.include?(h)
-            mapping[key] ||= i
-          end
-        end
+      normalized_headers.each_with_index do |h, i|
+        key = ALIAS_TO_KEY[h]
+        mapping[key] ||= i if key
       end
       mapping
     end
 
+    # Finding 17: removed the dead `(has_amount && has_direction)` clause —
+    # if has_amount is already true the first arm satisfies the condition and
+    # the third arm could never be the sole reason to pass.
     def validate_mapping!(mapping)
       raise ParseError, "Could not find a date column in the CSV. Expected a column like 'Data', 'Date', or 'Fecha'." unless mapping[:date]
 
       has_amount  = mapping.key?(:amount)
       has_debit   = mapping.key?(:debit)
       has_credit  = mapping.key?(:credit)
-      has_direction = mapping.key?(:direction)
 
-      unless has_amount || (has_debit && has_credit) || (has_amount && has_direction)
+      unless has_amount || (has_debit && has_credit)
         raise ParseError, "Could not find an amount column in the CSV. Expected 'Valor', 'Montante', 'Amount', or separate Debit/Credit columns."
       end
     end
 
     # ── Row parsing ───────────────────────────────────────────────────────────
 
+    # Finding 21: single traversal — extract `fields` once for both raw_values
+    # and the normalized-header map, avoiding two implicit row.to_h calls.
     def parse_row(row, normalized_headers, mapping, position)
-      raw_values = row.to_h
-      values = normalized_headers.zip(row.fields).to_h
+      fields     = row.fields
+      raw_values = row.headers.zip(fields).to_h
+      values     = normalized_headers.zip(fields).to_h
 
       date_str   = field(values, mapping, :date)
       booked_on  = parse_date(date_str) rescue nil
@@ -243,6 +254,10 @@ module Reconciliations
 
     # Parse a human-formatted decimal string to integer cents. Returns nil if
     # the string is blank or cannot be parsed.
+    #
+    # Finding 11: added EU integer thousands detection (`1.200` → 120000) before
+    # the decimal check so a dot followed by exactly three digits is treated as
+    # a thousands separator when no comma is present.
     def parse_cents(raw)
       return nil if raw.blank?
 
@@ -263,17 +278,19 @@ module Reconciliations
       return nil if str.blank?
 
       # Detect EU vs US format:
-      #   EU: 1.234,56  or 1234,56  → comma = decimal separator
-      #   US: 1,234.56  or 1234.56  → dot   = decimal separator
+      #   EU decimal:   1.234,56  or 1234,56  → comma = decimal separator
+      #   EU integer:   1.200                 → dot   = thousands separator (no decimal)
+      #   US decimal:   1,234.56  or 1234.56  → dot   = decimal separator
       #
       # Key insight: whichever separator appears LAST is the decimal separator.
-      # Any separators before the last one are thousands separators and must be
-      # stripped.  The guards on /\.\d{3}/ are intentionally removed — `1.200,00`
-      # is EU format (dot = thousands, comma = decimal) but would have been
-      # misidentified because it contains a dot followed by three digits.
+      # Any separators before the last one are thousands separators and are stripped.
       amount = if str.match?(/,\d{1,2}\z/)
         # EU: last separator is comma → decimal; strip dots (thousands), swap comma
         str.gsub(".", "").gsub(",", ".").to_f
+      elsif str.match?(/\.\d{3}\z/) && !str.include?(",")
+        # EU integer grouping only: "1.200" = 1200, "2.000" = 2000.
+        # Dot followed by exactly 3 digits with no comma → thousands separator.
+        str.gsub(".", "").to_f
       elsif str.match?(/\.\d{1,2}\z/)
         # US: last separator is dot → decimal; strip commas (thousands)
         str.gsub(",", "").to_f

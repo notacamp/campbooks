@@ -35,14 +35,17 @@ class Reconciliation < ApplicationRecord
 
   # ── Computed helpers ─────────────────────────────────────────────────────────
 
+  # Memoized so the index controller can pre-populate @total_transactions with a
+  # single batch query (instance_variable_set) and the model skips the per-row
+  # COUNT when that value is already set.
   def total_transactions
-    bank_transactions.count
+    @total_transactions ||= bank_transactions.count
   end
 
   # Transactions that are no longer "unmatched" — matched, excluded, or with a
   # pending invoice request count as "resolved" for the progress counter.
   def resolved_count
-    bank_transactions.where(status: %i[matched excluded requested]).count
+    @resolved_count ||= bank_transactions.where(status: %i[matched excluded requested]).count
   end
 
   def progress_label

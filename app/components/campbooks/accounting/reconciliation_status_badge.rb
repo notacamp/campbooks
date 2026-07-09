@@ -28,8 +28,10 @@ module Campbooks
 
       private
 
+      # Finding 18: use the canonical activerecord.attributes key shared with
+      # human_enum so the label is always in sync with model i18n conventions.
       def label
-        t(".#{@status}")
+        I18n.t("activerecord.attributes.reconciliation.statuses.#{@status}")
       end
     end
   end

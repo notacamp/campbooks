@@ -1,0 +1,24 @@
+<%# Finding 7: Turbo Streams response for the accounting index pagination.
+    Loaded lazily by the turbo_frame in index.html.erb when @pagy.next is set. %>
+
+<%= turbo_stream.append "reconciliations_table_body" do %>
+  <%= render partial: "reconciliations/row", collection: @reconciliations, as: :reconciliation %>
+<% end %>
+
+<%= turbo_stream.append "reconciliations_cards" do %>
+  <%= render partial: "reconciliations/card", collection: @reconciliations, as: :reconciliation %>
+<% end %>
+
+<% if @pagy.next %>
+  <%= turbo_stream.replace "reconciliations_pagination" do %>
+    <%= turbo_frame_tag "reconciliations_pagination",
+          src: accounting_path(page: @pagy.next, format: :turbo_stream),
+          loading: :lazy do %>
+      <div class="flex items-center justify-center py-6">
+        <%= render Campbooks::Spinner.new(size: :md) %>
+      </div>
+    <% end %>
+  <% end %>
+<% else %>
+  <%= turbo_stream.remove "reconciliations_pagination" %>
+<% end %>

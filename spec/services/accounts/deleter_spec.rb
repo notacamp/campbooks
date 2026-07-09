@@ -49,6 +49,24 @@ RSpec.describe Accounts::Deleter do
       # These FK landmines must be nullified in the sole-member path too
       expect { described_class.new(user).delete! }.not_to raise_error
     end
+
+    # Finding 1: reconciliations reference statement_document_id (FK :restrict).
+    # Deleting documents first would violate the FK. We destroy reconciliations
+    # first so the document delete doesn't trip over this constraint.
+    it "destroys reconciliations before documents so FK constraint is not violated" do
+      # The document must be in the same workspace so @workspace.documents.destroy_all
+      # actually destroys it. Build both in the same workspace.
+      stmt_doc = create(:document, :bank_statement, workspace: workspace)
+      reconciliation = create(:reconciliation, workspace: workspace,
+                               created_by: user, statement_document: stmt_doc)
+
+      # Must not raise PG::ForeignKeyViolation — old code would fail here
+      # because it deleted documents before reconciliations.
+      expect { described_class.new(user).delete! }.not_to raise_error
+
+      expect { reconciliation.reload }.to raise_error(ActiveRecord::RecordNotFound)
+      expect { stmt_doc.reload }.to raise_error(ActiveRecord::RecordNotFound)
+    end
   end
 
   describe "#delete! — one of several workspace members (removes only this user)" do

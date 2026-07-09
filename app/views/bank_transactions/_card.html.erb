@@ -1,4 +1,4 @@
-<div class="bg-card rounded-lg border border-border px-4 py-3">
+<div id="<%= dom_id(transaction, :card) %>" class="bg-card rounded-lg border border-border px-4 py-3">
   <div class="flex items-start justify-between gap-3">
     <div class="min-w-0 flex-1">
       <p class="text-sm text-foreground truncate" title="<%= transaction.description %>"><%= transaction.description %></p>
@@ -16,9 +16,9 @@
         <span class="text-xs font-normal text-muted-foreground"><%= transaction.currency %></span>
       </p>
       <% if transaction.matched? %>
-        <%= render Campbooks::Badge.new(variant: :success, size: :sm) { t("reconciliations.statuses.matched") } %>
+        <%= render Campbooks::Badge.new(variant: :success, size: :sm) { human_enum(BankTransaction, :status, transaction.status) } %>
       <% elsif transaction.excluded? %>
-        <%= render Campbooks::Badge.new(variant: :neutral, size: :sm) { t("reconciliations.statuses.excluded") } %>
+        <%= render Campbooks::Badge.new(variant: :neutral, size: :sm) { human_enum(BankTransaction, :status, transaction.status) } %>
       <% end %>
     </div>
   </div>
