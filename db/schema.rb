@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_06_180000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_09_100200) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -168,6 +168,30 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_180000) do
     t.index ["author_id"], name: "index_authored_documents_on_author_id"
     t.index ["workspace_id", "created_at"], name: "index_authored_documents_on_workspace_id_and_created_at"
     t.index ["workspace_id"], name: "index_authored_documents_on_workspace_id"
+  end
+
+  create_table "bank_transactions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.integer "amount_cents", null: false
+    t.integer "balance_after_cents"
+    t.date "booked_on", null: false
+    t.string "counterparty"
+    t.datetime "created_at", null: false
+    t.string "currency", default: "EUR", null: false
+    t.text "description", null: false
+    t.string "exclusion_reason"
+    t.integer "position", null: false
+    t.jsonb "raw_data", default: {}, null: false
+    t.uuid "reconciliation_id", null: false
+    t.datetime "requested_at"
+    t.uuid "requested_by_id"
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["reconciliation_id", "position"], name: "index_bank_transactions_on_reconciliation_position", unique: true
+    t.index ["reconciliation_id"], name: "index_bank_transactions_on_reconciliation_id"
+    t.index ["requested_by_id"], name: "index_bank_transactions_on_requested_by_id"
+    t.index ["workspace_id", "status"], name: "index_bank_transactions_on_workspace_and_status"
+    t.index ["workspace_id"], name: "index_bank_transactions_on_workspace_id"
   end
 
   create_table "beta_codes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1252,6 +1276,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_180000) do
     t.index ["workspace_id"], name: "index_pipelines_on_workspace_id"
   end
 
+  create_table "reconciliations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "bank_name"
+    t.integer "closing_balance_cents"
+    t.datetime "created_at", null: false
+    t.uuid "created_by_id", null: false
+    t.string "currency", default: "EUR", null: false
+    t.integer "export_status", default: 0, null: false
+    t.boolean "integrity_warning", default: false, null: false
+    t.text "integrity_warning_message"
+    t.integer "opening_balance_cents"
+    t.text "parse_error"
+    t.date "period_end"
+    t.date "period_start"
+    t.uuid "statement_document_id", null: false
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["created_by_id"], name: "index_reconciliations_on_created_by_id"
+    t.index ["statement_document_id"], name: "index_reconciliations_on_statement_document_id"
+    t.index ["workspace_id", "status"], name: "index_reconciliations_on_workspace_and_status"
+    t.index ["workspace_id"], name: "index_reconciliations_on_workspace_id"
+  end
+
   create_table "recovery_codes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "code_digest", null: false
     t.datetime "created_at", null: false
@@ -1720,6 +1767,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_180000) do
     t.index ["user_id", "agent_thread_id"], name: "index_thread_follows_on_user_id_and_agent_thread_id", unique: true
   end
 
+  create_table "transaction_matches", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "bank_transaction_id", null: false
+    t.float "confidence"
+    t.datetime "created_at", null: false
+    t.uuid "document_id", null: false
+    t.jsonb "match_reasons", default: {}, null: false
+    t.integer "matched_by", default: 0, null: false
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["bank_transaction_id", "document_id"], name: "index_transaction_matches_on_transaction_and_document", unique: true
+    t.index ["bank_transaction_id"], name: "index_transaction_matches_on_bank_transaction_id"
+    t.index ["document_id"], name: "index_transaction_matches_on_document_id"
+  end
+
   create_table "users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.boolean "app_admin", default: false, null: false
     t.integer "compose_default", default: 0, null: false
@@ -1871,6 +1932,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_180000) do
   add_foreign_key "audit_events", "users", on_delete: :nullify
   add_foreign_key "authored_documents", "users", column: "author_id"
   add_foreign_key "authored_documents", "workspaces"
+  add_foreign_key "bank_transactions", "reconciliations", on_delete: :cascade
+  add_foreign_key "bank_transactions", "users", column: "requested_by_id", on_delete: :nullify
+  add_foreign_key "bank_transactions", "workspaces"
   add_foreign_key "beta_codes", "users", column: "created_by_id"
   add_foreign_key "beta_codes", "users", column: "redeemed_by_id"
   add_foreign_key "bug_reports", "users"
@@ -1978,6 +2042,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_180000) do
   add_foreign_key "pipeline_memberships", "pipelines"
   add_foreign_key "pipeline_stages", "pipelines"
   add_foreign_key "pipelines", "workspaces"
+  add_foreign_key "reconciliations", "documents", column: "statement_document_id", on_delete: :restrict
+  add_foreign_key "reconciliations", "users", column: "created_by_id", on_delete: :restrict
+  add_foreign_key "reconciliations", "workspaces"
   add_foreign_key "recovery_codes", "users"
   add_foreign_key "reminders", "calendar_events"
   add_foreign_key "reminders", "users", column: "confirmed_by_id"
@@ -2024,6 +2091,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_180000) do
   add_foreign_key "tasks", "workspaces"
   add_foreign_key "thread_follows", "agent_threads"
   add_foreign_key "thread_follows", "users"
+  add_foreign_key "transaction_matches", "bank_transactions", on_delete: :cascade
+  add_foreign_key "transaction_matches", "documents", on_delete: :cascade
   add_foreign_key "users", "workspaces"
   add_foreign_key "webauthn_credentials", "users"
   add_foreign_key "workflow_execution_steps", "workflow_executions"

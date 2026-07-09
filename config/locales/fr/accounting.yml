@@ -1,0 +1,76 @@
+---
+fr:
+  shared:
+    nav:
+      accounting: Comptabilité
+
+  command_palette:
+    commands:
+      accounting: Comptabilité
+
+  reconciliations:
+    untitled_statement: Relevé bancaire
+    destroy_confirm: Supprimer ce rapprochement ? Toutes les transactions analysées seront supprimées.
+    statuses:
+      matched: Associé
+      excluded: Exclu
+      unmatched: Non associé
+      suggested: Suggéré
+      requested: Facture demandée
+    parse_job:
+      pdf_not_yet_supported: L'analyse des PDF arrivera dans la prochaine version. Veuillez exporter votre relevé au format CSV pour l'instant.
+      integrity_mismatch: "Échec de la vérification du solde : solde de clôture attendu %{expected} mais le relevé affiche %{actual}."
+    index:
+      title: Comptabilité
+      new_reconciliation: Nouveau rapprochement
+      col_statement: Relevé
+      col_bank: Banque
+      col_period: Période
+      col_progress: Avancement
+      col_status: Statut
+      empty_title: Rapprochez votre premier relevé bancaire
+      empty_description: Importez un relevé CSV pour associer chaque débit à sa facture de dépense. Campbooks garde votre comptabilité prête pour un audit.
+      empty_cta: Importer un relevé
+    new:
+      title: Nouveau rapprochement
+      from_documents_title: Depuis vos documents
+      from_documents_description: Choisissez un relevé bancaire que Campbooks a déjà classé depuis votre messagerie.
+      no_documents: Aucun relevé archivé pour l'instant. Téléchargez-en un à la place.
+      upload_title: Télécharger un relevé
+      upload_description: Téléchargez un export CSV ou PDF de votre banque.
+      drop_here: Déposez votre fichier ici
+      accepted_formats: PDF ou CSV
+      click_to_browse: Parcourir les fichiers
+      csv_hint: Les exports CSV sont analysés instantanément — sans IA nécessaire.
+      upload_and_start: Télécharger et démarrer le rapprochement
+    create:
+      created: Relevé importé — analyse des transactions en cours…
+      document_not_found: Document introuvable.
+      file_upload_failed: Échec du téléchargement du fichier. Veuillez réessayer.
+      no_source: Veuillez sélectionner ou télécharger un relevé bancaire.
+    show:
+      title: Rapprochement
+      delete: Supprimer
+      integrity_warning: Écart de solde détecté
+      status_parsing: Lecture de votre relevé…
+      status_matching: Association des transactions…
+      parse_failed_title: Impossible de lire ce relevé
+      parse_failed_generic: Une erreur inattendue s'est produite lors de la lecture du fichier.
+      parse_failed_hint: Essayez de réexporter depuis votre banque au format CSV ou vérifiez que le fichier n'est pas corrompu.
+      no_transactions: Aucune transaction trouvée.
+      col_date: Date
+      col_description: Description
+      col_counterparty: Contrepartie
+      col_amount: Montant
+      col_match: Association
+    destroy:
+      destroyed: Rapprochement supprimé.
+
+  components:
+    accounting:
+      reconciliation_status_badge:
+        pending: En attente
+        parsing: Analyse
+        matching: Association
+        ready: Prêt
+        failed: Échec

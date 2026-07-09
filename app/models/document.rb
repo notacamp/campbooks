@@ -20,6 +20,9 @@ class Document < ApplicationRecord
   has_many :task_documents, dependent: :destroy
   has_many :tasks, through: :task_documents
 
+  has_many :transaction_matches, dependent: :destroy
+  has_many :bank_transactions, through: :transaction_matches
+
   # Stage 3 "filesystem" layer — folders this document is filed into (its *place*,
   # orthogonal to its DocumentType *kind*).
   has_many :folder_memberships, as: :folderable, dependent: :destroy

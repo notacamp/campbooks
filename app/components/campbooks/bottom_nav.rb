@@ -19,7 +19,7 @@ module Campbooks
     # permanent tab — they collapse into a single "More" burger that opens a
     # popover above the bar (the desktop NavRail still shows all of them, since
     # the vertical rail has room). Order here is the order in the menu.
-    OVERFLOW_KEYS = %i[tasks workflows contacts organizations activity].freeze
+    OVERFLOW_KEYS = %i[tasks digests accounting workflows contacts organizations activity].freeze
 
     # Hamburger glyph for the "More" tab, matching the stroked weight of the
     # other nav icons (NavigationHelper#nav_icon_svg).

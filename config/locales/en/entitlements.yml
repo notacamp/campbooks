@@ -49,6 +49,7 @@ en:
       not_enabled: "%{feature} is turned off for your workspace."
       over_limit: You've reached your plan's limit for %{feature}. Upgrade for more.
     features:
+      accounting: Accounting
       ai_model_access: AI models
       digests: Digests
       document_templates: Document templates
