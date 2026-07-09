@@ -16,6 +16,12 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-07-09
+
+### Fixed
+
+- **Accounting: PDF statement parsing on OpenAI/Mistral providers extracted zero transactions.** Page rasterization passed ImageMagick's bracket page syntax to `MiniMagick::Image.open`, which MiniMagick 5 rejects — every page silently failed and the AI received an imageless prompt. Pages are now selected via `#page` after opening (the same mechanism the document analyzer uses). A statement that yields no readable pages or no transactions now fails loudly with a clear message instead of completing as "ready" with an empty table.
+
 ## [0.19.0] - 2026-07-09
 
 ### Added

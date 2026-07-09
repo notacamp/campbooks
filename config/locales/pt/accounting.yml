@@ -34,6 +34,9 @@ pt:
       pdf_ai_error: "Falha na análise por IA: %{message}"
       unsupported_format: "Formato de ficheiro não suportado. Por favor, carregue um extrato bancário em CSV ou PDF."
       integrity_mismatch: "Verificação de saldo falhou: saldo de fecho esperado %{expected} mas o extrato mostra %{actual}."
+    bank_statement_parser:
+      pages_unreadable: "Não conseguimos processar nenhuma página deste extrato PDF. Tente exportá-lo novamente do seu banco ou carregue um CSV."
+      no_transactions: "Não conseguimos ler nenhum movimento deste extrato. Se não for uma imagem digitalizada, tente exportar um CSV do seu banco."
     index:
       title: Contabilidade
       new_reconciliation: Nova reconciliação
