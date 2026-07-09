@@ -20,7 +20,9 @@ module Campbooks
       def view_template
         if @link
           a(href: helpers.document_path(@document), target: "_blank", rel: "noopener",
-            title: t(".open_document"), class: "#{chip_classes} group/chip hover:ring-1 hover:ring-border") do
+            title: t(".open_document"),
+            data: { document_preview_title: @document.display_title },
+            class: "#{chip_classes} group/chip hover:ring-1 hover:ring-border") do
             chip_body
           end
         else

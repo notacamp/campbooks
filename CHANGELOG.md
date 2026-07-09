@@ -16,6 +16,12 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.19.4] - 2026-07-09
+
+### Changed
+
+- **Accounting: documents preview in place.** Clicking a matched/suggested invoice chip, a search candidate in the resolve panel, or the new "View statement" chip opens the document in a slide-over preview (bottom sheet on mobile) without leaving the workbench — the file renders inline, with an "open full page" escape hatch. Ctrl/Cmd+click still opens the full document page directly.
+
 ## [0.19.3] - 2026-07-09
 
 ### Changed
