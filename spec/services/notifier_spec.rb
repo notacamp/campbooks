@@ -48,4 +48,38 @@ RSpec.describe Notifier do
       expect(user.notifications.active.where(notifiable: doc)).to be_empty
     end
   end
+
+  describe ".reconciliation_ready" do
+    let(:reconciliation) { create(:reconciliation, :ready, workspace:, created_by: user) }
+
+    it "sends a notification to all workspace users" do
+      Notifier.reconciliation_ready(reconciliation)
+      n = user.notifications.active.find_by(group_key: "reconciliation_ready/#{reconciliation.id}")
+      expect(n).to be_present
+      expect(n.title).to be_present
+      expect(n.category).to eq("reconciliation")
+    end
+  end
+
+  describe ".reconciliation_parse_failed" do
+    let(:reconciliation) { create(:reconciliation, :failed, workspace:, created_by: user) }
+
+    it "sends an action_required notification to all workspace users" do
+      Notifier.reconciliation_parse_failed(reconciliation)
+      n = user.notifications.active.find_by(group_key: "reconciliation_parse_failed/#{reconciliation.id}")
+      expect(n).to be_present
+      expect(n).to be_priority_action_required
+    end
+  end
+
+  describe ".reconciliation_export_ready" do
+    let(:reconciliation) { create(:reconciliation, :ready, workspace:, created_by: user) }
+
+    it "sends a notification to all workspace users" do
+      Notifier.reconciliation_export_ready(reconciliation)
+      n = user.notifications.active.find_by(group_key: "reconciliation_export/#{reconciliation.id}")
+      expect(n).to be_present
+      expect(n.title).to be_present
+    end
+  end
 end

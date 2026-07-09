@@ -94,10 +94,16 @@
         </div>
 
       <% elsif transaction.requested? %>
-        <%# 📨 Requested %>
-        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium tone-info">
-          <%= t("reconciliations.bank_transactions.row.requested") %>
-        </span>
+        <%# 📨 Requested: blue chip + Undo %>
+        <div class="flex items-center justify-between gap-2">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium tone-info">
+            <%= t("reconciliations.bank_transactions.row.requested") %>
+          </span>
+          <%= button_to t("shared.actions.undo"),
+                reset_reconciliation_bank_transaction_path(reconciliation, transaction),
+                method: :post,
+                class: "text-xs text-accent-600 hover:text-accent-700 font-medium" %>
+        </div>
 
       <% else %>
         <%# ❓ Unmatched: amber pill + Resolve button %>

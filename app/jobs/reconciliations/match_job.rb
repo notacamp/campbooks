@@ -24,6 +24,7 @@ module Reconciliations
 
       @reconciliation.update!(status: :ready)
       broadcast_update!
+      Notifier.reconciliation_ready(@reconciliation)
 
     rescue *Ai::Adapters::Base::TRANSIENT_ERRORS => e
       Rails.logger.warn("[Reconciliations::MatchJob] Transient error for #{reconciliation_id}: #{e.class}: #{e.message}")

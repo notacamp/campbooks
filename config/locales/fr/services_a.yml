@@ -134,3 +134,9 @@ fr:
       title: Nouveau commentaire de %{actor_name}
     thread_mention:
       title: "%{actor_name} vous a mentionné"
+    reconciliation_ready:
+      title: Rapprochement prêt à réviser
+    reconciliation_parse_failed:
+      title: Impossible de lire le relevé bancaire
+    reconciliation_export_ready:
+      title: Zip de rapprochement prêt à télécharger

@@ -1,0 +1,86 @@
+<%# Export button region — broadcast target for Reconciliations::ExportJob.
+    Locals: reconciliation [Reconciliation]
+    DOM ID: reconciliation_export_button (stable; updated by ExportJob broadcast)
+    States: none → primary CTA; generating → disabled ghost with spinner;
+            generated → primary download link + quiet re-export; failed → ghost retry.
+    When fully resolved (no unmatched/suggested left), the none/generated state
+    gets the Ember "win moment" treatment. %>
+
+<% fully_resolved = reconciliation.ready? &&
+     reconciliation.bank_transactions.where(status: %i[unmatched suggested]).none? %>
+
+<div id="reconciliation_export_button" class="inline-flex items-center gap-2">
+  <% if reconciliation.export_generating? %>
+    <%# Generating — disabled ghost with spinner %>
+    <span class="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg border border-border text-muted-foreground cursor-not-allowed">
+      <%= render Campbooks::Spinner.new(size: :xs) %>
+      <%= t("reconciliations.export_button.generating") %>
+    </span>
+
+  <% elsif reconciliation.export_generated? && reconciliation.export_zip.attached? %>
+    <%# Generated — primary download link + quiet re-export %>
+    <% if fully_resolved %>
+      <%# Win-moment: Ember gradient CTA %>
+      <%= link_to download_reconciliation_path(reconciliation),
+                  class: "inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg text-white bg-ember-gradient shadow-ember hover:opacity-90 transition-opacity" do %>
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+        </svg>
+        <%= t("reconciliations.export_button.download") %>
+      <% end %>
+    <% else %>
+      <%# Standard generated state %>
+      <%= link_to download_reconciliation_path(reconciliation),
+                  class: "inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg border border-border bg-card hover:bg-muted/40 transition-colors" do %>
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+        </svg>
+        <%= t("reconciliations.export_button.download") %>
+      <% end %>
+      <%# Quiet re-export link %>
+      <%= button_to t("reconciliations.export_button.re_export"),
+                    export_reconciliation_path(reconciliation),
+                    method: :post,
+                    class: "text-xs text-muted-foreground hover:text-foreground" %>
+    <% end %>
+
+  <% elsif reconciliation.export_failed? %>
+    <%# Failed — ghost retry %>
+    <%= button_to export_reconciliation_path(reconciliation),
+                  method: :post,
+                  class: "inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg border border-border bg-card hover:bg-muted/40 transition-colors text-red-600 dark:text-red-400" do %>
+      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+      </svg>
+      <%= t("reconciliations.export_button.retry") %>
+    <% end %>
+
+  <% else %>
+    <%# None — primary "Download for accountant" CTA %>
+    <% if fully_resolved %>
+      <%# Win-moment: Ember gradient CTA %>
+      <%= button_to export_reconciliation_path(reconciliation),
+                    method: :post,
+                    class: "inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg text-white bg-ember-gradient shadow-ember hover:opacity-90 transition-opacity" do %>
+        <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+        </svg>
+        <%= t("reconciliations.export_button.download_for_accountant") %>
+      <% end %>
+    <% else %>
+      <%= button_to export_reconciliation_path(reconciliation),
+                    method: :post,
+                    class: "inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg border border-border bg-card hover:bg-muted/40 transition-colors" do %>
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+        </svg>
+        <%= t("reconciliations.export_button.download_for_accountant") %>
+      <% end %>
+    <% end %>
+  <% end %>
+</div>
