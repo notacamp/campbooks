@@ -16,6 +16,12 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.19.3] - 2026-07-09
+
+### Changed
+
+- **Accounting: match chips open the document.** The matched/suggested invoice chip in the workbench rows, cards, and resolve panel now links to the document (new tab), so you can inspect the actual invoice before confirming a match.
+
 ## [0.19.2] - 2026-07-09
 
 ### Fixed
