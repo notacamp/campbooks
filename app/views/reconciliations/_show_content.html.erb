@@ -43,6 +43,22 @@
 
 <% elsif reconciliation.ready? || reconciliation.pending? %>
   <% if transactions.any? %>
+    <%# SummaryBar — status counts + NIF exceptions + "Confirm all N" button.
+        id="reconciliation_summary_bar" is the broadcast target from Matcher. %>
+    <% status_counts   = reconciliation.bank_transactions.group(:status).count %>
+    <% company_nif     = Current.workspace&.company_nif.presence %>
+    <% nif_exc_count   = if local_assigns.key?(:nif_exception_count)
+                           local_assigns[:nif_exception_count]
+                         elsif company_nif
+                           reconciliation.nif_exception_count(company_nif)
+                         else
+                           0
+                         end %>
+    <%= render "reconciliations/summary_bar",
+               reconciliation:      reconciliation,
+               status_counts:       status_counts,
+               nif_exception_count: nif_exc_count %>
+
     <%# Desktop table — tbody ID used by show.turbo_stream.erb to append next pages %>
     <div class="hidden md:block bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
       <table class="min-w-full divide-y divide-border">
@@ -56,14 +72,18 @@
           </tr>
         </thead>
         <tbody id="transactions_table_body" class="bg-card divide-y divide-border">
-          <%= render partial: "bank_transactions/row", collection: transactions, as: :transaction %>
+          <%= render partial: "bank_transactions/row",
+                     collection: transactions, as: :transaction,
+                     locals: { reconciliation: reconciliation } %>
         </tbody>
       </table>
     </div>
 
     <%# Mobile cards — container ID used by show.turbo_stream.erb to append next pages %>
     <div id="transactions_cards" class="md:hidden space-y-2">
-      <%= render partial: "bank_transactions/card", collection: transactions, as: :transaction %>
+      <%= render partial: "bank_transactions/card",
+                 collection: transactions, as: :transaction,
+                 locals: { reconciliation: reconciliation } %>
     </div>
 
     <% if next_page.present? %>

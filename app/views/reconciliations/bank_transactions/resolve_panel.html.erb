@@ -1,0 +1,14 @@
+<%# Lazy Turbo Frame response for the resolve panel.
+    Loaded when the user clicks "Resolve" on an unmatched transaction.
+    The outer turbo-frame ID must match what the transaction-resolve Stimulus
+    controller sets as frameIdValue (data-transaction-resolve-frame-id-value),
+    both derived from dom_id(@transaction, :resolve_frame).
+    The inner frame "resolve_doc_search_<id>" is navigated by the search form. %>
+<turbo-frame id="<%= dom_id(@transaction, :resolve_frame) %>">
+  <%= render Campbooks::Accounting::ResolvePanel.new(
+        transaction:         @transaction,
+        reconciliation:      @reconciliation,
+        suggested_matches:   @suggested_matches,
+        candidate_documents: @candidate_documents,
+        company_nif:         @company_nif) %>
+</turbo-frame>

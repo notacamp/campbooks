@@ -11,6 +11,13 @@
             class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-accent-500 focus:ring-accent-500 sm:text-sm",
             placeholder: t(".workspace_context_placeholder") %>
     </div>
+    <div class="mb-4">
+      <%= f.label :company_nif, t(".company_nif_label"), class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" %>
+      <p class="text-xs text-gray-500 dark:text-gray-400 mb-2"><%= t(".company_nif_hint") %></p>
+      <%= f.text_field :company_nif, value: Current.workspace&.company_nif,
+            class: "block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-accent-500 focus:ring-accent-500 sm:text-sm dark:bg-gray-800 dark:text-gray-100",
+            placeholder: "PT123456789" %>
+    </div>
     <div class="flex items-center justify-between">
       <%= render(Campbooks::Button.new(variant: :primary, type: :submit)) { t(".save_profile") } %>
       <% if current_user.workspace_context.present? %>

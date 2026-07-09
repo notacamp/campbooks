@@ -263,4 +263,68 @@ RSpec.describe Document, type: :model do
       expect(doc.reference_display).to be_nil
     end
   end
+
+  # ── Document#nif_status ──────────────────────────────────────────────────────
+
+  describe "#nif_status" do
+    let(:doc) { build(:document, document_type: :expense_invoice) }
+
+    context "when company_nif is blank" do
+      it "returns nil" do
+        expect(doc.nif_status(nil)).to be_nil
+        expect(doc.nif_status("")).to be_nil
+      end
+    end
+
+    context "for non-applicable document types" do
+      it "returns nil for bank_statement" do
+        doc.document_type = :bank_statement
+        expect(doc.nif_status("PT123456789")).to be_nil
+      end
+
+      it "returns nil for revenue_invoice" do
+        doc.document_type = :revenue_invoice
+        expect(doc.nif_status("PT123456789")).to be_nil
+      end
+    end
+
+    context "when company_vat_present is true (EU-standard VAT on document)" do
+      it "returns :ok without inspecting vendor_nif" do
+        doc.company_vat_present = true
+        expect(doc.nif_status("PT123456789")).to eq(:ok)
+      end
+    end
+
+    context "when buyer_nif matches" do
+      it "returns :ok for exact ISO match" do
+        doc.buyer_nif = "PT123456789"
+        expect(doc.nif_status("PT123456789")).to eq(:ok)
+      end
+
+      it "normalizes by stripping PT prefix and spaces" do
+        doc.buyer_nif = "PT 123 456 789"
+        expect(doc.nif_status("123456789")).to eq(:ok)
+      end
+
+      it "normalizes dots and dashes" do
+        doc.buyer_nif = "123.456.789"
+        expect(doc.nif_status("123456789")).to eq(:ok)
+      end
+    end
+
+    context "when buyer_nif is present but mismatches" do
+      it "returns :mismatch" do
+        doc.buyer_nif = "PT987654321"
+        expect(doc.nif_status("PT123456789")).to eq(:mismatch)
+      end
+    end
+
+    context "when buyer_nif is blank" do
+      it "returns :missing when company_vat_present is false" do
+        doc.buyer_nif         = nil
+        doc.company_vat_present = false
+        expect(doc.nif_status("PT123456789")).to eq(:missing)
+      end
+    end
+  end
 end

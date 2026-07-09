@@ -229,6 +229,8 @@ pt:
         revoked: Todos os tokens de "%{name}" foram revogados.
     general:
       show:
+        company_nif_label: "NIF / número de contribuinte da empresa"
+        company_nif_hint: "O número de identificação fiscal da sua empresa. Utilizado para verificar se as faturas estão corretamente endereçadas a si."
         ai_providers_hint: Procura fornecedores de IA e definições de modelos? Agora
           encontra-os em %{link}.
         ai_providers_link_text: Fornecedores e serviços de IA

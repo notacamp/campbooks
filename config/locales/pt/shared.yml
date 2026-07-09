@@ -20,6 +20,7 @@ pt:
       save: Guardar
       save_changes: Guardar alterações
       search: Pesquisar
+      undo: Desfazer
       send: Enviar
       skip_for_now: Ignorar por agora
       update: Atualizar

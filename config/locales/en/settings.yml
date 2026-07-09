@@ -227,6 +227,8 @@ en:
         revoked: All tokens for "%{name}" were revoked.
     general:
       show:
+        company_nif_label: "Company VAT / NIF number"
+        company_nif_hint: "Your company's tax identification number. Used to verify invoices are correctly addressed to you."
         ai_providers_hint: Looking for AI providers and model settings? They now live
           under %{link}.
         ai_providers_link_text: AI providers & services

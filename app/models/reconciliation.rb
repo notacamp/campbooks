@@ -58,4 +58,21 @@ class Reconciliation < ApplicationRecord
     parts = [ period_start, period_end ].compact.map { |d| d.strftime("%-d %b %Y") }
     parts.uniq.join(" – ")
   end
+
+  # Count transactions whose top match (suggested or confirmed) has a NIF that
+  # is missing or mismatched against the workspace's company_nif.
+  # Returns 0 when company_nif is blank — callers don't need to guard.
+  def nif_exception_count(company_nif)
+    return 0 if company_nif.blank?
+
+    bank_transactions
+      .where(status: %i[matched suggested])
+      .includes(transaction_matches: :document)
+      .count do |txn|
+        top = txn.transaction_matches
+                 .select { |m| m.suggested? || m.confirmed? }
+                 .max_by(&:confidence)
+        top&.document&.nif_status(company_nif)&.in?(%i[missing mismatch]) || false
+      end
+  end
 end

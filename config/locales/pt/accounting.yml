@@ -29,7 +29,10 @@ pt:
     untitled_statement: Extrato bancário
     destroy_confirm: Eliminar esta reconciliação? Todas as transações analisadas serão removidas.
     parse_job:
-      pdf_not_yet_supported: A análise de PDF chegará na próxima versão. Por favor, exporte o extrato em CSV por agora.
+      no_ai_for_pdf: "A análise de PDF requer um fornecedor de IA configurado para análise de documentos. Configure um em Definições → Fornecedores de IA."
+      pdf_unparseable: "Não foi possível extrair transações deste PDF. O ficheiro pode estar digitalizado, encriptado ou num formato não suportado."
+      pdf_ai_error: "Falha na análise por IA: %{message}"
+      unsupported_format: "Formato de ficheiro não suportado. Por favor, carregue um extrato bancário em CSV ou PDF."
       integrity_mismatch: "Verificação de saldo falhou: saldo de fecho esperado %{expected} mas o extrato mostra %{actual}."
     index:
       title: Contabilidade
@@ -74,5 +77,95 @@ pt:
       col_counterparty: Contraparte
       col_amount: Montante
       col_match: Associação
+    confirm_all_suggestions:
+      confirmed:
+        one: "1 associação confirmada"
+        other: "%{count} associações confirmadas"
+    bank_transactions:
+      row:
+        confirm: Confirmar
+        reject: Rejeitar
+        not_this_one: Não é este
+        no_invoice: Fatura não encontrada
+        resolve: Resolver
+        requested: Fatura solicitada
+        more: mais
+      exclusion_reasons:
+        bank_fee: Comissão bancária
+        salary: Salário
+        transfer: Transferência interna
+        tax: Pagamento de imposto
+        other: Outro
+      confirm:
+        confirmed: Associação confirmada
+      reject:
+        rejected: Associação rejeitada
+      exclude:
+        excluded: "Marcado como excluído: %{reason}"
+        invalid_reason: Motivo de exclusão inválido.
+      reset:
+        reset: Associação removida
+      manual_match:
+        matched: "Associado a %{title}"
+        document_not_found: Documento não encontrado.
+      resolve_panel:
+        attach: Associar
+        no_docs_found: Nenhum documento correspondente encontrado.
     destroy:
       destroyed: Reconciliação eliminada.
+
+  components:
+    accounting:
+      summary_bar:
+        matched:
+          one: associado
+          other: associados
+        to_review:
+          one: para rever
+          other: para rever
+        unmatched:
+          one: por associar
+          other: por associar
+        excluded:
+          one: excluído
+          other: excluídos
+        requested:
+          one: solicitado
+          other: solicitados
+        nif_exceptions_title: Transações com problemas de NIF
+        nif_exceptions:
+          one: problema de NIF
+          other: problemas de NIF
+        confirm_all_confirm:
+          one: "Confirmar 1 associação sugerida?"
+          other: "Confirmar %{count} associações sugeridas?"
+        confirm_all:
+          one: Confirmar 1 associação
+          other: "Confirmar %{count} associações"
+      match_chip:
+        nif_mismatch: NIF não corresponde
+        nif_missing: NIF em falta no documento
+      confidence_badge:
+        strong: Associação forte
+        possible: Associação possível
+        weak: Associação fraca
+        reason_amount_exact: Montante exato
+        reason_amount_close: Montante dentro de 2%
+        reason_date:
+          one: 1 dia de diferença
+          other: "%{count} dias de diferença"
+        reason_name: "Semelhança de nome: %{pct}%"
+        reason_cross_reconciliation: "Já associado noutro extrato"
+      resolve_panel:
+        suggestions_title: "Sugestões do Scout"
+        checked_documents:
+          one: Verificado 1 documento candidato
+          other: "Verificados %{count} documentos candidatos"
+        use_this_match: Usar esta associação
+        not_this_one: Não é este
+        search_title: Pesquisar os seus documentos
+        search_placeholder: "Pesquisar por nome, n.º fatura…"
+        attach: Associar
+        exclude_title: Sem documento necessário
+        exclude_hint: Marque esta transação como uma despesa que não requer fatura.
+        mark_excluded: Marcar como excluído
