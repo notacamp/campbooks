@@ -86,7 +86,11 @@ class Workspace < ApplicationRecord
   end
 
   def company_nif
-    setting("company_nif")
+    # Falls back to the onboarding-collected company tax id — in PT (and most
+    # of the EU) the company tax number IS the VAT number, so the accounting
+    # NIF check works without asking for the same value twice. An explicit
+    # company_nif setting always wins.
+    setting("company_nif").presence || setting("company_tax_id").presence
   end
 
   def app_name
