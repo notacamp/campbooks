@@ -281,8 +281,21 @@ RSpec.describe Reconciliations::Matcher, "#ground_ai_matches (private)" do
     { "document_id" => id, "confidence" => conf, "reason" => reason }
   end
 
-  def ground(matches, docs)
-    matcher.send(:ground_ai_matches, txn, matches, docs.index_by(&:id))
+  def ground(matches, docs, audit: nil)
+    matcher.send(:ground_ai_matches, txn, matches, docs.index_by(&:id), audit: audit)
+  end
+
+  it "records every grounding decision in the audit trail" do
+    audit = []
+    spark   = doc(id: "d-bad", cents: 6999)
+    exact   = doc(id: "d-good", cents: 8598, vendor: "Amazon EU", invoice: "A-1")
+
+    ground([ ai("d-bad", 0.95), ai("d-good", 0.9), ai("ghost", 0.99) ], [ spark, exact ], audit: audit)
+
+    outcomes = audit.map { |a| a["outcome"] }
+    expect(outcomes).to contain_exactly("discarded_amount", "kept", "unknown_id")
+    discarded = audit.find { |a| a["outcome"] == "discarded_amount" }
+    expect(discarded).to include("claimed" => 0.95, "doc_amount_cents" => 6999, "txn_amount_cents" => 8598)
   end
 
   it "discards a confident AI match whose amount does not fit (the 2026-07-09 prod incident)" do

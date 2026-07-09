@@ -20,7 +20,7 @@ major, minor, or patch change here.
 
 ### Fixed
 
-- **Accounting: AI match suggestions are now grounded in the transaction amount.** The AI disambiguator could suggest an invoice whose amount doesn't fit the payment — with high claimed confidence and an invented justification. Model confidence is now bounded by evidence: exact amounts keep the model's score, near amounts (±2%) are capped below "strong", anything else is discarded (split payments whose invoices sum to the transaction are kept). Near-duplicate documents (a receipt and its invoice for the same purchase) collapse into a single suggestion.
+- **Accounting: AI match suggestions are now grounded in the transaction amount.** The AI disambiguator could suggest an invoice whose amount doesn't fit the payment — with high claimed confidence and an invented justification. Model confidence is now bounded by evidence: exact amounts keep the model's score, near amounts (±2%) are capped below "strong", anything else is discarded (split payments whose invoices sum to the transaction are kept). Near-duplicate documents (a receipt and its invoice for the same purchase) collapse into a single suggestion. Every AI disambiguation run is also audited to the database (`bank_transactions.ai_match_debug`: candidates sent, raw model claims, and each grounding decision) for debugging, and the matching prompt now states hard evidence rules — amount is primary, no invented company relationships, empty is a good answer — with a strict confidence rubric.
 
 ## [0.19.4] - 2026-07-09
 
