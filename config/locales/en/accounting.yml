@@ -66,6 +66,8 @@ en:
       file_upload_failed: File upload failed. Please try again.
       no_source: Please select or upload a bank statement.
     show:
+      statement_chip: "View statement"
+      view_statement: "Preview the bank statement used for this reconciliation"
       title: Reconciliation
       delete: Delete
       integrity_warning: Balance mismatch detected
@@ -112,6 +114,7 @@ en:
         matched: "Matched with %{title}"
         document_not_found: Document not found.
       resolve_panel:
+        open_document: "Preview the document — Ctrl/Cmd+click opens the full page"
         attach: Attach
         no_docs_found: No matching documents found.
       request_invoice:
@@ -176,8 +179,13 @@ en:
         confirm_all:
           one: Confirm 1 match
           other: "Confirm %{count} matches"
+      document_preview_drawer:
+        aria_label: "Document preview"
+        iframe_title: "Document file preview"
+        open_full_page: "Open full page"
+        close: "Close preview"
       match_chip:
-        open_document: "Open the document in a new tab"
+        open_document: "Preview the document — Ctrl/Cmd+click opens the full page"
         nif_mismatch: NIF does not match
         nif_missing: NIF missing on document
       confidence_badge:
@@ -192,6 +200,7 @@ en:
         reason_name: "Name similarity: %{pct}%"
         reason_cross_reconciliation: "Already matched in another statement"
       resolve_panel:
+        open_document: "Preview the document — Ctrl/Cmd+click opens the full page"
         suggestions_title: "Scout's suggestions"
         checked_documents:
           one: Checked 1 candidate document
