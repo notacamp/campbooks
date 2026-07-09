@@ -16,6 +16,12 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.19.2] - 2026-07-09
+
+### Fixed
+
+- **Settings → General wiped the workspace context on save and never persisted the VAT number.** The form scoped its fields under `user[...]` while the controller read top-level params, so saving the page cleared `workspace_context` and dropped `company_nif`. The form now submits the exact param names the controller reads, both writes are guarded so a request that omits a field never clears it, and specs pin the form's input names against the controller contract. `Workspace#company_nif` also falls back to the onboarding-collected company tax id, so the accounting NIF check works without re-entering the same number.
+
 ## [0.19.1] - 2026-07-09
 
 ### Fixed
