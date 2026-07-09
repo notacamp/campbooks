@@ -6,26 +6,39 @@ module Campbooks
     #
     # @param match       [TransactionMatch] the match record
     # @param nif_status  [Symbol, nil]      :ok, :missing, :mismatch, or nil
+    # @param link        [Boolean]          when true (default) the chip links to
+    #                                       the document so users can open the
+    #                                       invoice to confirm the match
     class MatchChip < Campbooks::Base
-      def initialize(match:, nif_status: nil)
+      def initialize(match:, nif_status: nil, link: true)
         @match      = match
         @document   = match.document
         @nif_status = nif_status
+        @link       = link
       end
 
       def view_template
-        div(class: chip_classes) do
-          # Document type dot
-          span(class: "w-1.5 h-1.5 rounded-full shrink-0 #{dot_color}", aria_hidden: "true")
-          span(class: "min-w-0") do
-            p(class: "text-xs font-medium truncate") { @document.display_title }
-            p(class: "text-[10px] text-muted-foreground") { meta_line }
+        if @link
+          a(href: helpers.document_path(@document), target: "_blank", rel: "noopener",
+            title: t(".open_document"), class: "#{chip_classes} group/chip hover:ring-1 hover:ring-border") do
+            chip_body
           end
-          nif_indicator if @nif_status.in?(%i[missing mismatch])
+        else
+          div(class: chip_classes) { chip_body }
         end
       end
 
       private
+
+      def chip_body
+        # Document type dot
+        span(class: "w-1.5 h-1.5 rounded-full shrink-0 #{dot_color}", aria_hidden: "true")
+        span(class: "min-w-0") do
+          p(class: "text-xs font-medium truncate group-hover/chip:underline") { @document.display_title }
+          p(class: "text-[10px] text-muted-foreground") { meta_line }
+        end
+        nif_indicator if @nif_status.in?(%i[missing mismatch])
+      end
 
       def chip_classes
         base = "inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs max-w-[220px]"

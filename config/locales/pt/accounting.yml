@@ -177,6 +177,7 @@ pt:
           one: Confirmar 1 associação
           other: "Confirmar %{count} associações"
       match_chip:
+        open_document: "Abrir o documento num novo separador"
         nif_mismatch: NIF não corresponde
         nif_missing: NIF em falta no documento
       confidence_badge:
