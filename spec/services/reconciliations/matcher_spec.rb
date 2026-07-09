@@ -258,3 +258,93 @@ RSpec.describe Reconciliations::Matcher, type: :service do
     end
   end
 end
+
+# ── ground_ai_matches ──────────────────────────────────────────────────────────
+
+RSpec.describe Reconciliations::Matcher, "#ground_ai_matches (private)" do
+  subject(:matcher) { described_class.new(reconciliation: reconciliation, workspace: workspace) }
+
+  let(:workspace)      { create(:workspace) }
+  let(:reconciliation) { create(:reconciliation, workspace:, created_by: create(:user, workspace:)) }
+
+  let(:txn) do
+    OpenStruct.new(id: "txn-1", amount_cents: -8598, booked_on: Date.new(2024, 6, 15),
+                   counterparty: "AMAZON.COM.BE", description: "PAYMENT VIA BANCONTACT", currency: "EUR")
+  end
+
+  def doc(id:, cents:, vendor: "Spark Mail Limited", date: Date.new(2024, 6, 29), invoice: nil)
+    OpenStruct.new(id: id, amount_cents: cents, vendor_name: vendor, client_name: nil,
+                   document_date: date, due_date: nil, invoice_number: invoice, currency: "EUR")
+  end
+
+  def ai(id, conf, reason = "model says so")
+    { "document_id" => id, "confidence" => conf, "reason" => reason }
+  end
+
+  def ground(matches, docs, audit: nil)
+    matcher.send(:ground_ai_matches, txn, matches, docs.index_by(&:id), audit: audit)
+  end
+
+  it "records every grounding decision in the audit trail" do
+    audit = []
+    spark   = doc(id: "d-bad", cents: 6999)
+    exact   = doc(id: "d-good", cents: 8598, vendor: "Amazon EU", invoice: "A-1")
+
+    ground([ ai("d-bad", 0.95), ai("d-good", 0.9), ai("ghost", 0.99) ], [ spark, exact ], audit: audit)
+
+    outcomes = audit.map { |a| a["outcome"] }
+    expect(outcomes).to contain_exactly("discarded_amount", "kept", "unknown_id")
+    discarded = audit.find { |a| a["outcome"] == "discarded_amount" }
+    expect(discarded).to include("claimed" => 0.95, "doc_amount_cents" => 6999, "txn_amount_cents" => 8598)
+  end
+
+  it "discards a confident AI match whose amount does not fit (the 2026-07-09 prod incident)" do
+    spark_receipt = doc(id: "d-receipt", cents: 6999)
+    spark_invoice = doc(id: "d-invoice", cents: 6999, invoice: "1AE12226-0003")
+
+    result = ground([ ai("d-receipt", 0.95), ai("d-invoice", 0.95) ], [ spark_receipt, spark_invoice ])
+
+    expect(result).to be_empty # €69.99 (even twice) is not an €85.98 payment
+  end
+
+  it "keeps an exact-amount match at the model's confidence" do
+    exact = doc(id: "d-exact", cents: 8598, vendor: "Amazon EU", invoice: "AMZ-1")
+
+    result = ground([ ai("d-exact", 0.93) ], [ exact ])
+
+    expect(result.size).to eq(1)
+    expect(result.first.first["confidence"]).to eq(0.93)
+  end
+
+  it "caps confidence for close-but-not-exact amounts" do
+    close = doc(id: "d-close", cents: 8560, invoice: "X-1") # within 2%
+
+    result = ground([ ai("d-close", 0.97) ], [ close ])
+
+    expect(result.first.first["confidence"]).to eq(described_class::AI_CONFIDENCE_CAP_CLOSE)
+  end
+
+  it "keeps a split payment whose documents sum to the transaction, capped per doc" do
+    a = doc(id: "d-a", cents: 5000, vendor: "Vendor A", invoice: "A-1")
+    b = doc(id: "d-b", cents: 3598, vendor: "Vendor B", invoice: "B-1", date: Date.new(2024, 6, 14))
+
+    result = ground([ ai("d-a", 0.9), ai("d-b", 0.9) ], [ a, b ])
+
+    expect(result.size).to eq(2)
+    expect(result.map { |m, _| m["confidence"] }).to all(eq(described_class::AI_CONFIDENCE_CAP_SPLIT))
+  end
+
+  it "collapses twin documents (same party, amount, date) preferring the one with an invoice number" do
+    twin_receipt = doc(id: "d-r", cents: 8598)
+    twin_invoice = doc(id: "d-i", cents: 8598, invoice: "INV-9")
+
+    result = ground([ ai("d-r", 0.95), ai("d-i", 0.9) ], [ twin_receipt, twin_invoice ])
+
+    expect(result.size).to eq(1)
+    expect(result.first.last.id).to eq("d-i")
+  end
+
+  it "ignores hallucinated document ids" do
+    expect(ground([ ai("no-such-doc", 0.99) ], [])).to be_empty
+  end
+end
