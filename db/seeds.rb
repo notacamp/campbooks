@@ -14,6 +14,13 @@ end
 org.settings["onboarding_completed_at"] ||= Time.current.iso8601
 org.save! if org.settings_changed?
 
+# Grant accounting to the demo workspace so the full reconciliation workbench
+# (resolve panel, confirm/reject/exclude actions) is accessible in development.
+accounting_override = { "accounting" => { "allowed" => true, "enabled" => true } }
+unless (org.entitlement_overrides || {})["accounting"]&.dig("allowed")
+  org.update!(entitlement_overrides: (org.entitlement_overrides || {}).merge(accounting_override))
+end
+
 puts "Workspace: #{org.name}"
 
 puts "Creating users..."
@@ -381,5 +388,195 @@ AiConfiguration::PURPOSES.each do |purpose|
   config.update(system_prompt: DEFAULT_SYSTEM_PROMPTS[purpose.to_sym]) if config.system_prompt.blank?
 end
 puts "AI adapters: #{org.ai_adapters.count}, assignments: #{org.ai_configurations.count}"
+
+# ── Accounting Demo Data ─────────────────────────────────────
+puts "Seeding accounting demo data..."
+
+admin_user = User.find_by(email_address: "admin@example.com")
+
+if admin_user && !Reconciliation.exists?(workspace: org)
+  expense_type  = DocumentType.find_by(name: "expense_invoice", workspace: org)
+  revenue_type  = DocumentType.find_by(name: "revenue_invoice",  workspace: org)
+  statement_type = DocumentType.find_by(name: "bank_statement",  workspace: org)
+  company_nif   = org.company_nif || "123456789"
+
+  # Helper: build a Document with file attached before save (bypasses on: :create validation)
+  def seed_document(workspace, attrs, filename:, content:, content_type:)
+    doc = workspace.documents.build(attrs)
+    doc.original_file.attach(
+      io: StringIO.new(content),
+      filename: filename,
+      content_type: content_type
+    )
+    doc.save!
+    doc
+  end
+
+  # ── Invoice documents (expense)
+  vodafone_doc = seed_document(org,
+    { document_type: :expense_invoice, document_type_id: expense_type&.id,
+      ai_status: :completed, review_status: :approved, source: :manual_upload,
+      vendor_name: "Vodafone Portugal S.A.", vendor_nif: "502626750",
+      buyer_nif: company_nif, invoice_number: "FT2024/00045",
+      amount_cents: 4590, tax_amount_cents: 888, tax_rate: 23.0,
+      document_date: Date.new(2024, 1, 3), currency: "EUR", company_vat_present: true },
+    filename: "vodafone_jan2024.pdf",
+    content: "Vodafone Portugal - Fatura FT2024/00045",
+    content_type: "application/pdf"
+  )
+
+  edp_doc = seed_document(org,
+    { document_type: :expense_invoice, document_type_id: expense_type&.id,
+      ai_status: :completed, review_status: :approved, source: :manual_upload,
+      vendor_name: "EDP - Energias de Portugal S.A.", vendor_nif: "500697256",
+      buyer_nif: company_nif, invoice_number: "FT2024/00112",
+      amount_cents: 11207, tax_amount_cents: 2166, tax_rate: 23.0,
+      document_date: Date.new(2024, 1, 8), currency: "EUR", company_vat_present: true },
+    filename: "edp_jan2024.pdf",
+    content: "EDP Energia - Fatura FT2024/00112",
+    content_type: "application/pdf"
+  )
+
+  staples_doc = seed_document(org,
+    { document_type: :expense_invoice, document_type_id: expense_type&.id,
+      ai_status: :completed, review_status: :pending, source: :manual_upload,
+      vendor_name: "Staples Portugal, Lda.", vendor_nif: "503415040",
+      buyer_nif: nil, # intentionally missing to demo NIF flag
+      invoice_number: "FT2024/00221",
+      amount_cents: 8432, tax_amount_cents: 1629, tax_rate: 23.0,
+      document_date: Date.new(2024, 1, 12), currency: "EUR", company_vat_present: false },
+    filename: "staples_jan2024.pdf",
+    content: "Staples Portugal - Fatura FT2024/00221",
+    content_type: "application/pdf"
+  )
+
+  # ── Revenue invoice (client paid us)
+  revenue_doc = seed_document(org,
+    { document_type: :revenue_invoice, document_type_id: revenue_type&.id,
+      ai_status: :completed, review_status: :approved, source: :manual_upload,
+      client_name: "Acme Consulting Lda.", client_nif: "509876543",
+      invoice_number: "FR2024/00008",
+      amount_cents: 150000, tax_amount_cents: 28980, tax_rate: 23.0,
+      document_date: Date.new(2024, 1, 15), currency: "EUR", company_vat_present: true },
+    filename: "revenue_jan2024.pdf",
+    content: "Demo Corp - Fatura FR2024/00008",
+    content_type: "application/pdf"
+  )
+
+  # ── Bank statement document (the CSV the reconciliation is based on)
+  statement_csv = <<~CSV
+    Date,Description,Counterparty,Amount,Balance
+    2024-01-05,Debito direto telecomunicacoes,VODAFONE PORTUGAL S.A.,-45.90,8454.10
+    2024-01-10,Energia eletrica janeiro,EDP ENERGIAS DE PORTUGAL,-112.07,8342.03
+    2024-01-14,Material de escritorio,STAPLES PORTUGAL LDA,-84.32,8257.71
+    2024-01-16,Transferencia recebida Acme,ACME CONSULTING LDA,1500.00,9757.71
+    2024-01-20,Combustivel frota,REPSOL PORTUGUESA S.A.,-60.00,9697.71
+    2024-01-25,Comissao manutencao conta,MILLENNIUM BCP,-3.50,9694.21
+    2024-01-28,Pagamento fornecedor,DISTRIBUIDORA NORTE LDA,-200.00,9494.21
+  CSV
+
+  statement_doc = seed_document(org,
+    { document_type: :bank_statement, document_type_id: statement_type&.id,
+      ai_status: :completed, review_status: :approved, source: :manual_upload,
+      bank_name: "Millennium BCP",
+      period_start: Date.new(2024, 1, 1), period_end: Date.new(2024, 1, 31),
+      opening_balance_cents: 850000, closing_balance_cents: 949421,
+      document_date: Date.new(2024, 1, 31), currency: "EUR", company_vat_present: false },
+    filename: "millennium_jan2024.csv",
+    content: statement_csv,
+    content_type: "text/csv"
+  )
+
+  # ── Reconciliation
+  recon = Reconciliation.create!(
+    workspace: org,
+    created_by: admin_user,
+    statement_document: statement_doc,
+    bank_name: "Millennium BCP",
+    currency: "EUR",
+    period_start: Date.new(2024, 1, 1),
+    period_end: Date.new(2024, 1, 31),
+    opening_balance_cents: 850000,
+    closing_balance_cents: 949421,
+    status: :ready,
+    export_status: :export_none
+  )
+
+  # ── Bank transactions
+  def create_tx(recon, position:, booked_on:, description:, counterparty:, amount_cents:, balance_after_cents:, status: :unmatched)
+    BankTransaction.create!(
+      reconciliation: recon,
+      workspace: recon.workspace,
+      position: position,
+      booked_on: booked_on,
+      description: description,
+      counterparty: counterparty,
+      amount_cents: amount_cents,
+      balance_after_cents: balance_after_cents,
+      currency: recon.currency,
+      status: status
+    )
+  end
+
+  tx1 = create_tx(recon, position: 1, booked_on: Date.new(2024, 1, 5),
+    description: "Debito direto telecomunicacoes", counterparty: "VODAFONE PORTUGAL S.A.",
+    amount_cents: -4590, balance_after_cents: 845410, status: :matched)
+
+  tx2 = create_tx(recon, position: 2, booked_on: Date.new(2024, 1, 10),
+    description: "Energia eletrica janeiro", counterparty: "EDP ENERGIAS DE PORTUGAL",
+    amount_cents: -11207, balance_after_cents: 834203, status: :matched)
+
+  tx3 = create_tx(recon, position: 3, booked_on: Date.new(2024, 1, 14),
+    description: "Material de escritorio", counterparty: "STAPLES PORTUGAL LDA",
+    amount_cents: -8432, balance_after_cents: 825771, status: :suggested)
+
+  tx4 = create_tx(recon, position: 4, booked_on: Date.new(2024, 1, 16),
+    description: "Transferencia recebida Acme", counterparty: "ACME CONSULTING LDA",
+    amount_cents: 150000, balance_after_cents: 975771, status: :matched)
+
+  tx5 = create_tx(recon, position: 5, booked_on: Date.new(2024, 1, 20),
+    description: "Combustivel frota", counterparty: "REPSOL PORTUGUESA S.A.",
+    amount_cents: -6000, balance_after_cents: 969771, status: :requested)
+  tx5.update_columns(requested_at: 2.days.ago, requested_by_id: admin_user.id)
+
+  _tx6 = create_tx(recon, position: 6, booked_on: Date.new(2024, 1, 25),
+    description: "Comissao manutencao conta", counterparty: "MILLENNIUM BCP",
+    amount_cents: -350, balance_after_cents: 969421, status: :excluded)
+  _tx6.update_columns(exclusion_reason: "bank_fee")
+
+  _tx7 = create_tx(recon, position: 7, booked_on: Date.new(2024, 1, 28),
+    description: "Pagamento fornecedor", counterparty: "DISTRIBUIDORA NORTE LDA",
+    amount_cents: -20000, balance_after_cents: 949421, status: :unmatched)
+
+  # ── Matches
+  TransactionMatch.create!(
+    bank_transaction: tx1, document: vodafone_doc,
+    status: :confirmed, matched_by: :ai,
+    confidence: 0.97,
+    match_reasons: { "amount_exact" => true, "date_diff_days" => 2, "name_similarity" => 88 }
+  )
+  TransactionMatch.create!(
+    bank_transaction: tx2, document: edp_doc,
+    status: :confirmed, matched_by: :ai,
+    confidence: 0.95,
+    match_reasons: { "amount_exact" => true, "date_diff_days" => 2, "name_similarity" => 79 }
+  )
+  TransactionMatch.create!(
+    bank_transaction: tx3, document: staples_doc,
+    status: :suggested, matched_by: :ai,
+    confidence: 0.78,
+    match_reasons: { "amount_exact" => true, "date_diff_days" => 2, "name_similarity" => 72 }
+  )
+  TransactionMatch.create!(
+    bank_transaction: tx4, document: revenue_doc,
+    status: :confirmed, matched_by: :ai,
+    confidence: 0.99,
+    match_reasons: { "amount_exact" => true, "date_diff_days" => 1, "name_similarity" => 91 }
+  )
+
+  puts "Accounting: reconciliation seeded (#{recon.id})"
+else
+  puts "Accounting: reconciliation already seeded — skipping"
+end
 
 puts "Done!"

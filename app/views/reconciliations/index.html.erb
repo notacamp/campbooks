@@ -4,6 +4,36 @@
   <% end %>
 <% end %>
 
+<% if Current.workspace.company_nif.blank? && !current_user.tour_dismissed?("accounting_nif_banner") %>
+  <%# tour-dismiss controller: removes element immediately + POSTs dismiss URL in background. %>
+  <%# No inline onclick (CSP-hostile); dismissal persists via User#tour_dismissed?. %>
+  <div id="accounting_nif_banner"
+       class="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
+       data-controller="tour-dismiss"
+       data-tour-dismiss-url-value="<%= dismiss_tour_path('accounting_nif_banner') %>">
+    <svg class="mt-0.5 size-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4M12 17h.01"/>
+    </svg>
+    <div class="flex-1 min-w-0">
+      <p class="font-semibold"><%= t("reconciliations.nif_banner.title") %></p>
+      <p class="mt-0.5 text-amber-800 dark:text-amber-300"><%= t("reconciliations.nif_banner.body") %></p>
+    </div>
+    <div class="flex shrink-0 items-center gap-2">
+      <%= link_to t("reconciliations.nif_banner.action"), settings_general_path,
+            class: "rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition-colors" %>
+      <button type="button"
+              data-action="tour-dismiss#dismiss"
+              class="rounded-md p-1 text-amber-600 hover:bg-amber-100 hover:text-amber-800 dark:text-amber-400 dark:hover:bg-amber-500/20 transition-colors text-xs"
+              aria-label="<%= t('reconciliations.nif_banner.dismiss') %>">
+        <svg class="size-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+<% end %>
+
 <% if @reconciliations.any? %>
   <%# Desktop table — hidden on mobile, cards below take over %>
   <div class="hidden md:block bg-card rounded-xl shadow-sm border border-border overflow-x-auto">

@@ -6,6 +6,8 @@
       back_label: t("reconciliations.index.title")) do |header| %>
   <% header.with_actions do %>
     <% unless @reconciliation.parsing? || @reconciliation.matching? %>
+      <%# Export button — stateful; updated live by ExportJob broadcasts. %>
+      <%= render "reconciliations/export_button", reconciliation: @reconciliation %>
       <%# Finding 19: Campbooks::Button :danger replaces the hand-rolled button_to. %>
       <%# data-turbo-method causes Turbo to send DELETE via JS, no form needed. %>
       <%= render Campbooks::Button.new(

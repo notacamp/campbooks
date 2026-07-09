@@ -111,8 +111,39 @@ en:
       resolve_panel:
         attach: Attach
         no_docs_found: No matching documents found.
+      request_invoice:
+        not_applicable: Invoice can only be requested for unmatched or NIF-flagged transactions.
+        opened_composer: Composer opened — review and send when ready.
+        counterparty_fallback: the supplier
+        standard_subject: "Missing invoice — payment of %{amount} on %{date}"
+        standard_body: "Hello,\n\nI'm writing to request an invoice for a payment of %{amount} made on %{date} to %{counterparty}.\n\nPlease send the invoice at your earliest convenience.\n\nThank you."
+        corrected_subject: "Corrected invoice request — missing VAT number (%{amount} on %{date})"
+        corrected_body: "Hello,\n\nI received an invoice for %{amount} dated %{date}, but the buyer NIF/VAT number (%{company_nif}) is missing or incorrect.\n\nCould you please issue a corrected invoice including our VAT number: %{company_nif}?\n\nThank you."
+    download:
+      not_ready: The zip is not ready yet. Please wait for it to be generated.
+    export:
+      already_generating: A zip is already being prepared. Please wait.
+      enqueued: Preparing your zip… you'll be notified when it's ready.
+      not_ready: The zip is not ready yet. Please wait for it to be generated.
+    export_button:
+      download_for_accountant: Download for accountant
+      download: Download zip
+      generating: Preparing your zip…
+      re_export: Re-export
+      retry: Retry export
+    zip_builder:
+      nif_yes: "yes"
+      nif_missing: "missing"
+      nif_mismatch: "mismatch"
+      cross_reconciliation_note: Also matched in another reconciliation
+      file_missing: "[file missing from Campbooks]"
     destroy:
       destroyed: Reconciliation deleted.
+    nif_banner:
+      title: Add your VAT number to check every invoice
+      body: "Campbooks will flag invoices where your company VAT number is missing or wrong."
+      action: Add VAT number
+      dismiss: Dismiss
 
   components:
     accounting:
@@ -169,3 +200,10 @@ en:
         exclude_title: No document needed
         exclude_hint: Mark this transaction as an expense that doesn't require an invoice.
         mark_excluded: Mark as excluded
+        counterparty_fallback: the supplier
+        request_invoice_title: "Ask %{counterparty} for the invoice"
+        request_invoice_note: "Nothing is sent automatically — you review and send from the composer."
+        request_invoice_to: To
+        request_invoice_to_placeholder: "supplier@example.com"
+        request_invoice_subject: Subject
+        request_invoice_open_composer: Review in composer

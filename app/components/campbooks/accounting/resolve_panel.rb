@@ -10,7 +10,7 @@ module Campbooks
     #   ① Scout's suggestions (suggested matches + Confirm/Reject)
     #   ② Search your documents (list-search + manual_match)
     #   ③ No document needed (exclusion reason + exclude action)
-    #   ④ Request invoice — PR 3 seam (not rendered)
+    #   ④ Request invoice (asks for invoice from counterparty via composer)
     #
     # @param transaction         [BankTransaction]
     # @param reconciliation      [Reconciliation]
@@ -35,6 +35,7 @@ module Campbooks
           suggestions_section if @suggested_matches.any?
           search_section
           exclude_section
+          request_invoice_section
         end
       end
 
@@ -127,17 +128,18 @@ module Campbooks
             @reconciliation, @transaction, format: :turbo_stream
           )
 
-          # Search form (outside the frame so it persists across frame refreshes)
-          raw helpers.form_with(url: search_url, method: :get,
-                                data: { controller: "list-search",
-                                        "turbo-frame": frame_id },
-                                class: "mb-2") do |f|
-            helpers.tag.div(class: "relative") do
-              f.text_field(:q,
-                placeholder: t(".search_placeholder"),
-                class:       "block w-full rounded-lg border-border bg-card text-sm px-3 py-2",
-                data:        { list_search_target: "input",
-                               action: "input->list-search#submit" })
+          # Use Phlex-native form: helpers.form_with(method: :get) with a block inside
+          # Phlex's render pipeline only emits the opening <form> tag — the block content
+          # and the closing </form> are lost, leaving an unclosed form that causes the
+          # browser to treat the subsequent exclude <form> as nested (and drop it).
+          form(action: search_url, method: :get, class: "mb-2",
+               data: { controller: "list-search", turbo_frame: frame_id }) do
+            div(class: "relative") do
+              input(type: "text", name: "q",
+                    placeholder: t(".search_placeholder"),
+                    class: "block w-full rounded-lg border-border bg-card text-sm px-3 py-2",
+                    data: { list_search_target: "input",
+                            action: "input->list-search#submit" })
             end
           end
 
@@ -188,19 +190,146 @@ module Campbooks
           h3(class: "text-sm font-semibold text-foreground") { t(".exclude_title") }
           p(class: "text-xs text-muted-foreground") { t(".exclude_hint") }
 
-          raw helpers.form_with(url: exclude_url, method: :post, class: "flex gap-2 items-end") do |f|
-            options = EXCLUSION_REASONS.map do |r|
-              [ t("reconciliations.bank_transactions.exclusion_reasons.#{r}"), r ]
+          # Use Phlex-native form so the CSRF token can be injected via
+          # input() rather than helpers.form_with (which writes directly to
+          # the output buffer and breaks inside Phlex component rendering).
+          form(action: exclude_url, method: :post, class: "flex gap-2 items-end") do
+            input(type: "hidden", name: "authenticity_token",
+                  value: helpers.form_authenticity_token)
+            div(class: "flex-1") do
+              select(name: "reason",
+                     class: "block w-full rounded-lg border-border bg-card text-sm px-3 py-2") do
+                EXCLUSION_REASONS.each do |r|
+                  option(value: r) { t("reconciliations.bank_transactions.exclusion_reasons.#{r}") }
+                end
+              end
             end
-            helpers.tag.div(class: "flex-1") do
-              f.select(:reason, options,
-                       {},
-                       class: "block w-full rounded-lg border-border bg-card text-sm px-3 py-2")
-            end +
-            f.submit(t(".mark_excluded"),
-                     class: "shrink-0 inline-flex items-center px-3 py-2 text-xs font-medium rounded-lg border border-border bg-card hover:bg-muted/40")
+            input(type: "submit",
+                  value: t(".mark_excluded"),
+                  class: "shrink-0 inline-flex items-center px-3 py-2 text-xs font-medium rounded-lg border border-border bg-card hover:bg-muted/40 cursor-pointer")
           end
         end
+      end
+
+      # ── Section 4: Request invoice ────────────────────────────────────────────
+      #
+      # A collapsed "Ask <counterparty> for the invoice" option row that expands
+      # to let the user edit the prefilled To/Subject/Body before opening the
+      # Dock composer. Nothing is sent from here — the user reviews and sends.
+
+      def request_invoice_section
+        counterparty = @transaction.counterparty.presence || t(".counterparty_fallback")
+        request_url  = helpers.request_invoice_reconciliation_bank_transaction_path(@reconciliation, @transaction)
+
+        div(class: "border border-dashed border-border rounded-lg overflow-hidden") do
+          # Collapsed toggle row
+          details_id = "request_invoice_details_#{@transaction.id}"
+          input(type: "checkbox", id: details_id, class: "peer hidden")
+          # peer-checked:rotate-180 only reaches direct later siblings of the .peer
+          # input. The SVG lives inside the label (not a direct sibling), so we use
+          # [&_svg]: arbitrary variant on the label itself to target the nested SVG.
+          label(for: details_id,
+                class: "flex items-center justify-between gap-2 px-3 py-2 cursor-pointer hover:bg-muted/40 transition-colors peer-checked:[&_svg]:rotate-180") do
+            span(class: "text-sm font-medium text-foreground") do
+              t(".request_invoice_title", counterparty: counterparty)
+            end
+            svg(class: "w-4 h-4 text-muted-foreground transition-transform",
+                fill: "none", viewBox: "0 0 24 24", stroke: "currentColor") do |s|
+              s.path(stroke_linecap: "round", stroke_linejoin: "round", stroke_width: "2",
+                     d: "M19 9l-7 7-7-7")
+            end
+          end
+
+          # Expanded content (peer-checked shows this)
+          div(class: "hidden peer-checked:block px-3 pb-3 space-y-3") do
+            p(class: "text-xs text-muted-foreground mt-1") { t(".request_invoice_note") }
+
+            # Use Phlex-native form: helpers.form_with(method: :post) injects the
+            # CSRF token directly into the output buffer and does not work inside
+            # Phlex's render pipeline. Build the form with native Phlex elements.
+            to_id = "to_address_#{@transaction.id}"
+            form(action: request_url, method: :post, class: "space-y-2") do
+              input(type: "hidden", name: "authenticity_token",
+                    value: helpers.form_authenticity_token)
+
+              # To field (editable prefill guess)
+              div do
+                label(for: to_id,
+                      class: "block text-xs font-medium text-muted-foreground mb-1") do
+                  t(".request_invoice_to")
+                end
+                input(type: "text", name: "to_address", id: to_id,
+                      value: guess_recipient_email,
+                      placeholder: t(".request_invoice_to_placeholder"),
+                      class: "block w-full rounded-md border-border bg-card text-sm px-2 py-1.5")
+              end
+
+              # Subject (read-only preview)
+              div do
+                p(class: "text-xs text-muted-foreground") do
+                  plain "#{t('.request_invoice_subject')}: #{prefill_subject}"
+                end
+              end
+
+              # Message body excerpt (read-only)
+              div do
+                p(class: "text-xs text-muted-foreground line-clamp-2") do
+                  plain prefill_body_preview
+                end
+              end
+
+              input(type: "submit",
+                    value: t(".request_invoice_open_composer"),
+                    class: "#{button_classes(:primary, size: :xs)} cursor-pointer")
+            end
+          end
+        end
+      end
+
+      def guess_recipient_email
+        # Try to find a workspace contact matching the counterparty/description tokens.
+        tokens = [
+          @transaction.counterparty.presence,
+          @transaction.description.split(/\s+/).first(3).join(" ")
+        ].compact.reject(&:blank?)
+
+        tokens.each do |token|
+          contact = Contact.where(workspace: @transaction.workspace)
+                           .where("name ILIKE :q OR email ILIKE :q", q: "%#{token}%")
+                           .order(last_email_at: :desc)
+                           .first
+          return contact.email if contact&.email.present?
+        end
+
+        ""
+      end
+
+      def prefill_subject
+        # Delegate NIF check to BankTransaction#nif_flagged? (single source).
+        nif_flagged = @transaction.nif_flagged?(@company_nif)
+        key = nif_flagged ? ".corrected_subject" : ".standard_subject"
+        I18n.t(key,
+               scope:  "reconciliations.bank_transactions.request_invoice",
+               amount: invoice_amount_preview,
+               date:   helpers.l(@transaction.booked_on, format: :date))
+      end
+
+      def prefill_body_preview
+        # Delegate NIF check to BankTransaction#nif_flagged? (single source).
+        nif_flagged = @transaction.nif_flagged?(@company_nif)
+        key = nif_flagged ? ".corrected_body" : ".standard_body"
+        I18n.t(key,
+               scope:        "reconciliations.bank_transactions.request_invoice",
+               amount:       invoice_amount_preview,
+               date:         helpers.l(@transaction.booked_on, format: :date),
+               counterparty: @transaction.counterparty.presence || t(".counterparty_fallback"),
+               company_nif:  @company_nif.to_s).truncate(120)
+      end
+
+      # Delegates to BankTransaction#signed_amount_label (single source shared
+      # with the controller). Uses the model method which uses sprintf internally.
+      def invoice_amount_preview
+        @transaction.signed_amount_label
       end
 
       # ── Helpers ──────────────────────────────────────────────────────────────

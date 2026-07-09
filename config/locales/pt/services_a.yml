@@ -129,3 +129,9 @@ pt:
       title: Novo comentário de %{actor_name}
     thread_mention:
       title: "%{actor_name} mencionou-o"
+    reconciliation_ready:
+      title: Reconciliação pronta para revisão
+    reconciliation_parse_failed:
+      title: Não foi possível ler o extrato bancário
+    reconciliation_export_ready:
+      title: Zip de reconciliação pronto para transferir

@@ -4,15 +4,16 @@ class Notification < ApplicationRecord
 
   # Coarse subject of the notification (drives icon/copy + preference mapping).
   enum :category, {
-    system:   0, # account disconnected, invitation approval
-    document: 1, # document needs review / failed
-    activity: 2, # teammate activity (uploads)
-    export:   3, # export ready / failed
-    ai_reply: 4, # Scout chat reply
-    contact:  5, # duplicate contacts
-    mention:  6, # a teammate @mentioned you in a discussion
-    comment:  7, # new activity on a discussion thread you follow
-    task:     8  # a task was assigned to you
+    system:         0, # account disconnected, invitation approval
+    document:       1, # document needs review / failed
+    activity:       2, # teammate activity (uploads)
+    export:         3, # export ready / failed
+    ai_reply:       4, # Scout chat reply
+    contact:        5, # duplicate contacts
+    mention:        6, # a teammate @mentioned you in a discussion
+    comment:        7, # new activity on a discussion thread you follow
+    task:           8, # a task was assigned to you
+    reconciliation: 9  # accounting reconciliation ready / parse failed / export ready
   }, prefix: true
 
   # Urgency tier — drives sectioning, toasts and badge behaviour.

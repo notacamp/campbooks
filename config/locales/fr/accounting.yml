@@ -111,8 +111,39 @@ fr:
       resolve_panel:
         attach: Associer
         no_docs_found: Aucun document correspondant trouvé.
+      request_invoice:
+        not_applicable: La facture ne peut être demandée que pour les transactions non associées ou avec NIF invalide.
+        opened_composer: Compositeur ouvert — révisez et envoyez quand vous êtes prêt.
+        counterparty_fallback: le fournisseur
+        standard_subject: "Facture manquante — paiement de %{amount} le %{date}"
+        standard_body: "Bonjour,\n\nJe vous contacte pour demander une facture concernant un paiement de %{amount} effectué le %{date} à %{counterparty}.\n\nMerci de bien vouloir nous faire parvenir la facture dans les meilleurs délais.\n\nCordialement."
+        corrected_subject: "Demande de facture rectificative — numéro de TVA absent (%{amount} le %{date})"
+        corrected_body: "Bonjour,\n\nJ'ai reçu une facture de %{amount} datée du %{date}, mais le numéro de TVA/NIF de l'acheteur (%{company_nif}) est absent ou incorrect.\n\nPourriez-vous émettre une facture rectificative incluant notre numéro de TVA : %{company_nif} ?\n\nCordialement."
+    download:
+      not_ready: Le zip n'est pas encore prêt. Veuillez patienter.
+    export:
+      already_generating: Un fichier zip est déjà en cours de préparation. Veuillez patienter.
+      enqueued: Préparation de votre zip… vous serez notifié lorsqu'il sera prêt.
+      not_ready: Le zip n'est pas encore prêt. Veuillez patienter.
+    export_button:
+      download_for_accountant: Télécharger pour le comptable
+      download: Télécharger le zip
+      generating: Préparation de votre zip…
+      re_export: Réexporter
+      retry: Réessayer l'export
+    zip_builder:
+      nif_yes: "oui"
+      nif_missing: "absent"
+      nif_mismatch: "non concordant"
+      cross_reconciliation_note: Également associé dans un autre relevé
+      file_missing: "[fichier absent dans Campbooks]"
     destroy:
       destroyed: Rapprochement supprimé.
+    nif_banner:
+      title: Ajoutez votre numéro de TVA pour vérifier toutes les factures
+      body: "Campbooks signalera les factures où le numéro de TVA de votre entreprise est absent ou incorrect."
+      action: Ajouter le numéro de TVA
+      dismiss: Ignorer
 
   components:
     accounting:
@@ -169,3 +200,10 @@ fr:
         exclude_title: Aucun document nécessaire
         exclude_hint: Marquez cette transaction comme une dépense ne nécessitant pas de facture.
         mark_excluded: Marquer comme exclu
+        counterparty_fallback: le fournisseur
+        request_invoice_title: "Demander la facture à %{counterparty}"
+        request_invoice_note: "Rien n'est envoyé automatiquement — révisez et envoyez depuis le compositeur."
+        request_invoice_to: À
+        request_invoice_to_placeholder: "fournisseur@exemple.com"
+        request_invoice_subject: Objet
+        request_invoice_open_composer: Réviser dans le compositeur
