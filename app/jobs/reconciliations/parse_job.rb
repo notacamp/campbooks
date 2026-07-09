@@ -172,14 +172,16 @@ module Reconciliations
     # shell is preserved and only its inner HTML is swapped.
     # Finding 9: rendered inside I18n.with_locale so the partial sees the right locale.
     def broadcast_update!
-      locale = @reconciliation.workspace.users.first&.locale || I18n.default_locale
+      locale = @reconciliation.created_by&.locale.presence || I18n.default_locale
+      transaction_count = @reconciliation.bank_transactions.count
       html = I18n.with_locale(locale) do
         ApplicationController.render(
           partial: "reconciliations/show_content",
           locals:  {
             reconciliation: @reconciliation,
-            transactions:   @reconciliation.bank_transactions.ordered.limit(50),
-            next_page:      nil
+            transactions:   @reconciliation.bank_transactions.ordered
+                                           .includes(transaction_matches: :document).limit(50),
+            next_page:      (transaction_count > 50 ? 2 : nil)
           },
           layout:  false
         )
