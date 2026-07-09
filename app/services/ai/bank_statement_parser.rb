@@ -65,6 +65,15 @@ module Ai
               I18n.t("reconciliations.parse_job.pdf_unparseable")
       end
 
+      if raw_transactions["transactions"].empty?
+        # An empty array from the AI means it could not read any rows (bad scan,
+        # cover-page-only render, …). Surfacing "ready with 0 transactions"
+        # reads as success to the user — treat it as a parse failure instead,
+        # mirroring CsvParser's zero-rows behavior.
+        raise Reconciliations::ParseError,
+              I18n.t("reconciliations.bank_statement_parser.no_transactions")
+      end
+
       raw_transactions
     rescue *Ai::Adapters::Base::TRANSIENT_ERRORS
       raise
@@ -151,6 +160,11 @@ module Ai
         # Rasterize pages to JPEG images.
         page_indices = pages || (0...([ page_count(pdf_data), MAX_PAGES ].min)).to_a
         image_parts = page_indices.map { |idx| rasterize_page(pdf_data, idx) }.compact
+        if image_parts.empty?
+          # Without a single readable page the AI would confidently return an
+          # empty statement — fail loudly instead of succeeding with nothing.
+          raise Reconciliations::ParseError, I18n.t("reconciliations.bank_statement_parser.pages_unreadable")
+        end
         image_parts << { type: :text, text: "Extract every transaction row from these bank statement pages as JSON." }
         image_parts
       end
@@ -183,14 +197,18 @@ module Ai
     end
 
     # Rasterize a single PDF page to a JPEG image part.
+    # MiniMagick 5 validates the path passed to .open, so ImageMagick's
+    # "path[page]" bracket syntax cannot be used there — select the page via
+    # #page after opening (same mechanism as Ai::Adapters::Openai#pdf_to_image).
     def rasterize_page(pdf_data, page_index)
       Tempfile.create([ "bs_page", ".pdf" ], binmode: true) do |pdf_file|
         pdf_file.write(pdf_data)
         pdf_file.rewind
 
-        image = MiniMagick::Image.open("#{pdf_file.path}[#{page_index}]")
+        image = MiniMagick::Image.open(pdf_file.path)
         image.format("jpg")
         image.density("150")
+        image.page(page_index.to_s)
 
         jpeg_data = File.binread(image.path)
         jpeg_base64 = Base64.strict_encode64(jpeg_data)
