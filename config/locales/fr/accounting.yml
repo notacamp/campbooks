@@ -29,7 +29,10 @@ fr:
     untitled_statement: Relevé bancaire
     destroy_confirm: Supprimer ce rapprochement ? Toutes les transactions analysées seront supprimées.
     parse_job:
-      pdf_not_yet_supported: L'analyse des PDF arrivera dans la prochaine version. Veuillez exporter votre relevé au format CSV pour l'instant.
+      no_ai_for_pdf: "L'analyse des PDF nécessite un fournisseur IA configuré pour l'analyse de documents. Configurez-en un dans Paramètres → Fournisseurs IA."
+      pdf_unparseable: "Impossible d'extraire les transactions de ce PDF. Le fichier est peut-être numérisé, chiffré ou dans un format non pris en charge."
+      pdf_ai_error: "Échec de l'analyse IA : %{message}"
+      unsupported_format: "Format de fichier non pris en charge. Veuillez télécharger un relevé bancaire au format CSV ou PDF."
       integrity_mismatch: "Échec de la vérification du solde : solde de clôture attendu %{expected} mais le relevé affiche %{actual}."
     index:
       title: Comptabilité
@@ -74,5 +77,95 @@ fr:
       col_counterparty: Contrepartie
       col_amount: Montant
       col_match: Association
+    confirm_all_suggestions:
+      confirmed:
+        one: "1 association confirmée"
+        other: "%{count} associations confirmées"
+    bank_transactions:
+      row:
+        confirm: Confirmer
+        reject: Rejeter
+        not_this_one: Ce n'est pas ça
+        no_invoice: Facture introuvable
+        resolve: Résoudre
+        requested: Facture demandée
+        more: plus
+      exclusion_reasons:
+        bank_fee: Frais bancaires
+        salary: Salaire
+        transfer: Virement interne
+        tax: Paiement d'impôt
+        other: Autre
+      confirm:
+        confirmed: Association confirmée
+      reject:
+        rejected: Association rejetée
+      exclude:
+        excluded: "Marqué comme exclu : %{reason}"
+        invalid_reason: Motif d'exclusion invalide.
+      reset:
+        reset: Association supprimée
+      manual_match:
+        matched: "Associé à %{title}"
+        document_not_found: Document introuvable.
+      resolve_panel:
+        attach: Associer
+        no_docs_found: Aucun document correspondant trouvé.
     destroy:
       destroyed: Rapprochement supprimé.
+
+  components:
+    accounting:
+      summary_bar:
+        matched:
+          one: associé
+          other: associés
+        to_review:
+          one: à réviser
+          other: à réviser
+        unmatched:
+          one: non associé
+          other: non associés
+        excluded:
+          one: exclu
+          other: exclus
+        requested:
+          one: demandé
+          other: demandés
+        nif_exceptions_title: Transactions avec problèmes de NIF
+        nif_exceptions:
+          one: problème de NIF
+          other: problèmes de NIF
+        confirm_all_confirm:
+          one: "Confirmer 1 association suggérée ?"
+          other: "Confirmer %{count} associations suggérées ?"
+        confirm_all:
+          one: Confirmer 1 association
+          other: "Confirmer %{count} associations"
+      match_chip:
+        nif_mismatch: Le NIF ne correspond pas
+        nif_missing: NIF absent du document
+      confidence_badge:
+        strong: Correspondance solide
+        possible: Correspondance possible
+        weak: Correspondance faible
+        reason_amount_exact: Montant exact
+        reason_amount_close: Montant dans les 2 %
+        reason_date:
+          one: 1 jour d'écart
+          other: "%{count} jours d'écart"
+        reason_name: "Similarité de nom : %{pct} %"
+        reason_cross_reconciliation: "Déjà associé dans un autre relevé"
+      resolve_panel:
+        suggestions_title: "Suggestions de Scout"
+        checked_documents:
+          one: 1 document candidat vérifié
+          other: "%{count} documents candidats vérifiés"
+        use_this_match: Utiliser cette association
+        not_this_one: Ce n'est pas ça
+        search_title: Rechercher vos documents
+        search_placeholder: "Rechercher par nom, n° facture…"
+        attach: Associer
+        exclude_title: Aucun document nécessaire
+        exclude_hint: Marquez cette transaction comme une dépense ne nécessitant pas de facture.
+        mark_excluded: Marquer comme exclu

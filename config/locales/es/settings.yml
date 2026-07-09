@@ -230,6 +230,8 @@ es:
         revoked: Se revocaron todos los tokens de "%{name}".
     general:
       show:
+        company_nif_label: "NIF / número de identificación fiscal"
+        company_nif_hint: "El número de identificación fiscal de su empresa. Se utiliza para verificar que las facturas están correctamente dirigidas a usted."
         ai_providers_hint: "¿Busca proveedores de IA y ajustes de modelos? Ahora se
           encuentran en %{link}."
         ai_providers_link_text: Proveedores y servicios de IA
