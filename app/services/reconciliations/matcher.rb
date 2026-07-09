@@ -25,6 +25,9 @@ module Reconciliations
     SCORE_HEURISTIC_FALLBACK = 0.5
     AI_MAX_CANDIDATES = 10
     MAX_SUGGESTIONS = 3
+    AMOUNT_CLOSE_TOLERANCE = 0.02  # 2% — same tolerance the heuristic score uses
+    AI_CONFIDENCE_CAP_CLOSE = 0.85 # AI conf ceiling when amounts are close, not exact
+    AI_CONFIDENCE_CAP_SPLIT = 0.8  # per-doc ceiling for split payments (docs sum to txn)
     DATE_DECAY_DAYS = 30
 
     # @param reconciliation [Reconciliation]
@@ -221,6 +224,112 @@ module Reconciliations
       end
     end
 
+    # Bounds AI-claimed confidence by objective evidence. Amount is the anchor:
+    #   exact               → keep the model's confidence as-is
+    #   within 2%           → cap at AI_CONFIDENCE_CAP_CLOSE
+    #   split payment       → several returned docs whose |amounts| SUM to the
+    #                         transaction (±2%) are all kept, capped per doc
+    #   otherwise           → discard the match entirely (log it)
+    # Also collapses near-duplicate documents (same party, amount and date —
+    # e.g. a receipt and its invoice) into the single best candidate.
+    # Returns an array of [match_hash, document] pairs.
+    # Persists the domain-level audit of one AI disambiguation run on the
+    # transaction (update_columns: no callbacks, never blocks matching).
+    def persist_match_debug(txn, config, doc_map, raw_matches, audit, kept_count, error: nil)
+      debug = {
+        "at"         => Time.current.iso8601,
+        "provider"   => config[:provider],
+        "model"      => config[:model],
+        "candidates" => doc_map.values.map { |d|
+          { "id" => d.id, "amount_cents" => d.amount_cents,
+            "party" => d.vendor_name.presence || d.client_name }
+        },
+        "response"   => raw_matches.map { |m| m.slice("document_id", "confidence", "reason") },
+        "grounding"  => audit,
+        "kept"       => kept_count
+      }
+      debug["error"] = error if error
+      txn.update_columns(ai_match_debug: debug, updated_at: Time.current)
+    rescue => e
+      Rails.logger.warn("[Reconciliations::Matcher] could not persist ai_match_debug for #{txn.id}: #{e.message}")
+    end
+
+    def ground_ai_matches(txn, matches, doc_map, audit: nil)
+      pairs = matches.filter_map do |m|
+        doc = doc_map[m["document_id"]]
+        unless doc
+          audit << { "document_id" => m["document_id"], "outcome" => "unknown_id",
+                     "claimed" => m["confidence"].to_f } if audit
+          next nil # unknown/hallucinated ids never match
+        end
+        [ m, doc ]
+      end
+      return [] if pairs.empty?
+
+      before_dedupe = pairs.map { |_, doc| doc.id }
+      pairs = dedupe_twin_documents(pairs)
+      if audit
+        (before_dedupe - pairs.map { |_, doc| doc.id }).each do |dropped_id|
+          audit << { "document_id" => dropped_id, "outcome" => "twin_collapsed" }
+        end
+      end
+
+      txn_abs = txn.amount_cents.abs
+      if pairs.size > 1
+        sum = pairs.sum { |_, doc| doc.amount_cents.to_i.abs }
+        if close_amounts?(sum, txn_abs)
+          return pairs.map { |m, doc|
+            capped = [ m["confidence"].to_f, AI_CONFIDENCE_CAP_SPLIT ].min
+            audit << { "document_id" => doc.id, "outcome" => "kept_split",
+                       "claimed" => m["confidence"].to_f, "final" => capped } if audit
+            [ m.merge("confidence" => capped), doc ]
+          }
+        end
+      end
+
+      pairs.filter_map do |m, doc|
+        doc_abs = doc.amount_cents.to_i.abs
+        claimed = m["confidence"].to_f
+        if doc_abs == txn_abs
+          audit << { "document_id" => doc.id, "outcome" => "kept",
+                     "claimed" => claimed, "final" => claimed } if audit
+          [ m, doc ]
+        elsif close_amounts?(doc_abs, txn_abs)
+          capped = [ claimed, AI_CONFIDENCE_CAP_CLOSE ].min
+          audit << { "document_id" => doc.id, "outcome" => "kept_capped",
+                     "claimed" => claimed, "final" => capped } if audit
+          [ m.merge("confidence" => capped), doc ]
+        else
+          audit << { "document_id" => doc.id, "outcome" => "discarded_amount",
+                     "claimed" => claimed, "doc_amount_cents" => doc_abs,
+                     "txn_amount_cents" => txn_abs } if audit
+          Rails.logger.info(
+            "[Reconciliations::Matcher] discarded AI match for txn #{txn.id}: " \
+            "doc #{doc.id} amount #{doc_abs} vs txn #{txn_abs} (claimed conf #{m["confidence"]})"
+          )
+          nil
+        end
+      end
+    end
+
+    def close_amounts?(a, b)
+      return false if a.zero? || b.zero?
+
+      (a - b).abs.to_f / [ a, b ].max <= AMOUNT_CLOSE_TOLERANCE
+    end
+
+    # A receipt and its invoice for the same purchase share party, amount and
+    # date — suggesting both reads as two different matches. Keep the best one
+    # (prefer a document with an invoice number, then the model's confidence).
+    def dedupe_twin_documents(pairs)
+      pairs.group_by { |_, doc|
+        [ (doc.vendor_name.presence || doc.client_name).to_s.downcase.strip,
+          doc.amount_cents, doc.document_date ]
+      }.values.map { |group|
+        group.max_by { |m, doc| [ doc.invoice_number.present? ? 1 : 0, m["confidence"].to_f ] }
+      }
+    end
+
     def build_reasons(txn, doc, score_val)
       reasons = {}
       # Amount
@@ -283,25 +392,42 @@ module Reconciliations
       end.join("\n")
 
       prompt = <<~PROMPT
-        Match this bank transaction to the best document(s) from the list.
+        Decide which document(s), if any, this bank transaction pays for.
 
         Transaction:
         - Date: #{txn.booked_on.iso8601}
-        - Description: #{txn.description}
         - Amount: #{format("%.2f", txn.amount_cents / 100.0)} #{txn.currency} (#{txn.debit? ? "debit/payment" : "credit/receipt"})
         - Counterparty: #{txn.counterparty.presence || "unknown"}
+        - Description: #{txn.description}
 
         Documents (by number):
         #{candidates}
 
-        Respond ONLY with valid JSON:
-        {"matches": [{"document_id": "<uuid>", "confidence": 0.0-1.0, "reason": "one sentence"}]}
+        HARD RULES:
+        1. The AMOUNT is the primary evidence. Only match a document whose amount
+           equals the transaction amount, or a SET of documents whose amounts sum
+           to it (a split payment). A single document with a different amount is
+           NOT a match, no matter how similar the names are.
+        2. Use only the facts shown above. NEVER assume or invent relationships
+           between companies (e.g. "X is a payment processor for Y") — if the
+           counterparty name and the document's party don't plausibly refer to
+           the same entity, they don't match.
+        3. Returning an empty list is a good answer. Most transactions have no
+           matching document; a wrong suggestion is worse than none.
 
-        Include only matches with confidence ≥ #{SCORE_AI_THRESHOLD}. Return [] if none are good matches.
+        Confidence rubric (apply strictly):
+        - 0.9-1.0: exact amount AND the names clearly refer to the same entity.
+        - 0.7-0.89: exact amount, names weakly compatible (abbreviation, brand vs
+          legal name) — never contradictory.
+        - #{SCORE_AI_THRESHOLD}-0.69: exact amount only, names unknown.
+        - Below #{SCORE_AI_THRESHOLD}: omit the match entirely.
+
+        Respond ONLY with valid JSON:
+        {"matches": [{"document_id": "<uuid>", "confidence": 0.0-1.0, "reason": "one sentence citing the evidence above"}]}
       PROMPT
 
       text = config[:adapter].chat(
-        system:      "You are a financial document matching assistant. Always respond with valid JSON only.",
+        system:      "You are a strict financial reconciliation assistant. You only assert matches supported by the data given; you never invent facts. Always respond with valid JSON only.",
         messages:    [ { role: "user", content: prompt } ],
         model:       config[:model],
         max_tokens:  1000,
@@ -309,16 +435,24 @@ module Reconciliations
       )
 
       parsed = Ai::ChatService.parse_json_response(text, object_start: /\{\s*"matches"/)
-      matches = Array(parsed["matches"]).select { |m| m["confidence"].to_f >= SCORE_AI_THRESHOLD }
-      return nil if matches.empty? # signal no suggestion to match_transaction
+      raw_matches = Array(parsed["matches"])
+      matches = raw_matches.select { |m| m["confidence"].to_f >= SCORE_AI_THRESHOLD }
 
       doc_map = scored_candidates.first(AI_MAX_CANDIDATES).map { |(doc, _)| [ doc.id, doc ] }.to_h
 
-      txn_changed = false
-      matches.first(MAX_SUGGESTIONS).each do |m|
-        doc = doc_map[m["document_id"]]
-        next unless doc
+      # The model's confidence is a claim, not evidence: bound it by objective
+      # signals before anything reaches the user (prod incident: a €69.99
+      # invoice suggested against an €85.98 payment at 0.95 with a hallucinated
+      # vendor relationship). Every decision lands in ai_match_debug so bad
+      # suggestions can be debugged from the DB (raw HTTP exchange is in
+      # external_service_calls via the SystemHealth middleware).
+      audit = []
+      grounded = matches.empty? ? [] : ground_ai_matches(txn, matches, doc_map, audit: audit)
+      persist_match_debug(txn, config, doc_map, raw_matches, audit, grounded.size)
+      return nil if grounded.empty?
 
+      txn_changed = false
+      grounded.first(MAX_SUGGESTIONS).each do |m, doc|
         reasons = build_reasons(txn, doc, m["confidence"].to_f)
         reasons["ai_reason"] = m["reason"] if m["reason"].present?
 
@@ -350,6 +484,9 @@ module Reconciliations
       raise
     rescue => e
       Rails.logger.warn("[Reconciliations::Matcher] AI disambiguation failed for txn #{txn.id}: #{e.class}: #{e.message}")
+      if config
+        persist_match_debug(txn, config, {}, [], [], 0, error: "#{e.class}: #{e.message.to_s.first(300)}")
+      end
       # Degrade gracefully — never fail the whole job for one transaction's AI call.
       nil # indicate AI produced no usable suggestion
     end
