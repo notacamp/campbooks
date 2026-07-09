@@ -144,3 +144,4 @@ fr:
         uploaded_one: Fichier téléversé.
       destroy:
         deleted: Fichier supprimé.
+        statement_document: Impossible de supprimer ce document — il est lié à un rapprochement bancaire.

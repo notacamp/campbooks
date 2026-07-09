@@ -139,3 +139,4 @@ en:
         uploaded_one: File uploaded.
       destroy:
         deleted: File deleted.
+        statement_document: Cannot delete this document — it is linked to a bank reconciliation.

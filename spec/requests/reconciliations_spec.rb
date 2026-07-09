@@ -30,8 +30,18 @@ RSpec.describe "Reconciliations", type: :request do
       it "lists reconciliations" do
         r = create(:reconciliation, workspace:, created_by: user)
         get "/accounting"
-        # The row partial links to /reconciliations/:id
         expect(response.body).to include("/reconciliations/#{r.id}")
+      end
+
+      # Finding 7: turbo_stream format returns 200 (pagination)
+      it "responds with turbo_stream for pagination" do
+        get "/accounting", headers: { "Accept" => "text/vnd.turbo-stream.html" }
+        expect(response).to have_http_status(:ok)
+      end
+
+      # Finding 12: /reconciliations (index route) was removed; accounting_path is canonical
+      it "accounting_path helper resolves to /accounting, not /reconciliations" do
+        expect(accounting_path).to eq("/accounting")
       end
     end
   end
@@ -86,6 +96,13 @@ RSpec.describe "Reconciliations", type: :request do
 
     it "returns 200" do
       get "/reconciliations/#{reconciliation.id}"
+      expect(response).to have_http_status(:ok)
+    end
+
+    # Finding 7: turbo_stream format for pagination
+    it "responds with turbo_stream for pagination" do
+      get "/reconciliations/#{reconciliation.id}",
+          headers: { "Accept" => "text/vnd.turbo-stream.html" }
       expect(response).to have_http_status(:ok)
     end
 

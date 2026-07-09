@@ -1,5 +1,22 @@
 ---
 pt:
+  activerecord:
+    attributes:
+      reconciliation:
+        statuses:
+          pending: Pendente
+          parsing: A analisar
+          matching: A associar
+          ready: Pronto
+          failed: Falhado
+      bank_transaction:
+        statuses:
+          unmatched: Por associar
+          suggested: Sugerido
+          matched: Associado
+          excluded: Excluído
+          requested: Fatura solicitada
+
   shared:
     nav:
       accounting: Contabilidade
@@ -11,12 +28,6 @@ pt:
   reconciliations:
     untitled_statement: Extrato bancário
     destroy_confirm: Eliminar esta reconciliação? Todas as transações analisadas serão removidas.
-    statuses:
-      matched: Associado
-      excluded: Excluído
-      unmatched: Por associar
-      suggested: Sugerido
-      requested: Fatura solicitada
     parse_job:
       pdf_not_yet_supported: A análise de PDF chegará na próxima versão. Por favor, exporte o extrato em CSV por agora.
       integrity_mismatch: "Verificação de saldo falhou: saldo de fecho esperado %{expected} mas o extrato mostra %{actual}."
@@ -65,12 +76,3 @@ pt:
       col_match: Associação
     destroy:
       destroyed: Reconciliação eliminada.
-
-  components:
-    accounting:
-      reconciliation_status_badge:
-        pending: Pendente
-        parsing: A analisar
-        matching: A associar
-        ready: Pronto
-        failed: Falhado

@@ -106,7 +106,7 @@ Rails.application.routes.draw do
   # first; AI/PDF and the matching workbench arrive in later PRs). Gated by
   # Features.accounting? and the :accounting entitlement (ReconciliationsController).
   get "accounting", to: "reconciliations#index", as: :accounting
-  resources :reconciliations, only: %i[index new create show destroy]
+  resources :reconciliations, only: %i[new create show destroy]
 
   # Tasks — actionable items (manual or AI-extracted) that move through a status
   # board, carry assignees + labels, and link to emails. Gated by Features.tasks?

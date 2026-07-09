@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_09_100200) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_09_100400) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -188,6 +188,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_09_100200) do
     t.datetime "updated_at", null: false
     t.uuid "workspace_id", null: false
     t.index ["reconciliation_id", "position"], name: "index_bank_transactions_on_reconciliation_position", unique: true
+    t.index ["reconciliation_id", "status"], name: "index_bank_transactions_on_reconciliation_and_status"
     t.index ["reconciliation_id"], name: "index_bank_transactions_on_reconciliation_id"
     t.index ["requested_by_id"], name: "index_bank_transactions_on_requested_by_id"
     t.index ["workspace_id", "status"], name: "index_bank_transactions_on_workspace_and_status"

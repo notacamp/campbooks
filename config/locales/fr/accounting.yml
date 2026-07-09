@@ -1,5 +1,22 @@
 ---
 fr:
+  activerecord:
+    attributes:
+      reconciliation:
+        statuses:
+          pending: En attente
+          parsing: Analyse
+          matching: Association
+          ready: Prêt
+          failed: Échec
+      bank_transaction:
+        statuses:
+          unmatched: Non associé
+          suggested: Suggéré
+          matched: Associé
+          excluded: Exclu
+          requested: Facture demandée
+
   shared:
     nav:
       accounting: Comptabilité
@@ -11,12 +28,6 @@ fr:
   reconciliations:
     untitled_statement: Relevé bancaire
     destroy_confirm: Supprimer ce rapprochement ? Toutes les transactions analysées seront supprimées.
-    statuses:
-      matched: Associé
-      excluded: Exclu
-      unmatched: Non associé
-      suggested: Suggéré
-      requested: Facture demandée
     parse_job:
       pdf_not_yet_supported: L'analyse des PDF arrivera dans la prochaine version. Veuillez exporter votre relevé au format CSV pour l'instant.
       integrity_mismatch: "Échec de la vérification du solde : solde de clôture attendu %{expected} mais le relevé affiche %{actual}."
@@ -65,12 +76,3 @@ fr:
       col_match: Association
     destroy:
       destroyed: Rapprochement supprimé.
-
-  components:
-    accounting:
-      reconciliation_status_badge:
-        pending: En attente
-        parsing: Analyse
-        matching: Association
-        ready: Prêt
-        failed: Échec

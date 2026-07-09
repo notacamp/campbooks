@@ -18,14 +18,14 @@
           <th class="w-1/12 px-3 py-3"></th>
         </tr>
       </thead>
-      <tbody class="bg-card divide-y divide-border">
+      <tbody id="reconciliations_table_body" class="bg-card divide-y divide-border">
         <%= render partial: "reconciliations/row", collection: @reconciliations, as: :reconciliation %>
       </tbody>
     </table>
   </div>
 
   <%# Mobile cards %>
-  <div class="md:hidden space-y-3">
+  <div id="reconciliations_cards" class="md:hidden space-y-3">
     <%= render partial: "reconciliations/card", collection: @reconciliations, as: :reconciliation %>
   </div>
 

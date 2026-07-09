@@ -1,5 +1,22 @@
 ---
 en:
+  activerecord:
+    attributes:
+      reconciliation:
+        statuses:
+          pending: Pending
+          parsing: Parsing
+          matching: Matching
+          ready: Ready
+          failed: Failed
+      bank_transaction:
+        statuses:
+          unmatched: Unmatched
+          suggested: Suggested
+          matched: Matched
+          excluded: Excluded
+          requested: Invoice requested
+
   shared:
     nav:
       accounting: Accounting
@@ -11,12 +28,6 @@ en:
   reconciliations:
     untitled_statement: Bank statement
     destroy_confirm: Delete this reconciliation? All parsed transactions will be removed.
-    statuses:
-      matched: Matched
-      excluded: Excluded
-      unmatched: Unmatched
-      suggested: Suggested
-      requested: Invoice requested
     parse_job:
       pdf_not_yet_supported: PDF parsing is coming in the next release. Please export your statement as CSV for now.
       integrity_mismatch: "Balance check failed: expected closing balance %{expected} but statement shows %{actual}."
@@ -65,12 +76,3 @@ en:
       col_match: Match
     destroy:
       destroyed: Reconciliation deleted.
-
-  components:
-    accounting:
-      reconciliation_status_badge:
-        pending: Pending
-        parsing: Parsing
-        matching: Matching
-        ready: Ready
-        failed: Failed

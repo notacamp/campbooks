@@ -12,20 +12,37 @@ class ReconciliationsController < ApplicationController
   before_action :require_authentication
   before_action :require_accounting_enabled
   before_action :set_reconciliation, only: %i[show destroy]
+  before_action :set_bank_statement_documents, only: %i[new create]
 
   def index
     @pagy, @reconciliations = pagy(
       Current.workspace.reconciliations.recent.includes(:statement_document),
       limit: 25
     )
+
+    # Finding 13: batch-load transaction counts to avoid N+1 queries for the
+    # progress bar on each reconciliation row/card.
+    rids = @reconciliations.map(&:id)
+    tx_totals    = BankTransaction.where(reconciliation_id: rids)
+                                  .group(:reconciliation_id).count
+    tx_resolved  = BankTransaction.where(reconciliation_id: rids,
+                                         status: %i[matched excluded requested])
+                                  .group(:reconciliation_id).count
+
+    # Pre-populate the memoized ivars on each Reconciliation instance so the
+    # model methods (#total_transactions / #resolved_count) skip the DB hit.
+    @reconciliations.each do |r|
+      r.instance_variable_set(:@total_transactions, tx_totals.fetch(r.id, 0))
+      r.instance_variable_set(:@resolved_count,     tx_resolved.fetch(r.id, 0))
+    end
+
+    respond_to do |format|
+      format.html
+      format.turbo_stream # pagination append -> index.turbo_stream.erb
+    end
   end
 
   def new
-    # Recent bank_statement documents to pre-fill the picker (limit 50 for UX).
-    @bank_statement_documents = Current.workspace.documents
-                                       .where(document_type: :bank_statement)
-                                       .order(created_at: :desc)
-                                       .limit(50)
   end
 
   def create
@@ -45,10 +62,6 @@ class ReconciliationsController < ApplicationController
       Reconciliations::ParseJob.perform_later(@reconciliation.id)
       redirect_to @reconciliation, success: t(".created")
     else
-      @bank_statement_documents = Current.workspace.documents
-                                         .where(document_type: :bank_statement)
-                                         .order(created_at: :desc)
-                                         .limit(50)
       render :new, status: :unprocessable_entity
     end
   end
@@ -59,10 +72,17 @@ class ReconciliationsController < ApplicationController
                      .includes(transaction_matches: :document),
       limit: 50
     )
+
+    respond_to do |format|
+      format.html
+      format.turbo_stream
+    end
   end
 
   def destroy
-    return if require_entitlement!(:accounting)
+    # Finding 10: ignore_limit: true — the :accounting entitlement may cap the
+    # number of reconciliations but must never block deleting one.
+    return if require_entitlement!(:accounting, ignore_limit: true)
 
     @reconciliation.destroy
     redirect_to accounting_path, success: t(".destroyed")
@@ -74,6 +94,15 @@ class ReconciliationsController < ApplicationController
     @reconciliation = Current.workspace.reconciliations.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     head :not_found
+  end
+
+  # Finding 16: shared before_action so both :new and the :create error path
+  # use the same query without duplicating it.
+  def set_bank_statement_documents
+    @bank_statement_documents = Current.workspace.documents
+                                       .where(document_type: :bank_statement)
+                                       .order(created_at: :desc)
+                                       .limit(50)
   end
 
   # Either find an existing Document by statement_document_id, or create one

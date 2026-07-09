@@ -27,6 +27,7 @@ module Accounts
       purge_attachments
 
       ApplicationRecord.transaction do
+        @workspace.reconciliations.destroy_all
         @workspace.documents.destroy_all
 
         email_account_ids = @workspace.email_accounts.ids
