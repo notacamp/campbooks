@@ -111,8 +111,38 @@ es:
       resolve_panel:
         attach: Asociar
         no_docs_found: No se encontraron documentos coincidentes.
+      request_invoice:
+        not_applicable: La factura solo puede solicitarse para transacciones sin asociar o con NIF inválido.
+        opened_composer: Compositor abierto — revise y envíe cuando esté listo.
+        counterparty_fallback: el proveedor
+        standard_subject: "Factura pendiente — pago de %{amount} el %{date}"
+        standard_body: "Hola,\n\nMe pongo en contacto para solicitar una factura por un pago de %{amount} realizado el %{date} a %{counterparty}.\n\nPor favor, envíe la factura a la mayor brevedad posible.\n\nGracias."
+        corrected_subject: "Solicitud de factura rectificada — NIF ausente (%{amount} el %{date})"
+        corrected_body: "Hola,\n\nHe recibido una factura de %{amount} con fecha %{date}, pero el NIF/número de IVA del comprador (%{company_nif}) está ausente o es incorrecto.\n\n¿Podría emitir una factura rectificada incluyendo nuestro NIF: %{company_nif}?\n\nGracias."
+    download:
+      not_ready: El zip aún no está listo. Por favor, espere.
+    export:
+      already_generating: Ya se está preparando un archivo zip. Por favor, espere.
+      enqueued: Preparando su zip… se le notificará cuando esté listo.
+      not_ready: El zip aún no está listo. Por favor, espere.
+    export_button:
+      download_for_accountant: Descargar para el contable
+      download: Descargar zip
+      generating: Preparando su zip…
+      re_export: Reexportar
+      retry: Reintentar exportación
+    zip_builder:
+      nif_yes: "sí"
+      nif_missing: "ausente"
+      nif_mismatch: "no coincide"
+      cross_reconciliation_note: También asociado en otro extracto
     destroy:
       destroyed: Conciliación eliminada.
+    nif_banner:
+      title: Añada su NIF para verificar todas las facturas
+      body: "Campbooks marcará las facturas donde el NIF de su empresa esté ausente o sea incorrecto."
+      action: Añadir NIF
+      dismiss: Descartar
 
   components:
     accounting:
@@ -169,3 +199,10 @@ es:
         exclude_title: Sin documento necesario
         exclude_hint: Marque esta transacción como un gasto que no requiere factura.
         mark_excluded: Marcar como excluido
+        counterparty_fallback: el proveedor
+        request_invoice_title: "Solicitar factura a %{counterparty}"
+        request_invoice_note: "Nada se envía automáticamente — revise y envíe desde el compositor."
+        request_invoice_to: Para
+        request_invoice_to_placeholder: "proveedor@ejemplo.com"
+        request_invoice_subject: Asunto
+        request_invoice_open_composer: Revisar en el compositor

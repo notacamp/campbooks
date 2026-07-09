@@ -207,6 +207,68 @@ RSpec.describe "Reconciliations::BankTransactions", type: :request do
     end
   end
 
+  # ── POST request_invoice ─────────────────────────────────────────────────────
+
+  describe "POST /reconciliations/:reconciliation_id/bank_transactions/:id/request_invoice" do
+    before { sign_in(user) }
+
+    context "with an unmatched transaction" do
+      it "marks the transaction as requested and opens the composer" do
+        expect(txn.status).to eq("unmatched")
+
+        post "/reconciliations/#{reconciliation.id}/bank_transactions/#{txn.id}/request_invoice",
+             headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+        expect(response).to have_http_status(:ok)
+        txn.reload
+        expect(txn.status).to eq("requested")
+        expect(txn.requested_at).to be_present
+        expect(txn.requested_by_id).to eq(user.id)
+        expect(response.body).to include("compose_dock")
+      end
+    end
+
+    context "with a matched transaction (no NIF flag)" do
+      let!(:matched_txn) do
+        create(:bank_transaction,
+               reconciliation:,
+               workspace:,
+               booked_on:    Date.new(2024, 1, 15),
+               description:  "Already matched",
+               amount_cents: -5000,
+               currency:     "EUR",
+               status:       :matched)
+      end
+
+      it "returns an info flash without changing the transaction" do
+        post "/reconciliations/#{reconciliation.id}/bank_transactions/#{matched_txn.id}/request_invoice",
+             headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+        expect(response).to have_http_status(:ok)
+        expect(matched_txn.reload.status).to eq("matched")
+        expect(matched_txn.reload.requested_at).to be_nil
+      end
+    end
+
+    context "with a cross-workspace transaction" do
+      it "returns 404" do
+        other_recon = create(:reconciliation, workspace: create(:workspace))
+        other_txn = create(:bank_transaction,
+                           reconciliation: other_recon,
+                           workspace: other_recon.workspace,
+                           booked_on: Date.today,
+                           description: "Cross-ws",
+                           amount_cents: -100,
+                           currency: "EUR")
+
+        post "/reconciliations/#{other_recon.id}/bank_transactions/#{other_txn.id}/request_invoice",
+             headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+        expect(response).to have_http_status(:not_found)
+      end
+    end
+  end
+
   # ── Entitlement guard ────────────────────────────────────────────────────────
 
   describe "entitlement check on mutation actions" do

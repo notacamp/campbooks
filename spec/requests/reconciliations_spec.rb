@@ -130,6 +130,77 @@ RSpec.describe "Reconciliations", type: :request do
     end
   end
 
+  # ── POST /reconciliations/:id/export ──────────────────────────────────────
+
+  describe "POST /reconciliations/:id/export" do
+    let(:reconciliation) { create(:reconciliation, :ready, workspace:, created_by: user) }
+
+    before { sign_in(user) }
+
+    it "enqueues ExportJob and returns turbo_stream" do
+      expect(Reconciliations::ExportJob).to receive(:perform_later).with(reconciliation.id)
+
+      post "/reconciliations/#{reconciliation.id}/export",
+           headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+      expect(response).to have_http_status(:ok)
+    end
+
+    it "returns an info message when already generating" do
+      reconciliation.update!(export_status: :export_generating)
+
+      expect(Reconciliations::ExportJob).not_to receive(:perform_later)
+
+      post "/reconciliations/#{reconciliation.id}/export",
+           headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+      expect(response).to have_http_status(:ok)
+    end
+
+    it "returns 404 for a reconciliation from another workspace" do
+      other_recon = create(:reconciliation, :ready,
+                           workspace: create(:workspace, plan: "pro"),
+                           created_by: create(:user))
+
+      post "/reconciliations/#{other_recon.id}/export",
+           headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+      expect(response).to have_http_status(:not_found)
+    end
+  end
+
+  # ── GET /reconciliations/:id/download ──────────────────────────────────────
+
+  describe "GET /reconciliations/:id/download" do
+    let(:reconciliation) { create(:reconciliation, :ready, workspace:, created_by: user) }
+
+    before { sign_in(user) }
+
+    context "when zip is not yet attached" do
+      it "redirects back to the reconciliation page" do
+        get "/reconciliations/#{reconciliation.id}/download"
+        expect(response).to redirect_to(reconciliation_path(reconciliation))
+      end
+    end
+
+    context "when zip is attached" do
+      before do
+        reconciliation.export_zip.attach(
+          io:           StringIO.new("PK\x03\x04fake zip"),
+          filename:     "reconciliation-test.zip",
+          content_type: "application/zip"
+        )
+        reconciliation.update!(export_status: :export_generated)
+      end
+
+      it "redirects to the blob download URL" do
+        get "/reconciliations/#{reconciliation.id}/download"
+        expect(response).to have_http_status(:redirect)
+        expect(response.location).to include("reconciliation-test.zip")
+      end
+    end
+  end
+
   describe "feature gate" do
     around do |example|
       with_env("ENABLE_ACCOUNTING" => nil) { example.run }

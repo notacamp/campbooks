@@ -191,6 +191,19 @@ class EmailComposeController < ApplicationController
     Emails::ComposePrefill::Result.new(to: "", cc: "", subject: "", quoted_body: "")
   end
 
+  # Build dock locals for a blank new-message compose via the shared service.
+  # The shared service (EmailCompose::DockLocals) is the single source of truth;
+  # EmailComposeController's dock_stream also reads its own ivars for the message
+  # path, so they remain in parallel only for the source-message path.
+  def blank_dock_locals_for(to: "", subject: "", body: "")
+    EmailCompose::DockLocals.blank(
+      user:    Current.user,
+      to:      to,
+      subject: subject,
+      body:    body
+    )
+  end
+
   # The freshest non-outdated Scout draft on the thread (created by the
   # suggest-reply tools). Question prompts also live as draft messages but
   # carry ai_suggested_actions — excluded so they never ghost into the canvas.

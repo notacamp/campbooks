@@ -13,12 +13,6 @@
       "note": "False positive: this is a Faraday HTTP connection.delete(url) to the external Zoho Calendar API, not an ActiveRecord SQL call."
     },
     {
-      "warning_type": "Cross-Site Scripting",
-      "fingerprint": "160ebb96b97c9ba1892cac803f2149f506ca16a2ac5e2401b71300c4cf9fe634",
-      "file": "app/views/email_messages/new.html.erb",
-      "note": "Accepted: renders the user's OWN email signature (a plain HTML column) as HTML by design, in their own composer preview. Self-authored content, self-rendered = self-XSS only, low risk."
-    },
-    {
       "warning_type": "SQL Injection",
       "fingerprint": "6803e797caa696be639cb6b7bba104dd9711ff5206ac305a45da96d91eed97b2",
       "file": "app/services/google/mail_client.rb",

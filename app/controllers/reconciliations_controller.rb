@@ -13,7 +13,7 @@ class ReconciliationsController < ApplicationController
 
   before_action :require_authentication
   before_action :require_accounting_enabled
-  before_action :set_reconciliation, only: %i[show destroy confirm_all_suggestions]
+  before_action :set_reconciliation, only: %i[show destroy confirm_all_suggestions export download]
   before_action :set_bank_statement_documents, only: %i[new create]
 
   def index
@@ -79,6 +79,41 @@ class ReconciliationsController < ApplicationController
       format.html
       format.turbo_stream
     end
+  end
+
+  # POST /reconciliations/:id/export
+  # Kicks off the async zip build. Refuses (info toast) when already generating.
+  def export
+    return if require_entitlement!(:accounting, ignore_limit: true)
+
+    if @reconciliation.export_generating?
+      render turbo_stream: notify_stream(t(".already_generating"), severity: :info)
+      return
+    end
+
+    # Reset a previous export so the user can re-export after confirming more.
+    @reconciliation.update!(export_status: :export_none) if @reconciliation.export_generated?
+
+    Reconciliations::ExportJob.perform_later(@reconciliation.id)
+
+    render turbo_stream: [
+      turbo_stream.update("reconciliation_export_button",
+                          partial: "reconciliations/export_button",
+                          locals: { reconciliation: @reconciliation }),
+      notify_stream(t(".enqueued"), severity: :info)
+    ]
+  end
+
+  # GET /reconciliations/:id/download
+  # Redirects to the signed blob URL for the generated zip.
+  def download
+    unless @reconciliation.export_zip.attached?
+      redirect_to @reconciliation, info: t(".not_ready")
+      return
+    end
+
+    redirect_to rails_blob_url(@reconciliation.export_zip, disposition: "attachment"),
+                allow_other_host: true
   end
 
   def destroy
