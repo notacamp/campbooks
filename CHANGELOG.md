@@ -16,6 +16,10 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Accounting module — Reconciliations (foundation, `ENABLE_ACCOUNTING=1`).** Lay the groundwork for bank-statement reconciliation behind a feature gate. Upload a CSV bank statement (or pick an existing bank-statement document) to create a Reconciliation; a background job parses the file, detects delimiter and encoding (UTF-8 BOM, Latin-1/Windows-1252 fallback), resolves multilingual column aliases (Portuguese, English, Spanish, French), handles three amount layouts (signed, debit/credit, amount+direction), and streams live status updates via Turbo Streams. Parsed transactions appear in a table on the reconciliation show page. PDF statements are rejected with a clear message (PDF parsing coming in a future release). The module ships with a `Reconciliation`, `BankTransaction`, and `TransactionMatch` model (UUID PKs), full i18n at four-locale parity, and an `:accounting` entitlement gate.
+
 ## [0.18.1] - 2026-07-07
 
 ### Fixed

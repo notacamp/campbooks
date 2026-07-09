@@ -30,7 +30,11 @@ module Files
     def destroy
       document = Current.workspace.documents.manual_upload.find(params[:id])
       filename = document.original_file.filename.to_s if document.original_file.attached?
-      document.destroy
+      unless document.destroy
+        redirect_back fallback_location: files_path,
+                      error: t(".statement_document")
+        return
+      end
       Events.publish("file.deleted", payload: { "filename" => filename })
       redirect_back fallback_location: files_path, success: t(".deleted")
     end

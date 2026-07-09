@@ -20,6 +20,19 @@ class Document < ApplicationRecord
   has_many :task_documents, dependent: :destroy
   has_many :tasks, through: :task_documents
 
+  has_many :transaction_matches, dependent: :destroy
+  has_many :bank_transactions, through: :transaction_matches
+
+  # A document used as a reconciliation statement cannot be deleted while the
+  # reconciliation exists (the FK is :restrict). Declaring restrict_with_error
+  # here causes document.destroy to return false and populate errors, giving the
+  # controller a clean signal to flash an error instead of 500-ing on the PG FK.
+  has_many :reconciliations_as_statement,
+           class_name:  "Reconciliation",
+           foreign_key: :statement_document_id,
+           dependent:   :restrict_with_error,
+           inverse_of:  :statement_document
+
   # Stage 3 "filesystem" layer — folders this document is filed into (its *place*,
   # orthogonal to its DocumentType *kind*).
   has_many :folder_memberships, as: :folderable, dependent: :destroy

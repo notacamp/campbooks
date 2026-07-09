@@ -1,0 +1,56 @@
+<%= render Campbooks::PageHeader.new(title: t(".title")) do |header| %>
+  <% header.with_actions do %>
+    <%= render Campbooks::Button.new(variant: :primary, href: new_reconciliation_path) { t(".new_reconciliation") } %>
+  <% end %>
+<% end %>
+
+<% if @reconciliations.any? %>
+  <%# Desktop table — hidden on mobile, cards below take over %>
+  <div class="hidden md:block bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
+    <table class="min-w-full table-fixed divide-y divide-border">
+      <thead class="bg-muted/40">
+        <tr>
+          <th class="w-4/12 px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide"><%= t(".col_statement") %></th>
+          <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide"><%= t(".col_bank") %></th>
+          <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide"><%= t(".col_period") %></th>
+          <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide"><%= t(".col_progress") %></th>
+          <th class="w-1/12 px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide"><%= t(".col_status") %></th>
+          <th class="w-1/12 px-3 py-3"></th>
+        </tr>
+      </thead>
+      <tbody id="reconciliations_table_body" class="bg-card divide-y divide-border">
+        <%= render partial: "reconciliations/row", collection: @reconciliations, as: :reconciliation %>
+      </tbody>
+    </table>
+  </div>
+
+  <%# Mobile cards %>
+  <div id="reconciliations_cards" class="md:hidden space-y-3">
+    <%= render partial: "reconciliations/card", collection: @reconciliations, as: :reconciliation %>
+  </div>
+
+  <% if @pagy.next %>
+    <%= turbo_frame_tag "reconciliations_pagination",
+        src: accounting_path(page: @pagy.next, format: :turbo_stream),
+        loading: :lazy do %>
+      <div class="flex items-center justify-center py-6">
+        <%= render Campbooks::Spinner.new(size: :md) %>
+      </div>
+    <% end %>
+  <% end %>
+<% else %>
+  <%= render(Campbooks::EmptyState.new(
+        variant: :standalone,
+        title:       t(".empty_title"),
+        description: t(".empty_description"))) do |state| %>
+    <% state.with_icon do %>
+      <svg class="w-7 h-7 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+      </svg>
+    <% end %>
+    <% state.with_actions do %>
+      <%= render Campbooks::Button.new(variant: :primary, href: new_reconciliation_path) { t(".empty_cta") } %>
+    <% end %>
+  <% end %>
+<% end %>

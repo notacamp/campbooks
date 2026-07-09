@@ -50,6 +50,7 @@ es:
       over_limit: Has alcanzado el límite de tu plan para %{feature}. Mejora tu plan
         para obtener más.
     features:
+      accounting: Contabilidad
       ai_model_access: Modelos de IA
       digests: Resúmenes
       document_templates: Plantillas de documentos

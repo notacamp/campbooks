@@ -1,0 +1,78 @@
+---
+es:
+  activerecord:
+    attributes:
+      reconciliation:
+        statuses:
+          pending: Pendiente
+          parsing: Analizando
+          matching: Asociando
+          ready: Listo
+          failed: Fallido
+      bank_transaction:
+        statuses:
+          unmatched: Sin asociar
+          suggested: Sugerido
+          matched: Asociado
+          excluded: Excluido
+          requested: Factura solicitada
+
+  shared:
+    nav:
+      accounting: Contabilidad
+
+  command_palette:
+    commands:
+      accounting: Contabilidad
+
+  reconciliations:
+    untitled_statement: Extracto bancario
+    destroy_confirm: ¿Eliminar esta conciliación? Se eliminarán todas las transacciones analizadas.
+    parse_job:
+      pdf_not_yet_supported: El análisis de PDF llegará en la próxima versión. Por favor, exporte el extracto como CSV por ahora.
+      integrity_mismatch: "Error en la verificación de saldo: se esperaba saldo de cierre %{expected} pero el extracto muestra %{actual}."
+    index:
+      title: Contabilidad
+      new_reconciliation: Nueva conciliación
+      col_statement: Extracto
+      col_bank: Banco
+      col_period: Período
+      col_progress: Progreso
+      col_status: Estado
+      empty_title: Concilie su primer extracto bancario
+      empty_description: Importe un extracto CSV para emparejar cada débito con su factura de gasto. Campbooks mantiene su contabilidad lista para auditoría.
+      empty_cta: Importar extracto
+    new:
+      title: Nueva conciliación
+      from_documents_title: Desde sus documentos
+      from_documents_description: Elija un extracto bancario que Campbooks ya archivó desde su correo.
+      no_documents: Aún no hay extractos archivados. Suba uno en su lugar.
+      upload_title: Subir un extracto
+      upload_description: Suba un exportado CSV o PDF de su banco.
+      drop_here: Suelte el archivo aquí
+      accepted_formats: PDF o CSV
+      click_to_browse: Buscar archivos
+      csv_hint: Los exportados CSV se analizan al instante — sin IA necesaria.
+      upload_and_start: Subir e iniciar conciliación
+    create:
+      created: Extracto importado — analizando transacciones…
+      document_not_found: Documento no encontrado.
+      file_upload_failed: Error al subir el archivo. Por favor, inténtelo de nuevo.
+      no_source: Por favor, seleccione o suba un extracto bancario.
+    show:
+      title: Conciliación
+      delete: Eliminar
+      integrity_warning: Discrepancia de saldo detectada
+      status_parsing: Leyendo su extracto…
+      status_matching: Asociando transacciones…
+      parse_failed_title: No se pudo leer este extracto
+      parse_failed_generic: Se produjo un error inesperado al leer el archivo.
+      parse_failed_hint: Intente reexportar desde su banco como CSV o compruebe que el archivo no esté dañado.
+      no_transactions: No se encontraron transacciones.
+      col_date: Fecha
+      col_description: Descripción
+      col_counterparty: Contraparte
+      col_amount: Importe
+      col_match: Asociación
+    destroy:
+      destroyed: Conciliación eliminada.

@@ -1,0 +1,48 @@
+<%= turbo_stream_from "reconciliation_#{@reconciliation.id}" %>
+
+<%= render Campbooks::PageHeader.new(
+      title:      @reconciliation.statement_document&.original_file&.filename&.to_s || t(".title"),
+      back_href:  accounting_path,
+      back_label: t("reconciliations.index.title")) do |header| %>
+  <% header.with_actions do %>
+    <% unless @reconciliation.parsing? || @reconciliation.matching? %>
+      <%# Finding 19: Campbooks::Button :danger replaces the hand-rolled button_to. %>
+      <%# data-turbo-method causes Turbo to send DELETE via JS, no form needed. %>
+      <%= render Campbooks::Button.new(
+            variant: :danger,
+            size:    :sm,
+            href:    reconciliation_path(@reconciliation),
+            data:    {
+              turbo_method:  :delete,
+              turbo_confirm: t("reconciliations.destroy_confirm")
+            }
+          ) { t(".delete") } %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<%# ── Status chips — Finding 19: raw inline spans → Campbooks::Badge ── %>
+<div class="flex flex-wrap items-center gap-2 mb-6">
+  <%= render Campbooks::Accounting::ReconciliationStatusBadge.new(status: @reconciliation.status) %>
+  <% if @reconciliation.bank_name.present? %>
+    <%= render Campbooks::Badge.new(variant: :neutral) { @reconciliation.bank_name } %>
+  <% end %>
+  <% if @reconciliation.period_label %>
+    <%= render Campbooks::Badge.new(variant: :neutral) { @reconciliation.period_label } %>
+  <% end %>
+  <% if @reconciliation.integrity_warning? %>
+    <%= render Campbooks::Badge.new(variant: :warning) do %>
+      <%= @reconciliation.integrity_warning_message.presence || t(".integrity_warning") %>
+    <% end %>
+  <% end %>
+</div>
+
+<%# Finding 6: div#reconciliation_content is the broadcast target shell.
+    _show_content is the single authoritative implementation, used here and
+    by ParseJob#broadcast_update! (which calls broadcast_update_to on this id). %>
+<div id="reconciliation_content">
+  <%= render "reconciliations/show_content",
+               reconciliation: @reconciliation,
+               transactions:   @transactions,
+               next_page:      @pagy.next %>
+</div>

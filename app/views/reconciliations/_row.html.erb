@@ -1,0 +1,35 @@
+<tr class="hover:bg-muted/30 transition-colors">
+  <td class="px-6 py-4">
+    <%= link_to reconciliation_path(reconciliation), class: "font-medium text-foreground hover:text-accent-600 truncate block max-w-xs" do %>
+      <%= reconciliation.statement_document&.original_file&.filename&.to_s&.truncate(60) || t("reconciliations.untitled_statement") %>
+    <% end %>
+    <span class="text-xs text-muted-foreground"><%= l(reconciliation.created_at, format: :date) %></span>
+  </td>
+  <td class="px-6 py-4 text-sm text-foreground"><%= reconciliation.bank_name.presence || "—" %></td>
+  <td class="px-6 py-4 text-sm text-foreground"><%= reconciliation.period_label || "—" %></td>
+  <td class="px-6 py-4">
+    <% if reconciliation.ready? %>
+      <div class="flex items-center gap-2">
+        <div class="flex-1 bg-muted rounded-full h-1.5 min-w-[60px]">
+          <% pct = reconciliation.total_transactions > 0 ? (reconciliation.resolved_count.to_f / reconciliation.total_transactions * 100).round : 0 %>
+          <div class="bg-accent-500 h-1.5 rounded-full" style="width: <%= pct %>%"></div>
+        </div>
+        <span class="text-xs text-muted-foreground tabular-nums"><%= reconciliation.progress_label %></span>
+      </div>
+    <% else %>
+      <span class="text-xs text-muted-foreground">—</span>
+    <% end %>
+  </td>
+  <td class="px-6 py-4">
+    <%= render Campbooks::Accounting::ReconciliationStatusBadge.new(status: reconciliation.status) %>
+  </td>
+  <td class="px-3 py-4 text-right">
+    <%= button_to reconciliation_path(reconciliation), method: :delete,
+          class: "text-muted-foreground hover:text-red-600 transition-colors p-1",
+          data: { turbo_confirm: t("reconciliations.destroy_confirm") } do %>
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+      </svg>
+    <% end %>
+  </td>
+</tr>

@@ -140,3 +140,4 @@ es:
         uploaded_one: Archivo subido.
       destroy:
         deleted: Archivo eliminado.
+        statement_document: No se puede eliminar este documento — está vinculado a una conciliación bancaria.
