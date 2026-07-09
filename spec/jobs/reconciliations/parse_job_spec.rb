@@ -38,9 +38,17 @@ RSpec.describe Reconciliations::ParseJob, type: :job do
       expect(reconciliation.reload.bank_transactions.count).to eq(2)
     end
 
-    it "sets status to ready" do
+    # ParseJob transitions to :matching (not :ready) and enqueues MatchJob.
+    # MatchJob transitions to :ready when matching completes.
+    it "sets status to matching" do
       described_class.perform_now(reconciliation.id)
-      expect(reconciliation.reload.status).to eq("ready")
+      expect(reconciliation.reload.status).to eq("matching")
+    end
+
+    it "enqueues MatchJob after parsing" do
+      expect {
+        described_class.perform_now(reconciliation.id)
+      }.to have_enqueued_job(Reconciliations::MatchJob).with(reconciliation.id)
     end
 
     it "sets period_start and period_end" do
@@ -75,14 +83,54 @@ RSpec.describe Reconciliations::ParseJob, type: :job do
       allow_any_instance_of(Reconciliations::ParseJob).to receive(:broadcast_update!).and_return(nil)
     end
 
-    it "sets status to failed" do
-      described_class.perform_now(reconciliation.id)
-      expect(reconciliation.reload.status).to eq("failed")
+    context "when AI is NOT configured for documents (default)" do
+      before do
+        allow(Ai::ProviderSetup).to receive(:configured?).with(anything, :documents).and_return(false)
+      end
+
+      it "sets status to failed" do
+        described_class.perform_now(reconciliation.id)
+        expect(reconciliation.reload.status).to eq("failed")
+      end
+
+      it "stores the no_ai_for_pdf user-facing message" do
+        described_class.perform_now(reconciliation.id)
+        # The message should mention AI provider, not "next release"
+        expect(reconciliation.reload.parse_error).to include("AI provider")
+      end
     end
 
-    it "stores a user-facing parse_error message" do
-      described_class.perform_now(reconciliation.id)
-      expect(reconciliation.reload.parse_error).to include("next release")
+    context "when AI IS configured for documents" do
+      let(:ai_result) do
+        {
+          "transactions" => [
+            { "date" => "2024-01-15", "description" => "Salary credit", "amount" => 2500.0 }
+          ],
+          "currency"    => "EUR",
+          "bank_name"   => "Test Bank"
+        }
+      end
+
+      before do
+        allow(Ai::ProviderSetup).to receive(:configured?).with(anything, :documents).and_return(true)
+        allow_any_instance_of(Ai::BankStatementParser).to receive(:call).and_return(ai_result)
+      end
+
+      it "sets status to matching" do
+        described_class.perform_now(reconciliation.id)
+        expect(reconciliation.reload.status).to eq("matching")
+      end
+
+      it "enqueues MatchJob after AI parsing" do
+        expect {
+          described_class.perform_now(reconciliation.id)
+        }.to have_enqueued_job(Reconciliations::MatchJob).with(reconciliation.id)
+      end
+
+      it "creates bank transactions from AI result" do
+        described_class.perform_now(reconciliation.id)
+        expect(reconciliation.reload.bank_transactions.count).to eq(1)
+      end
     end
   end
 

@@ -29,7 +29,6 @@ es:
     untitled_statement: Extracto bancario
     destroy_confirm: ¿Eliminar esta conciliación? Se eliminarán todas las transacciones analizadas.
     parse_job:
-      pdf_not_yet_supported: El análisis de PDF llegará en la próxima versión. Por favor, exporte el extracto como CSV por ahora.
       no_ai_for_pdf: "El análisis de PDF requiere un proveedor de IA configurado para el análisis de documentos. Configure uno en Ajustes → Proveedores de IA."
       pdf_unparseable: "No se pudieron extraer transacciones de este PDF. El archivo puede estar escaneado, cifrado o en un formato no compatible."
       pdf_ai_error: "Error en el análisis de IA: %{message}"
@@ -90,6 +89,7 @@ es:
         no_invoice: Factura no encontrada
         resolve: Resolver
         requested: Factura solicitada
+        more: más
       exclusion_reasons:
         bank_fee: Comisión bancaria
         salary: Salario

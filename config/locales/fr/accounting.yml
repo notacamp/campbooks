@@ -29,7 +29,6 @@ fr:
     untitled_statement: Relevé bancaire
     destroy_confirm: Supprimer ce rapprochement ? Toutes les transactions analysées seront supprimées.
     parse_job:
-      pdf_not_yet_supported: L'analyse des PDF arrivera dans la prochaine version. Veuillez exporter votre relevé au format CSV pour l'instant.
       no_ai_for_pdf: "L'analyse des PDF nécessite un fournisseur IA configuré pour l'analyse de documents. Configurez-en un dans Paramètres → Fournisseurs IA."
       pdf_unparseable: "Impossible d'extraire les transactions de ce PDF. Le fichier est peut-être numérisé, chiffré ou dans un format non pris en charge."
       pdf_ai_error: "Échec de l'analyse IA : %{message}"
@@ -90,6 +89,7 @@ fr:
         no_invoice: Facture introuvable
         resolve: Résoudre
         requested: Facture demandée
+        more: plus
       exclusion_reasons:
         bank_fee: Frais bancaires
         salary: Salaire

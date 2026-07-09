@@ -76,7 +76,7 @@ module Campbooks
         end
 
         if (delta = reasons["date_delta_days"])
-          lines << t(".reason_date", days: delta.to_i)
+          lines << t(".reason_date", count: delta.to_i)
         end
 
         if (sim = reasons["name_similarity"])

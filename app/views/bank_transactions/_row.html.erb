@@ -8,14 +8,17 @@
     Stimulus: data-controller="transaction-resolve" wires the Resolve button to
     insert a sibling expand <tr> with a lazy Turbo Frame. %>
 
-<% confirmed_match  = transaction.transaction_matches.find { |m| m.confirmed? } %>
+<% confirmed_matches = transaction.transaction_matches.select(&:confirmed?).sort_by { |m| -m.confidence.to_f } %>
+<% confirmed_match  = confirmed_matches.first %>
+<% confirmed_extra  = confirmed_matches.size - 1 %>
 <% suggested_match  = transaction.transaction_matches.select(&:suggested?).max_by { |m| m.confidence.to_f } %>
 <% company_nif      = Current.workspace.company_nif.presence %>
 
 <tr id="<%= dom_id(transaction) %>"
     class="<%= transaction.suggested? ? 'bg-amber-50/40 dark:bg-amber-950/20 hover:bg-amber-100/50 dark:hover:bg-amber-950/30' : 'hover:bg-muted/30' %> transition-colors"
     data-controller="<%= 'transaction-resolve' if transaction.unmatched? %>"
-    data-transaction-resolve-url-value="<%= resolve_panel_reconciliation_bank_transaction_path(reconciliation, transaction) if transaction.unmatched? %>">
+    data-transaction-resolve-url-value="<%= resolve_panel_reconciliation_bank_transaction_path(reconciliation, transaction) if transaction.unmatched? %>"
+    data-transaction-resolve-frame-id-value="<%= dom_id(transaction, :resolve_frame) if transaction.unmatched? %>">
 
   <%# Date %>
   <td class="px-6 py-3 text-sm text-foreground whitespace-nowrap tabular-nums">
@@ -41,10 +44,15 @@
   <%# Match cell — drives the whole workbench interaction %>
   <td class="px-4 py-3 text-sm">
     <% if transaction.matched? && confirmed_match %>
-      <%# ✅ Matched: MatchChip showing the confirmed document %>
-      <%= render(Campbooks::Accounting::MatchChip.new(
-            match:      confirmed_match,
-            nif_status: company_nif ? confirmed_match.document.nif_status(company_nif) : nil)) %>
+      <%# ✅ Matched: MatchChip showing the top confirmed document; "+N more" if multiple %>
+      <div class="flex items-center gap-1 flex-wrap">
+        <%= render(Campbooks::Accounting::MatchChip.new(
+              match:      confirmed_match,
+              nif_status: company_nif ? confirmed_match.document.nif_status(company_nif) : nil)) %>
+        <% if confirmed_extra > 0 %>
+          <span class="text-xs text-muted-foreground">+<%= confirmed_extra %> <%= t("reconciliations.bank_transactions.row.more") %></span>
+        <% end %>
+      </div>
 
     <% elsif transaction.suggested? && suggested_match %>
       <%# 🔶 Suggested: chip + badge + hover-revealed ✓/✗ buttons %>
@@ -57,8 +65,8 @@
 
         <%# ✓/✗ buttons: invisible by default, revealed on row hover (desktop) %>
         <div class="hidden group-hover/suggest:flex items-center gap-1 shrink-0">
+          <%# Rails 8: button_to with a block uses (url, options) — no label arg %>
           <%= button_to(
-                t("reconciliations.bank_transactions.row.confirm"),
                 confirm_reconciliation_bank_transaction_path(reconciliation, transaction),
                 method: :post,
                 params: { match_id: suggested_match.id },
@@ -71,7 +79,6 @@
           <% end %>
 
           <%= button_to(
-                t("reconciliations.bank_transactions.row.reject"),
                 reject_reconciliation_bank_transaction_path(reconciliation, transaction),
                 method: :post,
                 params: { match_id: suggested_match.id },

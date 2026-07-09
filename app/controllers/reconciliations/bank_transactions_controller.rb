@@ -17,7 +17,7 @@ module Reconciliations
     before_action :set_reconciliation
     before_action :set_transaction
     before_action -> { require_entitlement!(:accounting, ignore_limit: true) },
-                  only: %i[confirm reject exclude reset manual_match]
+                  only: %i[confirm reject exclude reset manual_match resolve_panel]
 
     VALID_EXCLUSION_REASONS = %w[bank_fee salary transfer tax other].freeze
 
@@ -145,6 +145,9 @@ module Reconciliations
       render turbo_stream: [
         turbo_stream.replace(dom_id(@transaction),        html: row_html),
         turbo_stream.replace(dom_id(@transaction, :card), html: card_html),
+        # Remove the stale resolve panel sibling row/div if still open
+        turbo_stream.remove("#{dom_id(@transaction)}_resolve_panel"),
+        turbo_stream.remove("#{dom_id(@transaction, :card)}_resolve_panel"),
         turbo_stream.replace("reconciliation_summary_bar", html: summary_html),
         notify_stream(toast_message)
       ]
@@ -167,26 +170,13 @@ module Reconciliations
     end
 
     def render_summary_bar_html
-      counts = @reconciliation.bank_transactions.group(:status).count
-      nif_count = nif_exception_count_for(@reconciliation)
+      counts    = @reconciliation.bank_transactions.group(:status).count
+      nif_count = @reconciliation.nif_exception_count(Current.workspace.company_nif.presence)
       ApplicationController.render(
         partial: "reconciliations/summary_bar",
         locals:  { reconciliation: @reconciliation, status_counts: counts, nif_exception_count: nif_count },
         layout:  false
       )
-    end
-
-    def nif_exception_count_for(reconciliation)
-      company_nif = Current.workspace.company_nif.presence
-      return 0 unless company_nif
-
-      reconciliation.bank_transactions
-                    .where(status: %i[matched suggested])
-                    .includes(transaction_matches: :document)
-                    .count do |txn|
-        top_match = txn.transaction_matches.select { |m| %w[suggested confirmed].include?(m.status) }.max_by(&:confidence)
-        top_match&.document&.nif_status(company_nif)&.in?(%i[missing mismatch]) || false
-      end
     end
 
     def candidate_documents_for(txn, q: nil)

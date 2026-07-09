@@ -8,11 +8,15 @@ class Settings::GeneralController < Settings::BaseController
     @org.settings["workspace_context"] = params[:workspace_context]
 
     # NIF (company VAT number): strip whitespace; empty string → remove key.
-    nif = params[:company_nif].to_s.strip
-    if nif.present?
-      @org.settings["company_nif"] = nif
-    else
-      @org.settings.delete("company_nif")
+    # Guard with params.key? so other forms posting to this action don't wipe
+    # the NIF when they don't include the field at all.
+    if params.key?(:company_nif)
+      nif = params[:company_nif].to_s.strip
+      if nif.present?
+        @org.settings["company_nif"] = nif
+      else
+        @org.settings.delete("company_nif")
+      end
     end
 
     if @org.save

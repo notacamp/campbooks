@@ -46,8 +46,14 @@
     <%# SummaryBar — status counts + NIF exceptions + "Confirm all N" button.
         id="reconciliation_summary_bar" is the broadcast target from Matcher. %>
     <% status_counts   = reconciliation.bank_transactions.group(:status).count %>
-    <% company_nif     = Current.workspace.company_nif.presence %>
-    <% nif_exc_count   = company_nif ? local_assigns.fetch(:nif_exception_count, 0) : 0 %>
+    <% company_nif     = Current.workspace&.company_nif.presence %>
+    <% nif_exc_count   = if local_assigns.key?(:nif_exception_count)
+                           local_assigns[:nif_exception_count]
+                         elsif company_nif
+                           reconciliation.nif_exception_count(company_nif)
+                         else
+                           0
+                         end %>
     <%= render "reconciliations/summary_bar",
                reconciliation:      reconciliation,
                status_counts:       status_counts,

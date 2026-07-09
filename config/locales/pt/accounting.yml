@@ -29,7 +29,6 @@ pt:
     untitled_statement: Extrato bancário
     destroy_confirm: Eliminar esta reconciliação? Todas as transações analisadas serão removidas.
     parse_job:
-      pdf_not_yet_supported: A análise de PDF chegará na próxima versão. Por favor, exporte o extrato em CSV por agora.
       no_ai_for_pdf: "A análise de PDF requer um fornecedor de IA configurado para análise de documentos. Configure um em Definições → Fornecedores de IA."
       pdf_unparseable: "Não foi possível extrair transações deste PDF. O ficheiro pode estar digitalizado, encriptado ou num formato não suportado."
       pdf_ai_error: "Falha na análise por IA: %{message}"
@@ -90,6 +89,7 @@ pt:
         no_invoice: Fatura não encontrada
         resolve: Resolver
         requested: Fatura solicitada
+        more: mais
       exclusion_reasons:
         bank_fee: Comissão bancária
         salary: Salário
