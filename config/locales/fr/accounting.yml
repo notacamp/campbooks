@@ -34,6 +34,9 @@ fr:
       pdf_ai_error: "Échec de l'analyse IA : %{message}"
       unsupported_format: "Format de fichier non pris en charge. Veuillez télécharger un relevé bancaire au format CSV ou PDF."
       integrity_mismatch: "Échec de la vérification du solde : solde de clôture attendu %{expected} mais le relevé affiche %{actual}."
+    bank_statement_parser:
+      pages_unreadable: "Impossible de traiter les pages de ce relevé PDF. Réexportez-le depuis votre banque ou importez un export CSV."
+      no_transactions: "Aucune opération n'a pu être lue dans ce relevé. S'il ne s'agit pas d'une image numérisée, essayez d'exporter un CSV depuis votre banque."
     index:
       title: Comptabilité
       new_reconciliation: Nouveau rapprochement

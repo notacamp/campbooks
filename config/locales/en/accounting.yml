@@ -34,6 +34,9 @@ en:
       pdf_ai_error: "AI parsing failed: %{message}"
       unsupported_format: "Unsupported file format. Please upload a CSV or PDF bank statement."
       integrity_mismatch: "Balance check failed: expected closing balance %{expected} but statement shows %{actual}."
+    bank_statement_parser:
+      pages_unreadable: "We couldn't render any pages of this PDF statement. Try re-exporting it from your bank, or upload a CSV export instead."
+      no_transactions: "We couldn't read any transactions from this statement. If it isn't a scanned image, try exporting a CSV from your bank instead."
     index:
       title: Accounting
       new_reconciliation: New reconciliation
