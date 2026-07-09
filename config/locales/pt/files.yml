@@ -141,3 +141,4 @@ pt:
         uploaded_one: Ficheiro carregado.
       destroy:
         deleted: Ficheiro eliminado.
+        statement_document: Não é possível eliminar este documento — está associado a uma reconciliação bancária.

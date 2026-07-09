@@ -1,0 +1,77 @@
+<%= render Campbooks::PageHeader.new(
+      title:      t(".title"),
+      back_href:  accounting_path,
+      back_label: t("reconciliations.index.title")) %>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+  <%# ── Option A: pick an existing bank_statement document ── %>
+  <div class="bg-card rounded-xl shadow-sm border border-border p-6">
+    <h2 class="text-base font-semibold text-foreground mb-1"><%= t(".from_documents_title") %></h2>
+    <p class="text-sm text-muted-foreground mb-5"><%= t(".from_documents_description") %></p>
+
+    <% if @bank_statement_documents.any? %>
+      <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
+        <% @bank_statement_documents.each do |doc| %>
+          <%= form_tag reconciliations_path, method: :post do %>
+            <%= hidden_field_tag :statement_document_id, doc.id %>
+            <button type="submit"
+                    class="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:border-accent-300 hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors text-left group">
+              <svg class="w-5 h-5 text-muted-foreground shrink-0 group-hover:text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h4m5 4H6a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z"/>
+              </svg>
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-foreground truncate"><%= doc.original_file.filename %></p>
+                <p class="text-xs text-muted-foreground"><%= l(doc.created_at, format: :date) %></p>
+              </div>
+              <svg class="w-4 h-4 text-muted-foreground group-hover:text-accent-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+              </svg>
+            </button>
+          <% end %>
+        <% end %>
+      </div>
+    <% else %>
+      <p class="text-sm text-muted-foreground italic"><%= t(".no_documents") %></p>
+    <% end %>
+  </div>
+
+  <%# ── Option B: upload a new file ── %>
+  <div class="bg-card rounded-xl shadow-sm border border-border p-6" data-controller="upload">
+    <h2 class="text-base font-semibold text-foreground mb-1"><%= t(".upload_title") %></h2>
+    <p class="text-sm text-muted-foreground mb-5"><%= t(".upload_description") %></p>
+
+    <%= form_tag reconciliations_path, method: :post, multipart: true do %>
+      <div class="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-accent-300 transition-colors cursor-pointer"
+           data-upload-target="dropzone"
+           data-action="dragover->upload#dragover dragenter->upload#dragover dragleave->upload#dragleave drop->upload#drop">
+        <svg class="mx-auto h-10 w-10 text-muted-foreground mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+        </svg>
+        <p class="text-sm text-foreground font-medium"><%= t(".drop_here") %></p>
+        <p class="text-xs text-muted-foreground mt-1"><%= t(".accepted_formats") %></p>
+        <label class="mt-3 inline-flex items-center px-3 py-1.5 text-sm font-medium text-accent-600 hover:text-accent-700 cursor-pointer">
+          <%= t(".click_to_browse") %>
+          <%= file_field_tag :statement_file, accept: ".pdf,.csv",
+              class: "sr-only",
+              data: { upload_target: "input", action: "change->upload#handleFiles" } %>
+        </label>
+      </div>
+
+      <div data-upload-target="fileList" class="hidden mt-3">
+        <ul data-upload-target="fileListItems" class="space-y-1 text-sm text-foreground"></ul>
+      </div>
+
+      <p class="text-xs text-muted-foreground mt-3">
+        <svg class="w-3.5 h-3.5 inline-block mr-1 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"/>
+        </svg>
+        <%= t(".csv_hint") %>
+      </p>
+
+      <div class="mt-4">
+        <%= render Campbooks::Button.new(variant: :primary, size: :md, type: :submit,
+              data: { upload_target: "submit" }) { t(".upload_and_start") } %>
+      </div>
+    <% end %>
+  </div>
+</div>

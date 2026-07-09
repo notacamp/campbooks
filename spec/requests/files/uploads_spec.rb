@@ -61,6 +61,26 @@ RSpec.describe "Files::Uploads", type: :request do
       delete files_upload_path(doc)
       expect(response).to have_http_status(:not_found)
     end
+
+    # Finding 2: statement documents have FK :restrict from reconciliations.
+    # destroy returns false; controller redirects with an error flash instead of 500.
+    it "flashes an error instead of raising when the document is a reconciliation statement" do
+      with_env("ENABLE_ACCOUNTING" => "1") do
+        # Build the statement document in the same workspace so the controller
+        # scope (Current.workspace.documents.manual_upload) can find it.
+        stmt_doc = create(:document, :bank_statement, workspace:, source: :manual_upload)
+        _reconciliation = create(:reconciliation, workspace:, created_by: user,
+                                                  statement_document: stmt_doc)
+
+        expect do
+          delete files_upload_path(stmt_doc)
+        end.not_to change(workspace.documents, :count)
+
+        expect(response).to be_redirect
+        follow_redirect!
+        expect(flash[:error]).to be_present
+      end
+    end
   end
 
   # -- analyze toggle at upload time (from files/uploads_controller_test.rb) --

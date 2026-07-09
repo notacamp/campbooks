@@ -72,6 +72,14 @@ module Features
       flag?("ENABLE_DIGESTS")
     end
 
+    # The Accounting module: bank-statement reconciliation against Documents,
+    # CSV parsing, transaction matching, and zip export. Gated end-to-end (nav,
+    # web, jobs) until production-ready. Orthogonal to the per-workspace
+    # `:accounting` billing entitlement — both must pass.
+    def accounting?
+      flag?("ENABLE_ACCOUNTING")
+    end
+
     private
 
     def flag?(name)

@@ -34,6 +34,8 @@ class CommandPaletteCatalog
       cmd("files", I18n.t("command_palette.commands.files"), I18n.t("command_palette.categories.navigate"), "folder", files_path),
       # Workflows is gated off by default until it's production-ready (Features.workflows?).
       *(Features.workflows? ? [ cmd("workflows", I18n.t("command_palette.commands.workflows"), I18n.t("command_palette.categories.navigate"), "workflow", workflows_path) ] : []),
+      # Accounting is gated off by default until it's production-ready (Features.accounting?).
+      *(Features.accounting? ? [ cmd("accounting", I18n.t("command_palette.commands.accounting"), I18n.t("command_palette.categories.navigate"), "credit-card", accounting_path) ] : []),
       cmd("email-scans", I18n.t("command_palette.commands.email_scans"), I18n.t("command_palette.categories.navigate"), "search", email_messages_path(inbox_settings: "accounts")),
       cmd("notifications", I18n.t("command_palette.commands.notifications"), I18n.t("command_palette.categories.navigate"), "bell", notifications_path),
       cmd("calendar", I18n.t("command_palette.commands.calendar"), I18n.t("command_palette.categories.navigate"), "calendar", calendar_path),
