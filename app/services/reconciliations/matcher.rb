@@ -25,6 +25,9 @@ module Reconciliations
     SCORE_HEURISTIC_FALLBACK = 0.5
     AI_MAX_CANDIDATES = 10
     MAX_SUGGESTIONS = 3
+    AMOUNT_CLOSE_TOLERANCE = 0.02  # 2% — same tolerance the heuristic score uses
+    AI_CONFIDENCE_CAP_CLOSE = 0.85 # AI conf ceiling when amounts are close, not exact
+    AI_CONFIDENCE_CAP_SPLIT = 0.8  # per-doc ceiling for split payments (docs sum to txn)
     DATE_DECAY_DAYS = 30
 
     # @param reconciliation [Reconciliation]
@@ -221,6 +224,68 @@ module Reconciliations
       end
     end
 
+    # Bounds AI-claimed confidence by objective evidence. Amount is the anchor:
+    #   exact               → keep the model's confidence as-is
+    #   within 2%           → cap at AI_CONFIDENCE_CAP_CLOSE
+    #   split payment       → several returned docs whose |amounts| SUM to the
+    #                         transaction (±2%) are all kept, capped per doc
+    #   otherwise           → discard the match entirely (log it)
+    # Also collapses near-duplicate documents (same party, amount and date —
+    # e.g. a receipt and its invoice) into the single best candidate.
+    # Returns an array of [match_hash, document] pairs.
+    def ground_ai_matches(txn, matches, doc_map)
+      pairs = matches.filter_map do |m|
+        doc = doc_map[m["document_id"]]
+        doc ? [ m, doc ] : nil # unknown/hallucinated ids never match
+      end
+      return [] if pairs.empty?
+
+      pairs = dedupe_twin_documents(pairs)
+
+      txn_abs = txn.amount_cents.abs
+      if pairs.size > 1
+        sum = pairs.sum { |_, doc| doc.amount_cents.to_i.abs }
+        if close_amounts?(sum, txn_abs)
+          return pairs.map { |m, doc|
+            [ m.merge("confidence" => [ m["confidence"].to_f, AI_CONFIDENCE_CAP_SPLIT ].min), doc ]
+          }
+        end
+      end
+
+      pairs.filter_map do |m, doc|
+        doc_abs = doc.amount_cents.to_i.abs
+        if doc_abs == txn_abs
+          [ m, doc ]
+        elsif close_amounts?(doc_abs, txn_abs)
+          [ m.merge("confidence" => [ m["confidence"].to_f, AI_CONFIDENCE_CAP_CLOSE ].min), doc ]
+        else
+          Rails.logger.info(
+            "[Reconciliations::Matcher] discarded AI match for txn #{txn.id}: " \
+            "doc #{doc.id} amount #{doc_abs} vs txn #{txn_abs} (claimed conf #{m["confidence"]})"
+          )
+          nil
+        end
+      end
+    end
+
+    def close_amounts?(a, b)
+      return false if a.zero? || b.zero?
+
+      (a - b).abs.to_f / [ a, b ].max <= AMOUNT_CLOSE_TOLERANCE
+    end
+
+    # A receipt and its invoice for the same purchase share party, amount and
+    # date — suggesting both reads as two different matches. Keep the best one
+    # (prefer a document with an invoice number, then the model's confidence).
+    def dedupe_twin_documents(pairs)
+      pairs.group_by { |_, doc|
+        [ (doc.vendor_name.presence || doc.client_name).to_s.downcase.strip,
+          doc.amount_cents, doc.document_date ]
+      }.values.map { |group|
+        group.max_by { |m, doc| [ doc.invoice_number.present? ? 1 : 0, m["confidence"].to_f ] }
+      }
+    end
+
     def build_reasons(txn, doc, score_val)
       reasons = {}
       # Amount
@@ -314,11 +379,15 @@ module Reconciliations
 
       doc_map = scored_candidates.first(AI_MAX_CANDIDATES).map { |(doc, _)| [ doc.id, doc ] }.to_h
 
-      txn_changed = false
-      matches.first(MAX_SUGGESTIONS).each do |m|
-        doc = doc_map[m["document_id"]]
-        next unless doc
+      # The model's confidence is a claim, not evidence: bound it by objective
+      # signals before anything reaches the user (prod incident: a €69.99
+      # invoice suggested against an €85.98 payment at 0.95 with a hallucinated
+      # vendor relationship).
+      grounded = ground_ai_matches(txn, matches, doc_map)
+      return nil if grounded.empty?
 
+      txn_changed = false
+      grounded.first(MAX_SUGGESTIONS).each do |m, doc|
         reasons = build_reasons(txn, doc, m["confidence"].to_f)
         reasons["ai_reason"] = m["reason"] if m["reason"].present?
 
