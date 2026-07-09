@@ -77,6 +77,66 @@ RSpec.describe BankTransaction, type: :model do
     end
   end
 
+  describe "#signed_amount_label" do
+    it "returns a negative sign for debits" do
+      transaction.amount_cents = -4590
+      transaction.currency = "EUR"
+      expect(transaction.signed_amount_label).to eq("-45.90 EUR")
+    end
+
+    it "returns a positive sign for credits" do
+      transaction.amount_cents = 120000
+      transaction.currency = "USD"
+      expect(transaction.signed_amount_label).to eq("+1200.00 USD")
+    end
+  end
+
+  describe "#nif_flagged?" do
+    let(:company_nif) { "123456789" }
+
+    it "returns false when company_nif is blank" do
+      expect(transaction.nif_flagged?("")).to be false
+      expect(transaction.nif_flagged?(nil)).to be false
+    end
+
+    it "returns false when there are no confirmed matches" do
+      expect(transaction.nif_flagged?(company_nif)).to be false
+    end
+
+    context "with a confirmed match" do
+      let(:doc) do
+        d = workspace.documents.build(document_type: :expense_invoice, ai_status: :completed,
+                                      review_status: :approved, source: :manual_upload,
+                                      buyer_nif: company_nif, amount_cents: 5000, currency: "EUR")
+        d.original_file.attach(io: StringIO.new("x"), filename: "inv.pdf", content_type: "application/pdf")
+        d.save!
+        d
+      end
+
+      before { transaction.save! }
+
+      it "returns false when the NIF is present and matches" do
+        create(:transaction_match, bank_transaction: transaction, document: doc,
+                                   status: :confirmed, matched_by: :ai, confidence: 0.9, match_reasons: {})
+        expect(transaction.nif_flagged?(company_nif)).to be false
+      end
+
+      it "returns true when the buyer NIF is missing" do
+        doc.update_columns(buyer_nif: nil)
+        create(:transaction_match, bank_transaction: transaction, document: doc,
+                                   status: :confirmed, matched_by: :ai, confidence: 0.9, match_reasons: {})
+        expect(transaction.nif_flagged?(company_nif)).to be true
+      end
+
+      it "returns true when the buyer NIF is a mismatch" do
+        doc.update_columns(buyer_nif: "999888777")
+        create(:transaction_match, bank_transaction: transaction, document: doc,
+                                   status: :confirmed, matched_by: :ai, confidence: 0.9, match_reasons: {})
+        expect(transaction.nif_flagged?(company_nif)).to be true
+      end
+    end
+  end
+
   describe "scope :ordered" do
     it "orders by position ascending" do
       transaction.save!

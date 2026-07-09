@@ -106,10 +106,16 @@
       </div>
 
     <% elsif transaction.requested? %>
-      <%# 📨 Requested: blue chip (PR 3 will add more actions) %>
-      <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium tone-info">
-        <%= t("reconciliations.bank_transactions.row.requested") %>
-      </span>
+      <%# 📨 Requested: blue chip + Undo %>
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium tone-info">
+          <%= t("reconciliations.bank_transactions.row.requested") %>
+        </span>
+        <%= button_to t("shared.actions.undo"),
+              reset_reconciliation_bank_transaction_path(reconciliation, transaction),
+              method: :post,
+              class: "text-xs text-accent-600 hover:text-accent-700 font-medium" %>
+      </div>
 
     <% else %>
       <%# ❓ Unmatched: amber "no invoice" pill + Resolve button %>

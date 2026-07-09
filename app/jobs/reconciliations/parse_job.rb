@@ -73,6 +73,7 @@ module Reconciliations
         updated_at:  Time.current
       )
       broadcast_update!
+      Notifier.reconciliation_parse_failed(@reconciliation) if @reconciliation
       # Do not re-raise — ParseError is a user-fixable data problem, not an
       # infrastructure error.  retry_on would only hammer the same bad file.
 

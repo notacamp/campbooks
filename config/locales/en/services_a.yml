@@ -128,3 +128,9 @@ en:
       title: New comment from %{actor_name}
     thread_mention:
       title: "%{actor_name} mentioned you"
+    reconciliation_ready:
+      title: Reconciliation ready for review
+    reconciliation_parse_failed:
+      title: Could not read bank statement
+    reconciliation_export_ready:
+      title: Reconciliation zip ready to download

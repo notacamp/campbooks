@@ -110,6 +110,8 @@ Rails.application.routes.draw do
   resources :reconciliations, only: %i[new create show destroy] do
     member do
       post :confirm_all_suggestions
+      post :export
+      get  :download
     end
     resources :bank_transactions, only: [],
               controller: "reconciliations/bank_transactions" do
@@ -119,6 +121,7 @@ Rails.application.routes.draw do
         post :exclude
         post :reset
         post :manual_match
+        post :request_invoice
         get  :resolve_panel
       end
     end

@@ -131,3 +131,9 @@ es:
       title: Nuevo comentario de %{actor_name}
     thread_mention:
       title: "%{actor_name} le ha mencionado"
+    reconciliation_ready:
+      title: Conciliación lista para revisar
+    reconciliation_parse_failed:
+      title: No se pudo leer el extracto bancario
+    reconciliation_export_ready:
+      title: Zip de conciliación listo para descargar

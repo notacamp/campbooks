@@ -111,8 +111,39 @@ pt:
       resolve_panel:
         attach: Associar
         no_docs_found: Nenhum documento correspondente encontrado.
+      request_invoice:
+        not_applicable: Fatura só pode ser solicitada para transações por associar ou com NIF inválido.
+        opened_composer: Compositor aberto — reveja e envie quando estiver pronto.
+        counterparty_fallback: o fornecedor
+        standard_subject: "Fatura em falta — pagamento de %{amount} a %{date}"
+        standard_body: "Olá,\n\nVenho por este meio solicitar fatura referente a um pagamento de %{amount} efetuado a %{date} a %{counterparty}.\n\nPor favor envie a fatura com a maior brevidade possível.\n\nCom os melhores cumprimentos."
+        corrected_subject: "Pedido de fatura corrigida — NIF em falta (%{amount} a %{date})"
+        corrected_body: "Olá,\n\nRecebi uma fatura de %{amount} datada de %{date}, mas o NIF/número de contribuinte do comprador (%{company_nif}) está em falta ou incorreto.\n\nPoderia emitir uma fatura corrigida incluindo o nosso NIF: %{company_nif}?\n\nCom os melhores cumprimentos."
+    download:
+      not_ready: O zip ainda não está pronto. Por favor aguarde.
+    export:
+      already_generating: Um ficheiro zip já está a ser preparado. Por favor aguarde.
+      enqueued: A preparar o seu zip… será notificado quando estiver pronto.
+      not_ready: O zip ainda não está pronto. Por favor aguarde.
+    export_button:
+      download_for_accountant: Descarregar para o contabilista
+      download: Descarregar zip
+      generating: A preparar o zip…
+      re_export: Reexportar
+      retry: Tentar novamente
+    zip_builder:
+      nif_yes: "sim"
+      nif_missing: "em falta"
+      nif_mismatch: "não corresponde"
+      cross_reconciliation_note: Também associado noutro extrato
+      file_missing: "[ficheiro em falta no Campbooks]"
     destroy:
       destroyed: Reconciliação eliminada.
+    nif_banner:
+      title: Adicione o seu NIF para verificar todas as faturas
+      body: "O Campbooks irá assinalar as faturas onde o NIF da sua empresa está em falta ou incorreto."
+      action: Adicionar NIF
+      dismiss: Dispensar
 
   components:
     accounting:
@@ -169,3 +200,10 @@ pt:
         exclude_title: Sem documento necessário
         exclude_hint: Marque esta transação como uma despesa que não requer fatura.
         mark_excluded: Marcar como excluído
+        counterparty_fallback: o fornecedor
+        request_invoice_title: "Pedir fatura a %{counterparty}"
+        request_invoice_note: "Nada é enviado automaticamente — reveja e envie a partir do compositor."
+        request_invoice_to: Para
+        request_invoice_to_placeholder: "fornecedor@exemplo.com"
+        request_invoice_subject: Assunto
+        request_invoice_open_composer: Rever no compositor
