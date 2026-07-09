@@ -415,6 +415,33 @@ class Document < ApplicationRecord
     document_date || created_at
   end
 
+  # ── NIF (VAT number) check ────────────────────────────────────────────────────
+  #
+  # Compares the buyer NIF on this document against the workspace's company NIF.
+  # Only applies to expense-side document types (expense_invoice, receipt, credit_note).
+  #
+  # @param company_nif [String, nil] the workspace's company VAT number
+  # @return [Symbol, nil] :ok, :missing, :mismatch, or nil when not applicable
+  NIF_APPLICABLE_TYPES = %w[expense_invoice receipt credit_note].freeze
+
+  def nif_status(company_nif)
+    return nil if company_nif.blank?
+    return nil unless NIF_APPLICABLE_TYPES.include?(document_type.to_s)
+
+    # If the doc explicitly says company VAT is present (from AI extraction), trust it.
+    return :ok if company_vat_present?
+
+    normalized_company = nif_normalize(company_nif)
+
+    if buyer_nif.blank?
+      :missing
+    elsif nif_normalize(buyer_nif) == normalized_company
+      :ok
+    else
+      :mismatch
+    end
+  end
+
   def searchable_fields_changed?
     saved_change_to_description? || saved_change_to_ai_extraction_data? ||
       saved_change_to_vendor_name? || saved_change_to_client_name? ||
@@ -424,6 +451,12 @@ class Document < ApplicationRecord
   end
 
   private
+
+  # Normalize a NIF/VAT number for comparison: upcase, remove spaces/dots/dashes,
+  # strip leading "PT" country prefix (Portuguese NIF is 9 digits, may be prefixed).
+  def nif_normalize(raw)
+    raw.to_s.upcase.gsub(/[\s.\-]/, "").delete_prefix("PT")
+  end
 
   # Thin metadata for document.* events.
   def tracking_payload

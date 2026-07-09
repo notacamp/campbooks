@@ -1,0 +1,9 @@
+<%# SummaryBar partial — wraps the Phlex component.
+    Locals:
+      reconciliation      [Reconciliation]
+      status_counts       [Hash] from BankTransaction.group(:status).count
+      nif_exception_count [Integer] transactions with NIF issues %>
+<%= render Campbooks::Accounting::SummaryBar.new(
+      reconciliation:      reconciliation,
+      status_counts:       status_counts,
+      nif_exception_count: nif_exception_count) %>

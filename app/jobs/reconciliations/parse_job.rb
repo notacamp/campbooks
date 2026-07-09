@@ -11,11 +11,15 @@ module Reconciliations
     queue_as :default
     retry_on StandardError, wait: :polynomially_longer, attempts: 3
 
-    # Registry of content-type → parser class. Adding a new format: add an
-    # entry here + implement the parser (must respond to `new(data).call`).
+    # Registry of content-type → parser class.
+    #
+    # CSV parsers take `new(data).call` (raw bytes).
+    # PDF parser is document-aware and takes `new(document).call`; the :pdf sentinel
+    # signals that, so parser_for can dispatch differently.
     PARSERS = {
       "text/csv"        => Reconciliations::CsvParser,
-      "application/csv" => Reconciliations::CsvParser
+      "application/csv" => Reconciliations::CsvParser,
+      "application/pdf" => :pdf
     }.freeze
 
     def perform(reconciliation_id)
@@ -24,8 +28,9 @@ module Reconciliations
 
       mark_parsing!
 
-      data = download_statement
-      rows = parse(data, @reconciliation.statement_document)
+      document = @reconciliation.statement_document
+      data     = download_statement
+      rows     = parse(data, document)
 
       ActiveRecord::Base.transaction do
         @reconciliation.bank_transactions.delete_all
@@ -54,10 +59,12 @@ module Reconciliations
         end
 
         BankTransaction.insert_all!(records) if records.any?
-        @reconciliation.update!(status: :ready)
+        # Transition to :matching — MatchJob will set :ready when done.
+        @reconciliation.update!(status: :matching)
       end
 
       broadcast_update!
+      Reconciliations::MatchJob.perform_later(@reconciliation.id)
 
     rescue Reconciliations::ParseError => e
       @reconciliation&.update_columns(
@@ -100,18 +107,88 @@ module Reconciliations
     def parse(data, document)
       blob  = document.original_file.blob
       klass = parser_for(blob)
-      unless klass
+
+      if klass.nil?
         raise Reconciliations::ParseError,
-              I18n.t("reconciliations.parse_job.pdf_not_yet_supported")
+              I18n.t("reconciliations.parse_job.unsupported_format")
       end
-      klass.new(data).call
+
+      if klass == :pdf
+        parse_pdf(document)
+      else
+        klass.new(data).call
+      end
     end
 
-    # Resolve content-type and filename extension to a parser class, or nil.
+    # Resolve content-type and filename extension to a parser class or sentinel.
+    # Returns nil when the format is unsupported.
     def parser_for(blob)
       content_type = blob.content_type.to_s
       filename     = blob.filename.to_s.downcase
-      PARSERS[content_type] || (filename.end_with?(".csv") ? Reconciliations::CsvParser : nil)
+
+      if PARSERS.key?(content_type)
+        return PARSERS[content_type]
+      end
+      return Reconciliations::CsvParser if filename.end_with?(".csv")
+      return :pdf if filename.end_with?(".pdf")
+
+      nil
+    end
+
+    # Parse a PDF via the AI provider. Gates on document AI being configured.
+    def parse_pdf(document)
+      workspace = @reconciliation.workspace
+      unless Ai::ProviderSetup.configured?(workspace, :documents)
+        raise Reconciliations::ParseError,
+              I18n.t("reconciliations.parse_job.no_ai_for_pdf")
+      end
+
+      result = Ai::BankStatementParser.new(document).call
+
+      # Fill reconciliation header fields from parser output when blank.
+      fill_header_from_ai(result)
+
+      # Convert AI transactions to the same row format CsvParser returns.
+      ai_transactions_to_rows(result["transactions"] || [])
+    end
+
+    # Apply AI-parsed header fields to the reconciliation when they are blank.
+    def fill_header_from_ai(result)
+      attrs = {}
+      attrs[:bank_name]              = result["bank_name"]             if @reconciliation.bank_name.blank? && result["bank_name"].present?
+      attrs[:currency]               = result["currency"]              if result["currency"].present?
+      attrs[:period_start]           = Date.parse(result["period_start"])  rescue nil if @reconciliation.period_start.blank? && result["period_start"].present?
+      attrs[:period_end]             = Date.parse(result["period_end"])    rescue nil if @reconciliation.period_end.blank? && result["period_end"].present?
+      attrs[:opening_balance_cents]  = result["opening_balance_cents"].to_i if @reconciliation.opening_balance_cents.blank? && result["opening_balance_cents"].present?
+      attrs[:closing_balance_cents]  = result["closing_balance_cents"].to_i if @reconciliation.closing_balance_cents.blank? && result["closing_balance_cents"].present?
+      @reconciliation.update!(attrs) if attrs.any?
+    end
+
+    # Map AI transaction hashes to the internal row format.
+    def ai_transactions_to_rows(transactions)
+      transactions.each_with_index.map do |t, idx|
+        date = begin
+          Date.parse(t["date"].to_s)
+        rescue
+          nil
+        end
+        next nil if date.nil?
+
+        amount_decimal = t["amount"].to_f
+        amount_cents   = (amount_decimal * 100).round
+        bal_decimal    = t["balance_after"]
+        bal_cents      = bal_decimal.present? ? (bal_decimal.to_f * 100).round : nil
+
+        {
+          position:            idx + 1,
+          booked_on:           date,
+          description:         t["description"].to_s.strip.presence || "Transaction #{idx + 1}",
+          counterparty:        t["counterparty"].presence,
+          amount_cents:        amount_cents,
+          balance_after_cents: bal_cents,
+          raw:                 t
+        }
+      end.compact
     end
 
     # After a successful parse, derive period_start/end and run the integrity

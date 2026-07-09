@@ -235,6 +235,8 @@ fr:
         revoked: Tous les jetons de « %{name} » ont été révoqués.
     general:
       show:
+        company_nif_label: "Numéro de TVA / NIF de l'entreprise"
+        company_nif_hint: "Le numéro d'identification fiscale de votre entreprise. Utilisé pour vérifier que les factures vous sont correctement adressées."
         ai_providers_hint: Vous cherchez les fournisseurs IA et les paramètres de
           modèle ? Ils se trouvent désormais sous %{link}.
         ai_providers_link_text: Fournisseurs et services IA

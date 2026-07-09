@@ -5,12 +5,14 @@
 
 <%# Desktop: append rows to the table body %>
 <%= turbo_stream.append "transactions_table_body" do %>
-  <%= render partial: "bank_transactions/row", collection: @transactions, as: :transaction %>
+  <%= render partial: "bank_transactions/row", collection: @transactions, as: :transaction,
+             locals: { reconciliation: @reconciliation } %>
 <% end %>
 
 <%# Mobile: append cards to the card list %>
 <%= turbo_stream.append "transactions_cards" do %>
-  <%= render partial: "bank_transactions/card", collection: @transactions, as: :transaction %>
+  <%= render partial: "bank_transactions/card", collection: @transactions, as: :transaction,
+             locals: { reconciliation: @reconciliation } %>
 <% end %>
 
 <%# Advance the lazy-loading cursor or remove it when all pages are loaded %>

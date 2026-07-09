@@ -9,9 +9,11 @@
 # Gated by Features.accounting? (readiness) and the :accounting entitlement
 # (billing). Cross-workspace access returns 404 per the app convention.
 class ReconciliationsController < ApplicationController
+  include ActionView::RecordIdentifier # bare dom_id(...) in turbo_stream helpers
+
   before_action :require_authentication
   before_action :require_accounting_enabled
-  before_action :set_reconciliation, only: %i[show destroy]
+  before_action :set_reconciliation, only: %i[show destroy confirm_all_suggestions]
   before_action :set_bank_statement_documents, only: %i[new create]
 
   def index
@@ -88,7 +90,78 @@ class ReconciliationsController < ApplicationController
     redirect_to accounting_path, success: t(".destroyed")
   end
 
+  # POST /reconciliations/:id/confirm_all_suggestions
+  # Bulk-confirm all highest-confidence suggested matches across the reconciliation.
+  def confirm_all_suggestions
+    return if require_entitlement!(:accounting, ignore_limit: true)
+
+    suggested_txns = @reconciliation.bank_transactions
+                                    .where(status: :suggested)
+                                    .includes(transaction_matches: :document)
+
+    confirmed_count = 0
+    all_streams     = []
+
+    suggested_txns.each do |txn|
+      best_match = txn.transaction_matches.select(&:suggested?)
+                      .max_by(&:confidence)
+      next unless best_match
+
+      ActiveRecord::Base.transaction do
+        best_match.update!(status: :confirmed)
+        txn.update!(status: :matched)
+      end
+
+      confirmed_count += 1
+      txn.reload
+      all_streams << turbo_stream.replace(dom_id(txn),        html: render_tx_row(txn))
+      all_streams << turbo_stream.replace(dom_id(txn, :card), html: render_tx_card(txn))
+    end
+
+    all_streams << turbo_stream.replace("reconciliation_summary_bar",
+                                        html: render_summary_bar(@reconciliation))
+    all_streams << notify_stream(t(".confirmed", count: confirmed_count))
+
+    render turbo_stream: all_streams
+  end
+
   private
+
+  # These helpers are shared by confirm_all_suggestions only — workbench actions
+  # live in Reconciliations::BankTransactionsController.
+
+  def render_tx_row(txn)
+    ApplicationController.render(partial: "bank_transactions/row",
+                                 locals: { transaction: txn, reconciliation: @reconciliation },
+                                 layout: false)
+  end
+
+  def render_tx_card(txn)
+    ApplicationController.render(partial: "bank_transactions/card",
+                                 locals: { transaction: txn, reconciliation: @reconciliation },
+                                 layout: false)
+  end
+
+  def render_summary_bar(reconciliation)
+    counts    = reconciliation.bank_transactions.group(:status).count
+    company_nif = Current.workspace.company_nif.presence
+    nif_count = company_nif ? nif_exception_count(reconciliation, company_nif) : 0
+    ApplicationController.render(
+      partial: "reconciliations/summary_bar",
+      locals:  { reconciliation: reconciliation, status_counts: counts, nif_exception_count: nif_count },
+      layout:  false
+    )
+  end
+
+  def nif_exception_count(reconciliation, company_nif)
+    reconciliation.bank_transactions
+                  .where(status: %i[matched suggested])
+                  .includes(transaction_matches: :document)
+                  .count do |txn|
+      top = txn.transaction_matches.select { |m| %w[suggested confirmed].include?(m.status) }.max_by(&:confidence)
+      top&.document&.nif_status(company_nif)&.in?(%i[missing mismatch]) || false
+    end
+  end
 
   def set_reconciliation
     @reconciliation = Current.workspace.reconciliations.find(params[:id])
