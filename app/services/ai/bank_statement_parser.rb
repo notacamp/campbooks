@@ -76,9 +76,10 @@ module Ai
       @document.original_file.blob.download
     end
 
-    # True when the statement has more than 15 pages.
+    # True when the statement has more pages than MAX_PAGES — chunk it to avoid
+    # silent truncation (rasterise path caps individual calls at MAX_PAGES).
     def large_statement?(pdf_data)
-      page_count(pdf_data) > 15
+      page_count(pdf_data) > MAX_PAGES
     rescue
       false
     end

@@ -99,28 +99,35 @@ class ReconciliationsController < ApplicationController
                                     .where(status: :suggested)
                                     .includes(transaction_matches: :document)
 
-    confirmed_count = 0
-    all_streams     = []
+    confirmed_txns = []
 
-    suggested_txns.each do |txn|
-      best_match = txn.transaction_matches.select(&:suggested?)
-                      .max_by(&:confidence)
-      next unless best_match
+    # One transaction for the whole bulk operation — atomic and concurrency-safe.
+    ActiveRecord::Base.transaction do
+      suggested_txns.each do |txn|
+        best_match = txn.transaction_matches.select(&:suggested?)
+                        .max_by(&:confidence)
+        next unless best_match
 
-      ActiveRecord::Base.transaction do
+        # Guard: re-check status inside transaction to avoid double-confirm.
+        next unless best_match.reload.suggested?
+
         best_match.update!(status: :confirmed)
         txn.update!(status: :matched)
+        confirmed_txns << txn
       end
+    end
 
-      confirmed_count += 1
+    all_streams = confirmed_txns.flat_map do |txn|
       txn.reload
-      all_streams << turbo_stream.replace(dom_id(txn),        html: render_tx_row(txn))
-      all_streams << turbo_stream.replace(dom_id(txn, :card), html: render_tx_card(txn))
+      [
+        turbo_stream.replace(dom_id(txn),        html: render_tx_row(txn)),
+        turbo_stream.replace(dom_id(txn, :card), html: render_tx_card(txn))
+      ]
     end
 
     all_streams << turbo_stream.replace("reconciliation_summary_bar",
                                         html: render_summary_bar(@reconciliation))
-    all_streams << notify_stream(t(".confirmed", count: confirmed_count))
+    all_streams << notify_stream(t(".confirmed", count: confirmed_txns.size))
 
     render turbo_stream: all_streams
   end
@@ -144,23 +151,12 @@ class ReconciliationsController < ApplicationController
 
   def render_summary_bar(reconciliation)
     counts    = reconciliation.bank_transactions.group(:status).count
-    company_nif = Current.workspace.company_nif.presence
-    nif_count = company_nif ? nif_exception_count(reconciliation, company_nif) : 0
+    nif_count = reconciliation.nif_exception_count(Current.workspace.company_nif.presence)
     ApplicationController.render(
       partial: "reconciliations/summary_bar",
       locals:  { reconciliation: reconciliation, status_counts: counts, nif_exception_count: nif_count },
       layout:  false
     )
-  end
-
-  def nif_exception_count(reconciliation, company_nif)
-    reconciliation.bank_transactions
-                  .where(status: %i[matched suggested])
-                  .includes(transaction_matches: :document)
-                  .count do |txn|
-      top = txn.transaction_matches.select { |m| %w[suggested confirmed].include?(m.status) }.max_by(&:confidence)
-      top&.document&.nif_status(company_nif)&.in?(%i[missing mismatch]) || false
-    end
   end
 
   def set_reconciliation

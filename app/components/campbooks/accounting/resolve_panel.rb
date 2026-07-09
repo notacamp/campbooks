@@ -218,14 +218,14 @@ module Campbooks
         end
       end
 
-      def button_classes(variant)
-        base = "inline-flex items-center justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition-colors"
-        case variant
-        when :primary
-          "#{base} bg-accent-600 text-white hover:bg-accent-700"
-        when :ghost
-          "#{base} border border-border text-foreground hover:bg-muted/40"
-        end
+      # Fix 13c: derive button CSS from Campbooks::Button constants so the resolve
+      # panel matches the rest of the UI and doesn't drift when token values change.
+      def button_classes(variant, size: :xs)
+        class_names(
+          Campbooks::Button::BASE_CLASSES,
+          Campbooks::Button::VARIANT_CLASSES[variant],
+          Campbooks::Button::SIZE_CLASSES[size]
+        )
       end
     end
   end

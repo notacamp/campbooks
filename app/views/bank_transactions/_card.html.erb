@@ -5,14 +5,17 @@
     For suggested status: full-width Confirm / Not this buttons always visible.
     For unmatched: Resolve button that shows inline expand panel. %>
 
-<% confirmed_match  = transaction.transaction_matches.find { |m| m.confirmed? } %>
+<% confirmed_matches = transaction.transaction_matches.select(&:confirmed?).sort_by { |m| -m.confidence.to_f } %>
+<% confirmed_match  = confirmed_matches.first %>
+<% confirmed_extra  = confirmed_matches.size - 1 %>
 <% suggested_match  = transaction.transaction_matches.select(&:suggested?).max_by { |m| m.confidence.to_f } %>
 <% company_nif      = Current.workspace.company_nif.presence %>
 
 <div id="<%= dom_id(transaction, :card) %>"
      class="bg-card rounded-lg border <%= transaction.suggested? ? 'border-amber-300 dark:border-amber-700' : 'border-border' %> overflow-hidden"
      data-controller="<%= 'transaction-resolve' if transaction.unmatched? %>"
-     data-transaction-resolve-url-value="<%= resolve_panel_reconciliation_bank_transaction_path(reconciliation, transaction) if transaction.unmatched? %>">
+     data-transaction-resolve-url-value="<%= resolve_panel_reconciliation_bank_transaction_path(reconciliation, transaction) if transaction.unmatched? %>"
+     data-transaction-resolve-frame-id-value="<%= dom_id(transaction, :resolve_frame) if transaction.unmatched? %>">
 
   <%# Main card body %>
   <div class="px-4 py-3">
@@ -41,10 +44,15 @@
     <%# Match section — rendered below the amount row %>
     <div class="mt-2">
       <% if transaction.matched? && confirmed_match %>
-        <%# ✅ Matched %>
-        <%= render(Campbooks::Accounting::MatchChip.new(
-              match:      confirmed_match,
-              nif_status: company_nif ? confirmed_match.document.nif_status(company_nif) : nil)) %>
+        <%# ✅ Matched: top confirmed chip + "+N more" when multiple %>
+        <div class="flex items-center gap-1 flex-wrap">
+          <%= render(Campbooks::Accounting::MatchChip.new(
+                match:      confirmed_match,
+                nif_status: company_nif ? confirmed_match.document.nif_status(company_nif) : nil)) %>
+          <% if confirmed_extra > 0 %>
+            <span class="text-xs text-muted-foreground">+<%= confirmed_extra %> <%= t("reconciliations.bank_transactions.row.more") %></span>
+          <% end %>
+        </div>
 
       <% elsif transaction.suggested? && suggested_match %>
         <%# 🔶 Suggested: chip + badge, then full-width action buttons %>

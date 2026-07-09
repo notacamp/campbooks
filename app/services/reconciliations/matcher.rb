@@ -3,6 +3,7 @@
 module Reconciliations
   # Matches each unmatched BankTransaction in a Reconciliation against workspace
   # Documents using heuristics and (optionally) AI disambiguation.
+  # include ActionView::RecordIdentifier so dom_id() works without a view context.
   #
   # Scoring (0..1):
   #   amount:   exact cents match → 0.5; within 2% → 0.35
@@ -17,6 +18,8 @@ module Reconciliations
   # Broadcasts a per-row turbo_stream replacement for every changed transaction.
   # Also broadcasts an updated summary bar every 10 changes and at the end.
   class Matcher
+    include ActionView::RecordIdentifier # dom_id(record) / dom_id(record, :card)
+
     SCORE_AUTO_SUGGEST = 0.85
     SCORE_AI_THRESHOLD = 0.6
     SCORE_HEURISTIC_FALLBACK = 0.5
@@ -33,6 +36,17 @@ module Reconciliations
     end
 
     def call
+      # Fix 13a: Prefetch document_ids that are already confirmed in OTHER reconciliations
+      # in this workspace — avoids N×M EXISTS queries inside cross_reconciliation_warning?.
+      @cross_recon_doc_ids = Set.new(
+        TransactionMatch.joins(:bank_transaction)
+                        .where(status: :confirmed)
+                        .where.not(bank_transactions: { reconciliation_id: @reconciliation.id })
+                        .where(document_id: @workspace.documents.select(:id))
+                        .distinct
+                        .pluck(:document_id)
+      )
+
       transactions = @reconciliation.bank_transactions.ordered
                                     .where(status: :unmatched)
 
@@ -56,11 +70,19 @@ module Reconciliations
       if top_score >= SCORE_AUTO_SUGGEST
         create_suggested_matches(txn, scored.first(MAX_SUGGESTIONS), method: :heuristic)
       elsif candidates.any? && ai_text_configured?
-        ai_match(txn, scored.first(AI_MAX_CANDIDATES))
+        # If AI produced no suggestions (no config rows, error, or empty result),
+        # fall through to the heuristic fallback so self-hosted installs still
+        # get a suggestion when the score is ≥ SCORE_HEURISTIC_FALLBACK.
+        ai_suggested = ai_match(txn, scored.first(AI_MAX_CANDIDATES))
+        unless ai_suggested
+          create_suggested_matches(txn, scored.first(1), method: :heuristic) if top_score >= SCORE_HEURISTIC_FALLBACK
+        end
       elsif top_score >= SCORE_HEURISTIC_FALLBACK
         create_suggested_matches(txn, scored.first(1), method: :heuristic)
       end
       # else: stays unmatched, no broadcast needed
+    rescue *Ai::Adapters::Base::TRANSIENT_ERRORS
+      raise # let MatchJob's retry_on handle 429/5xx
     rescue => e
       Rails.logger.error("[Reconciliations::Matcher] txn #{txn.id} failed: #{e.class}: #{e.message}")
     end
@@ -124,12 +146,8 @@ module Reconciliations
     end
 
     def name_score(txn, doc)
-      txn_text = (txn.counterparty.presence || txn.description.to_s).downcase
-      doc_text  = (doc.vendor_name.presence || doc.client_name.to_s).downcase
-
-      return 0.0 if txn_text.blank? || doc_text.blank?
-
-      sim = jaccard_similarity(tokenize(txn_text), tokenize(doc_text))
+      # Fix 13b: delegate to name_jaccard so both this and build_reasons share the cache.
+      sim = name_jaccard(txn, doc)
       sim >= 0.4 ? 0.25 * sim : 0.0
     end
 
@@ -170,12 +188,9 @@ module Reconciliations
 
     # ── Match creation ──────────────────────────────────────────────────────────
 
-    # Check if a document is confirmed in any OTHER reconciliation.
+    # Fix 13a: Uses the prefetched Set from call() — O(1) lookup instead of EXISTS query.
     def cross_reconciliation_warning?(doc)
-      TransactionMatch.joins(:bank_transaction)
-                      .where(document_id: doc.id, status: :confirmed)
-                      .where.not(bank_transactions: { reconciliation_id: @reconciliation.id })
-                      .exists?
+      @cross_recon_doc_ids&.include?(doc.id) || false
     end
 
     def create_suggested_matches(txn, scored_docs, method:)
@@ -232,12 +247,23 @@ module Reconciliations
       reasons
     end
 
+    # Fix 13b: memoize per (txn, doc) pair — score() and build_reasons() both call
+    # this, so without the cache we'd compute Jaccard twice per candidate.
     def name_jaccard(txn, doc)
+      @jaccard_cache ||= {}
+      key = [ txn.id, doc.id ]
+      return @jaccard_cache[key] if @jaccard_cache.key?(key)
+
       txn_text = (txn.counterparty.presence || txn.description.to_s).downcase
       doc_text  = (doc.vendor_name.presence || doc.client_name.to_s).downcase
-      return 0.0 if txn_text.blank? || doc_text.blank?
 
-      jaccard_similarity(tokenize(txn_text), tokenize(doc_text))
+      sim = if txn_text.blank? || doc_text.blank?
+        0.0
+      else
+        jaccard_similarity(tokenize(txn_text), tokenize(doc_text))
+      end
+
+      @jaccard_cache[key] = sim
     end
 
     # ── AI disambiguation ────────────────────────────────────────────────────────
@@ -248,7 +274,7 @@ module Reconciliations
 
     def ai_match(txn, scored_candidates)
       config = Ai::Configuration.for_any(Ai::ReminderExtractor::PURPOSES)
-      return unless config
+      return nil unless config
 
       candidates = scored_candidates.first(AI_MAX_CANDIDATES).map.with_index(1) do |(doc, _), idx|
         <<~CANDIDATE
@@ -284,7 +310,7 @@ module Reconciliations
 
       parsed = Ai::ChatService.parse_json_response(text, object_start: /\{\s*"matches"/)
       matches = Array(parsed["matches"]).select { |m| m["confidence"].to_f >= SCORE_AI_THRESHOLD }
-      return if matches.empty?
+      return nil if matches.empty? # signal no suggestion to match_transaction
 
       doc_map = scored_candidates.first(AI_MAX_CANDIDATES).map { |(doc, _)| [ doc.id, doc ] }.to_h
 
@@ -318,11 +344,14 @@ module Reconciliations
         @change_count += 1
         broadcast_summary_bar if (@change_count % 10).zero?
       end
+
+      txn_changed # return truthy when suggestions were created, nil/false otherwise
     rescue *Ai::Adapters::Base::TRANSIENT_ERRORS
       raise
     rescue => e
       Rails.logger.warn("[Reconciliations::Matcher] AI disambiguation failed for txn #{txn.id}: #{e.class}: #{e.message}")
       # Degrade gracefully — never fail the whole job for one transaction's AI call.
+      nil # indicate AI produced no usable suggestion
     end
 
     # ── Broadcasting ─────────────────────────────────────────────────────────────
@@ -346,12 +375,12 @@ module Reconciliations
 
         Turbo::StreamsChannel.broadcast_replace_to(
           "reconciliation_#{@reconciliation.id}",
-          target: dom_id_for(txn_fresh),
+          target: dom_id(txn_fresh),
           html:   row_html
         )
         Turbo::StreamsChannel.broadcast_replace_to(
           "reconciliation_#{@reconciliation.id}",
-          target: dom_id_for(txn_fresh, :card),
+          target: dom_id(txn_fresh, :card),
           html:   card_html
         )
       end
@@ -380,24 +409,7 @@ module Reconciliations
     end
 
     def nif_exception_count
-      company_nif = @workspace.company_nif.presence
-      return 0 unless company_nif
-
-      @reconciliation.bank_transactions
-                     .where(status: %i[matched suggested])
-                     .includes(transaction_matches: :document)
-                     .count do |txn|
-        txn.transaction_matches.select(&:suggested?).max_by(&:confidence)
-           &.document
-           &.nif_status(company_nif)
-           &.in?(%i[missing mismatch]) || false
-      end
-    end
-
-    def dom_id_for(record, suffix = nil)
-      parts = [ "bank_transaction", record.id ]
-      parts << suffix.to_s if suffix
-      parts.join("_")
+      @reconciliation.nif_exception_count(@workspace.company_nif.presence)
     end
   end
 end

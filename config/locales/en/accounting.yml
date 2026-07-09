@@ -29,7 +29,6 @@ en:
     untitled_statement: Bank statement
     destroy_confirm: Delete this reconciliation? All parsed transactions will be removed.
     parse_job:
-      pdf_not_yet_supported: PDF parsing is coming in the next release. Please export your statement as CSV for now.
       no_ai_for_pdf: "PDF parsing requires an AI provider configured for document analysis. Please set one up in Settings → AI providers."
       pdf_unparseable: "Could not extract transactions from this PDF. The file may be scanned, encrypted, or in an unsupported format."
       pdf_ai_error: "AI parsing failed: %{message}"
@@ -90,6 +89,7 @@ en:
         no_invoice: No invoice found
         resolve: Resolve
         requested: Invoice requested
+        more: more
       exclusion_reasons:
         bank_fee: Bank fee
         salary: Salary

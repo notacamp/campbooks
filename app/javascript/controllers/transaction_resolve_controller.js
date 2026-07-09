@@ -8,17 +8,20 @@ import { Controller } from "@hotwired/stimulus"
 // Mobile/card: appends an inline section to the card div and lazy-loads the
 // same Turbo Frame into it.
 //
-// The outer Turbo Frame ID is "<element.id>_resolve_frame" which matches the
-// <turbo-frame> tag in resolve_panel.html.erb.
-// The controller element can be a <tr> (desktop) or a <div> (mobile card).
+// Values:
+//   url         - the resolve_panel URL to load into the frame
+//   frameId     - the exact Turbo Frame ID expected by resolve_panel.html.erb
+//                 (e.g. "bank_transaction_<uuid>_resolve_frame"). Passed
+//                 explicitly so both the <tr> and the card <div> use the same
+//                 ID regardless of their own element.id.
 export default class extends Controller {
-  static values = { url: String }
+  static values = { url: String, frameId: String }
 
   toggle(event) {
     event.preventDefault()
 
+    const frameId  = this.frameIdValue
     const panelId  = `${this.element.id}_resolve_panel`
-    const frameId  = `${this.element.id}_resolve_frame`
 
     let panel = document.getElementById(panelId)
 
