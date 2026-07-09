@@ -1,0 +1,22 @@
+<tr class="hover:bg-muted/30 transition-colors">
+  <td class="px-6 py-3 text-sm text-foreground whitespace-nowrap tabular-nums"><%= l(transaction.booked_on, format: :date) %></td>
+  <td class="px-6 py-3 text-sm text-foreground max-w-xs">
+    <p class="truncate" title="<%= transaction.description %>"><%= transaction.description %></p>
+  </td>
+  <td class="px-6 py-3 text-sm text-muted-foreground truncate max-w-[140px]">
+    <%= transaction.counterparty.presence || "—" %>
+  </td>
+  <td class="px-6 py-3 text-sm font-medium tabular-nums text-right whitespace-nowrap
+             <%= transaction.debit? ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400' %>">
+    <%= transaction.debit? ? "−" : "+" %><%= number_to_currency(transaction.amount_cents.abs / 100.0, unit: transaction.currency + " ", precision: 2, delimiter: " ", separator: ",") %>
+  </td>
+  <td class="px-6 py-3">
+    <% if transaction.matched? %>
+      <%= render Campbooks::Badge.new(variant: :success, size: :md) { t("reconciliations.statuses.matched") } %>
+    <% elsif transaction.excluded? %>
+      <%= render Campbooks::Badge.new(variant: :neutral, size: :md) { t("reconciliations.statuses.excluded") } %>
+    <% else %>
+      <span class="text-xs text-muted-foreground">—</span>
+    <% end %>
+  </td>
+</tr>

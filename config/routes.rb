@@ -102,6 +102,12 @@ Rails.application.routes.draw do
     end
   end
 
+  # Accounting — bank statement reconciliation against Documents (CSV parsing
+  # first; AI/PDF and the matching workbench arrive in later PRs). Gated by
+  # Features.accounting? and the :accounting entitlement (ReconciliationsController).
+  get "accounting", to: "reconciliations#index", as: :accounting
+  resources :reconciliations, only: %i[index new create show destroy]
+
   # Tasks — actionable items (manual or AI-extracted) that move through a status
   # board, carry assignees + labels, and link to emails. Gated by Features.tasks?
   # and the :tasks entitlement (TasksController). Board + skim + email-linking

@@ -162,6 +162,7 @@ GEM
     crass (1.0.7)
     css_parser (1.22.0)
       addressable
+    csv (3.2.6)
     date (3.5.1)
     debug (1.11.1)
       irb (~> 1.10)
@@ -842,6 +843,7 @@ DEPENDENCIES
   campbooks_cloud!
   capybara
   countries
+  csv
   debug
   doorkeeper (~> 5.9)
   dotenv-rails

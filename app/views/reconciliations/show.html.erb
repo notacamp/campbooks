@@ -1,0 +1,124 @@
+<%= turbo_stream_from "reconciliation_#{@reconciliation.id}" %>
+
+<%= render Campbooks::PageHeader.new(
+      title:      @reconciliation.statement_document&.original_file&.filename&.to_s || t(".title"),
+      back_href:  accounting_path,
+      back_label: t("reconciliations.index.title")) do |header| %>
+  <% header.with_actions do %>
+    <% unless @reconciliation.parsing? || @reconciliation.matching? %>
+      <%= button_to reconciliation_path(@reconciliation), method: :delete,
+            class: "inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-700 border border-red-200 hover:border-red-300 rounded-lg transition-colors",
+            data: { turbo_confirm: t("reconciliations.destroy_confirm") } do %>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+        </svg>
+        <%= t(".delete") %>
+      <% end %>
+    <% end %>
+  <% end %>
+<% end %>
+
+<%# ── Status chips ── %>
+<div class="flex flex-wrap items-center gap-2 mb-6">
+  <%= render Campbooks::Accounting::ReconciliationStatusBadge.new(status: @reconciliation.status) %>
+  <% if @reconciliation.bank_name.present? %>
+    <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground rounded-md">
+      <%= @reconciliation.bank_name %>
+    </span>
+  <% end %>
+  <% if @reconciliation.period_label %>
+    <span class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground rounded-md">
+      <%= @reconciliation.period_label %>
+    </span>
+  <% end %>
+  <% if @reconciliation.integrity_warning? %>
+    <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 rounded-md">
+      <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+      </svg>
+      <%= @reconciliation.integrity_warning_message.presence || t(".integrity_warning") %>
+    </span>
+  <% end %>
+</div>
+
+<div id="reconciliation_content">
+  <% if @reconciliation.parsing? || @reconciliation.matching? %>
+    <%# ── Parsing / matching in progress: spinner + skeleton rows ── %>
+    <div class="bg-card rounded-xl shadow-sm border border-border p-6 mb-6">
+      <div class="flex items-center gap-3 text-muted-foreground">
+        <%= render Campbooks::Spinner.new(size: :sm) %>
+        <span class="text-sm font-medium">
+          <%= @reconciliation.parsing? ? t(".status_parsing") : t(".status_matching") %>
+        </span>
+      </div>
+    </div>
+    <div class="space-y-2">
+      <% 3.times do %>
+        <div class="bg-card rounded-lg border border-border px-6 py-4 animate-pulse">
+          <div class="flex items-center gap-4">
+            <div class="h-3 bg-muted rounded w-20"></div>
+            <div class="h-3 bg-muted rounded flex-1"></div>
+            <div class="h-3 bg-muted rounded w-16"></div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+
+  <% elsif @reconciliation.failed? %>
+    <%# ── Parse failed ── %>
+    <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6">
+      <div class="flex items-start gap-3">
+        <svg class="w-5 h-5 text-red-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/>
+        </svg>
+        <div>
+          <h3 class="text-sm font-semibold text-red-800 dark:text-red-300"><%= t(".parse_failed_title") %></h3>
+          <p class="mt-1 text-sm text-red-700 dark:text-red-400">
+            <%= @reconciliation.parse_error.presence || t(".parse_failed_generic") %>
+          </p>
+          <p class="mt-2 text-xs text-red-600 dark:text-red-500"><%= t(".parse_failed_hint") %></p>
+        </div>
+      </div>
+    </div>
+
+  <% elsif @reconciliation.ready? || @reconciliation.pending? %>
+    <% if @transactions.any? %>
+      <%# ── Desktop transactions table ── %>
+      <div class="hidden md:block bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
+        <table class="min-w-full divide-y divide-border">
+          <thead class="bg-muted/40">
+            <tr>
+              <th class="w-[10%] px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide"><%= t(".col_date") %></th>
+              <th class="w-5/12 px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide"><%= t(".col_description") %></th>
+              <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide"><%= t(".col_counterparty") %></th>
+              <th class="w-[12%] px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wide tabular-nums"><%= t(".col_amount") %></th>
+              <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide"><%= t(".col_match") %></th>
+            </tr>
+          </thead>
+          <tbody class="bg-card divide-y divide-border">
+            <%= render partial: "bank_transactions/row", collection: @transactions, as: :transaction %>
+          </tbody>
+        </table>
+      </div>
+
+      <%# ── Mobile cards ── %>
+      <div class="md:hidden space-y-2">
+        <%= render partial: "bank_transactions/card", collection: @transactions, as: :transaction %>
+      </div>
+
+      <% if @pagy.next %>
+        <%= turbo_frame_tag "transactions_pagination",
+            src: reconciliation_path(@reconciliation, page: @pagy.next, format: :turbo_stream),
+            loading: :lazy do %>
+          <div class="flex items-center justify-center py-6">
+            <%= render Campbooks::Spinner.new(size: :md) %>
+          </div>
+        <% end %>
+      <% end %>
+    <% else %>
+      <div class="bg-card rounded-xl shadow-sm border border-border px-6 py-10 text-center text-sm text-muted-foreground">
+        <%= t(".no_transactions") %>
+      </div>
+    <% end %>
+  <% end %>
+</div>

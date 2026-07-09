@@ -1,0 +1,76 @@
+---
+en:
+  shared:
+    nav:
+      accounting: Accounting
+
+  command_palette:
+    commands:
+      accounting: Accounting
+
+  reconciliations:
+    untitled_statement: Bank statement
+    destroy_confirm: Delete this reconciliation? All parsed transactions will be removed.
+    statuses:
+      matched: Matched
+      excluded: Excluded
+      unmatched: Unmatched
+      suggested: Suggested
+      requested: Invoice requested
+    parse_job:
+      pdf_not_yet_supported: PDF parsing is coming in the next release. Please export your statement as CSV for now.
+      integrity_mismatch: "Balance check failed: expected closing balance %{expected} but statement shows %{actual}."
+    index:
+      title: Accounting
+      new_reconciliation: New reconciliation
+      col_statement: Statement
+      col_bank: Bank
+      col_period: Period
+      col_progress: Progress
+      col_status: Status
+      empty_title: Reconcile your first bank statement
+      empty_description: Import a CSV bank statement to pair every debit with its expense invoice. Campbooks keeps your books audit-ready.
+      empty_cta: Import statement
+    new:
+      title: New reconciliation
+      from_documents_title: From your documents
+      from_documents_description: Pick a bank statement Campbooks already filed from your email.
+      no_documents: No bank statements on file yet. Upload one instead.
+      upload_title: Upload a statement
+      upload_description: Upload a CSV or PDF export from your bank.
+      drop_here: Drop your file here
+      accepted_formats: PDF or CSV
+      click_to_browse: Browse files
+      csv_hint: CSV exports parse instantly — no AI needed.
+      upload_and_start: Upload and start reconciliation
+    create:
+      created: Statement imported — parsing transactions…
+      document_not_found: Document not found.
+      file_upload_failed: File upload failed. Please try again.
+      no_source: Please select or upload a bank statement.
+    show:
+      title: Reconciliation
+      delete: Delete
+      integrity_warning: Balance mismatch detected
+      status_parsing: Reading your statement…
+      status_matching: Matching transactions…
+      parse_failed_title: Could not read this statement
+      parse_failed_generic: An unexpected error occurred while reading the file.
+      parse_failed_hint: Try re-exporting from your bank as CSV, or check that the file is not corrupted.
+      no_transactions: No transactions found.
+      col_date: Date
+      col_description: Description
+      col_counterparty: Counterparty
+      col_amount: Amount
+      col_match: Match
+    destroy:
+      destroyed: Reconciliation deleted.
+
+  components:
+    accounting:
+      reconciliation_status_badge:
+        pending: Pending
+        parsing: Parsing
+        matching: Matching
+        ready: Ready
+        failed: Failed
