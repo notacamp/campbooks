@@ -225,12 +225,15 @@ module Campbooks
           # Collapsed toggle row
           details_id = "request_invoice_details_#{@transaction.id}"
           input(type: "checkbox", id: details_id, class: "peer hidden")
+          # peer-checked:rotate-180 only reaches direct later siblings of the .peer
+          # input. The SVG lives inside the label (not a direct sibling), so we use
+          # [&_svg]: arbitrary variant on the label itself to target the nested SVG.
           label(for: details_id,
-                class: "flex items-center justify-between gap-2 px-3 py-2 cursor-pointer hover:bg-muted/40 transition-colors") do
+                class: "flex items-center justify-between gap-2 px-3 py-2 cursor-pointer hover:bg-muted/40 transition-colors peer-checked:[&_svg]:rotate-180") do
             span(class: "text-sm font-medium text-foreground") do
               t(".request_invoice_title", counterparty: counterparty)
             end
-            svg(class: "w-4 h-4 text-muted-foreground transition-transform peer-checked:rotate-180",
+            svg(class: "w-4 h-4 text-muted-foreground transition-transform",
                 fill: "none", viewBox: "0 0 24 24", stroke: "currentColor") do |s|
               s.path(stroke_linecap: "round", stroke_linejoin: "round", stroke_width: "2",
                      d: "M19 9l-7 7-7-7")
@@ -302,12 +305,8 @@ module Campbooks
       end
 
       def prefill_subject
-        company_nif = @transaction.workspace.company_nif.presence
-        nif_flagged = company_nif.present? && begin
-          top = @transaction.transaction_matches.select(&:confirmed?).max_by(&:confidence)
-          top&.document&.nif_status(company_nif)&.in?(%i[missing mismatch])
-        end
-
+        # Delegate NIF check to BankTransaction#nif_flagged? (single source).
+        nif_flagged = @transaction.nif_flagged?(@company_nif)
         key = nif_flagged ? ".corrected_subject" : ".standard_subject"
         I18n.t(key,
                scope:  "reconciliations.bank_transactions.request_invoice",
@@ -316,26 +315,21 @@ module Campbooks
       end
 
       def prefill_body_preview
-        company_nif = @transaction.workspace.company_nif.presence
-        nif_flagged = company_nif.present? && begin
-          top = @transaction.transaction_matches.select(&:confirmed?).max_by(&:confidence)
-          top&.document&.nif_status(company_nif)&.in?(%i[missing mismatch])
-        end
-
+        # Delegate NIF check to BankTransaction#nif_flagged? (single source).
+        nif_flagged = @transaction.nif_flagged?(@company_nif)
         key = nif_flagged ? ".corrected_body" : ".standard_body"
         I18n.t(key,
                scope:        "reconciliations.bank_transactions.request_invoice",
                amount:       invoice_amount_preview,
                date:         helpers.l(@transaction.booked_on, format: :date),
                counterparty: @transaction.counterparty.presence || t(".counterparty_fallback"),
-               company_nif:  company_nif.to_s).truncate(120)
+               company_nif:  @company_nif.to_s).truncate(120)
       end
 
+      # Delegates to BankTransaction#signed_amount_label (single source shared
+      # with the controller). Uses the model method which uses sprintf internally.
       def invoice_amount_preview
-        sign = @transaction.debit? ? "-" : "+"
-        # Use sprintf (not format) — Phlex::Rails overrides `format` to return :html.
-        amt  = sprintf("%.2f", @transaction.amount_cents.abs / 100.0)
-        "#{sign}#{amt} #{@transaction.currency}"
+        @transaction.signed_amount_label
       end
 
       # ── Helpers ──────────────────────────────────────────────────────────────

@@ -136,6 +136,7 @@ es:
       nif_missing: "ausente"
       nif_mismatch: "no coincide"
       cross_reconciliation_note: También asociado en otro extracto
+      file_missing: "[archivo no disponible en Campbooks]"
     destroy:
       destroyed: Conciliación eliminada.
     nif_banner:

@@ -83,6 +83,8 @@ class ReconciliationsController < ApplicationController
 
   # POST /reconciliations/:id/export
   # Kicks off the async zip build. Refuses (info toast) when already generating.
+  # Transitions to :export_generating synchronously before enqueue so a second
+  # rapid POST sees the guard and is rejected (no duplicate jobs or broadcasts).
   def export
     return if require_entitlement!(:accounting, ignore_limit: true)
 
@@ -91,8 +93,8 @@ class ReconciliationsController < ApplicationController
       return
     end
 
-    # Reset a previous export so the user can re-export after confirming more.
-    @reconciliation.update!(export_status: :export_none) if @reconciliation.export_generated?
+    # Synchronous transition prevents double-click from enqueuing duplicate jobs.
+    @reconciliation.update!(export_status: :export_generating)
 
     Reconciliations::ExportJob.perform_later(@reconciliation.id)
 
@@ -106,8 +108,12 @@ class ReconciliationsController < ApplicationController
 
   # GET /reconciliations/:id/download
   # Redirects to the signed blob URL for the generated zip.
+  # Requires :accounting entitlement and that the export has finished generating.
+  # During regeneration the old blob stays attached but must not be served.
   def download
-    unless @reconciliation.export_zip.attached?
+    return if require_entitlement!(:accounting, ignore_limit: true)
+
+    unless @reconciliation.export_generated?
       redirect_to @reconciliation, info: t(".not_ready")
       return
     end

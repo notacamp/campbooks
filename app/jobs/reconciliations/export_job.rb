@@ -18,7 +18,8 @@ module Reconciliations
       @reconciliation = Reconciliation.find(reconciliation_id)
       Current.workspace = @reconciliation.workspace
 
-      @reconciliation.update!(export_status: :export_generating)
+      # The controller already set :export_generating synchronously before
+      # enqueueing, so we just broadcast the current state here.
       broadcast_export_button!
 
       data = Reconciliations::ZipBuilder.new(@reconciliation).call

@@ -136,6 +136,7 @@ en:
       nif_missing: "missing"
       nif_mismatch: "mismatch"
       cross_reconciliation_note: Also matched in another reconciliation
+      file_missing: "[file missing from Campbooks]"
     destroy:
       destroyed: Reconciliation deleted.
     nif_banner:

@@ -136,6 +136,7 @@ pt:
       nif_missing: "em falta"
       nif_mismatch: "não corresponde"
       cross_reconciliation_note: Também associado noutro extrato
+      file_missing: "[ficheiro em falta no Campbooks]"
     destroy:
       destroyed: Reconciliação eliminada.
     nif_banner:

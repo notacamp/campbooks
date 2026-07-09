@@ -272,22 +272,17 @@ module Reconciliations
 
     # True when the transaction is matched and the top confirmed document has a
     # NIF issue (missing or mismatch) — the "corrected invoice" case.
+    # Delegates NIF check to BankTransaction#nif_flagged? (single source).
     def nif_flagged_match?
       return false unless @transaction.matched?
 
-      company_nif = Current.workspace.company_nif.presence
-      return false if company_nif.blank?
-
-      top_match = @transaction.transaction_matches.select(&:confirmed?).max_by(&:confidence)
-      return false unless top_match
-
-      top_match.document.nif_status(company_nif)&.in?(%i[missing mismatch]) || false
+      @transaction.nif_flagged?(Current.workspace.company_nif.presence)
     end
 
+    # Delegates to BankTransaction#signed_amount_label (single source shared
+    # with the resolve panel prefill helpers).
     def invoice_amount_text
-      sign = @transaction.debit? ? "-" : "+"
-      amt  = format("%.2f", @transaction.amount_cents.abs / 100.0)
-      "#{sign}#{amt} #{@transaction.currency}"
+      @transaction.signed_amount_label
     end
   end
 end
