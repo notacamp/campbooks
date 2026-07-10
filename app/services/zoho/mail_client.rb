@@ -26,7 +26,7 @@ module Zoho
         req.params["receivedTime"] = received_time_before if received_time_before
       end
 
-      data = JSON.parse(response.body)
+      data = parse_json(response.body)
       # NB: this view endpoint returns Zoho's own metadata only — no transport
       # headers (List-Unsubscribe / Precedence / Auto-Submitted), so Zoho mail
       # carries none of the header-based bulk signals Gmail/Microsoft do. The
@@ -38,7 +38,7 @@ module Zoho
       url = "#{BASE_URL}/accounts/#{@email_account.provider_account_id}/folders/#{folder_id}/messages/#{message_id}/content"
 
       response = connection.get(url)
-      data = JSON.parse(response.body)
+      data = parse_json(response.body)
       data.is_a?(Hash) ? data["data"]&.dig("content") : nil
     end
 
@@ -46,7 +46,7 @@ module Zoho
       url = "#{BASE_URL}/accounts/#{@email_account.provider_account_id}/folders/#{folder_id}/messages/#{message_id}/attachmentinfo"
 
       response = connection.get(url)
-      data = JSON.parse(response.body)
+      data = parse_json(response.body)
       if data.is_a?(Hash)
         inner = data["data"]
         if inner.is_a?(Hash)
@@ -80,7 +80,7 @@ module Zoho
     def list_folders
       url = "#{BASE_URL}/accounts/#{@email_account.provider_account_id}/folders"
       response = connection.get(url)
-      data = JSON.parse(response.body)
+      data = parse_json(response.body)
 
       unless response.success? && data.is_a?(Hash) && data["status"]&.dig("code") == 200
         raise "Failed to list folders: #{response.body[0..300]}"
@@ -122,7 +122,7 @@ module Zoho
         req.headers["Content-Type"] = "application/json"
         req.body = { folderName: name }.to_json
       end
-      data = JSON.parse(response.body)
+      data = parse_json(response.body)
       data.is_a?(Hash) ? data["data"] : data
     end
 
@@ -141,7 +141,7 @@ module Zoho
     def list_labels
       url = "#{BASE_URL}/accounts/#{@email_account.provider_account_id}/labels"
       response = connection.get(url)
-      data = JSON.parse(response.body)
+      data = parse_json(response.body)
       data.is_a?(Hash) ? (data["data"] || []) : Array(data)
     end
 
@@ -151,7 +151,7 @@ module Zoho
         req.headers["Content-Type"] = "application/json"
         req.body = { displayName: name, color: color }.to_json
       end
-      data = JSON.parse(response.body)
+      data = parse_json(response.body)
       data.is_a?(Hash) ? data["data"] : data
     end
 
@@ -161,13 +161,13 @@ module Zoho
         req.headers["Content-Type"] = "application/json"
         req.body = { displayName: name, color: color }.to_json
       end
-      JSON.parse(response.body)
+      parse_json(response.body)
     end
 
     def delete_label(label_id)
       url = "#{BASE_URL}/accounts/#{@email_account.provider_account_id}/labels/#{label_id}"
       response = connection.delete(url)
-      JSON.parse(response.body)
+      parse_json(response.body)
     rescue => e
       { "status" => { "code" => 500, "description" => e.message } }
     end
@@ -182,7 +182,7 @@ module Zoho
           messageId: Array(message_id)
         }.to_json
       end
-      JSON.parse(response.body)
+      parse_json(response.body)
     end
 
     def remove_labels_from_message(message_id, label_ids)
@@ -195,7 +195,7 @@ module Zoho
           messageId: Array(message_id)
         }.to_json
       end
-      JSON.parse(response.body)
+      parse_json(response.body)
     end
 
     def list_messages_by_label(label_id, limit: 200, start: nil)
@@ -205,7 +205,7 @@ module Zoho
         req.params["limit"] = limit
         req.params["start"] = start if start
       end
-      data = JSON.parse(response.body)
+      data = parse_json(response.body)
       data.is_a?(Hash) ? (data["data"] || []) : Array(data)
     end
 
@@ -229,7 +229,7 @@ module Zoho
         }.merge(extra).to_json
       end
       raise "#{mode} failed with status #{response.status}: #{response.body[0..200]}" unless response.success?
-      JSON.parse(response.body)
+      parse_json(response.body)
     rescue => e
       Rails.logger.error("[Zoho::MailClient] #{mode} failed: #{e.message}")
       raise
@@ -253,7 +253,7 @@ module Zoho
       @drafts_folder_id ||= begin
         url = "#{BASE_URL}/accounts/#{@email_account.provider_account_id}/folders"
         response = connection.get(url)
-        data = JSON.parse(response.body)
+        data = parse_json(response.body)
         folders = data.is_a?(Hash) ? (data["data"] || []) : Array(data)
         drafts = folders.find { |f| f["folderName"] == "Drafts" || f["name"] == "Drafts" }
         drafts&.dig("folderId") || raise("Could not find Drafts folder for #{@email_account.email_address}")
@@ -278,7 +278,7 @@ module Zoho
         req.body = payload.to_json
       end
 
-      data = JSON.parse(response.body)
+      data = parse_json(response.body)
       data.is_a?(Hash) ? data["data"] : data
     rescue => e
       Rails.logger.error("[Zoho::MailClient] save_draft failed: #{e.message}")
@@ -292,7 +292,7 @@ module Zoho
         req.headers["Content-Type"] = "application/json"
         req.body = payload.to_json
       end
-      JSON.parse(response.body)
+      parse_json(response.body)
     rescue => e
       Rails.logger.error("[Zoho::MailClient] update_draft failed: #{e.message}")
       nil
@@ -322,7 +322,7 @@ module Zoho
         req.headers["Content-Type"] = "application/json"
         req.body = payload.to_json
       end
-      result = JSON.parse(response.body)
+      result = parse_json(response.body)
       Rails.logger.info("[Zoho::MailClient] send_message response: status=#{response.status}, body=#{response.body[0..500]}")
       result
     rescue => e
@@ -353,7 +353,7 @@ module Zoho
         req.body = body
       end
 
-      ref = JSON.parse(response.body)["data"]
+      ref = parse_json(response.body)["data"]
       ref = ref.first if ref.is_a?(Array)
       return nil unless ref.is_a?(Hash) && ref["storeName"].present?
       {
@@ -369,7 +369,7 @@ module Zoho
     def send_draft(draft_message_id)
       url = "#{BASE_URL}/accounts/#{@email_account.provider_account_id}/messages/#{draft_message_id}/send"
       response = connection.post(url)
-      result = JSON.parse(response.body)
+      result = parse_json(response.body)
       Rails.logger.info("[Zoho::MailClient] send_draft response: status=#{response.status}, body=#{response.body[0..500]}")
       result
     rescue => e
@@ -378,6 +378,20 @@ module Zoho
     end
 
     private
+
+    # Zoho truncates message summaries at a fixed length and can cut a multi-byte
+    # emoji in half, leaving a lone UTF-16 surrogate escape (e.g. `"gift \uD83C"`)
+    # that strict JSON rejects — one such message used to poison the whole page,
+    # and with it every sync of its folder. Strict parse first; on failure,
+    # replace only the unpaired surrogate escapes with U+FFFD and retry.
+    SURROGATE_PAIR = /\\u[dD][89abAB]\h{2}\\u[dD][c-fC-F]\h{2}/
+    LONE_SURROGATE = /\\u[dD][89a-fA-F]\h{2}/
+
+    def parse_json(body)
+      JSON.parse(body)
+    rescue JSON::ParserError
+      JSON.parse(body.to_s.gsub(/#{SURROGATE_PAIR}|#{LONE_SURROGATE}/o) { |m| m.length > 6 ? m : "\\uFFFD" })
+    end
 
     def connection
       # Rebuilt per call so @oauth.access_token is re-read each request. Memoizing

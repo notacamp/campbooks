@@ -53,6 +53,22 @@ RSpec.describe Zoho::MailClient, type: :service do
       expect(result.size).to eq(1)
       expect(result.first["messageId"]).to eq("msg_1")
     end
+
+    it "tolerates a lone UTF-16 surrogate escape (emoji truncated mid-pair by Zoho)" do
+      # Zoho truncates summaries at a fixed length and can cut an emoji in half,
+      # leaving `\uD83C` with no low half — strict JSON.parse rejects the whole
+      # page, which used to poison every sync of the folder.
+      raw = %q({"data":[{"messageId":"msg_1","subject":"Party","summary":"gift \uD83C","sentDateInGMT":"1714490000000"},{"messageId":"msg_2","subject":"ok 🎉","summary":"fine"}]})
+      allow(conn).to receive(:get)
+                       .with("https://mail.zoho.eu/api/accounts/ACC123/messages/view")
+                       .and_yield(fake_request_with_params)
+                       .and_return(instance_double(Faraday::Response, body: raw, success?: true))
+
+      result = client.list_messages(folder_id: "fold_1")
+      expect(result.map { |m| m["messageId"] }).to eq(%w[msg_1 msg_2])
+      expect(result.first["summary"]).to eq("gift �")
+      expect(result.last["subject"]).to eq("ok 🎉") # valid pairs survive untouched
+    end
   end
 
   describe "#list_messages_with_attachments" do
