@@ -1,5 +1,6 @@
 class EmbedChunkJob < ApplicationJob
   queue_as :default
+  queue_with_priority BACKGROUND_PRIORITY
 
   def perform(chunk)
     return if chunk.embedding.present? && chunk.embedding_model.present?

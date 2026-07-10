@@ -1,5 +1,6 @@
 class EmbedTagJob < ApplicationJob
   queue_as :default
+  queue_with_priority BACKGROUND_PRIORITY
 
   def perform(tag)
     return unless tag.workspace.present?

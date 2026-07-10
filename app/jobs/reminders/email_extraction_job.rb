@@ -4,6 +4,12 @@ module Reminders
   class EmailExtractionJob < ApplicationJob
     queue_as :default
     retry_on StandardError, wait: :polynomially_longer, attempts: 3
+    # LLM rate limits get patient retries (429/5xx propagate as TRANSIENT_ERRORS),
+    # declared after the StandardError handler so it wins for these classes. Paced
+    # to ≤2 in flight so a mailbox-history backfill can't burst the shared model
+    # key into a 429 storm. Mirrors ContactAnalysisJob.
+    retry_on(*Ai::Adapters::Base::TRANSIENT_ERRORS, wait: :polynomially_longer, attempts: 5)
+    limits_concurrency to: 2, key: "ai_email_extraction"
 
     # Only announce confident finds in the discussion, matching the home feed's bar
     # (Feed::Sources::Reminder::FEED_MIN_CONFIDENCE) — below this they live quietly on

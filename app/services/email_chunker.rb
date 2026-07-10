@@ -23,7 +23,11 @@ class EmailChunker
   # [{ content:, chunk_type:, position:, metadata: { sender:, timestamp:, is_quoted:, message_index: } }]
   def chunk
     messages = split_into_messages(plain_text_body)
-    return [ default_chunk ] if messages.empty?
+    # default_chunk already returns an array of one chunk hash — return it as-is.
+    # Wrapping it again ([ default_chunk ]) yields a nested array whose element is
+    # an Array, and downstream `chunk[:content]` then raises TypeError (Symbol
+    # into Integer). Hit whenever the plain-text body is blank (image-only mail).
+    return default_chunk if messages.empty?
 
     chunks = []
     messages.each_with_index do |msg, idx|
