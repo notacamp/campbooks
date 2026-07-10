@@ -98,6 +98,7 @@ es:
           email: Correo electrónico
           manual_upload: Carga manual
           notion: Notion
+          sent_email: Correo enviado
       document_template:
         ai_statuses:
           completed: Listo

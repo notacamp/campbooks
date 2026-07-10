@@ -1,0 +1,15 @@
+<%# Renders hidden fields for all active filters + optional q.
+    Locals: filters (Documents::Filters), q (String or nil).
+    Used by bulk-action forms (Reanalyze / Export) to carry the current filter
+    state through to the controller without a full page reload. %>
+<% (local_assigns[:filters] || Documents::Filters.new).to_h.each do |key, value| %>
+  <% Array(value).each do |v| %>
+    <%# type is multi-value (type[]) so params[type] arrives as an array; every
+        other panel param is single-value in the current UI but stored as an
+        array internally — submit without brackets so params.permit handles both. %>
+    <%= hidden_field_tag(key == :type ? "type[]" : key.to_s, v) %>
+  <% end %>
+<% end %>
+<% if local_assigns[:q].present? %>
+  <%= hidden_field_tag :q, local_assigns[:q] %>
+<% end %>

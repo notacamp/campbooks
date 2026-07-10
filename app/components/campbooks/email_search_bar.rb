@@ -36,7 +36,8 @@ module Campbooks
           turbo_action: "replace",
           action: "change->email-search#submitNow",
           email_search_suggestions_value: catalog.to_json,
-          email_search_heading_text: t(".suggest.heading")
+          email_search_heading_text: t(".suggest.heading"),
+          email_search_heading_text_value: t(".suggest.heading")
         },
         **@attrs
       ) do

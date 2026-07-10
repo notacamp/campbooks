@@ -200,4 +200,47 @@ RSpec.describe "Files search filters", type: :request do
       expect(response.body).not_to include("HIDDEN-RESTRICTED")
     end
   end
+
+  # ── files_results turbo frame present ─────────────────────────────────────
+
+  describe "GET /files" do
+    it "renders the files_results turbo frame" do
+      get files_path
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include('id="files_results"')
+    end
+  end
+
+  # ── filter chips render for active filters ─────────────────────────────────
+
+  describe "GET /files with an active filter" do
+    it "renders a chip for the active filter" do
+      titled("APPROVED-DOC", review_status: :approved)
+
+      get files_path(review_status: "approved")
+
+      expect(response).to have_http_status(:ok)
+      # A chip links to the same page without that filter (removes review_status param)
+      expect(response.body).to include("APPROVED-DOC")
+      # Chip markup: a link with the × close icon inside the results frame
+      expect(response.body).to match(/data-turbo-frame="_top".*M6 18L18 6/m)
+        .or match(/M6 18L18 6.*data-turbo-frame="_top"/m)
+    end
+  end
+
+  # ── pagination link preserves filter params ────────────────────────────────
+
+  describe "GET /files with filter and enough docs to paginate" do
+    it "the pagination frame src carries the active filter params" do
+      # Create 35 approved docs to trigger pagination (page size = 30)
+      35.times { |i| titled("APPROVED-#{i}", review_status: :approved) }
+
+      get files_path(review_status: "approved")
+
+      expect(response).to have_http_status(:ok)
+      # The files_pagination turbo frame src should include review_status
+      expect(response.body).to include("review_status")
+      expect(response.body).to include("files_pagination")
+    end
+  end
 end

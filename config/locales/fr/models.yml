@@ -98,6 +98,7 @@ fr:
           email: Email
           manual_upload: Téléversement manuel
           notion: Notion
+          sent_email: E-mail envoyé
       document_template:
         ai_statuses:
           completed: Prêt
