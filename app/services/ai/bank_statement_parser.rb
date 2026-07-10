@@ -197,23 +197,40 @@ module Ai
     end
 
     # Rasterize a single PDF page to a JPEG image part.
-    # MiniMagick 5 validates the path passed to .open, so ImageMagick's
-    # "path[page]" bracket syntax cannot be used there — select the page via
-    # #page after opening (same mechanism as Ai::Adapters::Openai#pdf_to_image).
+    #
+    # Page selection MUST go through the convert tool's input bracket syntax
+    # ("input.pdf[N]"): MiniMagick's Image#page sets -page canvas geometry (it
+    # does NOT select a page), and Image#format on a multipage PDF writes
+    # per-page artifacts whose paths don't line up — the 2026-07-10 prod
+    # incident sent two identical ~5KB junk thumbnails to the model, which
+    # correctly answered "no transactions". -density must precede the input
+    # so ImageMagick decodes the PDF at 150dpi rather than upscaling 72dpi.
+    MIN_RENDER_BYTES = 10_240 # a real 150dpi page is 10-50x this; smaller = failed render
+
     def rasterize_page(pdf_data, page_index)
       Tempfile.create([ "bs_page", ".pdf" ], binmode: true) do |pdf_file|
         pdf_file.write(pdf_data)
-        pdf_file.rewind
+        pdf_file.flush
 
-        image = MiniMagick::Image.open(pdf_file.path)
-        image.format("jpg")
-        image.density("150")
-        image.page(page_index.to_s)
+        Tempfile.create([ "bs_render", ".jpg" ], binmode: true) do |out|
+          MiniMagick.convert do |convert|
+            convert.density(150)
+            convert << "#{pdf_file.path}[#{page_index.to_i}]"
+            convert.quality(85)
+            convert << out.path
+          end
 
-        jpeg_data = File.binread(image.path)
-        jpeg_base64 = Base64.strict_encode64(jpeg_data)
+          jpeg_data = File.binread(out.path)
+          if jpeg_data.bytesize < MIN_RENDER_BYTES
+            Rails.logger.warn(
+              "[Ai::BankStatementParser] Page #{page_index} rendered suspiciously small " \
+              "(#{jpeg_data.bytesize} bytes) — treating as failed render"
+            )
+            return nil
+          end
 
-        { type: :image, media_type: "image/jpeg", data: jpeg_base64 }
+          { type: :image, media_type: "image/jpeg", data: Base64.strict_encode64(jpeg_data) }
+        end
       end
     rescue => e
       Rails.logger.warn("[Ai::BankStatementParser] Page #{page_index} rasterize failed: #{e.message}")
