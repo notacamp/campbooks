@@ -16,6 +16,15 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Files: uploading a file now refreshes the page.** After an upload the panel
+  stayed open and the new file didn't show up — and on an empty Files page (or an
+  empty folder) nothing appeared to happen at all. The page render that follows an
+  upload was matching the infinite-scroll pagination stream instead of a full
+  refresh. Uploading now reloads the view: the new file appears at the top of the
+  list, the upload panel closes, and a confirmation toast is shown.
+
 ## [0.22.0] - 2026-07-10
 
 ### Added
