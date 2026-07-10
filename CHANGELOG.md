@@ -16,6 +16,10 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Inbox rules (backend):** workspace-scoped, user-defined deterministic rules (`EmailRule`) that evaluate against every newly ingested email and can be run retroactively via `EmailRuleRunJob`. Each rule matches criteria (from, to, subject, body, category, email account, has attachment) with AND-across-fields / OR-within-field semantics and applies actions: apply tags, archive the thread, mark as read, move to a custom folder. Runs are undoable when the match set is <= 25,000 emails (`EmailRules::UndoRun`).
+
 ## [0.19.9] - 2026-07-10
 
 ### Changed
