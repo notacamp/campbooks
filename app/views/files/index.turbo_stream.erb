@@ -13,7 +13,7 @@
 <% if @pagy.next %>
   <%= turbo_stream.replace "files_pagination" do %>
     <%= turbo_frame_tag "files_pagination",
-          src: (@folder ? files_folder_path(@folder, page: @pagy.next, format: :turbo_stream, type: params[:type], category: params[:category], review_status: params[:review_status], month: params[:month]) : files_path(page: @pagy.next, folder_id: params[:folder_id], format: :turbo_stream, type: params[:type], category: params[:category], review_status: params[:review_status], month: params[:month])),
+          src: (@folder ? files_folder_path(@folder, files_filter_params(@filters, q: params[:q]).merge(page: @pagy.next, format: :turbo_stream)) : files_path(files_filter_params(@filters, q: params[:q]).merge(page: @pagy.next, format: :turbo_stream))),
           loading: :lazy do %>
       <div class="flex items-center justify-center py-6">
         <%= render Campbooks::Spinner.new(size: :md) %>
