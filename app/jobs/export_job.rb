@@ -6,9 +6,16 @@ class ExportJob < ApplicationJob
     export.update!(status: :generating)
 
     begin
-      documents = export.workspace.documents
-        .where(status: [ :processed, :approved ])
-        .then { |scope| apply_filters(scope, export.filters) }
+      # Base scope: documents whose AI analysis finished and that haven't been
+      # explicitly rejected by a human. Replaces the now-removed `status` column.
+      base = export.workspace.documents
+        .where(ai_status: :completed, review_status: [ :pending, :approved ])
+
+      # Apply stored filters, normalising legacy hashes from old export records.
+      filters = Documents::Filters.from_params(normalize_legacy_filters(export.filters))
+      # Exports are workspace-wide — no per-user folder permission check needed
+      # (exports never carry folder-name params; folder_id still works by id).
+      documents = filters.apply(base, workspace: export.workspace, user: nil)
         .includes(:classification)
 
       export.update!(documents_count: documents.count)
@@ -35,11 +42,30 @@ class ExportJob < ApplicationJob
 
   private
 
-  def apply_filters(scope, filters)
-    scope = scope.by_type(filters["type"]) if filters["type"].present?
-    if filters["year"].present? && filters["month"].present?
-      scope = scope.for_month(filters["year"].to_i, filters["month"].to_i)
+  # Normalise filter hashes stored by older versions of the export action so
+  # Documents::Filters.from_params can consume them unchanged.
+  #
+  # Legacy shape (pre-refactor):
+  #   { "year" => "2026", "month" => "6", "type" => "<id>", "category" => "..." }
+  #
+  # Normalized shape:
+  #   { "month" => "2026-06", "type" => ["<id>"], "category" => "..." }
+  def normalize_legacy_filters(stored)
+    return {} if stored.blank?
+
+    h = stored.stringify_keys
+
+    # year + month → "YYYY-MM" month param
+    if h["year"].present? && h["month"].present?
+      month_str = format("%04d-%02d", h["year"].to_i, h["month"].to_i)
+      h = h.except("year", "month").merge("month" => month_str)
     end
-    scope
+
+    # Scalar type → single-element array (Filters expects array)
+    if h["type"].present? && !h["type"].is_a?(Array)
+      h["type"] = [ h["type"] ]
+    end
+
+    h
   end
 end

@@ -33,6 +33,34 @@ en:
       file_meta:
         kind_file: File
         kind_image: Image
+      filter_chips:
+        date_from_prefix: "From:"
+        date_to_prefix: "To:"
+        starred: Starred
+      filter_panel:
+        ai_status: Processing
+        amount_max: Amount max (EUR)
+        amount_min: Amount min (EUR)
+        any_category: All categories
+        any_expense_category: All categories
+        any_folder: All folders
+        any_processing: Any status
+        any_source: All sources
+        any_status: All statuses
+        category: Category
+        clear_filters: Clear filters
+        date_from: From date
+        date_to: To date
+        entity: Vendor / entity
+        entity_placeholder: e.g. EDP, Vodafone
+        expense_category: Expense category
+        folder: Folder
+        number_placeholder: e.g. INV-001
+        reference_number: Reference #
+        review_status: Review status
+        source: Source
+        starred: Starred only
+        type: Document type
       folder_sharing:
         add_button: Add
         add_title: Add people
@@ -53,8 +81,34 @@ en:
         you_badge: You
       search_bar:
         clear: Clear search
+        filters: Filters
         placeholder: Search files…
-        submit: Search
+        searching: Searching…
+        suggest:
+          after: documents after a date
+          amount_gt: documents with amount greater than
+          amount_lt: documents with amount less than
+          before: documents before a date
+          category: by document category
+          expense: by expense category
+          heading: Refine your search
+          in: documents in a folder
+          is: by status or flag
+          number: by reference number
+          source: by document source
+          type: by document type
+          values:
+            approved: approved
+            email: email
+            failed: failed
+            notion: notion
+            pending: pending review
+            processing: processing
+            rejected: rejected
+            sent: sent email
+            starred: starred
+            upload: manual upload
+          vendor: by vendor or entity
       sidebar:
         all_files: All files
         label: Folders
@@ -89,17 +143,6 @@ en:
       exports_col_status: Status
       exports_heading: Recent exports
       files_section: Files
-      filter_all_categories: All categories
-      filter_all_folders: All folders
-      filter_all_statuses: All statuses
-      filter_all_types: All types
-      filter_category: Category
-      filter_folder: Folder
-      filter_month: Month
-      filter_status: Status
-      filter_type: Type
-      filter_types_selected: "%{count} selected"
-      filters: Filters
       internal_documents: Internal documents
       manage_access: Manage access
       manage_access_locked: Manage access · Private

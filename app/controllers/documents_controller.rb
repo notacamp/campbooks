@@ -206,15 +206,13 @@ class DocumentsController < ApplicationController
   end
 
   def reprocess_all
-    documents = Current.workspace.documents
-    documents = documents.by_type(params[:type]) if params[:type].present?
-    documents = documents.by_category(params[:category]) if params[:category].present?
+    filters = bulk_action_filters
+    documents = filters.apply(
+      Current.workspace.documents,
+      workspace: Current.workspace,
+      user: Current.user
+    ).reprocessable
 
-    if (year_month = month_filter)
-      documents = documents.for_month(*year_month)
-    end
-
-    documents = documents.reprocessable
     count = documents.count
     documents.find_each do |doc|
       was_failed = doc.ai_failed?
@@ -224,24 +222,20 @@ class DocumentsController < ApplicationController
       DocumentProcessJob.perform_later(doc.id)
     end
     Notifier.documents_need_review(Current.workspace, bump: false)
-    redirect_to files_path(type: params[:type], category: params[:category], review_status: params[:review_status], month: params[:month]),
-                success: t(".queued", count: count)
+    redirect_to files_path(bulk_action_return_params(filters)), success: t(".queued", count: count)
   end
 
   def export
-    year, month = month_filter
-
-    filters = {
-      "type" => params[:type].presence,
-      "category" => params[:category].presence,
-      "year" => year&.to_s,
-      "month" => month&.to_s
-    }.compact
-
-    export = Current.workspace.exports.create!(status: :pending, filters: filters)
+    filters = bulk_action_filters
+    # Persist the MERGED constraint set (panel + query modifiers): the job runs
+    # later without the query text, so modifier filters must be materialized now
+    # or the ZIP would come out broader than the list on screen.
+    export = Current.workspace.exports.create!(
+      status: :pending,
+      filters: filters.to_persistable_h(workspace: Current.workspace, user: Current.user)
+    )
     ExportJob.perform_later(export.id)
-    redirect_to files_path(type: params[:type], category: params[:category], review_status: params[:review_status], month: params[:month]),
-                success: t(".generating")
+    redirect_to files_path(bulk_action_return_params(filters)), success: t(".generating")
   end
 
   def merge
@@ -293,6 +287,23 @@ class DocumentsController < ApplicationController
   end
 
   private
+
+  # The filter set a bulk action (reanalyze-all / export) operates on: the panel
+  # params PLUS any modifier filters in the search text, so the action covers
+  # exactly the documents the user is looking at.
+  def bulk_action_filters
+    filters = Documents::Filters.from_params(params)
+    if params[:q].present?
+      filters.merge_query(Documents::SearchQuery.parse(params[:q]).filters)
+    end
+    filters
+  end
+
+  # Params for the post-action redirect back to /files: panel filters + the raw
+  # query, reproducing the view the action was triggered from.
+  def bulk_action_return_params(filters)
+    filters.to_h.merge(q: params[:q].presence).compact
+  end
 
   # The month picker (<input type="month">) submits a single "YYYY-MM" value, so
   # parse it into the [year, month] integer pair `for_month` expects. Returns nil

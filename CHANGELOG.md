@@ -16,6 +16,18 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-07-10
+
+### Added
+
+- **Files: search modifiers.** The Files search box now understands Gmail-style modifiers alongside free text — `type:receipt`, `category:accounting`, `vendor:EDP`, `number:FT2026/448`, `amount>100`, `amount<500`, `after:2026-01` / `before:2026-06-30`, `is:starred|pending|approved|rejected|failed|processing`, `source:email|upload|notion|sent`, `expense:travel`, and `in:<folder>` — with a typeahead that suggests modifiers and their values as you type (mirroring the inbox search).
+- **Files: full filter panel.** The old five-field strip is replaced by a filter panel on the search bar covering document type (multi-select), category, review status, processing status, source, starred, document-date range, amount range, vendor/entity, reference number, expense category, and folder. Active filters show as removable chips above the results, and the results update live without a page reload.
+- **Files: filtered bulk actions.** "Reanalyze" and "Export" now honor everything the list is filtered by — panel filters and search modifiers alike — so the ZIP matches exactly what's on screen.
+
+### Fixed
+
+- **Document exports produced no ZIP.** The export job still filtered on a `status` column that was split into `ai_status`/`review_status`, so every export errored; it now exports analyzed, non-rejected documents. Existing export records with legacy filters remain readable.
+
 ## [0.20.0] - 2026-07-10
 
 ### Added
@@ -1398,7 +1410,9 @@ major, minor, or patch change here.
 
 - Initial public, source-available release of Campbooks.
 
-[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/notacamp/campbooks/compare/v0.20.0...v0.21.0
+[0.20.0]: https://github.com/notacamp/campbooks/compare/v0.19.9...v0.20.0
 [0.17.0]: https://github.com/notacamp/campbooks/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/notacamp/campbooks/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/notacamp/campbooks/compare/v0.14.0...v0.15.0

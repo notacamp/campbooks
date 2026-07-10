@@ -91,4 +91,65 @@ RSpec.describe Documents::Search do
     results = search({ q: "FolderCo" }, folder: folder).results
     expect(results.map(&:id)).to eq([ inside.id ])
   end
+
+  # ── modifier integration ────────────────────────────────────────────────────
+
+  it "modifiers in the query string act as hard SQL filters on both arms" do
+    matched   = build_doc(vendor_name: "EDP", review_status: :approved)
+    unmatched = build_doc(vendor_name: "EDP", review_status: :pending)
+
+    results = search({ q: "EDP is:approved" }).results
+    expect(results.map(&:id)).to include(matched.id)
+    expect(results.map(&:id)).not_to include(unmatched.id)
+  end
+
+  it "a q with only modifiers (no free text) → text_query? is false" do
+    s = search({ q: "is:pending type:receipt" })
+    expect(s.text_query?).to be_falsey
+  end
+
+  it "a q with only modifiers returns paginate-compatible scope, not bounded array" do
+    s = search({ q: "is:approved" })
+    expect(s.text_query?).to be_falsey
+    expect(s.scope).to respond_to(:limit)
+    expect(s.scope).to respond_to(:offset)
+  end
+
+  it "a q with free text keeps text_query? true even with modifiers" do
+    s = search({ q: "invoice is:pending" })
+    expect(s.text_query?).to be_truthy
+    expect(s.search_text).to eq("invoice")
+  end
+
+  it "keeps modifier constraints out of the panel-facing filter surface" do
+    s = search({ q: "is:approved", review_status: "pending" })
+    # The reader reflects the PANEL param; the modifier still wins when applying
+    # (covered in filters_spec) but never leaks into chips/hidden fields.
+    expect(s.filters.review_status).to eq("pending")
+    expect(s.filters.to_h).to eq({ review_status: "pending" })
+  end
+
+  it "panel + modifier filters are AND-combined in results" do
+    matched   = build_doc(vendor_name: "EDP", starred: true, review_status: :approved)
+    unmatched = build_doc(vendor_name: "EDP", starred: false, review_status: :approved)
+
+    results = search({ q: "EDP is:starred" }).results
+    expect(results.map(&:id)).to include(matched.id)
+    expect(results.map(&:id)).not_to include(unmatched.id)
+  end
+
+  it "permission scope survives when modifier filters are active" do
+    other_ws = Workspace.create!(name: "Other", slug: "o-#{SecureRandom.hex(4)}")
+    other = other_ws.documents.new(
+      document_type: "other", source: :manual_upload,
+      ai_status: :completed, review_status: :approved, vendor_name: "SharedVendor"
+    )
+    other.original_file.attach(io: StringIO.new("x"), filename: "x.pdf", content_type: "application/pdf")
+    other.save!
+
+    mine = build_doc(vendor_name: "SharedVendor", review_status: :approved)
+    results = search({ q: "SharedVendor is:approved" }).results
+    expect(results.map(&:id)).to include(mine.id)
+    expect(results.map(&:id)).not_to include(other.id)
+  end
 end

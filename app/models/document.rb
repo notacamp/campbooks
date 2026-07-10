@@ -187,6 +187,51 @@ class Document < ApplicationRecord
 
   scope :not_pushed_to_drive, -> { where(google_drive_push_status: [ :not_pushed, :failed ]) }
 
+  # ── Filter scopes (Documents::Filters) ──────────────────────────────────────
+
+  scope :by_source, ->(values) {
+    vals = Array(values).reject(&:blank?)
+    where(source: vals) if vals.any?
+  }
+  scope :starred_only, ->(flag) { where(starred: true) if flag }
+  scope :document_date_from, ->(d) { where("documents.document_date >= ?", d) if d.present? }
+  scope :document_date_to,   ->(d) { where("documents.document_date <= ?", d) if d.present? }
+  scope :amount_at_least, ->(cents) { where("documents.amount_cents >= ?", cents) if cents.present? }
+  scope :amount_at_most,  ->(cents) { where("documents.amount_cents <= ?", cents) if cents.present? }
+
+  # OR across vendor_name / client_name / bank_name / sender_name for each term;
+  # multiple terms are themselves OR'd together — composed via relation.or over a
+  # literal SQL fragment (no runtime-built SQL strings, which Brakeman flags).
+  scope :by_entity, ->(terms) {
+    terms = Array(terms).reject(&:blank?)
+    next unless terms.any?
+
+    terms.map { |term|
+      where(
+        "documents.vendor_name ILIKE :t OR documents.client_name ILIKE :t OR " \
+        "documents.bank_name ILIKE :t OR documents.sender_name ILIKE :t",
+        t: "%#{sanitize_sql_like(term)}%"
+      )
+    }.reduce(:or)
+  }
+
+  scope :by_reference, ->(terms) {
+    terms = Array(terms).reject(&:blank?)
+    next unless terms.any?
+
+    terms.map { |term|
+      where(
+        "documents.invoice_number ILIKE :t OR documents.receipt_number ILIKE :t",
+        t: "%#{sanitize_sql_like(term)}%"
+      )
+    }.reduce(:or)
+  }
+
+  scope :by_expense_category, ->(values) {
+    vals = Array(values).reject(&:blank?)
+    where(expense_category: vals) if vals.any?
+  }
+
   def generate_canonical_filename!
     self.canonical_filename = Documents::FilenameGenerator.new(self).call
     save!
