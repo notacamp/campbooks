@@ -13,20 +13,33 @@ module Emails
       def supports_delta? = false
 
       def sync!(scan_log: nil)
-        up = upserter(scan_log)
-        Emails::FolderSync.call(account).reduce(Result.empty) do |acc, folder|
-          acc.merge(window_new_mail(folder, up))
-        end
+        each_folder_isolated(scan_log) { |folder, up| window_new_mail(folder, up) }
       end
 
       def full_resync!(scan_log: nil)
-        up = upserter(scan_log)
-        Emails::FolderSync.call(account).reduce(Result.empty) do |acc, folder|
-          acc.merge(walk_folder(folder, up))
-        end
+        each_folder_isolated(scan_log) { |folder, up| walk_folder(folder, up) }
       end
 
       private
+
+      # One folder blowing up (a Zoho hiccup, a page the client can't parse) must
+      # not abort the folders after it — without this isolation a single bad
+      # folder freezes the rest of the mailbox's sync indefinitely, delta and
+      # full alike. Failures land on the scan log so the run reads
+      # completed-with-errors instead of losing the other folders' counts.
+      def each_folder_isolated(scan_log)
+        up = upserter(scan_log)
+        errors = []
+        result = Emails::FolderSync.call(account).reduce(Result.empty) do |acc, folder|
+          acc.merge(yield(folder, up))
+        rescue => e
+          Rails.logger.error("[Emails::SyncStrategies::Zoho] #{account.email_address} folder #{folder.name}: #{e.class}: #{e.message}")
+          errors << { folder: folder.name, error: "#{e.class}: #{e.message.to_s.first(200)}" }
+          acc
+        end
+        scan_log&.update!(error_messages: errors) if errors.any?
+        result
+      end
 
       # One newest-first page per folder; ingest only messages newer than the
       # watermark (older ones are already stored), then advance it. No change feed,

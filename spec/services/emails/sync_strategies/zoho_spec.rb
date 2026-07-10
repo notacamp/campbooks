@@ -39,6 +39,31 @@ RSpec.describe Emails::SyncStrategies::Zoho do
     end
   end
 
+  describe "folder isolation" do
+    let(:scan_log) { create(:email_scan_log, email_account: account) }
+
+    before do
+      allow(client).to receive(:list_folders).and_return([
+        { "folderId" => "f_bad", "folderName" => "Poisoned" },
+        { "folderId" => "f_inbox", "folderName" => "Inbox" }
+      ])
+      allow(client).to receive(:list_messages).with(hash_including(folder_id: "f_bad"))
+                                              .and_raise(JSON::ParserError, "incomplete surrogate pair")
+      allow(client).to receive(:list_messages).with(hash_including(folder_id: "f_inbox"))
+                                              .and_return([ msg("m1") ])
+    end
+
+    it "#sync! keeps syncing the folders after one that raises, and records the failure" do
+      expect { strategy.sync!(scan_log: scan_log) }.to change(EmailMessage, :count).by(1)
+      expect(account.email_folders.find_by(provider_folder_id: "f_inbox").last_synced_at).to be_present
+      expect(scan_log.reload.error_messages.to_s).to include("Poisoned")
+    end
+
+    it "#full_resync! keeps walking the folders after one that raises" do
+      expect { strategy.full_resync!(scan_log: scan_log) }.to change(EmailMessage, :count).by(1)
+    end
+  end
+
   describe "#full_resync! walks every folder fully" do
     it "paginates the folder and ingests every page" do
       page1 = Array.new(200) { |i| msg("p#{i}") }
