@@ -1,0 +1,93 @@
+---
+pt:
+  helpers:
+    email_rule_criteria:
+      from: "De"
+      to: "Para"
+      subject: "assunto contém"
+      body: "corpo contém"
+      category: "categoria é"
+      has_attachment: "tem um anexo"
+      no_criteria: "Nenhuma condição definida"
+  components:
+    inbox_settings_modal:
+      nav:
+        rules: Regras
+  inbox_settings:
+    rules:
+      index:
+        heading: Regras
+        subheading: Etiquete, arquive e organize o e-mail recebido automaticamente quando corresponder às suas condições.
+        new_rule: Nova regra
+      empty:
+        heading: Ainda não há regras
+        body: As regras são aplicadas a cada novo e-mail e também podem varrer o e-mail que já tem. Comece com um exemplo.
+        starter_receipts_title: Etiquetar recibos
+        starter_receipts_body: De um endereço de faturação, etiquete como Recibos e arquive.
+        starter_client_title: Organizar e-mail de clientes
+        starter_client_body: De um domínio de cliente, etiquete e mova para a pasta do cliente.
+        starter_newsletters_title: Silenciar newsletters
+        starter_newsletters_body: Categoria Newsletters, marcar como lido e arquivar.
+      rule:
+        paused: Pausada
+        archive_chip: Arquivar
+        mark_read_chip: Marcar como lido
+        run: Executar
+        edit: Editar
+        delete: Eliminar
+        enable_rule: Ativar regra
+        disable_rule: Pausar regra
+        delete_confirm: "Eliminar a regra \"%{name}\"?"
+        matched_count:
+          one: "Correspondeu a %{count} e-mail"
+          other: "Correspondeu a %{count} e-mails"
+        last_ran: "executada há %{time}"
+        never_run_on_existing: Nunca executada no e-mail existente
+        running_progress: "A executar no e-mail existente, %{processed} de %{total}"
+        applied_count:
+          one: "Aplicada a %{count} e-mail"
+          other: "Aplicada a %{count} e-mails"
+        undo: Desfazer
+      form:
+        name_label: Nome da regra
+        when_label: "Quando"
+        when_hint: "todas as condições abaixo devem corresponder"
+        from_label: De
+        from_placeholder: "@dominio.com ou nome@exemplo.com"
+        from_hint: Um endereço ou @domínio. Vírgulas significam qualquer um.
+        to_label: Para / CC
+        to_placeholder: Qualquer destinatário
+        subject_label: Assunto contém
+        subject_placeholder: Qualquer texto
+        body_label: Corpo contém
+        body_placeholder: Qualquer texto
+        category_label: Categoria
+        category_blank: Qualquer categoria
+        account_label: Conta
+        account_blank: Todas as contas
+        has_attachment_label: Apenas se tiver um anexo
+        then_label: "Então"
+        apply_tags_label: Aplicar etiquetas
+        archive_label: Arquivar
+        archive_hint: Ignora a caixa de entrada. Ainda pesquisável e etiquetado.
+        mark_read_label: Marcar como lido
+        folder_label: Mover para pasta
+        folder_blank: Sem pasta
+        match_count_label: e-mails existentes correspondem a estas condições
+        run_on_existing_label: Também executar nesses agora
+        cancel: Cancelar
+        save_rule: Guardar regra
+      create:
+        created_toast: Regra criada.
+      update:
+        updated_toast: Regra atualizada.
+      destroy:
+        deleted_toast: Regra eliminada.
+      toggle:
+        enabled_toast: "Regra \"%{name}\" ativada."
+        paused_toast: "Regra \"%{name}\" pausada."
+      run:
+        queued_toast: "A executar \"%{name}\" no e-mail existente."
+      undo:
+        undone: Execução desfeita.
+        not_found: Execução não encontrada.

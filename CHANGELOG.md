@@ -16,7 +16,7 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
-## [0.20.0] - 2026-07-10
+## [0.21.0] - 2026-07-10
 
 ### Added
 
@@ -27,6 +27,17 @@ major, minor, or patch change here.
 ### Fixed
 
 - **Document exports produced no ZIP.** The export job still filtered on a `status` column that was split into `ai_status`/`review_status`, so every export errored; it now exports analyzed, non-rejected documents. Existing export records with legacy filters remain readable.
+
+## [0.20.0] - 2026-07-10
+
+### Added
+
+- **Inbox rules:** workspace-scoped, user-defined deterministic rules that evaluate against every newly ingested email and can be run retroactively. Each rule matches criteria (from, to, subject, body, category, email account, has attachment) and applies actions: tag, archive, mark as read, move to a custom folder. Runs are undoable when the match set is <= 25,000 emails. Managed via **Settings → Inbox → Rules** with live match-count preview, run-progress polling, and per-run undo.
+
+### Fixed
+
+- **Inbox groups: rules added to a group are now saved.** The Groups builder submits its rules as indexed form fields, which the server parsed as a hash rather than a list — so every sender/organization/document-type/query rule was silently dropped, and a rules-only group saved nothing at all. Rules now persist on create and update.
+- **Inbox groups: a stray blank-named group no longer shows an un-editable row.** A group heading is always non-blank, but a legacy blank-named row could still render an Edit/Ungroup link with no group name, so clicking Edit appeared to do nothing. Blank-named rows are now filtered out of the Groups panel and the inbox.
 
 ## [0.19.9] - 2026-07-10
 
@@ -1399,7 +1410,8 @@ major, minor, or patch change here.
 
 - Initial public, source-available release of Campbooks.
 
-[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/notacamp/campbooks/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/notacamp/campbooks/compare/v0.19.9...v0.20.0
 [0.17.0]: https://github.com/notacamp/campbooks/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/notacamp/campbooks/compare/v0.15.0...v0.16.0

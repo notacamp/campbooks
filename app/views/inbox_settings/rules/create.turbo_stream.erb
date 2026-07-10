@@ -1,0 +1,8 @@
+<%= turbo_stream.prepend "inbox_settings_rules_rows" do %>
+  <%= render "inbox_settings/rules/rule", rule: @rule %>
+<% end %>
+<%= turbo_stream.remove "inbox_settings_rules_empty" %>
+<%= turbo_stream.update "inbox_settings_rule_form", "" %>
+<%= turbo_stream.append "action_toasts" do %>
+  <%= render "shared/action_toast", message: t(".created_toast"), variant: :success %>
+<% end %>

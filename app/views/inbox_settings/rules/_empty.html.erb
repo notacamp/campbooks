@@ -1,0 +1,29 @@
+<div id="inbox_settings_rules_empty" class="text-center py-10 px-4">
+  <div class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-muted mb-3">
+    <svg class="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+    </svg>
+  </div>
+  <h4 class="text-sm font-semibold text-foreground mb-1"><%= t(".heading") %></h4>
+  <p class="text-xs text-muted-foreground max-w-[40ch] mx-auto mb-4"><%= t(".body") %></p>
+  <div class="flex gap-2 justify-center flex-wrap mt-5">
+    <%= link_to new_inbox_settings_rule_path(prefill: { from: "@billing.stripe.com", subject: "invoice" }),
+          data: { turbo_frame: "inbox_settings_rule_form" },
+          class: "border border-dashed border-border rounded-lg p-3 text-left max-w-[180px] hover:bg-muted/50 transition-colors" do %>
+      <span class="block text-xs font-medium text-foreground mb-0.5"><%= t(".starter_receipts_title") %></span>
+      <span class="block text-xs text-muted-foreground"><%= t(".starter_receipts_body") %></span>
+    <% end %>
+    <%= link_to new_inbox_settings_rule_path(prefill: { from: "@client.com" }),
+          data: { turbo_frame: "inbox_settings_rule_form" },
+          class: "border border-dashed border-border rounded-lg p-3 text-left max-w-[180px] hover:bg-muted/50 transition-colors" do %>
+      <span class="block text-xs font-medium text-foreground mb-0.5"><%= t(".starter_client_title") %></span>
+      <span class="block text-xs text-muted-foreground"><%= t(".starter_client_body") %></span>
+    <% end %>
+    <%= link_to new_inbox_settings_rule_path(prefill: { category: "promotions" }),
+          data: { turbo_frame: "inbox_settings_rule_form" },
+          class: "border border-dashed border-border rounded-lg p-3 text-left max-w-[180px] hover:bg-muted/50 transition-colors" do %>
+      <span class="block text-xs font-medium text-foreground mb-0.5"><%= t(".starter_newsletters_title") %></span>
+      <span class="block text-xs text-muted-foreground"><%= t(".starter_newsletters_body") %></span>
+    <% end %>
+  </div>
+</div>
