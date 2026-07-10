@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-07-10
+
 ### Fixed
 
 - **Files: uploading a file now refreshes the page.** After an upload the panel
