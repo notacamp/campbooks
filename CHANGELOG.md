@@ -16,6 +16,12 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.19.9] - 2026-07-10
+
+### Changed
+
+- **Accounting: match confidence is now governed by entity agreement, not amount proximity.** A near-amount invoice from a clearly different organization can no longer be suggested (a close-amount pairing needs positive name/entity evidence; without it, it's discarded with the reason recorded). Exact-amount matches without entity evidence cap at "Possible"; strong confidence requires exact amount *and* the same party. The AI now also sees each candidate invoice's own description so it can judge what the invoice is for against who actually received the payment.
+
 ## [0.19.8] - 2026-07-10
 
 ### Fixed
