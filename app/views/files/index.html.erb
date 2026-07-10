@@ -3,7 +3,6 @@
     <% header.with_actions do %>
       <%= render "shared/customize_ai_button", purpose: "document_analysis" %>
       <% if @needs_review_count.to_i > 0 %>
-        <%# Opens the document Skim review queue (folded in from the old Documents page). %>
         <button type="button" data-action="click->doc-skim-overlay#open"
             class="inline-flex items-center gap-1.5 rounded-md border border-accent-200 bg-accent-50 px-3 py-2 text-sm font-medium text-accent-700 hover:bg-accent-100 cursor-pointer dark:border-accent-500/30 dark:bg-accent-500/10 dark:text-accent-300">
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
@@ -62,7 +61,6 @@
       </div>
 
       <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <%# Default ON: extract & classify immediately. Off just stores the file. %>
         <label class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-200">
           <%= check_box_tag :analyze, "1", true, class: "mt-0.5 rounded border-gray-300 text-accent-600 focus:ring-accent-500" %>
           <span>
@@ -75,10 +73,7 @@
     <% end %>
   </div>
 
-  <%# Document Skim — the review-queue ring tray + full-screen review overlay, folded
-      in from the old Documents page. Page-scoped (the doc-skim-overlay controller is on
-      this view's root div) so it never collides with the global email Skim. The tray
-      loads lazily and renders nothing when nothing needs review. %>
+  <%# Document Skim — the review-queue ring tray + full-screen review overlay %>
   <%= turbo_stream_from "doc_skim_#{Current.workspace.id}" %>
   <%= turbo_frame_tag "doc_skim_tray", src: document_skim_tray_path, loading: :lazy, class: "block" %>
   <%= render "shared/doc_skim_overlay" %>
@@ -90,112 +85,130 @@
       </aside>
 
       <div class="min-w-0 flex-1">
+        <%# Search bar — embeds the filter panel; live-submits into `files_results`. %>
         <%= render Campbooks::Files::SearchBar.new(
               q: @search_query.presence || params[:q],
               folder: @folder,
-              filter_params: params.permit(:category, :review_status, :ai_status, :month, :folder_id, type: []).to_h) %>
+              filters: @filters,
+              document_types: @document_types,
+              folders: @folders,
+              categories: @categories) %>
 
-        <% if @search_query.present? %>
-          <p class="mb-4 text-sm text-muted-foreground" role="status">
-            <%= t(".search_results", count: @files.size, q: @search_query) %>
-          </p>
-        <% end %>
-
-        <%# Filters (collapsed by default; auto-open when a filter is active) — carried
-            over from the old Documents page, kept secondary so the file manager leads.
-            Plain <details> (no .filters-disclosure class) → native collapse at all widths. %>
-        <% active_filter_count = [ params[:category].presence, Array(params[:type]).reject(&:blank?).presence, params[:review_status].presence, params[:month].presence, (@folder ? nil : params[:folder_id].presence) ].compact.size %>
-        <details class="group/filters bg-card rounded-xl shadow-sm border border-gray-200 mb-4 dark:border-white/10" <%= "open" if active_filter_count > 0 %>>
-          <summary class="flex items-center justify-between gap-2 p-4 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
-            <span class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L15 12.414V19a1 1 0 01-.553.894l-4 2A1 1 0 019 21v-8.586L3.293 6.707A1 1 0 013 6V4z"/></svg>
-              <%= t(".filters") %>
-              <% if active_filter_count > 0 %>
-                <%= render Campbooks::Badge.new(variant: :accent, size: :sm) { active_filter_count } %>
-              <% end %>
-            </span>
-            <svg class="w-4 h-4 text-gray-400 group-open/filters:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-          </summary>
-          <div class="px-4 pb-4 pt-0">
-            <%= form_tag (@folder ? files_folder_path(@folder) : files_path), method: :get, class: "flex flex-wrap gap-4 items-end" do %>
-              <% if @search_query.present? %><%= hidden_field_tag :q, @search_query %><% end %>
-              <div class="w-full sm:w-auto">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200"><%= t(".filter_category") %></label>
-                <%= select_tag :category,
-                    options_for_select([ [ t(".filter_all_categories"), "" ] ] + @categories.map { |c| [ human_enum(DocumentType, :category, c), c ] }, params[:category]),
-                    class: "mt-1 block w-full sm:w-auto rounded-md border-gray-300 shadow-sm text-sm",
-                    onchange: "this.form.requestSubmit()" %>
-              </div>
-              <div class="relative w-full sm:w-auto">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200"><%= t(".filter_type") %></label>
-                <details class="group mt-1" data-controller="dropdown-close">
-                  <summary class="flex items-center justify-between gap-2 rounded-md border border-gray-300 shadow-sm text-sm px-3 py-2 bg-card cursor-pointer select-none min-w-[160px]">
-                    <span><%= Array(params[:type]).any? ? t(".filter_types_selected", count: Array(params[:type]).size) : t(".filter_all_types") %></span>
-                    <svg class="w-4 h-4 text-gray-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                  </summary>
-                  <div class="absolute z-10 mt-1 bg-card border border-gray-200 rounded-md shadow-lg p-2 w-56 max-h-60 overflow-y-auto dark:border-white/10">
-                    <% @document_types.each do |dt| %>
-                      <label class="flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-gray-50 rounded cursor-pointer dark:hover:bg-white/5">
-                        <%= check_box_tag 'type[]', dt.id, Array(params[:type]).include?(dt.id.to_s),
-                            class: "rounded border-gray-300 text-accent-600 focus:ring-accent-500",
-                            onchange: "this.form.requestSubmit()" %>
-                        <span class="flex items-center gap-1.5">
-                          <%= render Campbooks::ColorDot.new(color: document_type_dot_color(dt), size: :sm) %>
-                          <%= dt.name.humanize %>
-                        </span>
-                      </label>
-                    <% end %>
-                  </div>
-                </details>
-              </div>
-              <div class="w-full sm:w-auto">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200"><%= t(".filter_status") %></label>
-                <%= select_tag :review_status,
-                    options_for_select([ [ t(".filter_all_statuses"), "" ] ] + Document.review_statuses.keys.map { |s| [ human_enum(Document, :review_status, s), s ] }, params[:review_status]),
-                    class: "mt-1 block w-full sm:w-auto rounded-md border-gray-300 shadow-sm text-sm",
-                    onchange: "this.form.requestSubmit()" %>
-              </div>
-              <div class="w-full sm:w-auto">
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-200"><%= t(".filter_month") %></label>
-                <%= month_field_tag :month, params[:month], class: "mt-1 block w-full sm:w-auto rounded-md border-gray-300 shadow-sm text-sm",
-                    onchange: "this.form.requestSubmit()" %>
-              </div>
-              <% if @folder.nil? && @folders.any? %>
-                <div class="w-full sm:w-auto">
-                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-200"><%= t(".filter_folder") %></label>
-                  <%= select_tag :folder_id,
-                      options_for_select([ [ t(".filter_all_folders"), "" ] ] + @folders.map { |mf| [ mf.name, mf.id ] }, params[:folder_id]),
-                      class: "mt-1 block w-full sm:w-auto rounded-md border-gray-300 shadow-sm text-sm",
-                      onchange: "this.form.requestSubmit()" %>
-                </div>
+        <%# Bulk actions (all-files view only) — slim row below the bar, outside
+            the results frame so they don't re-render on filter change. %>
+        <% if @folder.nil? %>
+          <div class="flex flex-wrap items-center justify-end gap-2 mt-2 mb-2">
+            <% if @reprocessable_count.to_i > 0 %>
+              <%= form_tag reprocess_all_documents_path, method: :post, class: "inline" do %>
+                <%= render "files/filter_hidden_fields", filters: @filters, q: params[:q] %>
+                <%= render Campbooks::Button.new(variant: :outline, size: :sm, type: :submit) { t(".reanalyze_all", count: @reprocessable_count) } %>
               <% end %>
             <% end %>
-
-            <% unless @folder %>
-              <%# Workspace-wide bulk actions (re-analyze + export), tucked under the filters. %>
-              <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-200 pt-4 dark:border-white/10">
-                <% if @reprocessable_count.to_i > 0 %>
-                  <%= form_tag reprocess_all_documents_path, method: :post, class: "inline" do %>
-                    <% Array(params[:type]).each do |ty| %><%= hidden_field_tag 'type[]', ty %><% end %>
-                    <%= hidden_field_tag :category, params[:category] if params[:category].present? %>
-                    <%= hidden_field_tag :review_status, params[:review_status] if params[:review_status].present? %>
-                    <%= hidden_field_tag :month, params[:month] if params[:month].present? %>
-                    <%= render Campbooks::Button.new(variant: :outline, size: :sm, type: :submit) { t(".reanalyze_all", count: @reprocessable_count) } %>
-                  <% end %>
-                <% end %>
-                <%= form_tag export_documents_path, method: :post, class: "inline" do %>
-                  <% Array(params[:type]).each do |ty| %><%= hidden_field_tag 'type[]', ty %><% end %>
-                  <%= hidden_field_tag :category, params[:category] if params[:category].present? %>
-                  <%= hidden_field_tag :review_status, params[:review_status] if params[:review_status].present? %>
-                  <%= hidden_field_tag :month, params[:month] if params[:month].present? %>
-                  <%= render Campbooks::Button.new(variant: :outline, size: :sm, type: :submit, data: { turbo_confirm: t(".export_confirm") }) { t(".export") } %>
-                <% end %>
-              </div>
+            <%= form_tag export_documents_path, method: :post, class: "inline" do %>
+              <%= render "files/filter_hidden_fields", filters: @filters, q: params[:q] %>
+              <%= render Campbooks::Button.new(variant: :outline, size: :sm, type: :submit, data: { turbo_confirm: t(".export_confirm") }) { t(".export") } %>
             <% end %>
           </div>
-        </details>
+        <% end %>
 
-        <!-- Mobile folder strip (the sidebar is desktop-only) -->
+        <%# Results frame: chips + count + sections + table + pagination.
+            The mobile folder strip and exports history stay outside this frame. %>
+        <%= turbo_frame_tag "files_results" do %>
+          <%# Active-filter chips (panel filters only, not modifier text). %>
+          <%= render Campbooks::Files::FilterChips.new(
+                filters: @filters,
+                q: @search_query.presence || params[:q],
+                folder: @folder,
+                document_types: @document_types,
+                folders: @folders) %>
+
+          <% if @search_query.present? %>
+            <p class="px-2.5 py-1.5 text-sm text-muted-foreground" role="status">
+              <%= t(".search_results", count: @files.size, q: @search_query) %>
+            </p>
+          <% end %>
+
+          <!-- Internal (authored) documents -->
+          <% if @internal_docs.any? %>
+            <section class="mb-6">
+              <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".internal_documents") %></h2>
+              <div class="space-y-2">
+                <% @internal_docs.each do |doc| %>
+                  <%= render Campbooks::Files::DocRow.new(doc: doc, folders: @folders, current_folder: @folder) %>
+                <% end %>
+              </div>
+            </section>
+          <% end %>
+
+          <!-- Filed emails (shown inside a folder) -->
+          <% if @filed_emails.any? %>
+            <section class="mb-6">
+              <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".emails") %></h2>
+              <div class="space-y-2">
+                <% @filed_emails.each do |email| %>
+                  <%= render Campbooks::Files::EmailRow.new(email: email, current_folder: @folder) %>
+                <% end %>
+              </div>
+            </section>
+          <% end %>
+
+          <% if @files.any? %>
+            <% if @internal_docs.any? || @filed_emails.any? %>
+              <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".files_section") %></h2>
+            <% end %>
+            <!-- Files table (md+) -->
+            <div class="hidden md:block bg-card rounded-xl shadow-sm border border-gray-200 overflow-visible dark:border-white/10">
+              <table class="min-w-full table-fixed divide-y divide-gray-200 dark:divide-white/10">
+                <thead class="bg-warm-ash-bg">
+                  <tr>
+                    <th class="w-5/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_name") %></th>
+                    <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_kind") %></th>
+                    <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_size") %></th>
+                    <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_added") %></th>
+                    <th class="w-12 px-3 py-3"><span class="sr-only"><%= t(".col_actions") %></span></th>
+                  </tr>
+                </thead>
+                <tbody id="files_tbody" class="bg-card divide-y divide-gray-200 dark:divide-white/10">
+                  <% @files.each do |file| %>
+                    <%= render Campbooks::Files::FileRow.new(doc: file, folders: @folders, current_folder: @folder) %>
+                  <% end %>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Files cards (mobile) -->
+            <div id="files_cards" class="md:hidden space-y-3">
+              <% @files.each do |file| %>
+                <%= render Campbooks::Files::FileCard.new(doc: file, folders: @folders, current_folder: @folder) %>
+              <% end %>
+            </div>
+          <% elsif @search_query.present? || @filters.any? %>
+            <div class="bg-card rounded-xl shadow-sm border border-gray-200 px-6 py-10 text-center text-sm text-gray-500 dark:border-white/10">
+              <%= t(".search_empty") %>
+            </div>
+          <% elsif @internal_docs.empty? && @filed_emails.empty? %>
+            <div class="bg-card rounded-xl shadow-sm border border-gray-200 px-6 py-8 text-center text-sm text-gray-500 dark:border-white/10">
+              <%= t(".empty_folder") %>
+            </div>
+          <% end %>
+
+          <% if @pagy&.next %>
+            <%= turbo_frame_tag "files_pagination",
+                  src: (@folder ? files_folder_path(@folder, files_filter_params(@filters, q: params[:q]).merge(page: @pagy.next, format: :turbo_stream)) : files_path(files_filter_params(@filters, q: params[:q]).merge(page: @pagy.next, format: :turbo_stream))),
+                  loading: :lazy do %>
+              <div class="flex items-center justify-center py-6">
+                <%= render Campbooks::Spinner.new(size: :md) %>
+              </div>
+            <% end %>
+          <% end %>
+          <noscript>
+            <% if @pagy&.pages.to_i > 1 %>
+              <div class="mt-4"><%== pagy_nav(@pagy) %></div>
+            <% end %>
+          </noscript>
+        <% end %>
+
+        <!-- Mobile folder strip (outside the results frame) -->
         <% if @folders.any? %>
           <div class="lg:hidden -mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
             <%= link_to t(".all_files"), files_path,
@@ -209,89 +222,7 @@
           </div>
         <% end %>
 
-        <!-- Internal (authored) documents -->
-        <% if @internal_docs.any? %>
-          <section class="mb-6">
-            <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".internal_documents") %></h2>
-            <div class="space-y-2">
-              <% @internal_docs.each do |doc| %>
-                <%= render Campbooks::Files::DocRow.new(doc: doc, folders: @folders, current_folder: @folder) %>
-              <% end %>
-            </div>
-          </section>
-        <% end %>
-
-        <!-- Filed emails (shown inside a folder) -->
-        <% if @filed_emails.any? %>
-          <section class="mb-6">
-            <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".emails") %></h2>
-            <div class="space-y-2">
-              <% @filed_emails.each do |email| %>
-                <%= render Campbooks::Files::EmailRow.new(email: email, current_folder: @folder) %>
-              <% end %>
-            </div>
-          </section>
-        <% end %>
-
-        <% if @files.any? %>
-          <% if @internal_docs.any? || @filed_emails.any? %>
-            <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".files_section") %></h2>
-          <% end %>
-          <!-- Files table (md+). overflow-visible (not overflow-x-auto) so the per-row
-               actions dropdown can escape the card; the table is table-fixed and
-               desktop-only, so it never overflows horizontally. -->
-          <div class="hidden md:block bg-card rounded-xl shadow-sm border border-gray-200 overflow-visible dark:border-white/10">
-            <table class="min-w-full table-fixed divide-y divide-gray-200 dark:divide-white/10">
-              <thead class="bg-warm-ash-bg">
-                <tr>
-                  <th class="w-5/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_name") %></th>
-                  <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_kind") %></th>
-                  <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_size") %></th>
-                  <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_added") %></th>
-                  <th class="w-12 px-3 py-3"><span class="sr-only"><%= t(".col_actions") %></span></th>
-                </tr>
-              </thead>
-              <tbody id="files_tbody" class="bg-card divide-y divide-gray-200 dark:divide-white/10">
-                <% @files.each do |file| %>
-                  <%= render Campbooks::Files::FileRow.new(doc: file, folders: @folders, current_folder: @folder) %>
-                <% end %>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Files cards (mobile) -->
-          <div id="files_cards" class="md:hidden space-y-3">
-            <% @files.each do |file| %>
-              <%= render Campbooks::Files::FileCard.new(doc: file, folders: @folders, current_folder: @folder) %>
-            <% end %>
-          </div>
-        <% elsif @search_query.present? %>
-          <div class="bg-card rounded-xl shadow-sm border border-gray-200 px-6 py-10 text-center text-sm text-gray-500 dark:border-white/10">
-            <%= t(".search_empty") %>
-          </div>
-        <% elsif @internal_docs.empty? && @filed_emails.empty? %>
-          <div class="bg-card rounded-xl shadow-sm border border-gray-200 px-6 py-8 text-center text-sm text-gray-500 dark:border-white/10">
-            <%= t(".empty_folder") %>
-          </div>
-        <% end %>
-
-        <% if @pagy&.next %>
-          <%= turbo_frame_tag "files_pagination",
-                src: (@folder ? files_folder_path(@folder, page: @pagy.next, format: :turbo_stream, type: params[:type], category: params[:category], review_status: params[:review_status], month: params[:month]) : files_path(page: @pagy.next, folder_id: params[:folder_id], format: :turbo_stream, type: params[:type], category: params[:category], review_status: params[:review_status], month: params[:month])),
-                loading: :lazy do %>
-            <div class="flex items-center justify-center py-6">
-              <%= render Campbooks::Spinner.new(size: :md) %>
-            </div>
-          <% end %>
-        <% end %>
-        <noscript>
-          <% if @pagy&.pages.to_i > 1 %>
-            <div class="mt-4"><%== pagy_nav(@pagy) %></div>
-          <% end %>
-        </noscript>
-
-        <%# Recent exports (collapsed; all-files view only) — download ZIPs produced by
-            the Export bulk action above. Carried over from the old Documents page. %>
+        <%# Recent exports (all-files view only) — outside the frame. %>
         <% if @folder.nil? && @exports.present? %>
           <details class="group/exports mt-8 bg-card rounded-xl shadow-sm border border-gray-200 dark:border-white/10">
             <summary class="flex items-center justify-between gap-2 p-4 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
@@ -333,25 +264,24 @@
       </div>
     </div>
   <% else %>
-    <%= render(Campbooks::EmptyState.new(variant: :standalone, title: t(".empty_title"), description: t(".empty_description"))) do |state| %>
-      <% state.with_icon do %>
-        <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-        </svg>
-      <% end %>
-      <% state.with_actions do %>
-        <%= render(Campbooks::Button.new(variant: :primary, data: { action: "click->upload#toggle" })) { t(".empty_upload") } %>
-        <%= render(Campbooks::Button.new(variant: :outline, data: { action: "new-folder#open" })) { t(".new_folder") } %>
+    <%# files_results frame must always be present in the DOM so Turbo can target it. %>
+    <%= turbo_frame_tag "files_results" do %>
+      <%= render(Campbooks::EmptyState.new(variant: :standalone, title: t(".empty_title"), description: t(".empty_description"))) do |state| %>
+        <% state.with_icon do %>
+          <svg class="w-7 h-7 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V18a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+          </svg>
+        <% end %>
+        <% state.with_actions do %>
+          <%= render(Campbooks::Button.new(variant: :primary, data: { action: "click->upload#toggle" })) { t(".empty_upload") } %>
+          <%= render(Campbooks::Button.new(variant: :outline, data: { action: "new-folder#open" })) { t(".new_folder") } %>
+        <% end %>
       <% end %>
     <% end %>
   <% end %>
 
-  <%# Files-context new-folder dialog: non-Turbo so MailFoldersController redirects
-      back to /files (its Turbo streams target the mail pane), and provision=false so
-      no provider folder/label is created for a file-only folder. %>
   <%= render Campbooks::NewFolderModal.new(turbo: false, subtitle: t(".new_folder_hint"), hidden_fields: { provision: false, return_to: "files" }) %>
 
-  <%# "Manage access" dialog — lazy-loads the sharing panel (Files::FolderSharesController). %>
   <% if @folder&.manageable_by?(Current.user) %>
     <dialog id="folder-share-dialog"
         class="m-auto w-[calc(100vw-2rem)] max-w-md overflow-hidden rounded-2xl border border-border bg-card p-0 text-card-foreground shadow-2xl backdrop:bg-black/40"
