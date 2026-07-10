@@ -85,9 +85,11 @@
       </aside>
 
       <div class="min-w-0 flex-1">
-        <%# Search bar — embeds the filter panel; live-submits into `files_results`. %>
+        <%# Search bar — embeds the filter panel; live-submits into `files_results`.
+            The box always shows the RAW query — modifiers included — never the
+            stripped text (that would erase the user's modifiers on reload). %>
         <%= render Campbooks::Files::SearchBar.new(
-              q: @search_query.presence || params[:q],
+              q: params[:q],
               folder: @folder,
               filters: @filters,
               document_types: @document_types,
@@ -114,10 +116,11 @@
         <%# Results frame: chips + count + sections + table + pagination.
             The mobile folder strip and exports history stay outside this frame. %>
         <%= turbo_frame_tag "files_results" do %>
-          <%# Active-filter chips (panel filters only, not modifier text). %>
+          <%# Active-filter chips (panel filters only, not modifier text). Remove
+              links carry the RAW query so modifiers survive chip removal. %>
           <%= render Campbooks::Files::FilterChips.new(
                 filters: @filters,
-                q: @search_query.presence || params[:q],
+                q: params[:q],
                 folder: @folder,
                 document_types: @document_types,
                 folders: @folders) %>
@@ -182,7 +185,7 @@
                 <%= render Campbooks::Files::FileCard.new(doc: file, folders: @folders, current_folder: @folder) %>
               <% end %>
             </div>
-          <% elsif @search_query.present? || @filters.any? %>
+          <% elsif params[:q].present? || @filters.narrowing? %>
             <div class="bg-card rounded-xl shadow-sm border border-gray-200 px-6 py-10 text-center text-sm text-gray-500 dark:border-white/10">
               <%= t(".search_empty") %>
             </div>

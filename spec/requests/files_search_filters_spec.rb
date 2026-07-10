@@ -243,4 +243,53 @@ RSpec.describe "Files search filters", type: :request do
       expect(response.body).to include("files_pagination")
     end
   end
+
+  # ── free-text search hides internal docs (parity with pre-refactor UI) ─────
+
+  describe "GET /files?q=<free text> with internal documents present" do
+    it "drops internal docs from the results (ranked document search only)" do
+      create(:authored_document, workspace: workspace, title: "INTERNAL-NOTE")
+      titled("SEARCHABLE-DOC", vendor_name: "Zeta Traders")
+
+      get files_path(q: "zeta")
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include("INTERNAL-NOTE")
+
+      # Modifier-only queries stay in browse mode, where internal docs are only
+      # hidden when a document-specific constraint is active (is:pending is one).
+      get files_path(q: "is:pending")
+      expect(response.body).not_to include("INTERNAL-NOTE")
+
+      # No narrowing at all → internal docs render.
+      get files_path
+      expect(response.body).to include("INTERNAL-NOTE")
+    end
+  end
+
+  # ── the search box and chips keep the RAW query (modifiers included) ───────
+
+  describe "GET /files?q=<text + modifier>" do
+    it "renders the search input with the raw query, not the stripped text" do
+      titled("EDP-DOC", vendor_name: "EDP Energias")
+
+      get files_path(q: "edp is:pending")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("edp is:pending")
+    end
+  end
+
+  # ── bulk export materializes modifier filters ───────────────────────────────
+
+  describe "POST /documents/export with modifiers in q" do
+    it "persists the merged filter set so the job matches the on-screen list" do
+      post export_documents_path(q: "source:email is:approved", review_status: "pending")
+
+      export = Export.last
+      # Modifier wins for the status; the source modifier is materialized.
+      expect(export.filters["review_status"]).to eq("approved")
+      expect(export.filters["source"]).to eq([ "email" ])
+      expect(response).to redirect_to(files_path(review_status: "pending", q: "source:email is:approved"))
+    end
+  end
 end

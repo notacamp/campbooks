@@ -357,16 +357,88 @@ RSpec.describe Documents::Filters do
       expect(ids).to include(d1.id, d2.id)
     end
 
-    it "modifier review_status wins over panel value" do
+    it "modifier review_status wins over the panel value when applying" do
+      approved = build_doc(review_status: :approved)
+      build_doc(review_status: :pending)
+
       f = described_class.from_params(review_status: "pending")
       f.merge_query({ review_status: "approved" })
-      expect(f.review_status).to eq("approved")
+      ids = f.apply(workspace.documents.accessible_to(user), workspace: workspace, user: user).pluck(:id)
+
+      expect(ids).to eq([ approved.id ])
     end
 
-    it "categories are unioned" do
+    it "categories are unioned when applying" do
+      dt_acc = create(:document_type, workspace: workspace, name: "Bill",     category: "accounting")
+      dt_leg = create(:document_type, workspace: workspace, name: "Contract", category: "legal")
+      dt_ins = create(:document_type, workspace: workspace, name: "Policy",   category: "insurance")
+      d_acc = build_doc.tap { |d| d.update_columns(document_type_id: dt_acc.id) }
+      d_leg = build_doc.tap { |d| d.update_columns(document_type_id: dt_leg.id) }
+      d_ins = build_doc.tap { |d| d.update_columns(document_type_id: dt_ins.id) }
+
       f = described_class.from_params(category: "accounting")
       f.merge_query({ categories: [ "legal" ] })
-      expect(f.categories).to include("accounting", "legal")
+      ids = f.apply(workspace.documents.accessible_to(user), workspace: workspace, user: user).pluck(:id)
+
+      expect(ids).to include(d_acc.id, d_leg.id)
+      expect(ids).not_to include(d_ins.id)
+    end
+
+    # Modifier state must stay OUT of the panel-facing surface: it lives in the
+    # query text (visible + editable there), so leaking it into to_h / readers /
+    # the badge count would make it show up as unremovable chips and re-add
+    # itself through hidden fields after the user edits the query.
+    it "keeps modifier state out of to_h, the readers, and active_count" do
+      f = described_class.from_params({})
+      f.merge_query({ categories: [ "legal" ], review_status: "approved", starred: true,
+                      entities: [ "EDP" ], sources: [ "email" ] })
+
+      expect(f.to_h).to eq({})
+      expect(f.categories).to be_empty
+      expect(f.review_status).to be_nil
+      expect(f.starred).to be(false)
+      expect(f.entities).to be_empty
+      expect(f.sources).to be_empty
+      expect(f.active_count).to eq(0)
+      expect(f.any?).to be(false)
+      expect(f.narrowing?).to be(true)
+      expect(f.document_specific?).to be(true)
+    end
+  end
+
+  # ── to_persistable_h ───────────────────────────────────────────────────────
+
+  describe "#to_persistable_h" do
+    it "materializes modifier filters (type names resolved to ids) for storage" do
+      dt = create(:document_type, workspace: workspace, name: "Receipt", category: "accounting")
+
+      f = described_class.from_params(review_status: "pending")
+      f.merge_query({ type_names: [ "receipt" ], sources: [ "email" ], review_status: "approved",
+                      amount_min_cents: 10_000 })
+      h = f.to_persistable_h(workspace: workspace, user: user)
+
+      expect(h[:type]).to eq([ dt.id.to_s ])
+      expect(h[:source]).to eq([ "email" ])
+      expect(h[:review_status]).to eq("approved")
+      expect(h[:amount_min]).to eq("100.0")
+    end
+
+    it "resolves a folder modifier to the folder id under the user's permissions" do
+      folder = create(:mail_folder, workspace: workspace, name: "Taxes")
+
+      f = described_class.from_params({})
+      f.merge_query({ folder_name: "taxes" })
+      h = f.to_persistable_h(workspace: workspace, user: user)
+
+      expect(h[:folder_id]).to eq(folder.id.to_s)
+    end
+
+    it "stores an unmatchable folder id for an unknown folder name" do
+      f = described_class.from_params({})
+      f.merge_query({ folder_name: "nope" })
+      h = f.to_persistable_h(workspace: workspace, user: user)
+
+      expect(h[:folder_id]).to eq("00000000-0000-0000-0000-000000000000")
     end
   end
 

@@ -11,9 +11,10 @@ module Campbooks
     # name="date-from") and would no longer match the controller's permitted
     # params. Strings render verbatim.
     class FilterPanel < Campbooks::Base
-      def initialize(folder: nil, filters: nil, document_types: [], folders: [], categories: [], **attrs)
+      def initialize(folder: nil, filters: nil, q: nil, document_types: [], folders: [], categories: [], **attrs)
         @folder         = folder
         @filters        = filters || Documents::Filters.new
+        @q              = q.to_s.strip.presence
         @document_types = document_types
         @folders        = folders
         @categories     = categories
@@ -86,7 +87,7 @@ module Campbooks
                   class: "w-3.5 h-3.5 rounded border-gray-300 text-accent-600 focus:ring-accent-500"
                 )
                 render(Campbooks::ColorDot.new(color: helpers.document_type_dot_color(dt), size: :sm))
-                span(class: "text-sm text-gray-700 dark:text-gray-200 truncate") { dt.name }
+                span(class: "text-sm text-gray-700 dark:text-gray-200 truncate") { dt.name.humanize }
               end
             end
           end
@@ -104,10 +105,13 @@ module Campbooks
         end
       end
 
+      # Clears the panel filters but keeps the search text (modifiers included) —
+      # the query is cleared by the bar's own × control, not this link.
       def footer
         return unless @filters.any?
 
-        clear_href = @folder ? helpers.files_folder_path(@folder) : helpers.files_path
+        clear_params = @q ? { q: @q } : {}
+        clear_href = @folder ? helpers.files_folder_path(@folder, clear_params) : helpers.files_path(clear_params)
         div(class: "pt-1 border-t border-gray-100") do
           a(
             href: clear_href,

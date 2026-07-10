@@ -12,7 +12,9 @@ class FilesController < ApplicationController
     # "All files": the workspace's internal documents + uploaded files. Emails only
     # surface inside a folder they've been filed into (see #show). The filter strip
     # narrows every kind shown here, not just the files (see #filtered_internal_docs).
-    @internal_docs = filtered_internal_docs(Current.workspace.authored_documents.accessible_to(Current.user))
+    # A free-text search swaps the whole list for ranked document results, so the
+    # other item kinds drop out entirely (they have their own search surfaces).
+    @internal_docs = @search.text_query? ? [] : filtered_internal_docs(Current.workspace.authored_documents.accessible_to(Current.user))
     @filed_emails  = []
 
     @needs_review_count = Current.workspace.documents.needs_review.count
@@ -53,8 +55,8 @@ class FilesController < ApplicationController
     build_search
 
     load_filter_data
-    @internal_docs = filtered_internal_docs(@folder.authored_documents)
-    @filed_emails  = filtered_filed_emails(@folder.email_messages.accessible_to(Current.user))
+    @internal_docs = @search.text_query? ? [] : filtered_internal_docs(@folder.authored_documents)
+    @filed_emails  = @search.text_query? ? [] : filtered_filed_emails(@folder.email_messages.accessible_to(Current.user))
 
     # Skim is workspace-wide, so the "Review N" button shows inside a folder too.
     @needs_review_count = Current.workspace.documents.needs_review.count

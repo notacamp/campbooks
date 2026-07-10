@@ -39,7 +39,7 @@ module Campbooks
         # Document type — one chip per selected type id.
         @filters.type_ids.each do |type_id|
           dt    = @document_types.find { |d| d.id.to_s == type_id.to_s }
-          label = dt ? dt.name : type_id.to_s
+          label = dt ? dt.name.humanize : type_id.to_s
           chips << { label: label, remove_path: remove_array_item(:type, type_id) }
         end
 

@@ -200,37 +200,31 @@ class Document < ApplicationRecord
   scope :amount_at_most,  ->(cents) { where("documents.amount_cents <= ?", cents) if cents.present? }
 
   # OR across vendor_name / client_name / bank_name / sender_name for each term;
-  # multiple terms are themselves OR'd together.
+  # multiple terms are themselves OR'd together — composed via relation.or over a
+  # literal SQL fragment (no runtime-built SQL strings, which Brakeman flags).
   scope :by_entity, ->(terms) {
     terms = Array(terms).reject(&:blank?)
     next unless terms.any?
 
-    clauses = []
-    binds   = {}
-    terms.each_with_index do |term, i|
-      key = :"entity_#{i}"
-      binds[key] = "%#{sanitize_sql_like(term)}%"
-      clauses << "(documents.vendor_name ILIKE :#{key} OR " \
-                 "documents.client_name  ILIKE :#{key} OR " \
-                 "documents.bank_name    ILIKE :#{key} OR " \
-                 "documents.sender_name  ILIKE :#{key})"
-    end
-    where(clauses.join(" OR "), binds)
+    terms.map { |term|
+      where(
+        "documents.vendor_name ILIKE :t OR documents.client_name ILIKE :t OR " \
+        "documents.bank_name ILIKE :t OR documents.sender_name ILIKE :t",
+        t: "%#{sanitize_sql_like(term)}%"
+      )
+    }.reduce(:or)
   }
 
   scope :by_reference, ->(terms) {
     terms = Array(terms).reject(&:blank?)
     next unless terms.any?
 
-    clauses = []
-    binds   = {}
-    terms.each_with_index do |term, i|
-      key = :"ref_#{i}"
-      binds[key] = "%#{sanitize_sql_like(term)}%"
-      clauses << "(documents.invoice_number ILIKE :#{key} OR " \
-                 "documents.receipt_number  ILIKE :#{key})"
-    end
-    where(clauses.join(" OR "), binds)
+    terms.map { |term|
+      where(
+        "documents.invoice_number ILIKE :t OR documents.receipt_number ILIKE :t",
+        t: "%#{sanitize_sql_like(term)}%"
+      )
+    }.reduce(:or)
   }
 
   scope :by_expense_category, ->(values) {
