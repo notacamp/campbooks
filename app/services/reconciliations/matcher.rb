@@ -25,9 +25,15 @@ module Reconciliations
     SCORE_HEURISTIC_FALLBACK = 0.5
     AI_MAX_CANDIDATES = 10
     MAX_SUGGESTIONS = 3
-    AMOUNT_CLOSE_TOLERANCE = 0.02  # 2% — same tolerance the heuristic score uses
-    AI_CONFIDENCE_CAP_CLOSE = 0.85 # AI conf ceiling when amounts are close, not exact
-    AI_CONFIDENCE_CAP_SPLIT = 0.8  # per-doc ceiling for split payments (docs sum to txn)
+    AMOUNT_CLOSE_TOLERANCE = 0.02   # 2% — same tolerance the heuristic score uses
+    NAME_AGREEMENT_THRESHOLD = 0.4  # token-Jaccard floor for "same entity" evidence
+    AI_CONFIDENCE_CAP_SPLIT = 0.8   # per-doc ceiling for split payments (docs sum to txn)
+    # Confidence ceilings by evidence tier — the model's claim never exceeds
+    # what amount + entity agreement objectively support (2026-07-10 incidents:
+    # €69.99 vs €85.98 fabricated match; then a close-amount accountant
+    # transfer paired with an unrelated laptop vendor at 0.85).
+    AI_CAP_EXACT_ENTITY_UNKNOWN = 0.75 # exact amount, but no positive entity evidence
+    AI_CAP_CLOSE_ENTITY_MATCH   = 0.7  # close amount allowed ONLY with entity evidence
     DATE_DECAY_DAYS = 30
 
     # @param reconciliation [Reconciliation]
@@ -290,26 +296,56 @@ module Reconciliations
       pairs.filter_map do |m, doc|
         doc_abs = doc.amount_cents.to_i.abs
         claimed = m["confidence"].to_f
+        entity  = entity_agreement?(txn, doc)
+
         if doc_abs == txn_abs
-          audit << { "document_id" => doc.id, "outcome" => "kept",
-                     "claimed" => claimed, "final" => claimed } if audit
-          [ m, doc ]
-        elsif close_amounts?(doc_abs, txn_abs)
-          capped = [ claimed, AI_CONFIDENCE_CAP_CLOSE ].min
-          audit << { "document_id" => doc.id, "outcome" => "kept_capped",
+          # Exact amount: entity agreement lets the model's confidence stand;
+          # without it the ceiling is "possible" — never a strong claim.
+          final = entity ? claimed : [ claimed, AI_CAP_EXACT_ENTITY_UNKNOWN ].min
+          audit << { "document_id" => doc.id, "outcome" => entity ? "kept" : "kept_entity_unknown",
+                     "claimed" => claimed, "final" => final } if audit
+          [ m.merge("confidence" => final), doc ]
+        elsif close_amounts?(doc_abs, txn_abs) && entity
+          # Near amount is only suggestible WITH positive entity evidence.
+          capped = [ claimed, AI_CAP_CLOSE_ENTITY_MATCH ].min
+          audit << { "document_id" => doc.id, "outcome" => "kept_close_entity",
                      "claimed" => claimed, "final" => capped } if audit
           [ m.merge("confidence" => capped), doc ]
         else
-          audit << { "document_id" => doc.id, "outcome" => "discarded_amount",
+          reason = close_amounts?(doc_abs, txn_abs) ? "discarded_entity_mismatch" : "discarded_amount"
+          audit << { "document_id" => doc.id, "outcome" => reason,
                      "claimed" => claimed, "doc_amount_cents" => doc_abs,
-                     "txn_amount_cents" => txn_abs } if audit
+                     "txn_amount_cents" => txn_abs,
+                     "name_similarity" => name_jaccard(txn, doc).round(2) } if audit
           Rails.logger.info(
-            "[Reconciliations::Matcher] discarded AI match for txn #{txn.id}: " \
+            "[Reconciliations::Matcher] #{reason} for txn #{txn.id}: " \
             "doc #{doc.id} amount #{doc_abs} vs txn #{txn_abs} (claimed conf #{m["confidence"]})"
           )
           nil
         end
       end
+    end
+
+    # Legal-form suffixes carry no identity signal ("Lda" matches every
+    # Portuguese company). Distinctive-token overlap handles real-world name
+    # variants ("Amazon EU S.a.r.l." vs "AMAZON.COM.BE") that strict Jaccard
+    # misses, while unrelated parties (an accountancy transfer vs a laptop
+    # vendor) share nothing and fail the gate.
+    ENTITY_NOISE_TOKENS = %w[
+      lda ltda sa sarl srl bvba bv nv inc ltd limited gmbh ag plc llc llp
+      unipessoal company co corp corporation the and of de da do dos das
+    ].freeze
+
+    def entity_agreement?(txn, doc)
+      txn_tokens = distinctive_tokens("#{txn.counterparty} #{txn.description}")
+      doc_tokens = distinctive_tokens("#{doc.vendor_name} #{doc.client_name}")
+      return false if txn_tokens.empty? || doc_tokens.empty?
+
+      (txn_tokens & doc_tokens).any? || name_jaccard(txn, doc) >= NAME_AGREEMENT_THRESHOLD
+    end
+
+    def distinctive_tokens(text)
+      tokenize(text.to_s).reject { |t| t.length < 3 || ENTITY_NOISE_TOKENS.include?(t) }.to_set
     end
 
     def close_amounts?(a, b)
@@ -386,8 +422,10 @@ module Reconciliations
       return nil unless config
 
       candidates = scored_candidates.first(AI_MAX_CANDIDATES).map.with_index(1) do |(doc, _), idx|
+        about = doc.description.presence || doc.ai_summary.presence
         <<~CANDIDATE
           #{idx}. [id: #{doc.id}] #{doc.classification&.name || doc.document_type} — #{doc.document_date&.iso8601 || "no date"} — #{doc.amount_cents&.then { |c| format("%.2f", c / 100.0) } || "?"} #{doc.currency} — #{doc.vendor_name.presence || doc.client_name.presence || "unknown"} #{doc.invoice_number.present? ? "(inv. #{doc.invoice_number})" : ""}
+          #{about ? "   about: #{about.to_s.tr("\n", " ")[0, 140]}" : ""}
         CANDIDATE
       end.join("\n")
 
@@ -404,23 +442,28 @@ module Reconciliations
         #{candidates}
 
         HARD RULES:
-        1. The AMOUNT is the primary evidence. Only match a document whose amount
-           equals the transaction amount, or a SET of documents whose amounts sum
-           to it (a split payment). A single document with a different amount is
-           NOT a match, no matter how similar the names are.
+        1. AMOUNT and ENTITY are co-primary evidence. First understand WHO
+           received the payment (from the transaction's description and
+           counterparty) and WHAT each candidate invoice is for (its party and
+           "about" line) — then judge whether they are the same business
+           relationship.
         2. Use only the facts shown above. NEVER assume or invent relationships
-           between companies (e.g. "X is a payment processor for Y") — if the
-           counterparty name and the document's party don't plausibly refer to
-           the same entity, they don't match.
+           between companies (e.g. "X is a payment processor for Y"). If the
+           payment's receiver is clearly a DIFFERENT organization than the
+           invoice's party (e.g. an accountancy transfer vs a hardware vendor's
+           invoice), it is NOT a match regardless of how close the amounts are.
         3. Returning an empty list is a good answer. Most transactions have no
            matching document; a wrong suggestion is worse than none.
 
         Confidence rubric (apply strictly):
-        - 0.9-1.0: exact amount AND the names clearly refer to the same entity.
-        - 0.7-0.89: exact amount, names weakly compatible (abbreviation, brand vs
-          legal name) — never contradictory.
-        - #{SCORE_AI_THRESHOLD}-0.69: exact amount only, names unknown.
-        - Below #{SCORE_AI_THRESHOLD}: omit the match entirely.
+        - 0.9-1.0: exact amount AND the names/purpose clearly refer to the same
+          entity and business relationship.
+        - 0.7-0.89: exact amount, entity weakly compatible (abbreviation, brand
+          vs legal name) — never contradictory.
+        - #{SCORE_AI_THRESHOLD}-0.69: exact amount with unknown entity, OR
+          near-exact amount (within ~2%) with the SAME entity.
+        - Below #{SCORE_AI_THRESHOLD}: omit — including EVERY case where the
+          amounts differ AND the entities don't clearly agree.
 
         Respond ONLY with valid JSON:
         {"matches": [{"document_id": "<uuid>", "confidence": 0.0-1.0, "reason": "one sentence citing the evidence above"}]}
