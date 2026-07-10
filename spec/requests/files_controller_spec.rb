@@ -97,6 +97,47 @@ RSpec.describe "Files", type: :request do
     expect(html.css("a[href='#{document_path(doc)}']")).not_to be_empty
   end
 
+  # index.turbo_stream.erb is the infinite-scroll *pagination* append, requested
+  # only by the lazy files_pagination frame (always with ?page=N). When Turbo
+  # follows the redirect after an upload it re-issues the GET with the form
+  # submission's `Accept: text/vnd.turbo-stream.html` still attached but NO page —
+  # that must render the full page (whole view refreshes: new file listed, upload
+  # panel collapsed, flash shown), never the bare append stream (which drops the
+  # row when the list is empty and never closes the panel).
+  describe "GET /files turbo_stream content negotiation" do
+    it "renders the full HTML page for a turbo-stream request without a page (post-upload redirect follow)" do
+      build_doc(ai_status: :completed, review_status: :approved)
+
+      get files_path, headers: { "Accept" => "text/vnd.turbo-stream.html, text/html, application/xhtml+xml" }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.media_type).to eq("text/html")
+      expect(response.body).to include('data-upload-target="container"'), "expected full-page chrome (collapsed upload panel)"
+      expect(response.body).not_to include("<turbo-stream")
+    end
+
+    it "still serves the infinite-scroll append stream for a genuine ?page request" do
+      build_doc(ai_status: :completed, review_status: :approved)
+
+      get files_path(page: 1), headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+      expect(response.media_type).to eq("text/vnd.turbo-stream.html")
+      expect(response.body).to include('action="append"')
+      expect(response.body).to include('target="files_tbody"')
+    end
+
+    it "renders the full HTML page for a folder view turbo-stream request without a page" do
+      folder = @workspace.mail_folders.create!(name: "Receipts")
+      build_doc(ai_status: :completed, review_status: :approved)
+
+      get files_folder_path(folder), headers: { "Accept" => "text/vnd.turbo-stream.html, text/html" }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.media_type).to eq("text/html")
+      expect(response.body).not_to include("<turbo-stream")
+    end
+  end
+
   private
 
   def build_doc(ai_status:, review_status:, **attrs)

@@ -39,10 +39,7 @@ class FilesController < ApplicationController
     # Visiting Files clears the nav attention dot.
     Current.workspace.documents.needs_review.where(viewed_at: nil).update_all(viewed_at: Time.current)
 
-    respond_to do |format|
-      format.html
-      format.turbo_stream
-    end
+    respond_with_list
   end
 
   def show
@@ -70,13 +67,33 @@ class FilesController < ApplicationController
 
     @has_any_files = true
 
-    respond_to do |format|
-      format.html { render :index }
-      format.turbo_stream { render :index }
-    end
+    respond_with_list
   end
 
   private
+
+  # #index and #show share one template. Its turbo_stream variant
+  # (index.turbo_stream.erb) is ONLY the infinite-scroll pagination append,
+  # requested exclusively by the lazy `files_pagination` frame — which always
+  # carries ?page=N. Any *other* request that merely accepts turbo-stream is Turbo
+  # following a redirect (e.g. after an upload) with the form submission's
+  # `Accept: text/vnd.turbo-stream.html` header still attached; those must render
+  # the full page so the whole view refreshes (new file listed, upload panel
+  # collapsed, success flash shown) instead of a stray page-1 append (which is
+  # silently dropped when the list is empty and has no #files_tbody to target,
+  # and which never closes the upload panel).
+  def respond_with_list
+    respond_to do |format|
+      format.html { render :index }
+      format.turbo_stream do
+        if params[:page].present?
+          render :index
+        else
+          render :index, formats: [ :html ], content_type: "text/html"
+        end
+      end
+    end
+  end
 
   # Build one Documents::Search per request, deriving @filters and @search_query.
   # text_query? drives bounded-vs-paginated in the action.
