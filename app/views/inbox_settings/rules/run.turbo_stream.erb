@@ -1,0 +1,6 @@
+<%= turbo_stream.replace dom_id(@rule) do %>
+  <%= render "inbox_settings/rules/rule", rule: @rule.reload %>
+<% end %>
+<%= turbo_stream.append "action_toasts" do %>
+  <%= render "shared/action_toast", message: t(".queued_toast", name: @rule.name), variant: :info %>
+<% end %>

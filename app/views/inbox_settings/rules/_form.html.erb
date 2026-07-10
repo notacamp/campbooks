@@ -1,0 +1,203 @@
+<%# locals: rule %>
+<% persisted = rule.persisted? %>
+<%= form_with model: rule,
+      url: persisted ? inbox_settings_rule_path(rule) : inbox_settings_rules_path,
+      method: persisted ? :patch : :post,
+      data: {
+        controller: "rule-match-count",
+        "rule-match-count-url-value": match_count_inbox_settings_rules_path(format: :json)
+      },
+      class: "rounded-lg border border-border bg-muted/30 p-4 mb-4" do |f| %>
+
+  <% if rule.errors.any? %>
+    <div class="rounded-md bg-red-50 dark:bg-red-500/10 text-xs text-red-700 dark:text-red-300 px-3 py-2 mb-4">
+      <%= rule.errors.full_messages.to_sentence %>
+    </div>
+  <% end %>
+
+  <div class="max-w-xs mb-4">
+    <%= f.label :name, t(".name_label"), class: "block text-xs font-medium text-foreground mb-1" %>
+    <%= f.text_field :name, autofocus: true,
+          class: "block w-full rounded-md border border-input bg-background text-sm px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring" %>
+  </div>
+
+  <hr class="border-border my-4">
+
+  <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-2">
+    <%= t(".when_label") %>
+    <span class="text-[11px] font-normal normal-case tracking-normal text-muted-foreground/70"><%= t(".when_hint") %></span>
+  </p>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3"
+       data-action="input->rule-match-count#debounce change->rule-match-count#debounce">
+
+    <div>
+      <%= label_tag "email_rule_criteria_from", t(".from_label"),
+            class: "block text-xs font-medium text-foreground mb-1" %>
+      <%= text_field_tag "email_rule[criteria][from]",
+            Array(rule.criteria["from"]).join(", "),
+            id: "email_rule_criteria_from",
+            placeholder: t(".from_placeholder"),
+            class: "block w-full rounded-md border border-input bg-background text-sm px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring",
+            data: { "rule-match-count-target": "field" } %>
+      <p class="text-[11px] text-muted-foreground mt-1"><%= t(".from_hint") %></p>
+    </div>
+
+    <div>
+      <%= label_tag "email_rule_criteria_to", t(".to_label"),
+            class: "block text-xs font-medium text-foreground mb-1" %>
+      <%= text_field_tag "email_rule[criteria][to]",
+            Array(rule.criteria["to"]).join(", "),
+            id: "email_rule_criteria_to",
+            placeholder: t(".to_placeholder"),
+            class: "block w-full rounded-md border border-input bg-background text-sm px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring",
+            data: { "rule-match-count-target": "field" } %>
+    </div>
+
+    <div>
+      <%= label_tag "email_rule_criteria_subject", t(".subject_label"),
+            class: "block text-xs font-medium text-foreground mb-1" %>
+      <%= text_field_tag "email_rule[criteria][subject]",
+            Array(rule.criteria["subject"]).join(", "),
+            id: "email_rule_criteria_subject",
+            placeholder: t(".subject_placeholder"),
+            class: "block w-full rounded-md border border-input bg-background text-sm px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring",
+            data: { "rule-match-count-target": "field" } %>
+    </div>
+
+    <div>
+      <%= label_tag "email_rule_criteria_body", t(".body_label"),
+            class: "block text-xs font-medium text-foreground mb-1" %>
+      <%= text_field_tag "email_rule[criteria][body]",
+            Array(rule.criteria["body"]).join(", "),
+            id: "email_rule_criteria_body",
+            placeholder: t(".body_placeholder"),
+            class: "block w-full rounded-md border border-input bg-background text-sm px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring",
+            data: { "rule-match-count-target": "field" } %>
+    </div>
+
+    <div>
+      <%= label_tag "email_rule_criteria_category", t(".category_label"),
+            class: "block text-xs font-medium text-foreground mb-1" %>
+      <%= select_tag "email_rule[criteria][category]",
+            options_for_select(email_rule_category_options, Array(rule.criteria["category"]).first),
+            include_blank: t(".category_blank"),
+            id: "email_rule_criteria_category",
+            class: "block w-full rounded-md border border-input bg-background text-sm px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring",
+            data: { "rule-match-count-target": "field" } %>
+    </div>
+
+    <div>
+      <%= label_tag "email_rule_criteria_email_account_id", t(".account_label"),
+            class: "block text-xs font-medium text-foreground mb-1" %>
+      <% workspace_accounts = Current.workspace.email_accounts %>
+      <%= select_tag "email_rule[criteria][email_account_id]",
+            options_for_select(workspace_accounts.map { |a| [ a.display_name, a.id ] }, rule.criteria["email_account_id"]),
+            include_blank: t(".account_blank"),
+            id: "email_rule_criteria_email_account_id",
+            class: "block w-full rounded-md border border-input bg-background text-sm px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring",
+            data: { "rule-match-count-target": "field" } %>
+    </div>
+  </div>
+
+  <div class="mt-3" data-action="change->rule-match-count#debounce">
+    <label class="flex items-center gap-2 cursor-pointer">
+      <%= check_box_tag "email_rule[criteria][has_attachment]", "1",
+            rule.criteria["has_attachment"] == true,
+            id: "email_rule_criteria_has_attachment",
+            class: "rounded border-input text-primary focus:ring-ring",
+            data: { "rule-match-count-target": "field" } %>
+      <span class="text-sm text-foreground"><%= t(".has_attachment_label") %></span>
+    </label>
+  </div>
+
+  <hr class="border-border my-4">
+
+  <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-3"><%= t(".then_label") %></p>
+
+  <%# Tag picker: checkbox chips, one per workspace tag %>
+  <div class="flex items-start gap-4 py-2">
+    <p class="text-sm font-medium text-foreground flex-shrink-0 w-28"><%= t(".apply_tags_label") %></p>
+    <div class="flex items-center gap-1.5 flex-wrap">
+      <% workspace_tags = Current.workspace.tags.visible.order(:name) %>
+      <% selected_ids = rule.tag_ids.map(&:to_s) %>
+      <% workspace_tags.each do |tag| %>
+        <% checked = selected_ids.include?(tag.id.to_s) %>
+        <label class="inline-flex items-center gap-1.5 border rounded-full text-xs font-medium px-2.5 py-1 cursor-pointer transition-colors <%= checked ? "border-foreground/30 bg-foreground/5" : "border-border hover:bg-muted" %>">
+          <%= check_box_tag "email_rule[tag_ids][]", tag.id, checked, class: "sr-only" %>
+          <%= render(Campbooks::ColorDot.new(color: tag.color.presence || "#9ca3af", size: :sm)) %>
+          <%= tag.name %>
+        </label>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Archive switch %>
+  <div class="flex items-center justify-between gap-4 py-2.5 border-t border-border/50">
+    <div>
+      <p class="text-sm font-medium text-foreground"><%= t(".archive_label") %></p>
+      <p class="text-xs text-muted-foreground"><%= t(".archive_hint") %></p>
+    </div>
+    <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+      <%= f.check_box :archive, class: "sr-only peer" %>
+      <span class="w-8 h-5 rounded-full bg-border peer-checked:bg-primary transition-colors relative block">
+        <span class="block w-3.5 h-3.5 rounded-full bg-background shadow absolute top-[3px] left-[3px] peer-checked:translate-x-[10px] transition-transform"></span>
+      </span>
+    </label>
+  </div>
+
+  <%# Mark read switch %>
+  <div class="flex items-center justify-between gap-4 py-2.5 border-t border-border/50">
+    <p class="text-sm font-medium text-foreground"><%= t(".mark_read_label") %></p>
+    <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+      <%= f.check_box :mark_read, class: "sr-only peer" %>
+      <span class="w-8 h-5 rounded-full bg-border peer-checked:bg-primary transition-colors relative block">
+        <span class="block w-3.5 h-3.5 rounded-full bg-background shadow absolute top-[3px] left-[3px] peer-checked:translate-x-[10px] transition-transform"></span>
+      </span>
+    </label>
+  </div>
+
+  <%# Folder select %>
+  <div class="flex items-center justify-between gap-4 py-2.5 border-t border-border/50">
+    <p class="text-sm font-medium text-foreground"><%= t(".folder_label") %></p>
+    <div class="w-44">
+      <% folders = Current.workspace.mail_folders.order(:name) %>
+      <%= f.select :mail_folder_id,
+            options_for_select(folders.map { |fl| [ fl.name, fl.id ] }, rule.mail_folder_id),
+            { include_blank: t(".folder_blank") },
+            class: "block w-full rounded-md border border-input bg-background text-sm px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring" %>
+    </div>
+  </div>
+
+  <hr class="border-border my-4">
+
+  <%# Footer: live match count + run-on-existing + actions %>
+  <div class="flex items-start justify-between gap-4 flex-wrap">
+    <div>
+      <p class="text-xs text-muted-foreground flex items-center gap-1.5 tabular-nums"
+         data-rule-match-count-target="display" hidden>
+        <span class="font-semibold text-foreground" data-rule-match-count-target="count"></span>
+        <%= t(".match_count_label") %>
+      </p>
+      <label class="flex items-center gap-2 mt-2 cursor-pointer">
+        <%= check_box_tag "email_rule[run_on_existing]", "1", false,
+              class: "rounded border-input text-primary focus:ring-ring" %>
+        <span class="text-sm text-foreground">
+          <%= t(".run_on_existing_label") %>
+          (<span data-rule-match-count-target="countInline">0</span>)
+        </span>
+      </label>
+    </div>
+
+    <div class="flex items-center gap-2 flex-wrap">
+      <button type="button"
+              onclick="this.closest('turbo-frame').innerHTML = ''"
+              class="px-3 py-1.5 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:bg-muted transition-colors cursor-pointer">
+        <%= t(".cancel") %>
+      </button>
+      <%= render(Campbooks::Button.new(variant: :primary, size: :sm, type: :submit)) {
+            persisted ? t("shared.actions.save_changes") : t(".save_rule")
+          } %>
+    </div>
+  </div>
+<% end %>

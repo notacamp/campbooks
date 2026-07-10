@@ -456,6 +456,21 @@ Rails.application.routes.draw do
       member { post :set_default }
     end
 
+    resources :rules do
+      member do
+        patch :toggle
+        post  :run
+      end
+      collection do
+        get :match_count
+      end
+    end
+    # Undo a retroactive run — explicit route so Rails doesn't look for
+    # InboxSettings::RunsController.
+    post "rules/:rule_id/runs/:id/undo",
+         to: "rules#undo",
+         as: :undo_rule_run
+
     get  "accounts", to: "accounts#show", as: :accounts
     post "accounts/scan", to: "accounts#scan_now", as: :accounts_scan
   end
