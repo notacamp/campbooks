@@ -3,10 +3,13 @@
 module EmailRules
   # Reverses a completed EmailRuleRun.  For each action the run applied, the
   # inverse is performed:
-  #   - Tags applied by the rule are removed (by provenance: applied_by_rule_id).
-  #   - Archived emails are moved back to the inbox folder (per account).
-  #   - Emails marked read by the run are marked unread (DB + provider).
-  #   - Folder memberships added by the run are removed.
+  #   - Tags the RUN applied are removed — scoped by provenance
+  #     (applied_by_rule_id) AND the run's tagged_email_ids, so tags the user
+  #     added themselves and tags this rule applied at ingest time stay.
+  #   - Threads the run archived are moved back to the inbox (grouped per
+  #     account, one provider call per batch — mirrors Tools::BulkUnarchive).
+  #   - Emails the run marked read are marked unread (DB + provider job).
+  #   - Folder memberships the run created are removed.
   #
   # Refuses to run when the run is not completed or undoable is false.
   class UndoRun
@@ -39,48 +42,65 @@ module EmailRules
       @run.email_rule
     end
 
-    # Remove tag rows whose provenance points to this rule.  Scoped by
-    # applied_by_rule_id so only rule-applied tags are removed; tags the user
-    # added independently are untouched.
+    # Remove tag rows whose provenance points to this rule, limited to the
+    # emails THIS run tagged.  Ingest-time applications of the same rule (which
+    # record provenance but are not part of the run) are untouched.
     def remove_rule_tags
-      EmailMessageTag.where(applied_by_rule_id: rule.id).destroy_all
+      email_ids = @run.tagged_email_ids
+      return if email_ids.blank?
+
+      EmailMessageTag.where(
+        applied_by_rule_id: rule.id,
+        email_message_id: email_ids
+      ).destroy_all
     end
 
-    # Move archived emails back to the inbox folder, per account (mirrors
-    # Tools::BulkUnarchive, but without Current.user dependency).
+    # Move archived mail back to the inbox.  Tools::Archive moved the whole
+    # thread, so the undo restores the whole thread too.  Provider calls are
+    # grouped per account (one move_to_folder per account batch), mirroring
+    # Tools::BulkUnarchive rather than one call per email.
     def unarchive_emails
       email_ids = @run.archived_email_ids
       return if email_ids.blank?
 
-      EmailMessage.where(id: email_ids).includes(:email_account).find_each do |email|
-        account = email.email_account
-        client  = account.mail_client
+      emails = EmailMessage.where(id: email_ids).includes(:email_account, :email_thread)
+
+      emails.group_by(&:email_account).each do |account, messages|
+        client = account.mail_client
         next unless client.respond_to?(:inbox_folder_id) && client.respond_to?(:move_to_folder)
 
         inbox_id = client.inbox_folder_id
         next unless inbox_id
 
-        provider_ids = [ email.provider_message_id ].compact
+        thread_ids = messages.map(&:email_thread_id).compact.uniq
+        scope = account.email_messages.where(email_thread_id: thread_ids)
+          .or(account.email_messages.where(id: messages.map(&:id)))
+
+        provider_ids = scope.pluck(:provider_message_id).compact
         next if provider_ids.empty?
 
         client.move_to_folder(provider_ids, inbox_id)
-        email.update_columns(provider_folder_id: inbox_id, updated_at: Time.current)
+        scope.update_all(provider_folder_id: inbox_id, updated_at: Time.current)
       rescue => e
-        Rails.logger.error("[EmailRules::UndoRun] unarchive failed for email #{email.id}: #{e.message}")
+        Rails.logger.error("[EmailRules::UndoRun] unarchive failed for account #{account.id}: #{e.message}")
       end
     end
 
-    # Mark emails unread in DB and push the state to the provider via
-    # MarkUnreadJob (mirrors BulkMarkRead's job-dispatch pattern).
+    # Mark emails unread in the DB, then push the state to the provider with
+    # one MarkUnreadJob per account (mirrors BulkMarkRead's job-dispatch
+    # pattern, batched instead of per-email).
     def mark_emails_unread
       email_ids = @run.marked_read_email_ids
       return if email_ids.blank?
 
-      EmailMessage.where(id: email_ids).find_each do |email|
-        email.update_columns(read: false, updated_at: Time.current)
-        if email.provider_message_id.present?
-          MarkUnreadJob.perform_later(email.email_account_id, [ email.provider_message_id ])
-        end
+      emails = EmailMessage.where(id: email_ids)
+      emails.update_all(read: false, updated_at: Time.current)
+
+      emails.group_by(&:email_account_id).each do |account_id, messages|
+        provider_ids = messages.map(&:provider_message_id).compact
+        next if provider_ids.empty?
+
+        MarkUnreadJob.perform_later(account_id, provider_ids)
       end
     end
 

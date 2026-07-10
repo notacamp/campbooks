@@ -18,6 +18,7 @@ class CreateEmailRuleRuns < ActiveRecord::Migration[8.1]
       t.integer :processed_count, null: false, default: 0
 
       # Undo bookkeeping: only populated when undoable is true.
+      t.jsonb :tagged_email_ids,     null: false, default: []
       t.jsonb :archived_email_ids,   null: false, default: []
       t.jsonb :marked_read_email_ids, null: false, default: []
       t.jsonb :moved_email_ids,      null: false, default: []

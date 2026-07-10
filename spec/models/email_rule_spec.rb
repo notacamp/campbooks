@@ -58,6 +58,14 @@ RSpec.describe EmailRule, type: :model do
         rule = valid_rule(criteria: { "has_attachment" => true })
         expect(rule).to be_valid
       end
+
+      it "rejects a rule whose only criterion is the account selector" do
+        # The account narrows scope but is not a condition — an account-only
+        # rule would match that account's entire mailbox.
+        rule = valid_rule(criteria: { "email_account_id" => account.id })
+        expect(rule).not_to be_valid
+        expect(rule.errors[:criteria]).to be_present
+      end
     end
 
     describe "action_present" do

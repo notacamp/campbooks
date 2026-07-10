@@ -206,6 +206,35 @@ RSpec.describe EmailRuleRunJob, type: :job do
                              status: :completed, undoable: false)
       expect { EmailRules::UndoRun.call(completed_run) }.to raise_error(ArgumentError)
     end
+
+    it "undo leaves the rule's ingest-time tag applications untouched" do
+      # Tagged by the same rule at ingest time — provenance set, but NOT part
+      # of this run (email arrived later / matched at ingest).
+      ingest_email = make_email(subject: "unrelated", provider_message_id: "msg_ingest")
+      EmailMessageTag.create!(email_message: ingest_email, tag: tag, applied_by_rule_id: rule.id)
+
+      described_class.perform_now(run.id)
+      EmailRules::UndoRun.call(run.reload)
+
+      expect(email.reload.tags).not_to include(tag)
+      expect(ingest_email.reload.tags).to include(tag)
+    end
+
+    it "undo restores the whole archived thread, not just the matched message" do
+      sibling = make_email(
+        subject: "totally different",
+        email_thread: thread,
+        provider_message_id: "msg_undo_sibling"
+      )
+
+      described_class.perform_now(run.id)
+      EmailRules::UndoRun.call(run.reload)
+
+      expect(mail_client).to have_received(:move_to_folder).with(
+        array_including("msg_undo_1", "msg_undo_sibling"), "Inbox"
+      )
+      expect(sibling.reload.provider_folder_id).to eq("Inbox")
+    end
   end
 
   # -------------------------------------------------------------------------
@@ -226,6 +255,37 @@ RSpec.describe EmailRuleRunJob, type: :job do
     it "is a no-op when run is already completed" do
       run.update!(status: :completed)
       expect { described_class.perform_now(run.id) }.not_to change(EmailMessageTag, :count)
+    end
+
+    it "resumes and completes a run that a previous attempt left as failed" do
+      run.update!(status: :failed, processed_count: 1)
+
+      described_class.perform_now(run.id)
+
+      expect(run.reload.status).to eq("completed")
+      expect(run.processed_count).to eq(1)
+      expect(email.reload.read).to be true
+    end
+
+    it "resumes a run stranded in running by a crashed worker" do
+      run.update!(status: :running)
+
+      described_class.perform_now(run.id)
+
+      expect(run.reload.status).to eq("completed")
+    end
+
+    it "skips an email whose actions raise and still completes the run" do
+      bad = make_email(subject: "invoice", read: false, provider_message_id: "msg_bad")
+      allow(MarkReadJob).to receive(:perform_later).with(account.id, [ "msg_bad" ])
+        .and_raise(RuntimeError, "provider hiccup")
+
+      described_class.perform_now(run.id)
+
+      expect(run.reload.status).to eq("completed")
+      expect(run.processed_count).to eq(2)
+      expect(email.reload.read).to be true
+      expect(bad.reload.read).to be true # DB update happened before the provider push raised
     end
   end
 end

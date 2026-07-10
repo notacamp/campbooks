@@ -218,9 +218,17 @@ RSpec.describe EmailRules::Applier, type: :service do
         create(:email_thread, email_account: account).tap { |t| email.update_columns(email_thread_id: t.id) }
       end
 
-      it "increments rule.matched_count by 1 per apply call" do
+      it "does not increment matched_count from #apply (retro runs report via their run record)" do
         expect {
           described_class.new(email).apply(rule)
+        }.not_to change { rule.reload.matched_count }
+      end
+
+      it "increments matched_count once per matching rule on the ingest path (#call)" do
+        email.update!(from_address: "billing@a.com")
+
+        expect {
+          described_class.new(email).call
         }.to change { rule.reload.matched_count }.by(1)
       end
     end
@@ -262,6 +270,35 @@ RSpec.describe EmailRules::Applier, type: :service do
         described_class.new(email).apply(rule, run: run)
         expect(run.archived_email_ids).to be_empty
         expect(run.marked_read_email_ids).to be_empty
+      end
+
+      it "appends to tagged_email_ids only when a tag row was actually created" do
+        tag = create(:tag, workspace: workspace)
+        rule.tags << tag
+
+        described_class.new(email).apply(rule, run: run)
+        expect(run.tagged_email_ids).to include(email.id)
+
+        run2 = create(:email_rule_run, email_rule: rule, workspace: workspace, undoable: true)
+        described_class.new(email).apply(rule, run: run2)
+        expect(run2.tagged_email_ids).to be_empty
+      end
+
+      it "does not record archived_email_ids when Tools::Archive fails" do
+        allow(Tools::Archive).to receive(:call).and_return(nil)
+
+        described_class.new(email).apply(rule, run: run)
+        expect(run.archived_email_ids).to be_empty
+      end
+
+      it "does not record archived_email_ids when the email was already archived" do
+        email.update_columns(provider_folder_id: "Archive")
+        allow(Tools::Archive).to receive(:call)
+
+        described_class.new(email).apply(rule, run: run)
+
+        expect(Tools::Archive).not_to have_received(:call)
+        expect(run.archived_email_ids).to be_empty
       end
 
       it "appends to moved_email_ids when email is moved to folder" do

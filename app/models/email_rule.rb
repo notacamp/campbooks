@@ -72,11 +72,15 @@ class EmailRule < ApplicationRecord
     self.criteria = normalised
   end
 
+  # The account selector only narrows scope — it is not a condition.  Without
+  # this distinction, an account-only rule would match that account's entire
+  # mailbox (catastrophic when combined with the archive action).
   def criteria_present
-    populated = criteria.reject { |_, v| v.nil? || (v.is_a?(Array) && v.empty?) || v == false }
-    return if populated.any?
+    conditions = criteria.except("email_account_id")
+      .reject { |_, v| v.nil? || (v.is_a?(Array) && v.empty?) || v == false }
+    return if conditions.any?
 
-    errors.add(:criteria, "at least one criterion is required (a rule with empty criteria would match all mail)")
+    errors.add(:criteria, "at least one condition is required (a rule with no conditions would match all mail)")
   end
 
   def action_present

@@ -752,6 +752,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_10_210003) do
     t.integer "processed_count", default: 0, null: false
     t.uuid "started_by_id"
     t.integer "status", default: 0, null: false
+    t.jsonb "tagged_email_ids", default: [], null: false
     t.boolean "undoable", default: true, null: false
     t.datetime "updated_at", null: false
     t.uuid "workspace_id", null: false
