@@ -30,34 +30,39 @@ RSpec.describe Ai::BankStatementParser do
 
   after { Current.workspace = nil }
 
-  describe "page rasterization (regression: prod 2026-07-09)" do
-    # MiniMagick 5 validates the path handed to .open, so the ImageMagick
-    # bracket syntax ("file.pdf[0]") raises ENOENT. The page must be selected
-    # via #page AFTER opening. This spec drives the real rasterize_page method
-    # with a mocked MiniMagick and fails if the bracket syntax comes back.
-    it "opens the tempfile path without bracket page syntax and selects the page via #page" do
-      image = double("MiniMagick::Image", path: "/tmp/converted.jpg")
-      opened_paths = []
+  describe "page rasterization (regressions: prod 2026-07-09 and 2026-07-10)" do
+    # 07-09: bracket syntax passed to Image.open raised ENOENT on every page.
+    # 07-10: the "fix" used Image#format + Image#page — canvas geometry, not a
+    # page selector — producing junk thumbnails on multipage PDFs. The correct
+    # mechanism is the convert tool with a bracketed INPUT and density BEFORE
+    # the input. Real-ImageMagick coverage lives in pdf_rasterization_spec.rb;
+    # this example pins the tool invocation shape without needing ImageMagick.
+    it "renders via the convert tool: density first, bracketed input, explicit output" do
+      recorded = []
+      tool = double("convert")
+      allow(tool).to receive(:density) { |v| recorded << [ :density, v ] }
+      allow(tool).to receive(:quality) { |v| recorded << [ :quality, v ] }
+      allow(tool).to receive(:<<)      { |v| recorded << [ :arg, v ] }
+      allow(MiniMagick).to receive(:convert) { |&blk| blk.call(tool) }
+      big_jpeg = "x" * (described_class::MIN_RENDER_BYTES + 1)
+      allow(File).to receive(:binread).and_return(big_jpeg)
 
-      allow(MiniMagick::Image).to receive(:open) do |path|
-        opened_paths << path
-        raise Errno::ENOENT, path if path.include?("[")
+      part = described_class.new(document).send(:rasterize_page, "%PDF-1.4 fake", 1)
 
-        image
-      end
-      allow(image).to receive(:format)
-      allow(image).to receive(:density)
-      allow(image).to receive(:page)
-      allow(File).to receive(:binread).with("/tmp/converted.jpg").and_return("jpegbytes")
-
-      part = described_class.new(document).send(:rasterize_page, "%PDF-1.4 fake", 2)
-
-      expect(opened_paths).to all(satisfy { |p| !p.include?("[") })
-      expect(image).to have_received(:page).with("2")
+      expect(recorded.first.first).to eq(:density) # density must precede the input
+      input = recorded.find { |k, v| k == :arg && v.to_s.include?(".pdf") }
+      expect(input.last).to match(/\.pdf\[1\]\z/) # page via bracketed input arg
       expect(part).to include(type: :image, media_type: "image/jpeg")
     end
-  end
 
+    it "treats a suspiciously small render as a failed page" do
+      tool = double("convert", density: nil, quality: nil, "<<": nil)
+      allow(MiniMagick).to receive(:convert) { |&blk| blk.call(tool) }
+      allow(File).to receive(:binread).and_return("tiny")
+
+      expect(described_class.new(document).send(:rasterize_page, "%PDF-1.4 fake", 0)).to be_nil
+    end
+  end
   describe "when no pages can be rasterized" do
     it "raises ParseError instead of sending an imageless prompt" do
       parser = described_class.new(document)

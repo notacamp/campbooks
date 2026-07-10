@@ -16,6 +16,12 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.19.6] - 2026-07-10
+
+### Fixed
+
+- **Accounting: multipage PDF statements rendered as junk thumbnails on OpenAI/Mistral providers.** Page selection used MiniMagick's `Image#page` — which sets canvas geometry, not the page — so multi-page statements (e.g. Millennium combined extracts) reached the model as unreadable images and parsed to zero transactions. Pages are now rendered through ImageMagick's convert tool (`-density 150 input.pdf[N]`), suspiciously small renders are treated as failures, and the shared document-analysis rasterizer got the same fix (multi-page invoices were affected too).
+
 ## [0.19.5] - 2026-07-10
 
 ### Fixed
