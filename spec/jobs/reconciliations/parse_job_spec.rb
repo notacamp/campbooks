@@ -224,3 +224,26 @@ RSpec.describe Reconciliations::ParseJob, type: :job do
     end
   end
 end
+
+RSpec.describe Reconciliations::ParseJob, "zero-amount row filtering" do
+  let(:workspace) { create(:workspace) }
+  let(:user)      { create(:user, workspace:) }
+  let(:document) do
+    doc = workspace.documents.build(document_type: :bank_statement, ai_status: :skipped,
+                                    review_status: :pending, source: :manual_upload)
+    csv = "Date;Description;Amount\n01-07-2025;SALDO INICIAL;0,00\n01-07-2025;TRF TAXLIBRIS;-233,70\n31-07-2025;SALDO FINAL;0,00\n"
+    doc.original_file.attach(io: StringIO.new(csv), filename: "s.csv", content_type: "text/csv")
+    doc.save!
+    doc
+  end
+  let(:reconciliation) { create(:reconciliation, workspace:, created_by: user, statement_document: document) }
+
+  before { allow_any_instance_of(described_class).to receive(:broadcast_update!) }
+
+  it "drops balance/summary rows so only real movements are inserted" do
+    described_class.perform_now(reconciliation.id)
+
+    amounts = reconciliation.reload.bank_transactions.pluck(:amount_cents)
+    expect(amounts).to eq([ -23370 ])
+  end
+end

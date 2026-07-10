@@ -298,6 +298,9 @@ module Ai
 
         RULES:
         - Include EVERY transaction row — do not skip any.
+        - EXCLUDE balance/summary lines (opening balance, closing balance, available
+          balance, "SALDO", totals) — they are not transactions; report those values
+          only in opening_balance_cents / closing_balance_cents.
         - amounts must be signed decimals: negative means money left the account (debit/payment),
           positive means money entered the account (credit/receipt).
         - Dates must be YYYY-MM-DD.
