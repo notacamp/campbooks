@@ -42,14 +42,17 @@ module InboxSettings
     end
 
     def update
-      @rule.tag_ids = permitted_tag_ids
-
-      if @rule.update(rule_params)
-        enqueue_run_on_existing if run_on_existing?
-        # -> update.turbo_stream.erb
-      else
-        render_form_errors
+      # tag_ids= persists immediately on a saved record, so wrap the whole
+      # update in a transaction: a validation failure must not half-apply.
+      ActiveRecord::Base.transaction do
+        @rule.tag_ids = permitted_tag_ids
+        @rule.update!(rule_params)
       end
+
+      enqueue_run_on_existing if run_on_existing?
+      # -> update.turbo_stream.erb
+    rescue ActiveRecord::RecordInvalid
+      render_form_errors
     end
 
     def destroy

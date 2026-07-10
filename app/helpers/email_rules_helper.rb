@@ -1,13 +1,6 @@
 # frozen_string_literal: true
 
 module EmailRulesHelper
-  CATEGORY_HUMAN = {
-    "notifications" => nil,  # resolved via i18n at render time
-    "promotions"    => nil,
-    "social"        => nil,
-    "updates"       => nil
-  }.freeze
-
   # Plain-language summary of a rule's active criteria for display in the list row.
   # Returns an HTML-safe string like:
   #   From <b>@stripe.com</b> · subject contains <b>"invoice"</b>
