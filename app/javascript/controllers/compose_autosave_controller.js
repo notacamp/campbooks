@@ -20,9 +20,11 @@ export default class extends Controller {
   }
 
   static DEBOUNCE_MS = 1500
+  static SAVED_STATUS_MS = 2500 // how long "Draft saved" lingers before it fades away
 
   connect() {
     this._timer = null
+    this._statusTimer = null
     this._suspended = false
     this._dirty = false
     this._creating = false
@@ -34,6 +36,7 @@ export default class extends Controller {
 
   disconnect() {
     clearTimeout(this._timer)
+    clearTimeout(this._statusTimer)
     document.removeEventListener("turbo:before-visit", this._flushBound)
     window.removeEventListener("pagehide", this._flushBound)
   }
@@ -178,8 +181,30 @@ export default class extends Controller {
     if (this.hasDraftIdInputTarget) this.draftIdInputTarget.value = id
   }
 
+  // The status label doubles as a toast. "Saving…" is transient state that the
+  // next status supersedes, but "Draft saved" is a terminal confirmation that
+  // would otherwise linger forever — so it auto-clears (with a short fade) like a
+  // toast, instead of sitting in the composer indefinitely.
   _setStatus(text) {
-    if (this.hasStatusTarget) this.statusTarget.textContent = text
+    if (!this.hasStatusTarget) return
+    clearTimeout(this._statusTimer)
+    const el = this.statusTarget
+    el.style.transition = ""
+    el.style.opacity = "1"
+    el.textContent = text
+    if (text === this.savedTextValue) {
+      this._statusTimer = setTimeout(() => this._fadeStatus(), this.constructor.SAVED_STATUS_MS)
+    }
+  }
+
+  _fadeStatus() {
+    if (!this.hasStatusTarget) return
+    const el = this.statusTarget
+    el.style.transition = "opacity 300ms ease-out"
+    el.style.opacity = "0"
+    this._statusTimer = setTimeout(() => {
+      if (this.hasStatusTarget) this.statusTarget.textContent = ""
+    }, 300)
   }
 
   _headers() {
