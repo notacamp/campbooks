@@ -16,6 +16,10 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The composer's "Draft saved" confirmation no longer lingers forever.** After an autosave the composer showed a "Draft saved" label that never went away — in the floating compose dock it read like a toast that refused to dismiss. It now fades out a couple of seconds after saving, while the transient "Saving…" state still shows while a save is in flight.
+
 ## [0.21.1] - 2026-07-10
 
 ### Fixed
