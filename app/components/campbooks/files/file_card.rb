@@ -17,7 +17,8 @@ module Campbooks
       def view_template
         div(id: helpers.dom_id(@doc, :card),
           class: "flex items-center gap-3 rounded-xl border border-gray-200 bg-card p-3 shadow-sm dark:border-white/10") do
-          a(href: helpers.document_path(@doc), class: "flex min-w-0 flex-1 items-center gap-3") do
+          # Inside the `files_results` frame — break out (see FileRow).
+          a(href: helpers.document_path(@doc), class: "flex min-w-0 flex-1 items-center gap-3", data: { turbo_frame: "_top" }) do
             span(class: "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground") { raw(safe(type_icon)) }
             span(class: "min-w-0 flex-1") do
               span(class: "block truncate text-sm font-medium text-foreground") { @doc.display_title }

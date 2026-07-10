@@ -69,8 +69,11 @@ module Campbooks
         end
       end
 
+      # Menu links leave the list (document page / file download) — break out of
+      # the `files_results` frame the rows render in, or Turbo shows "Content
+      # missing" (the target pages don't carry that frame).
       def menu_link(href, label)
-        a(href: href, class: menu_item_classes) { label }
+        a(href: href, class: menu_item_classes, data: { turbo_frame: "_top" }) { label }
       end
 
       def menu_item_classes

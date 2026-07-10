@@ -16,6 +16,17 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.22.2] - 2026-07-10
+
+### Fixed
+
+- **Files: opening a file works again.** Clicking a file (or an internal document
+  or filed email) in the Files list showed a "Content missing" placeholder instead
+  of the document — the list lives inside the frame that live-updates search and
+  filters, and since v0.21.0 the row links navigated that frame instead of the
+  page. Row links (including the row menu's Open and Download) now open the full
+  page, on desktop and mobile.
+
 ## [0.22.1] - 2026-07-10
 
 ### Fixed
