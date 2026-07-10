@@ -16,6 +16,12 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.19.7] - 2026-07-10
+
+### Fixed
+
+- **Accounting: multipage PDF statements only sent their cover page to the AI.** The page counter used `identify "file.pdf[0]"` with `%n`, which reports the size of the *selected* list — always 1 — so only page one was rasterized and statements whose transactions live on later pages parsed to zero. Pages are now counted from the PDF's actual frame list.
+
 ## [0.19.6] - 2026-07-10
 
 ### Fixed
