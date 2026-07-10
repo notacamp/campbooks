@@ -16,10 +16,14 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.21.1] - 2026-07-10
+
 ### Fixed
 
 - **Emails sent from Campbooks never appeared in the Sent folder.** The locally recorded copy was filed under a `"sent"` placeholder id that the Sent folder view (which filters on the provider's real folder ids) could never match — and the sync kept the placeholder forever. Sends now record under the account's real Sent folder id (visible immediately), and the next scan heals any existing placeholder rows.
 - **One un-parseable Zoho message no longer stalls a mailbox's sync.** Zoho truncates message summaries and can cut an emoji in half, producing invalid JSON that poisoned the whole page — freezing that folder and every folder after it in the scan (deep pages permanently blocked the 15-minute full reconcile). Zoho responses now scrub lone UTF-16 surrogate escapes on parse failure, and a folder that still errors is skipped and recorded on the scan log instead of aborting the remaining folders.
+
+## [0.21.0] - 2026-07-10
 
 ### Added
 
@@ -1413,7 +1417,8 @@ major, minor, or patch change here.
 
 - Initial public, source-available release of Campbooks.
 
-[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.21.1...HEAD
+[0.21.1]: https://github.com/notacamp/campbooks/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/notacamp/campbooks/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/notacamp/campbooks/compare/v0.19.9...v0.20.0
 [0.17.0]: https://github.com/notacamp/campbooks/compare/v0.16.0...v0.17.0
