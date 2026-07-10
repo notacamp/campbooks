@@ -33,6 +33,34 @@ es:
       file_meta:
         kind_file: Archivo
         kind_image: Imagen
+      filter_chips:
+        date_from_prefix: "Desde:"
+        date_to_prefix: "Hasta:"
+        starred: Con estrella
+      filter_panel:
+        ai_status: Procesamiento
+        amount_max: Importe máx. (EUR)
+        amount_min: Importe mín. (EUR)
+        any_category: Todas las categorías
+        any_expense_category: Todas las categorías
+        any_folder: Todas las carpetas
+        any_processing: Cualquier estado
+        any_source: Todas las fuentes
+        any_status: Todos los estados
+        category: Categoría
+        clear_filters: Borrar filtros
+        date_from: Fecha inicial
+        date_to: Fecha final
+        entity: Proveedor / entidad
+        entity_placeholder: ej. Vodafone, EDP
+        expense_category: Categoría de gasto
+        folder: Carpeta
+        number_placeholder: ej. FAC-001
+        reference_number: Referencia #
+        review_status: Estado de revisión
+        source: Origen
+        starred: Solo con estrella
+        type: Tipo de documento
       folder_sharing:
         add_button: Añadir
         add_title: Añadir personas
@@ -53,8 +81,34 @@ es:
         you_badge: Tú
       search_bar:
         clear: Borrar búsqueda
+        filters: Filtros
         placeholder: Buscar archivos…
-        submit: Buscar
+        searching: Buscando…
+        suggest:
+          after: documentos después de una fecha
+          amount_gt: documentos con importe mayor que
+          amount_lt: documentos con importe menor que
+          before: documentos antes de una fecha
+          category: por categoría de documento
+          expense: por categoría de gasto
+          heading: Refinar búsqueda
+          in: documentos en una carpeta
+          is: por estado o etiqueta
+          number: por número de referencia
+          source: por origen del documento
+          type: por tipo de documento
+          values:
+            approved: aprobado
+            email: correo electrónico
+            failed: fallido
+            notion: notion
+            pending: por revisar
+            processing: procesando
+            rejected: rechazado
+            sent: correo enviado
+            starred: con estrella
+            upload: carga manual
+          vendor: por proveedor o entidad
       sidebar:
         all_files: Todos los archivos
         label: Carpetas
@@ -90,17 +144,6 @@ es:
       exports_col_status: Estado
       exports_heading: Exportaciones recientes
       files_section: Archivos
-      filter_all_categories: Todas las categorías
-      filter_all_folders: Todas las carpetas
-      filter_all_statuses: Todos los estados
-      filter_all_types: Todos los tipos
-      filter_category: Categoría
-      filter_folder: Carpeta
-      filter_month: Mes
-      filter_status: Estado
-      filter_type: Tipo
-      filter_types_selected: "%{count} seleccionado(s)"
-      filters: Filtros
       internal_documents: Documentos internos
       manage_access: Gestionar acceso
       manage_access_locked: Gestionar acceso · Privado
@@ -140,3 +183,4 @@ es:
         uploaded_one: Archivo subido.
       destroy:
         deleted: Archivo eliminado.
+        statement_document: No se puede eliminar este documento — está vinculado a una conciliación bancaria.

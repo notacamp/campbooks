@@ -21,11 +21,13 @@ export default class extends Controller {
   static values = {
     debounce: { type: Number, default: 300 },
     suggestions: { type: Array, default: [] },
-    inboxUrl: String
+    inboxUrl: String,
+    frameId: { type: String, default: "email_search_results" },
+    headingText: { type: String, default: "" }
   }
 
   connect() {
-    this.frame = document.getElementById("email_search_results")
+    this.frame = document.getElementById(this.frameIdValue)
     // Wrapper around the results frame — carries data-searching to swap the stale
     // list for the skeleton placeholder while a fetch is in flight.
     this.pane = document.getElementById("email_search_pane")
@@ -520,7 +522,7 @@ export default class extends Controller {
       "aria-hidden": "true"
     })
     // Static heading text — set as attribute to avoid innerHTML with user data.
-    h.textContent = this.element.dataset.emailSearchHeadingText || "Refine your search"
+    h.textContent = this.headingTextValue || this.element.dataset.emailSearchHeadingText || "Refine your search"
     this.suggestionsListTarget.appendChild(h)
   }
 

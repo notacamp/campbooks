@@ -20,6 +20,19 @@ class Document < ApplicationRecord
   has_many :task_documents, dependent: :destroy
   has_many :tasks, through: :task_documents
 
+  has_many :transaction_matches, dependent: :destroy
+  has_many :bank_transactions, through: :transaction_matches
+
+  # A document used as a reconciliation statement cannot be deleted while the
+  # reconciliation exists (the FK is :restrict). Declaring restrict_with_error
+  # here causes document.destroy to return false and populate errors, giving the
+  # controller a clean signal to flash an error instead of 500-ing on the PG FK.
+  has_many :reconciliations_as_statement,
+           class_name:  "Reconciliation",
+           foreign_key: :statement_document_id,
+           dependent:   :restrict_with_error,
+           inverse_of:  :statement_document
+
   # Stage 3 "filesystem" layer — folders this document is filed into (its *place*,
   # orthogonal to its DocumentType *kind*).
   has_many :folder_memberships, as: :folderable, dependent: :destroy
@@ -173,6 +186,51 @@ class Document < ApplicationRecord
   }
 
   scope :not_pushed_to_drive, -> { where(google_drive_push_status: [ :not_pushed, :failed ]) }
+
+  # ── Filter scopes (Documents::Filters) ──────────────────────────────────────
+
+  scope :by_source, ->(values) {
+    vals = Array(values).reject(&:blank?)
+    where(source: vals) if vals.any?
+  }
+  scope :starred_only, ->(flag) { where(starred: true) if flag }
+  scope :document_date_from, ->(d) { where("documents.document_date >= ?", d) if d.present? }
+  scope :document_date_to,   ->(d) { where("documents.document_date <= ?", d) if d.present? }
+  scope :amount_at_least, ->(cents) { where("documents.amount_cents >= ?", cents) if cents.present? }
+  scope :amount_at_most,  ->(cents) { where("documents.amount_cents <= ?", cents) if cents.present? }
+
+  # OR across vendor_name / client_name / bank_name / sender_name for each term;
+  # multiple terms are themselves OR'd together — composed via relation.or over a
+  # literal SQL fragment (no runtime-built SQL strings, which Brakeman flags).
+  scope :by_entity, ->(terms) {
+    terms = Array(terms).reject(&:blank?)
+    next unless terms.any?
+
+    terms.map { |term|
+      where(
+        "documents.vendor_name ILIKE :t OR documents.client_name ILIKE :t OR " \
+        "documents.bank_name ILIKE :t OR documents.sender_name ILIKE :t",
+        t: "%#{sanitize_sql_like(term)}%"
+      )
+    }.reduce(:or)
+  }
+
+  scope :by_reference, ->(terms) {
+    terms = Array(terms).reject(&:blank?)
+    next unless terms.any?
+
+    terms.map { |term|
+      where(
+        "documents.invoice_number ILIKE :t OR documents.receipt_number ILIKE :t",
+        t: "%#{sanitize_sql_like(term)}%"
+      )
+    }.reduce(:or)
+  }
+
+  scope :by_expense_category, ->(values) {
+    vals = Array(values).reject(&:blank?)
+    where(expense_category: vals) if vals.any?
+  }
 
   def generate_canonical_filename!
     self.canonical_filename = Documents::FilenameGenerator.new(self).call
@@ -402,6 +460,33 @@ class Document < ApplicationRecord
     document_date || created_at
   end
 
+  # ── NIF (VAT number) check ────────────────────────────────────────────────────
+  #
+  # Compares the buyer NIF on this document against the workspace's company NIF.
+  # Only applies to expense-side document types (expense_invoice, receipt, credit_note).
+  #
+  # @param company_nif [String, nil] the workspace's company VAT number
+  # @return [Symbol, nil] :ok, :missing, :mismatch, or nil when not applicable
+  NIF_APPLICABLE_TYPES = %w[expense_invoice receipt credit_note].freeze
+
+  def nif_status(company_nif)
+    return nil if company_nif.blank?
+    return nil unless NIF_APPLICABLE_TYPES.include?(document_type.to_s)
+
+    # If the doc explicitly says company VAT is present (from AI extraction), trust it.
+    return :ok if company_vat_present?
+
+    normalized_company = nif_normalize(company_nif)
+
+    if buyer_nif.blank?
+      :missing
+    elsif nif_normalize(buyer_nif) == normalized_company
+      :ok
+    else
+      :mismatch
+    end
+  end
+
   def searchable_fields_changed?
     saved_change_to_description? || saved_change_to_ai_extraction_data? ||
       saved_change_to_vendor_name? || saved_change_to_client_name? ||
@@ -411,6 +496,12 @@ class Document < ApplicationRecord
   end
 
   private
+
+  # Normalize a NIF/VAT number for comparison: upcase, remove spaces/dots/dashes,
+  # strip leading "PT" country prefix (Portuguese NIF is 9 digits, may be prefixed).
+  def nif_normalize(raw)
+    raw.to_s.upcase.gsub(/[\s.\-]/, "").delete_prefix("PT")
+  end
 
   # Thin metadata for document.* events.
   def tracking_payload

@@ -22,11 +22,19 @@ module Campbooks
       private
 
       def suggested_body
+        # A suggestion whose date has already passed isn't "upcoming" — surface it as
+        # something that may have slipped by, not a silent to-do (Task#overdue? is
+        # active-only, so check the date directly here).
+        forgotten = subject.due_at.present? && subject.due_at.past?
         div(class: "flex flex-wrap items-center gap-x-1.5 text-[12.5px]") do
-          span(class: "font-medium text-foreground") { t(".suggested") }
+          if forgotten
+            span(class: "font-medium text-amber-600 dark:text-amber-500") { t(".missed") }
+          else
+            span(class: "font-medium text-foreground") { t(".suggested") }
+          end
           if subject.due_at
             span(class: "text-muted-foreground/50") { "·" }
-            span(class: "font-medium text-muted-foreground") { due_text }
+            span(class: class_names("font-medium", forgotten ? "text-amber-600 dark:text-amber-500" : "text-muted-foreground")) { due_text }
           end
         end
         a(href: helpers.task_path(subject),

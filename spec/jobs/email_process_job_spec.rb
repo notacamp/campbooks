@@ -260,5 +260,91 @@ RSpec.describe EmailProcessJob, type: :job do
         expect(email_message.reload.provider_folder_id).to eq("ARCHIVE")
       end
     end
+
+    # Our own digests are delivered to the user's mailbox and re-ingested here. They
+    # must stay readable but skip the whole AI pipeline — even with a provider set up,
+    # so this proves the self_generated flag (not the AI gate) does the skipping.
+    context "when the email is self-generated (our own digest)" do
+      let(:email_message) do
+        create(:email_message,
+          email_account: account,
+          email_scan_log: scan_log,
+          status: :fetched,
+          has_attachment: false,
+          self_generated_kind: "digest")
+      end
+
+      before { allow(Ai::ProviderSetup).to receive(:configured?).and_return(true) }
+
+      it "stays readable and visible but runs none of the AI pipeline" do
+        expect(Emails::Triage).not_to receive(:new)
+        expect(Contacts::Identifier).not_to receive(:new)
+
+        expect { described_class.perform_now(email_message.id) }
+          .not_to have_enqueued_job(Reminders::EmailExtractionJob)
+
+        email_message.reload
+        # Readable: body fetched, marked processed, threaded into the inbox.
+        expect(email_message.status).to eq("processed")
+        expect(email_message.body).to eq("<html>Email body</html>")
+        expect(email_message.email_thread).to be_present
+        # Not mined: no triage tags applied.
+        expect(email_message.tags).to be_empty
+      end
+    end
+
+    # -----------------------------------------------------------------------
+    # EmailRules hook
+    # -----------------------------------------------------------------------
+    context "email rules" do
+      let(:workspace) { account.workspace }
+      let(:tag)       { create(:tag, workspace: workspace) }
+      # mark_read: true satisfies action_present validation at creation time
+      # before the tag association is persisted.
+      let!(:rule) do
+        r = create(:email_rule, workspace: workspace,
+                   criteria: { "subject" => [ "invoice" ] },
+                   archive: false, mark_read: true, enabled: true)
+        r.tags << tag
+        r
+      end
+
+      before { allow(MarkReadJob).to receive(:perform_later) }
+
+      let(:email_message) do
+        create(:email_message,
+          email_account: account,
+          email_scan_log: scan_log,
+          status: :fetched,
+          subject: "Invoice #42",
+          from_address: "billing@vendor.com")
+      end
+
+      it "applies enabled rules on first ingest" do
+        described_class.perform_now(email_message.id)
+        expect(email_message.reload.tags).to include(tag)
+      end
+
+      it "does NOT re-apply rules on reprocess (was_already_processed guard)" do
+        # First ingest: rule fires, tag applied.
+        described_class.perform_now(email_message.id)
+        initial_count = EmailMessageTag.count
+
+        # Remove rule so it would never match again, but the reprocess
+        # guard should stop EmailRules::Applier.new(email).call entirely.
+        rule.destroy
+
+        described_class.perform_now(email_message.id)
+        # No new tags created on reprocess.
+        expect(EmailMessageTag.count).to eq(initial_count)
+      end
+
+      it "does not fail ingestion when a rule raises" do
+        allow_any_instance_of(EmailRules::Applier).to receive(:call).and_raise(RuntimeError, "rule error")
+
+        expect { described_class.perform_now(email_message.id) }.not_to raise_error
+        expect(email_message.reload.status).to eq("processed")
+      end
+    end
   end
 end

@@ -2,14 +2,26 @@
 <%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
 
 <div class="max-w-2xl">
-  <%= form_with model: current_user, url: settings_general_path, method: :patch, class: "bg-card rounded-xl shadow-sm border border-gray-200 p-6" do |f| %>
+  <%# Scope-less form on purpose: Settings::GeneralController reads TOP-LEVEL
+      params (params[:workspace_context] / params[:company_nif]). A model-scoped
+      form nests them under user[...] — the controller then reads nil and wipes
+      the stored values (prod data-loss incident, 2026-07-09 / v0.19.2). The
+      request + view specs pin these exact param names; keep form and controller in sync. %>
+  <%= form_with url: settings_general_path, method: :patch, class: "bg-card rounded-xl shadow-sm border border-gray-200 p-6" do %>
     <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".workspace_profile_heading") %></h2>
     <p class="text-sm text-gray-500 mb-4"><%= t(".workspace_profile_desc") %></p>
     <div class="mb-4">
-      <%= f.label :workspace_context, t(".workspace_context_label"), class: "block text-sm font-medium text-gray-700 mb-1" %>
-      <%= f.text_area :workspace_context, rows: 6,
+      <%= label_tag :workspace_context, t(".workspace_context_label"), class: "block text-sm font-medium text-gray-700 mb-1" %>
+      <%= text_area_tag :workspace_context, Current.workspace&.workspace_context, rows: 6,
             class: "block w-full rounded-lg border-gray-300 shadow-sm focus:border-accent-500 focus:ring-accent-500 sm:text-sm",
             placeholder: t(".workspace_context_placeholder") %>
+    </div>
+    <div class="mb-4">
+      <%= label_tag :company_nif, t(".company_nif_label"), class: "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" %>
+      <p class="text-xs text-gray-500 dark:text-gray-400 mb-2"><%= t(".company_nif_hint") %></p>
+      <%= text_field_tag :company_nif, Current.workspace&.company_nif,
+            class: "block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-accent-500 focus:ring-accent-500 sm:text-sm dark:bg-gray-800 dark:text-gray-100",
+            placeholder: "PT123456789" %>
     </div>
     <div class="flex items-center justify-between">
       <%= render(Campbooks::Button.new(variant: :primary, type: :submit)) { t(".save_profile") } %>

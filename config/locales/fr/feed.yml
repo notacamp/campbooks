@@ -76,10 +76,12 @@ fr:
         starred: Mis en avant
         unstar: Retirer la mise en avant
       tag_suggestion_card:
+        filed_prefix: Classé
         file_it: Classer
         not_now: Pas maintenant
         prefix: Classer
         under: sous
+        undo: Annuler
       task_card:
         accept: Ajouter aux tâches
         complete: Terminer
@@ -87,6 +89,7 @@ fr:
         in_days:
           one: Dans %{count} jour
           other: Dans %{count} jours
+        missed: Vous l'avez peut-être oublié
         overdue: En retard
         suggested: Tâche suggérée
         today: À rendre aujourd'hui
@@ -110,6 +113,7 @@ fr:
       task_accepted: 'Ajoutée à vos tâches : %{title}'
       task_completed: 'Tâche terminée : %{title}'
       task_dismissed: Suggestion ignorée.
+      tag_filing_undone: Étiquette supprimée.
       unsupported: Cette action n'est pas prise en charge ici.
   home:
     index:
@@ -149,5 +153,18 @@ fr:
         single: Un seul élément requiert votre attention — Scout a classé le reste.
         some: "%{n} éléments requièrent votre attention — Scout les a empilés. Un
           coup d'œil et c'est plié."
+        syncing: Scout lit votre boîte — les e-mails triés apparaîtront ici dès qu'ils
+          seront prêts.
+      syncing_body: Les e-mails triés apparaissent ici au fur et à mesure. Les grandes
+        boîtes peuvent prendre quelques minutes.
+      syncing_cta: Regarder la boîte se remplir
+      syncing_title: Scout lit votre boîte de réception
       take_tour: Faire la visite
       your_feed: Votre fil
+    persona_applied:
+      body_html: Scout surveillera <strong>%{items}</strong> à mesure que votre courrier
+        arrive.
+      exploring_body: Scout utilisera des paramètres intelligents par défaut. Vous
+        pouvez ajouter des types de documents à tout moment dans les Paramètres.
+      heading: Compris
+      settings_link: Modifier dans les Paramètres

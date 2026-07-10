@@ -1,0 +1,29 @@
+<%# Turbo Stream replacement for the first-sync persona card once the user
+    submits their selection (or skips). Replaces the picker in place.
+    Locals: keys (Array of String template keys), result (Hash with :tags and :document_types arrays). %>
+<%
+  exploring = keys.blank? || keys == ["just_exploring"]
+  unless exploring
+    all_items  = result[:tags].to_a + result[:document_types].to_a
+    item_names = all_items.first(4).map { |r| r.respond_to?(:name) ? r.name : r.to_s }.join(", ")
+    # Idempotent re-apply creates nothing — fall back to the chosen templates' names.
+    item_names = keys.map { |k| t("onboarding.steps.template.templates.#{k}.name") }.join(", ") if item_names.blank?
+  end
+%>
+<div id="first-sync-persona"
+     class="mt-9 w-full max-w-sm rounded-2xl border px-4 py-3 text-left animate-fade-in <%= exploring ? 'border-border bg-muted/40 dark:bg-muted/20' : 'border-green-200 bg-green-50 dark:border-green-500/30 dark:bg-green-500/10' %>">
+  <p class="text-sm font-semibold <%= exploring ? 'text-foreground' : 'text-green-900 dark:text-green-200' %>">
+    <%= t(".heading") %>
+  </p>
+  <% if exploring %>
+    <p class="mt-1 text-xs text-muted-foreground"><%= t(".exploring_body") %></p>
+  <% else %>
+    <p class="mt-1 text-xs text-green-800/80 dark:text-green-300">
+      <%= t(".body_html", items: item_names) %>
+    </p>
+  <% end %>
+  <a href="<%= settings_setup_template_path %>"
+     class="mt-2 inline-block text-xs font-medium underline-offset-2 hover:underline <%= exploring ? 'text-muted-foreground' : 'text-green-800 dark:text-green-300' %>">
+    <%= t(".settings_link") %>
+  </a>
+</div>

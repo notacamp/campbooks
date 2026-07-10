@@ -3,6 +3,9 @@ module Ai
     CONFIDENCE_THRESHOLD = 0.7
     PURPOSE = "document_analysis"
 
+    # Type names the AI sometimes produces that should never create a DocumentType record.
+    JUNK_TYPE_NAMES = %w[null none unknown n/a na].freeze
+
     BASE_PROMPT = <<~PROMPT
       You are a document analysis assistant specialized in Portuguese business documents.
 
@@ -40,6 +43,17 @@ module Ai
       8. For a "Certidão", "Declaração", or certificate, use "certificate".
       9. For a "Nota de Crédito" (NC) — a credit note that reverses, corrects, or refunds a prior invoice — use "credit_note", NOT "expense_invoice".
       10. Fill metadata fields according to the schema for the type you selected.
+      11. BUYER NIF (buyer_nif field): extract the TAX NUMBER of the BUYER / RECIPIENT of the invoice.
+          This is the entity that is being invoiced (the one that will pay). Look for labels:
+          "NIF", "Contribuinte", "N.º de Contribuinte", "NIF do Adquirente", "NIF do Cliente".
+          It is a 9-digit number, possibly prefixed "PT". Do NOT confuse it with the VENDOR'S NIF
+          (the seller's tax ID, which is a different party). If only one NIF appears and the document
+          is an expense invoice, it is more likely the vendor's NIF — leave buyer_nif null in that case.
+      12. currency must always be an ISO-4217 code (EUR, USD, GBP, …). Never output "Euro", "€", "$",
+          or any other non-code representation.
+      13. NEVER use "null", "none", "unknown", or "n/a" as a document_type value. If no type fits,
+          create a descriptive English snake_case name. Only "other" is acceptable as a fallback, and
+          only under the conditions in rule 4.
     PROMPT
 
     def initialize(document)
@@ -241,7 +255,12 @@ module Ai
 
       type_name = result[:document_type]&.downcase&.strip
 
-      dt = if type_name.present?
+      # Guard: AI sometimes returns junk type names despite the prompt instructions.
+      # Treat any of these as "other" (no custom type creation) to prevent polluting
+      # the workspace's document-type list with garbage entries.
+      type_name = "other" if type_name.present? && JUNK_TYPE_NAMES.include?(type_name)
+
+      dt = if type_name.present? && type_name != "other"
         # Scope to the document's workspace: DocumentType names are unique per
         # workspace and the association is `workspace` (there is no `organization`).
         @document.workspace.document_types.find_or_create_by!(name: type_name) do |t|

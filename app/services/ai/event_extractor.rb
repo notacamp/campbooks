@@ -16,6 +16,18 @@ module Ai
       Result.new(title: title, start_at: start_at, end_at: start_at + 3600, all_day: false, location: guess_location)
     end
 
+    # Returns true when the email text contains an explicit time mention (e.g.
+    # "2:30 PM", "3pm", "14:00"). Used as a cheap gate before showing the inline
+    # event-draft block on the email page — avoids surfacing the block on every
+    # email just because the extractor always returns a default.
+    # Quoted reply chains and "On … wrote:" attribution lines are excluded:
+    # their timestamps would otherwise trigger the block on every threaded reply.
+    def has_time_proposal?
+      scan = text.lines.reject { |l| l.lstrip.start_with?(">") || l.match?(/\bwrote:\s*$/i) }.join
+      scan.match?(/\b\d{1,2}:\d{2}\s*(?:am|pm)?\b/i) ||
+        scan.match?(/\b\d{1,2}\s*(?:am|pm)\b/i)
+    end
+
     private
 
     def text
@@ -26,10 +38,14 @@ module Ai
       @email.subject.to_s.sub(/^(?:re|fwd?|fw)\s*:\s*/i, "").strip.presence || "Event"
     end
 
-    # Default to tomorrow 09:00; nudge the day/time when the email clearly says so.
+    # Default to the day after the email arrived, at 09:00 — anchored to the email's
+    # own date, not "now", so drafting an event from a months-old email doesn't
+    # silently land it in the current year. "today" in the text pins it to the
+    # email's day. The user refines the date on the calendar afterwards.
     def guess_start
-      day = Date.current + 1
-      day = Date.current if text.match?(/\btoday\b/i)
+      base = @email.received_at&.in_time_zone&.to_date || Date.current
+      day = base + 1
+      day = base if text.match?(/\btoday\b/i)
       hour, min = guess_time
       Time.zone.local(day.year, day.month, day.day, hour, min)
     end

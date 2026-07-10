@@ -74,6 +74,11 @@ fr:
       error_cta: Vérifier la connexion du compte
       error_title: Scout n'a pas pu joindre votre boîte
       escape: Regarder la boîte se remplir
+      persona_heading: Pendant que Scout lit — avec quoi travaillez-vous surtout ?
+      persona_skip: Ignorer pour l'instant
+      persona_subheading: Choisissez une ou plusieurs options. Scout classe les documents
+        et étiquette les e-mails en conséquence dès le début.
+      persona_submit: Appliquer
       subtitle_done: "%{needs_you} choses vous attendent. Tout le reste est trié et
         hors du chemin."
       subtitle_done_calm: Rien ne vous attend pour le moment. Tout est trié et hors
@@ -175,6 +180,14 @@ fr:
       switch_link: Utiliser mes propres clés
       text_role: E-mail et chat
       title: Campbooks AI
+    event_draft_block:
+      add: Ajouter au calendrier
+      added: "Dans votre calendrier"
+      drafted_from: extrait de cet e-mail
+      edit: Modifier
+      error_generic: Impossible de créer l'événement. Veuillez réessayer.
+      retry: Réessayer
+      view: Voir
     markdown_editor:
       preview_tab: Aperçu
       write_tab: Écrire

@@ -1,0 +1,103 @@
+<%# Single source-of-truth for the reconciliation detail body.
+    Rendered by show.html.erb (HTML request) and broadcast by ParseJob.
+    Locals:
+      reconciliation: Reconciliation
+      transactions:   ActiveRecord::Relation or Array (first page)
+      next_page:      Integer or nil (pagy cursor; nil when broadcast from job) %>
+<% if reconciliation.parsing? || reconciliation.matching? %>
+  <div class="bg-card rounded-xl shadow-sm border border-border p-6 mb-6">
+    <div class="flex items-center gap-3 text-muted-foreground">
+      <%= render Campbooks::Spinner.new(size: :sm) %>
+      <span class="text-sm font-medium">
+        <%= reconciliation.parsing? ? t("reconciliations.show.status_parsing") : t("reconciliations.show.status_matching") %>
+      </span>
+    </div>
+  </div>
+  <div class="space-y-2">
+    <% 3.times do %>
+      <div class="bg-card rounded-lg border border-border px-6 py-4 animate-pulse">
+        <div class="flex items-center gap-4">
+          <div class="h-3 bg-muted rounded w-20"></div>
+          <div class="h-3 bg-muted rounded flex-1"></div>
+          <div class="h-3 bg-muted rounded w-16"></div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+<% elsif reconciliation.failed? %>
+  <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6">
+    <div class="flex items-start gap-3">
+      <svg class="w-5 h-5 text-red-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clip-rule="evenodd"/>
+      </svg>
+      <div>
+        <h3 class="text-sm font-semibold text-red-800 dark:text-red-300"><%= t("reconciliations.show.parse_failed_title") %></h3>
+        <p class="mt-1 text-sm text-red-700 dark:text-red-400">
+          <%= reconciliation.parse_error.presence || t("reconciliations.show.parse_failed_generic") %>
+        </p>
+        <p class="mt-2 text-xs text-red-600 dark:text-red-500"><%= t("reconciliations.show.parse_failed_hint") %></p>
+      </div>
+    </div>
+  </div>
+
+<% elsif reconciliation.ready? || reconciliation.pending? %>
+  <% if transactions.any? %>
+    <%# SummaryBar — status counts + NIF exceptions + "Confirm all N" button.
+        id="reconciliation_summary_bar" is the broadcast target from Matcher. %>
+    <% status_counts   = reconciliation.bank_transactions.group(:status).count %>
+    <% company_nif     = Current.workspace&.company_nif.presence %>
+    <% nif_exc_count   = if local_assigns.key?(:nif_exception_count)
+                           local_assigns[:nif_exception_count]
+                         elsif company_nif
+                           reconciliation.nif_exception_count(company_nif)
+                         else
+                           0
+                         end %>
+    <%= render "reconciliations/summary_bar",
+               reconciliation:      reconciliation,
+               status_counts:       status_counts,
+               nif_exception_count: nif_exc_count %>
+
+    <%# Desktop table — tbody ID used by show.turbo_stream.erb to append next pages %>
+    <div class="hidden md:block bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
+      <table class="min-w-full divide-y divide-border">
+        <thead class="bg-muted/40">
+          <tr>
+            <th class="w-[10%] px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide"><%= t("reconciliations.show.col_date") %></th>
+            <th class="w-5/12 px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide"><%= t("reconciliations.show.col_description") %></th>
+            <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide"><%= t("reconciliations.show.col_counterparty") %></th>
+            <th class="w-[12%] px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wide tabular-nums"><%= t("reconciliations.show.col_amount") %></th>
+            <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide"><%= t("reconciliations.show.col_match") %></th>
+          </tr>
+        </thead>
+        <tbody id="transactions_table_body" class="bg-card divide-y divide-border">
+          <%= render partial: "bank_transactions/row",
+                     collection: transactions, as: :transaction,
+                     locals: { reconciliation: reconciliation } %>
+        </tbody>
+      </table>
+    </div>
+
+    <%# Mobile cards — container ID used by show.turbo_stream.erb to append next pages %>
+    <div id="transactions_cards" class="md:hidden space-y-2">
+      <%= render partial: "bank_transactions/card",
+                 collection: transactions, as: :transaction,
+                 locals: { reconciliation: reconciliation } %>
+    </div>
+
+    <% if next_page.present? %>
+      <%= turbo_frame_tag "transactions_pagination",
+          src: reconciliation_path(reconciliation, page: next_page, format: :turbo_stream),
+          loading: :lazy do %>
+        <div class="flex items-center justify-center py-6">
+          <%= render Campbooks::Spinner.new(size: :md) %>
+        </div>
+      <% end %>
+    <% end %>
+  <% else %>
+    <%= render(Campbooks::EmptyState.new(
+          variant: :card,
+          title: t("reconciliations.show.no_transactions"))) %>
+  <% end %>
+<% end %>

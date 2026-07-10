@@ -93,5 +93,26 @@ RSpec.describe "Onboarding welcome flow", type: :request do
       get root_path
       expect(response.body).not_to include("data-controller=\"first-sync\"")
     end
+
+    it "renders the escape-hatch form POSTing to skip_first_sync_onboarding_path" do
+      account = create(:email_account, workspace: user.workspace)
+      account.email_account_users.create!(user: user, owner: true, can_read: true, can_send: true, can_manage: true)
+      EmailScanLog.create!(email_account: account, status: :running, started_at: Time.current)
+
+      get root_path
+      expect(response.body).to include(skip_first_sync_onboarding_path)
+      # The form carries the Stimulus escape target
+      expect(response.body).to include("first-sync-target=\"escape\"")
+    end
+
+    it "renders the persona card with the apply_persona endpoint" do
+      account = create(:email_account, workspace: user.workspace)
+      account.email_account_users.create!(user: user, owner: true, can_read: true, can_send: true, can_manage: true)
+      EmailScanLog.create!(email_account: account, status: :running, started_at: Time.current)
+
+      get root_path
+      expect(response.body).to include("first-sync-persona")
+      expect(response.body).to include(apply_persona_onboarding_path)
+    end
   end
 end

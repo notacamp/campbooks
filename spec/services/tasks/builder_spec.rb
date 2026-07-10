@@ -69,6 +69,52 @@ RSpec.describe Tasks::Builder do
     expect(task.due_at).to be < Time.current
   end
 
+  # Temporal actionability: an email source carries a real received_at, so the builder
+  # can tell a live ask from a long-dead one. A full resync of years-old mail must not
+  # spray a flood of stale suggestions — but a genuinely-forgotten recent action should
+  # still surface. Rule: keep if future-dated OR the source email is still recent.
+  describe "temporal actionability (future OR recent source)" do
+    def build_from(email, item)
+      described_class.call(workspace: ws, source: email, raw_items: [ item ])
+    end
+
+    it "keeps a future-dated task even when the source email is a year old" do
+      email = create(:email_message, received_at: 400.days.ago)
+      item  = { "title" => "Renew the domain", "confidence" => 0.9, "due_date" => 60.days.from_now.to_date.iso8601 }
+      expect(build_from(email, item).size).to eq(1)
+    end
+
+    it "drops a past-dated task from an old source email (a long-dead deadline)" do
+      email = create(:email_message, received_at: 400.days.ago)
+      item  = { "title" => "File Q2 2024 VAT", "confidence" => 0.9, "due_date" => 380.days.ago.to_date.iso8601 }
+      expect(build_from(email, item)).to be_empty
+    end
+
+    it "drops an undated task from an old source email" do
+      email = create(:email_message, received_at: 400.days.ago)
+      item  = { "title" => "Reply about the proposal", "confidence" => 0.9 }
+      expect(build_from(email, item)).to be_empty
+    end
+
+    it "keeps an undated task from a recent source email (a live ask)" do
+      email = create(:email_message, received_at: 2.days.ago)
+      item  = { "title" => "Send the signed contract", "confidence" => 0.9 }
+      expect(build_from(email, item).size).to eq(1)
+    end
+
+    it "keeps a recently-overdue task so a forgotten action still surfaces" do
+      email = create(:email_message, received_at: 5.days.ago)
+      item  = { "title" => "Pay the invoice", "confidence" => 0.9, "due_date" => 2.days.ago.to_date.iso8601 }
+      expect(build_from(email, item).size).to eq(1)
+    end
+
+    it "keeps a task dated today from an old email (today is still actionable)" do
+      email = create(:email_message, received_at: 400.days.ago)
+      item  = { "title" => "Call the notary", "confidence" => 0.9, "due_date" => Date.current.iso8601 }
+      expect(build_from(email, item).size).to eq(1)
+    end
+  end
+
   it "the email-linking actions are registered" do
     expect(EmailActions.definition("create_task_from_email")).to be_truthy
     expect(EmailActions.definition("link_task_to_email")).to be_truthy

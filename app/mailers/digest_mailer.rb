@@ -1,6 +1,12 @@
 # frozen_string_literal: true
 
 class DigestMailer < ApplicationMailer
+  # Both actions stamp `X-Campbooks-Kind: digest` on the outgoing mail. Digests are
+  # delivered to the user's own mailbox, so the email scanner re-ingests them; the
+  # header lets Emails::SelfGeneratedDetector recognise them on the way back in and
+  # skip the AI pipeline (no reminders/tasks/contacts mined from a digest that
+  # already lists them) while the inbox badges them as digests to read.
+
   # Items listed per section before collapsing the rest into "and N more".
   MAX_SECTION_ITEMS = 5
 
@@ -23,7 +29,7 @@ class DigestMailer < ApplicationMailer
     with_recipient_locale(user) do
       total = @follow_ups.size + @reminders.size + @tasks.size
       @settings_url = settings_notifications_url
-      mail(to: user.email_address, subject: t(".subject", count: total))
+      mail(to: user.email_address, subject: t(".subject", count: total), "X-Campbooks-Kind" => "digest")
     end
   end
 
@@ -43,7 +49,7 @@ class DigestMailer < ApplicationMailer
     with_recipient_locale(@user) do
       @sections    = build_issue_sections
       @manage_url  = digests_url
-      mail(to: @user.email_address, subject: t(".subject", name: @digest.name))
+      mail(to: @user.email_address, subject: t(".subject", name: @digest.name), "X-Campbooks-Kind" => "digest")
     end
   end
 

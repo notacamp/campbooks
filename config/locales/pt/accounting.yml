@@ -1,0 +1,222 @@
+---
+pt:
+  activerecord:
+    attributes:
+      reconciliation:
+        statuses:
+          pending: Pendente
+          parsing: A analisar
+          matching: A associar
+          ready: Pronto
+          failed: Falhado
+      bank_transaction:
+        statuses:
+          unmatched: Por associar
+          suggested: Sugerido
+          matched: Associado
+          excluded: Excluído
+          requested: Fatura solicitada
+
+  shared:
+    nav:
+      accounting: Contabilidade
+
+  command_palette:
+    commands:
+      accounting: Contabilidade
+
+  reconciliations:
+    untitled_statement: Extrato bancário
+    destroy_confirm: Eliminar esta reconciliação? Todas as transações analisadas serão removidas.
+    parse_job:
+      no_ai_for_pdf: "A análise de PDF requer um fornecedor de IA configurado para análise de documentos. Configure um em Definições → Fornecedores de IA."
+      pdf_unparseable: "Não foi possível extrair transações deste PDF. O ficheiro pode estar digitalizado, encriptado ou num formato não suportado."
+      pdf_ai_error: "Falha na análise por IA: %{message}"
+      unsupported_format: "Formato de ficheiro não suportado. Por favor, carregue um extrato bancário em CSV ou PDF."
+      integrity_mismatch: "Verificação de saldo falhou: saldo de fecho esperado %{expected} mas o extrato mostra %{actual}."
+    bank_statement_parser:
+      pages_unreadable: "Não conseguimos processar nenhuma página deste extrato PDF. Tente exportá-lo novamente do seu banco ou carregue um CSV."
+      no_transactions: "Não conseguimos ler nenhum movimento deste extrato. Se não for uma imagem digitalizada, tente exportar um CSV do seu banco."
+    index:
+      title: Contabilidade
+      new_reconciliation: Nova reconciliação
+      col_statement: Extrato
+      col_bank: Banco
+      col_period: Período
+      col_progress: Progresso
+      col_status: Estado
+      empty_title: Reconcilie o seu primeiro extrato bancário
+      empty_description: Importe um extrato CSV para associar cada débito à sua fatura de despesa. O Campbooks mantém a sua contabilidade pronta para auditoria.
+      empty_cta: Importar extrato
+    new:
+      title: Nova reconciliação
+      from_documents_title: A partir dos seus documentos
+      from_documents_description: Escolha um extrato bancário que o Campbooks já arquivou do seu email.
+      no_documents: Ainda não há extratos arquivados. Faça upload de um.
+      upload_title: Carregar um extrato
+      upload_description: Carregue um export CSV ou PDF do seu banco.
+      drop_here: Largue o ficheiro aqui
+      accepted_formats: PDF ou CSV
+      click_to_browse: Procurar ficheiros
+      csv_hint: Os exports CSV são analisados instantaneamente — sem IA necessária.
+      upload_and_start: Carregar e iniciar reconciliação
+    create:
+      created: Extrato importado — a analisar transações…
+      document_not_found: Documento não encontrado.
+      file_upload_failed: Falha no upload do ficheiro. Por favor, tente novamente.
+      no_source: Por favor, selecione ou carregue um extrato bancário.
+    show:
+      statement_chip: "Ver extrato"
+      view_statement: "Pré-visualizar o extrato bancário desta reconciliação"
+      title: Reconciliação
+      delete: Eliminar
+      integrity_warning: Discrepância de saldo detetada
+      status_parsing: A ler o seu extrato…
+      status_matching: A associar transações…
+      parse_failed_title: Não foi possível ler este extrato
+      parse_failed_generic: Ocorreu um erro inesperado ao ler o ficheiro.
+      parse_failed_hint: Tente reexportar do seu banco em CSV ou verifique se o ficheiro não está corrompido.
+      no_transactions: Nenhuma transação encontrada.
+      col_date: Data
+      col_description: Descrição
+      col_counterparty: Contraparte
+      col_amount: Montante
+      col_match: Associação
+    confirm_all_suggestions:
+      confirmed:
+        one: "1 associação confirmada"
+        other: "%{count} associações confirmadas"
+    bank_transactions:
+      row:
+        confirm: Confirmar
+        reject: Rejeitar
+        not_this_one: Não é este
+        no_invoice: Fatura não encontrada
+        resolve: Resolver
+        requested: Fatura solicitada
+        more: mais
+      exclusion_reasons:
+        bank_fee: Comissão bancária
+        salary: Salário
+        transfer: Transferência interna
+        tax: Pagamento de imposto
+        other: Outro
+      confirm:
+        confirmed: Associação confirmada
+      reject:
+        rejected: Associação rejeitada
+      exclude:
+        excluded: "Marcado como excluído: %{reason}"
+        invalid_reason: Motivo de exclusão inválido.
+      reset:
+        reset: Associação removida
+      manual_match:
+        matched: "Associado a %{title}"
+        document_not_found: Documento não encontrado.
+      resolve_panel:
+        open_document: "Pré-visualizar o documento — Ctrl/Cmd+clique abre a página completa"
+        attach: Associar
+        no_docs_found: Nenhum documento correspondente encontrado.
+      request_invoice:
+        not_applicable: Fatura só pode ser solicitada para transações por associar ou com NIF inválido.
+        opened_composer: Compositor aberto — reveja e envie quando estiver pronto.
+        counterparty_fallback: o fornecedor
+        standard_subject: "Fatura em falta — pagamento de %{amount} a %{date}"
+        standard_body: "Olá,\n\nVenho por este meio solicitar fatura referente a um pagamento de %{amount} efetuado a %{date} a %{counterparty}.\n\nPor favor envie a fatura com a maior brevidade possível.\n\nCom os melhores cumprimentos."
+        corrected_subject: "Pedido de fatura corrigida — NIF em falta (%{amount} a %{date})"
+        corrected_body: "Olá,\n\nRecebi uma fatura de %{amount} datada de %{date}, mas o NIF/número de contribuinte do comprador (%{company_nif}) está em falta ou incorreto.\n\nPoderia emitir uma fatura corrigida incluindo o nosso NIF: %{company_nif}?\n\nCom os melhores cumprimentos."
+    download:
+      not_ready: O zip ainda não está pronto. Por favor aguarde.
+    export:
+      already_generating: Um ficheiro zip já está a ser preparado. Por favor aguarde.
+      enqueued: A preparar o seu zip… será notificado quando estiver pronto.
+      not_ready: O zip ainda não está pronto. Por favor aguarde.
+    export_button:
+      download_for_accountant: Descarregar para o contabilista
+      download: Descarregar zip
+      generating: A preparar o zip…
+      re_export: Reexportar
+      retry: Tentar novamente
+    zip_builder:
+      nif_yes: "sim"
+      nif_missing: "em falta"
+      nif_mismatch: "não corresponde"
+      cross_reconciliation_note: Também associado noutro extrato
+      file_missing: "[ficheiro em falta no Campbooks]"
+    destroy:
+      destroyed: Reconciliação eliminada.
+    nif_banner:
+      title: Adicione o seu NIF para verificar todas as faturas
+      body: "O Campbooks irá assinalar as faturas onde o NIF da sua empresa está em falta ou incorreto."
+      action: Adicionar NIF
+      dismiss: Dispensar
+
+  components:
+    accounting:
+      summary_bar:
+        matched:
+          one: associado
+          other: associados
+        to_review:
+          one: para rever
+          other: para rever
+        unmatched:
+          one: por associar
+          other: por associar
+        excluded:
+          one: excluído
+          other: excluídos
+        requested:
+          one: solicitado
+          other: solicitados
+        nif_exceptions_title: Transações com problemas de NIF
+        nif_exceptions:
+          one: problema de NIF
+          other: problemas de NIF
+        confirm_all_confirm:
+          one: "Confirmar 1 associação sugerida?"
+          other: "Confirmar %{count} associações sugeridas?"
+        confirm_all:
+          one: Confirmar 1 associação
+          other: "Confirmar %{count} associações"
+      document_preview_drawer:
+        aria_label: "Pré-visualização do documento"
+        iframe_title: "Pré-visualização do ficheiro"
+        open_full_page: "Abrir página completa"
+        close: "Fechar pré-visualização"
+      match_chip:
+        open_document: "Pré-visualizar o documento — Ctrl/Cmd+clique abre a página completa"
+        nif_mismatch: NIF não corresponde
+        nif_missing: NIF em falta no documento
+      confidence_badge:
+        strong: Associação forte
+        possible: Associação possível
+        weak: Associação fraca
+        reason_amount_exact: Montante exato
+        reason_amount_close: Montante dentro de 2%
+        reason_date:
+          one: 1 dia de diferença
+          other: "%{count} dias de diferença"
+        reason_name: "Semelhança de nome: %{pct}%"
+        reason_cross_reconciliation: "Já associado noutro extrato"
+      resolve_panel:
+        open_document: "Pré-visualizar o documento — Ctrl/Cmd+clique abre a página completa"
+        suggestions_title: "Sugestões do Scout"
+        checked_documents:
+          one: Verificado 1 documento candidato
+          other: "Verificados %{count} documentos candidatos"
+        use_this_match: Usar esta associação
+        not_this_one: Não é este
+        search_title: Pesquisar os seus documentos
+        search_placeholder: "Pesquisar por nome, n.º fatura…"
+        attach: Associar
+        exclude_title: Sem documento necessário
+        exclude_hint: Marque esta transação como uma despesa que não requer fatura.
+        mark_excluded: Marcar como excluído
+        counterparty_fallback: o fornecedor
+        request_invoice_title: "Pedir fatura a %{counterparty}"
+        request_invoice_note: "Nada é enviado automaticamente — reveja e envie a partir do compositor."
+        request_invoice_to: Para
+        request_invoice_to_placeholder: "fornecedor@exemplo.com"
+        request_invoice_subject: Assunto
+        request_invoice_open_composer: Rever no compositor

@@ -1,33 +1,44 @@
 import { Controller } from "@hotwired/stimulus"
 
-// Drives the first-run product walkthrough (Campbooks::ProductTour). Mounted on
-// <body> so any "Take the tour" button (data-action="product-tour#open") and the
-// overlay's own controls share one controller. Everything here is sandboxed —
-// no request touches the user's real data — except the one-time "seen" flag,
-// POSTed on finish/skip so the tour greets the user only once.
+// Drives the walkthrough v2 (Campbooks::ProductTour). An explanation-first,
+// stories-style slideshow: six slides about what Campbooks is and what each
+// module does. Tap-through only — no auto-advance in-app. Segmented progress
+// bars (click to jump), keyboard ← → / Escape, and per-slide vignette
+// animations (chips pop, counter ticks, buttons morph to a ✓ state).
 //
-// Each scene is shown one at a time. "Gated" scenes won't let the user advance
-// until they complete the scene's task (tap to reveal a summary, clear the skim
-// stack, set a reminder, ask Scout); completing it reveals a success cue and
-// enables Next. The skim scene plays a small stack of demo cards like Stories.
+// Mounted on <body> so any "Take the tour" button (data-action="product-tour#open")
+// and the overlay's own controls share one controller. Nothing touches the
+// user's real workspace; the only request is the one-time "seen" POST on close.
 const DISMISS_URL = "/tours/product_tour/dismiss"
 
+const REDUCED = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches
+
+// Stroke icons for the deck-head module label, keyed by slide type.
+const ICO = {
+  intro: '<svg viewBox="0 0 24 24" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M12 2l1.7 5.6L19.5 9l-5.8 1.4L12 16l-1.7-5.6L4.5 9l5.8-1.4z"/></svg>',
+  inbox: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5" aria-hidden="true"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>',
+  calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5" aria-hidden="true"><rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 3v4M16 3v4"/></svg>',
+  tasks: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+  docs: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5" aria-hidden="true"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>',
+  more: '<svg viewBox="0 0 24 24" fill="currentColor" class="h-3.5 w-3.5" aria-hidden="true"><path d="M12 2l1.7 5.6L19.5 9l-5.8 1.4L12 16l-1.7-5.6L4.5 9l5.8-1.4z"/></svg>'
+}
+
 export default class extends Controller {
-  static targets = ["panel", "scene", "dot", "stepLabel", "back", "next", "footer"]
+  static targets = ["panel", "slide", "segment", "segFill", "modLabel", "countLabel", "prevBtn", "nextBtn"]
 
   connect() {
-    this.index = 0
-    this.completed = new Set()
+    this.idx = 0
     this.opened = false
+    this._timers = []
+    this._rotTimer = null
 
-    // Open automatically on first run (server sets data-tour-autostart on home),
-    // or whenever ?tour=1 is in the URL (the replay link + a stable test handle).
     const wantsTour = new URLSearchParams(window.location.search).has("tour")
     const autostart = this.hasPanelTarget && this.panelTarget.dataset.tourAutostart === "true"
     if (wantsTour || autostart) requestAnimationFrame(() => this.open())
   }
 
   disconnect() {
+    this._clearAll()
     if (this.opened) document.documentElement.style.overflow = ""
   }
 
@@ -37,68 +48,59 @@ export default class extends Controller {
     if (event) event.preventDefault()
     if (!this.hasPanelTarget) return
     this.opened = true
-    this.index = 0
-    this.completed.clear()
-    this.resetScenes() // start every scene fresh (matters on replay)
+    this.idx = 0
+    this._clearAll()
+    this._resetSlides()
     this.panelTarget.classList.remove("hidden")
     this.panelTarget.classList.add("flex")
-    document.documentElement.style.overflow = "hidden" // freeze the page behind it
-    this.render()
+    document.documentElement.style.overflow = "hidden"
+    this._go(0)
     this.panelTarget.focus({ preventScroll: true })
   }
 
   close() {
     if (!this.hasPanelTarget) return
+    this._clearAll()
     this.panelTarget.classList.add("hidden")
     this.panelTarget.classList.remove("flex")
     document.documentElement.style.overflow = ""
     this.opened = false
   }
 
-  // Header "Skip tour" + finish "Explore on my own": remember it's seen, then close.
   skip(event) {
     if (event) event.preventDefault()
-    this.markSeen()
+    this._markSeen()
     this.close()
   }
 
-  // Finish "Connect your inbox": remember it's seen, then go connect for real.
-  // With no connect path (the welcome screen — the connect cards sit right
-  // behind the overlay) it just closes.
+  // "Connect your inbox" / "Back to your inbox" CTA on the last slide.
   finishConnect(event) {
     if (event) event.preventDefault()
     const path = event?.currentTarget?.dataset.tourConnectPath
     if (!path) { this.skip(); return }
-    this.markSeen()
+    this._markSeen()
     window.location.href = path
   }
 
-  markSeen() {
-    fetch(DISMISS_URL, {
-      method: "POST",
-      headers: { "X-CSRF-Token": this.csrf, Accept: "application/json" },
-      keepalive: true
-    }).catch(() => {})
-  }
-
-  // ── navigation ──────────────────────────────────────────────────────────────
-
-  get currentScene() { return this.sceneTargets[this.index] }
-  isGated(scene) { return scene?.dataset.tourGated === "true" }
+  // ── navigation ────────────────────────────────────────────────────────────
 
   next(event) {
     if (event) event.preventDefault()
-    if (this.isGated(this.currentScene) && !this.completed.has(this.index)) return // wait for the task
-    if (this.index >= this.sceneTargets.length - 1) { this.skip(); return }
-    this.index += 1
-    this.render()
+    if (this.idx >= this.slideTargets.length - 1) return
+    this._go(this.idx + 1)
   }
 
-  back(event) {
+  prev(event) {
     if (event) event.preventDefault()
-    if (this.index === 0) return
-    this.index -= 1
-    this.render()
+    if (this.idx <= 0) return
+    this._go(this.idx - 1)
+  }
+
+  // Click on a progress-bar segment to jump to that slide.
+  goTo(event) {
+    if (event) event.preventDefault()
+    const n = parseInt(event.currentTarget.dataset.tourSegmentIndex, 10)
+    if (!isNaN(n)) this._go(n)
   }
 
   onKeydown(event) {
@@ -106,168 +108,258 @@ export default class extends Controller {
     switch (event.key) {
       case "Escape":     this.skip(); break
       case "ArrowRight": this.next(); break
-      case "ArrowLeft":  this.back(); break
+      case "ArrowLeft":  this.prev(); break
       default: return
     }
     event.preventDefault()
   }
 
-  render() {
-    this.sceneTargets.forEach((scene, i) => {
-      const current = i === this.index
-      const entering = current && scene.classList.contains("hidden")
-      scene.classList.toggle("hidden", !current)
-      // Settle the scene's blocks in with a light stagger whenever it appears,
-      // and retrigger its one-shot flourishes (the finale pop + glow ring).
-      if (entering) {
-        this.replay(scene, "tour-scene-enter")
-        scene.querySelectorAll(".tour-finale-ring").forEach((el) => this.replay(el, "tour-finale-ring"))
-        scene.querySelectorAll(".animate-sync-done-pop").forEach((el) => this.replay(el, "animate-sync-done-pop"))
+  // ── internal render ────────────────────────────────────────────────────────
+
+  _go(n) {
+    this._clearAll()
+    const total = this.slideTargets.length
+    n = Math.max(0, Math.min(n, total - 1))
+    const prev = this.idx
+    this.idx = n
+    const slideEl = this.slideTargets[n]
+
+    // Progress bar segments
+    this.segFillTargets.forEach((fill, i) => {
+      fill.style.transition = "none"
+      fill.style.transform = i < n ? "scaleX(1)" : "scaleX(0)"
+    })
+    // Animate the current segment fill in (0.4s)
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (this.segFillTargets[n]) {
+        this.segFillTargets[n].style.transition = "transform 0.4s ease"
+        this.segFillTargets[n].style.transform = "scaleX(1)"
       }
-    })
+    }))
 
-    const total = this.sceneTargets.length
-    this.dotTargets.forEach((dot, i) => {
-      const state = i === this.index ? "current" : (i < this.index ? "done" : "ahead")
-      dot.classList.toggle("w-5", state === "current")
-      dot.classList.toggle("w-2", state !== "current")
-      dot.classList.toggle("bg-ember-gradient", state !== "ahead")
-      dot.classList.toggle("border-[1.5px]", state === "ahead")
-      dot.classList.toggle("border-border", state === "ahead")
-    })
-    if (this.hasStepLabelTarget && this.stepLabelTarget.dataset.tmpl) {
-      this.stepLabelTarget.textContent = this.stepLabelTarget.dataset.tmpl
-        .replace("{current}", this.index + 1).replace("{total}", total)
+    // Module label
+    if (this.hasModLabelTarget) {
+      const type = slideEl.dataset.tourSlideType || ""
+      const label = slideEl.dataset.tourModLabel || ""
+      this.modLabelTarget.innerHTML = `${ICO[type] || ""}${label ? `<span>${label}</span>` : ""}`
     }
-    if (this.hasBackTarget) this.backTarget.disabled = this.index === 0
-    // The finish scene carries its own CTAs, so hide the shared footer there.
-    if (this.hasFooterTarget) this.footerTarget.classList.toggle("hidden", this.index === total - 1)
-    this.syncNext()
-  }
 
-  syncNext() {
-    if (!this.hasNextTarget) return
-    this.nextTarget.disabled = this.isGated(this.currentScene) && !this.completed.has(this.index)
-  }
-
-  // ── task completion ──────────────────────────────────────────────────────────
-
-  // Generic "now you try" tap: stop the invite, give a tactile press, optionally
-  // reveal an element (the AI summary, the reminder chip, Scout's reply), consume
-  // the trigger, and mark the scene done.
-  completeTask(event) {
-    if (event) event.preventDefault()
-    const btn = event.currentTarget
-    this.stopInvite(this.currentScene)
-    this.press(btn)
-    if (btn.dataset.tourReveal) this.reveal(this.element.querySelector(btn.dataset.tourReveal))
-    if (btn.dataset.tourConsume === "true") btn.disabled = true
-    this.markDone()
-  }
-
-  // Skim scene: any keep/archive/etc. action on the visible card flies it out
-  // (played like Stories) and brings up the next. When the last card is cleared,
-  // the scene's done.
-  skimAct(event) {
-    const actionBtn = event.target.closest("[data-skim-action]")
-    if (!actionBtn) return
-    event.preventDefault()
-    const scene = this.currentScene
-    const cards = [...scene.querySelectorAll("[data-tour-skim-card]")]
-    const pos = cards.findIndex((c) => !c.classList.contains("hidden"))
-    if (pos === -1) return
-
-    // Fly the card out in the direction of intent — discard left, keep right.
-    const action = actionBtn.dataset.skimAction
-    const left = action === "archive" || action === "block" || action === "deny"
-    const card = cards[pos]
-    card.style.transition = "transform .34s cubic-bezier(0.16,1,0.3,1), opacity .3s ease"
-    card.style.transform = `translateX(${left ? "-" : ""}115%) rotate(${left ? "-" : ""}6deg)`
-    card.style.opacity = "0"
-    setTimeout(() => card.classList.add("hidden"), 340)
-
-    const done = pos + 1
-    const label = scene.querySelector("[data-tour-skim-progress]")
-    if (label?.dataset.tmpl) label.textContent = label.dataset.tmpl.replace("{done}", done).replace("{total}", cards.length)
-
-    const upcoming = cards[pos + 1]
-    if (upcoming) {
-      upcoming.classList.remove("hidden")
-      this.replay(upcoming, "animate-fade-in")
-    } else {
-      this.markDone()
+    // Counter
+    if (this.hasCountLabelTarget) {
+      this.countLabelTarget.textContent = `${n + 1} / ${total}`
     }
-  }
 
-  markDone() {
-    this.completed.add(this.index)
-    this.stopInvite(this.currentScene)
-    this.reveal(this.currentScene?.querySelector("[data-tour-done-cue]"))
-    this.syncNext()
-    if (this.hasNextTarget && !this.nextTarget.disabled) {
-      this.nextTarget.classList.add("animate-pulse")
-      setTimeout(() => this.nextTarget.classList.remove("animate-pulse"), 1400)
-    }
-  }
+    // Prev/next button states
+    if (this.hasPrevBtnTarget) this.prevBtnTarget.disabled = n === 0
+    if (this.hasNextBtnTarget) this.nextBtnTarget.disabled = n === total - 1
 
-  // Reveal a hidden element with an enter animation. The codebase toggles
-  // hidden↔flex explicitly (two display utilities otherwise fight by source
-  // order), so honour data-tour-flex.
-  reveal(el) {
-    if (!el) return
-    el.classList.remove("hidden")
-    if (el.dataset.tourFlex === "true") el.classList.add("flex")
-    this.replay(el, "animate-fade-in")
-  }
-
-  // (Re)play a one-shot animation class, retriggering it if already present.
-  replay(el, klass) {
-    el.classList.remove(klass)
-    void el.offsetWidth
-    el.classList.add(klass)
-  }
-
-  // A quick tactile press on a tapped target.
-  press(el) {
-    if (!el) return
-    el.style.transition = "transform .12s ease"
-    el.style.transform = "scale(0.97)"
-    setTimeout(() => { el.style.transform = ""; el.style.transition = "" }, 130)
-  }
-
-  // Stop the looping "tap me" invites in a scene once the user has acted.
-  stopInvite(scene) {
-    scene?.querySelectorAll("[data-tour-invite]").forEach((el) => el.classList.remove(el.dataset.tourInvite))
-  }
-
-  // Replaying the tour starts every scene fresh: re-hide reveals, re-enable the
-  // consumed triggers, restore the skim stacks + invites, reset counters.
-  resetScenes() {
-    this.element.querySelectorAll("[data-tour-done-cue]").forEach((el) => {
-      el.classList.add("hidden")
-      el.classList.remove("flex", "animate-fade-in")
-    })
-    this.element.querySelectorAll("[data-tour-reveal]").forEach((btn) => {
-      btn.disabled = false
-      const target = this.element.querySelector(btn.dataset.tourReveal)
-      if (target) { target.classList.add("hidden"); target.classList.remove("flex", "animate-fade-in") }
-    })
-    this.element.querySelectorAll("[data-tour-consume]").forEach((btn) => { btn.disabled = false })
-    this.element.querySelectorAll("[data-tour-invite]").forEach((el) => el.classList.add(el.dataset.tourInvite))
-    this.sceneTargets.forEach((scene) => {
-      if (scene.dataset.tourSkim !== "true") return
-      const cards = [...scene.querySelectorAll("[data-tour-skim-card]")]
-      cards.forEach((c, i) => {
-        c.classList.toggle("hidden", i !== 0)
-        c.classList.remove("animate-fade-in")
-        c.style.transform = ""
-        c.style.opacity = ""
-        c.style.transition = ""
+    // Slide transition — outgoing
+    if (prev !== n && this.slideTargets[prev]) {
+      const outEl = this.slideTargets[prev]
+      outEl.classList.remove("tour-slide-in")
+      outEl.classList.add("tour-slide-out")
+      this._at(450, () => {
+        outEl.classList.remove("tour-slide-out")
       })
-      const label = scene.querySelector("[data-tour-skim-progress]")
-      if (label?.dataset.tmpl) label.textContent = label.dataset.tmpl.replace("{done}", 0).replace("{total}", cards.length)
+    }
+
+    // Slide transition — incoming
+    slideEl.classList.remove("tour-slide-out", "tour-slide-in")
+    void slideEl.offsetWidth
+    slideEl.classList.add("tour-slide-in")
+
+    // Per-slide vignette animation
+    const type = slideEl.dataset.tourSlideType
+    this._enterSlide(slideEl, type)
+  }
+
+  // ── per-slide vignette animations ─────────────────────────────────────────
+
+  _enterSlide(slideEl, type) {
+    if (REDUCED) {
+      // Reduced motion: reveal everything instantly
+      slideEl.querySelectorAll(".tour-stage-el").forEach((el) => el.classList.add("on"))
+      slideEl.querySelectorAll(".tour-doc-field").forEach((el) => { el.style.opacity = "1" })
+      if (type === "intro") this._showRot(slideEl, 0)
+      return
+    }
+
+    // Stagger all .tour-stage-el elements
+    this._stagger(slideEl, ".tour-stage-el", 200, 180)
+
+    switch (type) {
+      case "intro":
+        this._runIntro(slideEl)
+        break
+      case "inbox":
+        this._runInbox(slideEl)
+        break
+      case "calendar":
+        this._runCalendar(slideEl)
+        break
+      case "tasks":
+        this._runTasks(slideEl)
+        break
+      case "docs":
+        this._runDocs(slideEl)
+        break
+      // "more": nothing extra beyond stagger
+    }
+  }
+
+  _runIntro(slideEl) {
+    if (REDUCED) { this._showRot(slideEl, 0); return }
+    let i = 0
+    this._showRot(slideEl, 0)
+    this._rotTimer = setInterval(() => {
+      i = (i + 1) % 5
+      this._showRot(slideEl, i)
+    }, 2500)
+  }
+
+  _showRot(slideEl, n) {
+    slideEl.querySelectorAll("[data-tour-rot-item]").forEach((el, j) => {
+      el.classList.remove("tour-rot-in", "tour-rot-out")
+      if (j === n) el.classList.add("tour-rot-in")
+      else if (j === (n - 1 + 5) % 5) el.classList.add("tour-rot-out")
     })
   }
 
-  get csrf() { return document.querySelector('meta[name="csrf-token"]')?.content || "" }
+  _runInbox(slideEl) {
+    // Chips pop in after the rows have staggered in
+    slideEl.querySelectorAll("[data-tour-chip]").forEach((chip, i) => {
+      this._at(1200 + i * 300, () => {
+        chip.style.opacity = "1"
+        chip.classList.add("animate-chip-pop")
+      })
+    })
+    // Group counter ticks up to its max
+    this._at(2200, () => {
+      const pill = slideEl.querySelector("[data-tour-counter]")
+      if (!pill) return
+      const max = parseInt(pill.dataset.tourCounterMax || "12", 10)
+      let n = 0
+      const tick = () => {
+        n += 4
+        pill.textContent = String(Math.min(n, max))
+        if (n < max) this._at(120, tick)
+      }
+      tick()
+    })
+  }
+
+  _runCalendar(slideEl) {
+    slideEl.querySelectorAll(".tour-morph-btn").forEach((btn) => {
+      const delay = parseInt(btn.dataset.tourMorphAt || "3000", 10)
+      this._at(delay, () => {
+        btn.textContent = btn.dataset.tourMorphText || btn.textContent
+        btn.classList.add("animate-win-pop")
+      })
+    })
+  }
+
+  _runTasks(slideEl) {
+    this._at(2600, () => {
+      const tick = slideEl.querySelector("[data-tour-tick]")
+      const text = slideEl.querySelector("[data-tour-tick-text]")
+      if (tick) { tick.classList.add("tour-tick-done"); tick.textContent = "✓" }
+      if (text) { text.classList.add("line-through", "text-muted-foreground", "!font-normal"); text.classList.remove("font-[550]") }
+    })
+  }
+
+  _runDocs(slideEl) {
+    // Doc fields fade in one by one
+    slideEl.querySelectorAll(".tour-doc-field").forEach((f, i) => {
+      this._at(1500 + i * 260, () => {
+        f.style.transition = "opacity 0.35s"
+        f.style.opacity = "1"
+      })
+    })
+    // Approve button morphs
+    const approveBtns = slideEl.querySelectorAll(".tour-morph-btn")
+    approveBtns.forEach((btn) => {
+      const delay = parseInt(btn.dataset.tourMorphAt || "3600", 10)
+      this._at(delay, () => {
+        btn.textContent = btn.dataset.tourMorphText || btn.textContent
+        btn.classList.add("animate-win-pop")
+      })
+    })
+  }
+
+  // ── reset ─────────────────────────────────────────────────────────────────
+
+  _resetSlides() {
+    this.slideTargets.forEach((slideEl) => {
+      slideEl.classList.remove("tour-slide-in", "tour-slide-out")
+
+      // Stage elements
+      slideEl.querySelectorAll(".tour-stage-el").forEach((el) => el.classList.remove("on"))
+
+      // Chips
+      slideEl.querySelectorAll("[data-tour-chip]").forEach((chip) => {
+        chip.classList.remove("animate-chip-pop")
+        chip.style.opacity = "0"
+      })
+
+      // Group counter
+      slideEl.querySelectorAll("[data-tour-counter]").forEach((p) => { p.textContent = "0" })
+
+      // Morph buttons — restore original text
+      slideEl.querySelectorAll(".tour-morph-btn").forEach((btn) => {
+        if (btn.dataset.originalText) btn.textContent = btn.dataset.originalText
+        btn.classList.remove("animate-win-pop")
+      })
+
+      // Tasks tick
+      slideEl.querySelectorAll("[data-tour-tick]").forEach((t) => {
+        t.classList.remove("tour-tick-done")
+        t.textContent = ""
+      })
+      slideEl.querySelectorAll("[data-tour-tick-text]").forEach((t) => {
+        t.classList.remove("line-through", "text-muted-foreground", "!font-normal")
+      })
+
+      // Doc fields
+      slideEl.querySelectorAll(".tour-doc-field").forEach((f) => {
+        f.style.transition = ""
+        f.style.opacity = "0"
+      })
+
+      // Rotation items
+      slideEl.querySelectorAll("[data-tour-rot-item]").forEach((el) => {
+        el.classList.remove("tour-rot-in", "tour-rot-out")
+      })
+    })
+  }
+
+  // ── helpers ───────────────────────────────────────────────────────────────
+
+  // Run a staggered add of class "on" to matching elements (for .tour-stage-el).
+  _stagger(root, selector, base, step) {
+    root.querySelectorAll(selector).forEach((el, i) => {
+      this._at(base + i * step, () => el.classList.add("on"))
+    })
+  }
+
+  // Schedule a callback (stored so _clearAll can cancel it).
+  _at(ms, fn) {
+    this._timers.push(setTimeout(fn, ms))
+  }
+
+  // Cancel all pending timers and the rotator interval.
+  _clearAll() {
+    this._timers.forEach(clearTimeout)
+    this._timers = []
+    if (this._rotTimer) { clearInterval(this._rotTimer); this._rotTimer = null }
+  }
+
+  _markSeen() {
+    fetch(DISMISS_URL, {
+      method: "POST",
+      headers: { "X-CSRF-Token": this._csrf, Accept: "application/json" },
+      keepalive: true
+    }).catch(() => {})
+  }
+
+  get _csrf() { return document.querySelector('meta[name="csrf-token"]')?.content || "" }
 }

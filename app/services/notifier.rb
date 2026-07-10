@@ -328,4 +328,72 @@ module Notifier
       )
     end
   end
+
+  # --- Reconciliation events (reconciliation / awaiting or action_required) ---
+
+  # Sent when MatchJob completes and the reconciliation is :ready for review.
+  def reconciliation_ready(reconciliation)
+    link  = "/reconciliations/#{reconciliation.id}"
+    group = "reconciliation_ready/#{reconciliation.id}"
+
+    reconciliation.workspace.users.find_each do |user|
+      I18n.with_locale(user.locale.presence || I18n.default_locale) do
+        Notification.notify(
+          user:                user,
+          category:            :reconciliation,
+          priority:            :awaiting,
+          title:               I18n.t("notifier.reconciliation_ready.title"),
+          body:                reconciliation.statement_document&.original_file&.filename.to_s,
+          link_url:            link,
+          group_key:           group,
+          notifiable:          reconciliation,
+          respect_preferences: false
+        )
+      end
+    end
+  end
+
+  # Sent when ParseJob encounters an unrecoverable ParseError.
+  def reconciliation_parse_failed(reconciliation)
+    link  = "/reconciliations/#{reconciliation.id}"
+    group = "reconciliation_parse_failed/#{reconciliation.id}"
+
+    reconciliation.workspace.users.find_each do |user|
+      I18n.with_locale(user.locale.presence || I18n.default_locale) do
+        Notification.notify(
+          user:                user,
+          category:            :reconciliation,
+          priority:            :action_required,
+          title:               I18n.t("notifier.reconciliation_parse_failed.title"),
+          body:                reconciliation.parse_error.to_s.truncate(120),
+          link_url:            link,
+          group_key:           group,
+          notifiable:          reconciliation,
+          respect_preferences: false
+        )
+      end
+    end
+  end
+
+  # Sent when ExportJob attaches the zip and sets :export_generated.
+  def reconciliation_export_ready(reconciliation)
+    link  = "/reconciliations/#{reconciliation.id}/download"
+    group = "reconciliation_export/#{reconciliation.id}"
+
+    reconciliation.workspace.users.find_each do |user|
+      I18n.with_locale(user.locale.presence || I18n.default_locale) do
+        Notification.notify(
+          user:                user,
+          category:            :reconciliation,
+          priority:            :awaiting,
+          title:               I18n.t("notifier.reconciliation_export_ready.title"),
+          body:                reconciliation.statement_document&.original_file&.filename.to_s,
+          link_url:            link,
+          group_key:           group,
+          notifiable:          reconciliation,
+          respect_preferences: false
+        )
+      end
+    end
+  end
 end

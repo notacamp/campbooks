@@ -92,6 +92,9 @@ export default class extends Controller {
       this.doneCtaTarget.classList.remove("hidden")
       this.doneCtaTarget.classList.add("flex", "animate-stage-in")
     }
+    // Hide the persona card (picker or confirmation) so it doesn't hang below the done CTA.
+    const persona = document.getElementById("first-sync-persona")
+    if (persona) persona.classList.add("hidden")
   }
 
   showError(initial) {

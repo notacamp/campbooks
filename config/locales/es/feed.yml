@@ -76,10 +76,12 @@ es:
         starred: Destacado
         unstar: Quitar destacado
       tag_suggestion_card:
+        filed_prefix: Etiquetado
         file_it: Etiquetar
         not_now: Ahora no
         prefix: Etiquetar
         under: como
+        undo: Deshacer
       task_card:
         accept: Añadir a tareas
         complete: Completar
@@ -87,6 +89,7 @@ es:
         in_days:
           one: Entrega en %{count} día
           other: Entrega en %{count} días
+        missed: Puede que se te haya pasado
         overdue: Atrasada
         suggested: Tarea sugerida
         today: Entrega hoy
@@ -110,6 +113,7 @@ es:
       task_accepted: 'Añadida a tus tareas: %{title}'
       task_completed: 'Tarea completada: %{title}'
       task_dismissed: Sugerencia descartada.
+      tag_filing_undone: Etiqueta eliminada.
       unsupported: Esa acción no es compatible aquí.
   home:
     index:
@@ -147,5 +151,18 @@ es:
         lots: "%{n} cosas te necesitan. Scout las apiló para que hojees sin agobios."
         single: Solo una cosa te necesita — Scout archivó el resto.
         some: "%{n} cosas te necesitan — Scout las apiló. Un hojeo rápido y listo."
+        syncing: Scout está leyendo tu bandeja — el correo ordenado aparecerá aquí
+          en cuanto esté listo.
+      syncing_body: El correo ordenado aparece aquí en cuanto esté listo. Las bandejas
+        grandes pueden tardar unos minutos.
+      syncing_cta: Ver cómo se llena
+      syncing_title: Scout está leyendo tu bandeja de entrada
       take_tour: Hacer la visita
       your_feed: Tu feed
+    persona_applied:
+      body_html: Scout prestará atención a <strong>%{items}</strong> a medida que
+        llegue tu correo.
+      exploring_body: Scout usará configuraciones inteligentes por defecto. Puedes
+        agregar tipos de documentos cuando quieras en Ajustes.
+      heading: Entendido
+      settings_link: Ajustar en Ajustes

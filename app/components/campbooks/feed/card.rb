@@ -73,7 +73,13 @@ module Campbooks
         when "task"
           { left: [ feed_dismiss_stage ], right: [ task_complete_stage ] }
         when "tag_suggestion"
-          { left: [ feed_dismiss_stage(t("components.feed.tag_suggestion_card.not_now")) ], right: [ tag_file_stage ] }
+          if @item.data["applied"]
+            # Notice mode: swipe-left undoes the auto-filing; no swipe-right (already filed).
+            { left: [ tag_undo_stage ], right: [] }
+          else
+            # Legacy ask-mode: swipe-left dismisses, swipe-right files.
+            { left: [ feed_dismiss_stage(t("components.feed.tag_suggestion_card.not_now")) ], right: [ tag_file_stage ] }
+          end
         when "follow_up"
           # Swipe-left retires the follow-up on the thread (not just this card);
           # the primary "Draft follow-up" is navigation (open the thread), so no swipe-right.
@@ -122,6 +128,12 @@ module Campbooks
         { key: "file", label: t("components.feed.tag_suggestion_card.file_it"), icon: :approve,
           color: "green", endpoint: act_endpoint,
           params: { "tool" => "add_tag", "args[tag_name]" => @item.data["tag_name"].to_s } }
+      end
+
+      def tag_undo_stage
+        { key: "undo", label: t("components.feed.tag_suggestion_card.undo"), icon: :dismiss,
+          color: "neutral", endpoint: act_endpoint,
+          params: { "tool" => "undo_tag_filing", "args[tag_name]" => @item.data["tag_name"].to_s } }
       end
 
       def feed_dismiss_stage(label = t("components.swipeable.dismiss"))

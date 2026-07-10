@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_06_160100) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_10_210003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -168,6 +168,32 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_160100) do
     t.index ["author_id"], name: "index_authored_documents_on_author_id"
     t.index ["workspace_id", "created_at"], name: "index_authored_documents_on_workspace_id_and_created_at"
     t.index ["workspace_id"], name: "index_authored_documents_on_workspace_id"
+  end
+
+  create_table "bank_transactions", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.jsonb "ai_match_debug"
+    t.integer "amount_cents", null: false
+    t.integer "balance_after_cents"
+    t.date "booked_on", null: false
+    t.string "counterparty"
+    t.datetime "created_at", null: false
+    t.string "currency", default: "EUR", null: false
+    t.text "description", null: false
+    t.string "exclusion_reason"
+    t.integer "position", null: false
+    t.jsonb "raw_data", default: {}, null: false
+    t.uuid "reconciliation_id", null: false
+    t.datetime "requested_at"
+    t.uuid "requested_by_id"
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["reconciliation_id", "position"], name: "index_bank_transactions_on_reconciliation_position", unique: true
+    t.index ["reconciliation_id", "status"], name: "index_bank_transactions_on_reconciliation_and_status"
+    t.index ["reconciliation_id"], name: "index_bank_transactions_on_reconciliation_id"
+    t.index ["requested_by_id"], name: "index_bank_transactions_on_requested_by_id"
+    t.index ["workspace_id", "status"], name: "index_bank_transactions_on_workspace_and_status"
+    t.index ["workspace_id"], name: "index_bank_transactions_on_workspace_id"
   end
 
   create_table "beta_codes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -647,10 +673,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_160100) do
   end
 
   create_table "email_message_tags", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "applied_by_rule_id"
     t.datetime "created_at", null: false
     t.uuid "email_message_id", null: false
     t.uuid "tag_id", null: false
     t.datetime "updated_at", null: false
+    t.index ["applied_by_rule_id"], name: "idx_email_message_tags_applied_by_rule", where: "(applied_by_rule_id IS NOT NULL)"
     t.index ["email_message_id", "tag_id"], name: "idx_email_message_tags_unique", unique: true
     t.index ["email_message_id"], name: "index_email_message_tags_on_email_message_id"
     t.index ["tag_id"], name: "index_email_message_tags_on_tag_id"
@@ -688,6 +716,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_160100) do
     t.string "provider_thread_id"
     t.boolean "read", default: false, null: false
     t.datetime "received_at"
+    t.string "self_generated_kind", comment: "Campbooks-generated mail re-ingested from the mailbox (e.g. 'digest'); nil for third-party mail. Skips the AI pipeline."
     t.datetime "skimmed_at"
     t.integer "status", default: 0, null: false
     t.string "subject"
@@ -710,6 +739,55 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_160100) do
     t.index ["received_at"], name: "idx_email_messages_ai_todos", order: :desc, where: "((ai_action_prompt IS NOT NULL) AND (ai_action_prompt <> ''::text) AND (ai_todo_dismissed = false))"
     t.index ["skimmed_at"], name: "index_email_messages_on_skimmed_at"
     t.index ["status"], name: "index_email_messages_on_status"
+  end
+
+  create_table "email_rule_runs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.jsonb "archived_email_ids", default: [], null: false
+    t.datetime "created_at", null: false
+    t.uuid "email_rule_id", null: false
+    t.datetime "finished_at"
+    t.jsonb "marked_read_email_ids", default: [], null: false
+    t.integer "matched_count", default: 0, null: false
+    t.jsonb "moved_email_ids", default: [], null: false
+    t.integer "processed_count", default: 0, null: false
+    t.uuid "started_by_id"
+    t.integer "status", default: 0, null: false
+    t.jsonb "tagged_email_ids", default: [], null: false
+    t.boolean "undoable", default: true, null: false
+    t.datetime "updated_at", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["email_rule_id"], name: "index_email_rule_runs_on_email_rule_id"
+    t.index ["started_by_id"], name: "index_email_rule_runs_on_started_by_id"
+    t.index ["workspace_id"], name: "index_email_rule_runs_on_workspace_id"
+  end
+
+  create_table "email_rule_tags", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "email_rule_id", null: false
+    t.uuid "tag_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email_rule_id", "tag_id"], name: "idx_email_rule_tags_unique", unique: true
+    t.index ["email_rule_id"], name: "index_email_rule_tags_on_email_rule_id"
+    t.index ["tag_id"], name: "index_email_rule_tags_on_tag_id"
+  end
+
+  create_table "email_rules", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.boolean "archive", default: false, null: false
+    t.datetime "created_at", null: false
+    t.uuid "created_by_id"
+    t.jsonb "criteria", default: {}, null: false
+    t.boolean "enabled", default: true, null: false
+    t.datetime "last_run_at"
+    t.uuid "mail_folder_id"
+    t.boolean "mark_read", default: false, null: false
+    t.bigint "matched_count", default: 0, null: false
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["created_by_id"], name: "index_email_rules_on_created_by_id"
+    t.index ["mail_folder_id"], name: "index_email_rules_on_mail_folder_id"
+    t.index ["workspace_id"], name: "index_email_rules_on_workspace_id"
+    t.index ["workspace_id"], name: "index_email_rules_on_workspace_id_and_enabled", where: "(enabled = true)"
   end
 
   create_table "email_scan_logs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1251,6 +1329,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_160100) do
     t.index ["workspace_id"], name: "index_pipelines_on_workspace_id"
   end
 
+  create_table "reconciliations", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "bank_name"
+    t.integer "closing_balance_cents"
+    t.datetime "created_at", null: false
+    t.uuid "created_by_id", null: false
+    t.string "currency", default: "EUR", null: false
+    t.integer "export_status", default: 0, null: false
+    t.boolean "integrity_warning", default: false, null: false
+    t.text "integrity_warning_message"
+    t.integer "opening_balance_cents"
+    t.text "parse_error"
+    t.date "period_end"
+    t.date "period_start"
+    t.uuid "statement_document_id", null: false
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["created_by_id"], name: "index_reconciliations_on_created_by_id"
+    t.index ["statement_document_id"], name: "index_reconciliations_on_statement_document_id"
+    t.index ["workspace_id", "status"], name: "index_reconciliations_on_workspace_and_status"
+    t.index ["workspace_id"], name: "index_reconciliations_on_workspace_id"
+  end
+
   create_table "recovery_codes", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "code_digest", null: false
     t.datetime "created_at", null: false
@@ -1719,6 +1820,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_160100) do
     t.index ["user_id", "agent_thread_id"], name: "index_thread_follows_on_user_id_and_agent_thread_id", unique: true
   end
 
+  create_table "transaction_matches", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "bank_transaction_id", null: false
+    t.float "confidence"
+    t.datetime "created_at", null: false
+    t.uuid "document_id", null: false
+    t.jsonb "match_reasons", default: {}, null: false
+    t.integer "matched_by", default: 0, null: false
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["bank_transaction_id", "document_id"], name: "index_transaction_matches_on_transaction_and_document", unique: true
+    t.index ["bank_transaction_id"], name: "index_transaction_matches_on_bank_transaction_id"
+    t.index ["document_id"], name: "index_transaction_matches_on_document_id"
+  end
+
   create_table "users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.boolean "app_admin", default: false, null: false
     t.integer "compose_default", default: 0, null: false
@@ -1870,6 +1985,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_160100) do
   add_foreign_key "audit_events", "users", on_delete: :nullify
   add_foreign_key "authored_documents", "users", column: "author_id"
   add_foreign_key "authored_documents", "workspaces"
+  add_foreign_key "bank_transactions", "reconciliations", on_delete: :cascade
+  add_foreign_key "bank_transactions", "users", column: "requested_by_id", on_delete: :nullify
+  add_foreign_key "bank_transactions", "workspaces"
   add_foreign_key "beta_codes", "users", column: "created_by_id"
   add_foreign_key "beta_codes", "users", column: "redeemed_by_id"
   add_foreign_key "bug_reports", "users"
@@ -1918,12 +2036,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_160100) do
   add_foreign_key "email_accounts", "workspaces"
   add_foreign_key "email_folders", "email_accounts"
   add_foreign_key "email_message_tags", "email_messages"
+  add_foreign_key "email_message_tags", "email_rules", column: "applied_by_rule_id", on_delete: :nullify
   add_foreign_key "email_message_tags", "tags"
   add_foreign_key "email_messages", "agent_messages", column: "ai_analysis_message_id"
   add_foreign_key "email_messages", "contacts"
   add_foreign_key "email_messages", "email_accounts"
   add_foreign_key "email_messages", "email_scan_logs"
   add_foreign_key "email_messages", "email_threads"
+  add_foreign_key "email_rule_runs", "email_rules", on_delete: :cascade
+  add_foreign_key "email_rule_runs", "users", column: "started_by_id", on_delete: :nullify
+  add_foreign_key "email_rule_runs", "workspaces"
+  add_foreign_key "email_rule_tags", "email_rules", on_delete: :cascade
+  add_foreign_key "email_rule_tags", "tags", on_delete: :cascade
+  add_foreign_key "email_rules", "mail_folders", on_delete: :nullify
+  add_foreign_key "email_rules", "users", column: "created_by_id", on_delete: :nullify
+  add_foreign_key "email_rules", "workspaces"
   add_foreign_key "email_scan_logs", "email_accounts"
   add_foreign_key "email_template_documents", "document_templates"
   add_foreign_key "email_template_documents", "email_templates"
@@ -1977,6 +2104,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_160100) do
   add_foreign_key "pipeline_memberships", "pipelines"
   add_foreign_key "pipeline_stages", "pipelines"
   add_foreign_key "pipelines", "workspaces"
+  add_foreign_key "reconciliations", "documents", column: "statement_document_id", on_delete: :restrict
+  add_foreign_key "reconciliations", "users", column: "created_by_id", on_delete: :restrict
+  add_foreign_key "reconciliations", "workspaces"
   add_foreign_key "recovery_codes", "users"
   add_foreign_key "reminders", "calendar_events"
   add_foreign_key "reminders", "users", column: "confirmed_by_id"
@@ -2023,6 +2153,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_06_160100) do
   add_foreign_key "tasks", "workspaces"
   add_foreign_key "thread_follows", "agent_threads"
   add_foreign_key "thread_follows", "users"
+  add_foreign_key "transaction_matches", "bank_transactions", on_delete: :cascade
+  add_foreign_key "transaction_matches", "documents", on_delete: :cascade
   add_foreign_key "users", "workspaces"
   add_foreign_key "webauthn_credentials", "users"
   add_foreign_key "workflow_execution_steps", "workflow_executions"

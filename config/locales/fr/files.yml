@@ -34,6 +34,34 @@ fr:
       file_meta:
         kind_file: Fichier
         kind_image: Image
+      filter_chips:
+        date_from_prefix: "Depuis :"
+        date_to_prefix: "Jusqu'à :"
+        starred: Avec étoile
+      filter_panel:
+        ai_status: Traitement
+        amount_max: Montant max. (EUR)
+        amount_min: Montant min. (EUR)
+        any_category: Toutes les catégories
+        any_expense_category: Toutes les catégories
+        any_folder: Tous les dossiers
+        any_processing: Tout état
+        any_source: Toutes les sources
+        any_status: Tous les statuts
+        category: Catégorie
+        clear_filters: Effacer les filtres
+        date_from: Date de début
+        date_to: Date de fin
+        entity: Fournisseur / entité
+        entity_placeholder: ex. EDF, Orange
+        expense_category: Catégorie de dépense
+        folder: Dossier
+        number_placeholder: ex. FAC-001
+        reference_number: "Référence #"
+        review_status: Statut de vérification
+        source: Source
+        starred: Étoilés seulement
+        type: Type de document
       folder_sharing:
         add_button: Ajouter
         add_title: Ajouter des personnes
@@ -54,8 +82,34 @@ fr:
         you_badge: Vous
       search_bar:
         clear: Effacer la recherche
+        filters: Filtres
         placeholder: Rechercher des fichiers…
-        submit: Rechercher
+        searching: Recherche en cours…
+        suggest:
+          after: documents après une date
+          amount_gt: documents avec montant supérieur à
+          amount_lt: documents avec montant inférieur à
+          before: documents avant une date
+          category: par catégorie de document
+          expense: par catégorie de dépense
+          heading: Affiner la recherche
+          in: documents dans un dossier
+          is: par statut ou étiquette
+          number: par numéro de référence
+          source: par source du document
+          type: par type de document
+          values:
+            approved: approuvé
+            email: e-mail
+            failed: échoué
+            notion: notion
+            pending: à vérifier
+            processing: en traitement
+            rejected: rejeté
+            sent: e-mail envoyé
+            starred: avec étoile
+            upload: téléversement manuel
+          vendor: par fournisseur ou entité
       sidebar:
         all_files: Tous les fichiers
         label: Dossiers
@@ -91,17 +145,6 @@ fr:
       exports_col_status: Statut
       exports_heading: Exports récents
       files_section: Fichiers
-      filter_all_categories: Toutes les catégories
-      filter_all_folders: Tous les dossiers
-      filter_all_statuses: Tous les statuts
-      filter_all_types: Tous les types
-      filter_category: Catégorie
-      filter_folder: Dossier
-      filter_month: Mois
-      filter_status: Statut
-      filter_type: Type
-      filter_types_selected: "%{count} sélectionné(s)"
-      filters: Filtres
       internal_documents: Documents internes
       manage_access: Gérer l'accès
       manage_access_locked: Gérer l'accès · Privé
@@ -144,3 +187,4 @@ fr:
         uploaded_one: Fichier téléversé.
       destroy:
         deleted: Fichier supprimé.
+        statement_document: Impossible de supprimer ce document — il est lié à un rapprochement bancaire.

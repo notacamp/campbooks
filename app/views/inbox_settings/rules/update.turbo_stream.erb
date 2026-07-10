@@ -1,0 +1,7 @@
+<%= turbo_stream.replace dom_id(@rule) do %>
+  <%= render "inbox_settings/rules/rule", rule: @rule %>
+<% end %>
+<%= turbo_stream.update "inbox_settings_rule_form", "" %>
+<%= turbo_stream.append "action_toasts" do %>
+  <%= render "shared/action_toast", message: t(".updated_toast"), variant: :success %>
+<% end %>

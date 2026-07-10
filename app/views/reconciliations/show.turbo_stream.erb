@@ -1,0 +1,31 @@
+<%# Finding 7: Turbo Streams response for show pagination.
+    Loaded lazily by the turbo_frame in _show_content.html.erb when next_page is set.
+    Appends the next page of rows to both the desktop table tbody and the mobile card
+    list, then advances (or removes) the pagination cursor. %>
+
+<%# Desktop: append rows to the table body %>
+<%= turbo_stream.append "transactions_table_body" do %>
+  <%= render partial: "bank_transactions/row", collection: @transactions, as: :transaction,
+             locals: { reconciliation: @reconciliation } %>
+<% end %>
+
+<%# Mobile: append cards to the card list %>
+<%= turbo_stream.append "transactions_cards" do %>
+  <%= render partial: "bank_transactions/card", collection: @transactions, as: :transaction,
+             locals: { reconciliation: @reconciliation } %>
+<% end %>
+
+<%# Advance the lazy-loading cursor or remove it when all pages are loaded %>
+<% if @pagy.next %>
+  <%= turbo_stream.replace "transactions_pagination" do %>
+    <%= turbo_frame_tag "transactions_pagination",
+          src: reconciliation_path(@reconciliation, page: @pagy.next, format: :turbo_stream),
+          loading: :lazy do %>
+      <div class="flex items-center justify-center py-6">
+        <%= render Campbooks::Spinner.new(size: :md) %>
+      </div>
+    <% end %>
+  <% end %>
+<% else %>
+  <%= turbo_stream.remove "transactions_pagination" %>
+<% end %>

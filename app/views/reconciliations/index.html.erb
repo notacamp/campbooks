@@ -1,0 +1,86 @@
+<%= render Campbooks::PageHeader.new(title: t(".title")) do |header| %>
+  <% header.with_actions do %>
+    <%= render Campbooks::Button.new(variant: :primary, href: new_reconciliation_path) { t(".new_reconciliation") } %>
+  <% end %>
+<% end %>
+
+<% if Current.workspace.company_nif.blank? && !current_user.tour_dismissed?("accounting_nif_banner") %>
+  <%# tour-dismiss controller: removes element immediately + POSTs dismiss URL in background. %>
+  <%# No inline onclick (CSP-hostile); dismissal persists via User#tour_dismissed?. %>
+  <div id="accounting_nif_banner"
+       class="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200"
+       data-controller="tour-dismiss"
+       data-tour-dismiss-url-value="<%= dismiss_tour_path('accounting_nif_banner') %>">
+    <svg class="mt-0.5 size-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4M12 17h.01"/>
+    </svg>
+    <div class="flex-1 min-w-0">
+      <p class="font-semibold"><%= t("reconciliations.nif_banner.title") %></p>
+      <p class="mt-0.5 text-amber-800 dark:text-amber-300"><%= t("reconciliations.nif_banner.body") %></p>
+    </div>
+    <div class="flex shrink-0 items-center gap-2">
+      <%= link_to t("reconciliations.nif_banner.action"), settings_general_path,
+            class: "rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 transition-colors" %>
+      <button type="button"
+              data-action="tour-dismiss#dismiss"
+              class="rounded-md p-1 text-amber-600 hover:bg-amber-100 hover:text-amber-800 dark:text-amber-400 dark:hover:bg-amber-500/20 transition-colors text-xs"
+              aria-label="<%= t('reconciliations.nif_banner.dismiss') %>">
+        <svg class="size-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+<% end %>
+
+<% if @reconciliations.any? %>
+  <%# Desktop table — hidden on mobile, cards below take over %>
+  <div class="hidden md:block bg-card rounded-xl shadow-sm border border-border overflow-x-auto">
+    <table class="min-w-full table-fixed divide-y divide-border">
+      <thead class="bg-muted/40">
+        <tr>
+          <th class="w-4/12 px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide"><%= t(".col_statement") %></th>
+          <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide"><%= t(".col_bank") %></th>
+          <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide"><%= t(".col_period") %></th>
+          <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide"><%= t(".col_progress") %></th>
+          <th class="w-1/12 px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide"><%= t(".col_status") %></th>
+          <th class="w-1/12 px-3 py-3"></th>
+        </tr>
+      </thead>
+      <tbody id="reconciliations_table_body" class="bg-card divide-y divide-border">
+        <%= render partial: "reconciliations/row", collection: @reconciliations, as: :reconciliation %>
+      </tbody>
+    </table>
+  </div>
+
+  <%# Mobile cards %>
+  <div id="reconciliations_cards" class="md:hidden space-y-3">
+    <%= render partial: "reconciliations/card", collection: @reconciliations, as: :reconciliation %>
+  </div>
+
+  <% if @pagy.next %>
+    <%= turbo_frame_tag "reconciliations_pagination",
+        src: accounting_path(page: @pagy.next, format: :turbo_stream),
+        loading: :lazy do %>
+      <div class="flex items-center justify-center py-6">
+        <%= render Campbooks::Spinner.new(size: :md) %>
+      </div>
+    <% end %>
+  <% end %>
+<% else %>
+  <%= render(Campbooks::EmptyState.new(
+        variant: :standalone,
+        title:       t(".empty_title"),
+        description: t(".empty_description"))) do |state| %>
+    <% state.with_icon do %>
+      <svg class="w-7 h-7 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+      </svg>
+    <% end %>
+    <% state.with_actions do %>
+      <%= render Campbooks::Button.new(variant: :primary, href: new_reconciliation_path) { t(".empty_cta") } %>
+    <% end %>
+  <% end %>
+<% end %>

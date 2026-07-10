@@ -73,6 +73,11 @@ pt:
       error_cta: Verificar a ligação da conta
       error_title: O Scout não conseguiu aceder à sua caixa
       escape: Ver a caixa de entrada a encher
+      persona_heading: Enquanto o Scout lê — com o que lida maioritariamente?
+      persona_skip: Ignorar por agora
+      persona_subheading: Escolha uma ou mais. O Scout arquiva documentos e etiqueta
+        emails em conformidade desde o início.
+      persona_submit: Aplicar
       subtitle_done: "%{needs_you} coisas aguardam por si. Todo o resto está organizado
         e fora do caminho."
       subtitle_done_calm: Nada aguarda por si neste momento. Está tudo organizado
@@ -174,6 +179,14 @@ pt:
       switch_link: Usar as minhas próprias chaves
       text_role: Email e chat
       title: Campbooks AI
+    event_draft_block:
+      add: Adicionar ao calendário
+      added: "No seu calendário"
+      drafted_from: criado a partir deste email
+      edit: Editar
+      error_generic: Não foi possível criar o evento. Tente novamente.
+      retry: Tentar novamente
+      view: Ver
     markdown_editor:
       preview_tab: Pré-visualizar
       write_tab: Editar

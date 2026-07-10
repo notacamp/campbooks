@@ -13,28 +13,46 @@ module Documents
   # language: an unambiguous document_type pre-narrows the semantic candidate pool,
   # and a counterparty / number sharpens the keyword (ILIKE) arm. A wrong parse never
   # hides a result — the keyword arm always runs unfiltered by the parser.
+  #
+  # Modifier tokens in the query string (`type:receipt vendor:EDP amount>100`) are
+  # extracted by Documents::SearchQuery and promoted to hard SQL filters via
+  # Documents::Filters. A query consisting ONLY of modifiers (no free text) falls
+  # through to browse/pagination mode — text_query? is false in that case.
   class Search
     # A free-text query returns a single bounded, rank-ordered page — HNSW has no
     # stable offset, so relevance results don't paginate. This caps the pool.
     RESULT_LIMIT = 100
 
+    # Exposed for controllers and views.
+    attr_reader :filters
+
     # @param folder [MailFolder, nil] when set, search is scoped to that folder.
     def initialize(user:, workspace:, params:, folder: nil)
-      @user = user
+      @user      = user
       @workspace = workspace
-      @params = params || {}
-      @folder = folder
+      @params    = params || {}
+      @folder    = folder
+      @filters   = build_filters
     end
 
-    # A free-text query searches by relevance (embedding + keyword); with no query we
-    # just browse/filter. Drives bounded-vs-paginated in the controller.
+    # True when free text remains after stripping modifiers. A query that contains
+    # only modifiers (e.g. "type:receipt is:pending") returns false and the
+    # controller falls back to paginated browse mode.
     def text_query?
-      query.present?
+      search_text.present?
     end
 
-    # Browse / filter-only path. An AR relation safe for pagy.
+    # The parsed free text (modifiers stripped) — exposed for the view's count line.
+    def search_text
+      @search_text ||= parsed_query.text
+    end
+
+    # Browse / filter-only path. An AR relation safe for pagy. Includes the
+    # attachments and classification so the list renders without N+1s.
     def scope
-      apply_structural_filters(base_scope).starred_first.recent
+      @filters.apply(base_scope, workspace: @workspace, user: @user)
+              .includes(:classification).with_attached_original_file
+              .starred_first.recent
     end
 
     # The free-text result set: a bounded, rank-ordered Array<Document> blending
@@ -47,7 +65,8 @@ module Documents
       ids = ((semantic_ids || []) + keyword_ids).uniq.first(RESULT_LIMIT)
       return [] if ids.empty?
 
-      by_id = apply_structural_filters(base_scope).where(id: ids).index_by(&:id)
+      by_id = @filters.apply(base_scope, workspace: @workspace, user: @user)
+                      .where(id: ids).index_by(&:id)
       ids.filter_map { |id| by_id[id] }
     end
 
@@ -58,13 +77,32 @@ module Documents
 
     private
 
-    def query
-      @params[:q].to_s.strip.presence
+    # ── Filter setup ─────────────────────────────────────────────────────────
+
+    def build_filters
+      base = Documents::Filters.from_params(@params)
+      base.merge_query(parsed_query.filters) if raw_query.present?
+      base
     end
 
-    def parsed
-      @parsed ||= Documents::QueryParser.parse(query.to_s)
+    # ── Query parsing ─────────────────────────────────────────────────────────
+
+    def raw_query
+      @raw_query ||= @params[:q].to_s.strip.presence
     end
+
+    # Modifier-aware tokeniser — splits raw q into free text + filter directives.
+    def parsed_query
+      @parsed_query ||= Documents::SearchQuery.parse(raw_query.to_s)
+    end
+
+    # NL-hint parser on the MODIFIER-STRIPPED text (so type/number/counterparty
+    # hints don't double-count with explicit modifier filters).
+    def parsed
+      @parsed ||= Documents::QueryParser.parse(search_text.to_s)
+    end
+
+    # ── Scopes ────────────────────────────────────────────────────────────────
 
     # Workspace + permission + (optional) folder. in_folder scopes to a SINGLE folder,
     # where FolderMembership is unique per (folder, document), so the join can't
@@ -76,31 +114,23 @@ module Documents
       rel
     end
 
-    # User-explicit UI filters only — NOT the parser's hints, which stay soft.
-    def apply_structural_filters(rel)
-      rel = rel.by_type(@params[:type])
-      rel = rel.by_category(@params[:category])
-      rel = rel.by_review_status(@params[:review_status])
-      rel = rel.by_ai_status(@params[:ai_status])
-      rel = rel.for_month(*month_filter) if month_filter
-      rel
-    end
-
-    # Keyword arm: structural filters + ILIKE across the user-visible text columns,
-    # plus a targeted ILIKE on any counterparty / number the parser extracted (so an
-    # entity buried in a noisy phrase still lands an exact hit on the right column).
+    # Keyword arm: filters + ILIKE across the user-visible text columns,
+    # plus a targeted ILIKE on any counterparty / number the parser extracted.
     def keyword_scope
-      apply_text_filter(apply_structural_filters(base_scope)).starred_first.recent
+      apply_text_filter(@filters.apply(base_scope, workspace: @workspace, user: @user))
+        .starred_first.recent
     end
 
     def apply_text_filter(rel)
+      return rel unless search_text.present?
+
       clauses = [
         "documents.vendor_name ILIKE :q", "documents.client_name ILIKE :q",
         "documents.description ILIKE :q", "documents.ai_summary ILIKE :q",
         "documents.invoice_number ILIKE :q", "documents.receipt_number ILIKE :q",
         "documents.canonical_filename ILIKE :q", "documents.metadata ->> 'title' ILIKE :q"
       ]
-      binds = { q: "%#{sanitize_like(query)}%" }
+      binds = { q: "%#{sanitize_like(search_text)}%" }
 
       if parsed.counterparty.present?
         clauses << "documents.vendor_name ILIKE :cp" << "documents.client_name ILIKE :cp"
@@ -114,7 +144,7 @@ module Documents
       rel.where(clauses.join(" OR "), binds)
     end
 
-    # --- Meaning mode ---
+    # ── Semantic arm ─────────────────────────────────────────────────────────
 
     # Ranked Document ids from the vector index, scoped to documents.
     #   nil => index empty or search errored (caller falls back to keyword scope)
@@ -142,20 +172,12 @@ module Documents
     # vector pool. Counterparty/number deliberately stay out — a wrong parse must not
     # exclude a candidate before ranking can save it (the keyword arm carries them).
     def search_service_filters
-      filters = { searchable_type: "Document" }
-      filters[:document_type] = parsed.document_type if parsed.document_type.present?
-      filters
+      sf = { searchable_type: "Document" }
+      sf[:document_type] = parsed.document_type if parsed.document_type.present?
+      sf
     end
 
-    # --- helpers ---
-
-    def month_filter
-      return if @params[:month].blank?
-      date = Date.parse("#{@params[:month]}-01")
-      [ date.year, date.month ]
-    rescue ArgumentError
-      nil
-    end
+    # ── helpers ──────────────────────────────────────────────────────────────
 
     def sanitize_like(str)
       Document.sanitize_sql_like(str.to_s)

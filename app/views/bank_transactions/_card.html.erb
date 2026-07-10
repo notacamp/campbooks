@@ -1,0 +1,126 @@
+<%# Mobile card — one per BankTransaction. Shown below md breakpoint.
+    Locals: transaction, reconciliation
+    DOM ID: dom_id(transaction, :card) = "card_bank_transaction_<id>"
+    Suggested cards show amber border wash.
+    For suggested status: full-width Confirm / Not this buttons always visible.
+    For unmatched: Resolve button that shows inline expand panel. %>
+
+<% confirmed_matches = transaction.transaction_matches.select(&:confirmed?).sort_by { |m| -m.confidence.to_f } %>
+<% confirmed_match  = confirmed_matches.first %>
+<% confirmed_extra  = confirmed_matches.size - 1 %>
+<% suggested_match  = transaction.transaction_matches.select(&:suggested?).max_by { |m| m.confidence.to_f } %>
+<% company_nif      = Current.workspace.company_nif.presence %>
+
+<div id="<%= dom_id(transaction, :card) %>"
+     class="bg-card rounded-lg border <%= transaction.suggested? ? 'border-amber-300 dark:border-amber-700' : 'border-border' %> overflow-hidden"
+     data-controller="<%= 'transaction-resolve' if transaction.unmatched? %>"
+     data-transaction-resolve-url-value="<%= resolve_panel_reconciliation_bank_transaction_path(reconciliation, transaction) if transaction.unmatched? %>"
+     data-transaction-resolve-frame-id-value="<%= dom_id(transaction, :resolve_frame) if transaction.unmatched? %>">
+
+  <%# Main card body %>
+  <div class="px-4 py-3">
+    <div class="flex items-start justify-between gap-3">
+      <div class="min-w-0 flex-1">
+        <p class="text-sm text-foreground truncate" title="<%= transaction.description %>">
+          <%= transaction.description %>
+        </p>
+        <p class="text-xs text-muted-foreground mt-0.5">
+          <%= l(transaction.booked_on, format: :date) %>
+          <% if transaction.counterparty.present? %>
+            &middot; <%= transaction.counterparty %>
+          <% end %>
+        </p>
+      </div>
+
+      <div class="text-right shrink-0">
+        <p class="text-sm font-medium tabular-nums
+                  <%= transaction.debit? ? 'text-red-600 dark:text-red-400' : 'text-green-700 dark:text-green-400' %>">
+          <%= transaction.debit? ? "−" : "+" %><%= number_to_currency(transaction.amount_cents.abs / 100.0, unit: "", precision: 2) %>
+          <span class="text-xs font-normal text-muted-foreground"><%= transaction.currency %></span>
+        </p>
+      </div>
+    </div>
+
+    <%# Match section — rendered below the amount row %>
+    <div class="mt-2">
+      <% if transaction.matched? && confirmed_match %>
+        <%# ✅ Matched: top confirmed chip + "+N more" when multiple %>
+        <div class="flex items-center gap-1 flex-wrap">
+          <%= render(Campbooks::Accounting::MatchChip.new(
+                match:      confirmed_match,
+                nif_status: company_nif ? confirmed_match.document.nif_status(company_nif) : nil)) %>
+          <% if confirmed_extra > 0 %>
+            <span class="text-xs text-muted-foreground">+<%= confirmed_extra %> <%= t("reconciliations.bank_transactions.row.more") %></span>
+          <% end %>
+        </div>
+
+      <% elsif transaction.suggested? && suggested_match %>
+        <%# 🔶 Suggested: chip + badge, then full-width action buttons %>
+        <div class="space-y-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <%= render(Campbooks::Accounting::MatchChip.new(
+                  match:      suggested_match,
+                  nif_status: company_nif ? suggested_match.document.nif_status(company_nif) : nil)) %>
+            <%= render(Campbooks::Accounting::ConfidenceBadge.new(match: suggested_match, expandable: true)) %>
+          </div>
+          <%# Full-width confirm/reject always visible on mobile %>
+          <div class="flex gap-2">
+            <%= button_to(
+                  t("reconciliations.bank_transactions.row.confirm"),
+                  confirm_reconciliation_bank_transaction_path(reconciliation, transaction),
+                  method: :post,
+                  params: { match_id: suggested_match.id },
+                  class: "flex-1 py-1.5 text-xs font-medium rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors") %>
+            <%= button_to(
+                  t("reconciliations.bank_transactions.row.not_this_one"),
+                  reject_reconciliation_bank_transaction_path(reconciliation, transaction),
+                  method: :post,
+                  params: { match_id: suggested_match.id },
+                  class: "flex-1 py-1.5 text-xs font-medium rounded-lg border border-border text-foreground hover:bg-muted/40 transition-colors") %>
+          </div>
+        </div>
+
+      <% elsif transaction.excluded? %>
+        <%# ⊘ Excluded: neutral chip + undo %>
+        <div class="flex items-center justify-between gap-2">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium tone-neutral">
+            <%= t("reconciliations.bank_transactions.exclusion_reasons.#{transaction.exclusion_reason}",
+                  default: transaction.exclusion_reason&.humanize) %>
+          </span>
+          <%= button_to t("shared.actions.undo"),
+                reset_reconciliation_bank_transaction_path(reconciliation, transaction),
+                method: :post,
+                class: "text-xs text-accent-600 hover:text-accent-700 font-medium" %>
+        </div>
+
+      <% elsif transaction.requested? %>
+        <%# 📨 Requested: blue chip + Undo %>
+        <div class="flex items-center justify-between gap-2">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium tone-info">
+            <%= t("reconciliations.bank_transactions.row.requested") %>
+          </span>
+          <%= button_to t("shared.actions.undo"),
+                reset_reconciliation_bank_transaction_path(reconciliation, transaction),
+                method: :post,
+                class: "text-xs text-accent-600 hover:text-accent-700 font-medium" %>
+        </div>
+
+      <% else %>
+        <%# ❓ Unmatched: amber pill + Resolve button %>
+        <div class="flex items-center gap-2">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium tone-warning">
+            <%= t("reconciliations.bank_transactions.row.no_invoice") %>
+          </span>
+          <button type="button"
+                  class="text-xs text-accent-600 hover:text-accent-700 font-medium"
+                  data-action="click->transaction-resolve#toggle">
+            <%= t("reconciliations.bank_transactions.row.resolve") %>
+          </button>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Inline resolve panel placeholder — Stimulus will inject a Turbo Frame here when opened %>
+  <%# The data-transaction-resolve-target="panel" div is injected by JS, not pre-rendered. %>
+</div>

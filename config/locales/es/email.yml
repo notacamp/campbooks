@@ -135,6 +135,7 @@ es:
       collapse_discussion_aria: Contraer conversación
       collapse_sidebar_aria: Contraer barra lateral
       compose_label: Redactar
+      digest_badge: Resumen
       discussion_button_label: Conversación
       discussion_empty_body: Deje una nota para su equipo, o etiquete a %{scout_mention}
         para preguntarle a la IA sobre este correo.

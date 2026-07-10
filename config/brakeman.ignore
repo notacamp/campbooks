@@ -13,12 +13,6 @@
       "note": "False positive: this is a Faraday HTTP connection.delete(url) to the external Zoho Calendar API, not an ActiveRecord SQL call."
     },
     {
-      "warning_type": "Cross-Site Scripting",
-      "fingerprint": "160ebb96b97c9ba1892cac803f2149f506ca16a2ac5e2401b71300c4cf9fe634",
-      "file": "app/views/email_messages/new.html.erb",
-      "note": "Accepted: renders the user's OWN email signature (a plain HTML column) as HTML by design, in their own composer preview. Self-authored content, self-rendered = self-XSS only, low risk."
-    },
-    {
       "warning_type": "SQL Injection",
       "fingerprint": "6803e797caa696be639cb6b7bba104dd9711ff5206ac305a45da96d91eed97b2",
       "file": "app/services/google/mail_client.rb",
@@ -47,6 +41,12 @@
       "fingerprint": "583275b7a183848bf15a9537f01a87bdb51325ef3e402d87db88293533f2e297",
       "file": "app/views/documents/_row.html.erb",
       "note": "False positive (LinkToHref): same as _card — Document#google_drive_url is a hardcoded https://drive.google.com link built from an API-supplied file id, never user input."
+    },
+    {
+      "warning_type": "Command Injection",
+      "fingerprint": "a284034f3c40dbd51e030cd2bf3e3317a28a595a803202d3bb89c169e6856ac1",
+      "file": "app/services/ai/bank_statement_parser.rb",
+      "note": "False positive: Open3.capture3 is called with an argv array (not a shell string), so no shell expansion occurs. The interpolated values are integers (i.to_i) and Tempfile paths generated internally — never user input."
     }
   ],
   "brakeman_version": "8.0.5"

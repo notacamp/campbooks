@@ -29,10 +29,12 @@ class Workspace < ApplicationRecord
   has_many :bug_reports, dependent: :destroy
   has_many :reminders, dependent: :destroy
   has_many :tasks, dependent: :destroy
+  has_many :reconciliations, dependent: :destroy
   has_many :mail_folders, dependent: :destroy
   has_many :scheduled_emails, dependent: :restrict_with_error
   has_many :draft_emails, dependent: :destroy
   has_many :scheduled_digests, dependent: :destroy
+  has_many :email_rules, dependent: :destroy
 
   has_many :invitations, dependent: :destroy
 
@@ -85,7 +87,11 @@ class Workspace < ApplicationRecord
   end
 
   def company_nif
-    setting("company_nif")
+    # Falls back to the onboarding-collected company tax id — in PT (and most
+    # of the EU) the company tax number IS the VAT number, so the accounting
+    # NIF check works without asking for the same value twice. An explicit
+    # company_nif setting always wins.
+    setting("company_nif").presence || setting("company_tax_id").presence
   end
 
   def app_name

@@ -1,0 +1,222 @@
+---
+fr:
+  activerecord:
+    attributes:
+      reconciliation:
+        statuses:
+          pending: En attente
+          parsing: Analyse
+          matching: Association
+          ready: Prêt
+          failed: Échec
+      bank_transaction:
+        statuses:
+          unmatched: Non associé
+          suggested: Suggéré
+          matched: Associé
+          excluded: Exclu
+          requested: Facture demandée
+
+  shared:
+    nav:
+      accounting: Comptabilité
+
+  command_palette:
+    commands:
+      accounting: Comptabilité
+
+  reconciliations:
+    untitled_statement: Relevé bancaire
+    destroy_confirm: Supprimer ce rapprochement ? Toutes les transactions analysées seront supprimées.
+    parse_job:
+      no_ai_for_pdf: "L'analyse des PDF nécessite un fournisseur IA configuré pour l'analyse de documents. Configurez-en un dans Paramètres → Fournisseurs IA."
+      pdf_unparseable: "Impossible d'extraire les transactions de ce PDF. Le fichier est peut-être numérisé, chiffré ou dans un format non pris en charge."
+      pdf_ai_error: "Échec de l'analyse IA : %{message}"
+      unsupported_format: "Format de fichier non pris en charge. Veuillez télécharger un relevé bancaire au format CSV ou PDF."
+      integrity_mismatch: "Échec de la vérification du solde : solde de clôture attendu %{expected} mais le relevé affiche %{actual}."
+    bank_statement_parser:
+      pages_unreadable: "Impossible de traiter les pages de ce relevé PDF. Réexportez-le depuis votre banque ou importez un export CSV."
+      no_transactions: "Aucune opération n'a pu être lue dans ce relevé. S'il ne s'agit pas d'une image numérisée, essayez d'exporter un CSV depuis votre banque."
+    index:
+      title: Comptabilité
+      new_reconciliation: Nouveau rapprochement
+      col_statement: Relevé
+      col_bank: Banque
+      col_period: Période
+      col_progress: Avancement
+      col_status: Statut
+      empty_title: Rapprochez votre premier relevé bancaire
+      empty_description: Importez un relevé CSV pour associer chaque débit à sa facture de dépense. Campbooks garde votre comptabilité prête pour un audit.
+      empty_cta: Importer un relevé
+    new:
+      title: Nouveau rapprochement
+      from_documents_title: Depuis vos documents
+      from_documents_description: Choisissez un relevé bancaire que Campbooks a déjà classé depuis votre messagerie.
+      no_documents: Aucun relevé archivé pour l'instant. Téléchargez-en un à la place.
+      upload_title: Télécharger un relevé
+      upload_description: Téléchargez un export CSV ou PDF de votre banque.
+      drop_here: Déposez votre fichier ici
+      accepted_formats: PDF ou CSV
+      click_to_browse: Parcourir les fichiers
+      csv_hint: Les exports CSV sont analysés instantanément — sans IA nécessaire.
+      upload_and_start: Télécharger et démarrer le rapprochement
+    create:
+      created: Relevé importé — analyse des transactions en cours…
+      document_not_found: Document introuvable.
+      file_upload_failed: Échec du téléchargement du fichier. Veuillez réessayer.
+      no_source: Veuillez sélectionner ou télécharger un relevé bancaire.
+    show:
+      statement_chip: "Voir le relevé"
+      view_statement: "Prévisualiser le relevé bancaire de cette réconciliation"
+      title: Rapprochement
+      delete: Supprimer
+      integrity_warning: Écart de solde détecté
+      status_parsing: Lecture de votre relevé…
+      status_matching: Association des transactions…
+      parse_failed_title: Impossible de lire ce relevé
+      parse_failed_generic: Une erreur inattendue s'est produite lors de la lecture du fichier.
+      parse_failed_hint: Essayez de réexporter depuis votre banque au format CSV ou vérifiez que le fichier n'est pas corrompu.
+      no_transactions: Aucune transaction trouvée.
+      col_date: Date
+      col_description: Description
+      col_counterparty: Contrepartie
+      col_amount: Montant
+      col_match: Association
+    confirm_all_suggestions:
+      confirmed:
+        one: "1 association confirmée"
+        other: "%{count} associations confirmées"
+    bank_transactions:
+      row:
+        confirm: Confirmer
+        reject: Rejeter
+        not_this_one: Ce n'est pas ça
+        no_invoice: Facture introuvable
+        resolve: Résoudre
+        requested: Facture demandée
+        more: plus
+      exclusion_reasons:
+        bank_fee: Frais bancaires
+        salary: Salaire
+        transfer: Virement interne
+        tax: Paiement d'impôt
+        other: Autre
+      confirm:
+        confirmed: Association confirmée
+      reject:
+        rejected: Association rejetée
+      exclude:
+        excluded: "Marqué comme exclu : %{reason}"
+        invalid_reason: Motif d'exclusion invalide.
+      reset:
+        reset: Association supprimée
+      manual_match:
+        matched: "Associé à %{title}"
+        document_not_found: Document introuvable.
+      resolve_panel:
+        open_document: "Prévisualiser le document — Ctrl/Cmd+clic ouvre la page complète"
+        attach: Associer
+        no_docs_found: Aucun document correspondant trouvé.
+      request_invoice:
+        not_applicable: La facture ne peut être demandée que pour les transactions non associées ou avec NIF invalide.
+        opened_composer: Compositeur ouvert — révisez et envoyez quand vous êtes prêt.
+        counterparty_fallback: le fournisseur
+        standard_subject: "Facture manquante — paiement de %{amount} le %{date}"
+        standard_body: "Bonjour,\n\nJe vous contacte pour demander une facture concernant un paiement de %{amount} effectué le %{date} à %{counterparty}.\n\nMerci de bien vouloir nous faire parvenir la facture dans les meilleurs délais.\n\nCordialement."
+        corrected_subject: "Demande de facture rectificative — numéro de TVA absent (%{amount} le %{date})"
+        corrected_body: "Bonjour,\n\nJ'ai reçu une facture de %{amount} datée du %{date}, mais le numéro de TVA/NIF de l'acheteur (%{company_nif}) est absent ou incorrect.\n\nPourriez-vous émettre une facture rectificative incluant notre numéro de TVA : %{company_nif} ?\n\nCordialement."
+    download:
+      not_ready: Le zip n'est pas encore prêt. Veuillez patienter.
+    export:
+      already_generating: Un fichier zip est déjà en cours de préparation. Veuillez patienter.
+      enqueued: Préparation de votre zip… vous serez notifié lorsqu'il sera prêt.
+      not_ready: Le zip n'est pas encore prêt. Veuillez patienter.
+    export_button:
+      download_for_accountant: Télécharger pour le comptable
+      download: Télécharger le zip
+      generating: Préparation de votre zip…
+      re_export: Réexporter
+      retry: Réessayer l'export
+    zip_builder:
+      nif_yes: "oui"
+      nif_missing: "absent"
+      nif_mismatch: "non concordant"
+      cross_reconciliation_note: Également associé dans un autre relevé
+      file_missing: "[fichier absent dans Campbooks]"
+    destroy:
+      destroyed: Rapprochement supprimé.
+    nif_banner:
+      title: Ajoutez votre numéro de TVA pour vérifier toutes les factures
+      body: "Campbooks signalera les factures où le numéro de TVA de votre entreprise est absent ou incorrect."
+      action: Ajouter le numéro de TVA
+      dismiss: Ignorer
+
+  components:
+    accounting:
+      summary_bar:
+        matched:
+          one: associé
+          other: associés
+        to_review:
+          one: à réviser
+          other: à réviser
+        unmatched:
+          one: non associé
+          other: non associés
+        excluded:
+          one: exclu
+          other: exclus
+        requested:
+          one: demandé
+          other: demandés
+        nif_exceptions_title: Transactions avec problèmes de NIF
+        nif_exceptions:
+          one: problème de NIF
+          other: problèmes de NIF
+        confirm_all_confirm:
+          one: "Confirmer 1 association suggérée ?"
+          other: "Confirmer %{count} associations suggérées ?"
+        confirm_all:
+          one: Confirmer 1 association
+          other: "Confirmer %{count} associations"
+      document_preview_drawer:
+        aria_label: "Aperçu du document"
+        iframe_title: "Aperçu du fichier"
+        open_full_page: "Ouvrir la page complète"
+        close: "Fermer l'aperçu"
+      match_chip:
+        open_document: "Prévisualiser le document — Ctrl/Cmd+clic ouvre la page complète"
+        nif_mismatch: Le NIF ne correspond pas
+        nif_missing: NIF absent du document
+      confidence_badge:
+        strong: Correspondance solide
+        possible: Correspondance possible
+        weak: Correspondance faible
+        reason_amount_exact: Montant exact
+        reason_amount_close: Montant dans les 2 %
+        reason_date:
+          one: 1 jour d'écart
+          other: "%{count} jours d'écart"
+        reason_name: "Similarité de nom : %{pct} %"
+        reason_cross_reconciliation: "Déjà associé dans un autre relevé"
+      resolve_panel:
+        open_document: "Prévisualiser le document — Ctrl/Cmd+clic ouvre la page complète"
+        suggestions_title: "Suggestions de Scout"
+        checked_documents:
+          one: 1 document candidat vérifié
+          other: "%{count} documents candidats vérifiés"
+        use_this_match: Utiliser cette association
+        not_this_one: Ce n'est pas ça
+        search_title: Rechercher vos documents
+        search_placeholder: "Rechercher par nom, n° facture…"
+        attach: Associer
+        exclude_title: Aucun document nécessaire
+        exclude_hint: Marquez cette transaction comme une dépense ne nécessitant pas de facture.
+        mark_excluded: Marquer comme exclu
+        counterparty_fallback: le fournisseur
+        request_invoice_title: "Demander la facture à %{counterparty}"
+        request_invoice_note: "Rien n'est envoyé automatiquement — révisez et envoyez depuis le compositeur."
+        request_invoice_to: À
+        request_invoice_to_placeholder: "fournisseur@exemple.com"
+        request_invoice_subject: Objet
+        request_invoice_open_composer: Réviser dans le compositeur

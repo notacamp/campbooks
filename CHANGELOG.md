@@ -16,7 +16,135 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Inbox search now shows it's working.** A free-text search runs a semantic
+  (embedding) lookup that can take a second or two, but the only cue was a tiny
+  corner spinner and a faint dim of the old results — so the pane looked frozen.
+  Running a search now shows a progress bar under the search field and skeleton
+  placeholder rows in the results area the moment the request fires, so the wait
+  is legible instead of dead air.
+- **Clearing the search box takes you back to your inbox.** Emptying the query
+  (when no filters are still active) now returns you to the real inbox — grouped
+  list, layout switcher and all — instead of leaving you stranded on a bare
+  results list at the `/search` URL.
+
+## [0.21.0] - 2026-07-10
+
 ### Added
+
+- **Files: search modifiers.** The Files search box now understands Gmail-style modifiers alongside free text — `type:receipt`, `category:accounting`, `vendor:EDP`, `number:FT2026/448`, `amount>100`, `amount<500`, `after:2026-01` / `before:2026-06-30`, `is:starred|pending|approved|rejected|failed|processing`, `source:email|upload|notion|sent`, `expense:travel`, and `in:<folder>` — with a typeahead that suggests modifiers and their values as you type (mirroring the inbox search).
+- **Files: full filter panel.** The old five-field strip is replaced by a filter panel on the search bar covering document type (multi-select), category, review status, processing status, source, starred, document-date range, amount range, vendor/entity, reference number, expense category, and folder. Active filters show as removable chips above the results, and the results update live without a page reload.
+- **Files: filtered bulk actions.** "Reanalyze" and "Export" now honor everything the list is filtered by — panel filters and search modifiers alike — so the ZIP matches exactly what's on screen.
+
+### Fixed
+
+- **Document exports produced no ZIP.** The export job still filtered on a `status` column that was split into `ai_status`/`review_status`, so every export errored; it now exports analyzed, non-rejected documents. Existing export records with legacy filters remain readable.
+
+## [0.20.0] - 2026-07-10
+
+### Added
+
+- **Inbox rules:** workspace-scoped, user-defined deterministic rules that evaluate against every newly ingested email and can be run retroactively. Each rule matches criteria (from, to, subject, body, category, email account, has attachment) and applies actions: tag, archive, mark as read, move to a custom folder. Runs are undoable when the match set is <= 25,000 emails. Managed via **Settings → Inbox → Rules** with live match-count preview, run-progress polling, and per-run undo.
+
+### Fixed
+
+- **Inbox groups: rules added to a group are now saved.** The Groups builder submits its rules as indexed form fields, which the server parsed as a hash rather than a list — so every sender/organization/document-type/query rule was silently dropped, and a rules-only group saved nothing at all. Rules now persist on create and update.
+- **Inbox groups: a stray blank-named group no longer shows an un-editable row.** A group heading is always non-blank, but a legacy blank-named row could still render an Edit/Ungroup link with no group name, so clicking Edit appeared to do nothing. Blank-named rows are now filtered out of the Groups panel and the inbox.
+
+## [0.19.9] - 2026-07-10
+
+### Changed
+
+- **Accounting: match confidence is now governed by entity agreement, not amount proximity.** A near-amount invoice from a clearly different organization can no longer be suggested (a close-amount pairing needs positive name/entity evidence; without it, it's discarded with the reason recorded). Exact-amount matches without entity evidence cap at "Possible"; strong confidence requires exact amount *and* the same party. The AI now also sees each candidate invoice's own description so it can judge what the invoice is for against who actually received the payment.
+
+## [0.19.8] - 2026-07-10
+
+### Fixed
+
+- **Accounting: bank-statement balance/summary lines no longer appear as phantom 0.00 transactions.** Opening/closing/available-balance rows ("SALDO INICIAL"…) are excluded in the parsing prompt and any zero-amount row is dropped before insert — a real movement is never zero.
+
+## [0.19.7] - 2026-07-10
+
+### Fixed
+
+- **Accounting: multipage PDF statements only sent their cover page to the AI.** The page counter used `identify "file.pdf[0]"` with `%n`, which reports the size of the *selected* list — always 1 — so only page one was rasterized and statements whose transactions live on later pages parsed to zero. Pages are now counted from the PDF's actual frame list.
+
+## [0.19.6] - 2026-07-10
+
+### Fixed
+
+- **Accounting: multipage PDF statements rendered as junk thumbnails on OpenAI/Mistral providers.** Page selection used MiniMagick's `Image#page` — which sets canvas geometry, not the page — so multi-page statements (e.g. Millennium combined extracts) reached the model as unreadable images and parsed to zero transactions. Pages are now rendered through ImageMagick's convert tool (`-density 150 input.pdf[N]`), suspiciously small renders are treated as failures, and the shared document-analysis rasterizer got the same fix (multi-page invoices were affected too).
+
+## [0.19.5] - 2026-07-10
+
+### Fixed
+
+- **Accounting: AI match suggestions are now grounded in the transaction amount.** The AI disambiguator could suggest an invoice whose amount doesn't fit the payment — with high claimed confidence and an invented justification. Model confidence is now bounded by evidence: exact amounts keep the model's score, near amounts (±2%) are capped below "strong", anything else is discarded (split payments whose invoices sum to the transaction are kept). Near-duplicate documents (a receipt and its invoice for the same purchase) collapse into a single suggestion. Every AI disambiguation run is also audited to the database (`bank_transactions.ai_match_debug`: candidates sent, raw model claims, and each grounding decision) for debugging, and the matching prompt now states hard evidence rules — amount is primary, no invented company relationships, empty is a good answer — with a strict confidence rubric.
+
+## [0.19.4] - 2026-07-09
+
+### Changed
+
+- **Accounting: documents preview in place.** Clicking a matched/suggested invoice chip, a search candidate in the resolve panel, or the new "View statement" chip opens the document in a slide-over preview (bottom sheet on mobile) without leaving the workbench — the file renders inline, with an "open full page" escape hatch. Ctrl/Cmd+click still opens the full document page directly.
+
+## [0.19.3] - 2026-07-09
+
+### Changed
+
+- **Accounting: match chips open the document.** The matched/suggested invoice chip in the workbench rows, cards, and resolve panel now links to the document (new tab), so you can inspect the actual invoice before confirming a match.
+
+## [0.19.2] - 2026-07-09
+
+### Fixed
+
+- **Settings → General wiped the workspace context on save and never persisted the VAT number.** The form scoped its fields under `user[...]` while the controller read top-level params, so saving the page cleared `workspace_context` and dropped `company_nif`. The form now submits the exact param names the controller reads, both writes are guarded so a request that omits a field never clears it, and specs pin the form's input names against the controller contract. `Workspace#company_nif` also falls back to the onboarding-collected company tax id, so the accounting NIF check works without re-entering the same number.
+
+## [0.19.1] - 2026-07-09
+
+### Fixed
+
+- **Accounting: PDF statement parsing on OpenAI/Mistral providers extracted zero transactions.** Page rasterization passed ImageMagick's bracket page syntax to `MiniMagick::Image.open`, which MiniMagick 5 rejects — every page silently failed and the AI received an imageless prompt. Pages are now selected via `#page` after opening (the same mechanism the document analyzer uses). A statement that yields no readable pages or no transactions now fails loudly with a clear message instead of completing as "ready" with an empty table.
+
+## [0.19.0] - 2026-07-09
+
+### Added
+
+- **Accounting module — bank reconciliation (`ENABLE_ACCOUNTING=1` + `:accounting` entitlement).** A new top-level module for small-business bookkeeping: pick a bank statement Campbooks already filed from your email (or upload one) and every debit is matched to its expense invoice, every credit to its sales invoice.
+  - **Statement parsing**: CSV extracts parse deterministically (delimiter + encoding detection incl. UTF-8 BOM and Latin-1, multilingual column aliases in pt/en/es/fr, three amount layouts, EU/US decimal formats, balance integrity + sign-convention checks). PDF statements parse via AI (`Ai::BankStatementParser` — native multi-page PDF on Anthropic/Gemini, per-page rasterization on OpenAI/Mistral, chunked for long statements).
+  - **Matching engine**: `Reconciliations::Matcher` scores candidates by amount exactness, date proximity and name similarity, optionally disambiguating with the workspace's text AI; strong matches are auto-suggested with plain-language reasons and live Turbo Stream progress.
+  - **Workbench**: confirm/reject suggestions inline, bulk "Confirm all", manually attach any document, exclude transactions with a reason (bank fee, salary, transfer, tax), or **request the missing invoice** — a pre-filled email opens in the composer (standard or corrected-NIF variant); nothing is ever sent automatically.
+  - **VAT number check (optional)**: set your company NIF in Settings → General and expense invoices missing it (or carrying a different one) are flagged inline, counted in the summary bar, and reported in the export.
+  - **Accountant export**: a background job builds a zip with the original statement, matched invoices renamed `YYYY-MM-DD ±amount vendor invoice-no` in `debits/`/`credits/` folders, and an `index.csv` listing every transaction, its resolution and NIF status.
+  - Ships with notifications (ready for review / parse failed / zip ready), a demo-workspace seed reconciliation, and full four-locale i18n.
+
+## [0.18.1] - 2026-07-07
+
+### Fixed
+
+- **A mailbox backfill no longer floods your feed with stale suggestions from old email.** When a full resync or a newly-connected account ingested months- or years-old mail, the AI task/reminder extractors ran on every message and — because a task suggestion had no recency check — could mint hundreds of suggestions at once, many dated to the wrong year (an invoice "due in 2024", a relative date rolled forward into this year). Suggestions are now staged only while still temporally live: a **future-dated** action is always kept; an **overdue or undated** one only when its source email is still recent. A genuinely forgotten recent action still surfaces — framed as **"You may have missed this"** on the feed — while a long-dead ask from a backfill is dropped. Drafting a calendar event from an old email now anchors to the email's own date instead of always defaulting to tomorrow.
+
+## [0.18.0] - 2026-07-06
+
+### Fixed
+
+- **Campbooks' own digest emails are no longer mined by the AI pipeline.** Digests
+  are delivered to your mailbox, so the email scanner re-ingests them; previously the
+  reminder / task / contact extractors ran on them, so a digest that *lists* your
+  reminders could spawn duplicate ones. Campbooks-generated mail is now recognised at
+  ingest — via an `X-Campbooks-Kind` header we stamp on the way out, with a
+  sender-address fallback for providers (e.g. Zoho) that strip custom headers — and
+  skips all AI analysis while staying fully readable in the inbox. Digests are
+  marked with a **Digest** badge so you know they're ours to read.
+- An in-progress inbox no longer claims "All caught up" when the user navigates away from the first-sync stage while a scan is still running. Home now shows an honest "Scout is reading your inbox" state.
+
+### Added
+
+- **First-run walkthrough rebuilt as an explanation-first slideshow.** What Campbooks is (with rotating Scout statements), then Inbox, Calendar, Tasks (feature-gated), Documents, and a "much more" close with docs link and connect CTA. Segmented progress bars with 0.4s fill animation, module label + slide counter, per-slide vignette animations (chips pop, group counter ticks, event and reminder buttons confirm, task ticks, document fields fade in), keyboard navigation, and click-to-jump segments. New registrations land on home where it auto-opens.
+- **Tag filing is now do-and-tell: Scout files the email and tells you in the feed — one tap undoes it.** (Previously the feed asked before filing.)
+- The first-sync wait screen now asks what you mostly deal with (persona setup applies mid-scan via a compact chip picker; a Turbo Stream swaps the card for a confirmation once submitted).
+- Skipping the first-sync stage via the escape hatch now actually skips it — a POST sets a session flag so home does not re-trap you in the stage on subsequent visits.
+- **Scheduling emails now show the drafted event inline — one tap adds it to your calendar (Edit still opens the full form).** When Scout detects a time proposal in an email (e.g. "does 3pm work?"), a bordered event block appears below the thread with the extracted title and time range. Tap "Add to calendar" to confirm it in one step; tap "Edit" to open the prefilled calendar form. Scout drafts — you decide.
 
 - **MCP: `archive_emails` tool to clear inbox noise at scale.** Agents can now
   archive every email matching a filter — a whole tag (e.g. `Notifications`), a
@@ -1308,7 +1436,9 @@ major, minor, or patch change here.
 
 - Initial public, source-available release of Campbooks.
 
-[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/notacamp/campbooks/compare/v0.20.0...v0.21.0
+[0.20.0]: https://github.com/notacamp/campbooks/compare/v0.19.9...v0.20.0
 [0.17.0]: https://github.com/notacamp/campbooks/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/notacamp/campbooks/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/notacamp/campbooks/compare/v0.14.0...v0.15.0

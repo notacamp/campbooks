@@ -74,6 +74,11 @@ es:
       error_cta: Comprobar la conexión de la cuenta
       error_title: Scout no pudo acceder a su buzón
       escape: Ver cómo se llena la bandeja
+      persona_heading: Mientras Scout lee — ¿con qué trata principalmente?
+      persona_skip: Omitir por ahora
+      persona_subheading: Elija una o varias. Scout archivará documentos y etiquetará
+        correos en consecuencia desde el principio.
+      persona_submit: Aplicar
       subtitle_done: "%{needs_you} cosas le esperan. Todo lo demás está ordenado y
         fuera del camino."
       subtitle_done_calm: Nada le espera ahora mismo. Todo está ordenado y fuera del
@@ -174,6 +179,14 @@ es:
       switch_link: Usar mis propias claves
       text_role: Correo y chat
       title: Campbooks AI
+    event_draft_block:
+      add: Añadir al calendario
+      added: "En tu calendario"
+      drafted_from: extraído de este correo
+      edit: Editar
+      error_generic: No se pudo crear el evento. Inténtalo de nuevo.
+      retry: Reintentar
+      view: Ver
     markdown_editor:
       preview_tab: Vista previa
       write_tab: Escribir

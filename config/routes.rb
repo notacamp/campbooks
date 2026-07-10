@@ -51,6 +51,8 @@ Rails.application.routes.draw do
       post :suggest_document_types
       post :suggest_tags
       get :first_sync_status
+      post :apply_persona
+      post :skip_first_sync
     end
   end
 
@@ -97,6 +99,31 @@ Rails.application.routes.draw do
       post :confirm
       post :dismiss
       post :snooze
+    end
+  end
+
+  # Accounting — bank statement reconciliation against Documents. Gated by
+  # Features.accounting? and the :accounting entitlement.
+  # PR 2 adds: matching engine, workbench actions (nested bank_transactions),
+  # and confirm_all_suggestions.
+  get "accounting", to: "reconciliations#index", as: :accounting
+  resources :reconciliations, only: %i[new create show destroy] do
+    member do
+      post :confirm_all_suggestions
+      post :export
+      get  :download
+    end
+    resources :bank_transactions, only: [],
+              controller: "reconciliations/bank_transactions" do
+      member do
+        post :confirm
+        post :reject
+        post :exclude
+        post :reset
+        post :manual_match
+        post :request_invoice
+        get  :resolve_panel
+      end
     end
   end
 
@@ -429,6 +456,21 @@ Rails.application.routes.draw do
       member { post :set_default }
     end
 
+    resources :rules do
+      member do
+        patch :toggle
+        post  :run
+      end
+      collection do
+        get :match_count
+      end
+    end
+    # Undo a retroactive run — explicit route so Rails doesn't look for
+    # InboxSettings::RunsController.
+    post "rules/:rule_id/runs/:id/undo",
+         to: "rules#undo",
+         as: :undo_rule_run
+
     get  "accounts", to: "accounts#show", as: :accounts
     post "accounts/scan", to: "accounts#scan_now", as: :accounts_scan
   end
@@ -543,6 +585,11 @@ Rails.application.routes.draw do
       patch :dismiss_todo
       # Dismiss the "waiting on reply" nudge for this thread from the inbox section.
       post :dismiss_follow_up
+      # Inline scheduled-event draft block: lazy-loaded turbo frame (GET) and
+      # one-tap "Add to calendar" (POST). Both go through the same named route;
+      # the frame's src uses GET and the Add button POSTs to the same path.
+      get  :event_draft, to: "email_messages/event_drafts#show"
+      post :event_draft, to: "email_messages/event_drafts#create"
       post   "follow", to: "thread_follows#create", as: :follow
       delete "follow", to: "thread_follows#destroy"
       post :compose, to: "email_compose#create"

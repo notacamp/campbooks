@@ -187,13 +187,22 @@ module Ai
 
         Tempfile.create([ "pdf_page", ".pdf" ], binmode: true) do |pdf_file|
           pdf_file.write(Base64.decode64(base64_data))
-          pdf_file.rewind
+          pdf_file.flush
 
-          image = MiniMagick::Image.open(pdf_file.path)
-          image.format("jpg")
-          image.page("0")  # first page only
-
-          jpeg_data = File.binread(image.path)
+          # Select page 0 via the convert tool's input bracket syntax. The old
+          # Image#format + Image#page pipeline broke on MULTI-page PDFs
+          # (Image#page is -page canvas geometry, not a page selector; #format
+          # writes per-page artifacts with mismatched paths) and produced junk
+          # thumbnails — see Ai::BankStatementParser#rasterize_page.
+          jpeg_data = Tempfile.create([ "pdf_render", ".jpg" ], binmode: true) do |out|
+            MiniMagick.convert do |convert|
+              convert.density(150)
+              convert << "#{pdf_file.path}[0]" # first page only
+              convert.quality(85)
+              convert << out.path
+            end
+            File.binread(out.path)
+          end
           jpeg_base64 = Base64.strict_encode64(jpeg_data)
 
           {

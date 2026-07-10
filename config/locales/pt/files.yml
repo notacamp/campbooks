@@ -34,6 +34,34 @@ pt:
       file_meta:
         kind_file: Ficheiro
         kind_image: Imagem
+      filter_chips:
+        date_from_prefix: "De:"
+        date_to_prefix: "Até:"
+        starred: Com estrela
+      filter_panel:
+        ai_status: Processamento
+        amount_max: Valor máx. (EUR)
+        amount_min: Valor mín. (EUR)
+        any_category: Todas as categorias
+        any_expense_category: Todas as categorias
+        any_folder: Todas as pastas
+        any_processing: Qualquer estado
+        any_source: Todas as origens
+        any_status: Todos os estados
+        category: Categoria
+        clear_filters: Limpar filtros
+        date_from: Data inicial
+        date_to: Data final
+        entity: Fornecedor / entidade
+        entity_placeholder: ex. EDP, Vodafone
+        expense_category: Categoria de despesa
+        folder: Pasta
+        number_placeholder: ex. FAT-001
+        reference_number: Referência #
+        review_status: Estado de revisão
+        source: Origem
+        starred: Apenas com estrela
+        type: Tipo de documento
       folder_sharing:
         add_button: Adicionar
         add_title: Adicionar pessoas
@@ -54,8 +82,34 @@ pt:
         you_badge: Você
       search_bar:
         clear: Limpar pesquisa
+        filters: Filtros
         placeholder: Pesquisar ficheiros…
-        submit: Pesquisar
+        searching: A pesquisar…
+        suggest:
+          after: documentos após uma data
+          amount_gt: documentos com valor superior a
+          amount_lt: documentos com valor inferior a
+          before: documentos antes de uma data
+          category: por categoria de documento
+          expense: por categoria de despesa
+          heading: Refinar pesquisa
+          in: documentos numa pasta
+          is: por estado ou marcação
+          number: por número de referência
+          source: por origem do documento
+          type: por tipo de documento
+          values:
+            approved: aprovado
+            email: email
+            failed: falhado
+            notion: notion
+            pending: por rever
+            processing: em processamento
+            rejected: rejeitado
+            sent: email enviado
+            starred: com estrela
+            upload: carregamento manual
+          vendor: por fornecedor ou entidade
       sidebar:
         all_files: Todos os ficheiros
         label: Pastas
@@ -91,17 +145,6 @@ pt:
       exports_col_status: Estado
       exports_heading: Exportações recentes
       files_section: Ficheiros
-      filter_all_categories: Todas as categorias
-      filter_all_folders: Todas as pastas
-      filter_all_statuses: Todos os estados
-      filter_all_types: Todos os tipos
-      filter_category: Categoria
-      filter_folder: Pasta
-      filter_month: Mês
-      filter_status: Estado
-      filter_type: Tipo
-      filter_types_selected: "%{count} selecionado(s)"
-      filters: Filtros
       internal_documents: Documentos internos
       manage_access: Gerir acesso
       manage_access_locked: Gerir acesso · Privado
@@ -141,3 +184,4 @@ pt:
         uploaded_one: Ficheiro carregado.
       destroy:
         deleted: Ficheiro eliminado.
+        statement_document: Não é possível eliminar este documento — está associado a uma reconciliação bancária.

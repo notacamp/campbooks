@@ -78,6 +78,40 @@ RSpec.describe "Feed::Items", type: :request do
       expect(item.reload).to be_active
     end
 
+    context "undo_tag_filing (notice-mode undo)" do
+      let(:contact) { create(:contact, workspace: workspace) }
+      let(:tag)     { create(:tag, workspace: workspace, name: "Invoices") }
+
+      def notice_card(tag_name: "invoices")
+        message = create(:email_message, email_account: account,
+                         from_address: "billing@acme.com", contact_id: contact.id)
+        feed_item_for(message, kind: "tag_suggestion",
+                      data: { "tag_name" => tag_name, "applied" => true })
+      end
+
+      it "removes the tag and resolves the notice card" do
+        item = notice_card
+        allow(EmailActions).to receive(:run).with("remove_tag", hash_including(user: user))
+          .and_return({ success: true, message: "Tag removed", result: {} })
+
+        post act_feed_item_path(item), params: { tool: "undo_tag_filing", args: { tag_name: "invoices" } }, headers: turbo
+
+        expect(response).to have_http_status(:ok)
+        expect(item.reload.acted_at).to be_present
+        expect(EmailActions).to have_received(:run).with("remove_tag", hash_including(user: user))
+      end
+
+      it "records a rejected learning decision on undo" do
+        item = notice_card
+        allow(EmailActions).to receive(:run).with("remove_tag", anything)
+          .and_return({ success: true, message: "Tag removed", result: {} })
+
+        expect {
+          post act_feed_item_path(item), params: { tool: "undo_tag_filing", args: { tag_name: "invoices" } }, headers: turbo
+        }.to change { LearningDecision.where(domain: "tag_suggestion", label: "rejected", user: user).count }.by(1)
+      end
+    end
+
     context "tag-suggestion learning" do
       let(:contact) { create(:contact, workspace: workspace) }
 
@@ -86,7 +120,7 @@ RSpec.describe "Feed::Items", type: :request do
         feed_item_for(message, kind: "tag_suggestion", data: { "tag_name" => tag })
       end
 
-      it "records an accepted decision when a tag suggestion is acted on" do
+      it "records an accepted decision when a legacy tag suggestion is acted on" do
         item = tag_card
         allow(EmailActions).to receive(:run).and_return({ success: true, tool: "add_tag", message: "Filed", result: {} })
 
