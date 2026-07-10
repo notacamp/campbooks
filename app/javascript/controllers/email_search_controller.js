@@ -34,6 +34,14 @@ export default class extends Controller {
     this._remoteTimer = null
     this._openPanel = false
 
+    // Turbo dispatches fetch events on the element that initiated the request:
+    // on THIS FORM for a submitted search, on the frame only for in-frame
+    // navigations (pagination links). Listen on both, or a typed query — the
+    // main path — never shows the busy state.
+    this._onSubmitStart = () => this._showBusy()
+    this._onSubmitEnd   = () => this._hideBusy()
+    this.element.addEventListener("turbo:submit-start", this._onSubmitStart)
+    this.element.addEventListener("turbo:submit-end",   this._onSubmitEnd)
     if (this.frame) {
       this._onFetchStart = (e) => { if (e.target === this.frame) this._showBusy() }
       this._onFetchDone  = (e) => { if (e.target === this.frame) this._hideBusy() }
@@ -48,6 +56,8 @@ export default class extends Controller {
     clearTimeout(this.timer)
     clearTimeout(this._blurTimer)
     clearTimeout(this._remoteTimer)
+    this.element.removeEventListener("turbo:submit-start", this._onSubmitStart)
+    this.element.removeEventListener("turbo:submit-end",   this._onSubmitEnd)
     if (this.frame) {
       this.frame.removeEventListener("turbo:before-fetch-request", this._onFetchStart)
       this.frame.removeEventListener("turbo:frame-render",          this._onFetchDone)
