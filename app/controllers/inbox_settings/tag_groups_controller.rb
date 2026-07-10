@@ -99,13 +99,18 @@ module InboxSettings
       end
     end
 
-    # Parse the rules[] array from form params.  Each element is expected to be
-    # a hash (or ActionController::Parameters) with :rule_type and :value.
+    # Parse the submitted rules into a list of { rule_type:, value: } hashes. The
+    # form uses indexed inputs (rules[0][rule_type], rules[1][...]), which Rack
+    # parses into an index-keyed hash ({ "0" => {...}, "1" => {...} }) rather than
+    # an array — so we take its values. A plain array of hashes is still accepted.
     def parsed_rules_params
-      Array(params[:rules]).filter_map do |r|
-        next unless r.is_a?(Hash) || r.respond_to?(:to_unsafe_h)
-        h = r.respond_to?(:to_unsafe_h) ? r.to_unsafe_h : r
-        { rule_type: h["rule_type"].to_s, value: h["value"].to_s }
+      raw = params[:rules]
+      raw = raw.to_unsafe_h if raw.respond_to?(:to_unsafe_h)
+      items = raw.is_a?(Hash) ? raw.values : Array(raw)
+      items.filter_map do |r|
+        r = r.to_unsafe_h if r.respond_to?(:to_unsafe_h)
+        next unless r.is_a?(Hash)
+        { rule_type: r["rule_type"].to_s, value: r["value"].to_s }
       end
     end
 
@@ -125,7 +130,9 @@ module InboxSettings
     def load_groups
       tag_groups_by_name = groups_scope.by_name.group_by(&:group_name).sort_by { |name, _| name.downcase }
       rule_names = Current.workspace.inbox_group_rules.pluck(:group_name).uniq
-      all_names  = (tag_groups_by_name.map(&:first) + rule_names).uniq.sort
+      # A group name is always non-blank; guard against any stray blank-named row
+      # (e.g. a legacy orphan) so it never renders a dead, un-editable entry.
+      all_names  = (tag_groups_by_name.map(&:first) + rule_names).compact.reject { |n| n.to_s.strip.empty? }.uniq.sort
 
       @groups = all_names.map do |name|
         tags  = tag_groups_by_name.to_h[name] || []
