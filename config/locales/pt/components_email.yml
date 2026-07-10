@@ -170,6 +170,8 @@ pt:
     email_search_result:
       no_subject: "(sem assunto)"
       sent_to: Para %{address}
+    email_search_skeleton:
+      searching: A procurar na sua caixa de entrada…
     inbox_view_switcher:
       aria_label: Disposição da caixa
       board: Vista de quadro

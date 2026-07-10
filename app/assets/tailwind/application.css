@@ -251,6 +251,12 @@
   --animate-skeleton: skeleton-pulse 1.8s ease-in-out infinite;
   --animate-fade-in: fade-in 0.25s var(--ease-out-quint);
 
+  /* Indeterminate scan bar under the inbox search field while a query is in
+     flight — makes a slow semantic search read as "working", not frozen. The
+     reduced-motion guard below stops the loop (the skeleton + "Searching…" cue
+     still convey progress). */
+  --animate-search-progress: search-progress 1.15s ease-in-out infinite;
+
   /* Product-tour "now you try" invites — draw the eye to the thing to tap. The
      global reduced-motion guard below stops the loop. */
   --animate-tour-breathe: tour-breathe 2.2s var(--ease-out-quint) infinite;
@@ -431,6 +437,12 @@ html {
 @keyframes skeleton-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
+}
+
+/* A one-third-width segment sweeps left→right across the search bar's base. */
+@keyframes search-progress {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(400%); }
 }
 
 @keyframes typingBounce {

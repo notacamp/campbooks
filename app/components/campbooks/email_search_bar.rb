@@ -36,18 +36,37 @@ module Campbooks
           turbo_action: "replace",
           action: "change->email-search#submitNow",
           email_search_suggestions_value: catalog.to_json,
+          email_search_inbox_url_value: helpers.email_messages_path,
           email_search_heading_text: t(".suggest.heading"),
           email_search_heading_text_value: t(".suggest.heading")
         },
         **@attrs
       ) do
-        input_row
+        div(class: "relative") do
+          input_row
+          progress_bar
+        end
         suggestions_panel
         panel
       end
     end
 
     private
+
+    # Indeterminate scan bar pinned to the base of the search field. Hidden until
+    # the email-search controller reveals it on `turbo:before-fetch-request` for
+    # the results frame (and hides it again on render) — so a slow semantic query
+    # reads as "working". aria-hidden: the sr-only "Searching…" text in the busy
+    # spinner already announces the state.
+    def progress_bar
+      div(
+        class: "absolute inset-x-0 bottom-0 h-0.5 overflow-hidden hidden",
+        data: { email_search_target: "progress" },
+        aria_hidden: "true"
+      ) do
+        div(class: "h-full w-1/3 rounded-full bg-accent-600 animate-search-progress")
+      end
+    end
 
     def input_row
       div(class: "flex items-center gap-1.5 px-2.5 py-1.5 relative") do

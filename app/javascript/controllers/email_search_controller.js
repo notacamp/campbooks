@@ -11,23 +11,39 @@ import { Controller } from "@hotwired/stimulus"
 // - Filters button: toggles the panel
 // - tag filter box: client-side show/hide of the tag checkboxes
 // - modifier typeahead: Gmail-style token detection, shows a suggestions panel
-// - busy state: dims the frame while a fetch is in-flight via CSS [&[busy]]
+// - busy state: while a fetch is in flight, shows the search-bar progress bar +
+//   spinner and flags the results pane (data-searching) so the skeleton
+//   placeholder replaces the stale list (see _showBusy/_hideBusy)
+// - empty box + no filters: leaves search and visits the real inbox instead of
+//   submitting a blank in-frame search (see _performSubmit)
 export default class extends Controller {
-  static targets = ["query", "filterPanel", "tagOption", "suggestions", "suggestionsList", "searchIcon", "spinner"]
+  static targets = ["query", "filterPanel", "tagOption", "suggestions", "suggestionsList", "searchIcon", "spinner", "progress"]
   static values = {
     debounce: { type: Number, default: 300 },
     suggestions: { type: Array, default: [] },
+    inboxUrl: String,
     frameId: { type: String, default: "email_search_results" },
     headingText: { type: String, default: "" }
   }
 
   connect() {
     this.frame = document.getElementById(this.frameIdValue)
+    // Wrapper around the results frame — carries data-searching to swap the stale
+    // list for the skeleton placeholder while a fetch is in flight.
+    this.pane = document.getElementById("email_search_pane")
     this._activeIndex = -1
     this._blurTimer = null
     this._remoteTimer = null
     this._openPanel = false
 
+    // Turbo dispatches fetch events on the element that initiated the request:
+    // on THIS FORM for a submitted search, on the frame only for in-frame
+    // navigations (pagination links). Listen on both, or a typed query — the
+    // main path — never shows the busy state.
+    this._onSubmitStart = () => this._showBusy()
+    this._onSubmitEnd   = () => this._hideBusy()
+    this.element.addEventListener("turbo:submit-start", this._onSubmitStart)
+    this.element.addEventListener("turbo:submit-end",   this._onSubmitEnd)
     if (this.frame) {
       this._onFetchStart = (e) => { if (e.target === this.frame) this._showBusy() }
       this._onFetchDone  = (e) => { if (e.target === this.frame) this._hideBusy() }
@@ -42,6 +58,8 @@ export default class extends Controller {
     clearTimeout(this.timer)
     clearTimeout(this._blurTimer)
     clearTimeout(this._remoteTimer)
+    this.element.removeEventListener("turbo:submit-start", this._onSubmitStart)
+    this.element.removeEventListener("turbo:submit-end",   this._onSubmitEnd)
     if (this.frame) {
       this.frame.removeEventListener("turbo:before-fetch-request", this._onFetchStart)
       this.frame.removeEventListener("turbo:frame-render",          this._onFetchDone)
@@ -61,12 +79,46 @@ export default class extends Controller {
   // suggestion is applied so the panel doesn't immediately reopen.
   _scheduleSubmitOnly() {
     clearTimeout(this.timer)
-    this.timer = setTimeout(() => this.element.requestSubmit(), this.debounceValue)
+    this.timer = setTimeout(() => this._performSubmit(), this.debounceValue)
   }
 
   submitNow() {
     clearTimeout(this.timer)
+    this._performSubmit()
+  }
+
+  // Empty box + no active filters → this isn't a search any more. Leave the
+  // search frame entirely and restore the *real* inbox (grouped list, view
+  // switcher, feed) with a top-level visit — instead of submitting a blank
+  // search that renders a bare thread list inside the frame and strands you on
+  // /search. Any active filter keeps us in filtered search.
+  _performSubmit() {
+    if (this._isBlankSearch() && this.hasInboxUrlValue && window.Turbo) {
+      window.Turbo.visit(this.inboxUrlValue, { action: "replace" })
+      return
+    }
     this.element.requestSubmit()
+  }
+
+  _isBlankSearch() {
+    const q = this.hasQueryTarget ? this.queryTarget.value.trim() : ""
+    if (q !== "") return false
+    return !this._hasActiveFilters()
+  }
+
+  // Any filter field carrying a real value — folder/category/priority selects,
+  // sender/domain/date inputs, account/tag checkboxes, the unread & attachment
+  // toggles. Skips the query itself, the tag AND/OR mode, pagination, and the
+  // "empty" sentinels a control submits when it isn't really filtering.
+  _hasActiveFilters() {
+    const skipKeys = new Set(["q", "tag_match", "page"])
+    const emptyVals = new Set(["", "0", "all", "false"])
+    for (const [key, value] of new FormData(this.element).entries()) {
+      if (skipKeys.has(key)) continue
+      if (emptyVals.has(String(value).trim().toLowerCase())) continue
+      return true
+    }
+    return false
   }
 
   // --- Keydown handling ---
@@ -479,11 +531,15 @@ export default class extends Controller {
   _showBusy() {
     if (this.hasSearchIconTarget) this.searchIconTarget.classList.add("hidden")
     if (this.hasSpinnerTarget)    this.spinnerTarget.classList.remove("hidden")
+    if (this.hasProgressTarget)   this.progressTarget.classList.remove("hidden")
+    if (this.pane)                this.pane.setAttribute("data-searching", "on")
   }
 
   _hideBusy() {
     if (this.hasSearchIconTarget) this.searchIconTarget.classList.remove("hidden")
     if (this.hasSpinnerTarget)    this.spinnerTarget.classList.add("hidden")
+    if (this.hasProgressTarget)   this.progressTarget.classList.add("hidden")
+    if (this.pane)                this.pane.removeAttribute("data-searching")
   }
 
   // --- DOM helpers ---
