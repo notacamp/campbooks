@@ -165,4 +165,58 @@ RSpec.describe "InboxSettings::TagGroups (rules)", type: :request do
 
     expect(@workspace.inbox_group_rules.count).to eq(0)
   end
+
+  # ---- regression: the REAL browser form submits INDEXED inputs --------------
+  #
+  # The form renders rules[0][rule_type], rules[1][...] — which Rack parses into
+  # an index-keyed hash ({ "0" => {...} }), NOT an array. The array-shaped specs
+  # above all passed while the live form silently dropped every rule. These drive
+  # the exact shape a real submission produces.
+
+  it "create saves rules submitted in the real indexed-hash shape" do
+    post inbox_settings_tag_groups_path, params: {
+      name:  "Vendors",
+      rules: { "0" => { rule_type: "sender", value: "@vendor.example" },
+               "1" => { rule_type: "query",  value: "is:unread" } }
+    }
+
+    expect(response).to redirect_to(inbox_settings_tag_groups_path)
+    rules = @workspace.inbox_group_rules.where(group_name: "Vendors")
+    expect(rules.count).to eq(2)
+    expect(rules.map(&:rule_type)).to contain_exactly("query", "sender")
+  end
+
+  it "update replaces rules submitted in the real indexed-hash shape" do
+    @workspace.inbox_group_rules.create!(
+      group_name: "Vendors", rule_type: "sender", value: "@old.example"
+    )
+
+    patch inbox_settings_tag_groups_path, params: {
+      original_name: "Vendors",
+      name:          "Vendors",
+      rules:         { "0" => { rule_type: "sender", value: "@new.example" } }
+    }
+
+    rules = @workspace.inbox_group_rules.where(group_name: "Vendors")
+    expect(rules.count).to eq(1)
+    expect(rules.first.value).to eq("@new.example")
+  end
+
+  # ---- regression: a stray blank-named group must not render a dead row -------
+
+  it "index does not render an un-editable blank-named group row" do
+    tag = @workspace.tags.create!(name: "Orphan #{SecureRandom.hex(2)}", color: "#123456")
+    tag.update_column(:group_name, "") # legacy orphan: grouped but blank-named
+
+    get inbox_settings_tag_groups_path
+
+    expect(response).to have_http_status(:ok)
+    # A blank name would produce an edit link ending in "?group=" — never render it.
+    expect(response.body).not_to include('tag_groups/edit?group="')
+  end
+
+  it "edit of a blank/unknown group redirects instead of rendering a dead frame" do
+    get inbox_settings_edit_tag_group_path(group: "")
+    expect(response).to redirect_to(inbox_settings_tag_groups_path)
+  end
 end

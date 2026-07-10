@@ -329,7 +329,7 @@ module Emails
     def all_group_names
       tag_names  = grouped_tags_by_name.keys
       rule_names = all_rules.map(&:group_name).uniq
-      (tag_names + rule_names).uniq.sort
+      (tag_names + rule_names).compact.reject { |n| n.to_s.strip.empty? }.uniq.sort
     end
 
     # Base scope for EmailMessage subqueries: account-scoped + has a thread.
