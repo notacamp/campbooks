@@ -15,7 +15,8 @@ module Campbooks
       def view_template
         div(id: helpers.dom_id(@email, :files),
           class: "flex items-center gap-3 rounded-xl border border-gray-200 bg-card px-4 py-3 shadow-sm dark:border-white/10") do
-          a(href: helpers.email_message_path(@email), class: "flex min-w-0 flex-1 items-center gap-3") do
+          # Inside the `files_results` frame — break out (see FileRow).
+          a(href: helpers.email_message_path(@email), class: "flex min-w-0 flex-1 items-center gap-3", data: { turbo_frame: "_top" }) do
             span(class: "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground") { raw(safe(MAIL_ICON)) }
             span(class: "min-w-0 flex-1") do
               span(class: "block truncate text-sm font-medium text-foreground") { subject }
@@ -43,7 +44,7 @@ module Campbooks
           summary(class: "inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted [&::-webkit-details-marker]:hidden",
             aria: { label: t(".actions") }) { raw(safe(DOTS_ICON)) }
           div(class: "absolute right-0 z-20 mt-1 w-52 rounded-lg border border-border bg-card p-1 text-left shadow-lg") do
-            a(href: helpers.email_message_path(@email), class: menu_item) { t(".open") }
+            a(href: helpers.email_message_path(@email), class: menu_item, data: { turbo_frame: "_top" }) { t(".open") }
             remove_item if @current_folder
           end
         end

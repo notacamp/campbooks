@@ -17,7 +17,9 @@ module Campbooks
       def view_template
         tr(id: helpers.dom_id(@doc), class: "group hover:bg-accent-50 dark:hover:bg-white/5") do
           td(class: "px-6 py-3 max-w-0") do
-            a(href: helpers.document_path(@doc), class: "flex min-w-0 items-center gap-3") do
+            # Rows render inside the `files_results` frame; break out or Turbo
+            # would look for that frame on the document page ("Content missing").
+            a(href: helpers.document_path(@doc), class: "flex min-w-0 items-center gap-3", data: { turbo_frame: "_top" }) do
               span(class: "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground") { raw(safe(type_icon)) }
               span(class: "truncate text-sm font-medium text-foreground") { @doc.display_title }
             end
