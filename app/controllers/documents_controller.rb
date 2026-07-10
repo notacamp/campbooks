@@ -206,15 +206,13 @@ class DocumentsController < ApplicationController
   end
 
   def reprocess_all
-    documents = Current.workspace.documents
-    documents = documents.by_type(params[:type]) if params[:type].present?
-    documents = documents.by_category(params[:category]) if params[:category].present?
+    filters = Documents::Filters.from_params(params)
+    documents = filters.apply(
+      Current.workspace.documents,
+      workspace: Current.workspace,
+      user: Current.user
+    ).reprocessable
 
-    if (year_month = month_filter)
-      documents = documents.for_month(*year_month)
-    end
-
-    documents = documents.reprocessable
     count = documents.count
     documents.find_each do |doc|
       was_failed = doc.ai_failed?
@@ -224,24 +222,17 @@ class DocumentsController < ApplicationController
       DocumentProcessJob.perform_later(doc.id)
     end
     Notifier.documents_need_review(Current.workspace, bump: false)
-    redirect_to files_path(type: params[:type], category: params[:category], review_status: params[:review_status], month: params[:month]),
-                success: t(".queued", count: count)
+    redirect_to files_path(filters.to_h), success: t(".queued", count: count)
   end
 
   def export
-    year, month = month_filter
+    filters = Documents::Filters.from_params(params)
+    # q is intentionally excluded from export filters (search text is ephemeral).
+    filter_hash = filters.to_h
 
-    filters = {
-      "type" => params[:type].presence,
-      "category" => params[:category].presence,
-      "year" => year&.to_s,
-      "month" => month&.to_s
-    }.compact
-
-    export = Current.workspace.exports.create!(status: :pending, filters: filters)
+    export = Current.workspace.exports.create!(status: :pending, filters: filter_hash)
     ExportJob.perform_later(export.id)
-    redirect_to files_path(type: params[:type], category: params[:category], review_status: params[:review_status], month: params[:month]),
-                success: t(".generating")
+    redirect_to files_path(filter_hash), success: t(".generating")
   end
 
   def merge

@@ -187,6 +187,57 @@ class Document < ApplicationRecord
 
   scope :not_pushed_to_drive, -> { where(google_drive_push_status: [ :not_pushed, :failed ]) }
 
+  # ── Filter scopes (Documents::Filters) ──────────────────────────────────────
+
+  scope :by_source, ->(values) {
+    vals = Array(values).reject(&:blank?)
+    where(source: vals) if vals.any?
+  }
+  scope :starred_only, ->(flag) { where(starred: true) if flag }
+  scope :document_date_from, ->(d) { where("documents.document_date >= ?", d) if d.present? }
+  scope :document_date_to,   ->(d) { where("documents.document_date <= ?", d) if d.present? }
+  scope :amount_at_least, ->(cents) { where("documents.amount_cents >= ?", cents) if cents.present? }
+  scope :amount_at_most,  ->(cents) { where("documents.amount_cents <= ?", cents) if cents.present? }
+
+  # OR across vendor_name / client_name / bank_name / sender_name for each term;
+  # multiple terms are themselves OR'd together.
+  scope :by_entity, ->(terms) {
+    terms = Array(terms).reject(&:blank?)
+    next unless terms.any?
+
+    clauses = []
+    binds   = {}
+    terms.each_with_index do |term, i|
+      key = :"entity_#{i}"
+      binds[key] = "%#{sanitize_sql_like(term)}%"
+      clauses << "(documents.vendor_name ILIKE :#{key} OR " \
+                 "documents.client_name  ILIKE :#{key} OR " \
+                 "documents.bank_name    ILIKE :#{key} OR " \
+                 "documents.sender_name  ILIKE :#{key})"
+    end
+    where(clauses.join(" OR "), binds)
+  }
+
+  scope :by_reference, ->(terms) {
+    terms = Array(terms).reject(&:blank?)
+    next unless terms.any?
+
+    clauses = []
+    binds   = {}
+    terms.each_with_index do |term, i|
+      key = :"ref_#{i}"
+      binds[key] = "%#{sanitize_sql_like(term)}%"
+      clauses << "(documents.invoice_number ILIKE :#{key} OR " \
+                 "documents.receipt_number  ILIKE :#{key})"
+    end
+    where(clauses.join(" OR "), binds)
+  }
+
+  scope :by_expense_category, ->(values) {
+    vals = Array(values).reject(&:blank?)
+    where(expense_category: vals) if vals.any?
+  }
+
   def generate_canonical_filename!
     self.canonical_filename = Documents::FilenameGenerator.new(self).call
     save!
