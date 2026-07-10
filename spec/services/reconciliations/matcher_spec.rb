@@ -288,7 +288,7 @@ RSpec.describe Reconciliations::Matcher, "#ground_ai_matches (private)" do
   it "records every grounding decision in the audit trail" do
     audit = []
     spark   = doc(id: "d-bad", cents: 6999)
-    exact   = doc(id: "d-good", cents: 8598, vendor: "Amazon EU", invoice: "A-1")
+    exact   = doc(id: "d-good", cents: 8598, vendor: "Amazon.com.be", invoice: "A-1")
 
     ground([ ai("d-bad", 0.95), ai("d-good", 0.9), ai("ghost", 0.99) ], [ spark, exact ], audit: audit)
 
@@ -307,8 +307,8 @@ RSpec.describe Reconciliations::Matcher, "#ground_ai_matches (private)" do
     expect(result).to be_empty # €69.99 (even twice) is not an €85.98 payment
   end
 
-  it "keeps an exact-amount match at the model's confidence" do
-    exact = doc(id: "d-exact", cents: 8598, vendor: "Amazon EU", invoice: "AMZ-1")
+  it "keeps an exact-amount match at the model's confidence when the entity agrees" do
+    exact = doc(id: "d-exact", cents: 8598, vendor: "Amazon.com.be", invoice: "AMZ-1")
 
     result = ground([ ai("d-exact", 0.93) ], [ exact ])
 
@@ -316,12 +316,32 @@ RSpec.describe Reconciliations::Matcher, "#ground_ai_matches (private)" do
     expect(result.first.first["confidence"]).to eq(0.93)
   end
 
-  it "caps confidence for close-but-not-exact amounts" do
-    close = doc(id: "d-close", cents: 8560, invoice: "X-1") # within 2%
+  it "discards a close-amount match when the entities are unrelated (the accountant-vs-laptop-vendor incident)" do
+    # txn counterparty is AMAZON.COM.BE; the doc's vendor shares no tokens.
+    close = doc(id: "d-close", cents: 8560, vendor: "iRepairshop BVBA", invoice: "X-1") # within 2%
 
-    result = ground([ ai("d-close", 0.97) ], [ close ])
+    audit = []
+    result = ground([ ai("d-close", 0.97) ], [ close ], audit: audit)
 
-    expect(result.first.first["confidence"]).to eq(described_class::AI_CONFIDENCE_CAP_CLOSE)
+    expect(result).to be_empty
+    expect(audit.first).to include("outcome" => "discarded_entity_mismatch")
+  end
+
+  it "keeps a close-amount match WITH entity agreement, capped below strong" do
+    close = doc(id: "d-close-e", cents: 8560, vendor: "Amazon EU S.a.r.l.", invoice: "X-2")
+
+    result = ground([ ai("d-close-e", 0.97) ], [ close ])
+
+    expect(result.size).to eq(1)
+    expect(result.first.first["confidence"]).to eq(described_class::AI_CAP_CLOSE_ENTITY_MATCH)
+  end
+
+  it "caps exact-amount matches without entity evidence at possible" do
+    exact_unknown = doc(id: "d-eu", cents: 8598, vendor: "Totally Unrelated Lda", invoice: "Z-9")
+
+    result = ground([ ai("d-eu", 0.95) ], [ exact_unknown ])
+
+    expect(result.first.first["confidence"]).to eq(described_class::AI_CAP_EXACT_ENTITY_UNKNOWN)
   end
 
   it "keeps a split payment whose documents sum to the transaction, capped per doc" do
