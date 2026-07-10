@@ -138,6 +138,7 @@ class EmailProcessJob < ApplicationJob
     end
 
     apply_sender_rules(email)
+    apply_email_rules(email) unless was_already_processed
 
     email.processed! unless was_already_processed
 
@@ -211,6 +212,14 @@ class EmailProcessJob < ApplicationJob
     Tags::DefaultGroups.tag_email!(email)
   rescue => e
     Rails.logger.error("[EmailProcessJob] bucket tag failed for email #{email.id}: #{e.message}")
+  end
+
+  # Workspace-level inbox rules, applied once on first ingest (never on reprocess).
+  # Tolerant of failure: a raising rule must never fail ingestion.
+  def apply_email_rules(email)
+    EmailRules::Applier.new(email).call
+  rescue => e
+    Rails.logger.error("[EmailProcessJob] email rules failed for email #{email.id}: #{e.message}")
   end
 
   # Per-sender rules, applied once the Contact is resolved. Tolerant of failure so

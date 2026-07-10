@@ -34,6 +34,7 @@ class Workspace < ApplicationRecord
   has_many :scheduled_emails, dependent: :restrict_with_error
   has_many :draft_emails, dependent: :destroy
   has_many :scheduled_digests, dependent: :destroy
+  has_many :email_rules, dependent: :destroy
 
   has_many :invitations, dependent: :destroy
 
