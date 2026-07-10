@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_10_003806) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_10_210003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -673,10 +673,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_10_003806) do
   end
 
   create_table "email_message_tags", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "applied_by_rule_id"
     t.datetime "created_at", null: false
     t.uuid "email_message_id", null: false
     t.uuid "tag_id", null: false
     t.datetime "updated_at", null: false
+    t.index ["applied_by_rule_id"], name: "idx_email_message_tags_applied_by_rule", where: "(applied_by_rule_id IS NOT NULL)"
     t.index ["email_message_id", "tag_id"], name: "idx_email_message_tags_unique", unique: true
     t.index ["email_message_id"], name: "index_email_message_tags_on_email_message_id"
     t.index ["tag_id"], name: "index_email_message_tags_on_tag_id"
@@ -737,6 +739,54 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_10_003806) do
     t.index ["received_at"], name: "idx_email_messages_ai_todos", order: :desc, where: "((ai_action_prompt IS NOT NULL) AND (ai_action_prompt <> ''::text) AND (ai_todo_dismissed = false))"
     t.index ["skimmed_at"], name: "index_email_messages_on_skimmed_at"
     t.index ["status"], name: "index_email_messages_on_status"
+  end
+
+  create_table "email_rule_runs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.jsonb "archived_email_ids", default: [], null: false
+    t.datetime "created_at", null: false
+    t.uuid "email_rule_id", null: false
+    t.datetime "finished_at"
+    t.jsonb "marked_read_email_ids", default: [], null: false
+    t.integer "matched_count", default: 0, null: false
+    t.jsonb "moved_email_ids", default: [], null: false
+    t.integer "processed_count", default: 0, null: false
+    t.uuid "started_by_id"
+    t.integer "status", default: 0, null: false
+    t.boolean "undoable", default: true, null: false
+    t.datetime "updated_at", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["email_rule_id"], name: "index_email_rule_runs_on_email_rule_id"
+    t.index ["started_by_id"], name: "index_email_rule_runs_on_started_by_id"
+    t.index ["workspace_id"], name: "index_email_rule_runs_on_workspace_id"
+  end
+
+  create_table "email_rule_tags", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.uuid "email_rule_id", null: false
+    t.uuid "tag_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["email_rule_id", "tag_id"], name: "idx_email_rule_tags_unique", unique: true
+    t.index ["email_rule_id"], name: "index_email_rule_tags_on_email_rule_id"
+    t.index ["tag_id"], name: "index_email_rule_tags_on_tag_id"
+  end
+
+  create_table "email_rules", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.boolean "archive", default: false, null: false
+    t.datetime "created_at", null: false
+    t.uuid "created_by_id"
+    t.jsonb "criteria", default: {}, null: false
+    t.boolean "enabled", default: true, null: false
+    t.datetime "last_run_at"
+    t.uuid "mail_folder_id"
+    t.boolean "mark_read", default: false, null: false
+    t.bigint "matched_count", default: 0, null: false
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["created_by_id"], name: "index_email_rules_on_created_by_id"
+    t.index ["mail_folder_id"], name: "index_email_rules_on_mail_folder_id"
+    t.index ["workspace_id"], name: "index_email_rules_on_workspace_id"
+    t.index ["workspace_id"], name: "index_email_rules_on_workspace_id_and_enabled", where: "(enabled = true)"
   end
 
   create_table "email_scan_logs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -1985,12 +2035,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_10_003806) do
   add_foreign_key "email_accounts", "workspaces"
   add_foreign_key "email_folders", "email_accounts"
   add_foreign_key "email_message_tags", "email_messages"
+  add_foreign_key "email_message_tags", "email_rules", column: "applied_by_rule_id", on_delete: :nullify
   add_foreign_key "email_message_tags", "tags"
   add_foreign_key "email_messages", "agent_messages", column: "ai_analysis_message_id"
   add_foreign_key "email_messages", "contacts"
   add_foreign_key "email_messages", "email_accounts"
   add_foreign_key "email_messages", "email_scan_logs"
   add_foreign_key "email_messages", "email_threads"
+  add_foreign_key "email_rule_runs", "email_rules", on_delete: :cascade
+  add_foreign_key "email_rule_runs", "users", column: "started_by_id", on_delete: :nullify
+  add_foreign_key "email_rule_runs", "workspaces"
+  add_foreign_key "email_rule_tags", "email_rules", on_delete: :cascade
+  add_foreign_key "email_rule_tags", "tags", on_delete: :cascade
+  add_foreign_key "email_rules", "mail_folders", on_delete: :nullify
+  add_foreign_key "email_rules", "users", column: "created_by_id", on_delete: :nullify
+  add_foreign_key "email_rules", "workspaces"
   add_foreign_key "email_scan_logs", "email_accounts"
   add_foreign_key "email_template_documents", "document_templates"
   add_foreign_key "email_template_documents", "email_templates"
