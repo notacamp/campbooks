@@ -7,13 +7,17 @@ module Campbooks
   # while one tap on "Add to calendar" uses the extracted date. Posts to
   # RemindersController (Turbo-stream removes the row).
   class ReminderRow < Campbooks::Base
-    def initialize(reminder:)
+    # `focused:` renders the keyboard cursor's [data-focused] up front — used by the
+    # Lookbook preview; on the live page reminders_keyboard_controller toggles it.
+    def initialize(reminder:, focused: false)
       @reminder = reminder
+      @focused = focused
     end
 
     def view_template
       div(
         id: "reminder_#{@reminder.id}",
+        data: row_data,
         class: class_names(
           "-mx-3 rounded-xl px-3 py-3 transition-colors hover:bg-muted/40",
           @reminder.confirmed? ? "opacity-60" : nil
@@ -49,10 +53,12 @@ module Campbooks
     end
 
     # Right-aligned bar: priority increases right-to-left, primary on the far right.
+    # Each button carries a data-reminders-action hook so the keyboard controller
+    # can click it (d / s / ⏎), and an on-row key chip shown only when focused.
     def action_bar
       div(class: "flex shrink-0 items-center gap-1.5 sm:pt-0.5") do
-        post_button(helpers.dismiss_reminder_path(@reminder), t(".dismiss"))
-        post_button(helpers.snooze_reminder_path(@reminder), t(".snooze"))
+        post_button(helpers.dismiss_reminder_path(@reminder), t(".dismiss"), action: "dismiss", key: "d")
+        post_button(helpers.snooze_reminder_path(@reminder), t(".snooze"), action: "snooze", key: "s")
         confirm_form
       end
     end
@@ -60,7 +66,7 @@ module Campbooks
     def confirmed_actions
       div(class: "flex shrink-0 items-center gap-2 sm:pt-0.5") do
         if @reminder.calendar_event_id
-          render Campbooks::Button.new(variant: :ghost, size: :sm, href: helpers.edit_calendar_event_path(@reminder.calendar_event_id)) { t(".view_event") }
+          render Campbooks::Button.new(variant: :ghost, size: :sm, href: helpers.edit_calendar_event_path(@reminder.calendar_event_id), data: { reminders_action: "primary" }) { t(".view_event") }
         else
           span(class: "text-sm text-muted-foreground") { t(".confirmed") }
         end
@@ -83,18 +89,42 @@ module Campbooks
     def confirm_form
       form(id: confirm_form_id, action: helpers.confirm_reminder_path(@reminder), method: :post, class: "inline-flex") do
         input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
-        render Campbooks::Button.new(variant: :primary, size: :sm, type: "submit") { t(".confirm") }
+        render Campbooks::Button.new(variant: :primary, size: :sm, type: "submit", data: { reminders_action: "confirm" }) do
+          plain t(".confirm")
+          key_chip("⏎", on_primary: true)
+        end
       end
     end
 
-    def post_button(url, label)
+    def post_button(url, label, action:, key:)
       form(action: url, method: :post, class: "inline-flex") do
         input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
-        render Campbooks::Button.new(variant: :ghost, size: :sm, type: "submit") { label }
+        render Campbooks::Button.new(variant: :ghost, size: :sm, type: "submit", data: { reminders_action: action }) do
+          plain label
+          key_chip(key)
+        end
       end
     end
 
     def confirm_form_id = "reminder_confirm_#{@reminder.id}"
+
+    # Marks the row as a keyboard-cursor unit; `data-focused` is the cursor itself.
+    def row_data
+      { reminders_row: "" }.tap { |d| d[:focused] = "" if @focused }
+    end
+
+    # A small key badge inside an action button. CSS keeps it hidden until the row
+    # is the keyboard cursor ([data-focused]) — see application.css.
+    def key_chip(symbol, on_primary: false)
+      kbd(
+        data: { reminders_keyhint: "" },
+        aria: { hidden: "true" },
+        class: class_names(
+          "ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded px-1 font-mono text-[10px] font-semibold leading-none",
+          on_primary ? "bg-primary-foreground/20 text-primary-foreground" : "bg-foreground/10 text-muted-foreground"
+        )
+      ) { symbol }
+    end
 
     # Ember Scout spark: marks the row as something Scout surfaced (the Meaning Rule —
     # Ember = Scout / this wants you).

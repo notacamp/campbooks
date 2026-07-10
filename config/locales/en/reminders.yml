@@ -45,6 +45,11 @@ en:
       empty_body: When Scout spots a due date, delivery, or deadline in your email
         or documents, it shows up here to confirm.
       empty_title: No reminders right now
+      shortcut_all: All shortcuts
+      shortcut_confirm: Add to calendar
+      shortcut_dismiss: Dismiss
+      shortcut_navigate: Navigate
+      shortcut_snooze: Snooze
       snoozed: Snoozed
       subtitle: Dated commitments Scout found in your email and documents. Confirm
         the ones you want on your calendar.

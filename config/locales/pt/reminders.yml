@@ -46,6 +46,11 @@ pt:
       empty_body: Quando o Scout detetar uma data de vencimento, entrega ou prazo
         no seu email ou documentos, aparece aqui para confirmar.
       empty_title: Sem lembretes de momento
+      shortcut_all: Todos os atalhos
+      shortcut_confirm: Adicionar ao calendário
+      shortcut_dismiss: Dispensar
+      shortcut_navigate: Navegar
+      shortcut_snooze: Adiar
       snoozed: Adiados
       subtitle: Compromissos com data que o Scout encontrou no seu email e documentos.
         Confirme os que quer no seu calendário.

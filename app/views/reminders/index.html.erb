@@ -17,7 +17,15 @@
       <p class="mt-1 text-sm text-muted-foreground"><%= t(".empty_body") %></p>
     </div>
   <% else %>
-    <div class="space-y-8">
+    <% kbd = "inline-flex h-5 min-w-[20px] items-center justify-center rounded border border-border bg-muted px-1.5 font-mono text-[11px] font-medium text-muted-foreground" %>
+    <div class="mb-5 hidden flex-wrap items-center gap-x-4 gap-y-1.5 rounded-xl border border-border bg-muted/30 px-3 py-2 text-[12.5px] text-muted-foreground sm:flex" aria-hidden="true">
+      <span class="inline-flex items-center gap-1"><kbd class="<%= kbd %>">↑</kbd><kbd class="<%= kbd %>">↓</kbd><span class="px-0.5 text-muted-foreground/60">/</span><kbd class="<%= kbd %>">j</kbd><kbd class="<%= kbd %>">k</kbd><span class="ml-1"><%= t(".shortcut_navigate") %></span></span>
+      <span class="inline-flex items-center gap-1"><kbd class="<%= kbd %>">⏎</kbd> <%= t(".shortcut_confirm") %></span>
+      <span class="inline-flex items-center gap-1"><kbd class="<%= kbd %>">s</kbd> <%= t(".shortcut_snooze") %></span>
+      <span class="inline-flex items-center gap-1"><kbd class="<%= kbd %>">d</kbd> <%= t(".shortcut_dismiss") %></span>
+      <span class="inline-flex items-center gap-1"><kbd class="<%= kbd %>">?</kbd> <%= t(".shortcut_all") %></span>
+    </div>
+    <div class="space-y-8" data-controller="reminders-keyboard">
       <% [ [ :upcoming, @upcoming ], [ :snoozed, @snoozed ] ].each do |key, list| %>
         <% next if list.empty? %>
         <section>

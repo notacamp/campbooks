@@ -16,6 +16,10 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Reminders: keyboard navigation.** Move a cursor through the reminders list with **↑↓** or **j / k**, then act on the focused reminder without the mouse — **⏎** adds it to the calendar, **s** snoozes, **d** dismisses. A key legend sits above the list (desktop) and the shortcuts are also listed in the global **?** dialog. Each key fires the row's own button, so the toast, undo, and row removal are identical to a click.
+
 ### Fixed
 
 - **Inbox search now shows it's working.** A free-text search runs a semantic
@@ -28,6 +32,12 @@ major, minor, or patch change here.
   (when no filters are still active) now returns you to the real inbox — grouped
   list, layout switcher and all — instead of leaving you stranded on a bare
   results list at the `/search` URL.
+
+## [0.21.2] - 2026-07-10
+
+### Fixed
+
+- **The composer's "Draft saved" confirmation no longer lingers forever.** After an autosave the composer showed a "Draft saved" label that never went away — in the floating compose dock it read like a toast that refused to dismiss. It now fades out a couple of seconds after saving, while the transient "Saving…" state still shows while a save is in flight.
 
 ## [0.21.1] - 2026-07-10
 
