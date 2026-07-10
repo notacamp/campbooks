@@ -41,7 +41,11 @@ module Campbooks
         { key: "j / →",   label: t(".shortcuts.cal_next"),         context: t(".contexts.calendar") },
         { key: "k / ←",   label: t(".shortcuts.cal_prev"),         context: t(".contexts.calendar") },
         { key: "d w m a", label: t(".shortcuts.cal_views"),        context: t(".contexts.calendar") },
-        { key: "c",       label: t(".shortcuts.cal_new"),          context: t(".contexts.calendar") }
+        { key: "c",       label: t(".shortcuts.cal_new"),          context: t(".contexts.calendar") },
+        { key: "↑↓ / j k", label: t(".shortcuts.reminders_navigate"), context: t(".contexts.reminders") },
+        { key: "⏎",       label: t(".shortcuts.reminders_confirm"),   context: t(".contexts.reminders") },
+        { key: "s",       label: t(".shortcuts.reminders_snooze"),    context: t(".contexts.reminders") },
+        { key: "d",       label: t(".shortcuts.reminders_dismiss"),   context: t(".contexts.reminders") }
       ]
     end
 

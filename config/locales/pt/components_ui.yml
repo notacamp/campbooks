@@ -134,6 +134,7 @@ pt:
         feed: Feed
         general: Geral
         navigation: Navegação
+        reminders: Lembretes
         selection: Seleção
       footer_hint: Prima ? para abrir este diálogo em qualquer momento.
       shortcuts:
@@ -163,6 +164,10 @@ pt:
         nav_organizations: Ir para Organizações
         nav_scout: Ir para Scout
         navigate_threads: Navegar conversas
+        reminders_confirm: Adicionar ao calendário
+        reminders_dismiss: Dispensar
+        reminders_navigate: Mover entre lembretes
+        reminders_snooze: Adiar
         reply: Responder
         reply_all: Responder a todos
         show_shortcuts: Mostrar atalhos

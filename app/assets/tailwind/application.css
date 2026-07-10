@@ -371,6 +371,24 @@
   [data-feed-focus-unit][data-focused] [data-feed-swipe-hint] { display: flex; }
 }
 
+/* ── Reminders keyboard cursor — the /reminders list is navigated with j/k and
+   the arrows (reminders_keyboard_controller). The moved-to row is flagged
+   [data-focused]; give it the ink-family --subtle fill plus a 1px inset ring so
+   it reads as "selected" without an Ember (Scout) signal. Unlayered, so it wins
+   over the row's layered hover utility; progressive, since with no JS the flag
+   never appears and the list looks unchanged. ──────────────────────────────── */
+[data-reminders-row][data-focused] {
+  background-color: var(--subtle);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+/* The on-row key chips (⏎ s d) surface only on the focused row, and only where a
+   physical keyboard is likely (fine pointer) — touch can't press them. */
+[data-reminders-keyhint] { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  [data-reminders-row][data-focused] [data-reminders-keyhint] { display: inline-flex; }
+}
+
 /* ── Nav-rail keyboard shortcut badges (g <key> navigation mode). ──────────
    Badges are always in the DOM so screen readers see aria-keyshortcuts, but
    the visual keycap only surfaces when the nav-shortcuts controller arms the

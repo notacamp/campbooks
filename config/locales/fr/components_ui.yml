@@ -135,6 +135,7 @@ fr:
         feed: Fil
         general: Général
         navigation: Navigation
+        reminders: Rappels
         selection: Sélection
       footer_hint: Appuyez sur ? pour ouvrir cette fenêtre à tout moment.
       shortcuts:
@@ -164,6 +165,10 @@ fr:
         nav_organizations: Aller aux Organisations
         nav_scout: Aller à Scout
         navigate_threads: Naviguer dans les conversations
+        reminders_confirm: Ajouter au calendrier
+        reminders_dismiss: Ignorer
+        reminders_navigate: Se déplacer entre les rappels
+        reminders_snooze: Reporter
         reply: Répondre
         reply_all: Répondre à tous
         show_shortcuts: Afficher les raccourcis
