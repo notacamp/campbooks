@@ -51,6 +51,15 @@ RSpec.describe "PDF page rasterization", type: :service do
       expect(page0[:data]).not_to eq(page1[:data])
     end
 
+    it "counts pages via the frame list, not identify's selected-list %n" do
+      skip "ImageMagick with PDF delegate not available" unless imagemagick_with_pdf_support?
+
+      parser = described_class.new(document)
+      # The old `identify "path[0]"` + %n approach always returned 1 for
+      # multipage PDFs, so only the cover page was rasterized.
+      expect(parser.send(:page_count, pdf_data)).to eq(2)
+    end
+
     it "returns nil (failed render) for an out-of-range page instead of junk" do
       skip "ImageMagick with PDF delegate not available" unless imagemagick_with_pdf_support?
 
