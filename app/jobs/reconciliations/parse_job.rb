@@ -37,6 +37,11 @@ module Reconciliations
 
         # Finding 3: derive period/integrity and apply any sign-flip BEFORE
         # building the insert records, so the persisted amounts are correct.
+        # Balance/summary lines (SALDO INICIAL/FINAL, totals) come back from
+        # the AI as 0.00 rows — a real movement is never zero. Drop them so
+        # they don't inflate the workbench as phantom unmatched transactions.
+        rows = rows.reject { |r| r[:amount_cents].to_i.zero? }
+
         update_period_and_integrity!(rows)
 
         records = rows.map do |r|
