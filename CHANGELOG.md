@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.22.0] - 2026-07-10
+
 ### Added
 
 - **Reminders: keyboard navigation.** Move a cursor through the reminders list with **↑↓** or **j / k**, then act on the focused reminder without the mouse — **⏎** adds it to the calendar, **s** snoozes, **d** dismisses. A key legend sits above the list (desktop) and the shortcuts are also listed in the global **?** dialog. Each key fires the row's own button, so the toast, undo, and row removal are identical to a click.
