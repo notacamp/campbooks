@@ -46,6 +46,11 @@ fr:
       empty_body: Quand Scout repère une échéance, une livraison ou un délai dans
         vos e-mails ou documents, il apparaît ici à confirmer.
       empty_title: Aucun rappel pour le moment
+      shortcut_all: Tous les raccourcis
+      shortcut_confirm: Ajouter au calendrier
+      shortcut_dismiss: Ignorer
+      shortcut_navigate: Naviguer
+      shortcut_snooze: Reporter
       snoozed: Reportés
       subtitle: Engagements datés que Scout a trouvés dans vos e-mails et documents.
         Confirmez ceux que vous voulez dans votre calendrier.

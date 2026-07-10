@@ -134,6 +134,7 @@ en:
         feed: Feed
         general: General
         navigation: Navigation
+        reminders: Reminders
         selection: Selection
       footer_hint: Press ? to open this dialog at any time.
       shortcuts:
@@ -163,6 +164,10 @@ en:
         nav_organizations: Go to Organizations
         nav_scout: Go to Scout
         navigate_threads: Navigate threads
+        reminders_confirm: Add to calendar
+        reminders_dismiss: Dismiss
+        reminders_navigate: Move between reminders
+        reminders_snooze: Snooze
         reply: Reply
         reply_all: Reply All
         show_shortcuts: Show shortcuts

@@ -29,6 +29,12 @@ class ReminderRowComponentPreview < ViewComponent::Preview
     )
   end
 
+  # The keyboard-cursor state: the row reminders_keyboard_controller has moved to
+  # (data-focused) — subtle fill + inset ring, and the on-row key chips revealed.
+  def focused
+    render Campbooks::ReminderRow.new(reminder: reminder, focused: true)
+  end
+
   private
 
   def reminder(reminder_type: "payment_due", title: "Pay EDP invoice — January", due_at: 3.days.from_now,
