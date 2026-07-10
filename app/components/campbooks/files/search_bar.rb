@@ -134,6 +134,7 @@ module Campbooks
           render(Campbooks::Files::FilterPanel.new(
             folder: @folder,
             filters: @filters,
+            q: @q,
             document_types: @document_types,
             folders: @folders,
             categories: @categories
@@ -146,7 +147,7 @@ module Campbooks
       def catalog
         [
           { token: "type:",     type: "enum",  description: t(".suggest.type"),
-            values: @document_types.map { |dt| { value: dt.name.downcase, label: dt.name } } },
+            values: @document_types.map { |dt| { value: dt.name.downcase, label: dt.name.humanize } } },
           { token: "category:", type: "enum",  description: t(".suggest.category"),
             values: @categories.map { |c| { value: c, label: helpers.human_enum(DocumentType, :category, c) } } },
           { token: "vendor:",   type: "text",  description: t(".suggest.vendor") },

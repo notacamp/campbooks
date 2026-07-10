@@ -206,7 +206,7 @@ class DocumentsController < ApplicationController
   end
 
   def reprocess_all
-    filters = Documents::Filters.from_params(params)
+    filters = bulk_action_filters
     documents = filters.apply(
       Current.workspace.documents,
       workspace: Current.workspace,
@@ -222,17 +222,20 @@ class DocumentsController < ApplicationController
       DocumentProcessJob.perform_later(doc.id)
     end
     Notifier.documents_need_review(Current.workspace, bump: false)
-    redirect_to files_path(filters.to_h), success: t(".queued", count: count)
+    redirect_to files_path(bulk_action_return_params(filters)), success: t(".queued", count: count)
   end
 
   def export
-    filters = Documents::Filters.from_params(params)
-    # q is intentionally excluded from export filters (search text is ephemeral).
-    filter_hash = filters.to_h
-
-    export = Current.workspace.exports.create!(status: :pending, filters: filter_hash)
+    filters = bulk_action_filters
+    # Persist the MERGED constraint set (panel + query modifiers): the job runs
+    # later without the query text, so modifier filters must be materialized now
+    # or the ZIP would come out broader than the list on screen.
+    export = Current.workspace.exports.create!(
+      status: :pending,
+      filters: filters.to_persistable_h(workspace: Current.workspace, user: Current.user)
+    )
     ExportJob.perform_later(export.id)
-    redirect_to files_path(filter_hash), success: t(".generating")
+    redirect_to files_path(bulk_action_return_params(filters)), success: t(".generating")
   end
 
   def merge
@@ -284,6 +287,23 @@ class DocumentsController < ApplicationController
   end
 
   private
+
+  # The filter set a bulk action (reanalyze-all / export) operates on: the panel
+  # params PLUS any modifier filters in the search text, so the action covers
+  # exactly the documents the user is looking at.
+  def bulk_action_filters
+    filters = Documents::Filters.from_params(params)
+    if params[:q].present?
+      filters.merge_query(Documents::SearchQuery.parse(params[:q]).filters)
+    end
+    filters
+  end
+
+  # Params for the post-action redirect back to /files: panel filters + the raw
+  # query, reproducing the view the action was triggered from.
+  def bulk_action_return_params(filters)
+    filters.to_h.merge(q: params[:q].presence).compact
+  end
 
   # The month picker (<input type="month">) submits a single "YYYY-MM" value, so
   # parse it into the [year, month] integer pair `for_month` expects. Returns nil

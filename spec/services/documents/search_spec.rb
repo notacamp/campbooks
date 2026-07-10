@@ -121,10 +121,12 @@ RSpec.describe Documents::Search do
     expect(s.search_text).to eq("invoice")
   end
 
-  it "filters exposed by attr_reader includes keyword modifier constraints" do
+  it "keeps modifier constraints out of the panel-facing filter surface" do
     s = search({ q: "is:approved", review_status: "pending" })
-    # modifier wins: approved overrides pending
-    expect(s.filters.review_status).to eq("approved")
+    # The reader reflects the PANEL param; the modifier still wins when applying
+    # (covered in filters_spec) but never leaks into chips/hidden fields.
+    expect(s.filters.review_status).to eq("pending")
+    expect(s.filters.to_h).to eq({ review_status: "pending" })
   end
 
   it "panel + modifier filters are AND-combined in results" do
