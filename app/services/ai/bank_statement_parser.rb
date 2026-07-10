@@ -93,16 +93,20 @@ module Ai
       false
     end
 
-    # Count pages in a PDF using MiniMagick identify.
+    # Count pages in a PDF via MiniMagick's frame list.
+    #
+    # Do NOT use `identify "path[0]"` + %n for this: with a page selector,
+    # %n reports the size of the SELECTED list — always 1 — so multipage
+    # statements were treated as single-page and only the cover page reached
+    # the model (2026-07-10 prod incident #3, Millennium 2-page extract).
     def page_count(pdf_data)
       Tempfile.create([ "bs_count", ".pdf" ], binmode: true) do |f|
         f.write(pdf_data)
         f.flush
-        output = `identify -format "%n\n" "#{f.path}[0]" 2>/dev/null`.strip
-        # identify on page 0 reports the total page count in %n
-        output.to_i.clamp(1, Float::INFINITY)
+        [ MiniMagick::Image.new(f.path).pages.size, 1 ].max
       end
-    rescue
+    rescue => e
+      Rails.logger.warn("[Ai::BankStatementParser] page_count failed: #{e.message}")
       1
     end
 
