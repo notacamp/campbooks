@@ -97,7 +97,7 @@ module Emails
         Emails::Threading.find_or_create_outbound(account, subject.presence || "(no subject)")
       sent = thread.email_messages.create!(
         email_account: account, provider_message_id: provider_message_id,
-        provider_folder_id: "sent", from_address: account.email_address,
+        provider_folder_id: sent_folder_id(account), from_address: account.email_address,
         to_address: to_address, cc_address: cc_address, bcc_address: bcc_address,
         subject: subject, body: body.to_s, received_at: Time.current,
         read: true, status: :processed
@@ -108,6 +108,20 @@ module Emails
     rescue => e
       Rails.logger.error("[Emails::Sender] failed to record sent message: #{e.message}")
       nil
+    end
+
+    # The provider's outbound system folder, across naming schemes (Zoho/Gmail
+    # "Sent", Microsoft "Sent Items", some Gmail mirrors "Sent Mail").
+    SENT_FOLDER_NAMES = [ "sent", "sent items", "sent mail" ].freeze
+
+    # The Sent folder view filters on the provider's real folder ids, so record
+    # the local copy under the id from the mirrored folder list — that makes it
+    # visible there the moment the send returns. Falls back to the legacy "sent"
+    # placeholder when the mirror hasn't seen the folder yet; the next scan heals
+    # that via Emails::MessageUpserter#reconcile.
+    def sent_folder_id(account)
+      account.email_folders.where("LOWER(name) IN (?)", SENT_FOLDER_NAMES)
+             .order(:position).pick(:provider_folder_id) || "sent"
     end
 
     def publish_event(account)
