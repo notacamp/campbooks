@@ -1,0 +1,93 @@
+---
+en:
+  helpers:
+    email_rule_criteria:
+      from: "From"
+      to: "To"
+      subject: "subject contains"
+      body: "body contains"
+      category: "category is"
+      has_attachment: "has an attachment"
+      no_criteria: "No conditions set"
+  components:
+    inbox_settings_modal:
+      nav:
+        rules: Rules
+  inbox_settings:
+    rules:
+      index:
+        heading: Rules
+        subheading: Tag, file, and archive incoming email automatically when it matches your conditions.
+        new_rule: New rule
+      empty:
+        heading: No rules yet
+        body: Rules run on every new email and can also sweep the mail you already have. Start from an example.
+        starter_receipts_title: Tag receipts
+        starter_receipts_body: From a billing address, tag Receipts and archive.
+        starter_client_title: File client mail
+        starter_client_body: From a client domain, tag and move to their folder.
+        starter_newsletters_title: Quiet newsletters
+        starter_newsletters_body: Category Newsletters, mark read and archive.
+      rule:
+        paused: Paused
+        archive_chip: Archive
+        mark_read_chip: Mark read
+        run: Run
+        edit: Edit
+        delete: Delete
+        enable_rule: Enable rule
+        disable_rule: Pause rule
+        delete_confirm: "Delete rule \"%{name}\"?"
+        matched_count:
+          one: "Matched %{count} email"
+          other: "Matched %{count} emails"
+        last_ran: "last ran %{time} ago"
+        never_run_on_existing: Never run on existing mail
+        running_progress: "Running on existing mail, %{processed} of %{total}"
+        applied_count:
+          one: "Applied to %{count} email"
+          other: "Applied to %{count} emails"
+        undo: Undo
+      form:
+        name_label: Rule name
+        when_label: "When"
+        when_hint: "all conditions below must match"
+        from_label: From
+        from_placeholder: "@domain.com or name@example.com"
+        from_hint: An address or @domain. Commas mean any of.
+        to_label: To / CC
+        to_placeholder: Any recipient
+        subject_label: Subject contains
+        subject_placeholder: Any text
+        body_label: Body contains
+        body_placeholder: Any text
+        category_label: Category
+        category_blank: Any category
+        account_label: Account
+        account_blank: All accounts
+        has_attachment_label: Only if it has an attachment
+        then_label: "Then"
+        apply_tags_label: Apply tags
+        archive_label: Archive
+        archive_hint: Skips the inbox. Still searchable and tagged.
+        mark_read_label: Mark as read
+        folder_label: Move to folder
+        folder_blank: No folder
+        match_count_label: existing emails match these conditions
+        run_on_existing_label: Also run on those now
+        cancel: Cancel
+        save_rule: Save rule
+      create:
+        created_toast: Rule created.
+      update:
+        updated_toast: Rule updated.
+      destroy:
+        deleted_toast: Rule deleted.
+      toggle:
+        enabled_toast: "Rule \"%{name}\" enabled."
+        paused_toast: "Rule \"%{name}\" paused."
+      run:
+        queued_toast: "Running \"%{name}\" on existing mail."
+      undo:
+        undone: Run undone.
+        not_found: Run not found.
