@@ -70,6 +70,24 @@ RSpec.describe Emails::MessageUpserter do
       expect(upserter.upsert(msg("flagid" => "flag_info"))).to eq(:reconciled)
       expect(existing.reload.zoho_flag).to eq("flag_info")
     end
+
+    it "leaves a real folder id alone (provider folder moves stay deferred)" do
+      original_folder = existing.provider_folder_id
+      expect(upserter.upsert(msg("folderId" => "elsewhere"))).to eq(:unchanged)
+      expect(existing.reload.provider_folder_id).to eq(original_folder)
+    end
+
+    context "when the existing row is a Sender-recorded placeholder" do
+      let!(:existing) do
+        create(:email_message, email_account: account, provider_message_id: "m1",
+               read: true, provider_folder_id: "sent")
+      end
+
+      it "adopts the provider's real folder id so the Sent folder view can find it" do
+        expect(upserter.upsert(msg("folderId" => "zf_sent_real", "status" => "1"))).to eq(:reconciled)
+        expect(existing.reload.provider_folder_id).to eq("zf_sent_real")
+      end
+    end
   end
 
   it "skips a message with no id" do

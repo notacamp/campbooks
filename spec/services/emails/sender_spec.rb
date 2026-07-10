@@ -31,6 +31,19 @@ RSpec.describe Emails::Sender do
       expect(Emails::FollowUpAnalysisJob).to have_received(:perform_later)
     end
 
+    it "records the sent copy under the provider's real Sent folder id when the mirror knows it" do
+      create(:email_folder, email_account: account, name: "Sent", provider_folder_id: "zf_sent")
+      stub_mail_client(double("MailClient", send_message: { "id" => "PROVIDERSENT" }))
+
+      result = described_class.call(
+        user: user, email_account_id: account.id,
+        to_address: "no-reply@example.com", subject: "Hi", body: "Hello"
+      )
+
+      expect(result).to be_ok
+      expect(account.email_messages.find_by(provider_message_id: "PROVIDERSENT").provider_folder_id).to eq("zf_sent")
+    end
+
     it "falls back to save_draft + send_draft when the provider has no send_message" do
       client = double("GraphClient")
       allow(client).to receive(:save_draft).and_return({ "id" => "DRAFT1" })

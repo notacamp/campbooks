@@ -50,6 +50,14 @@ module Emails
         existing.update_columns(zoho_flag: msg["flagid"])
         changed = true
       end
+      # Adopt the provider's real folder for a Sender-recorded outbound copy: it is
+      # created under the "sent" placeholder before the provider files it, and the
+      # Sent folder view filters on real provider folder ids — without this the
+      # copy never surfaces there. (General folder moves stay deferred, per above.)
+      if existing.provider_folder_id == "sent" && msg["folderId"].present? && msg["folderId"] != "sent"
+        existing.update_columns(provider_folder_id: msg["folderId"], updated_at: Time.current)
+        changed = true
+      end
       # Keep the provider label snapshot fresh (Gmail re-categorizations, user
       # label moves) — it feeds the triage category hint.
       labels = provider_labels(msg)
