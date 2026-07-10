@@ -16,6 +16,12 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.19.8] - 2026-07-10
+
+### Fixed
+
+- **Accounting: bank-statement balance/summary lines no longer appear as phantom 0.00 transactions.** Opening/closing/available-balance rows ("SALDO INICIAL"…) are excluded in the parsing prompt and any zero-amount row is dropped before insert — a real movement is never zero.
+
 ## [0.19.7] - 2026-07-10
 
 ### Fixed
