@@ -304,6 +304,16 @@ class Document < ApplicationRecord
     image? && !processed_pdf.attached?
   end
 
+  # True when the file should go through AI/OCR analysis (pdf, image, office, or any
+  # other content-bearing type). False for the non-documents in
+  # NON_DOCUMENT_CONTENT_TYPES (calendar invites, raw emails, archives, html), which
+  # Documents::PlainFileProcessor stores deterministically without an LLM/OCR call.
+  # Mirrors the #reviewable_attachment boundary.
+  def analyzable?
+    content_type = original_file&.content_type
+    content_type.present? && NON_DOCUMENT_CONTENT_TYPES.exclude?(content_type)
+  end
+
   def display_title
     metadata&.dig("title").presence || entity_display_name.presence || original_file.filename.to_s
   end
