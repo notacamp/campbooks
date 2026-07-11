@@ -28,7 +28,7 @@ pt:
           todas as contas de e-mail, documentos, calendários e dados associados.
         subtitle: Esta ação é permanente e não pode ser desfeita.
         title: Eliminar conta
-        what_will_be_deleted: O que será eliminado
+        what_will_be_deleted: O que  eliminado
       destroy:
         deletion_scheduled: A sua conta está a ser eliminada. A sua sessão foi terminada.
         wrong_email: O endereço de e-mail não corresponde.
@@ -151,6 +151,31 @@ pt:
         switched_to_byo: Mudou para as suas próprias chaves. Adicione um fornecedor
           abaixo para ativar a IA.
         switched_to_managed: A usar agora o Campbooks AI.
+      embeddings:
+        already_selected: Este modelo de embeddings já está selecionado.
+        change_confirm: Mudar o modelo de embeddings? Todo o conteúdo indexado será
+          novamente indexado através da API deste fornecedor (utiliza créditos da
+          API). A pesquisa semântica ficará parcialmente incompleta até a reindexação
+          terminar.
+        configure_provider_hint: Adicione um fornecedor %{provider} acima para usar
+          este modelo.
+        default_model: Predefinição
+        embeddings_desc: Escolha o modelo de embeddings utilizado para a pesquisa
+          semântica e sugestões de etiquetas. A mudança reindexa todo o conteúdo em
+          segundo plano.
+        embeddings_heading: Modelo de Embeddings
+        model_changed: Modelo de embeddings atualizado. A reindexação está a decorrer
+          em segundo plano — a pesquisa semântica pode estar temporariamente incompleta
+          até terminar.
+        provider_unavailable: "%{provider} não está configurado — adicione primeiro
+          um fornecedor %{provider} acima."
+        region_blocked: Esse fornecedor não é permitido pela sua política de residência
+          de dados.
+        region_blocked_hint: Não disponível com residência de dados na UE.
+        reindex_progress: Reindexação em curso — %{done} de %{total} fragmentos concluídos.
+          A pesquisa semântica está temporariamente incompleta.
+        save_embedding_model: Guardar Modelo de Embeddings
+        unknown_model: Modelo de embeddings desconhecido.
     api_clients:
       scope_families:
         calendar: Calendário

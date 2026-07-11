@@ -16,7 +16,7 @@ pt:
         title: A pesquisa precisa de um fornecedor de embeddings
       inline:
         documents: A IA para documentos precisa de um fornecedor com visão.
-        embeddings: A pesquisa precisa de um fornecedor OpenAI ou Gemini.
+        embeddings: "A pesquisa precisa de um fornecedor de embeddings — escolha um em Definições → IA."
         text: O Scout precisa de um fornecedor de IA.
       text:
         body: O Scout, as respostas inteligentes e a triagem da caixa de entrada funcionam

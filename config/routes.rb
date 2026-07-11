@@ -319,6 +319,7 @@ Rails.application.routes.draw do
     resource :plan, only: [ :show ], controller: "plan"
     resource :ai, only: [ :show ], controller: "ai" do
       post :switch_mode
+      patch :embeddings
     end
     # Custom AI guidance per feature (task/document/reminder/email extraction).
     # `edit`/`update` are keyed by the prompt purpose and power both this page and

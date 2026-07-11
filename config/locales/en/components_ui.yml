@@ -16,7 +16,7 @@ en:
         title: Search needs an embeddings provider
       inline:
         documents: Document AI needs a vision provider.
-        embeddings: Search needs an OpenAI or Gemini provider.
+        embeddings: "Search needs an embeddings provider — pick one in Settings → AI."
         text: Scout needs an AI provider.
       text:
         body: Scout, smart replies, and inbox triage all run on an AI provider. Add

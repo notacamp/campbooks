@@ -90,7 +90,7 @@ RSpec.describe Ai::EmbeddingModels do
 
   describe ".dimensions" do
     it "returns sorted unique dimensions" do
-      expect(described_class.dimensions).to eq([1024, 1536, 3072])
+      expect(described_class.dimensions).to eq([ 1024, 1536, 3072 ])
     end
   end
 

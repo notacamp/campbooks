@@ -45,28 +45,33 @@ module DimensionedEmbeddings
     # "Matches" for the DEFAULT entry includes legacy rows (embedding_model IS NULL)
     # because those were written before per-model stamping existed and carry the
     # default model's vectors.
+    # Built with Arel (not SQL strings) so the column name — internal, from the
+    # frozen dimension map — never passes through string interpolation.
     def fresh_for(entry, kind: _default_embedding_kind)
-      col = embedding_column_for(kind, entry.dimensions)
+      col   = arel_table[embedding_column_for(kind, entry.dimensions)]
+      stamp = arel_table[:embedding_model]
 
-      if entry.default?
-        # Legacy rows (NULL stamp) are considered fresh for the default entry.
-        where("(embedding_model = :m OR embedding_model IS NULL) AND #{col} IS NOT NULL", m: entry.model)
-      else
-        where("embedding_model = :m AND #{col} IS NOT NULL", m: entry.model)
-      end
+      stamp_ok = stamp.eq(entry.model)
+      # Legacy rows (NULL stamp) are considered fresh for the default entry.
+      stamp_ok = stamp_ok.or(stamp.eq(nil)) if entry.default?
+
+      where(stamp_ok.and(col.not_eq(nil)))
     end
 
     # Scope: the exact complement of fresh_for — rows that need (re)embedding.
     def stale_for(entry, kind: _default_embedding_kind)
-      col = embedding_column_for(kind, entry.dimensions)
+      col   = arel_table[embedding_column_for(kind, entry.dimensions)]
+      stamp = arel_table[:embedding_model]
 
-      if entry.default?
-        # Stale when stamp is set to something OTHER than the model, OR the column is null.
-        where("(embedding_model IS NOT NULL AND embedding_model <> :m) OR #{col} IS NULL", m: entry.model)
+      stamp_stale = if entry.default?
+        # Stale when the stamp is set to something OTHER than the model.
+        stamp.not_eq(nil).and(stamp.not_eq(entry.model))
       else
-        # Stale when stamp is null (unembedded), points to a different model, or the column is null.
-        where("embedding_model IS NULL OR embedding_model <> :m OR #{col} IS NULL", m: entry.model)
+        # Stale when the stamp is null (unembedded) or points to a different model.
+        stamp.eq(nil).or(stamp.not_eq(entry.model))
       end
+
+      where(stamp_stale.or(col.eq(nil)))
     end
   end
 
