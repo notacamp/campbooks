@@ -154,15 +154,16 @@ en:
         change_confirm: Switch embedding model? All indexed content will be re-embedded
           via this provider's API (uses API credits). Semantic search will be partially
           incomplete until re-indexing finishes.
-        configure_provider_hint: Add a %{provider} provider above to use this model.
+        configure_provider_hint: Set up %{provider} under AI Providers above to use
+          this model.
         default_model: Default
         embeddings_desc: Choose the embedding model used for semantic search and tag
           suggestions. Switching re-indexes all content in the background.
         embeddings_heading: Embedding Model
         model_changed: Embedding model updated. Re-indexing is running in the background
           — semantic search may be temporarily incomplete until it finishes.
-        provider_unavailable: "%{provider} isn't configured — add a %{provider} provider
-          above first."
+        provider_unavailable: "%{provider} isn't configured — set it up under AI Providers
+          first."
         region_blocked: That provider isn't allowed under your data residency policy.
         region_blocked_hint: Not available under EU data residency.
         reindex_progress: Re-indexing in progress — %{done} of %{total} chunks done.
