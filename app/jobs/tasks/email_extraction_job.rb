@@ -5,6 +5,11 @@ module Tasks
   class EmailExtractionJob < ApplicationJob
     queue_as :default
     retry_on StandardError, wait: :polynomially_longer, attempts: 3
+    # Patient retries on LLM rate limits + a ≤2 concurrency cap so a mailbox-history
+    # backfill doesn't 429 the shared model key. See Reminders::EmailExtractionJob
+    # and ContactAnalysisJob.
+    retry_on(*Ai::Adapters::Base::TRANSIENT_ERRORS, wait: :polynomially_longer, attempts: 5)
+    limits_concurrency to: 2, key: "ai_email_extraction"
 
     def perform(email_message_id)
       return unless Features.tasks?

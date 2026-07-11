@@ -16,6 +16,25 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.22.3] - 2026-07-10
+
+### Fixed
+
+- **Search embedding no longer fails on image-only / empty-body emails.** These
+  hit a chunker path that returned a malformed (doubly-nested) chunk and raised a
+  `TypeError`, so the message never got indexed for search. They now embed
+  correctly.
+- **AI extraction backfills no longer overwhelm the job queue.** Reminder and task
+  extraction now pace themselves (≤2 in flight) and retry patiently on provider
+  rate limits (HTTP 429) instead of failing outright — matching contact analysis —
+  so re-processing a large mailbox's history can't spike into a 429 storm or a
+  pile-up of failed jobs.
+- **Background search-embedding runs at a lower priority** so a bulk re-embed of a
+  mailbox can no longer delay user-triggered work — e.g. running an inbox rule on
+  existing mail, which previously queued behind the whole backfill.
+- **Search-record finalization tolerates a concurrency race** (duplicate-key
+  retry) when a searchable record's last chunks finish embedding simultaneously.
+
 ## [0.22.2] - 2026-07-10
 
 ### Fixed

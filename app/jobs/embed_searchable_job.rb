@@ -1,5 +1,6 @@
 class EmbedSearchableJob < ApplicationJob
   queue_as :default
+  queue_with_priority BACKGROUND_PRIORITY
 
   def perform(searchable)
     workspace = searchable.searchable_workspace
