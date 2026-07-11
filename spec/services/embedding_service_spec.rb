@@ -216,7 +216,7 @@ RSpec.describe EmbeddingService do
   # -----------------------------------------------------------------------
   describe "L2 normalization" do
     it "normalizes non-unit vectors returned by the adapter" do
-      non_unit = [3.0, 4.0]  # magnitude = 5, expected normalized: [0.6, 0.8]
+      non_unit = [ 3.0, 4.0 ]  # magnitude = 5, expected normalized: [0.6, 0.8]
 
       adapter = instance_double(Ai::Adapters::Openai)
       allow(adapter).to receive(:embed).and_return([ non_unit ])
@@ -225,11 +225,11 @@ RSpec.describe EmbeddingService do
       allow(svc).to receive(:find_embedding_adapter).and_return(adapter)
 
       result = svc.embed_batch([ "text" ])
-      expect(result.first.map { |v| v.round(4) }).to eq([0.6, 0.8])
+      expect(result.first.map { |v| v.round(4) }).to eq([ 0.6, 0.8 ])
     end
 
     it "leaves zero vectors unchanged" do
-      zero_vec = [0.0, 0.0, 0.0]
+      zero_vec = [ 0.0, 0.0, 0.0 ]
 
       adapter = instance_double(Ai::Adapters::Openai)
       allow(adapter).to receive(:embed).and_return([ zero_vec ])
@@ -249,7 +249,7 @@ RSpec.describe EmbeddingService do
     it "truncates each text to entry.max_input_chars before calling the adapter" do
       adapter = instance_double(Ai::Adapters::Openai)
       captured = nil
-      allow(adapter).to receive(:embed) { |texts, **_| captured = texts; [ [0.1] ] }
+      allow(adapter).to receive(:embed) { |texts, **_| captured = texts; [ [ 0.1 ] ] }
 
       svc = described_class.new(ws, entry: default_entry)
       allow(svc).to receive(:find_embedding_adapter).and_return(adapter)
@@ -263,7 +263,7 @@ RSpec.describe EmbeddingService do
     it "does not truncate text within the limit" do
       adapter = instance_double(Ai::Adapters::Openai)
       captured = nil
-      allow(adapter).to receive(:embed) { |texts, **_| captured = texts; [ [0.1] ] }
+      allow(adapter).to receive(:embed) { |texts, **_| captured = texts; [ [ 0.1 ] ] }
 
       svc = described_class.new(ws, entry: default_entry)
       allow(svc).to receive(:find_embedding_adapter).and_return(adapter)
