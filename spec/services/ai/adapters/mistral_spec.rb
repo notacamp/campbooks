@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "rails_helper"
 
 RSpec.describe Ai::Adapters::Mistral do
@@ -21,5 +23,42 @@ RSpec.describe Ai::Adapters::Mistral do
 
     result = adapter.chat(system: "sys", messages: [ { role: "user", content: "hi" } ], model: "mistral-small-latest", max_tokens: 100)
     expect(result).to eq("bonjour")
+  end
+
+  describe "#embeddings_endpoint" do
+    it "always returns the Mistral embeddings URL regardless of chat endpoint" do
+      adapter = described_class.new(api_key: "k")
+      expect(adapter.send(:embeddings_endpoint)).to eq("https://api.mistral.ai/v1/embeddings")
+    end
+  end
+
+  describe "#embed" do
+    let(:adapter) { described_class.new(api_key: "mkey") }
+    let(:request) { double("request") }
+    let(:response) do
+      double("response", body: { "data" => [ { "index" => 0, "embedding" => Array.new(1024) { 0.01 } } ] }.to_json)
+    end
+    let(:connection) { double("connection") }
+
+    before do
+      allow(adapter).to receive(:connection).and_return(connection)
+      allow(request).to receive(:body=)
+      allow(connection).to receive(:post)
+        .with("https://api.mistral.ai/v1/embeddings")
+        .and_yield(request).and_return(response)
+    end
+
+    it "POSTs to the Mistral embeddings endpoint" do
+      result = adapter.embed("hello", model: "mistral-embed")
+      expect(result).to be_an(Array)
+      expect(result.length).to eq(1024)
+    end
+
+    it "does not include dimensions in the request body (nil request_dimensions)" do
+      adapter.embed("hello", model: "mistral-embed", dimensions: nil)
+      expect(request).to have_received(:body=) do |json|
+        expect(JSON.parse(json)).not_to have_key("dimensions")
+      end
+    end
   end
 end

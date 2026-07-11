@@ -29,17 +29,30 @@ module Ai
         raise
       end
 
-      def embed(text, model: "text-embedding-3-small")
+      # NOTE: the previous implementation called Gemini's OpenAI-compatibility
+      # endpoint (/v1beta/openai/embeddings) while passing an OpenAI model name like
+      # "text-embedding-3-small". That endpoint only accepts Gemini model IDs, so it
+      # could never work for real Gemini embedding models. We now use the native
+      # batchEmbedContents API instead.
+      def embed(text, model:, dimensions: nil)
         input = Array(text)
-        embeddings_url = "https://generativelanguage.googleapis.com/v1beta/openai/embeddings"
+        url = "#{BASE_URL}/models/#{model}:batchEmbedContents?key=#{@api_key}"
 
-        response = connection.post(embeddings_url) do |req|
-          req.headers["Authorization"] = "Bearer #{@api_key}"
-          req.body = { model: model, input: input }.to_json
+        requests = input.map do |t|
+          req = {
+            model: "models/#{model}",
+            content: { parts: [ { text: t } ] }
+          }
+          req[:outputDimensionality] = dimensions if dimensions
+          req
+        end
+
+        response = connection.post(url) do |req|
+          req.body = { requests: requests }.to_json
         end
 
         data = JSON.parse(response.body)
-        vectors = data["data"].sort_by { |d| d["index"] }.map { |d| d["embedding"] }
+        vectors = data["embeddings"].map { |e| e["values"] }
 
         text.is_a?(Array) ? vectors : vectors.first
       rescue Faraday::Error => e
