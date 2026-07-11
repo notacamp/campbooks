@@ -16,6 +16,18 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.22.4] - 2026-07-11
+
+### Changed
+
+- **Non-document attachments no longer cost an AI vision call.** Document processing
+  now splits by file type: real documents (PDF, image, Office) go through AI/OCR
+  analysis as before, while non-documents — calendar invites, raw emails, archives,
+  HTML — are stored deterministically and marked *skipped* instead of being sent to
+  the model just to be labelled "other". Cheaper and faster, and it keeps those files
+  out of the review queue (as before) without the round-trip. They can still be
+  analysed on demand from the Files area.
+
 ## [0.22.3] - 2026-07-10
 
 ### Fixed
