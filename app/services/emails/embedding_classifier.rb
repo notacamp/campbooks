@@ -55,13 +55,19 @@ module Emails
 
     def verdicts
       @verdicts ||= begin
-        vector = @embedder.embed(text_for_embedding, workspace: workspace)
+        entry  = workspace.embedding_model_entry
+        vector = @embedder.embed(text_for_embedding, workspace: workspace, entry: entry)
         if vector.nil? || (vector.respond_to?(:empty?) && vector.empty?)
           []
         else
+          # fresh_for ensures only tag embeddings stamped for the workspace's
+          # current model are queried — stale rows (wrong embedding space) would
+          # produce meaningless cosine distances against the entry-dimensioned query.
+          embed_col = SearchTagEmbedding.embedding_column_for(:embedding, entry.dimensions)
           neighbors = SearchTagEmbedding
             .where(workspace: workspace)
-            .nearest_neighbors(:embedding, vector, distance: "cosine")
+            .merge(SearchTagEmbedding.fresh_for(entry))
+            .nearest_neighbors(embed_col, vector, distance: "cosine")
             .includes(:tag)
             .first(@top_k)
           self.class.verdicts_from(neighbors)
