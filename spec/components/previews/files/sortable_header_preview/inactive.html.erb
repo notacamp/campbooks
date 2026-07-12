@@ -1,0 +1,8 @@
+<table class="min-w-full table-fixed divide-y divide-gray-200">
+  <thead class="bg-warm-ash-bg">
+    <tr>
+      <%= render Campbooks::Files::SortableHeader.new(label: label, sort_key: sort_key, sorter: sorter, filters: filters, q: q, folder: folder, width_class: width_class) %>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>

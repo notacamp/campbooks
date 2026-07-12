@@ -10,14 +10,18 @@ module Campbooks
     # Symbol value through Phlex, which dasherises underscores (:date_from →
     # name="date-from") and would no longer match the controller's permitted
     # params. Strings render verbatim.
+    #
+    # When the active filter narrows to exactly one document type (panel type
+    # checkboxes), a "Type fields" section renders per-schema-field controls and
+    # a sort section provides mobile-accessible sorting.
     class FilterPanel < Campbooks::Base
       def initialize(folder: nil, filters: nil, q: nil, document_types: [], folders: [], categories: [], **attrs)
         @folder         = folder
         @filters        = filters || Documents::Filters.new
         @q              = q.to_s.strip.presence
         @document_types = document_types
-        @folders        = folders
         @categories     = categories
+        @folders        = folders
         @attrs          = attrs
       end
 
@@ -25,7 +29,9 @@ module Campbooks
         div(class: class_names("space-y-3", @attrs.delete(:class)), **@attrs) do
           scalar_fields
           types_section if @document_types.any?
+          type_fields_section if single_doc_type
           toggles
+          sort_section
           footer
         end
       end
@@ -94,6 +100,45 @@ module Campbooks
         end
       end
 
+      # Per-schema-field filter controls — only shown when exactly one type is
+      # selected via the type checkboxes. Each field renders the appropriate input
+      # based on its kind: text→text input, money/number/integer→min+max pair,
+      # date→from+to pair, enum→select, boolean→yes/no select.
+      def type_fields_section
+        sdt = single_doc_type
+        schema = DocumentTypes::Schema.for(sdt)
+        return unless schema.any?
+
+        section(t(".type_fields", type: sdt.name.humanize)) do
+          div(class: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-2") do
+            schema.fields.each do |field|
+              render_field_control(field)
+            end
+          end
+        end
+      end
+
+      # Mobile-accessible sorting. Always rendered so phone users can sort
+      # without needing the hidden table headers. The `sort` and `dir` inputs
+      # submit with the enclosing SearchBar form.
+      def sort_section
+        section(t(".sort")) do
+          div(class: "grid grid-cols-2 gap-x-3 gap-y-2") do
+            render(Campbooks::Select.new("sort",
+              options: sort_key_options,
+              selected: helpers.params[:sort].to_s,
+              aria_label: t(".sort")))
+            render(Campbooks::Select.new("dir",
+              options: [
+                [ t(".dir_asc"), "asc" ],
+                [ t(".dir_desc"), "desc" ]
+              ],
+              selected: helpers.params[:dir].presence || "asc",
+              aria_label: t(".dir_asc")))
+          end
+        end
+      end
+
       def toggles
         div(class: "flex flex-wrap items-center gap-4") do
           render(Campbooks::Toggle.new(
@@ -128,6 +173,87 @@ module Campbooks
         end
       end
 
+      # ── Helpers ──────────────────────────────────────────────────────────────
+
+      # Derive the single selected DocumentType from panel type_ids. Returns nil
+      # unless exactly one type is checked in the panel checkboxes.
+      def single_doc_type
+        return nil unless @filters.type_ids.size == 1
+
+        @document_types.find { |dt| dt.id.to_s == @filters.type_ids.first.to_s }
+      end
+
+      def render_field_control(field) # rubocop:disable Metrics/MethodLength, Metrics/CyclomaticComplexity
+        key = field.key
+        case field.kind
+        when :text
+          render(Campbooks::Input.new("f[#{key}][contains]",
+            label: field.label,
+            value: field_filter_value(key, "contains"),
+            placeholder: field.label,
+            rounded: :md))
+        when :money, :number, :integer
+          step = field.kind == :money ? "0.01" : "1"
+          render(Campbooks::Input.new("f[#{key}][min]",
+            type: :number,
+            label: "#{field.label} ≥",
+            value: field_filter_value(key, "min"),
+            placeholder: "0",
+            rounded: :md, step: step, min: "0"))
+          render(Campbooks::Input.new("f[#{key}][max]",
+            type: :number,
+            label: "#{field.label} ≤",
+            value: field_filter_value(key, "max"),
+            placeholder: "0",
+            rounded: :md, step: step, min: "0"))
+        when :date
+          render(Campbooks::Input.new("f[#{key}][from]",
+            type: :date,
+            label: "#{field.label} ≥",
+            value: field_filter_value(key, "from"),
+            rounded: :md))
+          render(Campbooks::Input.new("f[#{key}][to]",
+            type: :date,
+            label: "#{field.label} ≤",
+            value: field_filter_value(key, "to"),
+            rounded: :md))
+        when :enum
+          render(Campbooks::Select.new("f[#{key}][eq]",
+            label: field.label,
+            options: enum_option_pairs(key, field),
+            selected: field_filter_value(key, "eq"),
+            include_blank: "—"))
+        when :boolean
+          render(Campbooks::Select.new("f[#{key}][eq]",
+            label: field.label,
+            options: [
+              [ t(".boolean_yes"), "true" ],
+              [ t(".boolean_no"),  "false" ]
+            ],
+            selected: field_filter_value(key, "eq"),
+            include_blank: "—"))
+        end
+      end
+
+      def sort_key_options
+        opts = [
+          [ t(".sort_default"), "" ],
+          [ t(".sort_added"),   "added" ],
+          [ t(".sort_name"),    "name" ]
+        ]
+        if (sdt = single_doc_type)
+          DocumentTypes::Schema.for(sdt).fields.each do |field|
+            opts << [ field.label, field.key ]
+          end
+        end
+        opts
+      end
+
+      # Return the stored panel value for a given field_key + op pair.
+      def field_filter_value(field_key, op)
+        @filters.field_filters.dig(field_key.to_s, op.to_s)
+      end
+
       def category_options
         @categories.map { |c| [ helpers.human_enum(DocumentType, :category, c), c ] }
       end
@@ -146,6 +272,16 @@ module Campbooks
 
       def expense_category_options
         Document::EXPENSE_CATEGORIES.map { |k| [ helpers.human_enum(Document, :expense_category, k), k ] }
+      end
+
+      # Localized option pairs for a schema enum field — the two well-known enums
+      # reuse their i18n labels (same as chips and the document edit form).
+      def enum_option_pairs(key, field)
+        case key
+        when "expense_category" then expense_category_options
+        when "payment_method"   then helpers.payment_method_options
+        else Array(field.enum_values).map { |v| [ v.to_s.humanize, v.to_s ] }
+        end
       end
 
       def folder_options

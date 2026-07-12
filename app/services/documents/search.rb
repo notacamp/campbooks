@@ -24,7 +24,7 @@ module Documents
     RESULT_LIMIT = 100
 
     # Exposed for controllers and views.
-    attr_reader :filters
+    attr_reader :filters, :sorter
 
     # @param folder [MailFolder, nil] when set, search is scoped to that folder.
     def initialize(user:, workspace:, params:, folder: nil)
@@ -33,6 +33,7 @@ module Documents
       @params    = params || {}
       @folder    = folder
       @filters   = build_filters
+      @sorter    = build_sorter
     end
 
     # True when free text remains after stripping modifiers. A query that contains
@@ -49,10 +50,16 @@ module Documents
 
     # Browse / filter-only path. An AR relation safe for pagy. Includes the
     # attachments and classification so the list renders without N+1s.
+    # When a sorter is active its ORDER BY replaces the default starred_first/recent.
     def scope
-      @filters.apply(base_scope, workspace: @workspace, user: @user)
-              .includes(:classification).with_attached_original_file
-              .starred_first.recent
+      filtered = @filters.apply(base_scope, workspace: @workspace, user: @user)
+                         .includes(:classification).with_attached_original_file
+
+      if @sorter.active?
+        @sorter.apply(filtered)
+      else
+        filtered.starred_first.recent
+      end
     end
 
     # The free-text result set: a bounded, rank-ordered Array<Document> blending
@@ -83,6 +90,13 @@ module Documents
       base = Documents::Filters.from_params(@params)
       base.merge_query(parsed_query.filters) if raw_query.present?
       base
+    end
+
+    # Builds a Sorter. Extracted-field sort keys are only resolved when filters
+    # narrow to exactly one DocumentType (schema is then unambiguous).
+    def build_sorter
+      dt = @filters.single_type(@workspace)
+      Documents::Sorter.from_params(@params, document_type: dt)
     end
 
     # ── Query parsing ─────────────────────────────────────────────────────────

@@ -28,16 +28,18 @@ en:
       label: Folders
       remove: Remove from %{name}
     forms:
+      schema_fields:
+        cents_hint: "In cents (e.g. €123.45 = 12345)"
       bank_statement:
         account_number: Account Number
         bank_name: Bank Name
-        closing_balance: Closing Balance (cents)
+        closing_balance: Closing Balance
         currency: Currency
-        opening_balance: Opening Balance (cents)
+        opening_balance: Opening Balance
         period_end: Period End
         period_start: Period Start
       expense_invoice:
-        amount_cents: Amount (cents)
+        amount_cents: Amount
         buyer_nif: Buyer NIF
         company_vat_present: Company VAT number present
         currency: Currency
@@ -46,7 +48,7 @@ en:
         expense_category: Expense Category
         invoice_number: Invoice Number
         select_category: Select category
-        tax_amount_cents: Tax Amount (cents)
+        tax_amount_cents: Tax Amount
         tax_rate: Tax Rate (%)
         vendor_name: Vendor Name
         vendor_nif: Vendor NIF
@@ -54,7 +56,7 @@ en:
         document_date: Document Date
         entity_name: Entity Name
       receipt:
-        amount_cents: Amount (cents)
+        amount_cents: Amount
         document_date: Document Date
         payment_method: Payment Method
         receipt_number: Receipt Number
@@ -62,14 +64,14 @@ en:
         vendor_name: Vendor Name
         vendor_nif: Vendor NIF
       revenue_invoice:
-        amount_cents: Amount (cents)
+        amount_cents: Amount
         client_name: Client Name
         client_nif: Client NIF
         currency: Currency
         document_date: Document Date
         due_date: Due Date
         invoice_number: Invoice Number
-        tax_amount_cents: Tax Amount (cents)
+        tax_amount_cents: Tax Amount
         tax_rate: Tax Rate (%)
     index:
       accepted_formats: PDF, JPG, PNG, WEBP, HEIC

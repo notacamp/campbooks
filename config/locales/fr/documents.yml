@@ -29,16 +29,18 @@ fr:
       label: Dossiers
       remove: Retirer de %{name}
     forms:
+      schema_fields:
+        cents_hint: "En centimes (p. ex. 123,45 € = 12345)"
       bank_statement:
         account_number: Numéro de compte
         bank_name: Nom de la banque
-        closing_balance: Solde de clôture (centimes)
+        closing_balance: Solde de clôture
         currency: Devise
-        opening_balance: Solde d'ouverture (centimes)
+        opening_balance: Solde d'ouverture
         period_end: Fin de période
         period_start: Début de période
       expense_invoice:
-        amount_cents: Montant (centimes)
+        amount_cents: Montant
         buyer_nif: NIF de l'acheteur
         company_vat_present: Numéro de TVA de l'entreprise présent
         currency: Devise
@@ -47,7 +49,7 @@ fr:
         expense_category: Catégorie de Dépense
         invoice_number: Numéro de facture
         select_category: Sélectionner une catégorie
-        tax_amount_cents: Montant de la taxe (centimes)
+        tax_amount_cents: Montant de la taxe
         tax_rate: Taux de taxe (%)
         vendor_name: Nom du fournisseur
         vendor_nif: NIF du fournisseur
@@ -55,7 +57,7 @@ fr:
         document_date: Date du document
         entity_name: Nom de l'entité
       receipt:
-        amount_cents: Montant (centimes)
+        amount_cents: Montant
         document_date: Date du document
         payment_method: Mode de paiement
         receipt_number: Numéro de reçu
@@ -63,14 +65,14 @@ fr:
         vendor_name: Nom du fournisseur
         vendor_nif: NIF du fournisseur
       revenue_invoice:
-        amount_cents: Montant (centimes)
+        amount_cents: Montant
         client_name: Nom du client
         client_nif: NIF du client
         currency: Devise
         document_date: Date du document
         due_date: Date d'échéance
         invoice_number: Numéro de facture
-        tax_amount_cents: Montant de la taxe (centimes)
+        tax_amount_cents: Montant de la taxe
         tax_rate: Taux de taxe (%)
     index:
       accepted_formats: PDF, JPG, PNG, WEBP, HEIC

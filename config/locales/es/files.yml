@@ -36,6 +36,8 @@ es:
       filter_chips:
         date_from_prefix: "Desde:"
         date_to_prefix: "Hasta:"
+        field_from: "desde %{value}"
+        field_to: "hasta %{value}"
         starred: Con estrella
       filter_panel:
         ai_status: Procesamiento
@@ -47,10 +49,14 @@ es:
         any_processing: Cualquier estado
         any_source: Todas las fuentes
         any_status: Todos los estados
+        boolean_no: "No"
+        boolean_yes: "Sí"
         category: Categoría
         clear_filters: Borrar filtros
         date_from: Fecha inicial
         date_to: Fecha final
+        dir_asc: Ascendente
+        dir_desc: Descendente
         entity: Proveedor / entidad
         entity_placeholder: ej. Vodafone, EDP
         expense_category: Categoría de gasto
@@ -58,9 +64,14 @@ es:
         number_placeholder: ej. FAC-001
         reference_number: Referencia #
         review_status: Estado de revisión
+        sort: Ordenar por
+        sort_added: Fecha de adición
+        sort_default: Por defecto
+        sort_name: Nombre
         source: Origen
         starred: Solo con estrella
         type: Tipo de documento
+        type_fields: "Campos de %{type}"
       folder_sharing:
         add_button: Añadir
         add_title: Añadir personas
@@ -113,6 +124,10 @@ es:
         all_files: Todos los archivos
         label: Carpetas
         new_folder: Nueva carpeta
+      sortable_header:
+        sort_asc: Ordenar %{label} ascendente
+        sort_by: Ordenar por %{label}
+        sort_desc: Ordenar %{label} descendente
   files:
     index:
       ai_analyze: Analizar con IA

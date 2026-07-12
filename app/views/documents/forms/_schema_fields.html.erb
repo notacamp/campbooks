@@ -11,7 +11,8 @@
     <% when :date %>
       <%= render Campbooks::Input.new(field_name, type: :date, label: field[:label], value: field[:value]) %>
     <% when :money %>
-      <%= render Campbooks::Input.new(field_name, type: :number, label: field[:label], value: field[:value]) %>
+      <%= render Campbooks::Input.new(field_name, type: :number, label: field[:label], value: field[:value],
+                                      hint: t("documents.forms.schema_fields.cents_hint")) %>
     <% when :boolean %>
       <div class="flex items-end pb-1">
         <input type="hidden" name="<%= field_name %>" value="0">

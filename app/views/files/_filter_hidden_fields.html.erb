@@ -1,13 +1,37 @@
-<%# Renders hidden fields for all active panel filters + optional q.
-    Locals: filters (Documents::Filters), q (String or nil).
+<%# Renders hidden fields for all active panel filters + optional q/sort/dir.
+    Locals: filters (Documents::Filters), q (String or nil),
+            sort (String or nil), dir (String or nil).
     Used by the bulk-action forms (Reanalyze / Export) to carry the current
     filter state through. Array-valued params (type[], or a category/source/…
     that accumulated several values) must submit with [] — repeated bare names
-    would collapse to the last value in Rack's params parsing. %>
+    would collapse to the last value in Rack's params parsing.
+    One-level nested hashes (the f[key][op] field-filter shape) are emitted
+    as f[key][op]=value or f[key][op][]=v for array-valued ops. %>
 <% (local_assigns[:filters] || Documents::Filters.new).to_h.each do |key, value| %>
   <% if value.is_a?(Array) %>
     <% value.each do |v| %>
       <%= hidden_field_tag "#{key}[]", v %>
+    <% end %>
+  <% elsif value.is_a?(Hash) %>
+    <%# One-level nested hash: f[field_key][op]=value or f[field_key][op][]=v %>
+    <% value.each do |inner_key, inner_value| %>
+      <% if inner_value.is_a?(Hash) %>
+        <% inner_value.each do |op, op_val| %>
+          <% if op_val.is_a?(Array) %>
+            <% op_val.each do |v| %>
+              <%= hidden_field_tag "#{key}[#{inner_key}][#{op}][]", v %>
+            <% end %>
+          <% else %>
+            <%= hidden_field_tag "#{key}[#{inner_key}][#{op}]", op_val %>
+          <% end %>
+        <% end %>
+      <% elsif inner_value.is_a?(Array) %>
+        <% inner_value.each do |v| %>
+          <%= hidden_field_tag "#{key}[#{inner_key}][]", v %>
+        <% end %>
+      <% else %>
+        <%= hidden_field_tag "#{key}[#{inner_key}]", inner_value %>
+      <% end %>
     <% end %>
   <% else %>
     <%= hidden_field_tag key.to_s, value %>
@@ -15,4 +39,10 @@
 <% end %>
 <% if local_assigns[:q].present? %>
   <%= hidden_field_tag :q, local_assigns[:q] %>
+<% end %>
+<% if local_assigns[:sort].present? %>
+  <%= hidden_field_tag :sort, local_assigns[:sort] %>
+<% end %>
+<% if local_assigns[:dir].present? %>
+  <%= hidden_field_tag :dir, local_assigns[:dir] %>
 <% end %>

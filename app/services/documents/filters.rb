@@ -19,7 +19,7 @@ module Documents
   class Filters
     attr_reader :type_ids, :categories, :review_status, :ai_status, :sources,
                 :starred, :date_from, :date_to, :amount_min_cents, :amount_max_cents,
-                :entities, :numbers, :expense_categories, :folder_id
+                :entities, :numbers, :expense_categories, :folder_id, :field_filters
 
     def self.from_params(params)
       new(params)
@@ -74,6 +74,10 @@ module Documents
       # Folder by id (panel/mobile picker); a folder NAME only arrives via merge_query.
       @folder_id = p[:folder_id].presence&.to_s
 
+      # Extracted-field filters: f[key][op]=value.
+      # These are panel-only — no modifier-token equivalent in this PR.
+      @field_filters = parse_field_filters(p[:f])
+
       reset_query_state
     end
 
@@ -111,7 +115,7 @@ module Documents
     # Folder name is resolved via workspace.mail_folders.accessible_to(user) — an
     # unknown name results in scope.none. Pass user: nil to skip folder-name
     # resolution entirely (export path: stored filters only ever carry folder ids).
-    def apply(scope, workspace:, user:)
+    def apply(scope, workspace:, user:) # rubocop:disable Metrics/MethodLength, Metrics/AbcSize, Metrics/CyclomaticComplexity, Metrics/PerceivedComplexity
       ids = effective_type_ids(workspace)
       scope = scope.by_type(ids) if ids.any?
 
@@ -139,7 +143,24 @@ module Documents
         scope = scope.in_folder(@folder_id)
       end
 
+      # Extracted-field filters: applied only when exactly one document type is
+      # selected so the schema is unambiguous.
+      if @field_filters.any? && ids.size == 1
+        dt = workspace.document_types.find_by(id: ids.first)
+        scope = apply_field_filters(scope, dt) if dt
+      end
+
       scope
+    end
+
+    # Returns the single DocumentType when the active filter set narrows to exactly
+    # one type (panel ids + query modifier names resolved). Returns nil otherwise.
+    # Used by Documents::Search to pass the type to the Sorter.
+    def single_type(workspace)
+      ids = effective_type_ids(workspace)
+      return nil unless ids.size == 1
+
+      workspace.document_types.find_by(id: ids.first)
     end
 
     # True when at least one panel filter is active (excludes modifier-only state).
@@ -155,6 +176,7 @@ module Documents
 
     # Count of active panel-filter selections (like EmailSearchBar#active_count).
     # Array params count per-selection; single params count as 1.
+    # Field filters count each (key, op) pair individually.
     def active_count
       count  = @type_ids.size
       count += @categories.size
@@ -170,6 +192,7 @@ module Documents
       count += @numbers.size
       count += @expense_categories.size
       count += 1 if @folder_id.present?
+      count += @field_filters.sum { |_, ops| ops.size }
       count
     end
 
@@ -195,6 +218,7 @@ module Documents
       h[:number]           = @numbers                       if @numbers.any?
       h[:expense_category] = @expense_categories            if @expense_categories.any?
       h[:folder_id]        = @folder_id                     if @folder_id.present?
+      h[:f]                = @field_filters                 if @field_filters.any?
       h
     end
 
@@ -238,18 +262,19 @@ module Documents
     # otherwise-filtered list). Date range is NOT document-specific (it narrows
     # internal docs/emails by their own timestamps).
     def document_specific?
-      @type_ids.any?               || @q_type_names.any?          ||
-        @categories.any?           || @q_categories.any?          ||
-        @review_status.present?    || @q_review_status.present?   ||
-        @ai_status.present?        || @q_ai_status.present?       ||
-        @sources.any?              || @q_sources.any?             ||
-        @starred                   || @q_starred                  ||
+      @type_ids.any?               || @q_type_names.any?           ||
+        @categories.any?           || @q_categories.any?           ||
+        @review_status.present?    || @q_review_status.present?    ||
+        @ai_status.present?        || @q_ai_status.present?        ||
+        @sources.any?              || @q_sources.any?              ||
+        @starred                   || @q_starred                   ||
         @amount_min_cents.present? || @q_amount_min_cents.present? ||
         @amount_max_cents.present? || @q_amount_max_cents.present? ||
-        @entities.any?             || @q_entities.any?            ||
-        @numbers.any?              || @q_numbers.any?             ||
-        @expense_categories.any?   || @q_expense_categories.any?  ||
-        @folder_id.present?        || @q_folder_name.present?
+        @entities.any?             || @q_entities.any?             ||
+        @numbers.any?              || @q_numbers.any?              ||
+        @expense_categories.any?   || @q_expense_categories.any?   ||
+        @folder_id.present?        || @q_folder_name.present?      ||
+        @field_filters.any?
     end
 
     # The effective date range (query modifiers win), applicable to internal
@@ -357,6 +382,61 @@ module Documents
     def format_amount(cents)
       return nil unless cents
       (cents / 100.0).to_s
+    end
+
+    # ── Field-filter helpers ──────────────────────────────────────────────────
+
+    # Parse f[key][op]=value from request params or a stored hash.
+    # Accepts ActionController::Parameters or plain Hash.
+    # Returns a sanitized { "field_key" => { "op" => value } } hash.
+    # Blank scalar values are rejected; :in ops require at least one non-blank element.
+    def parse_field_filters(raw) # rubocop:disable Metrics/MethodLength
+      return {} unless raw.is_a?(Hash) || raw.respond_to?(:to_unsafe_h)
+
+      inner = raw.respond_to?(:to_unsafe_h) ? raw.to_unsafe_h : raw.to_h
+
+      inner.each_with_object({}) do |(field_key, ops), acc|
+        next unless ops.is_a?(Hash)
+
+        cleaned = ops.each_with_object({}) do |(op_str, val), h|
+          op = op_str.to_s
+          if op == "in"
+            arr = Array(val).map(&:to_s).reject(&:blank?)
+            h[op] = arr unless arr.empty?
+          else
+            v = val.to_s.strip
+            h[op] = v unless v.blank?
+          end
+        end
+
+        acc[field_key.to_s] = cleaned if cleaned.any?
+      end
+    end
+
+    # Apply parsed field filters against the schema of +document_type+.
+    # Unknown keys and unsupported ops are silently ignored (fail-open: the scope
+    # is unchanged rather than erroring, so a stale stored filter never 500s).
+    def apply_field_filters(scope, document_type)
+      schema = DocumentTypes::Schema.for(document_type)
+      @field_filters.each do |field_key, ops|
+        field = schema.field(field_key)
+        next if field.nil?
+
+        ops.each do |op_str, value|
+          scope = field.apply_predicate(scope, op_str.to_sym, field_filter_value(field, value))
+        end
+      end
+      scope
+    end
+
+    # Panel-facing unit conversion: money fields are filtered in EUROS (decimal),
+    # mirroring the long-standing amount_min/amount_max inputs, while storage and
+    # Field predicates speak integer cents.
+    def field_filter_value(field, value)
+      return value unless field.type == :money
+
+      euros = Float(value.to_s) rescue nil # rubocop:disable Style/RescueModifier
+      euros.nil? ? value : (euros * 100).round
     end
   end
 end

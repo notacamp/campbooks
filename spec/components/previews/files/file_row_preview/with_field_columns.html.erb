@@ -1,0 +1,5 @@
+<table class="min-w-full table-fixed divide-y divide-gray-200">
+  <tbody class="bg-card divide-y divide-gray-200">
+    <%= render Campbooks::Files::FileRow.new(doc: doc, folders: folders, current_folder: current_folder, field_columns: field_columns) %>
+  </tbody>
+</table>
