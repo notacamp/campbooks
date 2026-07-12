@@ -28,6 +28,11 @@ RSpec.describe Document, "email title" do
   # A pre-metadata-migration row: the value lives only in the legacy column
   # (bypassing the accessors, which write metadata).
   def plant_legacy_sender!(doc, value)
+    # The upgrade-path examples need the pre-v0.26 schema (the legacy column era);
+    # once the columns are dropped there is no legacy state left to simulate.
+    unless Document.connection.column_exists?(:documents, :sender_name)
+      skip "legacy sender_name column is dropped — upgrade path no longer reproducible"
+    end
     Document.where(id: doc.id).update_all(sender_name: value, metadata: nil)
   end
 

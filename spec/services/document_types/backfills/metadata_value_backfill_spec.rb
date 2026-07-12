@@ -8,6 +8,23 @@ RSpec.describe DocumentTypes::Backfills::MetadataValueBackfill do
   let(:conn) { ActiveRecord::Base.connection }
   let(:workspace) { create(:workspace) }
 
+  # These specs plant values in the legacy columns, which a later migration
+  # drops. On the post-drop schema the backfill is a guarded no-op — assert
+  # exactly that and skip the column-era behaviors.
+  before do
+    unless ActiveRecord::Base.connection.column_exists?(:documents, :vendor_name)
+      skip "legacy extracted-value columns are dropped — backfill is a no-op"
+    end
+  end
+
+  it "is a safe no-op when the legacy columns no longer exist" do
+    allow(ActiveRecord::Base.connection).to receive(:column_exists?).and_call_original
+    allow(ActiveRecord::Base.connection).to receive(:column_exists?)
+      .with(:documents, :vendor_name).and_return(false)
+
+    expect { described_class.run! }.not_to raise_error
+  end
+
   # Reload raw metadata JSONB as a Ruby hash for the given document id.
   def raw_metadata(doc_id)
     row = conn.select_one("SELECT metadata FROM documents WHERE id = '#{doc_id}'")
