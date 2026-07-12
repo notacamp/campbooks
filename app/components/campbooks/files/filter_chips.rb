@@ -12,12 +12,13 @@ module Campbooks
     class FilterChips < Campbooks::Base
       CLOSE_PATH = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>'.freeze
 
-      def initialize(filters:, q: nil, folder: nil, document_types: [], folders: [])
+      def initialize(filters:, q: nil, folder: nil, document_types: [], folders: [], single_type: nil)
         @filters        = filters
         @q              = q.to_s.strip.presence
         @folder         = folder
         @document_types = document_types
         @folders        = folders
+        @single_type    = single_type
       end
 
       def view_template
@@ -145,6 +146,9 @@ module Campbooks
           }
         end
 
+        # Per-schema-field filter chips — only when single type is active.
+        chips.concat(build_field_chips)
+
         chips
       end
 
@@ -160,6 +164,85 @@ module Campbooks
             fill: "none", stroke: "currentColor", viewBox: "0 0 24 24", aria_hidden: "true"
           ) { raw(safe(CLOSE_PATH)) }
         end
+      end
+
+      # One chip per (field_key, op) pair present in @filters.field_filters.
+      # Only runs when @single_type is set (the view passes it in).
+      def build_field_chips
+        return [] unless @single_type && @filters.field_filters.any?
+
+        schema = DocumentTypes::Schema.for(@single_type)
+        fields_by_key = schema.fields.index_by { |f| f.key.to_s }
+        chips = []
+
+        @filters.field_filters.each do |field_key, ops|
+          field = fields_by_key[field_key.to_s]
+          next unless field
+
+          ops.each do |op, raw_value|
+            next if raw_value.to_s.blank?
+
+            chips << {
+              label: format_field_chip_label(field, op.to_s, raw_value.to_s),
+              remove_path: remove_field_op(field_key, op)
+            }
+          end
+        end
+
+        chips
+      end
+
+      # Human-readable chip label for a single field filter op.
+      def format_field_chip_label(field, op, raw_value)
+        formatted = format_field_chip_value(field, op, raw_value)
+        case op
+        when "min"      then "#{field.label} ≥ #{formatted}"
+        when "max"      then "#{field.label} ≤ #{formatted}"
+        when "from"     then "#{field.label} #{t('.field_from', value: formatted)}"
+        when "to"       then "#{field.label} #{t('.field_to', value: formatted)}"
+        when "contains" then "#{field.label} \"#{raw_value}\""
+        else                 "#{field.label}: #{formatted}"
+        end
+      end
+
+      # Format the raw string value from params into a display string.
+      def format_field_chip_value(field, _op, raw_value)
+        case field.kind
+        when :money
+          euros = raw_value.to_f
+          format_amount((euros * 100).round)
+        when :date
+          begin
+            date = Date.parse(raw_value.to_s)
+            l(date, format: :long)
+          rescue ArgumentError, TypeError
+            raw_value
+          end
+        when :boolean
+          raw_value.to_s == "true" ? helpers.t("components.files.filter_panel.boolean_yes") : helpers.t("components.files.filter_panel.boolean_no")
+        else
+          raw_value.to_s
+        end
+      end
+
+      # Remove URL for a single (field_key, op) pair from the field_filters hash.
+      def remove_field_op(field_key, op)
+        h = filter_hash
+        # Deep-dup the nested :f hash so other chips are not affected.
+        f = h.fetch(:f, {}).transform_values { |ops| ops.to_h.dup }
+        field_ops = f[field_key.to_s].to_h.dup
+        field_ops.delete(op.to_s)
+        if field_ops.empty?
+          f.delete(field_key.to_s)
+        else
+          f[field_key.to_s] = field_ops
+        end
+        if f.empty?
+          h.delete(:f)
+        else
+          h[:f] = f
+        end
+        build_path(h)
       end
 
       # Build a removal URL for a single-value filter dimension.

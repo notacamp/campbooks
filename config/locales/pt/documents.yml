@@ -28,16 +28,18 @@ pt:
       label: Pastas
       remove: Remover de %{name}
     forms:
+      schema_fields:
+        cents_hint: "Em cêntimos (ex.: €123,45 = 12345)"
       bank_statement:
         account_number: Número de Conta
         bank_name: Nome do Banco
-        closing_balance: Saldo Final (cêntimos)
+        closing_balance: Saldo Final
         currency: Moeda
-        opening_balance: Saldo Inicial (cêntimos)
+        opening_balance: Saldo Inicial
         period_end: Fim do Período
         period_start: Início do Período
       expense_invoice:
-        amount_cents: Montante (cêntimos)
+        amount_cents: Montante
         buyer_nif: NIF do Comprador
         company_vat_present: NIF da empresa presente
         currency: Moeda
@@ -46,7 +48,7 @@ pt:
         expense_category: Categoria de Despesa
         invoice_number: Número de Factura
         select_category: Selecionar categoria
-        tax_amount_cents: Montante de IVA (cêntimos)
+        tax_amount_cents: Montante de IVA
         tax_rate: Taxa de IVA (%)
         vendor_name: Nome do Fornecedor
         vendor_nif: NIF do Fornecedor
@@ -54,7 +56,7 @@ pt:
         document_date: Data do Documento
         entity_name: Nome da Entidade
       receipt:
-        amount_cents: Montante (cêntimos)
+        amount_cents: Montante
         document_date: Data do Documento
         payment_method: Método de Pagamento
         receipt_number: Número de Recibo
@@ -62,14 +64,14 @@ pt:
         vendor_name: Nome do Fornecedor
         vendor_nif: NIF do Fornecedor
       revenue_invoice:
-        amount_cents: Montante (cêntimos)
+        amount_cents: Montante
         client_name: Nome do Cliente
         client_nif: NIF do Cliente
         currency: Moeda
         document_date: Data do Documento
         due_date: Data de Vencimento
         invoice_number: Número de Factura
-        tax_amount_cents: Montante de IVA (cêntimos)
+        tax_amount_cents: Montante de IVA
         tax_rate: Taxa de IVA (%)
     index:
       accepted_formats: PDF, JPG, PNG, WEBP, HEIC

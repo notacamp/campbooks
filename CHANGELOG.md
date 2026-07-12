@@ -16,6 +16,28 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-07-12
+
+### Added
+
+- **Sort and filter your documents by their extracted fields.** Filter the Files
+  page to a single document type and its fields become part of the page: the table
+  swaps in that type's most useful fields as sortable columns (click a header to
+  sort, click again to flip direction), the filter panel grows a "fields" section
+  with the right control per field — text contains, amount ≥/≤ (in euros), date
+  ranges, category pickers, yes/no — and active field filters show as removable
+  chips. All of it is driven by the type's field schema, so adding a field to a
+  custom type (Settings → Inbox → Document types) makes it sortable and filterable
+  with no code changes. Sorting is also available from the filter panel on mobile,
+  and exports respect the active field filters.
+
+### Changed
+
+- Money field labels dropped the "(cents)" suffix — list columns and filters show
+  formatted amounts; the document edit form keeps a cents hint under the input.
+- Built-in document types lead with their most scannable fields (name, amount,
+  dates) in both the Files columns and the document edit form.
+
 ## [0.24.0] - 2026-07-12
 
 ### Changed

@@ -36,6 +36,8 @@ en:
       filter_chips:
         date_from_prefix: "From:"
         date_to_prefix: "To:"
+        field_from: "from %{value}"
+        field_to: "to %{value}"
         starred: Starred
       filter_panel:
         ai_status: Processing
@@ -47,10 +49,14 @@ en:
         any_processing: Any status
         any_source: All sources
         any_status: All statuses
+        boolean_no: "No"
+        boolean_yes: "Yes"
         category: Category
         clear_filters: Clear filters
         date_from: From date
         date_to: To date
+        dir_asc: Ascending
+        dir_desc: Descending
         entity: Vendor / entity
         entity_placeholder: e.g. EDP, Vodafone
         expense_category: Expense category
@@ -58,9 +64,14 @@ en:
         number_placeholder: e.g. INV-001
         reference_number: Reference #
         review_status: Review status
+        sort: Sort by
+        sort_added: Added date
+        sort_default: Default
+        sort_name: Name
         source: Source
         starred: Starred only
         type: Document type
+        type_fields: "%{type} fields"
       folder_sharing:
         add_button: Add
         add_title: Add people
@@ -113,6 +124,10 @@ en:
         all_files: All files
         label: Folders
         new_folder: New folder
+      sortable_header:
+        sort_asc: Sort %{label} ascending
+        sort_by: Sort by %{label}
+        sort_desc: Sort %{label} descending
   files:
     index:
       ai_analyze: Analyze with AI

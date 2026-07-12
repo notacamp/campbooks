@@ -5,13 +5,17 @@ module Campbooks
     # One file (Document) as a card for the mobile list (below md). Mirrors FileRow's
     # content in a stacked layout; shares the icon/kind/size helpers and the actions
     # menu so the two never drift.
+    #
+    # When `field_columns:` is passed (a single-type filtered view), the first
+    # money or date field's formatted value is appended to the meta line.
     class FileCard < Campbooks::Base
       include FilePresentation
 
-      def initialize(doc:, folders: [], current_folder: nil)
+      def initialize(doc:, folders: [], current_folder: nil, field_columns: [])
         @doc = doc
         @folders = folders || []
         @current_folder = current_folder
+        @field_columns = field_columns || []
       end
 
       def view_template
@@ -34,7 +38,23 @@ module Campbooks
       private
 
       def meta_line
-        [ kind_label, human_size, l(@doc.created_at.to_date, format: :long) ].compact.join(" · ")
+        parts = [ kind_label, human_size, l(@doc.created_at.to_date, format: :long) ]
+
+        primary_field = @field_columns.find { |f| f.kind == :money || f.kind == :date }
+        if primary_field
+          value = primary_field.read(@doc.metadata)
+          formatted = format_primary_field(primary_field, value) if value
+          parts << formatted if formatted.present?
+        end
+
+        parts.compact.join(" · ")
+      end
+
+      def format_primary_field(field, value)
+        case field.kind
+        when :money then helpers.format_currency(value)
+        when :date  then helpers.l(value, format: :long)
+        end
       end
     end
   end

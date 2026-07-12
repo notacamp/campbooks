@@ -123,7 +123,8 @@
                 q: params[:q],
                 folder: @folder,
                 document_types: @document_types,
-                folders: @folders) %>
+                folders: @folders,
+                single_type: @single_type) %>
 
           <% if @search_query.present? %>
             <p class="px-2.5 py-1.5 text-sm text-muted-foreground" role="status">
@@ -160,20 +161,49 @@
               <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".files_section") %></h2>
             <% end %>
             <!-- Files table (md+) -->
-            <div class="hidden md:block bg-card rounded-xl shadow-sm border border-gray-200 overflow-visible dark:border-white/10">
+            <div class="hidden md:block bg-card rounded-xl shadow-sm border border-gray-200 overflow-x-auto dark:border-white/10">
+              <%# Width budget (table-fixed): name + N×2/12 fields + 2/12 added + w-12 actions ≤ 12/12. %>
+              <% name_width = @field_columns.any? ? (%w[w-5/12 w-5/12 w-4/12 w-3/12][@field_columns.size] || "w-3/12") : "w-5/12" %>
               <table class="min-w-full table-fixed divide-y divide-gray-200 dark:divide-white/10">
                 <thead class="bg-warm-ash-bg">
                   <tr>
-                    <th class="w-5/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_name") %></th>
-                    <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_kind") %></th>
-                    <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_size") %></th>
-                    <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_added") %></th>
+                    <%= render Campbooks::Files::SortableHeader.new(
+                          label: t(".col_name"),
+                          sort_key: "name",
+                          sorter: @sorter,
+                          filters: @filters,
+                          q: params[:q],
+                          folder: @folder,
+                          width_class: name_width) %>
+                    <% if @field_columns.any? %>
+                      <% @field_columns.each do |field| %>
+                        <%= render Campbooks::Files::SortableHeader.new(
+                              label: field.label,
+                              sort_key: field.key,
+                              sorter: @sorter,
+                              filters: @filters,
+                              q: params[:q],
+                              folder: @folder,
+                              width_class: "w-2/12") %>
+                      <% end %>
+                    <% else %>
+                      <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_kind") %></th>
+                      <th class="w-2/12 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase"><%= t(".col_size") %></th>
+                    <% end %>
+                    <%= render Campbooks::Files::SortableHeader.new(
+                          label: t(".col_added"),
+                          sort_key: "added",
+                          sorter: @sorter,
+                          filters: @filters,
+                          q: params[:q],
+                          folder: @folder,
+                          width_class: "w-2/12") %>
                     <th class="w-12 px-3 py-3"><span class="sr-only"><%= t(".col_actions") %></span></th>
                   </tr>
                 </thead>
                 <tbody id="files_tbody" class="bg-card divide-y divide-gray-200 dark:divide-white/10">
                   <% @files.each do |file| %>
-                    <%= render Campbooks::Files::FileRow.new(doc: file, folders: @folders, current_folder: @folder) %>
+                    <%= render Campbooks::Files::FileRow.new(doc: file, folders: @folders, current_folder: @folder, field_columns: @field_columns) %>
                   <% end %>
                 </tbody>
               </table>
@@ -182,7 +212,7 @@
             <!-- Files cards (mobile) -->
             <div id="files_cards" class="md:hidden space-y-3">
               <% @files.each do |file| %>
-                <%= render Campbooks::Files::FileCard.new(doc: file, folders: @folders, current_folder: @folder) %>
+                <%= render Campbooks::Files::FileCard.new(doc: file, folders: @folders, current_folder: @folder, field_columns: @field_columns) %>
               <% end %>
             </div>
           <% elsif params[:q].present? || @filters.narrowing? %>
@@ -197,7 +227,7 @@
 
           <% if @pagy&.next %>
             <%= turbo_frame_tag "files_pagination",
-                  src: (@folder ? files_folder_path(@folder, files_filter_params(@filters, q: params[:q]).merge(page: @pagy.next, format: :turbo_stream)) : files_path(files_filter_params(@filters, q: params[:q]).merge(page: @pagy.next, format: :turbo_stream))),
+                  src: (@folder ? files_folder_path(@folder, files_filter_params(@filters, q: params[:q], sorter: @sorter).merge(page: @pagy.next, format: :turbo_stream)) : files_path(files_filter_params(@filters, q: params[:q], sorter: @sorter).merge(page: @pagy.next, format: :turbo_stream))),
                   loading: :lazy do %>
               <div class="flex items-center justify-center py-6">
                 <%= render Campbooks::Spinner.new(size: :md) %>

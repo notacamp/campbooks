@@ -1,19 +1,19 @@
 <%= turbo_stream.append "files_tbody" do %>
   <% @files.each do |file| %>
-    <%= render Campbooks::Files::FileRow.new(doc: file, folders: @folders, current_folder: @folder) %>
+    <%= render Campbooks::Files::FileRow.new(doc: file, folders: @folders, current_folder: @folder, field_columns: @field_columns) %>
   <% end %>
 <% end %>
 
 <%= turbo_stream.append "files_cards" do %>
   <% @files.each do |file| %>
-    <%= render Campbooks::Files::FileCard.new(doc: file, folders: @folders, current_folder: @folder) %>
+    <%= render Campbooks::Files::FileCard.new(doc: file, folders: @folders, current_folder: @folder, field_columns: @field_columns) %>
   <% end %>
 <% end %>
 
 <% if @pagy.next %>
   <%= turbo_stream.replace "files_pagination" do %>
     <%= turbo_frame_tag "files_pagination",
-          src: (@folder ? files_folder_path(@folder, files_filter_params(@filters, q: params[:q]).merge(page: @pagy.next, format: :turbo_stream)) : files_path(files_filter_params(@filters, q: params[:q]).merge(page: @pagy.next, format: :turbo_stream))),
+          src: (@folder ? files_folder_path(@folder, files_filter_params(@filters, q: params[:q], sorter: @sorter).merge(page: @pagy.next, format: :turbo_stream)) : files_path(files_filter_params(@filters, q: params[:q], sorter: @sorter).merge(page: @pagy.next, format: :turbo_stream))),
           loading: :lazy do %>
       <div class="flex items-center justify-center py-6">
         <%= render Campbooks::Spinner.new(size: :md) %>

@@ -35,6 +35,19 @@ module Files
       )
     end
 
+    # Single type selected — type fields section and sort section appear.
+    def with_single_type
+      invoice_type = sample_document_types.first
+      filters = Documents::Filters.from_params(type: [ invoice_type.id ])
+      render Campbooks::Files::FilterPanel.new(
+        folder: nil,
+        filters: filters,
+        document_types: sample_document_types_with_schema,
+        folders: sample_folders,
+        categories: DocumentType::CATEGORIES
+      )
+    end
+
     # Folder-scoped view — folder select hidden (browsing a specific folder).
     def folder_scoped
       fake_folder = Struct.new(:id, :name, keyword_init: true).new(
@@ -52,10 +65,26 @@ module Files
     private
 
     FakeDocumentType = Struct.new(:id, :name, :color, keyword_init: true)
+    FakeDocumentTypeWithSchema = Struct.new(:id, :name, :color, :extraction_schema, keyword_init: true)
 
     def sample_document_types
       [
         FakeDocumentType.new(id: "aaaa", name: "Invoice",  color: "#3b82f6"),
+        FakeDocumentType.new(id: "bbbb", name: "Receipt",  color: "#10b981"),
+        FakeDocumentType.new(id: "cccc", name: "Contract", color: "#f59e0b")
+      ]
+    end
+
+    def sample_document_types_with_schema
+      [
+        FakeDocumentTypeWithSchema.new(
+          id: "aaaa", name: "Invoice", color: "#3b82f6",
+          extraction_schema: {
+            "vendor_name"  => { "type" => "string", "description" => "Vendor Name", "position" => 1 },
+            "invoice_date" => { "type" => "date",   "description" => "Invoice Date", "position" => 2 },
+            "total_amount" => { "type" => "money",  "description" => "Amount", "position" => 3 }
+          }
+        ),
         FakeDocumentType.new(id: "bbbb", name: "Receipt",  color: "#10b981"),
         FakeDocumentType.new(id: "cccc", name: "Contract", color: "#f59e0b")
       ]

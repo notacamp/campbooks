@@ -291,6 +291,92 @@ RSpec.describe "Files search filters", type: :request do
     end
   end
 
+  # ── single-type view: field column headers ────────────────────────────────
+
+  describe "GET /files with exactly one type selected" do
+    it "renders sortable column headers for the type's schema fields (first 4)" do
+      titled("INVOICE-DOC")
+
+      get files_path(type: [ expense_invoice_type.id.to_s ])
+
+      expect(response).to have_http_status(:ok)
+      # Top 3 schema fields of expense_invoice by position: vendor_name,
+      # amount_cents, document_date. Labels come from the label_key translations.
+      expect(response.body).to include("Vendor Name")
+      expect(response.body).to include("sort=amount_cents")
+      expect(response.body).to include("sort=document_date")
+      # Name and Added are always sortable; field headers replace Kind/Size in single-type mode
+      expect(response.body).to include("sort=vendor_name")
+    end
+
+    it "renders field values in table cells" do
+      doc = titled("VENDOR-DOC")
+      doc.update!(metadata: doc.metadata.merge("vendor_name" => "Distinctive Vendor Lda"))
+
+      get files_path(type: [ expense_invoice_type.id.to_s ])
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Distinctive Vendor Lda")
+    end
+  end
+
+  # ── mixed view: no field-specific sort links ───────────────────────────────
+
+  describe "GET /files with no type filter" do
+    it "does not render a sort link for schema-field keys" do
+      titled("SOME-DOC")
+
+      get files_path
+
+      expect(response).to have_http_status(:ok)
+      # sort=vendor_name must not appear when we're in the mixed (no single type) view
+      expect(response.body).not_to include("sort=vendor_name")
+    end
+  end
+
+  # ── sort header links carry correct params ─────────────────────────────────
+
+  describe "GET /files with type filter: sort links" do
+    it "renders sort links with sort=name and sort=added on the Name/Added headers" do
+      titled("SOME-DOC")
+
+      get files_path(type: [ expense_invoice_type.id.to_s ])
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("sort=name")
+      expect(response.body).to include("sort=added")
+    end
+
+    it "renders a sort link for the first schema field key" do
+      titled("SOME-DOC")
+
+      get files_path(type: [ expense_invoice_type.id.to_s ])
+
+      expect(response).to have_http_status(:ok)
+      # vendor_name is position=1 in expense_invoice schema
+      expect(response.body).to include("sort=vendor_name")
+    end
+  end
+
+  # ── turbo_stream pagination preserves field_columns ────────────────────────
+
+  describe "GET /files?page=2 in turbo_stream format with single type" do
+    it "appends rows that include schema field cells (200 OK, no error)" do
+      35.times { |i| titled("INVOICE-#{i}") }
+
+      get files_path(
+        type: [ expense_invoice_type.id.to_s ],
+        page: 2,
+        format: :turbo_stream
+      )
+
+      expect(response).to have_http_status(:ok)
+      expect(response.content_type).to include("text/vnd.turbo-stream.html")
+      # The stream appends to files_tbody
+      expect(response.body).to include("files_tbody")
+    end
+  end
+
   # ── files_results turbo frame present ─────────────────────────────────────
 
   describe "GET /files" do

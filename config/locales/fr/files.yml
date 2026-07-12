@@ -37,6 +37,8 @@ fr:
       filter_chips:
         date_from_prefix: "Depuis :"
         date_to_prefix: "Jusqu'à :"
+        field_from: "depuis %{value}"
+        field_to: "jusqu'à %{value}"
         starred: Avec étoile
       filter_panel:
         ai_status: Traitement
@@ -48,10 +50,14 @@ fr:
         any_processing: Tout état
         any_source: Toutes les sources
         any_status: Tous les statuts
+        boolean_no: "Non"
+        boolean_yes: "Oui"
         category: Catégorie
         clear_filters: Effacer les filtres
         date_from: Date de début
         date_to: Date de fin
+        dir_asc: Croissant
+        dir_desc: Décroissant
         entity: Fournisseur / entité
         entity_placeholder: ex. EDF, Orange
         expense_category: Catégorie de dépense
@@ -59,9 +65,14 @@ fr:
         number_placeholder: ex. FAC-001
         reference_number: "Référence #"
         review_status: Statut de vérification
+        sort: Trier par
+        sort_added: Date d'ajout
+        sort_default: Par défaut
+        sort_name: Nom
         source: Source
         starred: Étoilés seulement
         type: Type de document
+        type_fields: "Champs de %{type}"
       folder_sharing:
         add_button: Ajouter
         add_title: Ajouter des personnes
@@ -114,6 +125,10 @@ fr:
         all_files: Tous les fichiers
         label: Dossiers
         new_folder: Nouveau dossier
+      sortable_header:
+        sort_asc: Trier %{label} par ordre croissant
+        sort_by: Trier par %{label}
+        sort_desc: Trier %{label} par ordre décroissant
   files:
     index:
       ai_analyze: Analyser avec l'IA

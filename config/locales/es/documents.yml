@@ -29,16 +29,18 @@ es:
       label: Carpetas
       remove: Quitar de %{name}
     forms:
+      schema_fields:
+        cents_hint: "En céntimos (p. ej., €123,45 = 12345)"
       bank_statement:
         account_number: Número de cuenta
         bank_name: Nombre del banco
-        closing_balance: Saldo final (céntimos)
+        closing_balance: Saldo final
         currency: Divisa
-        opening_balance: Saldo inicial (céntimos)
+        opening_balance: Saldo inicial
         period_end: Fin del período
         period_start: Inicio del período
       expense_invoice:
-        amount_cents: Importe (céntimos)
+        amount_cents: Importe
         buyer_nif: NIF del comprador
         company_vat_present: NIF de la empresa presente
         currency: Divisa
@@ -47,7 +49,7 @@ es:
         expense_category: Categoría de Gasto
         invoice_number: Número de factura
         select_category: Seleccionar categoría
-        tax_amount_cents: Importe del impuesto (céntimos)
+        tax_amount_cents: Importe del impuesto
         tax_rate: Tipo impositivo (%)
         vendor_name: Nombre del proveedor
         vendor_nif: NIF del proveedor
@@ -55,7 +57,7 @@ es:
         document_date: Fecha del documento
         entity_name: Nombre de la entidad
       receipt:
-        amount_cents: Importe (céntimos)
+        amount_cents: Importe
         document_date: Fecha del documento
         payment_method: Método de pago
         receipt_number: Número de recibo
@@ -63,14 +65,14 @@ es:
         vendor_name: Nombre del proveedor
         vendor_nif: NIF del proveedor
       revenue_invoice:
-        amount_cents: Importe (céntimos)
+        amount_cents: Importe
         client_name: Nombre del cliente
         client_nif: NIF del cliente
         currency: Divisa
         document_date: Fecha del documento
         due_date: Fecha de vencimiento
         invoice_number: Número de factura
-        tax_amount_cents: Importe del impuesto (céntimos)
+        tax_amount_cents: Importe del impuesto
         tax_rate: Tipo impositivo (%)
     index:
       accepted_formats: PDF, JPG, PNG, WEBP, HEIC

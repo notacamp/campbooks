@@ -4,8 +4,9 @@ module Files
   # Preview for the Files filter chips — the removable active-filter badges that
   # render inside the `files_results` Turbo Frame alongside the result list.
   class FilterChipsPreview < Lookbook::Preview
-    FakeDocumentType = Struct.new(:id, :name, :color, keyword_init: true)
-    FakeFolder       = Struct.new(:id, :name, keyword_init: true)
+    FakeDocumentType           = Struct.new(:id, :name, :color, keyword_init: true)
+    FakeDocumentTypeWithSchema = Struct.new(:id, :name, :color, :extraction_schema, keyword_init: true)
+    FakeFolder                 = Struct.new(:id, :name, keyword_init: true)
 
     # No active filters — component renders nothing.
     def empty
@@ -53,6 +54,34 @@ module Files
           FakeDocumentType.new(id: "bbbb", name: "Receipt",  color: "#10b981")
         ],
         folders: []
+      )
+    end
+
+    # Field filter chips — per-schema-field op chips shown when single type selected.
+    def with_field_filters
+      invoice_type = FakeDocumentTypeWithSchema.new(
+        id: "aaaa", name: "Invoice", color: "#3b82f6",
+        extraction_schema: {
+          "vendor_name"  => { "type" => "string", "description" => "Vendor Name", "position" => 1 },
+          "invoice_date" => { "type" => "date",   "description" => "Invoice Date", "position" => 2 },
+          "total_amount" => { "type" => "money",  "description" => "Amount", "position" => 3 }
+        }
+      )
+      filters = Documents::Filters.from_params(
+        type: [ "aaaa" ],
+        f: {
+          "vendor_name"  => { "contains" => "EDP" },
+          "invoice_date" => { "from" => "2026-01-01", "to" => "2026-06-30" },
+          "total_amount" => { "min" => "100", "max" => "5000" }
+        }
+      )
+      render Campbooks::Files::FilterChips.new(
+        filters: filters,
+        q: nil,
+        folder: nil,
+        document_types: [ invoice_type ],
+        folders: [],
+        single_type: invoice_type
       )
     end
 
