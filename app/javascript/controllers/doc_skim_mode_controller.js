@@ -25,10 +25,15 @@ export default class extends Controller {
     this.lastAction = null // { type: "approve" | "dismiss", id }
     this.touch = null
     this.undoTimer = null
+    this.fieldsExpanded = false // "Extracted data" disclosure state, carried across cards
     this.render()
+    // Take keyboard focus so the shortcuts work without a click. The overlay also
+    // focuses us on frame-load, but the standalone /documents/skim page has no overlay,
+    // and an image/file card (no PDF iframe) has no load event to reclaim focus on.
+    this.element.focus({ preventScroll: true })
   }
 
-  disconnect() { clearTimeout(this.undoTimer) }
+  disconnect() { clearTimeout(this.undoTimer); clearTimeout(this.focusGuard) }
 
   // ---- input ---------------------------------------------------------------
 
@@ -38,10 +43,12 @@ export default class extends Controller {
       if (["Enter", " ", "Spacebar", "Escape"].includes(event.key)) { this.dismissIntro(); event.preventDefault(); event.stopPropagation() }
       return
     }
-    // Escape closes the lightbox, then any open panel, before bubbling to the overlay.
+    // Escape closes the lightbox, then the reclassify picker, then the extracted-data
+    // panel, before bubbling to the overlay (close).
     if (event.key === "Escape") {
       if (this.isPreviewOpen) { this.closePreview(); event.stopPropagation(); event.preventDefault(); return }
-      if (this.panelOpen) { this.closePanels(); event.stopPropagation(); event.preventDefault(); return }
+      if (this.reclassifyOpen) { this.closeReclassify(); event.stopPropagation(); event.preventDefault(); return }
+      if (this.fieldsExpanded) { this.collapseFields(); event.stopPropagation(); event.preventDefault(); return }
     }
     // Never hijack real typing (the edit inputs / reclassify select).
     const tag = (event.target.tagName || "").toLowerCase()
@@ -51,8 +58,10 @@ export default class extends Controller {
       if (event.key === " " || event.key === "Spacebar") { this.closePreview(); event.preventDefault() }
       return
     }
-    // While a panel is open the action shortcuts are suppressed (commit or cancel first).
-    if (this.panelOpen) return
+    // The reclassify picker suppresses the action shortcuts (commit or cancel first). An
+    // expanded "Extracted data" panel does NOT — typing is already guarded above, so you
+    // can still arrow between cards with it open.
+    if (this.reclassifyOpen) return
 
     switch (event.key) {
       case "ArrowRight": this.next(); break
@@ -92,7 +101,7 @@ export default class extends Controller {
   }
 
   onTouchStart(event) {
-    if (this.panelOpen || this.isPreviewOpen || this.introOpen) return
+    if (this.reclassifyOpen || this.isPreviewOpen || this.introOpen) return
     const t = event.changedTouches[0]
     this.touch = { x: t.clientX, y: t.clientY }
   }
@@ -167,7 +176,6 @@ export default class extends Controller {
   openReclassify() {
     const panel = this.currentPanel("reclassify")
     if (!panel) return
-    this.closeEdit()
     panel.classList.remove("hidden")
     panel.querySelector("[data-doc-skim-reclassify-select]")?.focus()
   }
@@ -208,6 +216,18 @@ export default class extends Controller {
     if (fields) fields.open = false
   }
 
+  // The disclosure's open/closed state is remembered (this.fieldsExpanded) and re-applied
+  // to each card, so a reviewer who wants the extracted data visible doesn't re-open it
+  // on every document. Fired by the <details> toggle (user click or programmatic).
+  onFieldsToggle(event) { this.fieldsExpanded = event.target.open }
+
+  // Escape from an expanded panel: collapse it and hand focus back to the stack so the
+  // keyboard shortcuts keep working.
+  collapseFields() {
+    this.closeEdit()
+    this.element.focus({ preventScroll: true })
+  }
+
   saveFields() {
     const id = this.currentId
     const panel = this.currentFields
@@ -245,8 +265,25 @@ export default class extends Controller {
   loadCurrentPreview() {
     const el = this.currentFrame?.querySelector("[data-doc-skim-preview-frame]")
     if (!el || el.getAttribute("src") || !el.dataset.src) return
-    el.addEventListener("load", () => el.classList.remove("opacity-0"), { once: true })
+    el.addEventListener("load", () => {
+      el.classList.remove("opacity-0")
+      this.keepFocusOffPreview(el)
+    }, { once: true })
     el.setAttribute("src", el.dataset.src)
+  }
+
+  // The browser's PDF viewer silently grabs keyboard focus a beat after it renders — no
+  // focus event fires, so we can't react to the steal directly, and inert/tabindex don't
+  // stop it. It only grabs once, so for ~1s after load we take focus back whenever the
+  // preview holds it. Without this, keydown goes to the plugin and every shortcut dies.
+  keepFocusOffPreview(el) {
+    clearTimeout(this.focusGuard)
+    let ticks = 0
+    const reclaim = () => {
+      if (document.activeElement === el) this.element.focus({ preventScroll: true })
+      if (++ticks < 20) this.focusGuard = setTimeout(reclaim, 50)
+    }
+    reclaim()
   }
 
   // Reveal the full-screen lightbox with a large view of the current document.
@@ -294,17 +331,15 @@ export default class extends Controller {
   get currentFields() { return this.currentFrame?.querySelector("[data-doc-skim-fields]") || null }
   currentPanel(kind) { return this.currentFrame?.querySelector(`[data-doc-skim-${kind}-panel]`) || null }
 
-  // An open fields disclosure (you're editing) or an open reclassify panel both
-  // suppress the nav/action shortcuts so typing/picking never triggers them.
-  get panelOpen() {
+  // Only the reclassify picker is a modal panel that suppresses the nav/action shortcuts
+  // (commit or cancel first). The "Extracted data" disclosure is a persistent view state,
+  // not a modal — it never suppresses nav (typing is guarded in onKeydown instead).
+  get reclassifyOpen() {
     const f = this.currentFrame
     if (!f) return false
-    if (this.currentFields?.open) return true
     return [...f.querySelectorAll("[data-doc-skim-reclassify-panel]")]
       .some((p) => !p.classList.contains("hidden"))
   }
-
-  closePanels() { this.closeEdit(); this.closeReclassify() }
 
   // ---- requests ------------------------------------------------------------
 
@@ -377,7 +412,16 @@ export default class extends Controller {
 
   get isDone() { return this.frameTargets.length === 0 || this.indexValue >= this.frameTargets.length }
 
-  indexValueChanged() { this.render() }
+  indexValueChanged() {
+    this.render()
+    // After moving cards, keep keyboard focus on the stack itself. If it sat on a child of
+    // the card we just left (the disclosure summary, the preview), that child is now hidden
+    // and focus would fall back to <body>, killing the shortcuts. Never yank it mid-edit.
+    const a = document.activeElement
+    const tag = (a?.tagName || "").toLowerCase()
+    if (tag === "input" || tag === "textarea" || tag === "select" || a?.isContentEditable) return
+    this.element.focus({ preventScroll: true })
+  }
 
   render() {
     this.closePreview() // navigating away dismisses any open lightbox
@@ -431,11 +475,12 @@ export default class extends Controller {
     if (this.hasRoadmapTarget) this.roadmapTarget.scrollLeft = 0
   }
 
-  // Each card shows fresh when navigated to: the fields disclosure collapsed and the
-  // reclassify panel closed.
+  // Each card starts with the reclassify panel closed. The "Extracted data" disclosure
+  // carries its open/closed state across cards (this.fieldsExpanded) so it isn't re-opened
+  // on every document.
   resetFrame(frame) {
     const fields = frame.querySelector("[data-doc-skim-fields]")
-    if (fields) fields.open = false
+    if (fields) fields.open = this.fieldsExpanded
     frame.querySelector("[data-doc-skim-reclassify-panel]")?.classList.add("hidden")
   }
 

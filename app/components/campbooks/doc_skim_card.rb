@@ -173,9 +173,13 @@ module Campbooks
     end
 
     # Inline PDF. The iframe is lazily loaded by the doc-skim-mode controller (it sets
-    # the src only for the active frame, so a long queue doesn't load every PDF at
-    # once) and fades in over the placeholder. The iframe is interactive, so only the
-    # explicit Expand control opens the lightbox.
+    # the src only for the active frame, so a long queue doesn't load every PDF at once)
+    # and fades in over the placeholder. It's a non-interactive first-page glance (like
+    # the image preview): kept out of the tab order and pointer flow, with a full-cover
+    # button that opens the lightbox for the real view. The browser's PDF viewer still
+    # grabs keyboard focus once when it loads (nothing declarative stops it), so the
+    # controller bounces focus back to the stack — otherwise the Skim shortcuts (arrows,
+    # A, R, …) would go to the plugin instead of us.
     def pdf_preview
       div(class: "relative flex min-h-[12rem] flex-1 overflow-hidden rounded-lg border border-border bg-muted/30") do
         div(class: "absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground") do
@@ -183,10 +187,15 @@ module Campbooks
           span(class: "max-w-full truncate px-4 text-xs") { @filename.presence || t(".document_fallback") }
         end
         iframe(
-          loading: "lazy",
+          loading: "lazy", tabindex: "-1", aria_hidden: "true",
           title: @filename.presence || t(".document_fallback"),
-          class: "absolute inset-0 h-full w-full bg-card opacity-0 transition-opacity duration-200",
+          class: "pointer-events-none absolute inset-0 h-full w-full bg-card opacity-0 transition-opacity duration-200",
           data: { doc_skim_preview_frame: true, src: file_path }
+        )
+        button(
+          type: "button", aria_label: t(".expand"),
+          class: "absolute inset-0 cursor-zoom-in",
+          data: { doc_skim_action: :preview }
         )
         preview_controls
       end
@@ -247,7 +256,8 @@ module Campbooks
     # data-doc-skim-meta-field → metadata) and treats the open disclosure as a panel,
     # suppressing the nav shortcuts while you type.
     def fields
-      details(class: "group/fields shrink-0 border-t border-border pt-3", data: { doc_skim_fields: true }) do
+      details(class: "group/fields shrink-0 border-t border-border pt-3",
+              data: { doc_skim_fields: true, action: "toggle->doc-skim-mode#onFieldsToggle" }) do
         summary(class: "flex cursor-pointer list-none select-none items-center justify-between gap-2 [&::-webkit-details-marker]:hidden") do
           span(class: "text-xs font-semibold uppercase tracking-wide text-muted-foreground/70") { t(".extracted_data") }
           svg(class: "h-4 w-4 flex-shrink-0 text-muted-foreground/60 transition-transform group-open/fields:rotate-180",
