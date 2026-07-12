@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_10_210003) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_11_004152) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -1445,6 +1445,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_10_210003) do
     t.text "content", null: false
     t.datetime "created_at", null: false
     t.vector "embedding", limit: 1536
+    t.vector "embedding_1024", limit: 1024
+    t.vector "embedding_3072", limit: 3072
     t.string "embedding_model"
     t.jsonb "metadata", default: {}, null: false
     t.integer "position", default: 0, null: false
@@ -1454,6 +1456,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_10_210003) do
     t.datetime "updated_at", null: false
     t.uuid "workspace_id", null: false
     t.index ["embedding"], name: "idx_search_chunks_embedding_hnsw", opclass: :vector_cosine_ops, using: :hnsw
+    t.index ["embedding_1024"], name: "idx_search_chunks_embedding_1024_hnsw", opclass: :vector_cosine_ops, using: :hnsw
     t.index ["metadata"], name: "index_search_chunks_on_metadata", using: :gin
     t.index ["searchable_type", "searchable_id"], name: "index_search_chunks_on_searchable_type_and_searchable_id"
     t.index ["workspace_id"], name: "index_search_chunks_on_workspace_id"
@@ -1461,6 +1464,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_10_210003) do
 
   create_table "search_records", force: :cascade do |t|
     t.vector "content_embedding", limit: 1536
+    t.vector "content_embedding_1024", limit: 1024
+    t.vector "content_embedding_3072", limit: 3072
     t.text "content_preview"
     t.datetime "created_at", null: false
     t.string "embedding_model"
@@ -1473,26 +1478,33 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_10_210003) do
     t.text "tags", default: [], array: true
     t.text "title"
     t.vector "title_embedding", limit: 1536
+    t.vector "title_embedding_1024", limit: 1024
+    t.vector "title_embedding_3072", limit: 3072
     t.datetime "updated_at", null: false
     t.uuid "workspace_id", null: false
     t.index ["content_embedding"], name: "idx_search_records_content_hnsw", opclass: :vector_cosine_ops, using: :hnsw
+    t.index ["content_embedding_1024"], name: "idx_search_records_content_1024_hnsw", opclass: :vector_cosine_ops, using: :hnsw
     t.index ["filter_data"], name: "index_search_records_on_filter_data", using: :gin
     t.index ["searchable_type", "searchable_id"], name: "index_search_records_on_searchable_type_and_searchable_id", unique: true
     t.index ["source_created_at"], name: "index_search_records_on_source_created_at"
     t.index ["tags"], name: "index_search_records_on_tags", using: :gin
     t.index ["title_embedding"], name: "idx_search_records_title_hnsw", opclass: :vector_cosine_ops, using: :hnsw
+    t.index ["title_embedding_1024"], name: "idx_search_records_title_1024_hnsw", opclass: :vector_cosine_ops, using: :hnsw
     t.index ["workspace_id"], name: "index_search_records_on_workspace_id"
   end
 
   create_table "search_tag_embeddings", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.string "content_hash"
     t.datetime "created_at", null: false
-    t.vector "embedding", limit: 1536, null: false
+    t.vector "embedding", limit: 1536
+    t.vector "embedding_1024", limit: 1024
+    t.vector "embedding_3072", limit: 3072
     t.string "embedding_model"
     t.uuid "tag_id", null: false
     t.datetime "updated_at", null: false
     t.uuid "workspace_id", null: false
     t.index ["embedding"], name: "idx_search_tag_embeddings_hnsw", opclass: :vector_cosine_ops, using: :hnsw
+    t.index ["embedding_1024"], name: "idx_search_tag_embeddings_1024_hnsw", opclass: :vector_cosine_ops, using: :hnsw
     t.index ["tag_id"], name: "index_search_tag_embeddings_on_tag_id", unique: true
     t.index ["workspace_id"], name: "index_search_tag_embeddings_on_workspace_id"
   end
@@ -1944,6 +1956,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_10_210003) do
     t.boolean "ai_processing_enabled", default: true, null: false
     t.datetime "created_at", null: false
     t.integer "email_retention_months"
+    t.string "embedding_model"
     t.jsonb "entitlement_overrides", default: {}, null: false
     t.string "name", null: false
     t.string "plan", default: "free", null: false

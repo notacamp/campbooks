@@ -31,10 +31,11 @@ class SearchService
   def search(query, filters: {}, options: {})
     return [] if query.blank?
 
-    opts = DEFAULT_OPTIONS.merge(options)
+    opts  = DEFAULT_OPTIONS.merge(options)
+    entry = @workspace.embedding_model_entry
 
-    # 1. Generate query embedding
-    query_embedding = EmbeddingService.embed(query, workspace: @workspace)
+    # 1. Generate query embedding via the workspace's configured model
+    query_embedding = EmbeddingService.embed(query, workspace: @workspace, entry: entry)
     return [] unless query_embedding
 
     # 2. Analyze query
@@ -45,10 +46,10 @@ class SearchService
     scope = apply_filters(scope, filters, query_analysis)
 
     # 4. Vector search
-    candidates = vector_search(scope, query_embedding, opts, filters)
+    candidates = vector_search(scope, query_embedding, opts, filters, entry)
 
     # 5. Compute scores
-    results = compute_scores(candidates, query_embedding, opts)
+    results = compute_scores(candidates, query_embedding, opts, entry: entry)
 
     # 6. Tag boosting
     if opts[:enable_tag_boosting] && query_analysis.matched_tags.any?
@@ -150,24 +151,27 @@ class SearchService
     scope
   end
 
-  def vector_search(scope, query_embedding, opts, filters)
+  def vector_search(scope, query_embedding, opts, filters, entry)
     candidate_limit = [ opts[:limit] * opts[:candidate_pool_multiplier], opts[:max_candidates] ].min
 
-    # Find nearest neighbors by content embedding using HNSW index
+    # Find nearest neighbors by content embedding using HNSW index.
+    # fresh_for ensures only records stamped for the workspace's current model
+    # are considered — stale records (wrong embedding space) are excluded.
+    content_col = SearchRecord.embedding_column_for(:content_embedding, entry.dimensions)
     scope
-      .where.not(content_embedding: nil)
-      .nearest_neighbors(:content_embedding, query_embedding, distance: "cosine")
+      .merge(SearchRecord.fresh_for(entry, kind: :content_embedding))
+      .nearest_neighbors(content_col, query_embedding, distance: "cosine")
       .limit(candidate_limit)
       .to_a
   end
 
-  def compute_scores(candidates, query_embedding, opts)
-    title_weight = opts[:title_weight]
+  def compute_scores(candidates, query_embedding, opts, entry:)
+    title_weight   = opts[:title_weight]
     content_weight = opts[:content_weight]
 
     candidates.map do |sr|
-      title_sim = cosine_similarity(sr.title_embedding, query_embedding) || 0.0
-      content_sim = cosine_similarity(sr.content_embedding, query_embedding) || 0.0
+      title_sim   = cosine_similarity(sr.embedding_vector(:title_embedding, entry.dimensions), query_embedding) || 0.0
+      content_sim = cosine_similarity(sr.embedding_vector(:content_embedding, entry.dimensions), query_embedding) || 0.0
 
       score = [ title_sim * title_weight, content_sim * content_weight ].max
 

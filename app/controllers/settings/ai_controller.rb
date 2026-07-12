@@ -6,6 +6,39 @@ class Settings::AiController < Settings::BaseController
     @configs = @org.ai_configurations.includes(:ai_adapter).order(:purpose).index_by(&:purpose)
     @managed_available = Ai::Platform.available?
     @using_managed = Ai::ProviderSetup.new(@org).using_managed?
+
+    current_entry = @org.embedding_model_entry
+    @embedding_total = SearchChunk.where(workspace: @org).count
+    @embedding_stale = SearchChunk.where(workspace: @org).stale_for(current_entry).count
+    @embedding_available = EmbeddingService.available_for?(@org, entry: current_entry)
+  end
+
+  def embeddings
+    key   = params[:embedding_model].to_s
+    entry = Ai::EmbeddingModels.find(key)
+
+    unless entry
+      return redirect_to settings_ai_path, error: t(".unknown_model")
+    end
+
+    unless @org.region_allows?(entry.provider)
+      return redirect_to settings_ai_path, error: t(".region_blocked")
+    end
+
+    unless EmbeddingService.available_for?(@org, entry: entry)
+      provider_name = helpers.human_enum(AiAdapter, :provider, entry.provider)
+      return redirect_to settings_ai_path, error: t(".provider_unavailable", provider: provider_name)
+    end
+
+    already_selected = @org.embedding_model == entry.key ||
+                       (@org.embedding_model.nil? && entry.default?)
+    if already_selected
+      return redirect_to settings_ai_path, notice: t(".already_selected")
+    end
+
+    @org.update!(embedding_model: entry.key)
+    Search::WorkspaceReembedJob.perform_later(@org)
+    redirect_to settings_ai_path, success: t(".model_changed")
   end
 
   # Flip the workspace between Campbooks-managed AI and bring-your-own keys.

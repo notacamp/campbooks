@@ -68,17 +68,19 @@ module Ai
 
       # text-embedding-3-small rejects inputs over 8191 tokens with a 400. A token
       # is always at least one character, so capping each input at this many chars
-      # guarantees we stay under the token limit no matter how the text tokenizes
-      # — a hard safety net beneath the chunker (chunks are meant to be ~2000
-      # tokens, so this only ever trims a mis-sized chunk, never a healthy one).
+      # guarantees we stay under the token limit no matter how the text tokenizes.
+      # EmbeddingService caps per-model first (entry.max_input_chars); this constant
+      # is a second safety net in case the adapter is called directly.
       EMBED_MAX_INPUT_CHARS = 8000
 
-      def embed(text, model: "text-embedding-3-small")
+      def embed(text, model:, dimensions: nil)
         input = Array(text).map { |t| t.to_s[0, EMBED_MAX_INPUT_CHARS] }
-        embeddings_url = "https://api.openai.com/v1/embeddings"
 
-        response = connection.post(embeddings_url) do |req|
-          req.body = { model: model, input: input }.to_json
+        body = { model: model, input: input }
+        body[:dimensions] = dimensions if dimensions
+
+        response = connection.post(embeddings_endpoint) do |req|
+          req.body = body.to_json
         end
 
         data = JSON.parse(response.body)
@@ -94,6 +96,19 @@ module Ai
 
       def default_headers
         super.merge("Authorization" => "Bearer #{@api_key}")
+      end
+
+      # Derive the embeddings endpoint from the chat endpoint. Custom deployments
+      # (e.g. Azure OpenAI, DeepSeek) that provide a /chat/completions URL also
+      # expose /embeddings at the same base; we swap the suffix. For the standard
+      # OpenAI endpoint or any URL that doesn't end in /chat/completions we keep
+      # the known hardcoded path.
+      def embeddings_endpoint
+        if @endpoint_url.to_s.end_with?("/chat/completions")
+          @endpoint_url.sub(%r{/chat/completions\z}, "/embeddings")
+        else
+          "https://api.openai.com/v1/embeddings"
+        end
       end
 
       def extract_text(body)

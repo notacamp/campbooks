@@ -55,7 +55,7 @@ module Ai
       # Whether the given model exposes native extended thinking / reasoning.
       def supports_thinking?(_model) = false
 
-      def embed(text, model: "text-embedding-3-small")
+      def embed(text, model:, dimensions: nil)
         raise NotImplementedError
       end
 

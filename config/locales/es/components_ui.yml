@@ -16,7 +16,7 @@ es:
         title: La búsqueda necesita un proveedor de embeddings
       inline:
         documents: La IA para documentos necesita un proveedor con visión.
-        embeddings: La búsqueda necesita un proveedor OpenAI o Gemini.
+        embeddings: "La búsqueda necesita un proveedor de embeddings — elige uno en Ajustes → IA."
         text: Scout necesita un proveedor de IA.
       text:
         body: Scout, las respuestas inteligentes y la clasificación de la bandeja

@@ -19,7 +19,9 @@ module Ai
     # The capabilities a feature can require. Each AI surface maps to exactly one:
     #   • :text       — chat/triage/replies/reminders (self-hosted-only legacy Anthropic fallback)
     #   • :documents  — PDF/image vision analysis (no fallback; DB config required)
-    #   • :embeddings — semantic search & tag classification (OpenAI/Gemini only)
+    #   • :embeddings — semantic search & tag classification; provider follows the
+    #                   workspace's embedding model selection (Settings → AI).
+    #                   Mistral gives EU-residency workspaces a compliant option.
     CAPABILITIES = %i[text documents embeddings].freeze
 
     # Convenience: "will <capability> actually work for this workspace right now?"
@@ -155,21 +157,21 @@ module Ai
                 .includes(:ai_adapter).any? { |c| c.ai_adapter.usable? }
     end
 
-    # Embeddings (semantic search + tag classification) only run on OpenAI/Gemini.
-    # EmbeddingService resolves a workspace adapter first; its env-key fallback is
-    # self-hosted only (the operator's own key), so on the cloud "available" means a
-    # configured OpenAI/Gemini adapter exists (managed workspaces have one) — never
-    # a silent platform key. Mirrors EmbeddingService#env_fallback_adapter.
+    # Embeddings are available when EmbeddingService can resolve a usable adapter
+    # for the workspace's current embedding model entry (respects region policy,
+    # provider-specific adapter, and self-hosted env-key fallback). Delegates
+    # entirely to EmbeddingService so the two stay in sync.
     def embeddings_available?
-      @workspace.ai_adapters.enabled.where(provider: ::EmbeddingService::EMBEDDING_PROVIDERS).exists? ||
-        (Rails.application.config.self_hosted && (ENV["OPENAI_API_KEY"].present? || ENV["GEMINI_API_KEY"].present?))
+      EmbeddingService.available_for?(@workspace)
     end
 
-    # Strict embeddings check (a workspace adapter, or the operator's own env key
-    # on a self-hosted box) — excludes the shared hosted-platform env keys.
+    # Strict counterpart of #embeddings_available? used to gate AUTOMATIC
+    # background embedding (auto-classify, re-embed sweeper). Delegates to
+    # EmbeddingService.available_for? — which already fails closed on the cloud
+    # (no silent platform-key embedding before the workspace opts in) — so the
+    # two are equivalent in their gating semantics.
     def embeddings_configured?
-      @workspace.ai_adapters.enabled.where(provider: ::EmbeddingService::EMBEDDING_PROVIDERS).exists? ||
-        (Rails.application.config.self_hosted && (ENV["OPENAI_API_KEY"].present? || ENV["GEMINI_API_KEY"].present?))
+      EmbeddingService.available_for?(@workspace)
     end
 
     # Current provider for each role, for prefilling the setup forms (nil if the

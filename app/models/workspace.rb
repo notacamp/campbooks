@@ -43,6 +43,9 @@ class Workspace < ApplicationRecord
   validates :name, presence: true
   validates :slug, presence: true, uniqueness: true
   validates :plan, presence: true, inclusion: { in: ->(_) { Entitlements::Catalog.plan_names } }
+  validates :embedding_model,
+            inclusion: { in: ->(_) { Ai::EmbeddingModels.keys } },
+            allow_nil: true
   validate :inbox_filter_strategy_valid
   validate :entitlement_overrides_valid
 
@@ -58,6 +61,12 @@ class Workspace < ApplicationRecord
 
   def setting(key, default = nil)
     settings&.fetch(key.to_s, default)
+  end
+
+  # Resolved embedding model entry for this workspace. Falls back to the DEFAULT
+  # entry when no per-workspace model is configured (nil embedding_model).
+  def embedding_model_entry
+    Ai::EmbeddingModels.resolve(embedding_model)
   end
 
   # Data-residency policy: may this workspace use an AI provider in the given

@@ -149,6 +149,27 @@ en:
         switched_to_byo: Switched to your own keys. Add a provider below to enable
           AI.
         switched_to_managed: Now using Campbooks AI.
+      embeddings:
+        already_selected: That embedding model is already selected.
+        change_confirm: Switch embedding model? All indexed content will be re-embedded
+          via this provider's API (uses API credits). Semantic search will be partially
+          incomplete until re-indexing finishes.
+        configure_provider_hint: Set up %{provider} under AI Providers above to use
+          this model.
+        default_model: Default
+        embeddings_desc: Choose the embedding model used for semantic search and tag
+          suggestions. Switching re-indexes all content in the background.
+        embeddings_heading: Embedding Model
+        model_changed: Embedding model updated. Re-indexing is running in the background
+          — semantic search may be temporarily incomplete until it finishes.
+        provider_unavailable: "%{provider} isn't configured — set it up under AI Providers
+          first."
+        region_blocked: That provider isn't allowed under your data residency policy.
+        region_blocked_hint: Not available under EU data residency.
+        reindex_progress: Re-indexing in progress — %{done} of %{total} chunks done.
+          Semantic search is temporarily incomplete.
+        save_embedding_model: Save Embedding Model
+        unknown_model: Unknown embedding model.
     api_clients:
       scope_families:
         calendar: Calendar

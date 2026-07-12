@@ -10,11 +10,11 @@ pt:
         residency_desc: Restrinja a região onde os seus dados podem ser processados
           pelos fornecedores de IA.
         residency_eu_hint: Só podem ser usados fornecedores de IA da região da UE.
-          A IA de texto permanece na UE (Mistral). Como ainda não há um fornecedor
-          da UE para IA de documentos ou pesquisa semântica, essas funcionalidades
-          ficam em pausa enquanto isto estiver ativo.
+          A IA de texto e a pesquisa semântica permanecem na UE (o Mistral suporta
+          ambas). A IA de documentos fica em pausa por ainda não haver um fornecedor
+          de visão da UE.
         residency_eu_label: Exigir residência de dados na UE
         residency_heading: Residência de dados
         residency_paused_note: A residência de dados na UE está ativa. A IA de documentos
-          e a pesquisa semântica estão em pausa por ainda não terem um fornecedor
-          da UE; a IA de texto continua num fornecedor da UE.
+          está em pausa (sem fornecedor de visão da UE ainda); a IA de texto e a
+          pesquisa semântica continuam em fornecedores da UE.

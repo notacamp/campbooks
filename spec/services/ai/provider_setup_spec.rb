@@ -205,5 +205,52 @@ RSpec.describe Ai::ProviderSetup do
         end
       end
     end
+
+    # --- Managed-Mistral opt-in: workspace embedding_model controls which provider
+    #     is tried, so having a managed Mistral adapter does NOT auto-configure
+    #     embeddings when the workspace is on the default (OpenAI) entry. ---
+
+    describe "managed-Mistral opt-in semantics" do
+      before do
+        @ws.ai_adapters.create!(
+          name: "Campbooks AI — Mistral", provider: "mistral",
+          managed: true, enabled: true
+        )
+      end
+
+      it "is NOT configured when embedding_model is nil (default=OpenAI) even with a managed Mistral adapter" do
+        # No OpenAI adapter, no OpenAI env key → EmbeddingService cannot resolve an
+        # OpenAI adapter for the default entry → embeddings are not configured.
+        with_env("OPENAI_API_KEY" => nil) do
+          expect(@setup.embeddings_configured?).to be_falsey
+          expect(@setup.embeddings_available?).to be_falsey
+        end
+      end
+
+      it "IS configured when embedding_model is 'mistral/mistral-embed' and MISTRAL_API_KEY is present" do
+        @ws.update!(embedding_model: "mistral/mistral-embed")
+        with_env("MISTRAL_API_KEY" => "mk-test") do
+          expect(@setup.embeddings_configured?).to be_truthy
+          expect(@setup.embeddings_available?).to be_truthy
+        end
+      end
+    end
+
+    # --- EU-residency workspace: OpenAI is blocked by region policy; Mistral is EU. ---
+
+    describe "EU-residency workspace" do
+      before { @ws.update!(required_data_region: "EU") }
+
+      it "is NOT configured for the default entry (OpenAI is a US provider)" do
+        @ws.ai_adapters.create!(name: "OpenAI", provider: "openai", api_key: "byo", enabled: true)
+        expect(@setup.embeddings_configured?).to be_falsey
+      end
+
+      it "IS configured when embedding_model is 'mistral/mistral-embed' and a usable Mistral adapter exists" do
+        @ws.update!(embedding_model: "mistral/mistral-embed")
+        @ws.ai_adapters.create!(name: "Mistral", provider: "mistral", api_key: "mk-byo", enabled: true)
+        expect(@setup.embeddings_configured?).to be_truthy
+      end
+    end
   end
 end

@@ -152,6 +152,31 @@ es:
         switched_to_byo: Has cambiado a tus propias claves. Añade un proveedor abajo
           para activar la IA.
         switched_to_managed: Ahora usando Campbooks AI.
+      embeddings:
+        already_selected: Ese modelo de embeddings ya está seleccionado.
+        change_confirm: "¿Cambiar el modelo de embeddings? Todo el contenido indexado
+          se volverá a indexar a través de la API de este proveedor (consume créditos de
+          API). La búsqueda semántica estará parcialmente incompleta hasta que finalice
+          la reindexación."
+        configure_provider_hint: Añade un proveedor %{provider} arriba para usar este
+          modelo.
+        default_model: Predeterminado
+        embeddings_desc: Elige el modelo de embeddings usado para la búsqueda semántica
+          y las sugerencias de etiquetas. El cambio reindexa todo el contenido en segundo
+          plano.
+        embeddings_heading: Modelo de embeddings
+        model_changed: Modelo de embeddings actualizado. La reindexación se está
+          ejecutando en segundo plano — la búsqueda semántica puede estar temporalmente
+          incompleta hasta que finalice.
+        provider_unavailable: "%{provider} no está configurado — añade primero un proveedor
+          %{provider} arriba."
+        region_blocked: Ese proveedor no está permitido según tu política de residencia
+          de datos.
+        region_blocked_hint: No disponible con residencia de datos en la UE.
+        reindex_progress: Reindexación en curso — %{done} de %{total} fragmentos completados.
+          La búsqueda semántica está temporalmente incompleta.
+        save_embedding_model: Guardar modelo de embeddings
+        unknown_model: Modelo de embeddings desconocido.
     api_clients:
       scope_families:
         calendar: Calendario
