@@ -203,6 +203,94 @@ RSpec.describe "Files search filters", type: :request do
     end
   end
 
+  # ── sort and field-filter (f[key][op]) tests ─────────────────────────────
+
+  # Create an expense_invoice DocumentType with the canonical schema so
+  # sync_document_type_id can link documents to it and the field predicates
+  # resolve against a real schema.
+  let!(:expense_invoice_type) do
+    create(:document_type, workspace: workspace,
+           name: "expense_invoice",
+           extraction_schema: DocumentTypes::BuiltinSchemas.for("expense_invoice"))
+  end
+
+  describe "GET /files with sort=amount_cents&dir=desc and single type selected" do
+    it "orders by amount_cents descending (expensive first)" do
+      cheap     = titled("CHEAP-DOC",     amount_cents: 1_000)   # €10
+      expensive = titled("EXPENSIVE-DOC", amount_cents: 100_000)  # €1000
+
+      get files_path(type: [ expense_invoice_type.id.to_s ], sort: "amount_cents", dir: "desc")
+
+      expect(response).to have_http_status(:ok)
+      expensive_pos = response.body.index("EXPENSIVE-DOC")
+      cheap_pos     = response.body.index("CHEAP-DOC")
+      expect(expensive_pos).to be < cheap_pos
+    end
+
+    it "orders by amount_cents ascending when dir=asc" do
+      cheap     = titled("CHEAP-DOC",     amount_cents: 1_000)
+      expensive = titled("EXPENSIVE-DOC", amount_cents: 100_000)
+
+      get files_path(type: [ expense_invoice_type.id.to_s ], sort: "amount_cents", dir: "asc")
+
+      expect(response).to have_http_status(:ok)
+      cheap_pos     = response.body.index("CHEAP-DOC")
+      expensive_pos = response.body.index("EXPENSIVE-DOC")
+      expect(cheap_pos).to be < expensive_pos
+    end
+  end
+
+  describe "GET /files with sort param and no type selected" do
+    it "ignores the sort param and renders normally (no error)" do
+      titled("SOME-DOC")
+      get files_path(sort: "amount_cents", dir: "desc")
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("SOME-DOC")
+    end
+  end
+
+  describe "GET /files with f[amount_cents][min] and single type" do
+    it "narrows results by the extracted field minimum" do
+      cheap     = titled("CHEAP-DOC",     amount_cents: 500)     # €5
+      expensive = titled("EXPENSIVE-DOC", amount_cents: 50_000)  # €500
+
+      get files_path(
+        type: [ expense_invoice_type.id.to_s ],
+        f: { amount_cents: { min: "100" } }   # ≥ €100 (euros, converted to cents internally)
+      )
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("EXPENSIVE-DOC")
+      expect(response.body).not_to include("CHEAP-DOC")
+    end
+  end
+
+  describe "GET /files with f[] and two types selected" do
+    it "ignores f filter when two types are selected" do
+      other_type = create(:document_type, workspace: workspace, name: "other_type", category: "other")
+      cheap      = titled("CHEAP-DOC", amount_cents: 500)
+
+      get files_path(
+        type: [ expense_invoice_type.id.to_s, other_type.id.to_s ],
+        f: { amount_cents: { min: "100" } }
+      )
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("CHEAP-DOC")
+    end
+  end
+
+  describe "GET /files with sort param in free-text mode" do
+    it "sort param is ignored for free-text queries (ranked results, no error)" do
+      titled("SEARCHABLE-DOC", vendor_name: "VendorXYZ999")
+
+      get files_path(q: "VendorXYZ999", sort: "amount_cents", dir: "desc")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("SEARCHABLE-DOC")
+    end
+  end
+
   # ── files_results turbo frame present ─────────────────────────────────────
 
   describe "GET /files" do

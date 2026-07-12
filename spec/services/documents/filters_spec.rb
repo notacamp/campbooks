@@ -551,4 +551,256 @@ RSpec.describe Documents::Filters do
       expect(range.end).to   be >= Time.zone.parse("2026-01-31 23:59:59")
     end
   end
+
+  # ── f[] field-filter dimension ────────────────────────────────────────────
+
+  # Helper: create an expense_invoice DocumentType with the canonical schema
+  # so that field-filter predicates resolve properly.
+  def expense_invoice_type
+    @expense_invoice_type ||= create(
+      :document_type, workspace: workspace, name: "expense_invoice",
+      extraction_schema: DocumentTypes::BuiltinSchemas.for("expense_invoice")
+    )
+  end
+
+  # Build a document typed to the single-schema type (so sync_document_type_id
+  # links it via document_type_id) with arbitrary metadata.
+  # Eagerly touches expense_invoice_type so the FK is set before save.
+  def typed_doc(**attrs)
+    expense_invoice_type  # ensure the DocumentType exists for sync_document_type_id
+    doc = workspace.documents.new(
+      document_type: "expense_invoice", source: :manual_upload,
+      ai_status: :completed, review_status: :pending,
+      **attrs
+    )
+    doc.original_file.attach(io: StringIO.new("x"), filename: "doc.pdf", content_type: "application/pdf")
+    doc.save!
+    doc
+  end
+
+  def apply_with_type(params)
+    dt = expense_invoice_type
+    f  = described_class.from_params(params.merge(type: [ dt.id.to_s ]))
+    f.apply(workspace.documents.accessible_to(user), workspace: workspace, user: user)
+  end
+
+  describe "f[] parsing" do
+    it "parses nested hash params into @field_filters" do
+      f = described_class.from_params(f: { "amount_cents" => { "min" => "1000" } })
+      expect(f.field_filters).to eq({ "amount_cents" => { "min" => "1000" } })
+    end
+
+    it "rejects blank scalar values" do
+      f = described_class.from_params(f: { "amount_cents" => { "min" => "", "max" => "500" } })
+      expect(f.field_filters).to eq({ "amount_cents" => { "max" => "500" } })
+    end
+
+    it "rejects :in ops with no non-blank elements" do
+      f = described_class.from_params(f: { "expense_category" => { "in" => [ "", "  " ] } })
+      expect(f.field_filters).to eq({})
+    end
+
+    it "keeps :in ops with at least one non-blank element" do
+      f = described_class.from_params(f: { "expense_category" => { "in" => [ "travel", "" ] } })
+      expect(f.field_filters).to eq({ "expense_category" => { "in" => [ "travel" ] } })
+    end
+
+    it "accepts ActionController::Parameters" do
+      params = ActionController::Parameters.new(
+        f: { "amount_cents" => { "min" => "500" } }
+      )
+      f = described_class.from_params(params)
+      expect(f.field_filters).to eq({ "amount_cents" => { "min" => "500" } })
+    end
+
+    it "returns an empty hash when f param is absent" do
+      expect(described_class.from_params({}).field_filters).to eq({})
+    end
+
+    it "returns an empty hash when f param is not a Hash" do
+      expect(described_class.from_params(f: "garbage").field_filters).to eq({})
+    end
+  end
+
+  describe "f[] single-type gating" do
+    it "applies field filters when exactly one type is selected (money values in euros)" do
+      cheap     = typed_doc(amount_cents: 500)    # €5
+      expensive = typed_doc(amount_cents: 50_000) # €500
+
+      # min is expressed in EUROS (mirrors amount_min); converted to cents internally.
+      ids = apply_with_type(f: { "amount_cents" => { "min" => "100" } }).pluck(:id)
+      expect(ids).to include(expensive.id)
+      expect(ids).not_to include(cheap.id)
+    end
+
+    it "accepts decimal euro values for money field filters" do
+      low  = typed_doc(amount_cents: 549)  # €5.49
+      high = typed_doc(amount_cents: 551)  # €5.51
+
+      ids = apply_with_type(f: { "amount_cents" => { "min" => "5.50" } }).pluck(:id)
+      expect(ids).to include(high.id)
+      expect(ids).not_to include(low.id)
+    end
+
+    it "ignores field filters when no type is selected" do
+      cheap     = typed_doc(amount_cents: 500)
+      expensive = typed_doc(amount_cents: 50_000)
+
+      f    = described_class.from_params(f: { "amount_cents" => { "min" => "10000" } })
+      ids  = f.apply(workspace.documents.accessible_to(user), workspace: workspace, user: user).pluck(:id)
+      expect(ids).to include(cheap.id, expensive.id)
+    end
+
+    it "ignores field filters when two types are selected" do
+      other_type = create(:document_type, workspace: workspace, name: "other_type", category: "other")
+      dt         = expense_invoice_type
+      cheap      = typed_doc(amount_cents: 500)
+
+      f = described_class.from_params(
+        type: [ dt.id.to_s, other_type.id.to_s ],
+        f: { "amount_cents" => { "min" => "10000" } }
+      )
+      ids = f.apply(workspace.documents.accessible_to(user), workspace: workspace, user: user).pluck(:id)
+      expect(ids).to include(cheap.id)
+    end
+
+    it "ignores unknown field keys silently" do
+      cheap = typed_doc(amount_cents: 500)
+
+      # "nonexistent_field" is not in the expense_invoice schema — it should be a no-op.
+      ids = apply_with_type(f: { "nonexistent_field" => { "min" => "10000" } }).pluck(:id)
+      expect(ids).to include(cheap.id)
+    end
+  end
+
+  describe "f[] op coverage against real documents" do
+    it "money :min narrows correctly (value in euros)" do
+      cheap     = typed_doc(amount_cents: 500)    # €5
+      expensive = typed_doc(amount_cents: 50_000) # €500
+
+      # Filter min=€50: cheap (€5) is below, expensive (€500) is above
+      ids = apply_with_type(f: { "amount_cents" => { "min" => "50" } }).pluck(:id)
+      expect(ids).to include(expensive.id)
+      expect(ids).not_to include(cheap.id)
+    end
+
+    it "money :max narrows correctly (value in euros)" do
+      cheap     = typed_doc(amount_cents: 500)    # €5
+      expensive = typed_doc(amount_cents: 50_000) # €500
+
+      # Filter max=€50: cheap (€5) qualifies, expensive (€500) does not
+      ids = apply_with_type(f: { "amount_cents" => { "max" => "50" } }).pluck(:id)
+      expect(ids).to include(cheap.id)
+      expect(ids).not_to include(expensive.id)
+    end
+
+    it "date :from (inclusive) narrows correctly" do
+      before_d = typed_doc(document_date: Date.new(2026, 5, 31))
+      inside   = typed_doc(document_date: Date.new(2026, 6, 1))
+
+      ids = apply_with_type(f: { "document_date" => { "from" => "2026-06-01" } }).pluck(:id)
+      expect(ids).to include(inside.id)
+      expect(ids).not_to include(before_d.id)
+    end
+
+    it "date :to (inclusive) narrows correctly" do
+      inside  = typed_doc(document_date: Date.new(2026, 6, 30))
+      after_d = typed_doc(document_date: Date.new(2026, 7, 1))
+
+      ids = apply_with_type(f: { "document_date" => { "to" => "2026-06-30" } }).pluck(:id)
+      expect(ids).to include(inside.id)
+      expect(ids).not_to include(after_d.id)
+    end
+
+    it "string :contains with LIKE-special chars is escaped properly" do
+      # Percent sign in the value must not be interpreted as a LIKE wildcard.
+      match   = typed_doc(vendor_name: "50% off corp")
+      no_match = typed_doc(vendor_name: "other corp")
+
+      ids = apply_with_type(f: { "vendor_name" => { "contains" => "50%" } }).pluck(:id)
+      expect(ids).to include(match.id)
+      expect(ids).not_to include(no_match.id)
+    end
+
+    it "string :contains with underscore is escaped properly" do
+      match    = typed_doc(vendor_name: "a_b corp")
+      no_match = typed_doc(vendor_name: "acb corp")
+
+      ids = apply_with_type(f: { "vendor_name" => { "contains" => "a_b" } }).pluck(:id)
+      expect(ids).to include(match.id)
+      expect(ids).not_to include(no_match.id)
+    end
+
+    it "enum :in narrows by matching values" do
+      travel = typed_doc(expense_category: "travel")
+      meals  = typed_doc(expense_category: "meals")
+      other  = typed_doc(expense_category: "office_supplies")
+
+      ids = apply_with_type(f: { "expense_category" => { "in" => [ "travel", "meals" ] } }).pluck(:id)
+      expect(ids).to include(travel.id, meals.id)
+      expect(ids).not_to include(other.id)
+    end
+
+    it "boolean :eq filters correctly" do
+      with_vat    = typed_doc(company_vat_present: true)
+      without_vat = typed_doc(company_vat_present: false)
+
+      ids = apply_with_type(f: { "company_vat_present" => { "eq" => "true" } }).pluck(:id)
+      expect(ids).to include(with_vat.id)
+      expect(ids).not_to include(without_vat.id)
+    end
+  end
+
+  describe "f[] active_count, any?, to_h, and to_persistable_h" do
+    it "active_count counts each (key, op) pair" do
+      f = described_class.from_params(
+        f: { "amount_cents" => { "min" => "100", "max" => "500" },
+             "vendor_name"  => { "contains" => "EDP" } }
+      )
+      # 2 ops on amount_cents + 1 on vendor_name = 3
+      expect(f.field_filters.sum { |_, ops| ops.size }).to eq(3)
+    end
+
+    it "is included in active_count total" do
+      f = described_class.from_params(
+        review_status: "approved",
+        f: { "amount_cents" => { "min" => "100" } }
+      )
+      # review_status=1, field filter min=1 → total 2
+      expect(f.active_count).to eq(2)
+    end
+
+    it "any? is true when field filters are the only active dimension" do
+      f = described_class.from_params(f: { "amount_cents" => { "min" => "100" } })
+      expect(f.any?).to be(true)
+    end
+
+    it "to_h includes :f when field filters are present" do
+      f = described_class.from_params(f: { "amount_cents" => { "min" => "100" } })
+      expect(f.to_h).to include(f: { "amount_cents" => { "min" => "100" } })
+    end
+
+    it "to_h omits :f when field filters are empty" do
+      expect(described_class.from_params({}).to_h).not_to have_key(:f)
+    end
+
+    it "to_persistable_h includes :f (through to_h)" do
+      f = described_class.from_params(f: { "amount_cents" => { "min" => "100" } })
+      h = f.to_persistable_h(workspace: workspace, user: user)
+      expect(h).to include(f: { "amount_cents" => { "min" => "100" } })
+    end
+
+    it "round-trips through from_params(to_h)" do
+      original = described_class.from_params(
+        f: { "amount_cents" => { "min" => "100" }, "expense_category" => { "in" => [ "travel" ] } }
+      )
+      rebuilt = described_class.from_params(original.to_h)
+      expect(rebuilt.field_filters).to eq(original.field_filters)
+    end
+
+    it "document_specific? is true when field filters are present" do
+      f = described_class.from_params(f: { "amount_cents" => { "min" => "100" } })
+      expect(f.document_specific?).to be(true)
+    end
+  end
 end
