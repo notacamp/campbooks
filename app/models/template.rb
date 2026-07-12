@@ -25,7 +25,10 @@ class Template < ApplicationRecord
         dt.category = attrs["category"]
         dt.color = attrs["color"]
         dt.prompt = attrs["prompt"]
-        dt.extraction_schema = attrs["extraction_schema"]
+        # Built-in types always get the canonical enriched schema — stored template
+        # data may predate the schema-driven field format (label_key/position/typing).
+        dt.extraction_schema =
+          DocumentTypes::BuiltinSchemas.for(attrs["name"]) || attrs["extraction_schema"]
       end
     end
   end

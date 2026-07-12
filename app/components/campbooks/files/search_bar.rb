@@ -173,7 +173,7 @@ module Campbooks
               { value: "sent",   label: t(".suggest.values.sent") }
             ] },
           { token: "expense:",  type: "enum",  description: t(".suggest.expense"),
-            values: Document.expense_categories.keys.map { |k|
+            values: Document::EXPENSE_CATEGORIES.map { |k|
               { value: k, label: helpers.human_enum(Document, :expense_category, k) }
             } },
           { token: "in:",       type: "enum",  description: t(".suggest.in"),

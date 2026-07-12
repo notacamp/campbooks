@@ -72,19 +72,23 @@ module Documents
         # If the kept document doesn't have the legacy email_message_id but the duplicate does,
         # adopt it from the duplicate if more complete
         if !@dry_run
-          # Adopt AI-extracted data from the duplicate if the kept one has less
+          # Adopt AI-extracted data from the duplicate if the kept one has less.
+          # Policy: dup's AI-extracted values win; keep's values are the fallback
+          # for each specific field when dup's is blank.
           if keep.ai_extraction_data.blank? && dup.ai_extraction_data.present?
+            merged_metadata = (dup.metadata || {}).merge(
+              "vendor_name"    => (dup.vendor_name.presence    || keep.vendor_name),
+              "client_name"    => (dup.client_name.presence    || keep.client_name),
+              "invoice_number" => (dup.invoice_number.presence || keep.invoice_number),
+              "receipt_number" => (dup.receipt_number.presence || keep.receipt_number),
+              "document_date"  => ((dup.metadata || {})["document_date"]  || (keep.metadata || {})["document_date"]),
+              "amount_cents"   => (dup.amount_cents   || keep.amount_cents),
+              "bank_name"      => (dup.bank_name.presence || keep.bank_name)
+            ).compact
             keep.update_columns(
               ai_extraction_data: dup.ai_extraction_data,
               ai_confidence_score: dup.ai_confidence_score,
-              metadata: dup.metadata,
-              vendor_name: dup.vendor_name.presence || keep.vendor_name,
-              client_name: dup.client_name.presence || keep.client_name,
-              invoice_number: dup.invoice_number.presence || keep.invoice_number,
-              receipt_number: dup.receipt_number.presence || keep.receipt_number,
-              document_date: dup.document_date || keep.document_date,
-              amount_cents: dup.amount_cents || keep.amount_cents,
-              bank_name: dup.bank_name.presence || keep.bank_name
+              metadata: merged_metadata
             )
           end
 

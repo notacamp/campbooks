@@ -104,9 +104,33 @@ class DocumentsController < ApplicationController
 
   def update
     was_review = @document.review_pending?
-    reclassified = reclassifying?(document_params)
+    safe_params   = document_params
+    reclassified  = reclassifying?(safe_params)
 
-    if @document.update(document_params)
+    # Separate the metadata sub-hash so we can MERGE it rather than replace:
+    # if we let metadata= run inside assign_attributes after the accessor writers
+    # (vendor_name=, amount_cents=, …), it would wipe out everything they just
+    # wrote into metadata — including unsubmitted keys such as metadata["title"]
+    # set by the inline rename action.
+    incoming_meta = safe_params.delete(:metadata)&.to_h || {}
+    @document.assign_attributes(safe_params)
+
+    # Merge incoming metadata keys (e.g. from custom-schema fields submitted as
+    # document[metadata][key]) with per-key schema coercion; blank value → remove key.
+    schema       = DocumentTypes::Schema.for(@document.classification)
+    current_meta = (@document.metadata || {}).dup
+    incoming_meta.each do |k, v|
+      field   = schema.field(k)
+      coerced = field ? field.coerce(v) : v.presence
+      if coerced.nil?
+        current_meta.delete(k.to_s)
+      else
+        current_meta[k.to_s] = coerced
+      end
+    end
+    @document.metadata = current_meta
+
+    if @document.save
       @document.generate_canonical_filename!
       if was_review && reclassified
         # Re-filing a document under review is itself the sign-off — approve it in
@@ -260,19 +284,23 @@ class DocumentsController < ApplicationController
         keep.document_email_messages.find_or_create_by!(email_message_id: dem.email_message_id)
       end
 
-      # Adopt data from merged doc if keep doc has less
+      # Adopt data from merged doc if keep doc has less.
+      # Policy: dup's AI-extracted values win (dup has the AI data); keep's values
+      # are the fallback for each specific field when dup's is blank.
       if keep.ai_extraction_data.blank? && dup.ai_extraction_data.present?
+        merged_metadata = (dup.metadata || {}).merge(
+          "vendor_name"    => (dup.vendor_name.presence    || keep.vendor_name),
+          "client_name"    => (dup.client_name.presence    || keep.client_name),
+          "invoice_number" => (dup.invoice_number.presence || keep.invoice_number),
+          "receipt_number" => (dup.receipt_number.presence || keep.receipt_number),
+          "document_date"  => ((dup.metadata || {})["document_date"]  || (keep.metadata || {})["document_date"]),
+          "amount_cents"   => (dup.amount_cents   || keep.amount_cents),
+          "bank_name"      => (dup.bank_name.presence || keep.bank_name)
+        ).compact
         keep.update_columns(
           ai_extraction_data: dup.ai_extraction_data,
           ai_confidence_score: dup.ai_confidence_score,
-          metadata: dup.metadata,
-          vendor_name: dup.vendor_name.presence || keep.vendor_name,
-          client_name: dup.client_name.presence || keep.client_name,
-          invoice_number: dup.invoice_number.presence || keep.invoice_number,
-          receipt_number: dup.receipt_number.presence || keep.receipt_number,
-          document_date: dup.document_date || keep.document_date,
-          amount_cents: dup.amount_cents || keep.amount_cents,
-          bank_name: dup.bank_name.presence || keep.bank_name
+          metadata: merged_metadata
         )
       end
 

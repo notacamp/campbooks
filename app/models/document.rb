@@ -2,6 +2,17 @@ class Document < ApplicationRecord
   include Pipelineable
   include Searchable
   include FolderAccessible
+  include Documents::ExtractedFields
+
+  # Canonical extracted-field enum values. Order is the legacy integer mapping
+  # (travel=0 … other=9) used by the expense_category writer for backwards
+  # compatibility with callers that still pass integers.
+  EXPENSE_CATEGORIES = %w[
+    travel meals office_supplies utilities rent software
+    professional_services equipment marketing other
+  ].freeze
+
+  PAYMENT_METHODS = %w[cash card transfer mbway multibanco check other].freeze
 
   belongs_to :workspace
 
@@ -96,27 +107,6 @@ class Document < ApplicationRecord
     failed: 2
   }, prefix: :drive
 
-  # Expense sub-category for expense_invoice docs (nullable — not every expense is
-  # categorised). Prefixed because `other` would otherwise clash with the
-  # document_type `other?` predicate.
-  enum :expense_category, {
-    travel: 0,
-    meals: 1,
-    office_supplies: 2,
-    utilities: 3,
-    rent: 4,
-    software: 5,
-    professional_services: 6,
-    equipment: 7,
-    marketing: 8,
-    other: 9
-  }, prefix: :expense
-
-  monetize :amount_cents, with_currency: :eur, allow_nil: true
-  monetize :tax_amount_cents, with_currency: :eur, allow_nil: true
-  monetize :opening_balance_cents, with_currency: :eur, allow_nil: true
-  monetize :closing_balance_cents, with_currency: :eur, allow_nil: true
-
   validates :document_type, presence: true
   validates :ai_status, presence: true
   validates :review_status, presence: true
@@ -129,7 +119,13 @@ class Document < ApplicationRecord
   scope :for_month, ->(year, month) {
     start_date = Date.new(year, month, 1)
     end_date = start_date.end_of_month
-    where(document_date: start_date..end_date)
+    where(
+      "(CASE WHEN documents.metadata->>'document_date' ~ '^\\d{4}-\\d{2}-\\d{2}' " \
+      "THEN documents.metadata->>'document_date' END) >= ? AND " \
+      "(CASE WHEN documents.metadata->>'document_date' ~ '^\\d{4}-\\d{2}-\\d{2}' " \
+      "THEN documents.metadata->>'document_date' END) <= ?",
+      start_date.iso8601, end_date.iso8601
+    )
   }
 
   scope :by_type, ->(type_id) { where(document_type_id: type_id) if type_id.present? }
@@ -194,10 +190,35 @@ class Document < ApplicationRecord
     where(source: vals) if vals.any?
   }
   scope :starred_only, ->(flag) { where(starred: true) if flag }
-  scope :document_date_from, ->(d) { where("documents.document_date >= ?", d) if d.present? }
-  scope :document_date_to,   ->(d) { where("documents.document_date <= ?", d) if d.present? }
-  scope :amount_at_least, ->(cents) { where("documents.amount_cents >= ?", cents) if cents.present? }
-  scope :amount_at_most,  ->(cents) { where("documents.amount_cents <= ?", cents) if cents.present? }
+  scope :document_date_from, ->(d) {
+    where(
+      "(CASE WHEN documents.metadata->>'document_date' ~ '^\\d{4}-\\d{2}-\\d{2}' " \
+      "THEN documents.metadata->>'document_date' END) >= ?",
+      d.to_s
+    ) if d.present?
+  }
+  scope :document_date_to, ->(d) {
+    where(
+      "(CASE WHEN documents.metadata->>'document_date' ~ '^\\d{4}-\\d{2}-\\d{2}' " \
+      "THEN documents.metadata->>'document_date' END) <= ?",
+      d.to_s
+    ) if d.present?
+  }
+  AMOUNT_CENTS_REGEX = '^-?\d{1,15}$'
+  scope :amount_at_least, ->(cents) {
+    where(
+      "(CASE WHEN documents.metadata->>'amount_cents' ~ ? " \
+      "THEN (documents.metadata->>'amount_cents')::bigint END) >= ?",
+      AMOUNT_CENTS_REGEX, cents
+    ) if cents.present?
+  }
+  scope :amount_at_most, ->(cents) {
+    where(
+      "(CASE WHEN documents.metadata->>'amount_cents' ~ ? " \
+      "THEN (documents.metadata->>'amount_cents')::bigint END) <= ?",
+      AMOUNT_CENTS_REGEX, cents
+    ) if cents.present?
+  }
 
   # OR across vendor_name / client_name / bank_name / sender_name for each term;
   # multiple terms are themselves OR'd together — composed via relation.or over a
@@ -208,8 +229,8 @@ class Document < ApplicationRecord
 
     terms.map { |term|
       where(
-        "documents.vendor_name ILIKE :t OR documents.client_name ILIKE :t OR " \
-        "documents.bank_name ILIKE :t OR documents.sender_name ILIKE :t",
+        "documents.metadata->>'vendor_name' ILIKE :t OR documents.metadata->>'client_name' ILIKE :t OR " \
+        "documents.metadata->>'bank_name' ILIKE :t OR documents.metadata->>'sender_name' ILIKE :t",
         t: "%#{sanitize_sql_like(term)}%"
       )
     }.reduce(:or)
@@ -221,15 +242,18 @@ class Document < ApplicationRecord
 
     terms.map { |term|
       where(
-        "documents.invoice_number ILIKE :t OR documents.receipt_number ILIKE :t",
+        "documents.metadata->>'invoice_number' ILIKE :t OR documents.metadata->>'receipt_number' ILIKE :t",
         t: "%#{sanitize_sql_like(term)}%"
       )
     }.reduce(:or)
   }
 
   scope :by_expense_category, ->(values) {
-    vals = Array(values).reject(&:blank?)
-    where(expense_category: vals) if vals.any?
+    input = Array(values).reject(&:blank?)
+    next unless input.any?
+
+    vals = input & Document::EXPENSE_CATEGORIES
+    vals.any? ? where("documents.metadata->>'expense_category' IN (?)", vals) : none
   }
 
   def generate_canonical_filename!
@@ -499,7 +523,7 @@ class Document < ApplicationRecord
 
   def searchable_fields_changed?
     saved_change_to_description? || saved_change_to_ai_extraction_data? ||
-      saved_change_to_vendor_name? || saved_change_to_client_name? ||
+      saved_change_to_extracted_field?("vendor_name") || saved_change_to_extracted_field?("client_name") ||
       saved_change_to_document_type? || saved_change_to_document_type_id? ||
       saved_change_to_review_status? || saved_change_to_ai_status? ||
       saved_change_to_ai_summary?
@@ -518,10 +542,14 @@ class Document < ApplicationRecord
     { "filename" => original_file&.filename.to_s, "document_type" => (classification&.name || document_type) }
   end
 
+  # Keep the classification FK in step with the legacy enum. Scoped to the document's
+  # own workspace (a global name lookup could link a document to another workspace's
+  # type — leaking its schema, prompt, and auto-star). Also fires on create when no
+  # explicit classification was given, so new documents always link when their
+  # workspace has a matching type (the enum default doesn't register as "changed").
   def sync_document_type_id
-    return unless document_type_changed?
-    dt = DocumentType.find_by(name: document_type)
-    self.document_type_id = dt&.id
+    return unless document_type_changed? || (new_record? && document_type_id.nil?)
+    self.document_type_id = workspace&.document_types&.find_by(name: document_type)&.id
   end
 
   # Auto-star a document when its classification opts into it (DocumentType#auto_star).

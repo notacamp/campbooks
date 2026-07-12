@@ -67,7 +67,7 @@ module Reminders
       return unless payment
 
       date = (Date.iso8601(payment["due_date"]) rescue nil)
-      document.update_column(:due_date, date) if date
+      document.update!(due_date: date) if date
     end
   end
 end

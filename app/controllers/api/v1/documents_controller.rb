@@ -55,7 +55,14 @@ module Api
       # Edit extracted fields. Does NOT change review state (use approve/reclassify
       # for that) — keeps the API explicit, unlike the web form's implicit approve.
       def update
-        @document.update!(document_params)
+        safe_params = document_params
+        # Merge the metadata payload instead of replacing it: metadata= assignment
+        # inside update! would wipe what the field accessor writers (vendor_name=, …)
+        # just wrote AND any unsubmitted keys such as metadata["title"].
+        incoming_meta = safe_params.delete(:metadata)&.to_h || {}
+        @document.assign_attributes(safe_params)
+        merge_metadata_payload(incoming_meta)
+        @document.save!
         @document.generate_canonical_filename!
         render_data(DocumentSerializer.new(@document.reload, detail: true).as_json)
       end
@@ -87,6 +94,25 @@ module Api
 
       def set_document
         @document = Current.workspace.documents.find(params[:id])
+      end
+
+      # Same merge semantics as the web DocumentsController#update: per-key schema
+      # coercion, blank values remove the key, unsubmitted keys survive.
+      def merge_metadata_payload(incoming_meta)
+        return if incoming_meta.blank?
+
+        schema       = DocumentTypes::Schema.for(@document.classification)
+        current_meta = (@document.metadata || {}).dup
+        incoming_meta.each do |k, v|
+          field   = schema.field(k)
+          coerced = field ? field.coerce(v) : v.presence
+          if coerced.nil?
+            current_meta.delete(k.to_s)
+          else
+            current_meta[k.to_s] = coerced
+          end
+        end
+        @document.metadata = current_meta
       end
 
       def document_params

@@ -125,19 +125,19 @@ module Documents
       return rel unless search_text.present?
 
       clauses = [
-        "documents.vendor_name ILIKE :q", "documents.client_name ILIKE :q",
+        "documents.metadata->>'vendor_name' ILIKE :q", "documents.metadata->>'client_name' ILIKE :q",
         "documents.description ILIKE :q", "documents.ai_summary ILIKE :q",
-        "documents.invoice_number ILIKE :q", "documents.receipt_number ILIKE :q",
-        "documents.canonical_filename ILIKE :q", "documents.metadata ->> 'title' ILIKE :q"
+        "documents.metadata->>'invoice_number' ILIKE :q", "documents.metadata->>'receipt_number' ILIKE :q",
+        "documents.canonical_filename ILIKE :q", "documents.metadata->>'title' ILIKE :q"
       ]
       binds = { q: "%#{sanitize_like(search_text)}%" }
 
       if parsed.counterparty.present?
-        clauses << "documents.vendor_name ILIKE :cp" << "documents.client_name ILIKE :cp"
+        clauses << "documents.metadata->>'vendor_name' ILIKE :cp" << "documents.metadata->>'client_name' ILIKE :cp"
         binds[:cp] = "%#{sanitize_like(parsed.counterparty)}%"
       end
       if parsed.number.present?
-        clauses << "documents.invoice_number ILIKE :num" << "documents.receipt_number ILIKE :num"
+        clauses << "documents.metadata->>'invoice_number' ILIKE :num" << "documents.metadata->>'receipt_number' ILIKE :num"
         binds[:num] = "%#{sanitize_like(parsed.number)}%"
       end
 

@@ -48,6 +48,158 @@ RSpec.describe Document, type: :model do
         expect(Document.for_month(2025, 1)).to include(jan_doc)
         expect(Document.for_month(2025, 1)).not_to include(feb_doc)
       end
+
+      it "includes documents on the first and last day of the month" do
+        first = create(:document, document_date: Date.new(2025, 3, 1))
+        last  = create(:document, document_date: Date.new(2025, 3, 31))
+        prev  = create(:document, document_date: Date.new(2025, 2, 28))
+        next_ = create(:document, document_date: Date.new(2025, 4, 1))
+
+        result = Document.for_month(2025, 3)
+        expect(result).to include(first, last)
+        expect(result).not_to include(prev, next_)
+      end
+
+      it "does not crash when a document has nil or blank document_date in metadata" do
+        nil_date = create(:document, document_date: nil)
+        expect { Document.for_month(2025, 1).to_a }.not_to raise_error
+        expect(Document.for_month(2025, 1)).not_to include(nil_date)
+      end
+    end
+
+    describe ".document_date_from" do
+      it "is inclusive on the boundary date" do
+        on_date    = create(:document, document_date: Date.new(2026, 6, 1))
+        before_it  = create(:document, document_date: Date.new(2026, 5, 31))
+
+        result = Document.document_date_from(Date.new(2026, 6, 1))
+        expect(result).to include(on_date)
+        expect(result).not_to include(before_it)
+      end
+
+      it "does not crash on a document with nil document_date" do
+        nil_date = create(:document, document_date: nil)
+        expect { Document.document_date_from(Date.new(2026, 1, 1)).to_a }.not_to raise_error
+        expect(Document.document_date_from(Date.new(2026, 1, 1))).not_to include(nil_date)
+      end
+    end
+
+    describe ".document_date_to" do
+      it "is inclusive on the boundary date" do
+        on_date   = create(:document, document_date: Date.new(2026, 12, 31))
+        after_it  = create(:document, document_date: Date.new(2027, 1, 1))
+
+        result = Document.document_date_to(Date.new(2026, 12, 31))
+        expect(result).to include(on_date)
+        expect(result).not_to include(after_it)
+      end
+    end
+
+    describe ".amount_at_least" do
+      it "returns only documents with amount >= threshold" do
+        cheap  = create(:document, amount_cents: 500)
+        pricey = create(:document, amount_cents: 20_000)
+
+        result = Document.amount_at_least(1_000)
+        expect(result).to include(pricey)
+        expect(result).not_to include(cheap)
+      end
+
+      it "does not crash on a document with nil amount_cents" do
+        nil_amount = create(:document, amount_cents: nil, tax_amount_cents: nil)
+        expect { Document.amount_at_least(100).to_a }.not_to raise_error
+        expect(Document.amount_at_least(100)).not_to include(nil_amount)
+      end
+
+      it "does not crash on a document with non-numeric amount_cents in metadata" do
+        bad = create(:document, amount_cents: nil, tax_amount_cents: nil)
+        bad.update_columns(metadata: (bad.metadata || {}).merge("amount_cents" => "not-a-number"))
+        expect { Document.amount_at_least(100).to_a }.not_to raise_error
+      end
+    end
+
+    describe ".amount_at_most" do
+      it "returns only documents with amount <= threshold" do
+        cheap  = create(:document, amount_cents: 500)
+        pricey = create(:document, amount_cents: 20_000)
+
+        result = Document.amount_at_most(1_000)
+        expect(result).to include(cheap)
+        expect(result).not_to include(pricey)
+      end
+    end
+
+    describe ".by_entity" do
+      it "matches vendor_name" do
+        doc   = create(:document, vendor_name: "Acme Corp")
+        other = create(:document, vendor_name: "Globex Inc")
+
+        expect(Document.by_entity([ "Acme" ])).to include(doc)
+        expect(Document.by_entity([ "Acme" ])).not_to include(other)
+      end
+
+      it "matches client_name" do
+        doc = create(:document, :revenue_invoice, client_name: "Beta Ltd")
+        expect(Document.by_entity([ "Beta" ])).to include(doc)
+      end
+
+      it "matches sender_name" do
+        doc = create(:document, sender_name: "SenderCo")
+        doc.update_columns(metadata: (doc.metadata || {}).merge("sender_name" => "SenderCo", "vendor_name" => nil))
+        expect(Document.by_entity([ "SenderCo" ])).to include(doc)
+      end
+
+      it "is case-insensitive (ILIKE)" do
+        doc = create(:document, vendor_name: "UPPER NAME")
+        expect(Document.by_entity([ "upper name" ])).to include(doc)
+      end
+
+      it "OR's multiple terms" do
+        doc_a = create(:document, vendor_name: "Alpha")
+        doc_b = create(:document, vendor_name: "Beta")
+        other = create(:document, vendor_name: "Gamma")
+
+        result = Document.by_entity(%w[Alpha Beta])
+        expect(result).to include(doc_a, doc_b)
+        expect(result).not_to include(other)
+      end
+
+      it "returns all when terms is empty" do
+        doc = create(:document)
+        expect(Document.by_entity([])).to include(doc)
+      end
+    end
+
+    describe ".by_reference" do
+      it "matches invoice_number" do
+        doc   = create(:document, invoice_number: "FT2024/001")
+        other = create(:document, invoice_number: "RC2024/002")
+
+        expect(Document.by_reference([ "FT2024" ])).to include(doc)
+        expect(Document.by_reference([ "FT2024" ])).not_to include(other)
+      end
+
+      it "matches receipt_number" do
+        doc = create(:document, :receipt, receipt_number: "RC2024/007")
+        expect(Document.by_reference([ "RC2024/007" ])).to include(doc)
+      end
+    end
+
+    describe ".by_expense_category" do
+      it "matches documents with the given expense_category in metadata" do
+        travel = create(:document, expense_category: "travel")
+        meals  = create(:document, expense_category: "meals")
+
+        expect(Document.by_expense_category([ "travel" ])).to include(travel)
+        expect(Document.by_expense_category([ "travel" ])).not_to include(meals)
+      end
+
+      it "filters out invalid categories (not in EXPENSE_CATEGORIES)" do
+        doc = create(:document, expense_category: "travel")
+        # 'nonsense' is not in EXPENSE_CATEGORIES — scope returns none
+        expect(Document.by_expense_category([ "nonsense" ])).to be_empty
+        expect(Document.by_expense_category([ "travel", "nonsense" ])).to include(doc)
+      end
     end
 
     describe ".needs_review" do
@@ -261,6 +413,40 @@ RSpec.describe Document, type: :model do
       dt = DocumentType.create!(workspace: workspace, name: "other", color: "#000", prompt: "test")
       doc = build(:document, :other, document_type_id: dt.id)
       expect(doc.reference_display).to be_nil
+    end
+  end
+
+  # ── Document#searchable_fields_changed? ─────────────────────────────────────
+
+  describe "#searchable_fields_changed?" do
+    it "returns true after vendor_name changes via extracted field" do
+      doc = create(:document, vendor_name: "Old Vendor")
+      doc.update!(vendor_name: "New Vendor")
+      expect(doc.searchable_fields_changed?).to be true
+    end
+
+    it "returns true after client_name changes via extracted field" do
+      doc = create(:document, :revenue_invoice, client_name: "Old Client")
+      doc.update!(client_name: "New Client")
+      expect(doc.searchable_fields_changed?).to be true
+    end
+
+    it "returns true after description changes" do
+      doc = create(:document, description: "old")
+      doc.update!(description: "new")
+      expect(doc.searchable_fields_changed?).to be true
+    end
+
+    it "returns true after review_status changes" do
+      doc = create(:document, :in_review)
+      doc.update!(review_status: :approved)
+      expect(doc.searchable_fields_changed?).to be true
+    end
+
+    it "returns false when no tracked field changed" do
+      doc = create(:document, starred: false)
+      doc.update!(starred: true)
+      expect(doc.searchable_fields_changed?).to be false
     end
   end
 

@@ -275,8 +275,6 @@ module Ai
       end
 
       enum_value = map_to_enum(type_name)
-      metadata = result[:metadata] || {}
-      metadata["title"] = result[:title] if result[:title].present?
 
       # Record the learned hint (if any) alongside the extraction so the review UI can
       # explain "matched N approvals from this sender". Reuses the memoized lookup.
@@ -291,30 +289,42 @@ module Ai
       # document page) alongside the extraction data.
       result["_provenance"] = Ai::Provenance.for_purpose("document_analysis")
 
-      # Populate existing columns from metadata for backward compat
+      # Build a normalized metadata hash from the AI result.
+      raw_meta = (result[:metadata] || {}).dup.transform_keys(&:to_s)
+      raw_meta["title"] = result[:title] if result[:title].present?
+
+      # Vendor name alias chain — write under "vendor_name" while preserving alias keys.
+      raw_meta["vendor_name"] ||=
+        raw_meta["insurer_name"]      ||
+        raw_meta["counterparty"]      ||
+        raw_meta["proposer_name"]     ||
+        raw_meta["sender"]            ||
+        raw_meta["entity_name"]       ||
+        raw_meta["issuing_authority"]
+
+      # Default currency to EUR when any money-ish field is present and currency is absent.
+      if raw_meta["currency"].blank? && raw_meta.any? { |k, v| k.end_with?("_cents") && v.present? }
+        raw_meta["currency"] = "EUR"
+      end
+
+      # Per-field coercion via the document type's schema; keys not in the schema are
+      # kept raw (the AI already returns ISO dates / integer cents from its prompt).
+      schema = DocumentTypes::Schema.for(dt)
+      normalized_meta = raw_meta.each_with_object({}) do |(key, value), h|
+        next if value.nil?
+
+        if (field = schema.field(key))
+          coerced = field.coerce(value)
+          h[key] = coerced unless coerced.nil?
+        else
+          h[key] = value
+        end
+      end
+
       @document.update!(
         document_type: enum_value,
         document_type_id: dt&.id,
-        metadata: metadata,
-        vendor_name: metadata["vendor_name"] || metadata["insurer_name"] || metadata["counterparty"] || metadata["proposer_name"] || metadata["sender"] || metadata["entity_name"] || metadata["issuing_authority"],
-        vendor_nif: metadata["vendor_nif"],
-        client_name: metadata["client_name"],
-        client_nif: metadata["client_nif"],
-        invoice_number: metadata["invoice_number"],
-        amount_cents: metadata["amount_cents"],
-        currency: metadata["currency"] || "EUR",
-        buyer_nif: metadata["buyer_nif"],
-        tax_amount_cents: metadata["tax_amount_cents"],
-        tax_rate: metadata["tax_rate"],
-        bank_name: metadata["bank_name"],
-        account_number: metadata["account_number"],
-        period_start: parse_date(metadata["period_start"]),
-        period_end: parse_date(metadata["period_end"]),
-        opening_balance_cents: metadata["opening_balance_cents"],
-        closing_balance_cents: metadata["closing_balance_cents"],
-        receipt_number: metadata["receipt_number"],
-        payment_method: metadata["payment_method"],
-        document_date: parse_date(metadata["document_date"]),
+        metadata: (@document.metadata || {}).merge(normalized_meta),
         description: result[:description],
         ai_summary: result[:summary],
         ai_confidence_score: result[:confidence],

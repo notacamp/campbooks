@@ -40,13 +40,25 @@
       "warning_type": "Cross-Site Scripting",
       "fingerprint": "583275b7a183848bf15a9537f01a87bdb51325ef3e402d87db88293533f2e297",
       "file": "app/views/documents/_row.html.erb",
-      "note": "False positive (LinkToHref): same as _card — Document#google_drive_url is a hardcoded https://drive.google.com link built from an API-supplied file id, never user input."
+      "note": "False positive (LinkToHref): same as _card \u2014 Document#google_drive_url is a hardcoded https://drive.google.com link built from an API-supplied file id, never user input."
     },
     {
       "warning_type": "Command Injection",
       "fingerprint": "a284034f3c40dbd51e030cd2bf3e3317a28a595a803202d3bb89c169e6856ac1",
       "file": "app/services/ai/bank_statement_parser.rb",
-      "note": "False positive: Open3.capture3 is called with an argv array (not a shell string), so no shell expansion occurs. The interpolated values are integers (i.to_i) and Tempfile paths generated internally — never user input."
+      "note": "False positive: Open3.capture3 is called with an argv array (not a shell string), so no shell expansion occurs. The interpolated values are integers (i.to_i) and Tempfile paths generated internally \u2014 never user input."
+    },
+    {
+      "warning_type": "SQL Injection",
+      "fingerprint": "6962fdc2ea8a127bd15a4e353e38e06fa850ca22704355492a67892bf7565b7a",
+      "file": "app/services/document_types/backfills/classification_link_backfill.rb",
+      "note": "False positive: the interpolated id list is built exclusively via connection.quote on each UUID (batched backfill); no user input reaches the SQL."
+    },
+    {
+      "warning_type": "SQL Injection",
+      "fingerprint": "f6d14038585b04d806409bfddcf4b4e2d8de6d2a4fc8532c015bc2c2495b8391",
+      "file": "app/services/document_types/backfills/metadata_value_backfill.rb",
+      "note": "False positive: the interpolated id list is built exclusively via connection.quote on each UUID (batched backfill); no user input reaches the SQL."
     }
   ],
   "brakeman_version": "8.0.5"

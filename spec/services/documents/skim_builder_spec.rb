@@ -58,23 +58,27 @@ RSpec.describe Documents::SkimBuilder do
       end
     end
 
-    context "when a built-in type has no custom schema" do
-      # With no per-type extraction_schema, the field set is the built-in type's
-      # canonical columns (what the detail page renders) — not the raw metadata hash.
+    context "when a built-in type carries its canonical schema" do
+      # Built-in types get their field set from the canonical BuiltinSchemas
+      # extraction_schema (what the detail page renders) — not the raw metadata hash.
       # The factory's default document_type is :expense_invoice.
+      let!(:type) do
+        DocumentType.create!(workspace: workspace, name: "expense_invoice", color: "#000",
+                             extraction_schema: DocumentTypes::BuiltinSchemas.for("expense_invoice"))
+      end
       let(:doc) do
-        create(:document, :in_review, workspace: workspace, vendor_name: "Acme Lda",
-               metadata: { "title" => "My invoice" })
+        create(:document, :in_review, workspace: workspace, vendor_name: "Acme Lda")
+          .tap { |d| d.update!(metadata: (d.metadata || {}).merge("title" => "My invoice")) }
       end
 
-      it "surfaces the built-in type's canonical column fields, never the title" do
+      it "surfaces the built-in type's canonical schema fields, never the title" do
         keys = card_for(doc)[:extracted_fields].map { |f| f[:key] }
 
         expect(keys).to include("vendor_name", "invoice_number", "amount_cents", "expense_category")
         expect(keys).not_to include("title")
       end
 
-      it "sources each value from the typed column" do
+      it "sources each value from the document metadata" do
         vendor = card_for(doc)[:extracted_fields].find { |f| f[:key] == "vendor_name" }
         expect(vendor[:value]).to eq("Acme Lda")
       end

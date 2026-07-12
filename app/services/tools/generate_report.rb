@@ -37,8 +37,8 @@ module Tools
 
     def self.document_summary(date_from, date_to)
       scope = Current.workspace&.documents || Document.none
-      scope = scope.where("document_date >= ?", Date.parse(date_from)) if date_from
-      scope = scope.where("document_date <= ?", Date.parse(date_to)) if date_to
+      scope = scope.where("documents.metadata->>'document_date' >= ?", Date.parse(date_from).iso8601) if date_from
+      scope = scope.where("documents.metadata->>'document_date' <= ?", Date.parse(date_to).iso8601) if date_to
 
       {
         type: "document_summary",
@@ -46,7 +46,7 @@ module Tools
         by_type: scope.group(:document_type).count.transform_keys { |k| Document.document_types.key(k) || k.to_s },
         by_ai_status: scope.group(:ai_status).count.transform_keys { |k| Document.ai_statuses.key(k) || k.to_s },
         by_review_status: scope.group(:review_status).count.transform_keys { |k| Document.review_statuses.key(k) || k.to_s },
-        total_amount_cents: scope.sum(:amount_cents),
+        total_amount_cents: scope.sum(Arel.sql("(CASE WHEN documents.metadata->>'amount_cents' ~ '^-{0,1}[0-9]{1,15}$' THEN (documents.metadata->>'amount_cents')::bigint END)")),
         period_start: date_from,
         period_end: date_to
       }

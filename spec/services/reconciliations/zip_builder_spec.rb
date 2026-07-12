@@ -153,7 +153,7 @@ RSpec.describe Reconciliations::ZipBuilder, type: :service do
 
     context "with a matched doc missing the buyer NIF" do
       before do
-        invoice_doc.update_columns(buyer_nif: nil)
+        invoice_doc.update!(buyer_nif: nil)
         create(:transaction_match,
                bank_transaction: debit_txn,
                document:         invoice_doc,

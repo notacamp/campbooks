@@ -145,7 +145,7 @@ module Campbooks
       end
 
       def expense_category_options
-        Document.expense_categories.keys.map { |k| [ helpers.human_enum(Document, :expense_category, k), k ] }
+        Document::EXPENSE_CATEGORIES.map { |k| [ helpers.human_enum(Document, :expense_category, k), k ] }
       end
 
       def folder_options

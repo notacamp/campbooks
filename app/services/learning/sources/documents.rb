@@ -50,7 +50,7 @@ module Learning
 
         scope = approved_corpus.limit(CORPUS_LIMIT)
         scope = if sender.present?
-          scope.where("LOWER(documents.sender_name) = ?", sender.downcase)
+          scope.where("LOWER(documents.metadata->>'sender_name') = ?", sender.downcase)
         else
           scope.where(email_account_id: account_id)
         end

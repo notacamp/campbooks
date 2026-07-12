@@ -21,7 +21,9 @@ RSpec.describe "Files search filters", type: :request do
     doc.original_file.attach(
       io: StringIO.new("x"), filename: "doc.pdf", content_type: "application/pdf"
     )
-    doc.metadata = { "title" => title }
+    # Merge — a bare assignment would wipe the extracted values the attrs above
+    # just wrote into metadata through the field accessors.
+    doc.metadata = (doc.metadata || {}).merge("title" => title)
     doc.save!
     doc
   end
