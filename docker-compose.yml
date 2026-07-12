@@ -41,6 +41,10 @@ services:
   postgres:
     image: pgvector/pgvector:pg17
     restart: unless-stopped
+    # Docker's default /dev/shm is 64MB; pgvector's parallel HNSW index builds
+    # allocate a shared-memory segment about that size and abort with "could not
+    # resize shared memory segment ... No space left on device" on large tables.
+    shm_size: 512mb
     environment:
       POSTGRES_USER: campbooks_app
       POSTGRES_PASSWORD: ${CAMPBOOKS_DATABASE_PASSWORD:?set CAMPBOOKS_DATABASE_PASSWORD in .env}

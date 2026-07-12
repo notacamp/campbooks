@@ -2,6 +2,14 @@
 
 class AddMultiDimensionEmbeddings < ActiveRecord::Migration[8.1]
   def change
+    # pgvector's parallel HNSW build allocates a ~64MB dynamic shared memory
+    # segment per build. Containers with Docker's default 64MB /dev/shm can't
+    # satisfy that, and the whole migration dies with PG::DiskFull ("could not
+    # resize shared memory segment"), even though the indexed columns are empty
+    # — this took the hosted deploy down on 2026-07-12. Single-process builds
+    # need no DSM segment and are plenty fast for empty columns.
+    up_only { execute("SET max_parallel_maintenance_workers = 0") }
+
     # Per-workspace embedding model selection (nil = use DEFAULT).
     add_column :workspaces, :embedding_model, :string
 
