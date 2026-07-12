@@ -16,6 +16,17 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.23.2] - 2026-07-12
+
+### Fixed
+
+- **The v0.23.0 embedding migration no longer needs a large `/dev/shm`.** pgvector's
+  parallel HNSW index build allocates a ~64MB shared-memory segment, which fails with
+  `PG::DiskFull` inside containers running Docker's default 64MB `/dev/shm` — even
+  though the new index columns are empty. The migration now builds those indexes
+  single-process, and the self-host `docker-compose.yml` gives Postgres
+  `shm_size: 512mb` for future index work.
+
 ## [0.23.1] - 2026-07-12
 
 ### Changed
