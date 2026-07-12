@@ -16,6 +16,20 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- **The "Extracted data" panel in document review (Skim) stays open as you move
+  between cards.** Expand it once and it stays expanded on the next document, so you
+  can keep the AI-extracted fields in view without re-opening the panel each time.
+
+### Fixed
+
+- **Document review (Skim) keyboard shortcuts work again when a PDF is on screen.**
+  The arrow keys (skip / go back) and the A / C / E / R / J / O / Space shortcuts
+  stopped responding whenever a PDF preview loaded — the browser's inline PDF viewer
+  was quietly capturing the keyboard. Skim now keeps keyboard focus on the review
+  card, so you can move through the queue entirely from the keyboard again.
+
 ## [0.23.0] - 2026-07-12
 
 ### Added
