@@ -125,10 +125,8 @@ module ApplicationHelper
     Money.new(cents, currency).format
   end
 
-  PAYMENT_METHODS = %w[cash card transfer mbway multibanco check other].freeze
-
   def payment_method_options
-    PAYMENT_METHODS.map { |key| [ t("helpers.payment_methods.#{key}"), key ] }
+    Document::PAYMENT_METHODS.map { |key| [ t("helpers.payment_methods.#{key}"), key ] }
   end
 
   def payment_method_label(method)

@@ -2,6 +2,17 @@ class Document < ApplicationRecord
   include Pipelineable
   include Searchable
   include FolderAccessible
+  include Documents::ExtractedFields
+
+  # Canonical extracted-field enum values. Order is the legacy integer mapping
+  # (travel=0 … other=9) used by the expense_category writer for backwards
+  # compatibility with callers that still pass integers.
+  EXPENSE_CATEGORIES = %w[
+    travel meals office_supplies utilities rent software
+    professional_services equipment marketing other
+  ].freeze
+
+  PAYMENT_METHODS = %w[cash card transfer mbway multibanco check other].freeze
 
   belongs_to :workspace
 
@@ -95,27 +106,6 @@ class Document < ApplicationRecord
     pushed: 1,
     failed: 2
   }, prefix: :drive
-
-  # Expense sub-category for expense_invoice docs (nullable — not every expense is
-  # categorised). Prefixed because `other` would otherwise clash with the
-  # document_type `other?` predicate.
-  enum :expense_category, {
-    travel: 0,
-    meals: 1,
-    office_supplies: 2,
-    utilities: 3,
-    rent: 4,
-    software: 5,
-    professional_services: 6,
-    equipment: 7,
-    marketing: 8,
-    other: 9
-  }, prefix: :expense
-
-  monetize :amount_cents, with_currency: :eur, allow_nil: true
-  monetize :tax_amount_cents, with_currency: :eur, allow_nil: true
-  monetize :opening_balance_cents, with_currency: :eur, allow_nil: true
-  monetize :closing_balance_cents, with_currency: :eur, allow_nil: true
 
   validates :document_type, presence: true
   validates :ai_status, presence: true

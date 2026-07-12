@@ -3,17 +3,14 @@
 require "rails_helper"
 
 RSpec.describe Documents::ExtractedFieldSet do
-  # Plain stub so the field set is tested in isolation (no DB), mirroring how
-  # SkimBuilder is exercised. Responds to any column like an AR record would,
-  # returning the configured value (nil when unset).
-  Classification = Struct.new(:extraction_schema)
+  # Minimal stub that responds like a Document (no DB).
+  Classification = Struct.new(:extraction_schema) unless defined?(Classification)
 
   class StubDoc
-    def initialize(document_type:, schema: nil, metadata: {}, columns: {})
+    def initialize(document_type:, schema: nil, metadata: {})
       @document_type = document_type
-      @schema = schema
-      @metadata = metadata
-      @columns = columns
+      @schema        = schema
+      @metadata      = metadata
     end
 
     attr_reader :document_type, :metadata
@@ -21,74 +18,148 @@ RSpec.describe Documents::ExtractedFieldSet do
     def classification
       @schema.nil? ? nil : Classification.new(@schema)
     end
-
-    def respond_to_missing?(_name, _include_private = false) = true
-    def method_missing(name, *) = @columns[name]
   end
 
-  it "built-in type returns its full column field set, even when blank" do
-    doc = StubDoc.new(document_type: "expense_invoice", columns: { vendor_name: "Acme Lda", amount_cents: 12_345 })
-    fields = described_class.new(doc).fields
+  # ── Schema-driven fields (enriched schema) ───────────────────────────────────
 
-    expect(fields.size).to eq(11)
-    expect(fields.all? { |f| f[:store] == :column }).to be_truthy
+  describe "schema-driven fields from an enriched schema" do
+    let(:schema) do
+      {
+        "vendor_name"   => { "type" => "string", "description" => "Vendor Name",  "position" => 1 },
+        "amount_cents"  => { "type" => "money",  "description" => "Amount",       "position" => 2 },
+        "document_date" => { "type" => "date",   "description" => "Document Date", "position" => 3 },
+        "status"        => { "type" => "enum",   "description" => "Status",
+                             "values" => %w[open closed],                          "position" => 4 }
+      }
+    end
 
-    vendor = fields.find { |f| f[:key] == "vendor_name" }
-    expect(vendor[:value]).to eq("Acme Lda")
-    expect(vendor[:kind]).to eq(:text)
+    let(:doc) do
+      StubDoc.new(
+        document_type: "insurance_policy",
+        schema: schema,
+        metadata: {
+          "vendor_name"   => "Insurer Co",
+          "amount_cents"  => 50_000,
+          "document_date" => "2024-06-01",
+          "status"        => "open"
+        }
+      )
+    end
 
-    amount = fields.find { |f| f[:key] == "amount_cents" }
-    expect(amount[:value]).to eq(12_345)
-    expect(amount[:kind]).to eq(:money)
+    subject(:fields) { described_class.new(doc).fields }
 
-    # A field with no column or metadata value is still present (blank kept).
-    expect(fields.map { |f| f[:key] }).to include("buyer_nif")
-    expect(fields.find { |f| f[:key] == "buyer_nif" }[:value]).to be_nil
+    it "returns fields in schema position order" do
+      expect(fields.map { |f| f[:key] }).to eq(%w[vendor_name amount_cents document_date status])
+    end
 
-    # Enum fields are present for display...
-    category = fields.find { |f| f[:key] == "expense_category" }
-    expect(category[:kind]).to eq(:enum_expense_category)
+    it "resolves values via Field#read (typed)" do
+      date_field = fields.find { |f| f[:key] == "document_date" }
+      expect(date_field[:value]).to eq(Date.new(2024, 6, 1))
+
+      money_field = fields.find { |f| f[:key] == "amount_cents" }
+      expect(money_field[:value]).to eq(50_000)
+    end
+
+    it "sets store to :metadata for all fields" do
+      expect(fields.all? { |f| f[:store] == :metadata }).to be true
+    end
+
+    it "sets kind correctly per type" do
+      expect(fields.find { |f| f[:key] == "amount_cents" }[:kind]).to  eq(:money)
+      expect(fields.find { |f| f[:key] == "document_date" }[:kind]).to eq(:date)
+      expect(fields.find { |f| f[:key] == "vendor_name" }[:kind]).to   eq(:text)
+      expect(fields.find { |f| f[:key] == "status" }[:kind]).to        eq(:enum)
+    end
+
+    it "includes enum_values for enum fields and nil for others" do
+      status_f  = fields.find { |f| f[:key] == "status" }
+      vendor_f  = fields.find { |f| f[:key] == "vendor_name" }
+      expect(status_f[:enum_values]).to  eq(%w[open closed])
+      expect(vendor_f[:enum_values]).to  be_nil
+    end
   end
 
-  it "built-in type falls back to metadata when the column is blank (legacy rows)" do
-    doc = StubDoc.new(document_type: "expense_invoice",
-                      columns: { vendor_name: nil },
-                      metadata: { "vendor_name" => "From Metadata" })
-    vendor = described_class.new(doc).fields.find { |f| f[:key] == "vendor_name" }
+  # ── Schema-driven fields (old-format schema without label_key/position) ──────
 
-    expect(vendor[:value]).to eq("From Metadata")
+  describe "schema-driven fields from an old-format schema" do
+    let(:doc) do
+      StubDoc.new(
+        document_type: "insurance_policy",
+        schema: {
+          "policy_no" => { "type" => "string", "description" => "Policy number" },
+          "insurer"   => {}
+        },
+        metadata: { "policy_no" => "AX-200" }
+      )
+    end
+
+    subject(:fields) { described_class.new(doc).fields }
+
+    it "returns fields in insertion order" do
+      expect(fields.map { |f| f[:key] }).to eq(%w[policy_no insurer])
+    end
+
+    it "uses description as label when label_key is absent" do
+      expect(fields.first[:label]).to eq("Policy number")
+    end
+
+    it "humanizes the key when no description or label_key" do
+      expect(fields.last[:label]).to eq("Insurer")
+    end
+
+    it "reads value from metadata" do
+      expect(fields.first[:value]).to eq("AX-200")
+    end
   end
 
-  it "custom type with a Hash extraction_schema uses schema fields, edited in metadata" do
-    schema = { "policy_no" => { "description" => "Policy number" }, "insurer" => {} }
-    doc = StubDoc.new(document_type: "insurance_policy", schema: schema,
-                      metadata: { "policy_no" => "AX-200" })
-    fields = described_class.new(doc).fields
+  # ── never_blank fallback ─────────────────────────────────────────────────────
 
-    expect(fields.map { |f| f[:key] }).to eq(%w[policy_no insurer])
-    expect(fields.all? { |f| f[:store] == :metadata }).to be_truthy
-    expect(fields.first[:label]).to eq("Policy number") # schema description wins
-    expect(fields.last[:label]).to eq("Insurer")        # humanised fallback
-    expect(fields.first[:value]).to eq("AX-200")
+  describe "never_blank fallback" do
+    it "falls back to raw metadata when schema fields are all blank" do
+      doc = StubDoc.new(
+        document_type: "insurance_policy",
+        schema: { "policy_no" => { "type" => "string", "description" => "Policy number" } },
+        metadata: { "flight_number" => "TP451", "gate" => "A12" }
+      )
+      fields = described_class.new(doc).fields
+      # schema field is blank, so falls back to metadata
+      expect(fields.map { |f| f[:key] }).to match_array(%w[flight_number gate])
+    end
   end
 
-  it "unknown type without a schema surfaces raw metadata, minus the title" do
-    doc = StubDoc.new(document_type: "mystery",
-                      metadata: { "title" => "Ignore me", "reference" => "R-1" })
-    fields = described_class.new(doc).fields
+  # ── No classification / no schema → raw metadata ─────────────────────────────
 
-    expect(fields.map { |f| f[:key] }).to eq(%w[reference])
-    expect(fields.first[:value]).to eq("R-1")
-    expect(fields.first[:store]).to eq(:metadata)
+  describe "no classification" do
+    it "surfaces raw metadata keys (minus title) when no schema" do
+      doc = StubDoc.new(
+        document_type: "mystery",
+        schema: nil,
+        metadata: { "title" => "Ignored", "reference" => "R-1", "note" => "See me" }
+      )
+      fields = described_class.new(doc).fields
+      expect(fields.map { |f| f[:key] }).to match_array(%w[reference note])
+      expect(fields.first[:store]).to eq(:metadata)
+    end
+
+    it "returns empty array for a document with no metadata and no schema" do
+      doc = StubDoc.new(document_type: "other", schema: nil, metadata: {})
+      expect(described_class.new(doc).fields).to eq([])
+    end
   end
 
-  it "COLUMN_KEYS lists every editable column; ENUM_KEYS flags the enum-backed ones" do
-    expect(described_class::COLUMN_KEYS).to include(:vendor_name)
-    expect(described_class::COLUMN_KEYS).to include(:amount_cents)
-    # Enums are editable too (as <select>s), so they're in COLUMN_KEYS...
-    expect(described_class::COLUMN_KEYS).to include(:expense_category)
-    expect(described_class::COLUMN_KEYS).to include(:payment_method)
-    # ...and ENUM_KEYS isolates them for the controller's blank -> nil coercion.
-    expect(described_class::ENUM_KEYS.sort).to eq(%i[expense_category payment_method].sort)
+  # ── Constants that were REMOVED ──────────────────────────────────────────────
+
+  describe "removed constants" do
+    it "does not define COLUMN_KEYS" do
+      expect(described_class.const_defined?(:COLUMN_KEYS)).to be false
+    end
+
+    it "does not define ENUM_KEYS" do
+      expect(described_class.const_defined?(:ENUM_KEYS)).to be false
+    end
+
+    it "does not define TYPE_FIELDS" do
+      expect(described_class.const_defined?(:TYPE_FIELDS)).to be false
+    end
   end
 end
