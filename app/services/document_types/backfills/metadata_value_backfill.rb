@@ -35,6 +35,10 @@ module DocumentTypes
       def run!
         conn = ActiveRecord::Base.connection
 
+        # No-op once the legacy columns are gone (they're dropped by a later
+        # migration; on an old→new upgrade this runs first, while they exist).
+        return unless conn.column_exists?(:documents, :vendor_name)
+
         MigDocument.in_batches(of: 500) do |batch|
           ids = batch.pluck(:id)
           next if ids.empty?

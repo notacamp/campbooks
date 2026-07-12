@@ -16,6 +16,18 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-07-12
+
+### Removed
+
+- ⚠️ **The legacy extracted-value columns were dropped from `documents`.** Since
+  v0.24.0 every extracted field lives in the `documents.metadata` JSONB store;
+  this release removes the 23 dead columns (`vendor_name`, `amount_cents`,
+  `document_date`, `expense_category`, …) and their indexes. Self-hosters
+  querying those columns directly must switch to `metadata->>'field'`. Rolling
+  back past this release requires a database backup taken beforehand — the
+  upgrade itself migrates all values safely and automatically.
+
 ## [0.25.0] - 2026-07-12
 
 ### Added

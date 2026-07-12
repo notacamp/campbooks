@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_12_000004) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_12_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -505,61 +505,36 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_000004) do
   end
 
   create_table "documents", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.string "account_number"
     t.float "ai_confidence_score"
     t.text "ai_error"
     t.jsonb "ai_extraction_data", default: {}
     t.integer "ai_processing_attempts", default: 0
     t.integer "ai_status", default: 0, null: false
     t.text "ai_summary"
-    t.integer "amount_cents"
-    t.string "bank_name"
-    t.string "buyer_nif"
     t.string "canonical_filename"
-    t.string "client_name"
-    t.string "client_nif"
-    t.integer "closing_balance_cents"
-    t.boolean "company_vat_present"
     t.string "content_hash"
     t.datetime "created_at", null: false
-    t.string "currency", default: "EUR"
     t.text "description"
-    t.date "document_date"
     t.integer "document_type", default: 0, null: false
     t.uuid "document_type_id"
-    t.date "due_date"
     t.uuid "email_account_id"
     t.string "email_message_id"
-    t.integer "expense_category"
     t.string "google_drive_file_id"
     t.text "google_drive_push_error"
     t.integer "google_drive_push_status", default: 0, null: false
     t.datetime "google_drive_pushed_at"
-    t.string "invoice_number"
     t.jsonb "metadata"
-    t.integer "opening_balance_cents"
-    t.string "payment_method"
-    t.date "period_end"
-    t.date "period_start"
     t.datetime "posted_to_thread_at"
-    t.string "receipt_number"
     t.integer "review_status", default: 0, null: false
     t.datetime "reviewed_at"
     t.uuid "reviewed_by_id"
-    t.string "sender_name"
     t.integer "source", default: 0, null: false
     t.boolean "starred", default: false, null: false
-    t.integer "tax_amount_cents"
-    t.decimal "tax_rate", precision: 5, scale: 2
     t.datetime "updated_at", null: false
-    t.string "vendor_name"
-    t.string "vendor_nif"
     t.datetime "viewed_at"
     t.uuid "workspace_id"
     t.index ["ai_status"], name: "index_documents_on_ai_status"
-    t.index ["client_nif"], name: "index_documents_on_client_nif"
     t.index ["content_hash"], name: "index_documents_on_content_hash"
-    t.index ["document_date"], name: "index_documents_on_document_date"
     t.index ["document_type"], name: "index_documents_on_document_type"
     t.index ["document_type_id"], name: "index_documents_on_document_type_id"
     t.index ["email_account_id"], name: "index_documents_on_email_account_id"
@@ -567,9 +542,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_12_000004) do
     t.index ["review_status"], name: "index_documents_on_review_status"
     t.index ["reviewed_by_id"], name: "index_documents_on_reviewed_by_id"
     t.index ["source"], name: "index_documents_on_source"
-    t.index ["vendor_nif"], name: "index_documents_on_vendor_nif"
     t.index ["workspace_id", "ai_status"], name: "index_documents_on_workspace_id_and_ai_status"
-    t.index ["workspace_id", "due_date"], name: "index_documents_on_workspace_and_due_date", where: "(due_date IS NOT NULL)"
     t.index ["workspace_id", "review_status", "ai_confidence_score"], name: "index_documents_on_workspace_review_confidence"
     t.index ["workspace_id", "review_status"], name: "index_documents_on_workspace_id_and_review_status"
     t.index ["workspace_id", "starred"], name: "index_documents_on_workspace_id_and_starred"
