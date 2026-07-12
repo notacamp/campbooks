@@ -85,6 +85,111 @@ RSpec.describe Ai::DocumentAnalyzer do
     end
   end
 
+  describe "apply_result metadata normalization" do
+    let(:workspace) { create(:workspace) }
+    let(:document)  { create(:document, workspace: workspace, document_type: :other, ai_status: :pending, metadata: nil) }
+    let(:adapter)   { instance_double(Ai::Adapters::Openai) }
+
+    before do
+      Current.workspace = workspace
+      allow(Ai::Configuration).to receive(:for).with("document_analysis").and_return(
+        { adapter: adapter, model: "gpt-4o-mini", max_tokens: 1000, temperature: 0.0 }
+      )
+    end
+
+    after { Current.workspace = nil }
+
+    it "resolves vendor_name from insurer_name alias when vendor_name is absent" do
+      allow(adapter).to receive(:chat).and_return({
+        document_type: "expense_invoice",
+        title: "Seguro Auto",
+        confidence: 0.9,
+        metadata: { "insurer_name" => "Fidelidade SA" }
+      }.to_json)
+
+      described_class.new(document).call
+      document.reload
+      expect(document.vendor_name).to eq("Fidelidade SA")
+      expect(document.metadata["insurer_name"]).to eq("Fidelidade SA")
+    end
+
+    it "defaults currency to EUR when a money field is present and currency is absent" do
+      allow(adapter).to receive(:chat).and_return({
+        document_type: "expense_invoice",
+        title: "Fatura",
+        confidence: 0.9,
+        metadata: { "vendor_name" => "Acme", "amount_cents" => 5000 }
+      }.to_json)
+
+      described_class.new(document).call
+      expect(document.reload.metadata["currency"]).to eq("EUR")
+    end
+
+    it "does not override an explicit currency" do
+      allow(adapter).to receive(:chat).and_return({
+        document_type: "expense_invoice",
+        title: "Invoice",
+        confidence: 0.9,
+        metadata: { "amount_cents" => 1000, "currency" => "USD" }
+      }.to_json)
+
+      described_class.new(document).call
+      expect(document.reload.metadata["currency"]).to eq("USD")
+    end
+
+    it "omits a date key from metadata when the AI returns a garbage date string (schema-backed type)" do
+      # Populate the expense_invoice DocumentType with its builtin schema so the
+      # date field is schema-known and garbage coercion can be enforced.
+      workspace.document_types.find_or_create_by!(name: "expense_invoice") do |t|
+        t.color = "#aabbcc"
+        t.extraction_schema = DocumentTypes::BuiltinSchemas.for("expense_invoice")
+      end
+
+      allow(adapter).to receive(:chat).and_return({
+        document_type: "expense_invoice",
+        title: "Fatura",
+        confidence: 0.9,
+        metadata: { "vendor_name" => "X", "document_date" => "not-a-date" }
+      }.to_json)
+
+      described_class.new(document).call
+      expect(document.reload.metadata).not_to have_key("document_date")
+    end
+
+    it "stores a valid date as an ISO string in metadata (schema-backed type)" do
+      workspace.document_types.find_or_create_by!(name: "expense_invoice") do |t|
+        t.color = "#aabbcc"
+        t.extraction_schema = DocumentTypes::BuiltinSchemas.for("expense_invoice")
+      end
+
+      allow(adapter).to receive(:chat).and_return({
+        document_type: "expense_invoice",
+        title: "Fatura",
+        confidence: 0.9,
+        metadata: { "vendor_name" => "X", "document_date" => "2025-03-15" }
+      }.to_json)
+
+      described_class.new(document).call
+      expect(document.reload.metadata["document_date"]).to eq("2025-03-15")
+    end
+
+    it "merges normalized metadata on top of existing metadata" do
+      document.update_columns(metadata: { "existing_key" => "existing_value" })
+
+      allow(adapter).to receive(:chat).and_return({
+        document_type: "expense_invoice",
+        title: "Fatura",
+        confidence: 0.9,
+        metadata: { "vendor_name" => "New Vendor" }
+      }.to_json)
+
+      described_class.new(document).call
+      document.reload
+      expect(document.metadata["existing_key"]).to eq("existing_value")
+      expect(document.metadata["vendor_name"]).to eq("New Vendor")
+    end
+  end
+
   # Regression: the filename heuristic's `\bata\b` word boundary (Portuguese
   # meeting-minute "ata") was corrupted into backspace control characters, which
   # silently broke the rule. Guard the boundary so unrelated names that merely

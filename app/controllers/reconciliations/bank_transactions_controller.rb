@@ -250,15 +250,24 @@ module Reconciliations
     def candidate_documents_for(txn, q: nil)
       scope = Current.workspace.documents
                      .where(document_type: txn.candidate_document_types)
-                     .where.not(amount_cents: [ nil, 0 ])
-                     .order(document_date: :desc)
+                     .where(
+                       "documents.metadata->>'amount_cents' IS NOT NULL AND " \
+                       "(CASE WHEN documents.metadata->>'amount_cents' ~ ? " \
+                       "THEN (documents.metadata->>'amount_cents')::bigint END) <> 0",
+                       Document::AMOUNT_CENTS_REGEX
+                     )
+                     .order(Arel.sql(
+                       "(CASE WHEN documents.metadata->>'document_date' ~ '^\\d{4}-\\d{2}-\\d{2}' " \
+                       "THEN documents.metadata->>'document_date' END) DESC NULLS LAST"
+                     ))
                      .limit(30)
 
       if q.present?
         like = "%#{ActiveRecord::Base.sanitize_sql_like(q)}%"
         scope = scope.where(
-          "vendor_name ILIKE :q OR sender_name ILIKE :q OR client_name ILIKE :q " \
-          "OR invoice_number ILIKE :q OR description ILIKE :q",
+          "documents.metadata->>'vendor_name' ILIKE :q OR documents.metadata->>'sender_name' ILIKE :q " \
+          "OR documents.metadata->>'client_name' ILIKE :q " \
+          "OR documents.metadata->>'invoice_number' ILIKE :q OR documents.description ILIKE :q",
           q: like
         )
       end

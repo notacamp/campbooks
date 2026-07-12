@@ -119,7 +119,13 @@ class Document < ApplicationRecord
   scope :for_month, ->(year, month) {
     start_date = Date.new(year, month, 1)
     end_date = start_date.end_of_month
-    where(document_date: start_date..end_date)
+    where(
+      "(CASE WHEN documents.metadata->>'document_date' ~ '^\\d{4}-\\d{2}-\\d{2}' " \
+      "THEN documents.metadata->>'document_date' END) >= ? AND " \
+      "(CASE WHEN documents.metadata->>'document_date' ~ '^\\d{4}-\\d{2}-\\d{2}' " \
+      "THEN documents.metadata->>'document_date' END) <= ?",
+      start_date.iso8601, end_date.iso8601
+    )
   }
 
   scope :by_type, ->(type_id) { where(document_type_id: type_id) if type_id.present? }
@@ -184,10 +190,35 @@ class Document < ApplicationRecord
     where(source: vals) if vals.any?
   }
   scope :starred_only, ->(flag) { where(starred: true) if flag }
-  scope :document_date_from, ->(d) { where("documents.document_date >= ?", d) if d.present? }
-  scope :document_date_to,   ->(d) { where("documents.document_date <= ?", d) if d.present? }
-  scope :amount_at_least, ->(cents) { where("documents.amount_cents >= ?", cents) if cents.present? }
-  scope :amount_at_most,  ->(cents) { where("documents.amount_cents <= ?", cents) if cents.present? }
+  scope :document_date_from, ->(d) {
+    where(
+      "(CASE WHEN documents.metadata->>'document_date' ~ '^\\d{4}-\\d{2}-\\d{2}' " \
+      "THEN documents.metadata->>'document_date' END) >= ?",
+      d.to_s
+    ) if d.present?
+  }
+  scope :document_date_to, ->(d) {
+    where(
+      "(CASE WHEN documents.metadata->>'document_date' ~ '^\\d{4}-\\d{2}-\\d{2}' " \
+      "THEN documents.metadata->>'document_date' END) <= ?",
+      d.to_s
+    ) if d.present?
+  }
+  AMOUNT_CENTS_REGEX = '^-?\d{1,15}$'
+  scope :amount_at_least, ->(cents) {
+    where(
+      "(CASE WHEN documents.metadata->>'amount_cents' ~ ? " \
+      "THEN (documents.metadata->>'amount_cents')::bigint END) >= ?",
+      AMOUNT_CENTS_REGEX, cents
+    ) if cents.present?
+  }
+  scope :amount_at_most, ->(cents) {
+    where(
+      "(CASE WHEN documents.metadata->>'amount_cents' ~ ? " \
+      "THEN (documents.metadata->>'amount_cents')::bigint END) <= ?",
+      AMOUNT_CENTS_REGEX, cents
+    ) if cents.present?
+  }
 
   # OR across vendor_name / client_name / bank_name / sender_name for each term;
   # multiple terms are themselves OR'd together — composed via relation.or over a
@@ -198,8 +229,8 @@ class Document < ApplicationRecord
 
     terms.map { |term|
       where(
-        "documents.vendor_name ILIKE :t OR documents.client_name ILIKE :t OR " \
-        "documents.bank_name ILIKE :t OR documents.sender_name ILIKE :t",
+        "documents.metadata->>'vendor_name' ILIKE :t OR documents.metadata->>'client_name' ILIKE :t OR " \
+        "documents.metadata->>'bank_name' ILIKE :t OR documents.metadata->>'sender_name' ILIKE :t",
         t: "%#{sanitize_sql_like(term)}%"
       )
     }.reduce(:or)
@@ -211,15 +242,18 @@ class Document < ApplicationRecord
 
     terms.map { |term|
       where(
-        "documents.invoice_number ILIKE :t OR documents.receipt_number ILIKE :t",
+        "documents.metadata->>'invoice_number' ILIKE :t OR documents.metadata->>'receipt_number' ILIKE :t",
         t: "%#{sanitize_sql_like(term)}%"
       )
     }.reduce(:or)
   }
 
   scope :by_expense_category, ->(values) {
-    vals = Array(values).reject(&:blank?)
-    where(expense_category: vals) if vals.any?
+    input = Array(values).reject(&:blank?)
+    next unless input.any?
+
+    vals = input & Document::EXPENSE_CATEGORIES
+    vals.any? ? where("documents.metadata->>'expense_category' IN (?)", vals) : none
   }
 
   def generate_canonical_filename!
@@ -489,7 +523,7 @@ class Document < ApplicationRecord
 
   def searchable_fields_changed?
     saved_change_to_description? || saved_change_to_ai_extraction_data? ||
-      saved_change_to_vendor_name? || saved_change_to_client_name? ||
+      saved_change_to_extracted_field?("vendor_name") || saved_change_to_extracted_field?("client_name") ||
       saved_change_to_document_type? || saved_change_to_document_type_id? ||
       saved_change_to_review_status? || saved_change_to_ai_status? ||
       saved_change_to_ai_summary?

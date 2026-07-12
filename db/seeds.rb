@@ -89,80 +89,52 @@ puts "Email tags: #{Tag.count}"
 company_nif = org.company_nif || "123456789"
 
 DOCUMENT_TYPES = {
+  # ── Five built-in types: canonical enriched schemas from DocumentTypes::BuiltinSchemas ──
   "expense_invoice"   => {
     category: "accounting",
     color: "#3b82f6",
     prompt: "An invoice FROM a supplier/vendor TO our company. Contains vendor details (name, NIF), invoice number, amounts, tax/IVA.",
-    schema: {
-      vendor_name:    { type: "string", description: "Name of the supplier/vendor" },
-      vendor_nif:     { type: "string", description: "9-digit NIF of the vendor" },
-      invoice_number: { type: "string", description: "Invoice number/identifier" },
-      amount_cents:   { type: "integer", description: "Total amount in cents (e.g. €123.45 = 12345)" },
-      tax_amount_cents: { type: "integer", description: "IVA tax amount in cents" },
-      tax_rate:       { type: "number", description: "IVA rate (e.g. 23.0 for 23%)" },
-      buyer_nif:      { type: "string", description: "NIF of the buyer (entity being billed)" },
-      document_date:  { type: "string", description: "Document date YYYY-MM-DD or null" },
-      currency:       { type: "string", description: "Currency code, default EUR" }
-    }
+    schema: DocumentTypes::BuiltinSchemas.for("expense_invoice")
   },
   "revenue_invoice"   => {
     category: "accounting",
     color: "#22c55e",
     prompt: "An invoice FROM our company TO a client. Our company (NIF #{company_nif}) is the seller/issuer.",
-    schema: {
-      client_name:    { type: "string", description: "Name of the client/customer" },
-      client_nif:     { type: "string", description: "9-digit NIF of the client" },
-      invoice_number: { type: "string", description: "Invoice number/identifier" },
-      amount_cents:   { type: "integer", description: "Total amount in cents" },
-      tax_amount_cents: { type: "integer", description: "IVA tax amount in cents" },
-      tax_rate:       { type: "number", description: "IVA rate" },
-      document_date:  { type: "string", description: "Document date YYYY-MM-DD or null" },
-      currency:       { type: "string", description: "Currency code, default EUR" }
-    }
-  },
-  "credit_note"       => {
-    category: "accounting",
-    color: "#ef4444",
-    prompt: "A credit note (Nota de Crédito / NC) that reverses, corrects, or refunds a prior invoice. Issued by a supplier to credit an amount back; references the original invoice.",
-    schema: {
-      vendor_name:    { type: "string", description: "Name of the issuer (supplier/vendor)" },
-      vendor_nif:     { type: "string", description: "9-digit NIF of the issuer" },
-      credit_note_number: { type: "string", description: "Credit note number/identifier" },
-      original_invoice_number: { type: "string", description: "Number of the original invoice being credited/corrected" },
-      amount_cents:   { type: "integer", description: "Credited amount in cents (e.g. €123.45 = 12345)" },
-      tax_amount_cents: { type: "integer", description: "IVA tax amount in cents" },
-      tax_rate:       { type: "number", description: "IVA rate (e.g. 23.0 for 23%)" },
-      document_date:  { type: "string", description: "Document date YYYY-MM-DD or null" },
-      currency:       { type: "string", description: "Currency code, default EUR" }
-    }
+    schema: DocumentTypes::BuiltinSchemas.for("revenue_invoice")
   },
   "bank_statement"    => {
     category: "accounting",
     color: "#8b5cf6",
     prompt: "A bank statement or account statement from a financial institution.",
-    schema: {
-      bank_name:       { type: "string", description: "Name of the bank" },
-      account_number:  { type: "string", description: "Account number or IBAN" },
-      period_start:    { type: "string", description: "Statement period start YYYY-MM-DD" },
-      period_end:      { type: "string", description: "Statement period end YYYY-MM-DD" },
-      opening_balance_cents: { type: "integer", description: "Opening balance in cents" },
-      closing_balance_cents: { type: "integer", description: "Closing balance in cents" },
-      document_date:   { type: "string", description: "Document date YYYY-MM-DD or null" },
-      currency:        { type: "string", description: "Currency code, default EUR" }
-    }
+    schema: DocumentTypes::BuiltinSchemas.for("bank_statement")
   },
   "receipt"           => {
     category: "accounting",
     color: "#f59e0b",
     prompt: "A proof of purchase or payment receipt. Smaller amounts, informal structure.",
+    schema: DocumentTypes::BuiltinSchemas.for("receipt")
+  },
+  "other"             => {
+    category: "other",
+    color: "#6b7280",
+    prompt: "A document that does not fit any of the other specific categories.",
+    schema: DocumentTypes::BuiltinSchemas.for("other")
+  },
+  # ── Custom types: enriched inline schemas with positions, money, date, and enum types ──
+  "credit_note"       => {
+    category: "accounting",
+    color: "#ef4444",
+    prompt: "A credit note (Nota de Crédito / NC) that reverses, corrects, or refunds a prior invoice. Issued by a supplier to credit an amount back; references the original invoice.",
     schema: {
-      vendor_name:    { type: "string", description: "Name of the store/merchant" },
-      vendor_nif:     { type: "string", description: "9-digit NIF of the merchant" },
-      receipt_number: { type: "string", description: "Receipt number" },
-      amount_cents:   { type: "integer", description: "Total amount in cents" },
-      payment_method: { type: "string", description: "Payment method: cash, card, transfer, mbway, multibanco, check, other" },
-      document_date:  { type: "string", description: "Document date YYYY-MM-DD or null" },
-      currency:       { type: "string", description: "Currency code, default EUR" }
+      vendor_name:             { type: "string", position: 1, description: "Name of the issuer (supplier/vendor)" },
+      vendor_nif:              { type: "string", position: 2, description: "9-digit NIF of the issuer" },
+      credit_note_number:      { type: "string", position: 3, description: "Credit note number/identifier" },
+      original_invoice_number: { type: "string", position: 4, description: "Number of the original invoice being credited/corrected" },
+      amount_cents:            { type: "money",  position: 5, description: "Credited amount in cents (e.g. €123.45 = 12345)" },
+      tax_amount_cents:        { type: "money",  position: 6, description: "IVA tax amount in cents" },
+      tax_rate:                { type: "number", position: 7, description: "IVA rate (e.g. 23.0 for 23%)" },
+      document_date:           { type: "date",   position: 8, description: "Document date YYYY-MM-DD or null" },
+      currency:                { type: "string", position: 9, description: "Currency code, default EUR" }
     }
   },
   "insurance_policy"  => {
@@ -170,13 +142,13 @@ DOCUMENT_TYPES = {
     color: "#a855f7",
     prompt: "An insurance policy document, certificate of insurance, coverage summary, or insurance claim form.",
     schema: {
-      insurer_name:   { type: "string", description: "Name of the insurance company" },
-      policy_number:  { type: "string", description: "Policy/apólice number" },
-      insured_party:  { type: "string", description: "Name of the insured person or entity" },
-      coverage_type:  { type: "string", description: "Type of coverage (auto, liability, property, health)" },
-      premium_cents:  { type: "integer", description: "Insurance premium amount in cents" },
-      document_date:  { type: "string", description: "Document date YYYY-MM-DD or null" },
-      currency:       { type: "string", description: "Currency code, default EUR" }
+      insurer_name:  { type: "string", position: 1, description: "Name of the insurance company" },
+      policy_number: { type: "string", position: 2, description: "Policy/apólice number" },
+      insured_party: { type: "string", position: 3, description: "Name of the insured person or entity" },
+      coverage_type: { type: "string", position: 4, description: "Type of coverage (auto, liability, property, health)" },
+      premium_cents: { type: "money",  position: 5, description: "Insurance premium amount in cents" },
+      document_date: { type: "date",   position: 6, description: "Document date YYYY-MM-DD or null" },
+      currency:      { type: "string", position: 7, description: "Currency code, default EUR" }
     }
   },
   "vehicle_document"  => {
@@ -184,12 +156,12 @@ DOCUMENT_TYPES = {
     color: "#eab308",
     prompt: "A vehicle-related document: registration, inspection report (IPO), title, insurance green card, or vehicle tax document.",
     schema: {
-      plate_number:    { type: "string", description: "License plate (matrícula) if present" },
-      vehicle_make:    { type: "string", description: "Vehicle brand/make (e.g. Mercedes-Benz)" },
-      vehicle_model:   { type: "string", description: "Vehicle model" },
-      vin:             { type: "string", description: "VIN/chassis number if present" },
-      document_subtype: { type: "string", description: "Specific sub-type (registration, IPO inspection, IUC tax, green card)" },
-      document_date:   { type: "string", description: "Document date YYYY-MM-DD or null" }
+      plate_number:     { type: "string", position: 1, description: "License plate (matrícula) if present" },
+      vehicle_make:     { type: "string", position: 2, description: "Vehicle brand/make (e.g. Mercedes-Benz)" },
+      vehicle_model:    { type: "string", position: 3, description: "Vehicle model" },
+      vin:              { type: "string", position: 4, description: "VIN/chassis number if present" },
+      document_subtype: { type: "string", position: 5, description: "Specific sub-type (registration, IPO inspection, IUC tax, green card)" },
+      document_date:    { type: "date",   position: 6, description: "Document date YYYY-MM-DD or null" }
     }
   },
   "contract"          => {
@@ -197,13 +169,13 @@ DOCUMENT_TYPES = {
     color: "#d946ef",
     prompt: "A legal contract, agreement, or terms and conditions between parties.",
     schema: {
-      counterparty:    { type: "string", description: "Name of the other party to the contract" },
-      contract_type:   { type: "string", description: "Type of contract (lease, service, employment, sale)" },
-      effective_date:  { type: "string", description: "Contract effective/start date YYYY-MM-DD" },
-      expiry_date:     { type: "string", description: "Contract expiry/end date YYYY-MM-DD if present" },
-      amount_cents:    { type: "integer", description: "Contract value/consideration in cents if present" },
-      document_date:   { type: "string", description: "Document date YYYY-MM-DD or null" },
-      currency:        { type: "string", description: "Currency code, default EUR" }
+      counterparty:  { type: "string", position: 1, description: "Name of the other party to the contract" },
+      contract_type: { type: "string", position: 2, description: "Type of contract (lease, service, employment, sale)" },
+      effective_date: { type: "date",  position: 3, description: "Contract effective/start date YYYY-MM-DD" },
+      expiry_date:   { type: "date",   position: 4, description: "Contract expiry/end date YYYY-MM-DD if present" },
+      amount_cents:  { type: "money",  position: 5, description: "Contract value/consideration in cents if present" },
+      document_date: { type: "date",   position: 6, description: "Document date YYYY-MM-DD or null" },
+      currency:      { type: "string", position: 7, description: "Currency code, default EUR" }
     }
   },
   "certificate"       => {
@@ -211,13 +183,13 @@ DOCUMENT_TYPES = {
     color: "#06b6d4",
     prompt: "An official certificate, license, permit, or registration issued by an authority.",
     schema: {
-      issuing_authority: { type: "string", description: "Authority that issued the certificate" },
-      certificate_type:  { type: "string", description: "Type of certificate (conformity, training, registration, license)" },
-      certificate_number: { type: "string", description: "Certificate identifier/number" },
-      subject_name:    { type: "string", description: "Name of the person/entity the certificate is about" },
-      issue_date:      { type: "string", description: "Date of issuance YYYY-MM-DD" },
-      expiry_date:     { type: "string", description: "Expiry date YYYY-MM-DD if present" },
-      document_date:   { type: "string", description: "Document date YYYY-MM-DD or null" }
+      issuing_authority:  { type: "string", position: 1, description: "Authority that issued the certificate" },
+      certificate_type:   { type: "string", position: 2, description: "Type of certificate (conformity, training, registration, license)" },
+      certificate_number: { type: "string", position: 3, description: "Certificate identifier/number" },
+      subject_name:       { type: "string", position: 4, description: "Name of the person/entity the certificate is about" },
+      issue_date:         { type: "date",   position: 5, description: "Date of issuance YYYY-MM-DD" },
+      expiry_date:        { type: "date",   position: 6, description: "Expiry date YYYY-MM-DD if present" },
+      document_date:      { type: "date",   position: 7, description: "Document date YYYY-MM-DD or null" }
     }
   },
   "tax_document"      => {
@@ -225,12 +197,12 @@ DOCUMENT_TYPES = {
     color: "#f97316",
     prompt: "A tax authority document: IRS, IRC, IVA, tax assessment, payment slip, or fiscal declaration.",
     schema: {
-      tax_type:        { type: "string", description: "Type of tax (IRS, IRC, IVA, IMI, etc.)" },
-      tax_period:      { type: "string", description: "Tax period (e.g. 2025)" },
-      taxpayer_nif:    { type: "string", description: "NIF of the taxpayer" },
-      amount_cents:    { type: "integer", description: "Tax amount in cents" },
-      document_date:   { type: "string", description: "Document date YYYY-MM-DD or null" },
-      currency:        { type: "string", description: "Currency code, default EUR" }
+      tax_type:      { type: "string", position: 1, description: "Type of tax (IRS, IRC, IVA, IMI, etc.)" },
+      tax_period:    { type: "string", position: 2, description: "Tax period (e.g. 2025)" },
+      taxpayer_nif:  { type: "string", position: 3, description: "NIF of the taxpayer" },
+      amount_cents:  { type: "money",  position: 4, description: "Tax amount in cents" },
+      document_date: { type: "date",   position: 5, description: "Document date YYYY-MM-DD or null" },
+      currency:      { type: "string", position: 6, description: "Currency code, default EUR" }
     }
   },
   "identification"    => {
@@ -238,13 +210,13 @@ DOCUMENT_TYPES = {
     color: "#f43f5e",
     prompt: "A personal or company identification document: citizen card, passport, NIF card, company registration certificate.",
     schema: {
-      id_type:         { type: "string", description: "Type of ID (citizen_card, passport, nif_card, company_registration)" },
-      person_name:     { type: "string", description: "Full name of the person or company name" },
-      id_number:       { type: "string", description: "Document number (passport number, citizen card number, NIPC)" },
-      nif:             { type: "string", description: "NIF if present on the document" },
-      issue_date:      { type: "string", description: "Date of issuance YYYY-MM-DD" },
-      expiry_date:     { type: "string", description: "Expiry date YYYY-MM-DD if present" },
-      document_date:   { type: "string", description: "Document date YYYY-MM-DD or null" }
+      id_type:       { type: "string", position: 1, description: "Type of ID (citizen_card, passport, nif_card, company_registration)" },
+      person_name:   { type: "string", position: 2, description: "Full name of the person or company name" },
+      id_number:     { type: "string", position: 3, description: "Document number (passport number, citizen card number, NIPC)" },
+      nif:           { type: "string", position: 4, description: "NIF if present on the document" },
+      issue_date:    { type: "date",   position: 5, description: "Date of issuance YYYY-MM-DD" },
+      expiry_date:   { type: "date",   position: 6, description: "Expiry date YYYY-MM-DD if present" },
+      document_date: { type: "date",   position: 7, description: "Document date YYYY-MM-DD or null" }
     }
   },
   "proposal"          => {
@@ -252,13 +224,13 @@ DOCUMENT_TYPES = {
     color: "#fb923c",
     prompt: "A business proposal, quote (orçamento), bid, or project estimate.",
     schema: {
-      proposer_name:   { type: "string", description: "Name of the entity making the proposal" },
-      proposal_type:   { type: "string", description: "Type (quote, bid, estimate, proposal)" },
-      amount_cents:    { type: "integer", description: "Total proposed amount in cents" },
-      validity_date:   { type: "string", description: "Proposal validity date YYYY-MM-DD if present" },
-      scope_summary:   { type: "string", description: "Brief summary of what the proposal covers" },
-      document_date:   { type: "string", description: "Document date YYYY-MM-DD or null" },
-      currency:        { type: "string", description: "Currency code, default EUR" }
+      proposer_name:  { type: "string", position: 1, description: "Name of the entity making the proposal" },
+      proposal_type:  { type: "string", position: 2, description: "Type (quote, bid, estimate, proposal)" },
+      amount_cents:   { type: "money",  position: 3, description: "Total proposed amount in cents" },
+      validity_date:  { type: "date",   position: 4, description: "Proposal validity date YYYY-MM-DD if present" },
+      scope_summary:  { type: "string", position: 5, description: "Brief summary of what the proposal covers" },
+      document_date:  { type: "date",   position: 6, description: "Document date YYYY-MM-DD or null" },
+      currency:       { type: "string", position: 7, description: "Currency code, default EUR" }
     }
   },
   "correspondence"    => {
@@ -266,20 +238,10 @@ DOCUMENT_TYPES = {
     color: "#64748b",
     prompt: "General correspondence, letters, or communications. Not a structured formal document.",
     schema: {
-      sender:          { type: "string", description: "Name of the sender/organization" },
-      recipient:       { type: "string", description: "Name of the recipient" },
-      subject:         { type: "string", description: "Subject/topic of the correspondence" },
-      document_date:   { type: "string", description: "Document date YYYY-MM-DD or null" }
-    }
-  },
-  "other"             => {
-    category: "other",
-    color: "#6b7280",
-    prompt: "A document that does not fit any of the other specific categories.",
-    schema: {
-      entity_name:     { type: "string", description: "Name of the entity/organization/person the document relates to" },
-      document_date:   { type: "string", description: "Document date YYYY-MM-DD or null" },
-      subject:         { type: "string", description: "What the document is about" }
+      sender:        { type: "string", position: 1, description: "Name of the sender/organization" },
+      recipient:     { type: "string", position: 2, description: "Name of the recipient" },
+      subject:       { type: "string", position: 3, description: "Subject/topic of the correspondence" },
+      document_date: { type: "date",   position: 4, description: "Document date YYYY-MM-DD or null" }
     }
   }
 }.freeze

@@ -112,7 +112,7 @@ class GlobalSearch
 
   def ilike_document_results
     @workspace.documents
-              .where("vendor_name ILIKE :q OR client_name ILIKE :q OR description ILIKE :q OR invoice_number ILIKE :q OR canonical_filename ILIKE :q", q: like)
+              .where("documents.metadata->>'vendor_name' ILIKE :q OR documents.metadata->>'client_name' ILIKE :q OR description ILIKE :q OR documents.metadata->>'invoice_number' ILIKE :q OR canonical_filename ILIKE :q", q: like)
               .order(created_at: :desc)
               .limit(PER_GROUP_LIMIT)
               .map { |d| result("Documents", d.display_title, d.entity_display_name, "file-text", document_path(d), id: d.id) }

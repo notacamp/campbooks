@@ -115,29 +115,45 @@ module Documents
       Documents::SkimTrayBroadcaster.refresh(Current.workspace)
     end
 
-    # The inline editor writes the same typed columns the detail page does — the
-    # full per-type field set (Documents::ExtractedFieldSet::COLUMN_KEYS) plus the
-    # free-text description. A blank enum picker means "unset" → nil, since assigning
-    # "" to an enum column raises.
+    # The inline editor permits all standard extracted-field names (accessor-backed)
+    # plus the free-text description. Blank values for any type (including enums) are
+    # handled automatically by the accessor writers, which coerce blank → nil and remove
+    # the key from metadata — no explicit ENUM_KEYS nil-out needed.
     def field_params
-      permitted = params.require(:document).permit(:description, *Documents::ExtractedFieldSet::COLUMN_KEYS)
-      Documents::ExtractedFieldSet::ENUM_KEYS.each { |key| permitted[key] = nil if permitted[key].blank? }
-      permitted
+      params.require(:document).permit(:description, *Document.extracted_field_names)
     end
 
-    # Inline edits to the AI-extracted fields write straight into the metadata hash
-    # (the canonical store the detail page edits too). Merge — never replace — so the
-    # display title and any keys not shown on the card survive; a blank clears a key.
+    # Inline edits to AI-extracted fields arrive here when submitted under the nested
+    # metadata key (document[metadata][field]). Merge — never replace — so the display
+    # title and any keys not shown on the card survive; a blank clears the key.
     def merge_metadata
       raw = params.dig(:document, :metadata)
       return if raw.blank?
 
-      # Tightened from permit!: only the AI-extracted field keys (+ display title)
-      # may be merged into the JSONB metadata. They map to the same field set the
-      # detail/skim forms render, so nothing legitimate is dropped.
-      incoming = raw.permit(*Documents::ExtractedFieldSet::COLUMN_KEYS, :title)
-                    .to_h.transform_values { |v| v.to_s.strip.presence }
-      @document.metadata = (@document.metadata || {}).merge(incoming)
+      # Permit the union of: schema-defined keys for this document's type (handles
+      # custom types whose fields differ from the standard 23) plus the standard
+      # extracted field names (always valid metadata keys). This avoids the
+      # ExtractedFieldSet#never_blank heuristic that collapses to [] on empty metadata.
+      schema     = DocumentTypes::Schema.for(@document.classification)
+      permit_keys = (schema.fields.map(&:key) + Document.extracted_field_names).uniq
+      incoming = raw.permit(*permit_keys, :title).to_h.transform_values { |v| v.to_s.strip.presence }
+      return if incoming.blank?
+
+      updated = (@document.metadata || {}).dup
+
+      incoming.each do |key, value|
+        if value.nil?
+          # Blank submission → clear the key from metadata.
+          updated.delete(key)
+        elsif (field = schema.field(key))
+          coerced = field.coerce(value)
+          coerced.nil? ? updated.delete(key) : (updated[key] = coerced)
+        else
+          updated[key] = value
+        end
+      end
+
+      @document.metadata = updated
     end
   end
 end

@@ -85,8 +85,8 @@ class PipelineMembershipsController < ApplicationController
     if query.present?
       like = "%#{query}%"
       scope = scope.where(
-        "documents.canonical_filename ILIKE :q OR documents.vendor_name ILIKE :q " \
-        "OR documents.client_name ILIKE :q OR documents.description ILIKE :q",
+        "documents.canonical_filename ILIKE :q OR documents.metadata->>'vendor_name' ILIKE :q " \
+        "OR documents.metadata->>'client_name' ILIKE :q OR documents.description ILIKE :q",
         q: like
       )
     end

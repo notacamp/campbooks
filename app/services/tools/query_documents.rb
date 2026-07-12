@@ -20,7 +20,10 @@ module Tools
         if results.any?
           document_ids = results.map(&:searchable_id)
           documents = Current.workspace.documents.where(id: document_ids)
-                              .order(document_date: :desc)
+                              .order(Arel.sql(
+                                "(CASE WHEN documents.metadata->>'document_date' ~ '^\\d{4}-\\d{2}-\\d{2}' " \
+                                "THEN documents.metadata->>'document_date' END) DESC NULLS LAST"
+                              ))
                               .limit(limit)
                               .map { |doc| format_document(doc) }
 
@@ -34,11 +37,14 @@ module Tools
 
       if args["search_text"].present?
         text = "%#{args["search_text"]}%"
-        scope = scope.where("vendor_name ILIKE ? OR description ILIKE ? OR invoice_number ILIKE ? OR client_name ILIKE ?", text, text, text, text)
+        scope = scope.where("documents.metadata->>'vendor_name' ILIKE ? OR description ILIKE ? OR documents.metadata->>'invoice_number' ILIKE ? OR documents.metadata->>'client_name' ILIKE ?", text, text, text, text)
       end
 
       total = scope.count
-      documents = scope.order(document_date: :desc).limit(limit).map { |doc| format_document(doc) }
+      documents = scope.order(Arel.sql(
+        "(CASE WHEN documents.metadata->>'document_date' ~ '^\\d{4}-\\d{2}-\\d{2}' " \
+        "THEN documents.metadata->>'document_date' END) DESC NULLS LAST"
+      )).limit(limit).map { |doc| format_document(doc) }
 
       { count: total, documents: documents, search_method: "text" }
     end
@@ -49,18 +55,18 @@ module Tools
       scope = scope.where(review_status: review) if review.present?
       scope = scope.where(ai_status: args["ai_status"]) if args["ai_status"].present?
       scope = scope.where(document_type: args["document_type"]) if args["document_type"].present?
-      scope = scope.where("vendor_name ILIKE ?", "%#{args["vendor_name"]}%") if args["vendor_name"].present?
-      scope = scope.where("amount_cents >= ?", args["amount_min_cents"].to_i) if args["amount_min_cents"].present?
-      scope = scope.where("amount_cents <= ?", args["amount_max_cents"].to_i) if args["amount_max_cents"].present?
+      scope = scope.where("documents.metadata->>'vendor_name' ILIKE ?", "%#{ActiveRecord::Base.sanitize_sql_like(args["vendor_name"])}%") if args["vendor_name"].present?
+      scope = scope.where("(CASE WHEN documents.metadata->>'amount_cents' ~ ? THEN (documents.metadata->>'amount_cents')::bigint END) >= ?", Document::AMOUNT_CENTS_REGEX, args["amount_min_cents"].to_i) if args["amount_min_cents"].present?
+      scope = scope.where("(CASE WHEN documents.metadata->>'amount_cents' ~ ? THEN (documents.metadata->>'amount_cents')::bigint END) <= ?", Document::AMOUNT_CENTS_REGEX, args["amount_max_cents"].to_i) if args["amount_max_cents"].present?
 
       if args["date_from"].present?
         date = Date.parse(args["date_from"]) rescue nil
-        scope = scope.where("document_date >= ?", date) if date
+        scope = scope.where("documents.metadata->>'document_date' >= ?", date.iso8601) if date
       end
 
       if args["date_to"].present?
         date = Date.parse(args["date_to"]) rescue nil
-        scope = scope.where("document_date <= ?", date) if date
+        scope = scope.where("documents.metadata->>'document_date' <= ?", date.iso8601) if date
       end
 
       scope = scope.where(source: args["source"]) if args["source"].present?

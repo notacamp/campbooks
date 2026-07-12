@@ -101,7 +101,12 @@ module Reconciliations
     def candidate_pool(txn)
       base = @workspace.documents
                        .where(document_type: txn.candidate_document_types)
-                       .where.not(amount_cents: [ nil, 0 ])
+                       .where(
+                         "documents.metadata->>'amount_cents' IS NOT NULL AND " \
+                         "(CASE WHEN documents.metadata->>'amount_cents' ~ ? " \
+                         "THEN (documents.metadata->>'amount_cents')::bigint END) <> 0",
+                         Document::AMOUNT_CENTS_REGEX
+                       )
 
       # Currency equality — normalize both sides to ISO codes.
       txn_currency = normalize_currency(txn.currency.to_s)
@@ -114,9 +119,10 @@ module Reconciliations
       due_date_range = ((booked - 30.days)..(booked + 30.days))
 
       docs = base.where(
-        "(document_date BETWEEN :dstart AND :dend) OR (due_date BETWEEN :dustart AND :duend)",
-        dstart:  doc_date_range.begin,  dend:  doc_date_range.end,
-        dustart: due_date_range.begin, duend: due_date_range.end
+        "(documents.metadata->>'document_date' >= :dstart AND documents.metadata->>'document_date' <= :dend) " \
+        "OR (documents.metadata->>'due_date' >= :dustart AND documents.metadata->>'due_date' <= :duend)",
+        dstart:  doc_date_range.begin.to_s,  dend:  doc_date_range.end.to_s,
+        dustart: due_date_range.begin.to_s, duend: due_date_range.end.to_s
       ).limit(50).to_a
 
       # Filter by normalized currency match.
