@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.23.1] - 2026-07-12
+
 ### Changed
 
 - **The "Extracted data" panel in document review (Skim) stays open as you move
