@@ -16,10 +16,12 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-07-12
+
 ### Added
 
 - **Choose your semantic-search embedding model per workspace.** Settings → AI
-  gains a "Semantic search" section where each workspace picks the model that
+  gains an "Embedding Model" section where each workspace picks the model that
   powers email/document search and tag classification: OpenAI
   `text-embedding-3-small` (the previous fixed default) or `text-embedding-3-large`,
   Google `gemini-embedding-001`, or Mistral `mistral-embed` — the Mistral option
