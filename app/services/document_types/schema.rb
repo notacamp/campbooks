@@ -16,13 +16,14 @@ module DocumentTypes
 
     Field = Struct.new(:key, :type, :label, :enum_values, :position, keyword_init: true) do # rubocop:disable Metrics/BlockLength
       # Legacy kind for Skim / field-set UI consumers.
-      # money→:money  date→:date  enum→:enum  everything else→:text
+      # money→:money  date→:date  enum→:enum  boolean→:boolean  everything else→:text
       def kind
         case type
-        when :money then :money
-        when :date  then :date
-        when :enum  then :enum
-        else             :text
+        when :money   then :money
+        when :date    then :date
+        when :enum    then :enum
+        when :boolean then :boolean
+        else               :text
         end
       end
 

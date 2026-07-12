@@ -229,22 +229,11 @@
             <% end %>
           </div>
 
-          <% schema = @document.classification&.extraction_schema %>
-          <% if schema.is_a?(Hash) && schema.any? %>
-            <% schema.each do |field_name, field_def| %>
-              <% value = @document.metadata&.dig(field_name) %>
-              <div>
-                <label class="<%= label_classes %>"><%= field_def["description"] || field_name.humanize %></label>
-                <% if field_def["type"] == "integer" %>
-                  <%= f.number_field "metadata[#{field_name}]", value: value, class: field_classes %>
-                <% else %>
-                  <%= f.text_field "metadata[#{field_name}]", value: value, class: field_classes %>
-                <% end %>
-              </div>
-            <% end %>
-          <% else %>
-            <% partial_name = lookup_context.exists?("documents/forms/#{@document.document_type}", nil, true) ? @document.document_type : "other" %>
-            <%= render "documents/forms/#{partial_name}", f: f %>
+          <% schema_fields = Documents::ExtractedFieldSet.new(@document).fields %>
+          <% if schema_fields.any? %>
+            <%= render "documents/forms/schema_fields",
+                  fields: schema_fields,
+                  extracted_names: Document.extracted_field_names %>
           <% end %>
 
           <div>

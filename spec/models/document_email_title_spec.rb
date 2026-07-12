@@ -15,12 +15,20 @@ RSpec.describe Document, "email title" do
       ai_status: :pending,
       review_status: :pending,
       source: :email,
-      sender_name: sender_name,
-      metadata: metadata
+      # metadata BEFORE sender_name: a later bare metadata assignment would wipe
+      # what the sender_name accessor writes into the metadata hash.
+      metadata: metadata,
+      sender_name: sender_name
     )
     doc.original_file.attach(io: StringIO.new("pdf"), filename: filename, content_type: "application/pdf")
     doc.save!
     doc
+  end
+
+  # A pre-metadata-migration row: the value lives only in the legacy column
+  # (bypassing the accessors, which write metadata).
+  def plant_legacy_sender!(doc, value)
+    Document.where(id: doc.id).update_all(sender_name: value, metadata: nil)
   end
 
   # ── Creation-path assertions ────────────────────────────────────────────────
@@ -45,13 +53,15 @@ RSpec.describe Document, "email title" do
 
   # ── Guard: display_title does not surface an email address after backfill ───
 
-  it "display_title falls back to filename for a legacy row once sender_name is cleared by backfill" do
-    # Simulates a legacy row created before the fix.
-    doc = build_doc(sender_name: "user@example.com", metadata: nil, filename: "attachment.pdf")
-    expect(doc.display_title).to match(/@/), "pre-backfill: email address is still visible (expected)"
+  it "display_title falls back to filename for a legacy row once the upgrade path has run" do
+    # Legacy row: email address in the sender_name COLUMN only (pre-metadata world).
+    doc = build_doc(filename: "attachment.pdf")
+    plant_legacy_sender!(doc, "user@example.com")
 
-    # The migration clears email-address sender_names — simulate it.
+    # Real upgrade order: the email-clearing migration ran before the
+    # column→metadata value backfill, so the address never reaches metadata.
     Document.where("sender_name LIKE '%@%'").update_all(sender_name: nil)
+    DocumentTypes::Backfills::MetadataValueBackfill.run!
     doc.reload
 
     expect(doc.display_title).not_to match(/@/),
@@ -67,24 +77,26 @@ RSpec.describe Document, "email title" do
 
   # ── Backfill migration behaviour ────────────────────────────────────────────
 
-  it "backfill query clears email-address sender_names and leaves proper names alone" do
-    email_doc = build_doc(sender_name: "alice@example.com")
-    name_doc  = build_doc(sender_name: "Acme Lda")
-    nil_doc   = build_doc(sender_name: nil)
+  it "the upgrade path clears email-address sender_names and carries proper names into metadata" do
+    email_doc = build_doc; plant_legacy_sender!(email_doc, "alice@example.com")
+    name_doc  = build_doc; plant_legacy_sender!(name_doc, "Acme Lda")
+    nil_doc   = build_doc
 
-    # Simulate what the migration does (in_batches is not available in tests
-    # without loading AR, so we run the same WHERE clause directly).
+    # Same order as the migrations: clear email-ish columns, then copy columns → metadata.
     Document.where("sender_name LIKE '%@%'").update_all(sender_name: nil)
+    DocumentTypes::Backfills::MetadataValueBackfill.run!
 
     expect(email_doc.reload.sender_name).to be_nil, "email-address sender_name should be cleared"
-    expect(name_doc.reload.sender_name).to eq("Acme Lda"), "human name should be preserved"
+    expect(name_doc.reload.sender_name).to eq("Acme Lda"), "human name should be carried into metadata"
     expect(nil_doc.reload.sender_name).to be_nil, "nil sender_name must stay nil"
   end
 
-  it "backfill is idempotent — safe to run twice" do
-    doc = build_doc(sender_name: "dup@example.com")
+  it "the clearing pass is idempotent — safe to run twice" do
+    doc = build_doc
+    plant_legacy_sender!(doc, "dup@example.com")
 
     2.times { Document.where("sender_name LIKE '%@%'").update_all(sender_name: nil) }
+    DocumentTypes::Backfills::MetadataValueBackfill.run!
 
     expect(doc.reload.sender_name).to be_nil
   end

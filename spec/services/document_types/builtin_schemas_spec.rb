@@ -120,9 +120,11 @@ RSpec.describe DocumentTypes::BuiltinSchemas do
       expect(due_pos).to be > doc_pos
     end
 
-    it "has expense_category as the last field" do
+    it "has company_vat_present as the last field, a boolean" do
       last_pos = schema.values.map { |d| d["position"] }.max
-      expect(schema["expense_category"]["position"]).to eq(last_pos)
+      expect(schema["company_vat_present"]["position"]).to eq(last_pos)
+      expect(schema["company_vat_present"]["type"]).to eq("boolean")
+      expect(schema["expense_category"]["type"]).to eq("enum")
     end
   end
 

@@ -16,6 +16,32 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-07-12
+
+### Changed
+
+- ⚠️ **Every document type is now schema-defined.** The five built-in types
+  (expense invoice, revenue invoice, receipt, bank statement, other) carry the same
+  kind of field schema custom types always had — one uniform, editable definition
+  per type (Settings → Inbox → Document types) that drives extraction, the document
+  edit form, and review. New fields added to a type's schema flow through the whole
+  app with no code changes.
+- ⚠️ **Extracted document values now live in one place.** Values previously split
+  between dedicated database columns and the document's metadata were merged into
+  the metadata store (an idempotent migration runs automatically on upgrade; the
+  old columns are retained for now and will be dropped in an upcoming release —
+  self-hosters querying `documents` columns directly should switch to
+  `metadata->>'field'`). The public API request/response shapes are unchanged.
+- **Documents in non-EUR currencies now display in their own currency.** Amounts
+  were previously always formatted as EUR regardless of the document's currency.
+
+### Fixed
+
+- **Document classification no longer crosses workspaces.** A document could be
+  linked to another workspace's document type of the same name; classification is
+  now always scoped to the document's own workspace, and documents pick up their
+  workspace's type on creation.
+
 ## [0.23.2] - 2026-07-12
 
 ### Fixed

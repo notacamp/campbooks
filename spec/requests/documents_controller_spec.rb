@@ -18,6 +18,64 @@ RSpec.describe "Documents", type: :request do
     expect(response).to redirect_to(files_path)
   end
 
+  describe "PATCH /documents/:id (update)" do
+    let(:doc) do
+      create(:document, workspace: @workspace,
+             metadata: { "title" => "My Invoice", "vendor_name" => "Old Corp", "amount_cents" => 500 })
+    end
+
+    it "metadata merge: preserves unsubmitted keys (e.g. title set by rename)" do
+      patch document_path(doc), params: {
+        document: { vendor_name: "New Corp" }
+      }
+
+      doc.reload
+      expect(doc.vendor_name).to eq("New Corp")
+      # title must survive — it was never submitted in this form post
+      expect(doc.metadata["title"]).to eq("My Invoice")
+    end
+
+    it "metadata merge: blank custom-schema value removes the key" do
+      doc.update_columns(metadata: doc.metadata.merge("custom_key" => "old value"))
+
+      patch document_path(doc), params: {
+        document: { metadata: { "custom_key" => "" } }
+      }
+
+      doc.reload
+      expect(doc.metadata).not_to have_key("custom_key")
+      # existing keys not submitted are preserved
+      expect(doc.metadata["title"]).to eq("My Invoice")
+    end
+
+    it "accessor-named params round-trip through coercion into metadata" do
+      patch document_path(doc), params: {
+        document: { amount_cents: "12345", vendor_name: "Acme Ltd" }
+      }
+
+      doc.reload
+      expect(doc.amount_cents).to eq(12_345)
+      expect(doc.vendor_name).to eq("Acme Ltd")
+      expect(doc.metadata["amount_cents"]).to eq(12_345)
+      expect(doc.metadata["vendor_name"]).to eq("Acme Ltd")
+    end
+
+    it "metadata merge: non-blank custom metadata key is coerced and stored" do
+      # Use a document with a custom schema containing a string field
+      dt = create(:document_type, workspace: @workspace, name: "Custom Type",
+                  extraction_schema: { "ref_code" => { "type" => "string", "position" => 1 } })
+      doc.update_columns(document_type_id: dt.id, metadata: { "title" => "Kept", "ref_code" => "OLD" })
+
+      patch document_path(doc), params: {
+        document: { metadata: { "ref_code" => "  NEW-REF  " } }
+      }
+
+      doc.reload
+      expect(doc.metadata["ref_code"]).to eq("NEW-REF")   # stripped by schema coercion
+      expect(doc.metadata["title"]).to eq("Kept")          # unsubmitted key preserved
+    end
+  end
+
   describe "POST /documents/perform_merge" do
     it "adopts AI data from dup into keep when keep has none; dup's values win for specific fields" do
       keep = create(:document, workspace: @workspace,

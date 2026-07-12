@@ -104,9 +104,33 @@ class DocumentsController < ApplicationController
 
   def update
     was_review = @document.review_pending?
-    reclassified = reclassifying?(document_params)
+    safe_params   = document_params
+    reclassified  = reclassifying?(safe_params)
 
-    if @document.update(document_params)
+    # Separate the metadata sub-hash so we can MERGE it rather than replace:
+    # if we let metadata= run inside assign_attributes after the accessor writers
+    # (vendor_name=, amount_cents=, …), it would wipe out everything they just
+    # wrote into metadata — including unsubmitted keys such as metadata["title"]
+    # set by the inline rename action.
+    incoming_meta = safe_params.delete(:metadata)&.to_h || {}
+    @document.assign_attributes(safe_params)
+
+    # Merge incoming metadata keys (e.g. from custom-schema fields submitted as
+    # document[metadata][key]) with per-key schema coercion; blank value → remove key.
+    schema       = DocumentTypes::Schema.for(@document.classification)
+    current_meta = (@document.metadata || {}).dup
+    incoming_meta.each do |k, v|
+      field   = schema.field(k)
+      coerced = field ? field.coerce(v) : v.presence
+      if coerced.nil?
+        current_meta.delete(k.to_s)
+      else
+        current_meta[k.to_s] = coerced
+      end
+    end
+    @document.metadata = current_meta
+
+    if @document.save
       @document.generate_canonical_filename!
       if was_review && reclassified
         # Re-filing a document under review is itself the sign-off — approve it in

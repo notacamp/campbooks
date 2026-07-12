@@ -1,0 +1,36 @@
+<%# Schema-driven field grid. Locals: fields (Array of ExtractedFieldSet hashes),
+    extracted_names (Array of String keys backed by Document accessor writers).
+    Fields in extracted_names submit as document[key]; others as document[metadata][key].
+    Money values are raw integer cents. Enum labels use the same helpers as the old
+    per-type partials (human_enum for expense_category, payment_method_label for
+    payment_method, humanize for everything else). -%>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  <% fields.each do |field| %>
+    <% field_name = extracted_names.include?(field[:key]) ? "document[#{field[:key]}]" : "document[metadata][#{field[:key]}]" %>
+    <% case field[:kind] %>
+    <% when :date %>
+      <%= render Campbooks::Input.new(field_name, type: :date, label: field[:label], value: field[:value]) %>
+    <% when :money %>
+      <%= render Campbooks::Input.new(field_name, type: :number, label: field[:label], value: field[:value]) %>
+    <% when :boolean %>
+      <div class="flex items-end pb-1">
+        <input type="hidden" name="<%= field_name %>" value="0">
+        <%= render Campbooks::Checkbox.new(field_name, label: field[:label], checked: field[:value] == true) %>
+      </div>
+    <% when :enum %>
+      <% enum_options = field[:enum_values].map do |v|
+           lbl = if field[:key] == "expense_category"
+             human_enum(Document, :expense_category, v)
+           elsif field[:key] == "payment_method"
+             payment_method_label(v)
+           else
+             v.humanize
+           end
+           [lbl, v]
+         end %>
+      <%= render Campbooks::Select.new(field_name, label: field[:label], options: enum_options, selected: field[:value].to_s, include_blank: true) %>
+    <% else %>
+      <%= render Campbooks::Input.new(field_name, label: field[:label], value: field[:value]) %>
+    <% end %>
+  <% end %>
+</div>

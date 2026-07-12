@@ -542,10 +542,14 @@ class Document < ApplicationRecord
     { "filename" => original_file&.filename.to_s, "document_type" => (classification&.name || document_type) }
   end
 
+  # Keep the classification FK in step with the legacy enum. Scoped to the document's
+  # own workspace (a global name lookup could link a document to another workspace's
+  # type — leaking its schema, prompt, and auto-star). Also fires on create when no
+  # explicit classification was given, so new documents always link when their
+  # workspace has a matching type (the enum default doesn't register as "changed").
   def sync_document_type_id
-    return unless document_type_changed?
-    dt = DocumentType.find_by(name: document_type)
-    self.document_type_id = dt&.id
+    return unless document_type_changed? || (new_record? && document_type_id.nil?)
+    self.document_type_id = workspace&.document_types&.find_by(name: document_type)&.id
   end
 
   # Auto-star a document when its classification opts into it (DocumentType#auto_star).

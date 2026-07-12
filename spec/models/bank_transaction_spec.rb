@@ -122,14 +122,14 @@ RSpec.describe BankTransaction, type: :model do
       end
 
       it "returns true when the buyer NIF is missing" do
-        doc.update_columns(buyer_nif: nil)
+        doc.update!(buyer_nif: nil)
         create(:transaction_match, bank_transaction: transaction, document: doc,
                                    status: :confirmed, matched_by: :ai, confidence: 0.9, match_reasons: {})
         expect(transaction.nif_flagged?(company_nif)).to be true
       end
 
       it "returns true when the buyer NIF is a mismatch" do
-        doc.update_columns(buyer_nif: "999888777")
+        doc.update!(buyer_nif: "999888777")
         create(:transaction_match, bank_transaction: transaction, document: doc,
                                    status: :confirmed, matched_by: :ai, confidence: 0.9, match_reasons: {})
         expect(transaction.nif_flagged?(company_nif)).to be true

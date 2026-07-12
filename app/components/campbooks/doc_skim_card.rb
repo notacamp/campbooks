@@ -309,8 +309,8 @@ module Campbooks
       when :money
         input(type: "number", inputmode: "numeric", value: edit_value(field[:value]),
               class: field_input_classes, data: store)
-      when :enum_expense_category then select_control(field, expense_category_options, store)
-      when :enum_payment_method   then select_control(field, helpers.payment_method_options, store)
+      when :enum    then select_control(field, enum_option_pairs(field), store)
+      when :boolean then select_control(field, boolean_option_pairs, store)
       else
         input(type: "text", value: edit_value(field[:value]), class: field_input_classes, data: store)
       end
@@ -332,7 +332,21 @@ module Campbooks
     end
 
     def expense_category_options
-      Document.expense_categories.keys.map { |key| [ helpers.human_enum(Document, :expense_category, key), key ] }
+      Document::EXPENSE_CATEGORIES.map { |key| [ helpers.human_enum(Document, :expense_category, key), key ] }
+    end
+
+    # Label/value pairs for a schema enum field. The two well-known enums keep their
+    # localized labels; ad-hoc enum values from custom schemas fall back to humanize.
+    def enum_option_pairs(field)
+      case field[:key]
+      when "expense_category" then expense_category_options
+      when "payment_method"   then helpers.payment_method_options
+      else Array(field[:enum_values]).map { |v| [ v.to_s.humanize, v.to_s ] }
+      end
+    end
+
+    def boolean_option_pairs
+      [ [ t(".boolean_yes"), "true" ], [ t(".boolean_no"), "false" ] ]
     end
 
     # Top-level display name (metadata["title"]).

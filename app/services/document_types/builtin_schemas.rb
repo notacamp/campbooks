@@ -57,7 +57,10 @@ module DocumentTypes
         "expense_category" => { "type" => "enum",  "position" => 11,
                                 "values"      => EXPENSE_CATEGORIES,
                                 "label_key"   => "documents.forms.expense_invoice.expense_category",
-                                "description" => "Expense Category" }
+                                "description" => "Expense Category" },
+        "company_vat_present" => { "type" => "boolean", "position" => 12,
+                                   "label_key"   => "documents.forms.expense_invoice.company_vat_present",
+                                   "description" => "Company VAT number present" }
       }.freeze,
 
       "revenue_invoice" => {

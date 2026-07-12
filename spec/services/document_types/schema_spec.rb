@@ -150,8 +150,8 @@ RSpec.describe DocumentTypes::Schema do
       expect(schema.field("tax_rate").kind).to eq(:text)
     end
 
-    it "returns :text for boolean type" do
-      expect(schema.field("active").kind).to eq(:text)
+    it "returns :boolean for boolean type" do
+      expect(schema.field("active").kind).to eq(:boolean)
     end
   end
 

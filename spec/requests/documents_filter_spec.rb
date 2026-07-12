@@ -13,9 +13,13 @@ RSpec.describe "Documents list filters", type: :request do
 
   # display_title prefers metadata["title"], so a distinctive title gives each
   # document a stable marker to assert on in the rendered list.
+  # document_date is set directly in metadata because passing both document_date:
+  # and metadata: to FactoryBot would cause the explicit metadata: hash (which
+  # goes through metadata=) to overwrite whatever the document_date= accessor
+  # already wrote into metadata, losing the date from the JSONB column.
   def titled(title, date)
     create(:document, :approved, workspace: workspace,
-           document_date: date, metadata: { "title" => title })
+           metadata: { "title" => title, "document_date" => date.iso8601 })
   end
 
   describe "GET /documents?month=YYYY-MM" do

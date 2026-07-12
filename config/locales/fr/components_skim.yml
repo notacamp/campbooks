@@ -5,6 +5,8 @@ fr:
       ai_confidence: Confiance de l'IA
       apply: Appliquer
       approve: Approuver
+      boolean_no: "Non"
+      boolean_yes: "Oui"
       document_fallback: Document
       download: Télécharger
       edit: Modifier
