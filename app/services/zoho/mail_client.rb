@@ -212,11 +212,11 @@ module Zoho
     # --- Read/Unread API ---
 
     def mark_read(message_ids)
-      update_message_status(message_ids, "markRead")
+      update_message_status(message_ids, "markAsRead")
     end
 
     def mark_unread(message_ids)
-      update_message_status(message_ids, "markUnread")
+      update_message_status(message_ids, "markAsUnread")
     end
 
     def update_message_status(message_ids, mode, extra = {})
