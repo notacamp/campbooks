@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-07-13
+
 ### Fixed
 
 - Clicking a contact on the Contacts page no longer shows a "Content missing"
@@ -1626,7 +1628,8 @@ major, minor, or patch change here.
 
 - Initial public, source-available release of Campbooks.
 
-[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.21.1...HEAD
+[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.26.1...HEAD
+[0.26.1]: https://github.com/notacamp/campbooks/compare/v0.26.0...v0.26.1
 [0.21.1]: https://github.com/notacamp/campbooks/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/notacamp/campbooks/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/notacamp/campbooks/compare/v0.19.9...v0.20.0
