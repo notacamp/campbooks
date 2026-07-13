@@ -34,10 +34,17 @@ module Zoho
     # Zoho has no incremental sync token, so an incremental pull is just a full
     # pull over the window. next_sync_token stays nil (the Calendar row falls back
     # to last_event_sync_at-based polling).
+    #
+    # This runs every minute, so it must stay a SINGLE request — chunking the
+    # persisted multi-month window here would fan out to ~16 Zoho calls per
+    # calendar per minute. Clamp to one 30-day window around now; changes outside
+    # it are picked up by the 15-minute full sweep, which chunks the whole window.
     def list_events_incremental(calendar)
       window_start = calendar.sync_window_start || 30.days.ago
       window_end   = calendar.sync_window_end   || 365.days.from_now
-      list_events_full(calendar, time_min: window_start, time_max: window_end)
+      clamped_start = [ window_start.to_time, 7.days.ago.to_time ].max
+      clamped_end   = [ window_end.to_time, clamped_start + SLICE_DAYS.days ].min
+      list_events_full(calendar, time_min: clamped_start, time_max: clamped_end)
     end
 
     # Zoho caps the range parameter at 31 days per request. We slice [time_min,

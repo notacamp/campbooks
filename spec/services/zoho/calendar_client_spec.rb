@@ -277,4 +277,47 @@ RSpec.describe Zoho::CalendarClient, type: :service do
       end
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # list_events_incremental clamps to a single slice
+  #
+  # The incremental pull runs every minute. If it inherited the persisted
+  # multi-month window it would chunk into ~16 requests per calendar per minute,
+  # so it must clamp to one <=30-day window around now (the 15-minute full sweep
+  # covers the rest of the window).
+  # ---------------------------------------------------------------------------
+
+  describe "#list_events_incremental" do
+    it "issues exactly one request even when the persisted window spans 455 days" do
+      calendar.sync_window_start = 90.days.ago
+      calendar.sync_window_end   = 365.days.from_now
+
+      allow(conn).to receive(:get)
+                       .with("#{base_url}/calendars/cal_001/events", anything)
+                       .and_return(ok_response("events" => []))
+
+      client.list_events_incremental(calendar)
+
+      expect(conn).to have_received(:get).exactly(1).times
+    end
+
+    it "polls a window that starts no earlier than ~7 days ago and spans at most 30 days" do
+      calendar.sync_window_start = 90.days.ago
+      calendar.sync_window_end   = 365.days.from_now
+
+      captured_range = nil
+      allow(conn).to receive(:get)
+                       .with("#{base_url}/calendars/cal_001/events", anything) do |_url, params|
+        captured_range = JSON.parse(params[:range])
+        ok_response("events" => [])
+      end
+
+      client.list_events_incremental(calendar)
+
+      range_start = Time.parse(captured_range["start"])
+      range_end   = Time.parse(captured_range["end"])
+      expect(range_start).to be_within(1.minute).of(7.days.ago)
+      expect(range_end - range_start).to be <= 30.days.to_i
+    end
+  end
 end
