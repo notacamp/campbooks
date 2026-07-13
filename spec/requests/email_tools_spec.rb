@@ -86,6 +86,26 @@ RSpec.describe "Email tools (Scout suggested actions)", type: :request do
     end
   end
 
+  # Regression (#294): the restore insert used to ride only on the inbox_feed
+  # broadcast, which folder/group/search views don't subscribe to — Undo looked
+  # like a no-op there until a manual reload. The acting tab's own response now
+  # prepends the row back into #email_threads.
+  describe "unarchive (undo) from the inbox list" do
+    let(:thread) { create(:email_thread, email_account: account) }
+    let(:message) { create(:email_message, email_account: account, email_thread: thread) }
+
+    before { allow(Tools::Unarchive).to receive(:call).and_return(true) }
+
+    it "prepends the restored thread row in the acting tab's response" do
+      post tool_email_message_path(message), params: { tool: "unarchive" }, as: :turbo_stream
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include('action="prepend"')
+      expect(response.body).to include('target="email_threads"')
+      expect(response.body).to include("thread_item_email_thread_#{thread.id}") # the re-rendered row
+    end
+  end
+
   describe "draft_reply" do
     let(:thread) { create(:email_thread, email_account: account) }
     let(:message) { create(:email_message, email_account: account, email_thread: thread) }
