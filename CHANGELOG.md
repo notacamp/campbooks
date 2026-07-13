@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-07-13
+
 ### Fixed
 
 - **Alerts and other mail sent from the same address as your Campbooks
