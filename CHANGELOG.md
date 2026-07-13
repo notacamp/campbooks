@@ -34,6 +34,31 @@ major, minor, or patch change here.
 - Undoing an archive now puts the conversation straight back into the list you
   were viewing (folder or search included) — previously it only reappeared on
   the unfiltered inbox or after a manual reload. (#294)
+- Marking mail read/unread in Campbooks now reaches the Zoho mailbox — Zoho
+  rejected the previous API mode string on every call, so read state silently
+  never synced back. (#296)
+- Zoho Calendar events sync into Campbooks again: event pulls are issued in
+  ≤31-day slices (Zoho caps the requested range), where previously every pull
+  was rejected and no Zoho events ever appeared. The minute-cadence poll stays
+  a single request covering the next month. (#297)
+- Creating, updating and deleting events on a Zoho calendar now works: the
+  event payload no longer contains JSON nulls (which Zoho answers with a 500),
+  and the concurrency etag is sent as a request header as Zoho requires —
+  previously updates and deletes were rejected outright. (#298)
+- Embedding ingest now survives provider outages: transient errors (rate
+  limits, timeouts) retry with backoff instead of permanently skipping the
+  chunk, and the re-embed sweep fails visibly instead of halting silently when
+  the provider becomes unavailable mid-run. New managed workspaces default to
+  the EU Mistral embedding model so semantic search works out of the box. (#295)
+- The System Health call log no longer stores full AI request/response bodies
+  for successful calls (they carried email-derived text and vector arrays) and
+  prunes successful AI rows after 7 days — the log had grown to several
+  gigabytes in about a week. (#299)
+- Managed document analysis works again: Mistral retired the `pixtral-large`
+  model id (the API now rejects it), so the managed vision default moves to the
+  multimodal `mistral-medium-latest`. Embedding requests are also packed to a
+  per-request character budget — Mistral rejects oversized batches outright,
+  which previously stalled the re-embed sweep. (#295)
 
 ## [0.26.0] - 2026-07-12
 
