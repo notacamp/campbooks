@@ -123,6 +123,15 @@ module Ai
         assign_purposes(docs, AiConfiguration::DOCUMENT_PURPOSES)
       end
 
+      # Managed text/docs run on Mistral (EU). Pin embeddings to the Mistral
+      # entry too so new managed workspaces embed without needing an OpenAI key.
+      # Only set when the workspace hasn't already chosen an explicit model — never
+      # override a deliberate selection.
+      if @workspace.embedding_model.nil?
+        mistral_entry = Ai::EmbeddingModels.find("mistral/mistral-embed")
+        @workspace.update!(embedding_model: mistral_entry.key)
+      end
+
       text
     end
 

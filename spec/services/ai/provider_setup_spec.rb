@@ -137,6 +137,22 @@ RSpec.describe Ai::ProviderSetup do
       end
     end
 
+    it "apply_managed sets embedding_model to mistral/mistral-embed when it was nil" do
+      with_env(text_key => "k") do
+        expect(@ws.embedding_model).to be_nil
+        @setup.apply_managed
+        expect(@ws.reload.embedding_model).to eq("mistral/mistral-embed")
+      end
+    end
+
+    it "apply_managed does not override an explicit non-nil embedding_model" do
+      @ws.update!(embedding_model: "openai/text-embedding-3-large")
+      with_env(text_key => "k") do
+        @setup.apply_managed
+        expect(@ws.reload.embedding_model).to eq("openai/text-embedding-3-large")
+      end
+    end
+
     it "apply_managed raises on a self-hosted install" do
       with_self_hosted do
         # Override the top-level before stub so self_hosted returns the real value

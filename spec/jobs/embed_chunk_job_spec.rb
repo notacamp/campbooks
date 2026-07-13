@@ -26,6 +26,32 @@ RSpec.describe EmbedChunkJob, type: :job do
     Array.new(dims) { 0.5 }
   end
 
+  # -----------------------------------------------------------------------
+  # Transient provider errors → job retries rather than going straight to failed
+  # -----------------------------------------------------------------------
+  describe "retry on transient provider errors" do
+    it "is configured to retry on every TRANSIENT_ERRORS class" do
+      retry_handlers = described_class.rescue_handlers.map(&:first)
+      Ai::Adapters::Base::TRANSIENT_ERRORS.each do |error_class|
+        expect(retry_handlers).to include(error_class.to_s),
+          "Expected EmbedChunkJob to retry on #{error_class}, but no retry_on handler found"
+      end
+    end
+
+    it "re-raises a rate-limit error from #perform so retry_on can schedule the retry" do
+      chunk = create_chunk(entry: default_entry)
+
+      allow(EmbeddingService).to receive(:embed)
+        .and_raise(Faraday::TooManyRequestsError.new(nil, nil))
+
+      # Call #perform directly: perform_now would let retry_on intercept the
+      # exception and schedule a retry instead of raising.
+      expect {
+        described_class.new.perform(chunk)
+      }.to raise_error(Faraday::TooManyRequestsError)
+    end
+  end
+
   describe "mistral workspace" do
     before { workspace.update!(embedding_model: "mistral/mistral-embed") }
 
