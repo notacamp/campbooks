@@ -233,9 +233,14 @@ RSpec.describe Search::WorkspaceReembedJob, type: :job do
   end
 
   # -----------------------------------------------------------------------
-  # embed_batch returning [] → halts, does NOT re-enqueue
+  # embed_batch returning [] mid-sweep → raises loudly, does NOT re-enqueue
+  #
+  # The workspace passed the entry-gate so a blank return means the provider
+  # became unavailable after the sweep started (quota exhausted, adapter gone).
+  # The job must raise Ai::EmbeddingUnavailableError so it lands in the failed
+  # set and is visible to operators, not vanish silently with work remaining.
   # -----------------------------------------------------------------------
-  describe "embed_batch returns blank" do
+  describe "embed_batch returns blank for a configured workspace" do
     before do
       workspace.update!(embedding_model: "mistral/mistral-embed")
       allow(Ai::ProviderSetup).to receive(:configured?).with(workspace, :embeddings).and_return(true)
@@ -243,9 +248,15 @@ RSpec.describe Search::WorkspaceReembedJob, type: :job do
       allow(EmbeddingService).to receive(:embed_batch).and_return([])
     end
 
-    it "halts and does NOT re-enqueue" do
+    it "raises Ai::EmbeddingUnavailableError" do
       expect {
         described_class.perform_now(workspace)
+      }.to raise_error(Ai::EmbeddingUnavailableError, /phase 1/)
+    end
+
+    it "does NOT re-enqueue itself before raising" do
+      expect {
+        described_class.perform_now(workspace) rescue nil
       }.not_to have_enqueued_job(described_class)
     end
   end

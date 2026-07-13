@@ -57,7 +57,7 @@ class AiConfiguration < ApplicationRecord
   }.freeze
 
   MODELS = {
-    "mistral"   => %w[mistral-large-latest mistral-medium-latest mistral-small-latest ministral-8b-latest pixtral-large-latest],
+    "mistral"   => %w[mistral-large-latest mistral-medium-latest mistral-small-latest ministral-8b-latest],
     "openai"    => %w[gpt-4o gpt-4o-mini gpt-4-turbo gpt-4 gpt-3.5-turbo o3-mini o4-mini],
     "anthropic" => %w[claude-sonnet-4-6 claude-haiku-4-5 claude-opus-4-7 claude-sonnet-4-5],
     "deepseek"  => %w[deepseek-v4-pro deepseek-chat deepseek-reasoner],
@@ -73,10 +73,12 @@ class AiConfiguration < ApplicationRecord
   }.freeze
 
   # Document analysis needs a vision-capable model, which may differ from the
-  # provider's general-purpose text default (e.g. Mistral uses pixtral for docs
-  # vs mistral-small for text). Falls back to DEFAULT_MODEL when absent.
+  # provider's general-purpose text default (e.g. Mistral uses the multimodal
+  # mistral-medium for docs vs mistral-small for text). Falls back to
+  # DEFAULT_MODEL when absent. NB: Mistral retired the pixtral-* ids — the API
+  # now answers them with 400 "Invalid model".
   DOC_DEFAULT_MODEL = {
-    "mistral"   => "pixtral-large-latest",
+    "mistral"   => "mistral-medium-latest",
     "openai"    => "gpt-4o-mini",
     "anthropic" => "claude-sonnet-4-6",
     "gemini"    => "gemini-2.0-flash"
