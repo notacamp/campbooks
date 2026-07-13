@@ -1,5 +1,12 @@
 ---
 es:
+  components:
+    email_template_picker:
+      button: Plantillas
+      button_aria: Insertar una plantilla de correo
+      close: Cerrar
+      subtitle: Elige una plantilla para insertarla en tu correo.
+      title: Plantillas de correo
   email_templates:
     fill_form:
       attachments_note:

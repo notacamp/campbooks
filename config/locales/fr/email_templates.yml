@@ -1,5 +1,12 @@
 ---
 fr:
+  components:
+    email_template_picker:
+      button: Modèles
+      button_aria: Insérer un modèle d'e-mail
+      close: Fermer
+      subtitle: Choisissez un modèle à insérer dans votre e-mail.
+      title: Modèles d'e-mail
   email_templates:
     fill_form:
       attachments_note:

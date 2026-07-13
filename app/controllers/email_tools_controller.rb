@@ -259,11 +259,23 @@ class EmailToolsController < ApplicationController
                     layout: false
                   )) ]
             else
-              # The live inbox broadcast (Emails::InboxBroadcaster#upsert, fired from
-              # EmailActions.run) owns re-inserting the row at the top of the inbox —
-              # for this tab and every other reader alike — and removes-before-prepends
-              # so it can't duplicate against this response. Nothing to add here.
-              []
+              # Restore the row in the acting tab directly. The inbox_feed broadcast
+              # (Emails::InboxBroadcaster#upsert) also prepends, but only the
+              # unfiltered default inbox subscribes to it — an Undo clicked while
+              # viewing a folder (#294) or a search never got its row back without a
+              # reload. The acting tab just watched this exact row leave on archive,
+              # so putting it back here is what Undo means; Turbo's prepend
+              # de-duplicates by id, so the tabs that also get the broadcast
+              # converge to a single row. No-ops where #email_threads doesn't exist.
+              if (thread = email_message.email_thread)&.latest_message
+                [ turbo_stream.prepend(
+                    Emails::InboxBroadcaster::THREADS_CONTAINER,
+                    partial: "email_messages/thread_row",
+                    locals: { thread: thread, active: false }
+                  ) ]
+              else
+                []
+              end
             end
           when "trash"
             toast = { message: t(".thread_trashed"), variant: :success }
