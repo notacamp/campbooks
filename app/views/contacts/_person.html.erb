@@ -1,7 +1,10 @@
 <%# locals: person %>
 <% primary = person.contacts.max_by { |c| c.email_count || 0 } %>
 <div id="<%= primary ? dom_id(primary, :contact_row) : "person_#{person.id}" %>" class="flex items-center gap-3 py-3 px-4 hover:bg-muted/40 transition-colors">
-  <%= link_to (primary ? contact_path(primary) : contacts_path), class: "flex items-center gap-3 min-w-0 flex-1" do %>
+  <%# The row lives inside the isc_list turbo frame — escape it, or the contact
+      page (which has no such frame) renders "Content missing". %>
+  <%= link_to (primary ? contact_path(primary) : contacts_path), class: "flex items-center gap-3 min-w-0 flex-1",
+        data: { turbo_frame: "_top" } do %>
     <span class="w-9 h-9 rounded-full bg-accent-100 text-accent-700 dark:bg-accent-500/15 dark:text-accent-300 text-sm font-semibold flex items-center justify-center flex-shrink-0">
       <%= person.display_name.to_s.first(1).upcase.presence || "?" %>
     </span>

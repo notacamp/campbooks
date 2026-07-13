@@ -36,7 +36,9 @@ class ComposeChatReplyJob < ApplicationJob
       )
     end
 
-    broadcast_update(thread, result[:auto_actions] || [])
+    # result is nil when the AI errored — still broadcast, or the error reply
+    # created above never reaches the open panel and the typing dots spin forever.
+    broadcast_update(thread, result ? (result[:auto_actions] || []) : [])
   rescue ActiveRecord::RecordNotFound
     Rails.logger.warn("[ComposeChatReplyJob] Message #{agent_message_id} not found, skipping")
   rescue => e
@@ -46,6 +48,11 @@ class ComposeChatReplyJob < ApplicationJob
 
   private
 
+  # The tools compose_chat_controller#__executeAutoAction__ knows. The tool name
+  # is model output interpolated into a <script> — only these exact strings may
+  # pass (anything else could break out of the JS string literal).
+  AUTO_ACTION_TOOLS = %w[set_recipients set_subject set_body select_account set_signature send_email].freeze
+
   def broadcast_update(thread, auto_actions = [])
     messages = thread.agent_messages.chronological.last(50)
     html = ApplicationController.render(
@@ -53,7 +60,8 @@ class ComposeChatReplyJob < ApplicationJob
       locals: { thread: thread, messages: messages }
     )
     # Build script tags for auto_actions — Turbo evaluates <script> in stream templates
-    auto_scripts = auto_actions.map { |a| "<script data-auto-action>var c=Stimulus.getControllerForElementAndIdentifier(document.querySelector('[data-controller~=compose-chat]'),'compose-chat');if(c)c.__executeAutoAction__('#{a['tool']}',#{a['args'].to_json})</script>" }.join
+    auto_scripts = auto_actions.select { |a| AUTO_ACTION_TOOLS.include?(a["tool"]) }
+                               .map { |a| "<script data-auto-action>var c=Stimulus.getControllerForElementAndIdentifier(document.querySelector('[data-controller~=compose-chat]'),'compose-chat');if(c)c.__executeAutoAction__('#{a['tool']}',#{(a['args'] || {}).to_json})</script>" }.join
     wrapped = "<div id=\"compose_messages_wrapper\" class=\"flex flex-col flex-1 min-h-0\">#{html}#{auto_scripts}</div>"
     Turbo::StreamsChannel.broadcast_replace_to(
       "compose_chat_#{thread.user.id}",

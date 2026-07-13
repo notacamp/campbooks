@@ -1,5 +1,12 @@
 ---
 en:
+  components:
+    email_template_picker:
+      button: Templates
+      button_aria: Insert an email template
+      close: Close
+      subtitle: Pick a template to insert into your email.
+      title: Email templates
   email_templates:
     fill_form:
       attachments_note:

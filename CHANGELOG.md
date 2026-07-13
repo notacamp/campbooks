@@ -16,6 +16,23 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Clicking a contact on the Contacts page no longer shows a "Content missing"
+  error — the row now opens the contact's page as a full navigation. (#288)
+- The parked-draft "Draft saved" pill no longer appears on the compose page,
+  where it sat on top of Scout's chat input and blocked typing. It still
+  surfaces on every other page. (#289)
+- Scout's compose assistant now drafts the email body immediately when you
+  describe what to say, instead of stopping after recipients/subject and never
+  writing the draft. It also no longer guesses recipient addresses — it only
+  uses addresses you typed or known contacts, and asks otherwise. (#290)
+- The "Templates" button in the composer footer was missing its translations
+  in all languages and rendered a raw translation-missing string. (#291)
+- Undoing an archive now puts the conversation straight back into the list you
+  were viewing (folder or search included) — previously it only reappeared on
+  the unfiltered inbox or after a manual reload. (#294)
+
 ## [0.26.0] - 2026-07-12
 
 ### Removed
