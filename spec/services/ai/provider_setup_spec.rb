@@ -145,11 +145,26 @@ RSpec.describe Ai::ProviderSetup do
       end
     end
 
+    it "apply_managed enqueues the re-embed sweep when it pins the model" do
+      with_env(text_key => "k") do
+        expect { @setup.apply_managed }
+          .to have_enqueued_job(Search::WorkspaceReembedJob).with(@ws)
+      end
+    end
+
     it "apply_managed does not override an explicit non-nil embedding_model" do
       @ws.update!(embedding_model: "openai/text-embedding-3-large")
       with_env(text_key => "k") do
         @setup.apply_managed
         expect(@ws.reload.embedding_model).to eq("openai/text-embedding-3-large")
+      end
+    end
+
+    it "apply_managed does not enqueue a sweep when the model was already set" do
+      @ws.update!(embedding_model: "openai/text-embedding-3-large")
+      with_env(text_key => "k") do
+        expect { @setup.apply_managed }
+          .not_to have_enqueued_job(Search::WorkspaceReembedJob)
       end
     end
 

@@ -126,10 +126,14 @@ module Ai
       # Managed text/docs run on Mistral (EU). Pin embeddings to the Mistral
       # entry too so new managed workspaces embed without needing an OpenAI key.
       # Only set when the workspace hasn't already chosen an explicit model — never
-      # override a deliberate selection.
+      # override a deliberate selection. Enqueue the sweep like the Settings
+      # model-switch does: a brand-new workspace has nothing to migrate (instant
+      # no-op), while an existing workspace opting into managed AI gets its stale
+      # chunks re-embedded instead of search silently degrading.
       if @workspace.embedding_model.nil?
         mistral_entry = Ai::EmbeddingModels.find("mistral/mistral-embed")
         @workspace.update!(embedding_model: mistral_entry.key)
+        Search::WorkspaceReembedJob.perform_later(@workspace)
       end
 
       text
