@@ -6,16 +6,26 @@ module Emails
   # AI extractors (and flag digests for the reader) instead of mining our own mail
   # for the reminders / tasks / contacts it already lists.
   #
-  # Detection is gated on the sender: the message must come FROM our own configured
-  # mailer address (MAILER_FROM). That gate is SPF/DMARC-protected, so a third party
-  # can't trip it by spoofing our headers. The X-Campbooks-Kind header — which we
-  # stamp on the way out (DigestMailer) and which Gmail / Microsoft surface on the
-  # way back in — only REFINES the kind (→ "digest") for mail already confirmed
-  # ours; Zoho strips transport headers from its list endpoint, so its digests fall
-  # back to the generic "campbooks" kind (still skipped, just not badged "Digest").
+  # Detection needs TWO signals, because MAILER_FROM can be a *shared* sending
+  # identity: one no-reply@ address is often used by the app AND by unrelated
+  # services on the same domain (health-monitoring alerts, a status page). Matching
+  # on the From address alone swallows those third-party alerts and robs them of
+  # triage and inbox rules. So a message is ours only when BOTH hold:
   #
-  # Dependency-free (the sender address is injected) so it unit-tests in isolation,
-  # like Emails::Categorizer.
+  #   1. From is our own mailer address (MAILER_FROM). SPF/DMARC-protected, so a
+  #      third party can't spoof it.
+  #   2. It carries our X-Campbooks-Kind marker — stamped on ALL app mail by
+  #      ApplicationMailer (refined to "digest" by DigestMailer). Gmail / Microsoft
+  #      surface it on the way back in, so its ABSENCE there means a *different*
+  #      sender is legitimately using our shared From address → ordinary inbound.
+  #
+  # Zoho strips transport headers from its list endpoint, so the marker can never
+  # arrive on a Zoho-synced message; there (`headers_available: false`) we fall back
+  # to the address-only signal — best-effort, at the cost of not distinguishing a
+  # shared-address third party on Zoho.
+  #
+  # Dependency-free (sender address + provider capability are injected) so it
+  # unit-tests in isolation, like Emails::Categorizer.
   class SelfGeneratedDetector
     GENERIC_KIND = "campbooks"
 
@@ -23,13 +33,16 @@ module Emails
     # (including a spoofed value) collapses to the generic kind.
     KNOWN_KINDS = %w[digest].freeze
 
-    def self.kind_for(msg, mailer_from:)
-      new(msg, mailer_from: mailer_from).kind
+    def self.kind_for(msg, mailer_from:, headers_available: true)
+      new(msg, mailer_from: mailer_from, headers_available: headers_available).kind
     end
 
-    def initialize(msg, mailer_from:)
+    # headers_available: does the syncing provider surface transport headers (and so
+    # our X-Campbooks-Kind marker)? True for Gmail/Microsoft, false for Zoho.
+    def initialize(msg, mailer_from:, headers_available: true)
       @msg = msg || {}
       @mailer_from = mailer_from
+      @headers_available = headers_available
     end
 
     # The self-generated kind ("digest" or "campbooks"), or nil for third-party mail.
@@ -37,7 +50,13 @@ module Emails
       return nil unless from_our_mailer?
 
       declared = header("header_campbooks_kind")
-      KNOWN_KINDS.include?(declared) ? declared : GENERIC_KIND
+      return KNOWN_KINDS.include?(declared) ? declared : GENERIC_KIND if declared
+
+      # From our shared address but WITHOUT our marker. On a provider that surfaces
+      # headers (Gmail/Microsoft) our own mail always carries it, so its absence
+      # means a different sender is using the address — not ours. Only when headers
+      # are unavailable (Zoho) do we fall back to the address-only signal.
+      @headers_available ? nil : GENERIC_KIND
     end
 
     private

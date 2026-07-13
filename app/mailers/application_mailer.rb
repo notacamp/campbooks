@@ -1,7 +1,14 @@
 class ApplicationMailer < ActionMailer::Base
   # Set MAILER_FROM to a sender your SMTP provider authorizes (with some providers,
   # e.g. Zoho, it must be the authenticated mailbox or a verified send-as alias).
-  default from: ENV.fetch("MAILER_FROM", "Campbooks <no-reply@example.com>")
+  #
+  # X-Campbooks-Kind marks every outgoing app email as ours. This mail is delivered
+  # to the user's own mailbox and re-ingested by the scanner; the marker lets
+  # Emails::SelfGeneratedDetector recognise it (and skip the AI pipeline) even when
+  # MAILER_FROM is a shared no-reply@ address that other services also send from.
+  # DigestMailer overrides it to "digest" so the inbox can badge digests.
+  default from: ENV.fetch("MAILER_FROM", "Campbooks <no-reply@example.com>"),
+          "X-Campbooks-Kind" => "campbooks"
   layout "mailer"
   helper :mailer_style
 
