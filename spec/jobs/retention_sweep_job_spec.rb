@@ -82,6 +82,26 @@ RSpec.describe RetentionSweepJob, type: :job do
       described_class.new.perform
       expect { fresh_success.reload }.not_to raise_error
     end
+
+    # ── AI service success retention (7-day window) ────────────────────────────
+
+    it "8-day-old successful ai_mistral row is pruned on the 7-day AI window" do
+      old_ai_success = make_call(service: "ai_mistral", status: :success, created_at: 8.days.ago)
+      described_class.new.perform
+      expect { old_ai_success.reload }.to raise_error(ActiveRecord::RecordNotFound)
+    end
+
+    it "8-day-old successful zoho_mail row is kept (not an AI service)" do
+      recent_non_ai_success = make_call(service: "zoho_mail", status: :success, created_at: 8.days.ago)
+      described_class.new.perform
+      expect { recent_non_ai_success.reload }.not_to raise_error
+    end
+
+    it "8-day-old ERROR ai_mistral row is kept (error window is 90 days)" do
+      ai_error = make_call(service: "ai_mistral", status: :error, created_at: 8.days.ago)
+      described_class.new.perform
+      expect { ai_error.reload }.not_to raise_error
+    end
   end
 
   describe "opt-in content retention" do

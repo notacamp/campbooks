@@ -339,6 +339,89 @@ RSpec.describe SystemHealth::FaradayMiddleware do
     expect(row.response_body.length).to be < large_body.length
   end
 
+  # ── AI service body capping ────────────────────────────────────────────────────
+
+  # Successful AI calls must be capped at AI_SUCCESS_BODY_LIMIT (500 chars) so
+  # email-derived content (embedding texts, vector arrays) does not accumulate
+  # verbatim in the operational log.
+  it "successful ai_* call caps request and response bodies at AI_SUCCESS_BODY_LIMIT" do
+    ai_limit = SystemHealth::FaradayMiddleware::AI_SUCCESS_BODY_LIMIT
+    large_request  = { model: "text-embedding-ada-002", input: "a" * 2000 }
+    large_response = '{"object":"list","data":[{"embedding":[' + ("0.12345," * 1536).chomp(",") + ']}]}'
+
+    stubs = Faraday::Adapter::Test::Stubs.new do |s|
+      s.post("/v1/embeddings") { [ 200, { "Content-Type" => "application/json" }, large_response ] }
+    end
+
+    conn = Faraday.new(url: "http://example.com") do |f|
+      f.use SystemHealth::FaradayMiddleware, service: "ai_openai"
+      f.request :json
+      f.adapter :test, stubs
+    end
+
+    conn.post("/v1/embeddings") { |req| req.body = large_request }
+
+    row = ExternalServiceCall.last
+    expect(row).to be_status_success
+
+    expect(row.request_body).not_to be_nil
+    expect(row.request_body.length).to be <= ai_limit + 40, "request_body should be capped near #{ai_limit}"
+    expect(row.request_body).to include("[truncated")
+
+    expect(row.response_body).not_to be_nil
+    expect(row.response_body.length).to be <= ai_limit + 40, "response_body should be capped near #{ai_limit}"
+    expect(row.response_body).to include("[truncated")
+  end
+
+  it "error ai_* call keeps body up to 10k cap and preserves content for diagnosis" do
+    # Body just under 10k so sanitize_body does NOT truncate, but over 500 so the
+    # AI success cap would have truncated it if incorrectly applied to errors.
+    diagnostic_body = '{"error":{"type":"invalid_request","message":"' + "x" * 600 + '"}}'
+
+    stubs = Faraday::Adapter::Test::Stubs.new do |s|
+      s.post("/v1/embeddings") { [ 429, { "Content-Type" => "application/json" }, diagnostic_body ] }
+    end
+
+    conn = Faraday.new(url: "http://example.com") do |f|
+      f.use SystemHealth::FaradayMiddleware, service: "ai_openai"
+      f.request :json
+      f.response :raise_error
+      f.adapter :test, stubs
+    end
+
+    expect {
+      conn.post("/v1/embeddings") { |req| req.body = { model: "text-embedding-ada-002" } }
+    }.to raise_error(Faraday::TooManyRequestsError)
+
+    row = ExternalServiceCall.last
+    expect(row).to be_status_error
+    # Body must NOT be truncated to the 500-char AI success cap.
+    expect(row.response_body).to include("invalid_request")
+    expect(row.response_body.length).to be > 500
+  end
+
+  it "non-ai success body is NOT capped at AI_SUCCESS_BODY_LIMIT" do
+    # A body between 500 and 10k chars — AI cap would chop it, standard cap keeps it.
+    medium_body = "x" * 800
+
+    stubs = Faraday::Adapter::Test::Stubs.new do |s|
+      s.get("/v1/messages") { [ 200, { "Content-Type" => "text/plain" }, medium_body ] }
+    end
+
+    conn = Faraday.new(url: "http://example.com") do |f|
+      f.use SystemHealth::FaradayMiddleware, service: "zoho_mail"
+      f.adapter :test, stubs
+    end
+
+    conn.get("/v1/messages")
+
+    row = ExternalServiceCall.last
+    expect(row).to be_status_success
+    # Body must arrive intact — no truncation marker.
+    expect(row.response_body).not_to include("[truncated")
+    expect(row.response_body.length).to eq(medium_body.length)
+  end
+
   # ── workspace option (account-bound attribution) ─────────────────────────────
 
   it "workspace option attributes the row without any ambient Current context" do

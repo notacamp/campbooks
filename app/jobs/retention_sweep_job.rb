@@ -14,6 +14,13 @@ class RetentionSweepJob < ApplicationJob
   LOG_RETENTION = 90.days
   DISMISSED_FEED_RETENTION = 30.days
   AUDIT_EVENT_RETENTION = 12.months
+  # System Health call-log retention windows:
+  #   AI services success  → 7 days:  embedding requests carry full email text;
+  #                                    responses carry vector arrays. High volume,
+  #                                    data-minimization concern, short useful life.
+  #   General success      → 30 days: enough for dashboard trend data.
+  #   Errors (any service) → 90 days: kept long for incident diagnosis.
+  SYSTEM_HEALTH_AI_SUCCESS_RETENTION = 7.days
   SYSTEM_HEALTH_SUCCESS_RETENTION = 30.days
 
   def perform
@@ -51,11 +58,16 @@ class RetentionSweepJob < ApplicationJob
     # grow forever. Deleted-user rows (user_id NULL) age out the same way.
     AuditEvent.where(created_at: ..AUDIT_EVENT_RETENTION.ago).in_batches.delete_all
 
-    # System Health service-call log rows. Errors are retained on the standard
-    # 90-day window; successes get a shorter 30-day window since they are high-
-    # volume and the dashboard only needs recent trend data.
+    # System Health service-call log rows.
+    # Three-tier window (see constant declarations above):
+    #   1. All rows past the error window (90 days) — general sweep.
+    #   2. Success rows past the general success window (30 days).
+    #   3. AI service success rows past the short AI window (7 days).
+    #      AI rows contain email-derived content (embedding texts, vectors) that
+    #      should not accumulate in an operational log longer than necessary.
     ExternalServiceCall.where(created_at: ..log_cutoff).in_batches.delete_all
     ExternalServiceCall.status_success.where(created_at: ..SYSTEM_HEALTH_SUCCESS_RETENTION.ago).in_batches.delete_all
+    ExternalServiceCall.ai_services.status_success.where(created_at: ..SYSTEM_HEALTH_AI_SUCCESS_RETENTION.ago).in_batches.delete_all
   end
 
   # Opt-in content retention: for each workspace that set email_retention_months,
