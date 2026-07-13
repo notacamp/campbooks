@@ -137,6 +137,38 @@ RSpec.describe Zoho::MailClient, type: :service do
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # Fix 1 - mark_read / mark_unread use the correct Zoho mode strings
+  # ---------------------------------------------------------------------------
+
+  describe "#mark_read" do
+    it "sends mode markAsRead (not markRead)" do
+      captured_body = nil
+      allow(conn).to receive(:put)
+                       .with("https://mail.zoho.eu/api/accounts/ACC123/updatemessage")
+                       .and_yield(fake_put_request { |b| captured_body = b })
+                       .and_return(response("status" => { "code" => 200, "description" => "success" }))
+
+      client.mark_read([ "msg_1" ])
+
+      expect(JSON.parse(captured_body)["mode"]).to eq("markAsRead")
+    end
+  end
+
+  describe "#mark_unread" do
+    it "sends mode markAsUnread (not markUnread)" do
+      captured_body = nil
+      allow(conn).to receive(:put)
+                       .with("https://mail.zoho.eu/api/accounts/ACC123/updatemessage")
+                       .and_yield(fake_put_request { |b| captured_body = b })
+                       .and_return(response("status" => { "code" => 200, "description" => "success" }))
+
+      client.mark_unread([ "msg_1" ])
+
+      expect(JSON.parse(captured_body)["mode"]).to eq("markAsUnread")
+    end
+  end
+
   private
 
   def response(body_hash)
@@ -147,6 +179,15 @@ RSpec.describe Zoho::MailClient, type: :service do
     double("request").tap do |req|
       params_hash = {}
       allow(req).to receive(:params).and_return(params_hash)
+    end
+  end
+
+  # Yields a request double whose body= setter invokes the provided block.
+  def fake_put_request(&capture)
+    double("put_request").tap do |req|
+      headers_hash = {}
+      allow(req).to receive(:headers).and_return(headers_hash)
+      allow(req).to receive(:body=) { |v| capture.call(v) }
     end
   end
 end
