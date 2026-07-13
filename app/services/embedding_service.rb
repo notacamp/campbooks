@@ -57,8 +57,7 @@ class EmbeddingService
 
     if primary
       begin
-        raw = primary.embed(capped_texts, model: @entry.model, dimensions: @entry.request_dimensions)
-        return normalize_vectors(raw)
+        return embed_in_request_batches(primary, capped_texts)
       rescue => e
         # A stale/invalid stored adapter key (e.g. a 401) shouldn't kill embeddings
         # when the SAME provider's env key is available — fall back to it.
@@ -70,8 +69,7 @@ class EmbeddingService
     end
 
     if fallback
-      raw = fallback.embed(capped_texts, model: @entry.model, dimensions: @entry.request_dimensions)
-      return normalize_vectors(raw)
+      return embed_in_request_batches(fallback, capped_texts)
     end
 
     Rails.logger.error("[EmbeddingService] No embedding-capable adapter found for provider #{@entry.provider}. " \
@@ -79,7 +77,46 @@ class EmbeddingService
     nil
   end
 
+  # Providers cap the TOTAL tokens per embeddings request — Mistral rejects a
+  # 50-chunk batch of long chunks with 400 "Too many tokens overall, split into
+  # more batches" (code 3210), which the adapter swallows as non-transient so
+  # the whole batch silently produces nothing. Pack requests to a conservative
+  # character budget instead of trusting the caller's batch size (~30k chars
+  # stays under Mistral's request token cap even at ~2 chars/token).
+  EMBED_REQUEST_CHAR_BUDGET = 30_000
+
   private
+
+  # Issues one API request per character-budgeted sub-batch and concatenates the
+  # normalized vectors in input order, so callers can zip results onto their
+  # inputs exactly as before.
+  def embed_in_request_batches(adapter, texts)
+    request_batches(texts).flat_map do |batch|
+      raw = adapter.embed(batch, model: @entry.model, dimensions: @entry.request_dimensions)
+      # A blank sub-batch means the adapter swallowed a non-transient error —
+      # propagate blankness rather than returning a partial, misaligned result.
+      return nil if raw.blank?
+
+      normalize_vectors(raw)
+    end
+  end
+
+  def request_batches(texts)
+    batches = []
+    current = []
+    chars = 0
+    texts.each do |text|
+      if current.any? && chars + text.length > EMBED_REQUEST_CHAR_BUDGET
+        batches << current
+        current = []
+        chars = 0
+      end
+      current << text
+      chars += text.length
+    end
+    batches << current if current.any?
+    batches
+  end
 
   # Provider-directed adapter resolution:
   #   1. Region gate: workspace.region_allows?(provider) must pass.

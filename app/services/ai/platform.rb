@@ -8,7 +8,7 @@ module Ai
   module Platform
     # Both managed text and documents run on Mistral (Paris) so cloud workspace
     # content stays in the EU by default — the GDPR-preferred default. Documents
-    # use pixtral-large-latest (vision); text uses mistral-small-latest.
+    # use the multimodal mistral-medium-latest (vision); text uses mistral-small-latest.
     # NB: requires MISTRAL_API_KEY in the platform env, else managed AI is unavailable.
     MANAGED_TEXT_PROVIDER = "mistral".freeze
     MANAGED_DOC_PROVIDER  = "mistral".freeze

@@ -304,4 +304,48 @@ RSpec.describe EmbeddingService do
       end
     end
   end
+
+  # -----------------------------------------------------------------------
+  # Request batching — providers cap total tokens per embeddings request
+  # (Mistral: 400 "Too many tokens overall, split into more batches"), so
+  # embed_batch must pack inputs into character-budgeted sub-requests.
+  # -----------------------------------------------------------------------
+  describe "request batching" do
+    let(:svc) { described_class.new(ws, entry: mistral_entry) }
+    let(:adapter) { double("mistral adapter") }
+
+    before do
+      allow(svc).to receive(:find_embedding_adapter).and_return(adapter)
+      allow(svc).to receive(:env_fallback_adapter).and_return(nil)
+    end
+
+    it "splits inputs into character-budgeted requests and concatenates results in order" do
+      texts = Array.new(5) { |i| "t#{i}" + "x" * 7998 } # 5 x 8000 chars -> batches of [3, 2]
+      batch_sizes = []
+      allow(adapter).to receive(:embed) do |batch, **|
+        batch_sizes << batch.size
+        batch.map { unit_vector(1024) }
+      end
+
+      result = svc.embed_batch(texts)
+
+      expect(batch_sizes).to eq([ 3, 2 ])
+      expect(result.size).to eq(5)
+    end
+
+    it "issues a single request when the inputs fit the budget" do
+      allow(adapter).to receive(:embed).and_return([ unit_vector(1024), unit_vector(1024) ])
+
+      svc.embed_batch([ "a", "b" ])
+
+      expect(adapter).to have_received(:embed).once
+    end
+
+    it "returns nil when any sub-batch comes back blank (adapter swallowed an error)" do
+      texts = Array.new(5) { "x" * 8000 }
+      allow(adapter).to receive(:embed).and_return(Array.new(3) { unit_vector(1024) }, nil)
+
+      expect(svc.embed_batch(texts)).to be_nil
+    end
+  end
 end
