@@ -54,6 +54,11 @@ major, minor, or patch change here.
   for successful calls (they carried email-derived text and vector arrays) and
   prunes successful AI rows after 7 days — the log had grown to several
   gigabytes in about a week. (#299)
+- Managed document analysis works again: Mistral retired the `pixtral-large`
+  model id (the API now rejects it), so the managed vision default moves to the
+  multimodal `mistral-medium-latest`. Embedding requests are also packed to a
+  per-request character budget — Mistral rejects oversized batches outright,
+  which previously stalled the re-embed sweep. (#295)
 
 ## [0.26.0] - 2026-07-12
 
