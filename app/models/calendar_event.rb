@@ -49,6 +49,18 @@ class CalendarEvent < ApplicationRecord
   end
 
   validates :provider_event_id, presence: true, uniqueness: { scope: :calendar_id }
+  # Form-only (`save(context: :form)` in CalendarEventsController): a garbled
+  # submission must not save a timeless event. Deliberately NOT default-context —
+  # sync paths save provider data as-is (zero-duration events are legal there,
+  # and apply_remote!/the scan job must never start rejecting remote rows).
+  validates :start_at, :end_at, presence: true, on: :form
+  validate :end_after_start, on: :form
+
+  def end_after_start
+    return if start_at.blank? || end_at.blank? || end_at > start_at
+    errors.add(:end_at, :after_start)
+  end
+  private :end_after_start
 
   delegate :calendar_account, :workspace, to: :calendar
 
@@ -82,6 +94,89 @@ class CalendarEvent < ApplicationRecord
   def duration
     return nil unless start_at && end_at
     end_at - start_at
+  end
+
+  # The conference link, only when it is a web URL. Provider-synced values are
+  # untrusted input — rendering conference_url raw as an href would let a
+  # malicious invite smuggle a javascript:/data: link into the UI.
+  def join_url
+    conference_url if conference_url&.match?(%r{\Ahttps?://}i)
+  end
+
+  # Values for the form's date/time chip inputs. All-day end dates are stored
+  # EXCLUSIVE (Google/ICS convention: "16–17 Jul" ends 18 Jul 00:00) but shown
+  # inclusive; -1s also lands right for legacy rows stored at 23:59:59.
+  def form_start_date = start_at&.to_date
+  def form_start_time = start_at&.strftime("%H:%M")
+  def form_end_time   = end_at&.strftime("%H:%M")
+  def form_end_date
+    return end_at&.to_date unless all_day?
+    end_at && (end_at - 1.second).to_date
+  end
+
+  # One attendee row for display, whatever vocabulary it was stored in.
+  Guest = Struct.new(:email, :name, :rsvp_status, :self_row, :organizer, keyword_init: true) do
+    def display_name = name.presence || email
+  end
+
+  # Providers store response statuses in their own vocabulary (Google camelCase,
+  # Zoho/ICS upper-case); rows we add use the rsvp_status enum words. Collapse
+  # them all to the enum vocabulary for display.
+  ATTENDEE_STATUSES = {
+    "accepted" => "accepted", "ACCEPTED" => "accepted",
+    "declined" => "declined", "DECLINED" => "declined",
+    "tentative" => "tentative", "TENTATIVE" => "tentative",
+    "needsAction" => "needs_action", "NEEDS-ACTION" => "needs_action",
+    "needs_action" => "needs_action"
+  }.freeze
+
+  def self.normalize_attendee_status(value)
+    ATTENDEE_STATUSES[value.to_s] || "needs_action"
+  end
+
+  def guests
+    Array(attendees).filter_map do |a|
+      row = a.is_a?(Hash) ? a.transform_keys(&:to_s) : { "email" => a.to_s }
+      next if row["email"].blank?
+      Guest.new(
+        email: row["email"].to_s,
+        name: row["name"].presence,
+        rsvp_status: self.class.normalize_attendee_status(row["rsvp_status"]),
+        self_row: row["self"] == true,
+        organizer: row["organizer"] == true
+      )
+    end
+  end
+
+  # Virtual form attribute: the guest list as comma-separated emails (what the
+  # guests pill input submits). The reader seeds the form; the writer replaces
+  # the list while keeping everything we know about guests that stay.
+  def attendee_emails
+    guests.map(&:email).join(",")
+  end
+
+  def attendee_emails=(value)
+    apply_guest_emails(value.to_s.split(/[,;\s]+/))
+  end
+
+  # Replaces the guest list from submitted emails. Guests that stay keep their
+  # stored row (name, response, flags); new guests start as needs_action;
+  # guests left out are dropped — except the account holder's own row, which is
+  # never dropped by a form submission (the UI doesn't offer removing "you").
+  # Invalid addresses are discarded; matching is case-insensitive.
+  def apply_guest_emails(emails)
+    current = Array(attendees).map { |a| a.is_a?(Hash) ? a.transform_keys(&:to_s) : { "email" => a.to_s } }
+    by_email = current.index_by { |a| a["email"].to_s.downcase }
+
+    rows = emails.map(&:to_s).map(&:strip)
+                 .select { |e| e.match?(URI::MailTo::EMAIL_REGEXP) }
+                 .uniq(&:downcase)
+                 .map { |email| by_email[email.downcase] || { "email" => email, "rsvp_status" => "needs_action" } }
+
+    current.select { |a| a["self"] == true }.each do |kept|
+      rows << kept unless rows.any? { |r| r["email"].to_s.casecmp?(kept["email"].to_s) }
+    end
+    self.attendees = rows
   end
 
   # The hex color to render this event in: always the owning calendar's

@@ -196,7 +196,8 @@ module Google
     def normalize_attendees(list)
       Array(list).map do |a|
         { "email" => a["email"], "name" => a["displayName"],
-          "rsvp_status" => a["responseStatus"], "self" => a["self"] == true }
+          "rsvp_status" => a["responseStatus"], "self" => a["self"] == true,
+          "organizer" => a["organizer"] == true }
       end
     end
 
@@ -266,8 +267,14 @@ module Google
       payload[:location] = attrs[:location] if attrs.key?(:location)
 
       if attrs[:all_day] && attrs[:start_at]
-        payload[:start] = { date: attrs[:start_at].to_date.iso8601 }
-        payload[:end] = { date: (attrs[:end_at] || attrs[:start_at]).to_date.iso8601 }
+        # Google's all-day end date is EXCLUSIVE and must be after the start.
+        # New rows already store it that way; legacy app-created rows stored
+        # end-of-day (same date), which Google rejects as an empty range.
+        start_date = attrs[:start_at].to_date
+        end_date = (attrs[:end_at] || attrs[:start_at]).to_date
+        end_date = start_date + 1 if end_date <= start_date
+        payload[:start] = { date: start_date.iso8601 }
+        payload[:end] = { date: end_date.iso8601 }
       elsif attrs[:start_at]
         zone = attrs[:time_zone].presence || "UTC"
         payload[:start] = { dateTime: attrs[:start_at].utc.iso8601, timeZone: zone }

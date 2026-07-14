@@ -253,4 +253,59 @@ RSpec.describe CalendarEvent, type: :model do
       expect(CalendarEvent.duplicate_for(email: email)).to eq(older)
     end
   end
+
+  describe "guests" do
+    let(:event) do
+      build(:calendar_event, attendees: [
+        { "email" => "maya@example.com", "name" => "Maya", "rsvp_status" => "accepted", "organizer" => true },
+        { "email" => "Me@Example.com", "rsvp_status" => "needsAction", "self" => true }
+      ])
+    end
+
+    describe "#guests" do
+      it "normalizes provider status vocabularies and skips email-less rows" do
+        event.attendees << { "email" => "z@example.com", "rsvp_status" => "NEEDS-ACTION" } << { "name" => "ghost" }
+        expect(event.guests.map(&:rsvp_status)).to eq(%w[accepted needs_action needs_action])
+        expect(event.guests.map(&:email)).to eq(%w[maya@example.com Me@Example.com z@example.com])
+      end
+
+      it "carries organizer/self flags and falls back to the email as display name" do
+        expect(event.guests.first).to have_attributes(organizer: true, self_row: false, display_name: "Maya")
+        expect(event.guests.last).to have_attributes(organizer: false, self_row: true, display_name: "Me@Example.com")
+      end
+    end
+
+    describe "#attendee_emails=" do
+      it "keeps stored rows (name, response, flags) for guests that stay" do
+        event.attendee_emails = "maya@example.com, new@example.com"
+        expect(event.attendees).to eq([
+          { "email" => "maya@example.com", "name" => "Maya", "rsvp_status" => "accepted", "organizer" => true },
+          { "email" => "new@example.com", "rsvp_status" => "needs_action" },
+          { "email" => "Me@Example.com", "rsvp_status" => "needsAction", "self" => true }
+        ])
+      end
+
+      it "drops guests left out, but never the account holder's own row" do
+        event.attendee_emails = "new@example.com"
+        expect(event.attendees.map { |a| a["email"] }).to eq(%w[new@example.com Me@Example.com])
+      end
+
+      it "matches case-insensitively (keeping the stored row), dedupes, and discards invalid addresses" do
+        event.attendee_emails = "MAYA@example.com maya@example.com not-an-email me@example.com"
+        expect(event.attendees.map { |a| a["email"] }).to eq(%w[maya@example.com Me@Example.com])
+        expect(event.attendees.first["rsvp_status"]).to eq("accepted")
+      end
+
+      it "clears everyone but self on an empty submission" do
+        event.attendee_emails = ""
+        expect(event.attendees.map { |a| a["email"] }).to eq(%w[Me@Example.com])
+      end
+    end
+
+    describe "#attendee_emails" do
+      it "round-trips the stored list for the form" do
+        expect(event.attendee_emails).to eq("maya@example.com,Me@Example.com")
+      end
+    end
+  end
 end

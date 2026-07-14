@@ -1,5 +1,12 @@
 ---
 en:
+  activerecord:
+    errors:
+      models:
+        calendar_event:
+          attributes:
+            end_at:
+              after_start: must be after the start
   calendar:
     index:
       close_sidebar: Close
@@ -28,8 +35,11 @@ en:
     destroy:
       deleted: Event deleted.
     edit:
+      join_video: Join video call
       rsvp_prompt: Will you attend?
       title: Edit event
+      view_only: View only
+      view_title: Event
     errors:
       not_writable: You don't have permission to change this event.
     form:
@@ -40,8 +50,16 @@ en:
       delete: Delete event
       delete_confirm: Delete this event?
       description_label: Description
+      description_placeholder: Add description
+      ends_date_label: End date
       ends_label: Ends
+      ends_time_label: End time
+      guests_hint: Guests get an email invitation when you save.
+      guests_label: Guests
+      guests_placeholder: Invite guests
+      invite_as_prefix: Invite
       location_label: Location
+      location_placeholder: Add location
       recurrence_all: All events in the series
       recurrence_label: Apply to
       recurrence_this: This event
@@ -49,7 +67,9 @@ en:
       rsvp_declined: 'No'
       rsvp_tentative: Maybe
       save: Save
+      starts_date_label: Start date
       starts_label: Starts
+      starts_time_label: Start time
       title_label: Title
       title_placeholder: Add a title
       type_auto: Auto-detect (AI)
@@ -71,7 +91,8 @@ en:
         other: "%{count} events imported."
       no_calendar: Pick a calendar to import into.
       no_file: Choose an .ics file to import.
-      parse_failed: That file couldn't be read as a calendar. Export a fresh .ics and try again.
+      parse_failed: That file couldn't be read as a calendar. Export a fresh .ics
+        and try again.
       skipped_duplicate:
         one: 1 duplicate skipped.
         other: "%{count} duplicates skipped."
@@ -86,11 +107,13 @@ en:
       wrong_type: That doesn't look like a calendar file (.ics).
     new:
       calendar_label: Import into
-      file_hint: Up to %{max_events} events per file. Recurring events are skipped for now.
+      file_hint: Up to %{max_events} events per file. Recurring events are skipped
+        for now.
       file_label: Calendar file (.ics)
       no_writable_calendars: Connect a writable, syncing calendar before importing.
       submit: Import events
-      subtitle: Bring events over from another calendar app. Imported events sync out to your provider just like ones you create here.
+      subtitle: Bring events over from another calendar app. Imported events sync
+        out to your provider just like ones you create here.
       title: Import events
   components:
     calendar:
@@ -105,17 +128,59 @@ en:
         all_day: All day
         untitled: "(No title)"
         video_call: Video call
-      scheduled_email_row:
-        to: To %{address}
-      snoozed_row:
-        no_subject: "(Snoozed email)"
-        snoozed_from: Returns — %{account}
+      guest_list:
+        declined: Declined
+        declined_count:
+          one: "%{count} declined"
+          other: "%{count} declined"
+        going: Going
+        going_count:
+          one: "%{count} going"
+          other: "%{count} going"
+        guests_count:
+          one: "%{count} guest"
+          other: "%{count} guests"
+        maybe: Maybe
+        maybe_count:
+          one: "%{count} maybe"
+          other: "%{count} maybe"
+        organizer: Organizer
+        pending: Pending
+        pending_count:
+          one: "%{count} pending"
+          other: "%{count} pending"
+        remove_guest: Remove %{name}
+        you: You
       month_grid:
         add_event: Add event
         more: "+%{count} more"
         show_events:
           one: Show %{count} event
           other: Show %{count} events
+      scheduled_email_row:
+        to: To %{address}
+      sidebar:
+        account_color: Account color
+        add: Add
+        add_calendars:
+          one: More calendars (%{count})
+          other: More calendars (%{count})
+        calendar_options: Calendar options
+        color_label: Color
+        connect_account: Connect an account
+        hide_calendar: Hide from my calendar
+        import_ics: Import events (.ics)
+        managers_only: Only calendar managers can enable these.
+        none_synced: No calendars syncing yet.
+        primary: "(primary)"
+        refresh_list: Refresh calendar list
+        show_calendar: Show on my calendar
+        stop_syncing: Stop syncing for everyone
+        stop_syncing_confirm: Stop syncing %{name}? Its events disappear from the
+          calendar for everyone on this account.
+      snoozed_row:
+        no_subject: "(Snoozed email)"
+        snoozed_from: Returns — %{account}
       time_until:
         in_days:
           one: In %{count} day
@@ -136,24 +201,6 @@ en:
         now: Now
         today: Today
         tomorrow: Tomorrow
-      sidebar:
-        account_color: Account color
-        add: Add
-        add_calendars:
-          one: More calendars (%{count})
-          other: More calendars (%{count})
-        calendar_options: Calendar options
-        color_label: Color
-        connect_account: Connect an account
-        hide_calendar: Hide from my calendar
-        import_ics: Import events (.ics)
-        managers_only: Only calendar managers can enable these.
-        none_synced: No calendars syncing yet.
-        primary: (primary)
-        refresh_list: Refresh calendar list
-        show_calendar: Show on my calendar
-        stop_syncing: Stop syncing for everyone
-        stop_syncing_confirm: Stop syncing %{name}? Its events disappear from the calendar for everyone on this account.
       week_grid:
         add: "+ Add"
         untitled: "(No title)"
