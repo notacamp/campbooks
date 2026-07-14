@@ -49,6 +49,7 @@ en:
         send: Send
         signature_default: "%{name} (default)"
       pill:
+        dismiss_title: Dismiss
         draft_saved: Draft saved
         resume_aria: Resume your draft
         untitled: Draft

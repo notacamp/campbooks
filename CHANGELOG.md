@@ -16,6 +16,17 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.28.1] - 2026-07-14
+
+### Fixed
+
+- Events created inside Campbooks before v0.28.0 — including AI-generated
+  ones from emails — now offer the guests editor. They were stored without
+  the "you organize this" flag, and sync's change-detection skip meant the
+  provider could never correct it; a one-time backfill repairs existing
+  events (no manual steps), and provider write responses now keep the
+  organizer flag and guest list up to date going forward.
+
 ## [0.28.0] - 2026-07-14
 
 ### Added
@@ -1697,7 +1708,8 @@ major, minor, or patch change here.
 
 - Initial public, source-available release of Campbooks.
 
-[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.28.0...HEAD
+[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.28.1...HEAD
+[0.28.1]: https://github.com/notacamp/campbooks/compare/v0.28.0...v0.28.1
 [0.28.0]: https://github.com/notacamp/campbooks/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/notacamp/campbooks/compare/v0.26.2...v0.27.0
 [0.26.2]: https://github.com/notacamp/campbooks/compare/v0.26.1...v0.26.2

@@ -29,11 +29,29 @@ RSpec.describe Calendars::EventWriter do
         provider_etag: '"etag_001"',
         provider_sequence: 1,
         html_link: "https://calendar.google.com/event/real",
-        conference_url: nil
+        conference_url: nil,
+        is_organizer: true,
+        attendees: [ { "email" => "maya@example.com", "rsvp_status" => "needsAction" } ]
       }
     end
 
     before { allow(client).to receive(:create_event).and_return(remote_response) }
+
+    it "adopts the provider's organizer flag and guest list from the response" do
+      # The stored etag makes inbound sync skip this row, so anything not
+      # persisted here would stay stale forever.
+      described_class.new(event).call(:create)
+      expect(event.reload.is_organizer).to be(true)
+      expect(event.attendees).to eq([ { "email" => "maya@example.com", "rsvp_status" => "needsAction" } ])
+    end
+
+    it "leaves is_organizer/attendees untouched when the response omits them" do
+      allow(client).to receive(:create_event).and_return(remote_response.except(:is_organizer, :attendees))
+      event.update_columns(is_organizer: true, attendees: [ { "email" => "keep@example.com" } ])
+      described_class.new(event).call(:create)
+      expect(event.reload.is_organizer).to be(true)
+      expect(event.attendees).to eq([ { "email" => "keep@example.com" } ])
+    end
 
     it "swaps the temp provider_event_id for the real one returned by the provider" do
       described_class.new(event).call(:create)

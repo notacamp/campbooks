@@ -49,6 +49,7 @@ es:
         send: Enviar
         signature_default: "%{name} (predeterminada)"
       pill:
+        dismiss_title: Ocultar
         draft_saved: Borrador guardado
         resume_aria: Retomar el borrador
         untitled: Borrador
