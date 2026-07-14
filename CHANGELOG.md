@@ -16,6 +16,14 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Calendar sync no longer corrupts an event's guest list when writing to the
+  provider: editing a synced event with guests used to push empty attendee
+  entries to Google (breaking the update), updates and RSVP changes reset the
+  other guests' responses to "pending", and Zoho writes dropped attendees
+  entirely. Guest lists are now only written back for events you organize.
+
 ## [0.27.0] - 2026-07-14
 
 ### Added

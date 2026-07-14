@@ -186,10 +186,35 @@ module Zoho
         }
       end
       payload[:isallday] = true if attrs[:all_day]
+      if attrs.key?(:attendees)
+        payload[:attendees] = Array(attrs[:attendees]).filter_map { |a| attendee_payload(a) }
+      end
       # Zoho carries the recurrence as a bare RRULE string (mirrors normalize_event
       # reading e["rrule"]). ⚠️ Unverified against a live Zoho grant.
       payload[:rrule] = attrs[:rrule] if attrs[:rrule].present?
       payload
+    end
+
+    # ICS-style participation statuses, keyed by our rsvp_status enum values
+    # (mirrors normalize_event reading a["status"]). ⚠️ Unverified against a
+    # live Zoho grant, like the rest of the write payloads.
+    ZOHO_RSVP_OUT = { "accepted" => "ACCEPTED", "declined" => "DECLINED",
+                      "tentative" => "TENTATIVE", "needs_action" => "NEEDS-ACTION" }.freeze
+
+    # One attendee for an outbound payload — canonical symbol-keyed rows from
+    # EventWriter, raw string-keyed jsonb rows, or a bare email string. Statuses
+    # already in Zoho's ICS vocabulary (stored by inbound sync) pass through.
+    def attendee_payload(a)
+      return { email: a } if a.is_a?(String)
+      row = a.transform_keys(&:to_s)
+      email = row["email"].presence
+      return nil unless email
+      { email: email, dname: row["name"].presence, status: attendee_status(row["rsvp_status"]) }.compact
+    end
+
+    def attendee_status(value)
+      v = value.to_s
+      ZOHO_RSVP_OUT[v] || ZOHO_RSVP_OUT.values.find { |ics| ics.casecmp?(v) }
     end
 
     # Fetch the current etag for an event so delete_event can send it as a header

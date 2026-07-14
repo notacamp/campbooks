@@ -74,6 +74,99 @@ RSpec.describe Calendars::EventWriter do
     end
   end
 
+  describe "attendee handling" do
+    let(:remote_response) do
+      { provider_event_id: "real_evt_abc", provider_etag: '"e2"', provider_sequence: 2,
+        html_link: nil, conference_url: nil }
+    end
+    let(:stored_attendees) do
+      [
+        { "email" => "maya@example.com", "name" => "Maya", "rsvp_status" => "accepted", "self" => false },
+        { "email" => "rui@example.com", "rsvp_status" => "needsAction" }
+      ]
+    end
+
+    describe "#call(:update)" do
+      before { allow(client).to receive(:update_event).and_return(remote_response) }
+
+      it "pushes a canonical symbol-keyed guest list for events the user organizes" do
+        event.update_columns(is_organizer: true, provider_event_id: "real_evt_abc", attendees: stored_attendees)
+        described_class.new(event).call(:update)
+        expect(client).to have_received(:update_event) do |_calendar, _id, attrs, **|
+          expect(attrs[:attendees]).to eq([
+            { email: "maya@example.com", name: "Maya", rsvp_status: "accepted" },
+            { email: "rui@example.com", rsvp_status: "needsAction" }
+          ])
+        end
+      end
+
+      it "does not push the guest list back on an invite the user merely received" do
+        event.update_columns(is_organizer: false, provider_event_id: "real_evt_abc", attendees: stored_attendees)
+        described_class.new(event).call(:update)
+        expect(client).to have_received(:update_event) do |_calendar, _id, attrs, **|
+          expect(attrs).not_to have_key(:attendees)
+        end
+      end
+    end
+
+    describe "#call(:create)" do
+      before { allow(client).to receive(:create_event).and_return(remote_response) }
+
+      it "includes attendees on the first push of an app-created event" do
+        event.update_columns(attendees: [ { "email" => "maya@example.com", "name" => "Maya" } ])
+        described_class.new(event).call(:create)
+        expect(client).to have_received(:create_event) do |_calendar, attrs|
+          expect(attrs[:attendees]).to eq([ { email: "maya@example.com", name: "Maya" } ])
+        end
+      end
+
+      it "drops attendee rows without an email instead of sending empty objects" do
+        event.update_columns(attendees: [ { "name" => "No Address" }, { "email" => "ok@example.com" }, "bare@example.com" ])
+        described_class.new(event).call(:create)
+        expect(client).to have_received(:create_event) do |_calendar, attrs|
+          expect(attrs[:attendees]).to eq([ { email: "ok@example.com" }, { email: "bare@example.com" } ])
+        end
+      end
+    end
+
+    describe "#call(:rsvp)" do
+      before { allow(client).to receive(:patch_rsvp).and_return(remote_response) }
+
+      it "sets the account holder's response and preserves everyone else's" do
+        event.update_columns(
+          rsvp_status: CalendarEvent.rsvp_statuses[:accepted],
+          provider_event_id: "real_evt_abc",
+          attendees: [
+            { "email" => "organizer@example.com", "name" => "Org", "rsvp_status" => "declined" },
+            { "email" => account.email_address, "rsvp_status" => "needsAction", "self" => true }
+          ]
+        )
+        described_class.new(event).call(:rsvp)
+        expect(client).to have_received(:patch_rsvp) do |_calendar, _id, attendees:, **|
+          expect(attendees).to eq([
+            { email: "organizer@example.com", name: "Org", rsvp_status: "declined" },
+            { email: account.email_address, rsvp_status: "accepted" }
+          ])
+        end
+      end
+
+      it "adds the account holder when they're missing from the stored list" do
+        event.update_columns(
+          rsvp_status: CalendarEvent.rsvp_statuses[:tentative],
+          provider_event_id: "real_evt_abc",
+          attendees: [ { "email" => "organizer@example.com", "rsvp_status" => "accepted" } ]
+        )
+        described_class.new(event).call(:rsvp)
+        expect(client).to have_received(:patch_rsvp) do |_calendar, _id, attendees:, **|
+          expect(attendees).to eq([
+            { email: "organizer@example.com", rsvp_status: "accepted" },
+            { email: account.email_address, rsvp_status: "tentative" }
+          ])
+        end
+      end
+    end
+  end
+
   describe "#call(:update) with ConflictError" do
     let(:stale_etag) { '"etag_old"' }
     let(:fresh_etag) { '"etag_fresh"' }

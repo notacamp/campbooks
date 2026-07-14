@@ -99,31 +99,46 @@ module Calendars
         start_at: @event.start_at,
         end_at: @event.end_at,
         all_day: @event.all_day,
-        time_zone: @event.start_time_zone,
-        attendees: @event.attendees
+        time_zone: @event.start_time_zone
       }
+      attrs[:attendees] = canonical_attendees if push_attendees?
       attrs[:rrule] = @event.rrule if recurrence && @event.rrule.present?
       attrs
     end
 
-    PROVIDER_RSVP = {
-      "accepted" => "accepted", "declined" => "declined",
-      "tentative" => "tentative", "needs_action" => "needsAction"
-    }.freeze
+    # The guest list is written back only for events we own — the organizer's
+    # copy, or an app-created event on its first push (the provider hasn't told
+    # us we're the organizer yet). Pushing the list on an invite we merely
+    # received would clobber the organizer's guest list with our stale copy.
+    def push_attendees?
+      @event.is_organizer? || @event.provider_event_id.to_s.start_with?("local-")
+    end
 
-    # The full attendee list with the account holder's own responseStatus set —
+    # Attendee rows in one symbol-keyed shape regardless of how they were stored
+    # (jsonb rows are string-keyed; rsvp_status may be in the provider's own
+    # vocabulary — the clients map it). Rows without an email are dropped.
+    def canonical_attendees
+      Array(@event.attendees).filter_map do |a|
+        next { email: a } if a.is_a?(String)
+        row = a.transform_keys(&:to_s)
+        email = row["email"].presence
+        next unless email
+        { email: email, name: row["name"].presence, rsvp_status: row["rsvp_status"].presence }.compact
+      end
+    end
+
+    # The full attendee list with the account holder's own rsvp_status set —
     # providers expect the whole list on an RSVP patch, not just the delta.
     def attendees_with_self_response
       mine = @account.email_address.to_s.downcase
-      status = PROVIDER_RSVP[@event.rsvp_status.to_s] || "needsAction"
-      list = Array(@event.attendees).map(&:dup)
-      self_row = list.find { |a| a["email"].to_s.downcase == mine }
-      if self_row
-        self_row["responseStatus"] = status
-      else
-        list << { "email" => @account.email_address, "responseStatus" => status, "self" => true }
+      list = canonical_attendees
+      self_row = list.find { |a| a[:email].to_s.downcase == mine }
+      unless self_row
+        self_row = { email: @account.email_address }
+        list << self_row
       end
-      list.map { |a| { email: a["email"], displayName: a["name"], responseStatus: a["responseStatus"] }.compact }
+      self_row[:rsvp_status] = @event.rsvp_status.to_s
+      list
     end
   end
 end
