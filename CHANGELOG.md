@@ -16,6 +16,24 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- You can now invite guests to calendar events. The event form gained a
+  guests field with contact autocomplete — invitees get a regular email
+  invitation from your calendar provider, and their yes/maybe/no responses
+  sync back and show live next to each guest. Events you were invited to
+  show the full guest list read-only, and your own response is a one-tap
+  Yes / Maybe / No control.
+
+### Changed
+
+- The event create/edit form was redesigned: a promoted title field,
+  compact date and time chips that keep the event duration when you move
+  the start, an all-day switch that hides the times, icon-led rows for
+  guests/location/description, and the calendar + event-type pickers
+  tucked into a compact settings row. Events on calendars you can't edit
+  get a cleaner read-only view with the guest list and a join-video link.
+
 ### Fixed
 
 - Calendar sync no longer corrupts an event's guest list when writing to the

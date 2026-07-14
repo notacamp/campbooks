@@ -1,5 +1,12 @@
 ---
 es:
+  activerecord:
+    errors:
+      models:
+        calendar_event:
+          attributes:
+            end_at:
+              after_start: debe ser posterior al inicio
   calendar:
     index:
       close_sidebar: Cerrar
@@ -28,8 +35,11 @@ es:
     destroy:
       deleted: Evento eliminado.
     edit:
+      join_video: Unirse a la videollamada
       rsvp_prompt: "¿Asistirás?"
       title: Editar evento
+      view_only: Solo lectura
+      view_title: Evento
     errors:
       not_writable: No tienes permiso para modificar este evento.
     form:
@@ -40,8 +50,16 @@ es:
       delete: Eliminar evento
       delete_confirm: "¿Eliminar este evento?"
       description_label: Descripción
+      description_placeholder: Añadir descripción
+      ends_date_label: Fecha de fin
       ends_label: Fin
+      ends_time_label: Hora de fin
+      guests_hint: Los invitados reciben una invitación por correo al guardar.
+      guests_label: Invitados
+      guests_placeholder: Invitar personas
+      invite_as_prefix: Invitar
       location_label: Ubicación
+      location_placeholder: Añadir ubicación
       recurrence_all: Todos los eventos de la serie
       recurrence_label: Aplicar a
       recurrence_this: Este evento
@@ -49,7 +67,9 @@ es:
       rsvp_declined: 'No'
       rsvp_tentative: Quizás
       save: Guardar
+      starts_date_label: Fecha de inicio
       starts_label: Inicio
+      starts_time_label: Hora de inicio
       title_label: Título
       title_placeholder: Añadir un título
       type_auto: Detección automática (IA)
@@ -71,7 +91,8 @@ es:
         other: "%{count} eventos importados."
       no_calendar: Elige un calendario donde importar.
       no_file: Elige un archivo .ics para importar.
-      parse_failed: No se pudo leer el archivo como calendario. Exporta un .ics nuevo e inténtalo de nuevo.
+      parse_failed: No se pudo leer el archivo como calendario. Exporta un .ics nuevo
+        e inténtalo de nuevo.
       skipped_duplicate:
         one: 1 duplicado omitido.
         other: "%{count} duplicados omitidos."
@@ -82,15 +103,19 @@ es:
         one: 1 evento recurrente omitido (aún no compatible).
         other: "%{count} eventos recurrentes omitidos (aún no compatibles)."
       too_large: El archivo es demasiado grande (máx. 2 MB).
-      truncated: El archivo tenía más de %{max} eventos; solo se importaron los primeros %{max}.
+      truncated: El archivo tenía más de %{max} eventos; solo se importaron los primeros
+        %{max}.
       wrong_type: Eso no parece un archivo de calendario (.ics).
     new:
       calendar_label: Importar en
-      file_hint: Hasta %{max_events} eventos por archivo. Los eventos recurrentes se omiten por ahora.
+      file_hint: Hasta %{max_events} eventos por archivo. Los eventos recurrentes
+        se omiten por ahora.
       file_label: Archivo de calendario (.ics)
-      no_writable_calendars: Conecta un calendario sincronizado y con permiso de escritura antes de importar.
+      no_writable_calendars: Conecta un calendario sincronizado y con permiso de escritura
+        antes de importar.
       submit: Importar eventos
-      subtitle: Trae eventos de otra aplicación de calendario. Los eventos importados se sincronizan con tu proveedor igual que los que creas aquí.
+      subtitle: Trae eventos de otra aplicación de calendario. Los eventos importados
+        se sincronizan con tu proveedor igual que los que creas aquí.
       title: Importar eventos
   components:
     calendar:
@@ -105,12 +130,54 @@ es:
         all_day: Todo el día
         untitled: "(Sin título)"
         video_call: Videollamada
+      guest_list:
+        declined: No asistirá
+        declined_count:
+          one: "%{count} no asistirá"
+          other: "%{count} no asistirán"
+        going: Asistirá
+        going_count:
+          one: "%{count} asistirá"
+          other: "%{count} asistirán"
+        guests_count:
+          one: "%{count} invitado"
+          other: "%{count} invitados"
+        maybe: Quizás
+        maybe_count:
+          one: "%{count} quizás"
+          other: "%{count} quizás"
+        organizer: Organizador
+        pending: Pendiente
+        pending_count:
+          one: "%{count} pendiente"
+          other: "%{count} pendientes"
+        remove_guest: Quitar a %{name}
+        you: Yo
       month_grid:
         add_event: Añadir evento
         more: "+%{count} más"
         show_events:
           one: Ver %{count} evento
           other: Ver %{count} eventos
+      sidebar:
+        account_color: Color de la cuenta
+        add: Añadir
+        add_calendars:
+          one: Más calendarios (%{count})
+          other: Más calendarios (%{count})
+        calendar_options: Opciones del calendario
+        color_label: Color
+        connect_account: Conectar una cuenta
+        hide_calendar: Ocultar de mi calendario
+        import_ics: Importar eventos (.ics)
+        managers_only: Solo los gestores del calendario pueden activarlos.
+        none_synced: Aún no se sincroniza ningún calendario.
+        primary: "(principal)"
+        refresh_list: Actualizar lista de calendarios
+        show_calendar: Mostrar en mi calendario
+        stop_syncing: Dejar de sincronizar para todos
+        stop_syncing_confirm: "¿Dejar de sincronizar %{name}? Sus eventos desaparecerán
+          del calendario para todos en esta cuenta."
       time_until:
         in_days:
           one: En %{count} día
@@ -131,24 +198,6 @@ es:
         now: Ahora
         today: Hoy
         tomorrow: Mañana
-      sidebar:
-        account_color: Color de la cuenta
-        add: Añadir
-        add_calendars:
-          one: Más calendarios (%{count})
-          other: Más calendarios (%{count})
-        calendar_options: Opciones del calendario
-        color_label: Color
-        connect_account: Conectar una cuenta
-        hide_calendar: Ocultar de mi calendario
-        import_ics: Importar eventos (.ics)
-        managers_only: Solo los gestores del calendario pueden activarlos.
-        none_synced: Aún no se sincroniza ningún calendario.
-        primary: (principal)
-        refresh_list: Actualizar lista de calendarios
-        show_calendar: Mostrar en mi calendario
-        stop_syncing: Dejar de sincronizar para todos
-        stop_syncing_confirm: "¿Dejar de sincronizar %{name}? Sus eventos desaparecerán del calendario para todos en esta cuenta."
       week_grid:
         add: "+ Añadir"
         untitled: "(Sin título)"

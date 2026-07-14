@@ -96,6 +96,13 @@ class CalendarEvent < ApplicationRecord
     end_at - start_at
   end
 
+  # The conference link, only when it is a web URL. Provider-synced values are
+  # untrusted input — rendering conference_url raw as an href would let a
+  # malicious invite smuggle a javascript:/data: link into the UI.
+  def join_url
+    conference_url if conference_url&.match?(%r{\Ahttps?://}i)
+  end
+
   # Values for the form's date/time chip inputs. All-day end dates are stored
   # EXCLUSIVE (Google/ICS convention: "16–17 Jul" ends 18 Jul 00:00) but shown
   # inclusive; -1s also lands right for legacy rows stored at 23:59:59.
