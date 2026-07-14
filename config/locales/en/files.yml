@@ -124,10 +124,19 @@ en:
         all_files: All files
         label: Folders
         new_folder: New folder
+      sort_menu:
+        added: Added
+        aria_label: Sort files
+        name: Name
+        sort: Sort
       sortable_header:
         sort_asc: Sort %{label} ascending
         sort_by: Sort by %{label}
         sort_desc: Sort %{label} descending
+      view_switcher:
+        aria_label: Files layout
+        grid: Grid
+        list: List
   files:
     index:
       ai_analyze: Analyze with AI

@@ -16,6 +16,15 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- Files can now be browsed as a grid of thumbnail tiles: a new List/Grid
+  switcher on the Files page (remembered per browser) shows each file's first
+  page — PDFs and images render a real preview, other types keep their icon —
+  with a sort menu replacing the table headers in grid mode. Thumbnails are
+  generated on the worker as documents arrive; existing documents are swept
+  by a one-shot background backfill on upgrade (no manual steps). (#307)
+
 ## [0.26.2] - 2026-07-13
 
 ### Fixed

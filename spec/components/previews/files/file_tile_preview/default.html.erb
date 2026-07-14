@@ -1,0 +1,5 @@
+<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
+  <% docs.each do |doc| %>
+    <%= render Campbooks::Files::FileTile.new(doc: doc, folders: folders, current_folder: nil) %>
+  <% end %>
+</div>

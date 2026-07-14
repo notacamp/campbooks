@@ -53,7 +53,7 @@ module Documents
     # When a sorter is active its ORDER BY replaces the default starred_first/recent.
     def scope
       filtered = @filters.apply(base_scope, workspace: @workspace, user: @user)
-                         .includes(:classification).with_attached_original_file
+                         .includes(:classification).with_attached_original_file.with_attached_thumbnail
 
       if @sorter.active?
         @sorter.apply(filtered)
@@ -73,6 +73,7 @@ module Documents
       return [] if ids.empty?
 
       by_id = @filters.apply(base_scope, workspace: @workspace, user: @user)
+                      .includes(:classification).with_attached_original_file.with_attached_thumbnail
                       .where(id: ids).index_by(&:id)
       ids.filter_map { |id| by_id[id] }
     end

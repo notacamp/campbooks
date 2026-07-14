@@ -38,23 +38,8 @@ module Campbooks
       private
 
       def meta_line
-        parts = [ kind_label, human_size, l(@doc.created_at.to_date, format: :long) ]
-
-        primary_field = @field_columns.find { |f| f.kind == :money || f.kind == :date }
-        if primary_field
-          value = primary_field.read(@doc.metadata)
-          formatted = format_primary_field(primary_field, value) if value
-          parts << formatted if formatted.present?
-        end
-
-        parts.compact.join(" · ")
-      end
-
-      def format_primary_field(field, value)
-        case field.kind
-        when :money then helpers.format_currency(value)
-        when :date  then helpers.l(value, format: :long)
-        end
+        [ kind_label, human_size, l(@doc.created_at.to_date, format: :long), primary_field_value(@field_columns) ]
+          .compact.join(" · ")
       end
     end
   end

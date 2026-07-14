@@ -124,6 +124,7 @@ RSpec.describe "Files", type: :request do
       expect(response.media_type).to eq("text/vnd.turbo-stream.html")
       expect(response.body).to include('action="append"')
       expect(response.body).to include('target="files_tbody"')
+      expect(response.body).to include('target="files_grid"'), "pagination must append tiles to the grid pane too"
     end
 
     it "renders the full HTML page for a folder view turbo-stream request without a page" do
@@ -135,6 +136,33 @@ RSpec.describe "Files", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.media_type).to eq("text/html")
       expect(response.body).not_to include("<turbo-stream")
+    end
+  end
+
+  # The grid layout ships alongside the table: the tiles pane, the List/Grid
+  # switcher, and the grid-only sort menu are all in the page (application.css +
+  # the files-layout controller swap them client-side from localStorage).
+  describe "grid view" do
+    it "renders the tiles pane, the layout switcher, and the sort menu on the all-files view" do
+      doc = build_doc(ai_status: :completed, review_status: :approved)
+
+      get files_path
+
+      html = Nokogiri::HTML(response.body)
+      expect(html.css("#files_grid[data-files-pane='grid']")).not_to be_empty
+      expect(html.css("#files_grid ##{ActionView::RecordIdentifier.dom_id(doc, :tile)}")).not_to be_empty
+      expect(html.css("[data-files-layout-target='button'][data-layout='grid']")).not_to be_empty
+      expect(html.css("[data-files-pane='sort']")).not_to be_empty
+      expect(html.css("[data-files-pane='table']")).not_to be_empty
+    end
+
+    it "renders the switcher inside a folder too" do
+      folder = @workspace.mail_folders.create!(name: "Receipts")
+
+      get files_folder_path(folder)
+
+      html = Nokogiri::HTML(response.body)
+      expect(html.css("[data-files-layout-target='button'][data-layout='grid']")).not_to be_empty
     end
   end
 

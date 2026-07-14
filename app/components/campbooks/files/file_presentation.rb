@@ -32,6 +32,22 @@ module Campbooks
 
         helpers.number_to_human_size(@doc.original_file.byte_size)
       end
+
+      # The first money/date schema field's formatted value (single-type filtered
+      # views pass `field_columns:`), or nil. Appended to FileCard/FileTile meta
+      # lines so the compact layouts still surface the column that matters.
+      def primary_field_value(field_columns)
+        field = Array(field_columns).find { |f| f.kind == :money || f.kind == :date }
+        return nil unless field
+
+        value = field.read(@doc.metadata)
+        return nil unless value
+
+        case field.kind
+        when :money then helpers.format_currency(value)
+        when :date  then helpers.l(value, format: :long)
+        end
+      end
     end
   end
 end
