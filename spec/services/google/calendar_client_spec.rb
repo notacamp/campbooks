@@ -4,6 +4,65 @@ require "rails_helper"
 # Uses WebMock to simulate the API responses; allocates the client directly so
 # no OAuth HTTP call is needed.
 # Converted from test/services/google/calendar_client_test.rb.
+RSpec.describe Google::CalendarClient, "outbound attendee payloads" do
+  let(:client) do
+    c = described_class.allocate
+    # Allocate without calling initialize — @oauth is injected manually so the
+    # token-refresh POST to accounts.google.com is never made.
+    fake_oauth = double("oauth", access_token: "fake_access_token")
+    c.instance_variable_set(:@oauth, fake_oauth)
+    c
+  end
+  let(:calendar) { build(:calendar, provider_calendar_id: "cal_1@group.calendar.google.com") }
+  let(:events_url) { "https://www.googleapis.com/calendar/v3/calendars/#{CGI.escape(calendar.provider_calendar_id)}/events" }
+
+  before { WebMock.disable_net_connect! }
+
+  it "maps attendees from any stored shape, keeping names and response statuses" do
+    captured = nil
+    stub_request(:post, events_url)
+      .with(query: { "sendUpdates" => "all" }) { |req| captured = JSON.parse(req.body); true }
+      .to_return(status: 200, body: "{}", headers: { "Content-Type" => "application/json" })
+
+    client.create_event(calendar, {
+      title: "Kickoff",
+      start_at: Time.utc(2026, 7, 16, 14, 0),
+      end_at: Time.utc(2026, 7, 16, 15, 0),
+      attendees: [
+        { email: "maya@example.com", name: "Maya", rsvp_status: "accepted" },   # canonical (our enum)
+        { "email" => "rui@example.com", "rsvp_status" => "needsAction" },        # raw jsonb row (Google vocab)
+        { email: "sam@example.com", rsvp_status: "needs_action" },               # our enum needing mapping
+        "bare@example.com",                                                      # bare string
+        { "name" => "No Email" }                                                 # dropped, Google 400s on it
+      ]
+    })
+
+    expect(captured["attendees"]).to eq([
+      { "email" => "maya@example.com", "displayName" => "Maya", "responseStatus" => "accepted" },
+      { "email" => "rui@example.com", "responseStatus" => "needsAction" },
+      { "email" => "sam@example.com", "responseStatus" => "needsAction" },
+      { "email" => "bare@example.com" }
+    ])
+  end
+
+  it "sends the full mapped list on an RSVP patch" do
+    captured = nil
+    stub_request(:patch, "#{events_url}/evt_9")
+      .with(query: { "sendUpdates" => "all" }) { |req| captured = JSON.parse(req.body); true }
+      .to_return(status: 200, body: "{}", headers: { "Content-Type" => "application/json" })
+
+    client.patch_rsvp(calendar, "evt_9", attendees: [
+      { email: "organizer@example.com", rsvp_status: "accepted" },
+      { email: "me@example.com", rsvp_status: "tentative" }
+    ])
+
+    expect(captured["attendees"]).to eq([
+      { "email" => "organizer@example.com", "responseStatus" => "accepted" },
+      { "email" => "me@example.com", "responseStatus" => "tentative" }
+    ])
+  end
+end
+
 RSpec.describe Google::CalendarClient, "ServiceUnavailable detection" do
   let(:calendar_list_url) { "https://www.googleapis.com/calendar/v3/users/me/calendarList" }
 

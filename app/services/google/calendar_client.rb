@@ -86,7 +86,7 @@ module Google
         req.headers["Content-Type"] = "application/json"
         req.headers["If-Match"] = etag if etag.present?
         req.params["sendUpdates"] = "all"
-        req.body = { attendees: attendees }.to_json
+        req.body = { attendees: Array(attendees).filter_map { |a| attendee_payload(a) } }.to_json
       end
       raise Calendars::ConflictError, "etag mismatch on #{provider_event_id}" if response.status == 412
       raise_for_status!(response, "patch_rsvp")
@@ -227,9 +227,34 @@ module Google
 
     GOOGLE_RSVP = { "accepted" => "accepted", "declined" => "declined",
                     "tentative" => "tentative", "needsAction" => "needs_action" }.freeze
+    GOOGLE_RSVP_OUT = GOOGLE_RSVP.invert.freeze
 
     def map_rsvp(status)
       GOOGLE_RSVP[status]
+    end
+
+    # One attendee for an outbound payload. Accepts canonical symbol-keyed rows
+    # from EventWriter, raw string-keyed rows straight out of the jsonb column,
+    # or a bare email string. Rows without an email are dropped (Google 400s on
+    # them). responseStatus is carried through — omitting it on a full-list
+    # update would reset every guest back to needsAction — accepting both our
+    # enum vocabulary and Google's own (inbound sync stores Google's).
+    def attendee_payload(a)
+      return { email: a } if a.is_a?(String)
+      row = a.transform_keys(&:to_s)
+      email = row["email"].presence
+      return nil unless email
+      {
+        email: email,
+        displayName: row["name"].presence,
+        responseStatus: attendee_response_status(row["rsvp_status"])
+      }.compact
+    end
+
+    def attendee_response_status(value)
+      v = value.to_s
+      return v if GOOGLE_RSVP.key?(v)
+      GOOGLE_RSVP_OUT[v]
     end
 
     # Builds a Google event resource from the writer's attribute hash. Only keys
@@ -250,9 +275,7 @@ module Google
       end
 
       if attrs.key?(:attendees)
-        payload[:attendees] = Array(attrs[:attendees]).map do |a|
-          a.is_a?(String) ? { email: a } : { email: a[:email], displayName: a[:name] }.compact
-        end
+        payload[:attendees] = Array(attrs[:attendees]).filter_map { |a| attendee_payload(a) }
       end
 
       # Recurrence: Google takes an array of iCal lines; the DTSTART is implied by

@@ -164,6 +164,28 @@ RSpec.describe Zoho::CalendarClient, type: :service do
       payload = JSON.parse(req_double.body[:eventdata])
       expect(payload["location"]).to eq("")
     end
+
+    it "maps attendees to email/dname/status, translating our enum to ICS statuses" do
+      client.create_event(calendar, {
+        title: "Meeting", start_at: Time.utc(2026, 6, 1, 10),
+        attendees: [
+          { email: "maya@example.com", name: "Maya", rsvp_status: "accepted" },   # canonical (our enum)
+          { "email" => "rui@example.com", "rsvp_status" => "NEEDS-ACTION" },       # raw jsonb row (ICS vocab)
+          { "name" => "No Email" }                                                 # dropped
+        ]
+      })
+      payload = JSON.parse(req_double.body[:eventdata])
+      expect(payload["attendees"]).to eq([
+        { "email" => "maya@example.com", "dname" => "Maya", "status" => "ACCEPTED" },
+        { "email" => "rui@example.com", "status" => "NEEDS-ACTION" }
+      ])
+    end
+
+    it "omits attendees entirely when the writer didn't include them" do
+      client.create_event(calendar, { title: "Meeting", start_at: Time.utc(2026, 6, 1, 10) })
+      payload = JSON.parse(req_double.body[:eventdata])
+      expect(payload).not_to have_key("attendees")
+    end
   end
 
   # ---------------------------------------------------------------------------
