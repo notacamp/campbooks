@@ -1,101 +1,267 @@
-<% field_classes = "w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring" %>
-<%= form_with model: @event, class: "space-y-4" do |f| %>
+<%= form_with model: @event, data: { controller: "calendar-event-form" } do |f| %>
   <% if @event.errors.any? %>
-    <div class="rounded-lg bg-red-50 text-red-700 text-sm px-3 py-2 dark:bg-red-500/10 dark:text-red-300">
+    <div class="rounded-lg bg-destructive/10 text-destructive text-sm px-3 py-2 mb-3">
       <%= @event.errors.full_messages.to_sentence %>
     </div>
   <% end %>
 
   <%= hidden_field_tag :view, params[:view] %>
 
-  <div>
-    <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".title_label") %></label>
-    <%= f.text_field :title, class: field_classes, placeholder: t(".title_placeholder"), autofocus: true %>
+  <%# ── Title ── %>
+  <div class="grid grid-cols-[30px_1fr] items-start pb-1">
+    <div></div>
+    <%# focus:shadow-none beats the global [type=text]:focus ring — these
+        borderless fields carry focus on their bottom hairline instead. %>
+    <%= f.text_field :title,
+          class: "w-full border-0 border-b border-border bg-transparent text-[17px] font-semibold tracking-tight px-0 pt-1.5 pb-2 focus:outline-none focus:shadow-none focus:border-ring rounded-none placeholder:text-muted-foreground placeholder:font-medium",
+          placeholder: t(".title_placeholder"),
+          autofocus: true %>
   </div>
 
-  <% if @event.new_record? && @calendars.present? %>
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".calendar_label") %></label>
-      <%= f.select :calendar_id,
-            @calendars.map { |c| [ "#{c.name} (#{c.calendar_account.display_name})", c.id ] },
-            { selected: @event.calendar_id }, class: field_classes %>
+  <%# ── Time row ── %>
+  <div class="grid grid-cols-[30px_1fr] items-start py-1.5">
+    <div class="pt-2 text-muted-foreground">
+      <svg class="w-[17px] h-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
     </div>
-  <% elsif @event.persisted? && @event.calendar %>
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".calendar_label") %></label>
-      <div class="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
-        <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background-color: <%= @event.calendar.display_color %>"></span>
-        <span class="text-sm font-medium text-foreground"><%= @event.calendar.name %></span>
-        <span class="truncate text-xs text-muted-foreground"><%= @event.calendar.calendar_account.display_name %></span>
+      <div class="flex items-center flex-wrap gap-1.5">
+        <input type="date" name="calendar_event[start_date]" value="<%= @event.form_start_date %>"
+               aria-label="<%= t('.starts_date_label') %>"
+               class="bg-muted hover:bg-subtle rounded-lg px-2.5 py-1.5 text-sm font-medium tabular-nums border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:shadow-none"
+               data-calendar-event-form-target="startDate"
+               data-action="change->calendar-event-form#startChanged">
+        <span data-calendar-event-form-target="timeFields"><input type="time" name="calendar_event[start_time]" value="<%= @event.form_start_time %>"
+               aria-label="<%= t('.starts_time_label') %>"
+               class="bg-muted hover:bg-subtle rounded-lg px-2.5 py-1.5 text-sm font-medium tabular-nums border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:shadow-none"
+               data-calendar-event-form-target="startTime"
+               data-action="change->calendar-event-form#startChanged"></span>
+        <span class="text-muted-foreground select-none" data-calendar-event-form-target="timeFields">&ndash;</span>
+        <span data-calendar-event-form-target="timeFields"><input type="time" name="calendar_event[end_time]" value="<%= @event.form_end_time %>"
+               aria-label="<%= t('.ends_time_label') %>"
+               class="bg-muted hover:bg-subtle rounded-lg px-2.5 py-1.5 text-sm font-medium tabular-nums border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:shadow-none"
+               data-calendar-event-form-target="endTime"
+               data-action="change->calendar-event-form#endChanged"></span>
+        <input type="date" name="calendar_event[end_date]" value="<%= @event.form_end_date %>"
+               aria-label="<%= t('.ends_date_label') %>"
+               class="bg-muted hover:bg-subtle rounded-lg px-2.5 py-1.5 text-sm font-medium tabular-nums border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-ring focus:shadow-none"
+               data-calendar-event-form-target="endDate"
+               data-action="change->calendar-event-form#endChanged">
       </div>
+      <div class="flex items-center gap-3.5 mt-2.5 flex-wrap">
+        <input type="hidden" name="calendar_event[all_day]" value="0">
+        <%= render Campbooks::Toggle.new(
+              name: "calendar_event[all_day]",
+              checked: @event.all_day?,
+              label: t(".all_day_label"),
+              data: {
+                calendar_event_form_target: "alldayToggle",
+                action: "change->calendar-event-form#alldayChanged"
+              }
+            ) %>
+        <% unless @event.series_instance? %>
+          <%# The picker's stacked label breaks this row's baseline — keep it for
+              screen readers only, and let the select sit inline with the toggle. %>
+          <div class="flex-1 min-w-[170px] max-w-[240px] [&_label]:sr-only [&_select]:!mt-0">
+            <%= render Campbooks::RecurrencePicker.new(name: "calendar_event[rrule]", selected: @event.rrule) %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# ── Guests (editable) ── %>
+  <% if guests_editable? %>
+    <div class="grid grid-cols-[30px_1fr] items-start py-1.5">
+      <div class="pt-2 text-muted-foreground">
+        <svg class="w-[17px] h-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/>
+        </svg>
+      </div>
+      <%# min-w-0: without it this grid cell's auto minimum lets long guest rows
+          widen the 1fr track past the modal (horizontal overflow at 375px). %>
+      <div class="relative min-w-0"
+           data-controller="event-guests"
+           data-event-guests-invite-label-value="<%= t('.invite_as_prefix') %>">
+        <input type="hidden"
+               name="calendar_event[attendee_emails]"
+               value="<%= @event.attendee_emails %>"
+               data-event-guests-target="hidden">
+        <%# The dropdown anchors to this inner wrapper so it opens right under the
+            pill input, not under the guest list + hint below. %>
+        <div class="relative">
+          <div class="flex flex-wrap items-center gap-1.5 border-b border-border pb-1.5 focus-within:border-ring"
+               data-event-guests-target="pills">
+            <input type="text"
+                   class="flex-1 min-w-[130px] border-0 bg-transparent text-sm px-0 py-1 rounded-none focus:outline-none focus:shadow-none placeholder:text-muted-foreground"
+                   placeholder="<%= t('.guests_placeholder') %>"
+                   aria-label="<%= t('.guests_label') %>"
+                   autocomplete="off"
+                   data-event-guests-target="search"
+                   data-action="input->event-guests#search keydown->event-guests#handleKeydown blur->event-guests#handleBlur">
+          </div>
+          <div class="absolute top-[calc(100%+4px)] left-0 right-0 z-50 hidden bg-card border border-border rounded-[10px] shadow-lg overflow-hidden"
+               data-event-guests-target="dropdown"
+               role="listbox">
+          </div>
+        </div>
+        <%= render Campbooks::Calendar::GuestList.new(guests: @event.guests, editable: true) %>
+        <p class="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
+          <svg class="w-[13px] h-[13px] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/>
+          </svg>
+          <%= t(".guests_hint") %>
+        </p>
+      </div>
+    </div>
+  <% elsif @event.guests.any? %>
+    <%# Read-only guest list when user is not the organizer %>
+    <div class="grid grid-cols-[30px_1fr] items-start py-1.5">
+      <div class="pt-2 text-muted-foreground">
+        <svg class="w-[17px] h-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/>
+        </svg>
+      </div>
+      <%= render Campbooks::Calendar::GuestList.new(guests: @event.guests, editable: false) %>
     </div>
   <% end %>
 
+  <%# ── Location ── %>
+  <div class="grid grid-cols-[30px_1fr] items-start py-1.5">
+    <div class="pt-2 text-muted-foreground">
+      <svg class="w-[17px] h-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/>
+      </svg>
+    </div>
+    <div>
+      <%= f.label :location, t(".location_label"), class: "sr-only" %>
+      <%= f.text_field :location,
+            class: "w-full border-0 border-b border-border bg-transparent text-sm px-0 py-1.5 focus:outline-none focus:shadow-none focus:border-ring rounded-none placeholder:text-muted-foreground",
+            placeholder: t(".location_placeholder") %>
+    </div>
+  </div>
+
+  <%# ── Description ── %>
+  <div class="grid grid-cols-[30px_1fr] items-start py-1.5">
+    <div class="pt-2 text-muted-foreground">
+      <svg class="w-[17px] h-[17px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12"/>
+      </svg>
+    </div>
+    <div>
+      <%= f.label :description, t(".description_label"), class: "sr-only" %>
+      <%= f.text_area :description,
+            rows: 2,
+            class: "w-full border-0 bg-transparent resize-none text-sm px-0 py-1.5 focus:outline-none focus:shadow-none rounded-none placeholder:text-muted-foreground",
+            placeholder: t(".description_placeholder") %>
+    </div>
+  </div>
+
+  <%# ── Settings: Calendar + Type ── %>
   <% event_types = Current.workspace.event_types.order(:name).to_a %>
   <% selected_type = @event.type_status_manual? ? (@event.event_type_id&.to_s || "none") : "auto" %>
-  <div>
-    <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".type_label") %></label>
-    <select name="type_choice" class="<%= field_classes %>">
-      <option value="auto" <%= "selected" if selected_type == "auto" %>><%= t(".type_auto") %></option>
-      <% event_types.each do |et| %>
-        <option value="<%= et.id %>" <%= "selected" if selected_type == et.id.to_s %>><%= et.name %></option>
+  <div class="border-t border-border pt-3 mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+    <div>
+      <label class="block text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5"><%= t(".calendar_label") %></label>
+      <% if @event.new_record? && @calendars.present? %>
+        <div class="relative">
+          <%= f.select :calendar_id,
+                @calendars.map { |c| ["#{c.name} (#{c.calendar_account.display_name})", c.id] },
+                { selected: @event.calendar_id },
+                class: "w-full appearance-none border border-input bg-card rounded-[9px] px-2.5 py-1.5 text-[13px] font-medium pr-7 focus:outline-none focus:ring-2 focus:ring-ring" %>
+          <span class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">
+            <svg class="w-[13px] h-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
+            </svg>
+          </span>
+        </div>
+      <% elsif @event.persisted? && @event.calendar %>
+        <div class="flex items-center gap-2 border border-input bg-card rounded-[9px] px-2.5 py-1.5 overflow-hidden">
+          <span class="w-2 h-2 rounded-full shrink-0" style="background-color: <%= @event.calendar.display_color %>"></span>
+          <span class="text-[13px] font-medium text-foreground truncate"><%= @event.calendar.name %></span>
+          <span class="text-xs text-muted-foreground truncate"><%= @event.calendar.calendar_account.display_name %></span>
+        </div>
       <% end %>
-      <option value="none" <%= "selected" if selected_type == "none" %>><%= t(".type_none") %></option>
-    </select>
-    <p class="text-xs text-muted-foreground mt-1">
+    </div>
+
+    <div>
+      <label class="block text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5"><%= t(".type_label") %></label>
+      <div class="relative">
+        <select name="type_choice"
+                class="w-full appearance-none border border-input bg-card rounded-[9px] px-2.5 py-1.5 text-[13px] font-medium pr-12 focus:outline-none focus:ring-2 focus:ring-ring">
+          <option value="auto" <%= "selected" if selected_type == "auto" %>><%= t(".type_auto") %></option>
+          <% event_types.each do |et| %>
+            <option value="<%= et.id %>" <%= "selected" if selected_type == et.id.to_s %>><%= et.name %></option>
+          <% end %>
+          <option value="none" <%= "selected" if selected_type == "none" %>><%= t(".type_none") %></option>
+        </select>
+        <span class="pointer-events-none absolute right-7 top-1/2 -translate-y-1/2">
+          <svg class="w-[13px] h-[13px]" viewBox="0 0 24 24" fill="none">
+            <defs>
+              <linearGradient id="ember_type_spark" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="oklch(62% 0.23 354)"/>
+                <stop offset="0.55" stop-color="oklch(67% 0.21 22)"/>
+                <stop offset="1" stop-color="oklch(76% 0.17 60)"/>
+              </linearGradient>
+            </defs>
+            <path fill="url(#ember_type_spark)" d="M12 2l2.1 6.1L20 10l-5.9 1.9L12 18l-2.1-6.1L4 10l5.9-1.9L12 2z"/>
+          </svg>
+        </span>
+        <span class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">
+          <svg class="w-[13px] h-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
+          </svg>
+        </span>
+      </div>
+    </div>
+
+    <p class="sm:col-span-2 text-xs text-muted-foreground -mt-0.5">
       <%= t(".type_hint") %>
       <%= link_to t(".type_manage"), event_types_path, data: { turbo_frame: "_top" }, class: "underline hover:text-foreground" %>
     </p>
   </div>
 
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".starts_label") %></label>
-      <%= f.datetime_field :start_at, class: field_classes %>
-    </div>
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".ends_label") %></label>
-      <%= f.datetime_field :end_at, class: field_classes %>
-    </div>
-  </div>
-
-  <label class="flex items-center gap-2 text-sm text-gray-700">
-    <%= f.check_box :all_day, class: "rounded border-border text-primary focus:ring-ring" %>
-    <%= t(".all_day_label") %>
-  </label>
-
-  <div>
-    <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".location_label") %></label>
-    <%= f.text_field :location, class: field_classes %>
-  </div>
-
-  <div>
-    <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".description_label") %></label>
-    <%= f.text_area :description, rows: 3, class: field_classes %>
-  </div>
-
-  <%# The "Repeat" picker creates/edits a series. A provider-materialized instance
-      is governed by its series, so it gets the this/all scope selector below instead. %>
-  <% unless @event.series_instance? %>
-    <%= render Campbooks::RecurrencePicker.new(name: "calendar_event[rrule]", selected: @event.rrule) %>
-  <% end %>
-
+  <%# ── Recurrence scope (series instances only) ── %>
   <% if @event.persisted? && @event.series_instance? %>
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1"><%= t(".recurrence_label") %></label>
-      <select name="recurrence_scope" class="<%= field_classes %>">
-        <option value="this"><%= t(".recurrence_this") %></option>
-        <option value="all"><%= t(".recurrence_all") %></option>
-      </select>
+    <div class="border-t border-border pt-3 mt-2">
+      <label class="block text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground mb-1.5"><%= t(".recurrence_label") %></label>
+      <div class="relative">
+        <select name="recurrence_scope"
+                class="w-full appearance-none border border-input bg-card rounded-[9px] px-2.5 py-1.5 text-[13px] font-medium pr-7 focus:outline-none focus:ring-2 focus:ring-ring">
+          <option value="this"><%= t(".recurrence_this") %></option>
+          <option value="all"><%= t(".recurrence_all") %></option>
+        </select>
+        <span class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground">
+          <svg class="w-[13px] h-[13px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
+          </svg>
+        </span>
+      </div>
     </div>
   <% end %>
 
-  <div class="flex items-center justify-between pt-2">
-    <%= render(Campbooks::Button.new(variant: :primary, size: :md, type: "submit")) { @event.new_record? ? t(".create") : t(".save") } %>
-    <%# Link (not button) so cancel works on the standalone full-page form too — see
-        _modal_header. In the modal, #close intercepts and closes the dialog instead. %>
-    <a href="<%= calendar_path(view: params[:view].presence) %>" data-turbo-frame="_top" data-action="click->calendar-event-modal#close" class="cursor-pointer text-sm text-gray-500 hover:text-gray-700">
+  <%# ── Footer ── %>
+  <div class="flex items-center gap-2.5 pt-3 mt-3 border-t border-border">
+    <% if @event.persisted? %>
+      <button type="submit"
+              form="delete_calendar_event_form"
+              class="inline-flex items-center gap-1.5 text-destructive text-[13px] font-medium hover:bg-destructive/10 rounded-lg px-2 py-1.5 cursor-pointer border-0 bg-transparent"
+              data-turbo-confirm="<%= t('.delete_confirm') %>">
+        <svg class="w-[15px] h-[15px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+        </svg>
+        <%= t(".delete") %>
+      </button>
+    <% end %>
+    <span class="flex-1"></span>
+    <a href="<%= calendar_path(view: params[:view].presence) %>"
+       data-turbo-frame="_top"
+       data-action="click->calendar-event-modal#close"
+       class="cursor-pointer border border-border rounded-[11px] px-3.5 py-2 text-[13.5px] font-semibold text-foreground hover:bg-muted">
       <%= t(".cancel") %>
     </a>
+    <%= render(Campbooks::Button.new(variant: :primary, size: :md, type: "submit")) { @event.new_record? ? t(".create") : t(".save") } %>
   </div>
 <% end %>

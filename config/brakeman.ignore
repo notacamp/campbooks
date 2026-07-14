@@ -59,6 +59,40 @@
       "fingerprint": "f6d14038585b04d806409bfddcf4b4e2d8de6d2a4fc8532c015bc2c2495b8391",
       "file": "app/services/document_types/backfills/metadata_value_backfill.rb",
       "note": "False positive: the interpolated id list is built exclusively via connection.quote on each UUID (batched backfill); no user input reaches the SQL."
+    },
+    {
+      "warning_type": "Cross-Site Scripting",
+      "warning_code": 4,
+      "fingerprint": "9e5c008ad0372c0b7311e8b0647c67974442f7e4e3241796cbb68811da1d499d",
+      "check_name": "LinkToHref",
+      "message": "Potentially unsafe model attribute in `link_to` href",
+      "file": "app/views/calendar_events/edit.html.erb",
+      "line": 62,
+      "link": "https://brakemanscanner.org/docs/warning_types/link_to_href",
+      "code": "link_to(CalendarEvent.accessible_to(Current.user).find(params[:id]).join_url, :target => \"_blank\", :rel => \"noopener noreferrer\", :class => \"inline-flex items-center gap-1.5 border border-border bg-transparent rounded-[9px] px-2.5 py-1.5 text-[13px] font-medium text-foreground hover:bg-muted\")",
+      "render_path": [
+        {
+          "type": "controller",
+          "class": "CalendarEventsController",
+          "method": "edit",
+          "line": 45,
+          "file": "app/controllers/calendar_events_controller.rb",
+          "rendered": {
+            "name": "calendar_events/edit",
+            "file": "app/views/calendar_events/edit.html.erb"
+          }
+        }
+      ],
+      "location": {
+        "type": "template",
+        "template": "calendar_events/edit"
+      },
+      "user_input": "CalendarEvent.accessible_to(Current.user).find(params[:id]).join_url",
+      "confidence": "Weak",
+      "cwe_id": [
+        79
+      ],
+      "note": "False positive (LinkToHref): CalendarEvent#join_url returns conference_url only when it matches \\Ahttps?:// \u2014 javascript:/data: schemes can never reach the href."
     }
   ],
   "brakeman_version": "8.0.5"
