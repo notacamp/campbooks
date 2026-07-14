@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-07-14
+
 ### Added
 
 - Files can now be browsed as a grid of thumbnail tiles: a new List/Grid
