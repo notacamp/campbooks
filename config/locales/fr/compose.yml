@@ -49,6 +49,7 @@ fr:
         send: Envoyer
         signature_default: "%{name} (par défaut)"
       pill:
+        dismiss_title: Masquer
         draft_saved: Brouillon enregistré
         resume_aria: Reprendre le brouillon
         untitled: Brouillon

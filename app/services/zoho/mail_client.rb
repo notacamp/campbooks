@@ -31,7 +31,7 @@ module Zoho
       # headers (List-Unsubscribe / Precedence / Auto-Submitted), so Zoho mail
       # carries none of the header-based bulk signals Gmail/Microsoft do. The
       # Categorizer falls back to its sender/subject rules for these accounts.
-      data.is_a?(Hash) ? (data["data"] || []) : Array(data)
+      unescape_html_fields(data.is_a?(Hash) ? (data["data"] || []) : Array(data))
     end
 
     def get_message_content(message_id, folder_id)
@@ -206,7 +206,7 @@ module Zoho
         req.params["start"] = start if start
       end
       data = parse_json(response.body)
-      data.is_a?(Hash) ? (data["data"] || []) : Array(data)
+      unescape_html_fields(data.is_a?(Hash) ? (data["data"] || []) : Array(data))
     end
 
     # --- Read/Unread API ---
@@ -378,6 +378,23 @@ module Zoho
     end
 
     private
+
+    # Zoho's list endpoints return address and text metadata HTML-entity-escaped
+    # ("&lt;user@example.com&gt;", "Q&amp;A") — unlike Gmail/Graph, which return raw
+    # header values. Decode at the client boundary so everything downstream
+    # (MessageUpserter, reply-all prefill, self-generated detection) sees real
+    # addresses. Message *content* is untouched: it's genuine HTML.
+    HTML_ESCAPED_FIELDS = %w[fromAddress toAddress ccAddress bccAddress sender subject summary].freeze
+
+    def unescape_html_fields(messages)
+      messages.each do |msg|
+        next unless msg.is_a?(Hash)
+        HTML_ESCAPED_FIELDS.each do |field|
+          value = msg[field]
+          msg[field] = CGI.unescapeHTML(value) if value.is_a?(String) && value.include?("&")
+        end
+      end
+    end
 
     # Zoho truncates message summaries at a fixed length and can cut a multi-byte
     # emoji in half, leaving a lone UTF-16 surrogate escape (e.g. `"gift \uD83C"`)

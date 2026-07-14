@@ -25,10 +25,10 @@ module Emails
 
     def to_address
       case @mode
-      when "reply" then @message.from_address.to_s
+      when "reply" then decode(@message.from_address.to_s)
       when "reply_all"
         recipients = []
-        recipients << @message.from_address.to_s if @message.from_address.present?
+        recipients << decode(@message.from_address.to_s) if @message.from_address.present?
         recipients.concat(parse_addresses(@message.to_address))
         recipients.reject! { |a| own_address?(a) }
         recipients.uniq.join(", ")
@@ -48,10 +48,10 @@ module Emails
       case @mode
       when "new_message" then ""
       when "forward"
-        subject = @message.subject.to_s
+        subject = decode(@message.subject.to_s)
         subject.match?(/^Fwd:\s*/i) ? subject : "Fwd: #{subject}"
       else
-        subject = @message.subject.to_s
+        subject = decode(@message.subject.to_s)
         subject.match?(/^Re:\s*/i) ? subject : "Re: #{subject}"
       end
     end
@@ -59,7 +59,7 @@ module Emails
     def quoted_body
       return "" if @mode == "new_message"
 
-      from = @message.from_address || "Unknown"
+      from = @message.from_address.present? ? decode(@message.from_address) : "Unknown"
       date = @message.received_at&.strftime("%b %d, %Y at %H:%M") || "Unknown date"
       body_html = @message.body.presence || @message.summary.presence || "(no content)"
 
@@ -70,8 +70,8 @@ module Emails
             ---------- Forwarded message ----------<br>
             <b>From:</b> #{ERB::Util.html_escape(from)}<br>
             <b>Date:</b> #{date}<br>
-            <b>Subject:</b> #{ERB::Util.html_escape(@message.subject || "")}<br>
-            <b>To:</b> #{ERB::Util.html_escape(@message.to_address || "")}
+            <b>Subject:</b> #{ERB::Util.html_escape(decode(@message.subject.to_s))}<br>
+            <b>To:</b> #{ERB::Util.html_escape(decode(@message.to_address.to_s))}
           </p>
           <br>
           #{body_html}
@@ -100,7 +100,15 @@ module Emails
 
     def parse_addresses(str)
       return [] if str.blank?
-      str.split(",").map(&:strip).select(&:present?)
+      str.split(",").map { |a| decode(a.strip) }.select(&:present?)
+    end
+
+    # Messages synced from Zoho before the client decoded its HTML-escaped
+    # metadata are stored as "&lt;user@example.com&gt;" — decode here so prefill
+    # built from those rows matches own_address? and renders real addresses
+    # instead of entity soup.
+    def decode(str)
+      str.include?("&") ? CGI.unescapeHTML(str) : str
     end
 
     # An address belongs to the receiving account when its email part matches —

@@ -21,9 +21,11 @@ class DraftEmail < ApplicationRecord
 
   # The pill resumes the most recently edited draft. A row only exists once the
   # user actually typed — the autosave controller creates it on first input, so
-  # an opened-and-abandoned reply never becomes a draft.
+  # an opened-and-abandoned reply never becomes a draft. A dismissed draft keeps
+  # its content but grows no pill until it's edited again (autosave clears the
+  # dismissal on update).
   def self.resumable_for(user)
-    where(user: user).latest_first.first
+    where(user: user, dismissed_at: nil).latest_first.first
   end
 
   def self.prune_for(user)

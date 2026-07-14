@@ -73,14 +73,22 @@ module Calendars
     def apply_remote!(remote)
       return @event.update_columns(outbound_pending: false) unless remote
 
-      @event.update!(
+      attrs = {
         provider_event_id: remote[:provider_event_id].presence || @event.provider_event_id,
         provider_etag: remote[:provider_etag],
         provider_sequence: remote[:provider_sequence],
         html_link: remote[:html_link].presence || @event.html_link,
         conference_url: remote[:conference_url].presence || @event.conference_url,
         outbound_pending: false
-      )
+      }
+      # Adopt the provider's authority on organizer + guest list. Storing the
+      # etag below makes the next inbound sync SKIP this row (loop-avoidance),
+      # so anything not persisted here stays stale until the event changes
+      # remotely — that's how app-created events were stuck with
+      # is_organizer: false and never got the guests editor.
+      attrs[:is_organizer] = remote[:is_organizer] unless remote[:is_organizer].nil?
+      attrs[:attendees] = remote[:attendees] unless remote[:attendees].nil?
+      @event.update!(attrs)
     end
 
     def target_provider_id(scope)
