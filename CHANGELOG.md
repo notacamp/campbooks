@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-07-14
+
 ### Added
 
 - You can now invite guests to calendar events. The event form gained a
@@ -1695,7 +1697,9 @@ major, minor, or patch change here.
 
 - Initial public, source-available release of Campbooks.
 
-[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.26.1...HEAD
+[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.28.0...HEAD
+[0.28.0]: https://github.com/notacamp/campbooks/compare/v0.27.0...v0.28.0
+[0.27.0]: https://github.com/notacamp/campbooks/compare/v0.26.2...v0.27.0
 [0.26.2]: https://github.com/notacamp/campbooks/compare/v0.26.1...v0.26.2
 [0.26.1]: https://github.com/notacamp/campbooks/compare/v0.26.0...v0.26.1
 [0.21.1]: https://github.com/notacamp/campbooks/compare/v0.21.0...v0.21.1
