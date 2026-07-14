@@ -16,6 +16,18 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.28.2] - 2026-07-14
+
+### Fixed
+
+- Reply All on a Zoho mailbox no longer adds you as a recipient of your own
+  reply. Zoho returns message metadata HTML-escaped (`&lt;you@example.com&gt;`),
+  which slipped past the composer's own-address exclusion — addresses and
+  subjects are now decoded when mail is synced, the composer decodes
+  already-stored messages, and a one-time background sweep repairs existing
+  rows (fixes stray `&amp;`/`&lt;` showing in senders and subjects too, no
+  manual steps).
+
 ## [0.28.1] - 2026-07-14
 
 ### Fixed
