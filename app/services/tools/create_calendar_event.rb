@@ -44,6 +44,7 @@ module Tools
         all_day: false,
         status: :confirmed,
         outbound_pending: true,
+        is_organizer: true,
         source_email_message: @email
       )
       return nil unless event.save

@@ -1,5 +1,12 @@
 ---
 en:
+  activerecord:
+    errors:
+      models:
+        calendar_event:
+          attributes:
+            end_at:
+              after_start: must be after the start
   calendar:
     index:
       close_sidebar: Close
