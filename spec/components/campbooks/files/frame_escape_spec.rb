@@ -36,6 +36,14 @@ RSpec.describe "Files list frame escape", type: :component do
     end
   end
 
+  describe Campbooks::Files::FileTile do
+    it "opens the document outside the files_results frame" do
+      doc = create(:document)
+      html = render_component(described_class.new(doc: doc))
+      expect_top_frame_link(html, "/documents/#{doc.id}")
+    end
+  end
+
   describe Campbooks::Files::FileActionsMenu do
     it "opens and downloads outside the files_results frame" do
       doc = create(:document)

@@ -125,10 +125,19 @@ pt:
         all_files: Todos os ficheiros
         label: Pastas
         new_folder: Nova pasta
+      sort_menu:
+        added: Adicionado
+        aria_label: Ordenar ficheiros
+        name: Nome
+        sort: Ordenar
       sortable_header:
         sort_asc: Ordenar %{label} ascendente
         sort_by: Ordenar por %{label}
         sort_desc: Ordenar %{label} descendente
+      view_switcher:
+        aria_label: Disposição dos ficheiros
+        grid: Grelha
+        list: Lista
   files:
     index:
       ai_analyze: Analisar com IA

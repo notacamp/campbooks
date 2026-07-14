@@ -10,6 +10,12 @@
   <% end %>
 <% end %>
 
+<%= turbo_stream.append "files_grid" do %>
+  <% @files.each do |file| %>
+    <%= render Campbooks::Files::FileTile.new(doc: file, folders: @folders, current_folder: @folder, field_columns: @field_columns) %>
+  <% end %>
+<% end %>
+
 <% if @pagy.next %>
   <%= turbo_stream.replace "files_pagination" do %>
     <%= turbo_frame_tag "files_pagination",

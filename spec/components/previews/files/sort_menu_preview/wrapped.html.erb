@@ -1,0 +1,5 @@
+<%# The menu is display:none until the Files page enters grid mode; force it
+    visible for the preview by reproducing the grid-mode wrapper. %>
+<div data-files-layout="grid">
+  <%= render Campbooks::Files::SortMenu.new(sorter: sorter, filters: Documents::Filters.new, q: nil, folder: nil) %>
+</div>

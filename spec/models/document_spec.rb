@@ -344,6 +344,31 @@ RSpec.describe Document, type: :model do
     end
   end
 
+  describe "#thumbnailable?" do
+    it "is true for PDFs and images, false for other types" do
+      doc = build(:document) # factory attaches a PDF
+      expect(doc.thumbnailable?).to be true
+
+      doc.original_file.attach(io: StringIO.new("png"), filename: "scan.png", content_type: "image/png")
+      expect(doc.thumbnailable?).to be true
+
+      doc.original_file.attach(io: StringIO.new("zip"), filename: "archive.zip", content_type: "application/zip")
+      expect(doc.thumbnailable?).to be false
+    end
+  end
+
+  describe "thumbnail generation enqueue" do
+    it "enqueues a GenerateThumbnailJob when a thumbnailable document is created" do
+      expect { create(:document) }.to have_enqueued_job(Documents::GenerateThumbnailJob)
+    end
+
+    it "does not enqueue for a non-thumbnailable type" do
+      doc = build(:document)
+      doc.original_file.attach(io: StringIO.new("zip"), filename: "archive.zip", content_type: "application/zip")
+      expect { doc.save! }.not_to have_enqueued_job(Documents::GenerateThumbnailJob)
+    end
+  end
+
   describe "#entity_display_name" do
     it "returns vendor_name for expense invoices" do
       dt = DocumentType.create!(workspace: workspace, name: "expense_invoice", color: "#000", prompt: "test")
