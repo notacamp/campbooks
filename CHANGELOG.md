@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.28.3] - 2026-07-20
+
 ### Security
 
 - Patched `loofah` (2.25.2) and `rails-html-sanitizer` (1.7.1) — upstream
