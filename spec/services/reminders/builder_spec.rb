@@ -4,6 +4,11 @@ RSpec.describe Reminders::Builder do
   let(:workspace) { create(:workspace) }
   let(:source)    { create(:document, workspace: workspace) }
 
+  # The fixtures use absolute due dates, and the builder drops past-due items
+  # (Builder#due_at gate) — pin the clock so the dates stay in the future
+  # instead of the suite going red by calendar drift (it did, on 2026-07-16).
+  around { |ex| travel_to(Time.zone.parse("2026-07-01 10:00:00")) { ex.run } }
+
   def build(items)
     described_class.call(workspace: workspace, source: source, raw_items: items, anchor_tz: Time.zone)
   end
