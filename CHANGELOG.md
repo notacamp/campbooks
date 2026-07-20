@@ -16,11 +16,25 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.28.3] - 2026-07-20
+
 ### Security
 
 - Patched `loofah` (2.25.2) and `rails-html-sanitizer` (1.7.1) — upstream
   sanitizer-bypass advisories (`javascript:` URI and SVG `href` filter
   evasion). These gems sanitize untrusted email HTML in Campbooks.
+
+### Fixed
+
+- Gmail attachments are ingested again: every Gmail message synced with
+  "no attachments", so files were never downloaded and never became Documents.
+  Gmail's metadata fetch carries no MIME part tree — attachment presence is now
+  derived from the message's Content-Type (`multipart/mixed`), and the ingest
+  path accepts boolean provider flags so a type drift can't silently zero the
+  flag again. A new maintenance task
+  (`bin/rails emails:backfill_gmail_attachments`, dry-run by default) repairs
+  already-synced Gmail mail by re-checking the provider and ingesting the
+  missed attachments.
 
 ## [0.28.2] - 2026-07-14
 
