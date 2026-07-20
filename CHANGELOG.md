@@ -48,6 +48,13 @@ major, minor, or patch change here.
 
 ## [0.28.1] - 2026-07-14
 
+### Added
+
+- The bottom-right "Draft saved" pill can now be dismissed. A new × control
+  hides it without deleting anything — the draft stays saved, an Undo in the
+  confirmation toast brings the pill straight back, and editing the draft
+  again revives it on its own.
+
 ### Fixed
 
 - Events created inside Campbooks before v0.28.0 — including AI-generated
