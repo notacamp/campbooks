@@ -16,6 +16,12 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Security
+
+- Patched `loofah` (2.25.2) and `rails-html-sanitizer` (1.7.1) — upstream
+  sanitizer-bypass advisories (`javascript:` URI and SVG `href` filter
+  evasion). These gems sanitize untrusted email HTML in Campbooks.
+
 ### Fixed
 
 - Gmail attachments are ingested again: every Gmail message synced with
