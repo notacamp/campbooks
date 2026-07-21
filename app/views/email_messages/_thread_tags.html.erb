@@ -1,7 +1,9 @@
-<%# Inside a group drill-in every row would repeat the group's own chip —
+<%# Chips represent the whole conversation's tags (thread union, Gmail-style).
+    Inside a group drill-in every row would repeat the group's own chip —
     redundant context, so it is hidden there (IS DISTINCT FROM keeps ungrouped
     tags visible); chips for OTHER groups/tags still show. %>
-<% tags = Tag.visible_for(Current.workspace).where(id: message.tags.select(:id)) %>
+<% tag_source = message.email_thread ? message.email_thread.tags : message.tags %>
+<% tags = Tag.visible_for(Current.workspace).where(id: tag_source.select(:id)) %>
 <% tags = tags.where("tags.group_name IS DISTINCT FROM ?", params[:group]) if params[:group].present? %>
 <% tags.first(3).each do |tag| %>
   <%= render(Campbooks::TagChip.new(tag: tag, size: :sm)) %>

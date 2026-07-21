@@ -6,15 +6,19 @@
     on both a Gmail and a Zoho account). Order by name then source so local
     tags (source=0) win over external (source=1) when names collide. %>
 <% all_tags = Tag.visible_for(Current.workspace).order(:name, :source).to_a.uniq(&:name).map { |t| { id: t.id, name: t.name, color: t.color } } %>
+<%# Thread-level union (Gmail-style): chips and assigned-ids reflect every
+    message in the conversation, not just the opened one. Adding still posts
+    to this message; the union makes the result show thread-wide. %>
+<% tag_source = message.email_thread ? message.email_thread.tags : message.tags %>
 
 <div id="<%= dom_id(message, :tags) %>"
      class="relative inline-flex items-center gap-1 flex-wrap"
      data-controller="email-tags"
      data-email-tags-message-id-value="<%= message.id %>"
      data-email-tags-all-tags-value="<%= all_tags.to_json %>"
-     data-email-tags-assigned-ids-value="<%= message.tags.pluck(:id).to_json %>">
+     data-email-tags-assigned-ids-value="<%= tag_source.pluck(:id).to_json %>">
 
-  <% Tag.visible_for(Current.workspace).where(id: message.tags.select(:id)).each do |tag| %>
+  <% Tag.visible_for(Current.workspace).where(id: tag_source.select(:id)).each do |tag| %>
     <%= render(Campbooks::TagChip.new(
           tag: tag, size: :md, removable: true,
           remove_data: { "action" => "email-tags#remove",

@@ -4,6 +4,9 @@ class EmailThread < ApplicationRecord
   has_one :agent_thread, as: :contextable, dependent: :destroy
   has_many :agent_messages, through: :agent_thread
   has_many :documents, through: :email_messages
+  # Tags are stored per-message (provider labels sync per-message); this is the
+  # thread-level union every UI surface presents, Gmail-style.
+  has_many :tags, -> { distinct }, through: :email_messages
 
   # Safety net so every thread — however it was created — carries the normalized
   # match key that Emails::Threading groups on. Only fills a blank key; never
