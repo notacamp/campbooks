@@ -16,6 +16,13 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Tag chips in the inbox and open conversation now show the whole thread's tags
+  (previously only the newest message's, so tags vanished when you replied);
+  removing a tag removes it from the entire conversation; Scout's remove-tag
+  tool now only matches tags in the email's workspace.
+
 ## [0.28.3] - 2026-07-20
 
 ### Security

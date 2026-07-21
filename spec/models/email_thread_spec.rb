@@ -1,6 +1,25 @@
 require "rails_helper"
 
 RSpec.describe EmailThread, type: :model do
+  describe "#tags" do
+    let(:workspace) { create(:workspace) }
+    let(:account) { create(:email_account, workspace: workspace) }
+    let(:thread) { create(:email_thread, email_account: account) }
+    let(:tag_a) { create(:tag, workspace: workspace, name: "TagA") }
+    let(:tag_b) { create(:tag, workspace: workspace, name: "TagB") }
+
+    it "returns the distinct union of tags across all messages in the thread" do
+      msg1 = create(:email_message, email_account: account, email_thread: thread)
+      msg2 = create(:email_message, email_account: account, email_thread: thread)
+
+      msg1.email_message_tags.create!(tag: tag_a)
+      msg2.email_message_tags.create!(tag: tag_a)
+      msg2.email_message_tags.create!(tag: tag_b)
+
+      expect(thread.tags.to_a).to match_array([ tag_a, tag_b ])
+    end
+  end
+
   describe "#accessible_by?" do
     let(:workspace) { create(:workspace) }
     let(:account) { create(:email_account, workspace: workspace) }

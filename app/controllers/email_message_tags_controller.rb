@@ -22,18 +22,10 @@ class EmailMessageTagsController < ApplicationController
   end
 
   def destroy
-    @tag = @message.tags.find(params[:id])
-
-    if @tag.external?
-      begin
-        label_assignment_service.new.remove(message: @message, tag: @tag)
-      rescue Zoho::LabelAssignmentService::Error, Google::LabelAssignmentService::Error => e
-        Rails.logger.error("[EmailMessageTags] Remove failed: #{e.message}")
-      end
-    else
-      @message.tags.delete(@tag)
-    end
-
+    # Look up the tag across the whole thread so a chip contributed by a sibling
+    # message can be removed from the opened message's view (tag_source union).
+    @tag = (@message.email_thread ? @message.email_thread.tags : @message.tags).find(params[:id])
+    Emails::ThreadTagRemover.call(message: @message, tag: @tag)
     respond_to(&:turbo_stream)
   end
 
