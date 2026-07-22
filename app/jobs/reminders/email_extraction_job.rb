@@ -32,14 +32,17 @@ module Reminders
       content = [ email.subject, email.ai_summary, body ].compact_blank.join("\n\n")
 
       memory = reminder_learning_memory(workspace)
+      known  = Commitments::Known.for(workspace: workspace, source: email)
 
       items = Ai::ReminderExtractor.new(
-        source:      email,
-        content:     content,
-        anchor_date: (email.received_at || Time.current).to_date,
-        time_zone:   Time.zone,
-        workspace:   workspace,
-        learning_memory: memory
+        source:             email,
+        content:            content,
+        anchor_date:        (email.received_at || Time.current).to_date,
+        time_zone:          Time.zone,
+        workspace:          workspace,
+        learning_memory:    memory,
+        known_commitments:  known,
+        tasks_active:       Features.tasks? && workspace.entitlements.feature?(:tasks)
       ).extract
 
       reminders = Reminders::Builder.call(

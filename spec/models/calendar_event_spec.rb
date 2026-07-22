@@ -252,6 +252,37 @@ RSpec.describe CalendarEvent, type: :model do
       create(:calendar_event, calendar: calendar, source_email_message: email, created_at: 1.day.ago)
       expect(CalendarEvent.duplicate_for(email: email)).to eq(older)
     end
+
+    context "thread-mate matching" do
+      let(:account) { create(:email_account) }
+      let(:thread)  { create(:email_thread, email_account: account) }
+      let(:first_email) { create(:email_message, email_account: account, email_thread: thread) }
+      let(:probe_email) { create(:email_message, email_account: account, email_thread: thread) }
+      let(:unrelated_email) { create(:email_message, email_account: account) }
+
+      it "finds an event sourced from a thread-mate of the probe email" do
+        # Event was created from the first message of the thread; probing with a later
+        # message of the same thread must still find it.
+        event = create(:calendar_event, calendar: calendar, source_email_message: first_email)
+        expect(CalendarEvent.duplicate_for(email: probe_email)).to eq(event)
+      end
+
+      it "returns nil for an unrelated email (different thread)" do
+        create(:calendar_event, calendar: calendar, source_email_message: first_email)
+        expect(CalendarEvent.duplicate_for(email: unrelated_email)).to be_nil
+      end
+
+      it "still applies the start_at date filter in thread-mate mode" do
+        day1 = 2.days.from_now.change(hour: 10)
+        create(:calendar_event, calendar: calendar, source_email_message: first_email,
+               start_at: day1, end_at: day1 + 1.hour)
+
+        # A probe for a different day should not find the event.
+        expect(CalendarEvent.duplicate_for(email: probe_email, start_at: day1 + 5.days)).to be_nil
+        # A probe for the same day should find it.
+        expect(CalendarEvent.duplicate_for(email: probe_email, start_at: day1)).not_to be_nil
+      end
+    end
   end
 
   describe "guests" do

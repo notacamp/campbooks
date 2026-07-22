@@ -41,9 +41,19 @@ class CalendarEvent < ApplicationRecord
   # spawn two genuinely different events (a meeting plus a later follow-up) while
   # collapsing repeats; without one (heuristic/unknown time), any non-cancelled event
   # from the email is the duplicate (conservative, since the bug is over-creation).
+  # When the email belongs to a thread, match events sourced from ANY message of the
+  # thread so a second email in the same conversation finds the event the first already
+  # created (confirming from a thread-mate must not create a duplicate event).
   def self.duplicate_for(email:, start_at: nil)
     return nil unless email
-    scope = where(source_email_message: email).where.not(status: :cancelled)
+
+    scope = if email.email_thread_id.present?
+      where(source_email_message_id: EmailMessage.where(email_thread_id: email.email_thread_id).select(:id))
+    else
+      where(source_email_message: email)
+    end
+
+    scope = scope.where.not(status: :cancelled)
     scope = scope.where("start_at::date = ?::date", start_at) if start_at
     scope.order(:created_at).first
   end

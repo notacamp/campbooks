@@ -31,15 +31,17 @@ module Tasks
       content = [ email.subject, email.ai_summary, body ].compact_blank.join("\n\n")
 
       memory = task_learning_memory(workspace)
+      known  = Commitments::Known.for(workspace: workspace, source: email)
 
       items = Ai::TaskExtractor.new(
-        source:      email,
-        content:     content,
-        anchor_date: (email.received_at || Time.current).to_date,
-        time_zone:   Time.zone,
-        workspace:   workspace,
-        known_tasks: known_thread_titles(email),
-        learning_memory: memory
+        source:            email,
+        content:           content,
+        anchor_date:       (email.received_at || Time.current).to_date,
+        time_zone:         Time.zone,
+        workspace:         workspace,
+        known_tasks:       known_thread_titles(email),
+        learning_memory:   memory,
+        known_commitments: known
       ).extract
 
       # Fingerprint on the THREAD so the same ask restated in a follow-up message

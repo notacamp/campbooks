@@ -30,14 +30,16 @@ module Tasks
       ].compact_blank.join("\n")
 
       memory = task_learning_memory(workspace)
+      known  = Commitments::Known.for(workspace: workspace, source: document)
 
       items = Ai::TaskExtractor.new(
-        source:      document,
-        content:     content,
-        anchor_date: document.document_date || document.created_at.to_date,
-        time_zone:   Time.zone,
-        workspace:   workspace,
-        learning_memory: memory
+        source:            document,
+        content:           content,
+        anchor_date:       document.document_date || document.created_at.to_date,
+        time_zone:         Time.zone,
+        workspace:         workspace,
+        learning_memory:   memory,
+        known_commitments: known
       ).extract
 
       tasks = Tasks::Builder.call(

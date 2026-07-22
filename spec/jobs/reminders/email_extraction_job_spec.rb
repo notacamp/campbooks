@@ -39,6 +39,22 @@ RSpec.describe Reminders::EmailExtractionJob do
     expect { described_class.new.perform(-1) }.not_to raise_error
   end
 
+  it "passes known_commitments and tasks_active to the extractor" do
+    allow(Ai::ProviderSetup).to receive(:configured?).and_return(true)
+    allow(Reminders::ExtractionGate).to receive(:email_allows?).and_return(true)
+    allow(Commitments::Known).to receive(:for).and_return([ "- [task] Do something — due 2026-07-30" ])
+
+    expect(Ai::ReminderExtractor).to receive(:new).with(
+      hash_including(
+        known_commitments: [ "- [task] Do something — due 2026-07-30" ],
+        tasks_active: (Features.tasks? && email.email_account.workspace.entitlements.feature?(:tasks))
+      )
+    ).and_return(double(extract: []))
+
+    allow(Reminders::Builder).to receive(:call).and_return([])
+    described_class.new.perform(email.id)
+  end
+
   # ── announce_in_discussion: focused on the discussion-announcement selection ──
   # Focused on the discussion-announcement selection added to the job; the AI
   # extraction itself is exercised by the extractor/builder specs.

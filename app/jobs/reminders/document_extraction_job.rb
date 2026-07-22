@@ -26,14 +26,17 @@ module Reminders
       ].compact_blank.join("\n")
 
       memory = reminder_learning_memory(workspace)
+      known  = Commitments::Known.for(workspace: workspace, source: document)
 
       items = Ai::ReminderExtractor.new(
-        source:      document,
-        content:     content,
-        anchor_date: document.document_date || document.created_at.to_date,
-        time_zone:   Time.zone,
-        workspace:   workspace,
-        learning_memory: memory
+        source:             document,
+        content:            content,
+        anchor_date:        document.document_date || document.created_at.to_date,
+        time_zone:          Time.zone,
+        workspace:          workspace,
+        learning_memory:    memory,
+        known_commitments:  known,
+        tasks_active:       Features.tasks? && workspace.entitlements.feature?(:tasks)
       ).extract
 
       reminders = Reminders::Builder.call(

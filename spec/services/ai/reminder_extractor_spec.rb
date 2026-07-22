@@ -53,6 +53,38 @@ RSpec.describe Ai::ReminderExtractor do
   # behaviour added alongside the per-leg prompt instruction: a multi-leg
   # itinerary must yield one reminder item per dated leg, not collapse to one.
 
+  context "known_commitments injection" do
+    def extractor_with(commitments:, tasks_active: false)
+      described_class.new(
+        source: email, content: "Pay invoice by 2026-07-15",
+        anchor_date: Date.new(2026, 7, 1), time_zone: Time.zone,
+        known_commitments: commitments, tasks_active: tasks_active
+      )
+    end
+
+    it "includes the already_tracked_commitments block in user_message when non-empty" do
+      ex = extractor_with(commitments: [ "- [task] Submit tax form — due 2026-07-30" ])
+      msg = ex.send(:user_message)
+      expect(msg).to include("<already_tracked_commitments>")
+      expect(msg).to include("- [task] Submit tax form — due 2026-07-30")
+    end
+
+    it "omits the already_tracked_commitments block when the list is empty" do
+      ex = extractor_with(commitments: [])
+      expect(ex.send(:user_message)).not_to include("<already_tracked_commitments>")
+    end
+
+    it "includes the tasks_active ownership rule in system_prompt when tasks_active: true" do
+      ex = extractor_with(commitments: [], tasks_active: true)
+      expect(ex.send(:system_prompt)).to include("separate task system")
+    end
+
+    it "omits the tasks_active rule when tasks_active: false" do
+      ex = extractor_with(commitments: [], tasks_active: false)
+      expect(ex.send(:system_prompt)).not_to include("separate task system")
+    end
+  end
+
   context "round-trip itinerary" do
     def stub_with_json(json)
       adapter = double("ai_adapter")
