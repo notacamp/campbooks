@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.28.5] - 2026-07-22
+
 ### Fixed
 
 - One commitment, one card: the AI task and reminder extractors no longer double
