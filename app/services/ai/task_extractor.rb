@@ -20,7 +20,7 @@ module Ai
     MAX_CONTENT = 8000      # chars of source text sent to the model
     MAX_KNOWN_TASKS = 20    # exclusion-list entries shown to the model
 
-    def initialize(source:, content:, anchor_date: nil, time_zone: nil, workspace: Current.workspace, known_tasks: [], learning_memory: nil)
+    def initialize(source:, content:, anchor_date: nil, time_zone: nil, workspace: Current.workspace, known_tasks: [], learning_memory: nil, known_commitments: [])
       @source = source
       @content = content.to_s[0, MAX_CONTENT].to_s
       @anchor_date = anchor_date || Date.current
@@ -28,6 +28,7 @@ module Ai
       @workspace = workspace
       @known_tasks = Array(known_tasks).compact_blank.first(MAX_KNOWN_TASKS)
       @learning_memory = learning_memory
+      @known_commitments = Array(known_commitments).compact_blank
     end
 
     # → Array<Hash> (string keys matching the schema), or [] on non-retryable failure.
@@ -94,6 +95,14 @@ module Ai
             your password").
           - anything already covered by <already_tracked_tasks> in the input (the same
             underlying action counts as covered even when worded differently).
+          - dated commitments the reader merely needs to be aware of or attend — deliveries,
+            renewals, subscription or auto-payments, trips, appointments, events. Those are
+            calendar reminders, not tasks. Extract a task only when the reader must actively
+            DO something to make progress.
+          - anything already covered by <already_tracked_commitments> in the input — the
+            reader's existing tasks, reminders, and calendar items. The same underlying
+            commitment counts as covered even when worded differently or tracked as a
+            different kind.
 
         For each task:
           - title: a short imperative summary of the action (<= 80 chars), e.g. "Send the
@@ -148,11 +157,25 @@ module Ai
         <source_metadata>
         #{source_metadata}
         </source_metadata>
-        #{known_tasks_block}
+        #{known_tasks_block}#{known_commitments_block}
         <content>
         #{@content}
         </content>
       MSG
+    end
+
+    # All tracked commitments (tasks, reminders, calendar events) — shown to the model
+    # as a cross-kind exclusion list so dated commitments the reader merely attends or
+    # observes are not re-extracted as tasks. Separate from known_tasks_block.
+    def known_commitments_block
+      return "" if @known_commitments.empty?
+
+      <<~BLOCK
+
+        <already_tracked_commitments>
+        #{@known_commitments.join("\n")}
+        </already_tracked_commitments>
+      BLOCK
     end
 
     # Tasks already tracked from this conversation — shown to the model as an

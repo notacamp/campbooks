@@ -43,6 +43,22 @@ RSpec.describe Ai::TaskExtractor do
     expect(extractor.send(:user_message)).not_to include("<already_tracked_tasks>")
   end
 
+  it "known_commitments renders the already_tracked_commitments block in user_message" do
+    extractor = described_class.new(
+      source: nil, content: "please send the file", workspace: nil,
+      known_commitments: [ "- [reminder/payment_due] Pay invoice — 2026-07-30" ]
+    )
+
+    msg = extractor.send(:user_message)
+    expect(msg).to include("<already_tracked_commitments>")
+    expect(msg).to include("- [reminder/payment_due] Pay invoice — 2026-07-30")
+  end
+
+  it "omits the already_tracked_commitments block when known_commitments is empty" do
+    extractor = described_class.new(source: nil, content: "please send the file", workspace: nil, known_commitments: [])
+    expect(extractor.send(:user_message)).not_to include("<already_tracked_commitments>")
+  end
+
   private
 
   # Swap Ai::Configuration.for_any for the duration of the block (mirrors the

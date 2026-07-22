@@ -16,6 +16,31 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- One commitment, one card: the AI task and reminder extractors no longer double
+  up. Both prompts now see what the workspace already tracks (open tasks, staged
+  reminders, upcoming calendar events) and skip re-extracting it; a dated action
+  is extracted as a task rather than also becoming a "deadline" reminder (when
+  the task module is on); and before staging anything, a new AI novelty check
+  compares the candidate against same-timeframe neighbors — matching an existing
+  task, reminder, or calendar event (even worded differently, or tracked as a
+  different kind) means nothing new is inserted. Deterministic matching got wider
+  too: tasks now dedupe across conversations (same due date + normalized title),
+  reminders match across reminder types, and a timed reminder is skipped when an
+  event already sits at that exact time. The check fails open — if the AI call
+  errors, the item is staged rather than lost, and the verdict is recorded on
+  the row for auditability.
+- Dismissals stick: a second email about a commitment you dismissed no longer
+  resurrects the reminder card, and a task you completed or cancelled is not
+  re-suggested by a lookalike email on the same date.
+- Confirming a reminder from a second email in a conversation no longer creates
+  a duplicate calendar event: duplicate detection now looks across the whole
+  thread, and the Scout / command-palette "add to calendar" action gets the same
+  guard.
+- Reminder activity noise: `reminder.created` is published only when a reminder
+  is first staged, not again on every re-scan of the same mail.
+
 ## [0.28.4] - 2026-07-22
 
 ### Fixed
