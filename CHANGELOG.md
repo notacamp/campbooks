@@ -25,7 +25,8 @@ major, minor, or patch change here.
   tags and attachments are gone; whitespace and alignment do the separating,
   matching the calendar and home. Sticky date headers traded their bordered
   pill for the calendar's quiet uppercase label (a soft blur keeps them legible
-  over scrolling rows).
+  over scrolling rows). The compose Desk follows suit: its top bar is frosted
+  instead of ruled, and the context and Scout rails lost their pane frames.
 
 ## [0.28.6] - 2026-07-23
 

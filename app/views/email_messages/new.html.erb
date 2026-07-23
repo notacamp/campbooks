@@ -14,8 +14,10 @@
         <%# ── Writing column ────────────────────────────────────── %>
         <div class="flex flex-col lg:flex-1 lg:min-h-0 min-w-0">
           <% if @account %>
-            <%# Top bar — sticky so it doesn't scroll off on mobile %>
-            <div class="sticky top-0 z-10 flex items-center gap-3 px-4 sm:px-6 py-3 border-b border-gray-100 flex-shrink-0 bg-card">
+            <%# Top bar — sticky so it doesn't scroll off on mobile. Frosted instead
+                of ruled: content sliding under the translucent bar stays legible
+                without a hairline (separation is whitespace, not lines). %>
+            <div class="sticky top-0 z-10 flex items-center gap-3 px-4 sm:px-6 py-3 flex-shrink-0 bg-card/90 backdrop-blur-md">
               <%= link_to email_messages_path, data: { turbo_frame: "_top" },
                     class: "inline-flex items-center gap-2 text-[13px] font-semibold text-gray-600 hover:text-gray-900 transition-colors" do %>
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
@@ -73,10 +75,10 @@
       </div><%# end writing + rail wrapper %>
 
       <%# ── Scout chat panel (desktop side column / mobile overlay) ── %>
-      <div class="hidden lg:flex flex-shrink-0 border-l border-gray-200 flex-col bg-card transition-all duration-200 w-96"
+      <div class="hidden lg:flex flex-shrink-0 flex-col bg-card transition-all duration-200 w-96"
            data-controller="chat-panel"
            data-scout-mobile-target="panel">
-        <div class="px-4 py-3 border-b border-gray-200 flex-shrink-0 flex items-center gap-1.5">
+        <div class="px-4 py-3 flex-shrink-0 flex items-center gap-1.5">
           <div class="hidden lg:block">
             <%= render(Campbooks::IconButton.new(aria_label: t(".toggle_chat_aria"), size: :sm, class: "hover:bg-gray-100", data: { action: "click->chat-panel#toggle" })) do %>
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-chat-panel-target="icon">

@@ -34,9 +34,11 @@ module Campbooks
       end
 
       def view_template
+        # No pane frame (border-t stacked / border-l side column) — the rail's
+        # bounded content cards separate it; whitespace does the rest.
         aside(
-          class: "flex flex-col gap-5 p-4 pb-8 border-t border-border " \
-                 "overflow-y-auto lg:border-t-0 lg:border-l lg:w-[380px] lg:flex-shrink-0 " \
+          class: "flex flex-col gap-5 p-4 pb-8 " \
+                 "overflow-y-auto lg:w-[380px] lg:flex-shrink-0 " \
                  "bg-card"
         ) do
           original_email_section if show_original_email?
