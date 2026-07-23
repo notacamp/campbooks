@@ -17,8 +17,10 @@
         it belongs to the list view (email-mobile `topband` target) so it hides while
         reading a message. %>
     <%# The band sits on the raw canvas (like home) rather than inside a bordered
-        toolbar slab — in dark mode the work panes below read as elevated cards. %>
-    <div data-email-mobile-target="topband" class="hidden lg:flex flex-col flex-shrink-0 border-b border-gray-100 bg-background">
+        toolbar slab — in dark mode the work panes below read as elevated cards.
+        No hairline underneath: whitespace separates it from the panes (the
+        calendar's separation vocabulary — space, not lines). %>
+    <div data-email-mobile-target="topband" class="hidden lg:flex flex-col flex-shrink-0 bg-background">
       <div class="flex items-center gap-3 px-4 py-2">
         <%# The search field owns the whole band up to Compose — no width cap, so
             the two ends meet instead of leaving a dead gap on wide screens. %>
@@ -54,7 +56,7 @@
     <!-- Thread list (mobile: shown in list mode; desktop: always shown) -->
     <%# Below lg the whole pane scrolls so the folder bar + search scroll away
         with the list; at lg+ the pane is fixed and only the inner list scrolls. %>
-    <div class="group/select hidden lg:flex w-full lg:w-64 flex-shrink-0 border-r border-gray-100 flex-col bg-card relative overflow-y-auto lg:overflow-visible"
+    <div class="group/select hidden lg:flex w-full lg:w-64 flex-shrink-0 flex-col bg-card relative overflow-y-auto lg:overflow-visible"
          data-controller="email-selection panel-resize"
          data-email-mobile-target="list"
          data-inbox-pane="list"
@@ -83,7 +85,7 @@
       <% end %>
       <%# Skim tray, Search and Compose now live in the content-spanning top band
           above the panes (see top of this file). %>
-      <div class="px-2.5 py-1.5 border-b border-gray-100 relative">
+      <div class="px-2.5 py-1.5 relative">
         <div class="flex items-center justify-between gap-1">
           <div class="flex items-center gap-1.5 min-w-0 flex-1">
             <input type="checkbox"

@@ -16,6 +16,17 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- The inbox breathes like the calendar now. The mail surface dropped the grid of
+  hairline separators that made it feel cramped — the frame borders around the
+  folder rail, thread list, reading pane and Scout rail, the rules under the
+  search band and toolbars, and the stacked lines between an email's subject,
+  tags and attachments are gone; whitespace and alignment do the separating,
+  matching the calendar and home. Sticky date headers traded their bordered
+  pill for the calendar's quiet uppercase label (a soft blur keeps them legible
+  over scrolling rows).
+
 ## [0.28.6] - 2026-07-23
 
 ### Fixed
