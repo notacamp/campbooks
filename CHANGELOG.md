@@ -16,6 +16,17 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- The home feed no longer repeats one conversation as several cards. When a
+  correspondent's replies land in separate threads (reply hops that re-encode
+  accented subjects — "saúde" → "saÃƒÂºde" — or drop the reply headers), each
+  fragment used to surface its own card. The feed now also collapses by
+  sender + subject, tolerant of encoding-mangled variants, and keeps the
+  newest message of the conversation as the single surviving card. Unknown
+  senders and blank subjects never collapse, so unrelated mail can't be
+  lumped together.
+
 ## [0.28.5] - 2026-07-22
 
 ### Fixed

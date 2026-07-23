@@ -41,7 +41,8 @@ module Feed
           EmailMessage.accessible_to(user).with_ai_todos.where(skimmed_at: nil)
             .not_answered_by_owner
             .select(:id, :received_at, :created_at, :ai_priority, :pinned_at, :read,
-                    :category, :email_account_id, :email_thread_id, :contact_id)
+                    :category, :email_account_id, :email_thread_id, :contact_id,
+                    :subject, :from_address) # the Generator's conversation claim
         ))
       end
 

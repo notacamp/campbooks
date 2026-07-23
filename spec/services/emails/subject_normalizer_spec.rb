@@ -40,6 +40,31 @@ RSpec.describe Emails::SubjectNormalizer do
     end
   end
 
+  describe ".conversation_key (ASCII-folded cross-thread key)" do
+    it "matches a clean subject with its re-encoded reply variants" do
+      clean = described_class.conversation_key("seguro de saúde")
+      once  = described_class.conversation_key("RE: FW: seguro de saÃƒÂºde")
+      twice = described_class.conversation_key("RE: seguro de saÃƒÂƒÃ†Â’ÃƒÂ‚Ã‚Âºde")
+
+      expect(clean).to eq("seguro de sade")
+      expect([ once, twice ]).to all(eq(clean))
+    end
+
+    it "keeps genuinely different subjects apart (digits survive the fold)" do
+      expect(described_class.conversation_key("Invoice 41"))
+        .not_to eq(described_class.conversation_key("Invoice 42"))
+    end
+
+    it "falls back to the plain key when the ASCII residue is too short" do
+      expect(described_class.conversation_key("日本語の件名")).to eq(described_class.key("日本語の件名"))
+      expect(described_class.conversation_key("Olá")).to eq("olá")
+    end
+
+    it "is blank for a subject that is only markers" do
+      expect(described_class.conversation_key("Re: Fwd:")).to eq("")
+    end
+  end
+
   describe ".display (human thread subject)" do
     it "strips the marker run but preserves the original case" do
       expect(described_class.display("RE: FW: Pedido de Simulação")).to eq("Pedido de Simulação")

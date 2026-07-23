@@ -112,4 +112,45 @@ RSpec.describe Feed::Generator do
     expect(user.feed_items.find_by(subject: msg)).to be_dismissed
     expect(user.feed_items.active.where(subject: msg)).to be_empty
   end
+
+  describe "conversation-fragment collapse (broken threading / mojibake subjects)" do
+    # One conversation whose replies landed in SEPARATE EmailThread rows — the
+    # reply hop re-encoded the accented subject, so subject-keyed threading (and
+    # the provider) treated each variant as a new conversation.
+    def fragment(subject_line, from: "Paulo Lobo <paulo@corretor.example>", received:)
+      thread = EmailThread.create!(subject: subject_line, email_account: account)
+      create(:email_message, email_account: account, email_thread: thread,
+             from_address: from, subject: subject_line,
+             ai_action_prompt: "Reply", received_at: received)
+    end
+
+    it "keeps one card per conversation, preferring the newest fragment" do
+      fragment("seguro de saúde", received: 3.hours.ago)
+      newest = fragment("RE: FW: seguro de saÃƒÂºde", received: 1.hour.ago)
+
+      Feed::Generator.for_user(user)
+
+      items = user.feed_items.active
+      expect(items.count).to eq(1)
+      expect(items.first.subject).to eq(newest)
+    end
+
+    it "keeps different senders' same-subject conversations separate" do
+      fragment("Proposta", from: "a@one.example", received: 2.hours.ago)
+      fragment("Proposta", from: "b@two.example", received: 1.hour.ago)
+
+      Feed::Generator.for_user(user)
+
+      expect(user.feed_items.active.count).to eq(2)
+    end
+
+    it "never conversation-claims a blank subject" do
+      fragment("", received: 2.hours.ago)
+      fragment("", received: 1.hour.ago)
+
+      Feed::Generator.for_user(user)
+
+      expect(user.feed_items.active.count).to eq(2)
+    end
+  end
 end
