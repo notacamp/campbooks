@@ -52,8 +52,22 @@ module Feed
         ran_kinds << klass.key
         candidates.each do |c|
           subject = c[:subject]
-          next if claimed[claim_key(subject)] # cross-source dedup: first source wins
-          claimed[claim_key(subject)] = true
+          keys = claim_keys(subject)
+          if (idx = keys.filter_map { |k| claimed[k] }.first)
+            # Claimed already. Across sources the first source wins (priority
+            # order). Within one source, a fragment of the same conversation
+            # that sorts newer replaces the earlier pick, so the surviving card
+            # is the conversation's latest message — sources iterate in id
+            # order, not recency (find_each), so order can't be trusted for this.
+            kind, existing = picked[idx]
+            if kind == klass.key && c[:sort_at] && existing[:sort_at] && c[:sort_at] > existing[:sort_at]
+              picked[idx] = [ klass.key, c ]
+              keys.each { |k| claimed[k] = idx }
+            end
+            next
+          end
+          idx = picked.size
+          keys.each { |k| claimed[k] = idx }
           picked << [ klass.key, c ]
         end
       end
@@ -79,15 +93,42 @@ module Feed
       picked.each { |_kind, c| c[:seen_at] = seen[c[:dedupe_key]] }
     end
 
-    # One card per email *thread* (not per message) across all sources, so an
-    # aged reminder and a fresh action on the same thread can't both surface.
+    # One card per email *conversation* (not per message) across all sources, so
+    # an aged reminder and a fresh action on the same thread can't both surface.
     # Non-threaded subjects (loose emails, documents) dedupe by record.
-    def claim_key(subject)
-      if subject.is_a?(EmailMessage) && subject.email_thread_id
-        "EmailThread:#{subject.email_thread_id}"
-      else
-        "#{subject.class.polymorphic_name}:#{subject.id}"
-      end
+    #
+    # Beyond the thread id, an email also claims a per-sender conversation key:
+    # encoding-mangled reply subjects and dropped reply headers fragment one
+    # conversation into several EmailThread rows, and without the wider key each
+    # fragment surfaces its own card (the claim loop keeps the newest fragment).
+    def claim_keys(subject)
+      return [ "#{subject.class.polymorphic_name}:#{subject.id}" ] unless subject.is_a?(EmailMessage)
+
+      keys = []
+      keys << "EmailThread:#{subject.email_thread_id}" if subject.email_thread_id
+      keys << conversation_claim(subject)
+      keys.compact!
+      keys.presence || [ "#{subject.class.polymorphic_name}:#{subject.id}" ]
+    end
+
+    # The bare address inside a From field ("Paulo <p@x.pt>" → "p@x.pt").
+    ADDRESS_IN_FROM = /[^\s<>"',;]+@[^\s<>"',;]+/
+
+    # nil when there's no usable signal (unknown sender or blank subject) — a
+    # blank key must never lump unrelated mail together. Defensive on attribute
+    # presence: sources SELECT narrow column lists, and a column missing here
+    # must degrade to thread-only claiming, never crash the generation run.
+    def conversation_claim(m)
+      return nil unless m.has_attribute?(:subject)
+
+      who   = (m.contact_id if m.has_attribute?(:contact_id))
+      who ||= (m.from_address.to_s[ADDRESS_IN_FROM]&.downcase if m.has_attribute?(:from_address))
+      return nil if who.blank?
+
+      subj = Emails::SubjectNormalizer.conversation_key(m.subject)
+      return nil if subj.blank?
+
+      "EmailConv:#{who}:#{subj}"
     end
 
     def row_for(kind, candidate, subject)

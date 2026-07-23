@@ -43,7 +43,8 @@ module Feed
             .where(skimmed_at: nil)
             .where("email_messages.received_at >= ?", WINDOW.ago)
             .select(:id, :received_at, :created_at, :ai_priority, :read,
-                    :category, :email_account_id, :email_thread_id, :contact_id)
+                    :category, :email_account_id, :email_thread_id, :contact_id,
+                    :subject, :from_address) # the Generator's conversation claim
         )
       end
 

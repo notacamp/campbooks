@@ -33,5 +33,23 @@ module Emails
     def key(subject)
       display(subject).downcase.gsub(/\s+/, " ").strip
     end
+
+    # Minimum ASCII residue for conversation_key to trust it; below this the
+    # plain key is safer than collapsing on almost-nothing.
+    MIN_CONVERSATION_KEY = 3
+
+    # Cross-thread conversation key for reuniting fragments of ONE conversation
+    # (the feed's claim layer): the thread key reduced to its ASCII letters and
+    # digits. Some mail clients re-encode accented subjects on every reply hop
+    # ("saúde" → "saÃƒÂºde" → "saÃƒÂƒÃ†Â’ÃƒÂ‚Ã‚Âºde"), and each mangled variant
+    # threads separately — but their ASCII residue is identical ("sade"), so
+    # this key matches them to the clean original. Falls back to the plain key
+    # when stripping leaves too little signal (short or non-Latin subjects),
+    # where a near-empty residue would merge unrelated conversations instead.
+    def conversation_key(subject)
+      k = key(subject)
+      ascii = k.gsub(/[^a-z0-9\s]+/, "").gsub(/\s+/, " ").strip
+      ascii.length >= MIN_CONVERSATION_KEY ? ascii : k
+    end
   end
 end
