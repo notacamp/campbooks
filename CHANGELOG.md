@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.28.6] - 2026-07-23
+
 ### Fixed
 
 - The home feed no longer repeats one conversation as several cards. When a
