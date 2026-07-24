@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Minimal capability. The Campbooks web app is Tauri-unaware — every native concern (deep links, opening the system browser, navigation) is handled Rust-side, so the remote web content is granted no IPC access.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}
