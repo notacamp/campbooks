@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.28.7] - 2026-07-24
+
 ### Changed
 
 - The inbox breathes like the calendar now. The mail surface dropped the grid of
@@ -1806,7 +1808,13 @@ major, minor, or patch change here.
 
 - Initial public, source-available release of Campbooks.
 
-[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.28.1...HEAD
+[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.28.7...HEAD
+[0.28.7]: https://github.com/notacamp/campbooks/compare/v0.28.6...v0.28.7
+[0.28.6]: https://github.com/notacamp/campbooks/compare/v0.28.5...v0.28.6
+[0.28.5]: https://github.com/notacamp/campbooks/compare/v0.28.4...v0.28.5
+[0.28.4]: https://github.com/notacamp/campbooks/compare/v0.28.3...v0.28.4
+[0.28.3]: https://github.com/notacamp/campbooks/compare/v0.28.2...v0.28.3
+[0.28.2]: https://github.com/notacamp/campbooks/compare/v0.28.1...v0.28.2
 [0.28.1]: https://github.com/notacamp/campbooks/compare/v0.28.0...v0.28.1
 [0.28.0]: https://github.com/notacamp/campbooks/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/notacamp/campbooks/compare/v0.26.2...v0.27.0
