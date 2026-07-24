@@ -54,13 +54,15 @@ module Api
       end
 
       # Reply (or reply-all) to a message the token can see. Threads automatically
-      # via the source message; sends from its account unless email_account_id is given.
+      # via the source message; sends from its account unless email_account_id is
+      # given. The default recipient is the sender — or, when the source message
+      # is one the account sent itself, its recipients (never the own address).
       def reply
         result = Emails::Sender.call(
           user: Current.user,
           source_message: @email,
           email_account_id: params[:email_account_id],
-          to_address: params[:to_address].presence || @email.from_address,
+          to_address: params[:to_address].presence || Emails::ComposePrefill.reply_to_address(@email),
           cc_address: params[:cc_address],
           bcc_address: params[:bcc_address],
           subject: reply_subject,

@@ -12,6 +12,14 @@ module Emails
       new(message, mode.to_s).call
     end
 
+    # The address a plain reply to `message` should target. Shared with the
+    # send-side surfaces (Scout's send/save-draft tools, Skim's inline reply,
+    # the API reply default) so a sent reply can never drift from what the
+    # composer prefills.
+    def self.reply_to_address(message)
+      new(message, "reply").to_address
+    end
+
     def initialize(message, mode)
       @message = message
       @mode = mode
@@ -21,11 +29,9 @@ module Emails
       Result.new(to: to_address, cc: cc_address, subject: subject, quoted_body: quoted_body)
     end
 
-    private
-
     def to_address
       case @mode
-      when "reply" then decode(@message.from_address.to_s)
+      when "reply" then reply_recipients
       when "reply_all"
         recipients = []
         recipients << decode(@message.from_address.to_s) if @message.from_address.present?
@@ -34,6 +40,20 @@ module Emails
         recipients.uniq.join(", ")
       else ""
       end
+    end
+
+    private
+
+    # A reply targets the sender — unless the source message is one the user
+    # sent themselves (the natural click when a thread sits awaiting the other
+    # side's answer): then it targets that message's recipients, like Gmail,
+    # so a reply never comes pre-addressed to the user's own inbox.
+    def reply_recipients
+      from = decode(@message.from_address.to_s)
+      return from unless own_address?(from)
+
+      others = parse_addresses(@message.to_address).reject { |a| own_address?(a) }.uniq
+      others.any? ? others.join(", ") : from
     end
 
     def cc_address

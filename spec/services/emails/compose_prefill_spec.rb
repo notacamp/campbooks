@@ -23,6 +23,44 @@ RSpec.describe Emails::ComposePrefill, type: :service do
 
       expect(prefill(message, :reply).to).to eq('"Supplier" <sender@example.com>')
     end
+
+    # Replying to a message the user sent themselves (the natural click when a
+    # thread sits awaiting the other side's answer) must target that message's
+    # recipients — never come pre-addressed to the user's own inbox.
+    it "targets the recipients when the source message was sent by the account itself" do
+      message = message_with(from_address: "me@example.com", to_address: "them@example.com")
+
+      expect(prefill(message, :reply).to).to eq("them@example.com")
+    end
+
+    it "recognizes the own sender in Display Name <addr> form and drops itself from the recipients" do
+      message = message_with(
+        from_address: "Me Myself <me@example.com>",
+        to_address: "them@example.com, Me Myself <me@example.com>"
+      )
+
+      expect(prefill(message, :reply).to).to eq("them@example.com")
+    end
+
+    it "falls back to the own address for a self-note (sent to no one else)" do
+      message = message_with(from_address: "me@example.com", to_address: "me@example.com")
+
+      expect(prefill(message, :reply).to).to eq("me@example.com")
+    end
+  end
+
+  describe ".reply_to_address" do
+    it "returns the sender for an inbound message" do
+      message = message_with(from_address: "sender@example.com")
+
+      expect(described_class.reply_to_address(message)).to eq("sender@example.com")
+    end
+
+    it "returns the recipients for an own-sent message" do
+      message = message_with(from_address: "me@example.com", to_address: "them@example.com")
+
+      expect(described_class.reply_to_address(message)).to eq("them@example.com")
+    end
   end
 
   describe "reply_all" do

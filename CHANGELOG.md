@@ -16,6 +16,14 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Replying to a message you sent yourself — the natural click when a thread is
+  awaiting the other side's answer — no longer addresses the reply to your own
+  inbox. Reply now targets that message's recipients (like Gmail), consistently
+  across the composer (Dock and Desk), Scout's send/save-draft actions, Skim's
+  inline reply, and the API's reply default.
+
 ## [0.28.7] - 2026-07-24
 
 ### Changed
