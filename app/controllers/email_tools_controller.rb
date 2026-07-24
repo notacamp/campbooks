@@ -528,7 +528,7 @@ class EmailToolsController < ApplicationController
     draft_result = mail_client.save_draft(
       subject: subject,
       body: body,
-      to_address: email_message.from_address
+      to_address: Emails::ComposePrefill.reply_to_address(email_message)
     )
     return nil unless draft_result
 
@@ -603,7 +603,7 @@ class EmailToolsController < ApplicationController
     draft_result = mail_client.save_draft(
       subject: args["subject"] || "Re: #{email_message.subject}",
       body: args["body"].to_s,
-      to_address: email_message.from_address
+      to_address: Emails::ComposePrefill.reply_to_address(email_message)
     )
     draft_result ? { provider_draft_id: draft_result["messageId"] || draft_result["id"] } : nil
   end

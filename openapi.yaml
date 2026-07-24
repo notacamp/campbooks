@@ -410,7 +410,8 @@ paths:
       description: >-
         Threads automatically via the source message. Sends from the source
         message's account unless `email_account_id` is given; replies to the
-        original sender unless `to_address` is given.
+        original sender (or, when the source message was sent by the account
+        itself, to its recipients) unless `to_address` is given.
       operationId: replyEmail
       security:
         - oauth2: [emails:send]
