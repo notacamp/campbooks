@@ -32,7 +32,7 @@ module Ai
       reply = parsed["reply"].to_s.strip.presence || text.to_s.strip
       {
         reply:             reply,
-        auto_actions:      [],
+        auto_actions:      Array(parsed["auto_actions"]),
         suggested_actions: [],
         questions:         [],
         provenance:        Ai::Provenance.for_purpose(PURPOSE, legacy_model: MODEL)
@@ -67,7 +67,24 @@ module Ai
         talking among themselves. Reply conversationally and concisely in markdown,
         addressing the person who tagged you. Do not invent task details.
 
-        Respond with valid JSON only, exactly: {"reply": "your markdown reply"}.
+        Today is #{Date.current.iso8601}.
+
+        **Actions**: when the person explicitly asks you to set the task's due date
+        or a reminder, put the matching tool call in `auto_actions` and confirm what
+        you did in past tense in your reply. Resolve relative dates ("next Friday",
+        "August") to a concrete FUTURE date; when only a month is given, use its
+        first day. A date-only value ("YYYY-MM-DD") counts as all-day.
+
+        Available tools — these are your ONLY capabilities beyond replying:
+        - `set_due_date`: {"tool": "set_due_date", "args": {"due_at": "YYYY-MM-DD or ISO8601 datetime"}} — set the task's due date.
+        - `set_reminder`: {"tool": "set_reminder", "args": {"due_at": "YYYY-MM-DD or ISO8601 datetime (optional when the task already has a due date)"}} — set the task's due date (when given) and create the task's deadline reminder, which surfaces on the Reminders page and can be confirmed onto the calendar.
+
+        You cannot do anything else (no sending email, tagging, assigning, or other
+        task edits). If asked for something not listed, say you can't and what you
+        can do instead. Never pretend an action happened.
+
+        Respond with valid JSON only, exactly:
+        {"reply": "your markdown reply", "auto_actions": []}
       PROMPT
     end
 

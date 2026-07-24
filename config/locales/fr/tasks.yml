@@ -121,6 +121,17 @@ fr:
       remind_failed: Impossible de définir le rappel.
       reminded: Rappel défini — confirmez-le sur la page Rappels pour l'ajouter à
         votre calendrier.
+    scout_actions:
+      error: Une erreur est survenue lors de l'exécution de cette action.
+      invalid_date: Je n'ai pas compris cette date.
+      set_due_date:
+        success: Date d'échéance définie au %{due}.
+      set_reminder:
+        no_due: La tâche a d'abord besoin d'une date d'échéance — dites-moi pour quand
+          définir le rappel.
+        success: Rappel défini pour le %{due} — confirmez-le sur la page Rappels pour
+          l'ajouter à votre calendrier.
+      unknown: Cette action n'est pas disponible dans une discussion de tâche.
     show:
       activity: Activité
       add_document: Joindre un document

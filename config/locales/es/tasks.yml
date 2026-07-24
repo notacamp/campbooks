@@ -121,6 +121,17 @@ es:
       remind_failed: No se pudo establecer el recordatorio.
       reminded: Recordatorio establecido — confírmalo en la página de Recordatorios
         para añadirlo a tu calendario.
+    scout_actions:
+      error: Algo salió mal al ejecutar esa acción.
+      invalid_date: No he podido entender esa fecha.
+      set_due_date:
+        success: Fecha de entrega establecida para el %{due}.
+      set_reminder:
+        no_due: La tarea necesita primero una fecha de entrega — dime para cuándo
+          establezco el recordatorio.
+        success: Recordatorio establecido para el %{due} — confírmalo en la página
+          de Recordatorios para añadirlo a tu calendario.
+      unknown: Esa acción no está disponible en una discusión de tarea.
     show:
       activity: Actividad
       add_document: Adjuntar un documento

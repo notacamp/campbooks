@@ -94,6 +94,8 @@ en:
     email_reply_daemon:
       auto_action_failures_prefix: 'However, I couldn''t complete these actions:'
       conversation_archived: This conversation has been archived.
+    task_chat_reply:
+      auto_action_failures_prefix: 'However, I couldn''t complete these actions:'
   notifier:
     account_disconnected:
       body: Re-authenticate to resume email sync.

@@ -16,6 +16,14 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- Scout can now act in a task discussion: asking it to set the task's due date
+  or a reminder ("@scout set a reminder for August") sets the date and creates
+  the task's deadline reminder — the same one as the task page's Remind button,
+  surfacing on the Reminders page and calendar. Previously Scout could only talk
+  about the task.
+
 ## [0.28.8] - 2026-07-24
 
 ### Fixed

@@ -121,6 +121,16 @@ en:
       remind_failed: Couldn't set the reminder.
       reminded: Reminder set — confirm it on the Reminders page to add it to your
         calendar.
+    scout_actions:
+      error: Something went wrong running that action.
+      invalid_date: I couldn't understand that date.
+      set_due_date:
+        success: Due date set to %{due}.
+      set_reminder:
+        no_due: The task needs a due date first — tell me when to remind you.
+        success: Reminder set for %{due} — confirm it on the Reminders page to add
+          it to your calendar.
+      unknown: That action isn't available in a task discussion.
     show:
       activity: Activity
       add_document: Attach a document

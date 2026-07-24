@@ -95,6 +95,8 @@ pt:
     email_reply_daemon:
       auto_action_failures_prefix: 'No entanto, não consegui concluir estas acções:'
       conversation_archived: Esta conversa foi arquivada.
+    task_chat_reply:
+      auto_action_failures_prefix: 'No entanto, não consegui concluir estas acções:'
   notifier:
     account_disconnected:
       body: Reautentique para retomar a sincronização de email.
