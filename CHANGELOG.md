@@ -23,6 +23,15 @@ major, minor, or patch change here.
   inbox. Reply now targets that message's recipients (like Gmail), consistently
   across the composer (Dock and Desk), Scout's send/save-draft actions, Skim's
   inline reply, and the API's reply default.
+- **Alerts and other mail sent from the same address as your Campbooks
+  notifications are now triaged and matched by inbox rules.** Messages whose
+  sender matched the app's own `MAILER_FROM` (for example a monitoring service
+  that shares a `no-reply@` address with Campbooks) were treated as Campbooks'
+  own re-ingested mail and skipped both AI triage and inbox rules on arrival — so
+  an inbox rule set up to tag them never fired. Detection now also requires the
+  `X-Campbooks-Kind` marker Campbooks stamps on its outgoing mail (with an
+  address-only fallback for Zoho, which strips headers), so third-party mail from
+  a shared sending address is handled like any other inbound message.
 
 ## [0.28.7] - 2026-07-24
 

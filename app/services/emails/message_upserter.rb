@@ -94,7 +94,15 @@ module Emails
         provider_labels: provider_labels(msg),
         # Flag our OWN mail (digests, notifications) so EmailProcessJob skips the AI
         # pipeline and the inbox can badge digests. nil for ordinary third-party mail.
-        self_generated_kind: Emails::SelfGeneratedDetector.kind_for(msg, mailer_from: ApplicationMailer.default[:from]),
+        # headers_available lets the detector require our X-Campbooks-Kind marker on
+        # providers that surface headers (Gmail/Microsoft), so a shared-address third
+        # party (e.g. monitoring alerts from the same no-reply@) isn't misread as ours;
+        # Zoho strips headers, so it falls back to the address-only signal.
+        self_generated_kind: Emails::SelfGeneratedDetector.kind_for(
+          msg,
+          mailer_from: ApplicationMailer.default[:from],
+          headers_available: !@account.zoho?
+        ),
         status: :fetched
       )
       EmailProcessJob.perform_later(email_message.id)

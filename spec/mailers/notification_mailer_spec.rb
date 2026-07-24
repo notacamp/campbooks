@@ -20,6 +20,10 @@ RSpec.describe NotificationMailer, type: :mailer do
       expect(mail.body.encoded).to include("Invoice 42")
       expect(mail.body.encoded).to include("http://example.com/email_threads/7")
     end
+
+    it "stamps X-Campbooks-Kind: campbooks so re-ingested app mail is recognised as ours" do
+      expect(mail["X-Campbooks-Kind"]&.value).to eq("campbooks")
+    end
   end
 
   describe "#thread_activity" do

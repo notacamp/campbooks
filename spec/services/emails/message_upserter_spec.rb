@@ -119,14 +119,6 @@ RSpec.describe Emails::MessageUpserter do
     # against the same source the detector reads.
     let(:our_from) { Mail::Address.new(ApplicationMailer.default[:from]).address }
 
-    it "flags mail from our own mailer address and still enqueues processing" do
-      outcome = nil
-      expect { outcome = upserter.upsert(msg("fromAddress" => our_from)) }
-        .to have_enqueued_job(EmailProcessJob)
-      expect(outcome).to eq(:created)
-      expect(EmailMessage.last.self_generated_kind).to eq("campbooks")
-    end
-
     it "records the 'digest' kind from the X-Campbooks-Kind header" do
       upserter.upsert(msg("fromAddress" => our_from, "header_campbooks_kind" => "digest"))
       expect(EmailMessage.last.self_generated_kind).to eq("digest")
@@ -137,6 +129,37 @@ RSpec.describe Emails::MessageUpserter do
       upserter.upsert(msg) # fromAddress: sender@test.com
       expect(EmailMessage.last.self_generated_kind).to be_nil
       expect(EmailMessage.last.self_generated?).to be false
+    end
+
+    # Zoho strips transport headers, so our X-Campbooks-Kind marker never arrives;
+    # there (the default :zoho account) we fall back to the From-address signal alone.
+    context "on a header-stripping provider (Zoho)" do
+      it "flags mail from our own address even without the marker header" do
+        outcome = nil
+        expect { outcome = upserter.upsert(msg("fromAddress" => our_from)) }
+          .to have_enqueued_job(EmailProcessJob)
+        expect(outcome).to eq(:created)
+        expect(EmailMessage.last.self_generated_kind).to eq("campbooks")
+      end
+    end
+
+    # Gmail/Microsoft surface headers, so our own mail always carries the marker. A
+    # message from our *shared* no-reply@ address WITHOUT it is a different sender
+    # (e.g. Grafana health alerts on a shared no-reply@) and must stay ordinary
+    # inbound so triage + inbox rules run — the regression this guards against.
+    context "on a header-surfacing provider (Gmail)" do
+      let(:account) { create(:email_account, provider: :google) }
+
+      it "does NOT flag a shared-address sender that lacks our marker header" do
+        upserter.upsert(msg("fromAddress" => "Not A Camp Monitoring <#{our_from}>"))
+        expect(EmailMessage.last.self_generated_kind).to be_nil
+        expect(EmailMessage.last.self_generated?).to be false
+      end
+
+      it "flags our own mail that carries the marker header" do
+        upserter.upsert(msg("fromAddress" => our_from, "header_campbooks_kind" => "campbooks"))
+        expect(EmailMessage.last.self_generated_kind).to eq("campbooks")
+      end
     end
   end
 end
