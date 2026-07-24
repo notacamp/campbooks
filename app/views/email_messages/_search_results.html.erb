@@ -4,7 +4,7 @@
     each chip removes its criterion via a full-page nav (keeps the bar in sync). %>
 <% chips = search_active_filters(search_params, accounts: @accounts || [], tags: @all_tags || []) %>
 
-<div class="border-b border-gray-100">
+<div>
   <% if chips.any? %>
     <div class="flex flex-wrap items-center gap-1 px-2.5 py-1.5">
       <% chips.each do |chip| %>

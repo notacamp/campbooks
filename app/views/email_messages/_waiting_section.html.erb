@@ -6,8 +6,8 @@
 <% waiting_threads = local_assigns[:waiting_threads] || [] %>
 <div id="waiting_replies_section">
   <% if waiting_threads.any? %>
-    <div class="group/section px-1.5 py-1.5 sticky top-0 z-20 flex items-center pointer-events-none">
-      <div class="pointer-events-auto inline-flex items-center rounded-full border border-gray-100 bg-card/75 px-3 py-1 shadow-sm backdrop-blur-md">
+    <div class="group/section px-1.5 pt-3 pb-1 sticky top-0 z-20 flex items-center pointer-events-none">
+      <div class="pointer-events-auto inline-flex items-center rounded-full bg-card/80 px-2 py-1 backdrop-blur-md">
         <div class="flex-shrink-0 w-0 group-hover/section:w-5 [&:has(input:checked)]:w-5 [&:has(input:indeterminate)]:w-5 group-data-[select-mode=on]/select:w-5 overflow-hidden transition-all duration-150 flex items-center">
           <input type="checkbox"
                  class="w-3.5 h-3.5 rounded border-gray-300 text-accent-600 focus:ring-accent-500 cursor-pointer bg-transparent"
