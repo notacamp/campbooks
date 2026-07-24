@@ -20,6 +20,18 @@ RSpec.describe DraftEmail do
     expect(DraftEmail.resumable_for(@user)).to eq(newer)
   end
 
+  it "resumable_for skips dismissed drafts" do
+    newest = build_draft(subject: "Newest")
+    older  = build_draft(subject: "Older")
+    older.update!(updated_at: 1.hour.ago)
+    newest.update!(dismissed_at: Time.current)
+
+    expect(DraftEmail.resumable_for(@user)).to eq(older), "a dismissed draft must not grow a pill"
+
+    older.update!(dismissed_at: Time.current)
+    expect(DraftEmail.resumable_for(@user)).to be_nil
+  end
+
   it "prune_for keeps only the newest MAX_PER_USER drafts" do
     (DraftEmail::MAX_PER_USER + 3).times { |i| build_draft(subject: "d#{i}") }
 

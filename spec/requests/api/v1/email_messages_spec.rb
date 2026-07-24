@@ -119,4 +119,32 @@ RSpec.describe "API v1 emails", type: :request do
       expect(response.parsed_body.dig("error", "code")).to eq("send_failed")
     end
   end
+
+  describe "POST /api/v1/emails/:id/reply" do
+    let(:headers) { api_auth_headers(workspace: workspace, user: user, scopes: "emails:send") }
+
+    before do
+      allow(Emails::Sender).to receive(:call).and_return(
+        Emails::Sender::Result.success(email_message: nil, provider_message_id: "PMID")
+      )
+    end
+
+    it "defaults the recipient to the source message's sender" do
+      email = create(:email_message, email_account: account, from_address: "sender@example.com")
+
+      post reply_api_v1_email_path(email), params: { body: "Hi" }, headers: headers
+
+      expect(response).to have_http_status(:created)
+      expect(Emails::Sender).to have_received(:call).with(hash_including(to_address: "sender@example.com"))
+    end
+
+    it "defaults to the recipients, not the own address, when replying to a message the account sent" do
+      email = create(:email_message, email_account: account,
+                     from_address: account.email_address, to_address: "client@example.com")
+
+      post reply_api_v1_email_path(email), params: { body: "Hi" }, headers: headers
+
+      expect(Emails::Sender).to have_received(:call).with(hash_including(to_address: "client@example.com"))
+    end
+  end
 end

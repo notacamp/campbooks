@@ -21,10 +21,12 @@ class CalendarEventsController < ApplicationController
     @event = calendar.calendar_events.new(event_params.except(:calendar_id))
     # A temp id satisfies the (calendar_id, provider_event_id) unique index until
     # the provider assigns the real one (EventWriter swaps it in on create).
-    @event.assign_attributes(provider_event_id: "local-#{SecureRandom.uuid}", status: :confirmed, outbound_pending: true)
+    # is_organizer is asserted up front (the provider would confirm it on the
+    # next pull anyway) so the guests editor is available immediately.
+    @event.assign_attributes(provider_event_id: "local-#{SecureRandom.uuid}", status: :confirmed, outbound_pending: true, is_organizer: true)
     apply_type_choice(@event)
 
-    if @event.save
+    if @event.save(context: :form)
       Calendars::EventWriteJob.perform_later(@event.id, "create")
       enqueue_classification(@event)
       Events.publish("calendar_event.created", subject: @event, workspace: @event.calendar.workspace, payload: { "title" => @event.title, "starts_at" => @event.start_at&.iso8601 })
@@ -45,7 +47,7 @@ class CalendarEventsController < ApplicationController
   def update
     @event.assign_attributes(event_params.except(:calendar_id).merge(outbound_pending: true))
     apply_type_choice(@event)
-    if @event.save
+    if @event.save(context: :form)
       Calendars::EventWriteJob.perform_later(@event.id, "update", recurrence_scope)
       enqueue_classification(@event)
       Events.publish("calendar_event.updated", subject: @event, workspace: @event.calendar.workspace, payload: { "title" => @event.title, "starts_at" => @event.start_at&.iso8601 })
@@ -135,8 +137,44 @@ class CalendarEventsController < ApplicationController
   end
 
   def event_params
-    params.require(:calendar_event).permit(:title, :description, :location, :start_at, :end_at, :all_day, :calendar_id, :rrule)
+    permitted = params.require(:calendar_event)
+                      .permit(:title, :description, :location, :start_at, :end_at, :all_day, :calendar_id, :rrule,
+                              :attendee_emails, :start_date, :start_time, :end_date, :end_time)
+    # Only the organizer may change the guest list (matches what the form
+    # offers; enforced here so a crafted request can't either).
+    permitted.delete(:attendee_emails) unless guests_editable?
+    compose_times(permitted)
   end
+
+  # The form submits date and time as separate chip inputs; compose them into
+  # start_at/end_at here (no-JS safe). Whole start_at/end_at params still work
+  # unchanged (reschedule, API-ish callers, older tests). All-day events store
+  # end_at as an EXCLUSIVE midnight — the Google/ICS convention the inbound
+  # sync already uses — so "16–17 Jul" submits as end_at 18 Jul 00:00.
+  def compose_times(permitted)
+    start_date = permitted.delete(:start_date)
+    start_time = permitted.delete(:start_time)
+    end_date   = permitted.delete(:end_date)
+    end_time   = permitted.delete(:end_time)
+    return permitted if start_date.blank?
+
+    if ActiveModel::Type::Boolean.new.cast(permitted[:all_day])
+      permitted[:start_at] = parse_param_date(start_date)
+      last_day = parse_param_date(end_date) || permitted[:start_at]
+      permitted[:end_at] = last_day && (last_day + 1.day)
+    else
+      permitted[:start_at] = parse_param_time("#{start_date} #{start_time}")
+      permitted[:end_at]   = parse_param_time("#{end_date.presence || start_date} #{end_time}")
+    end
+    permitted
+  end
+
+  # Guests are editable on a brand-new event or one the user organizes. An
+  # invite they merely received shows the read-only guest list instead.
+  def guests_editable?
+    @event.nil? || @event.new_record? || @event.is_organizer?
+  end
+  helper_method :guests_editable?
 
   # Translate the form's single "Type" selector into event_type + type_status:
   #   "auto"/blank → pending (AI classifies + colors it in the background)

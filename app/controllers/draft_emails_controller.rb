@@ -8,7 +8,7 @@
 # than leaked (404-not-403 rule doesn't apply: we just null the association).
 class DraftEmailsController < ApplicationController
   before_action :require_authentication
-  before_action :load_draft, only: [ :update, :destroy ]
+  before_action :load_draft, only: [ :update, :destroy, :dismiss, :undismiss ]
 
   # Re-opens a parked draft in the Dock (the pill's click target). A stale pill
   # pointing at a consumed draft just removes itself.
@@ -56,6 +56,8 @@ class DraftEmailsController < ApplicationController
   def update
     attrs = draft_params
     attrs[:email_account] = sendable_account(params.dig(:draft_email, :email_account_id)) if params.dig(:draft_email, :email_account_id)
+    # Any edit revives a dismissed draft — its pill has something new to show.
+    attrs[:dismissed_at] = nil
 
     if @draft.update(attrs)
       render json: { id: @draft.id, saved_at: @draft.updated_at.iso8601 }
@@ -69,7 +71,47 @@ class DraftEmailsController < ApplicationController
     head :no_content
   end
 
+  # The pill's × — waves the pill away without touching the draft's content.
+  # Undo (in the toast) brings it straight back; otherwise the draft stays
+  # parked invisibly until an edit revives it or pruning ages it out.
+  def dismiss
+    @draft.update!(dismissed_at: Time.current)
+    respond_to do |format|
+      format.turbo_stream do
+        render turbo_stream: [ turbo_stream.remove("compose_draft_pill"), dismissed_toast_stream ]
+      end
+      format.html { redirect_back fallback_location: email_messages_path }
+    end
+  end
+
+  def undismiss
+    @draft.update!(dismissed_at: nil)
+    respond_to do |format|
+      format.turbo_stream do
+        render turbo_stream: turbo_stream.append(
+          "compose_dock_root",
+          render_to_string(Campbooks::Compose::Pill.new(draft: @draft), layout: false)
+        )
+      end
+      format.html { redirect_back fallback_location: email_messages_path }
+    end
+  end
+
   private
+
+  def dismissed_toast_stream
+    turbo_stream.append(
+      Campbooks::ActionToast::REGION_ID,
+      render_to_string(
+        Campbooks::ActionToast.new(
+          message: t("draft_emails.dismiss.dismissed"),
+          variant: :success,
+          undo: { endpoint: undismiss_draft_email_path(@draft) }
+        ),
+        layout: false
+      )
+    )
+  end
 
   def stale_pill_response
     respond_to do |format|

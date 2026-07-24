@@ -509,7 +509,12 @@ module Google
         "toAddress" => headers["To"] || headers["to"],
         "subject" => headers["Subject"] || headers["subject"],
         "summary" => data["snippet"],
-        "hasAttachment" => has_attachment?(data["payload"]),
+        # format=metadata omits the MIME part tree, so attachment presence is
+        # derived from the top-level Content-Type: real attachments ride
+        # multipart/mixed (alternative/related are body-only or inline-image
+        # mail — same semantics as Zoho's hasAttachment). Normalized to the
+        # "1"/"0" strings MessageUpserter's Zoho-convention contract expects.
+        "hasAttachment" => attachment_content_type?(headers["Content-Type"], data["payload"]) ? "1" : "0",
         "receivedTime" => data["internalDate"],
         "status" => is_unread ? "0" : "1",  # "1" = read (matches Zoho convention)
         "header_list_unsubscribe" => headers["List-Unsubscribe"],
@@ -533,11 +538,9 @@ module Google
       headers
     end
 
-    def has_attachment?(payload)
-      return false unless payload
-
-      parts = payload["parts"] || []
-      parts.any? { |p| p["filename"].present? && p["filename"] != "" }
+    def attachment_content_type?(content_type_header, payload)
+      [ content_type_header, payload&.dig("mimeType") ]
+        .any? { |v| v.to_s.downcase.include?("multipart/mixed") }
     end
 
     def extract_html_body(payload)

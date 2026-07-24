@@ -7,6 +7,12 @@ RSpec.describe Feed::Rewind do
   let(:now) { Time.utc(2026, 6, 22, 12, 0) }
   let(:starred_contact) { create(:contact, workspace: workspace, starred_at: now) }
 
+  # `now` is injected into Rewind, but collaborators reached through it
+  # (Feed::Generator's curated-card windows) read the ambient clock — pin the
+  # ambient clock to the same instant, or the fixtures age out of the
+  # generator's freshness windows as real time drifts past the frozen date.
+  around { |ex| travel_to(now) { ex.run } }
+
   before do
     create(:email_account_user, user: user, email_account: account)
     # Fail open by default (no inbox-folder resolution) so these stay pure

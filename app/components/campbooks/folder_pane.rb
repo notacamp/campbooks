@@ -26,7 +26,9 @@ module Campbooks
 
     def view_template
       div(
-        class: "hidden lg:flex flex-shrink-0 border-r border-border bg-card",
+        # No border-r / bg — the rail floats on the canvas, separated from the
+        # thread list by whitespace alone (same vocabulary as the calendar sidebar).
+        class: "hidden lg:flex flex-shrink-0",
         data: {
           controller: "folder-pane mail-folder-drop",
           action: "dragover->mail-folder-drop#dragover drop->mail-folder-drop#drop " \

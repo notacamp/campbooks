@@ -2,6 +2,8 @@ class EmbedChunkJob < ApplicationJob
   queue_as :default
   queue_with_priority BACKGROUND_PRIORITY
 
+  retry_on(*Ai::Adapters::Base::TRANSIENT_ERRORS, wait: :polynomially_longer, attempts: 5)
+
   def perform(chunk)
     entry = chunk.workspace.embedding_model_entry
 

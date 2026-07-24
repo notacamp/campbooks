@@ -86,7 +86,7 @@ module Google
         req.headers["Content-Type"] = "application/json"
         req.headers["If-Match"] = etag if etag.present?
         req.params["sendUpdates"] = "all"
-        req.body = { attendees: attendees }.to_json
+        req.body = { attendees: Array(attendees).filter_map { |a| attendee_payload(a) } }.to_json
       end
       raise Calendars::ConflictError, "etag mismatch on #{provider_event_id}" if response.status == 412
       raise_for_status!(response, "patch_rsvp")
@@ -196,7 +196,8 @@ module Google
     def normalize_attendees(list)
       Array(list).map do |a|
         { "email" => a["email"], "name" => a["displayName"],
-          "rsvp_status" => a["responseStatus"], "self" => a["self"] == true }
+          "rsvp_status" => a["responseStatus"], "self" => a["self"] == true,
+          "organizer" => a["organizer"] == true }
       end
     end
 
@@ -227,9 +228,34 @@ module Google
 
     GOOGLE_RSVP = { "accepted" => "accepted", "declined" => "declined",
                     "tentative" => "tentative", "needsAction" => "needs_action" }.freeze
+    GOOGLE_RSVP_OUT = GOOGLE_RSVP.invert.freeze
 
     def map_rsvp(status)
       GOOGLE_RSVP[status]
+    end
+
+    # One attendee for an outbound payload. Accepts canonical symbol-keyed rows
+    # from EventWriter, raw string-keyed rows straight out of the jsonb column,
+    # or a bare email string. Rows without an email are dropped (Google 400s on
+    # them). responseStatus is carried through — omitting it on a full-list
+    # update would reset every guest back to needsAction — accepting both our
+    # enum vocabulary and Google's own (inbound sync stores Google's).
+    def attendee_payload(a)
+      return { email: a } if a.is_a?(String)
+      row = a.transform_keys(&:to_s)
+      email = row["email"].presence
+      return nil unless email
+      {
+        email: email,
+        displayName: row["name"].presence,
+        responseStatus: attendee_response_status(row["rsvp_status"])
+      }.compact
+    end
+
+    def attendee_response_status(value)
+      v = value.to_s
+      return v if GOOGLE_RSVP.key?(v)
+      GOOGLE_RSVP_OUT[v]
     end
 
     # Builds a Google event resource from the writer's attribute hash. Only keys
@@ -241,8 +267,14 @@ module Google
       payload[:location] = attrs[:location] if attrs.key?(:location)
 
       if attrs[:all_day] && attrs[:start_at]
-        payload[:start] = { date: attrs[:start_at].to_date.iso8601 }
-        payload[:end] = { date: (attrs[:end_at] || attrs[:start_at]).to_date.iso8601 }
+        # Google's all-day end date is EXCLUSIVE and must be after the start.
+        # New rows already store it that way; legacy app-created rows stored
+        # end-of-day (same date), which Google rejects as an empty range.
+        start_date = attrs[:start_at].to_date
+        end_date = (attrs[:end_at] || attrs[:start_at]).to_date
+        end_date = start_date + 1 if end_date <= start_date
+        payload[:start] = { date: start_date.iso8601 }
+        payload[:end] = { date: end_date.iso8601 }
       elsif attrs[:start_at]
         zone = attrs[:time_zone].presence || "UTC"
         payload[:start] = { dateTime: attrs[:start_at].utc.iso8601, timeZone: zone }
@@ -250,9 +282,7 @@ module Google
       end
 
       if attrs.key?(:attendees)
-        payload[:attendees] = Array(attrs[:attendees]).map do |a|
-          a.is_a?(String) ? { email: a } : { email: a[:email], displayName: a[:name] }.compact
-        end
+        payload[:attendees] = Array(attrs[:attendees]).filter_map { |a| attendee_payload(a) }
       end
 
       # Recurrence: Google takes an array of iCal lines; the DTSTART is implied by

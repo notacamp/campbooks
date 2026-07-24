@@ -63,14 +63,65 @@ module Reminders
       # Never overwrite a reminder the user already confirmed/dismissed/snoozed.
       return reminder if reminder.persisted? && !reminder.pending?
 
-      # Cross-source soft-dedup: the same commitment arriving as an email body AND its
-      # PDF attachment fingerprints differently (source_id differs), so without this both
-      # would surface a card. Adopt the sibling already staged from the other source.
-      # NOTE: two extraction jobs racing can both pass this guard (no DB constraint) —
-      # accepted until a (workspace, reminder_type, due_at::date, amount_cents) unique
-      # index lands; in practice the document job lags the email job by seconds.
-      if !reminder.persisted? && (sibling = cross_source_sibling(reminder_type, due_at, all_day, item))
-        return sibling
+      # Cross-source + cross-kind soft-dedup pipeline. Only runs for new rows — a
+      # persisted pending row re-processing on a re-ingest keeps today's behavior
+      # (reassign + save). The pipeline is fail-open: any unexpected path falls
+      # through to insert rather than silently dropping a real commitment.
+      if !reminder.persisted?
+        # 1. Deterministic sibling from another source or a different reminder_type.
+        if (sibling = cross_source_sibling(reminder_type, due_at, all_day, item))
+          if sibling.dismissed?
+            # The user already waved this commitment off — a second email must not
+            # resurrect the card.
+            Rails.logger.info("[Reminders::Builder] suppressed by dismissed sibling #{sibling.id} for '#{item['title']}'")
+            return nil
+          end
+          return sibling
+        end
+
+        # 2. Deterministic calendar check (timed candidates only): a workspace event
+        # already scheduled at exactly this instant means the commitment is already
+        # on the calendar — don't stage a duplicate reminder card.
+        if !all_day
+          if CalendarEvent.joins(calendar: :calendar_account)
+                          .where(calendar_accounts: { workspace_id: @workspace.id })
+                          .visible
+                          .exists?(start_at: due_at)
+            Rails.logger.info("[Reminders::Builder] suppressed by calendar event at #{due_at.iso8601} for '#{item['title']}'")
+            return nil
+          end
+        end
+
+        # 3. Novelty gate: ask the LLM whether this candidate duplicates a temporal
+        # neighbor. Skip when no neighbors exist (no matcher instantiation, no cost).
+        neighbors = Commitments::Neighbors.around(workspace: @workspace, due_at: due_at)
+        unless neighbors.empty?
+          matcher = Ai::CommitmentMatcher.new(
+            workspace:  @workspace,
+            candidate:  candidate_for(item, due_at, all_day),
+            neighbors:  neighbors
+          )
+          matched = matcher.match
+
+          if matched
+            if matched.is_a?(Reminder)
+              if matched.dismissed?
+                Rails.logger.info("[Reminders::Builder] suppressed by dismissed matched Reminder##{matched.id}")
+                return nil
+              end
+              return matched
+            else
+              # Matched a Task or CalendarEvent — existing commitment wins across kinds.
+              Rails.logger.info("[Reminders::Builder] suppressed by existing #{matched.class}##{matched.id}")
+              return nil
+            end
+          else
+            # No match (or check failed) — insert, with the verdict recorded on the item
+            # so the stored extracted_data explains why dedup passed.
+            verdict = matcher.failed? ? "check_failed" : "no_match"
+            item = item.merge("_novelty" => { "neighbors" => neighbors.size, "verdict" => verdict })
+          end
+        end
       end
 
       # Provenance: record the matched learning signal alongside the extraction so the
@@ -93,7 +144,11 @@ module Reminders
         extracted_data: item
       )
       reminder.save!
-      Events.publish("reminder.created", subject: reminder, actor: nil, payload: { "title" => reminder.title, "due_at" => reminder.due_at&.iso8601 })
+      # Publish only when this run actually created the row — a pending row re-saved on
+      # re-processing must not re-publish and spam /activity.
+      if reminder.previously_new_record?
+        Events.publish("reminder.created", subject: reminder, actor: nil, payload: { "title" => reminder.title, "due_at" => reminder.due_at&.iso8601 })
+      end
       reminder
     rescue ActiveRecord::RecordNotUnique
       # Concurrent build of the same fingerprint — adopt the row that won.
@@ -106,18 +161,20 @@ module Reminders
     # A reminder for the same commitment already staged from a DIFFERENT source: the invoice
     # email vs. its PDF, or (the case this guards) an airline's booking-confirmation and
     # ticket emails, which arrive seconds apart and each extract the same flight. Scoped to
-    # same workspace + type + due date, not dismissed, then matched in order of signal
-    # strength:
+    # same workspace + type + due date (ALL statuses including dismissed — the caller
+    # suppresses instead of adopting when the sibling is dismissed), then matched in order of
+    # signal strength:
     #   1. exact amount (bills/invoices);
-    #   2. exact timestamp for a TIMED event -- two same-type reminders at the same minute of
+    #   2. exact timestamp for a TIMED event — two same-type reminders at the same minute of
     #      the same day are the same commitment (all-day reminders share a 9am default, so
     #      they're excluded here and fall through to the title match);
     #   3. date-stripped title, so the model appending "on 2026-12-20" to one of two
     #      otherwise-identical titles doesn't split them into separate reminders.
+    #   4. type-agnostic title pass: "deadline" vs "event" labelling of the same commitment
+    #      still matches when the typed passes all miss (no reminder_type filter, no amount).
     # nil means genuinely no sibling.
     def cross_source_sibling(reminder_type, due_at, all_day, item)
       scope = Reminder.where(workspace: @workspace, reminder_type: reminder_type)
-                      .where.not(status: :dismissed)
                       .where("due_at::date = ?::date", due_at)
 
       amount = parse_amount(item["amount_cents"])
@@ -130,27 +187,39 @@ module Reminders
 
       title_key = dedup_title_key(item["title"])
       return nil if title_key.blank?
-      scope.where(amount_cents: nil).detect { |r| dedup_title_key(r.title) == title_key }
+
+      typed_match = scope.where(amount_cents: nil).detect { |r| dedup_title_key(r.title) == title_key }
+      return typed_match if typed_match
+
+      # Type-agnostic fallback: the same commitment may have been staged under a
+      # different reminder_type (e.g. "deadline" from one email, "event" from another).
+      # Skip the amount filter here — only nil-amount rows (non-monetary reminders).
+      Reminder.where(workspace: @workspace)
+              .where("due_at::date = ?::date", due_at)
+              .where(amount_cents: nil)
+              .detect { |r| dedup_title_key(r.title) == title_key }
     end
 
-    # Trailing date/time noise the model tends to append to a title ("... on 2026-12-20",
-    # "... de 20/12/2026", "... at 16:10"), plus a directly-preceding connector word. A
-    # connector alone is never stripped, so this only collapses date-suffix variants and
-    # can't merge genuinely different titles.
-    DEDUP_TITLE_NOISE = %r{
-      \s*
-      (?:\b(?:on|at|em|de|le|el)\s+)?
-      (?:
-        \d{4}-\d{2}-\d{2} |
-        \d{1,2}[/.]\d{1,2}(?:[/.]\d{2,4})? |
-        \d{1,2}[:h]\d{2}
-      )
-    }xi
-
-    # De-dupe match key: the thread-subject key (Re:/Fwd: stripped, case/space folded) with
-    # trailing date/time tokens removed.
+    # De-dupe match key: delegates to the shared Commitments::TitleKey module so the
+    # same normalisation is used across kinds. Kept private here so existing callers
+    # within this file are untouched.
     def dedup_title_key(title)
-      Emails::SubjectNormalizer.key(title.to_s).gsub(DEDUP_TITLE_NOISE, " ").squish
+      Commitments::TitleKey.of(title)
+    end
+
+    # Builds the candidate hash passed to Ai::CommitmentMatcher. Mirrors the shape
+    # documented in the matcher's constructor: string keys, iso8601 timestamp.
+    def candidate_for(item, due_at, all_day)
+      {
+        "kind"          => "reminder",
+        "title"         => item["title"].to_s.strip,
+        "due_at"        => due_at.iso8601,
+        "timed"         => !all_day,
+        "reminder_type" => item["reminder_type"].to_s,
+        "amount_cents"  => parse_amount(item["amount_cents"]),
+        "currency"      => item["currency"].presence,
+        "description"   => item["description"].to_s.first(200).presence
+      }
     end
 
     def parse_date(str)

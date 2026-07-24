@@ -1,4 +1,4 @@
-<div data-controller="upload new-folder folder-edit doc-skim-overlay">
+<div data-controller="upload new-folder folder-edit doc-skim-overlay files-layout">
   <%= render Campbooks::PageHeader.new(title: @folder ? @folder.name : t(".title"), subtitle: @folder ? nil : t(".subtitle")) do |header| %>
     <% header.with_actions do %>
       <%= render "shared/customize_ai_button", purpose: "document_analysis" %>
@@ -96,10 +96,11 @@
               folders: @folders,
               categories: @categories) %>
 
-        <%# Bulk actions (all-files view only) — slim row below the bar, outside
-            the results frame so they don't re-render on filter change. %>
-        <% if @folder.nil? %>
-          <div class="flex flex-wrap items-center justify-end gap-2 mt-2 mb-2">
+        <%# Toolbar — slim row below the bar, outside the results frame so it
+            doesn't re-render on filter change. Bulk actions (all-files view
+            only) + the grid-mode sort menu + the List/Grid switcher. %>
+        <div class="flex flex-wrap items-center justify-end gap-2 mt-2 mb-2">
+          <% if @folder.nil? %>
             <% if @reprocessable_count.to_i > 0 %>
               <%= form_tag reprocess_all_documents_path, method: :post, class: "inline" do %>
                 <%= render "files/filter_hidden_fields", filters: @filters, q: params[:q] %>
@@ -110,8 +111,10 @@
               <%= render "files/filter_hidden_fields", filters: @filters, q: params[:q] %>
               <%= render Campbooks::Button.new(variant: :outline, size: :sm, type: :submit, data: { turbo_confirm: t(".export_confirm") }) { t(".export") } %>
             <% end %>
-          </div>
-        <% end %>
+          <% end %>
+          <%= render Campbooks::Files::SortMenu.new(sorter: @sorter, filters: @filters, q: params[:q], folder: @folder, field_columns: @field_columns) %>
+          <%= render Campbooks::Files::ViewSwitcher.new %>
+        </div>
 
         <%# Results frame: chips + count + sections + table + pagination.
             The mobile folder strip and exports history stay outside this frame. %>
@@ -160,8 +163,8 @@
             <% if @internal_docs.any? || @filed_emails.any? %>
               <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".files_section") %></h2>
             <% end %>
-            <!-- Files table (md+) -->
-            <div class="hidden md:block bg-card rounded-xl shadow-sm border border-gray-200 overflow-x-auto dark:border-white/10">
+            <!-- Files table (md+, list mode) -->
+            <div data-files-pane="table" class="hidden md:block bg-card rounded-xl shadow-sm border border-gray-200 overflow-x-auto dark:border-white/10">
               <%# Width budget (table-fixed): name + N×2/12 fields + 2/12 added + w-12 actions ≤ 12/12. %>
               <% name_width = @field_columns.any? ? (%w[w-5/12 w-5/12 w-4/12 w-3/12][@field_columns.size] || "w-3/12") : "w-5/12" %>
               <table class="min-w-full table-fixed divide-y divide-gray-200 dark:divide-white/10">
@@ -209,10 +212,17 @@
               </table>
             </div>
 
-            <!-- Files cards (mobile) -->
-            <div id="files_cards" class="md:hidden space-y-3">
+            <!-- Files cards (mobile, list mode) -->
+            <div id="files_cards" data-files-pane="cards" class="md:hidden space-y-3">
               <% @files.each do |file| %>
                 <%= render Campbooks::Files::FileCard.new(doc: file, folders: @folders, current_folder: @folder, field_columns: @field_columns) %>
+              <% end %>
+            </div>
+
+            <!-- Files tiles (grid mode; hidden in list mode via application.css) -->
+            <div id="files_grid" data-files-pane="grid" class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
+              <% @files.each do |file| %>
+                <%= render Campbooks::Files::FileTile.new(doc: file, folders: @folders, current_folder: @folder, field_columns: @field_columns) %>
               <% end %>
             </div>
           <% elsif params[:q].present? || @filters.narrowing? %>

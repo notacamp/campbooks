@@ -80,7 +80,7 @@ module Emails
         to_address: sanitize(msg["toAddress"]),
         subject: sanitize(msg["subject"]),
         summary: sanitize(msg["summary"]),
-        has_attachment: msg["hasAttachment"].to_s == "1",
+        has_attachment: attachment_flag?(msg["hasAttachment"]),
         received_at: msg["receivedTime"] ? Time.at(msg["receivedTime"].to_i / 1000) : nil,
         read: msg["status"].to_s == "1",
         zoho_flag: msg["flagid"],
@@ -113,6 +113,13 @@ module Emails
       existing = @account.email_messages.find_by!(provider_message_id: message_id)
       EmailProcessJob.perform_later(existing.id) if existing.fetched? || existing.failed?
       :created
+    end
+
+    # Providers disagree on the flag's type — Zoho emits "0"/"1" strings, a
+    # normalizer can drift to booleans (Google's did, silently zeroing the flag
+    # for every Gmail message). Accept both shapes so type drift can't recur.
+    def attachment_flag?(value)
+      value == true || value.to_s == "1" || value.to_s.casecmp?("true")
     end
 
     # Strip PG-incompatible NUL bytes (mirrors ApplicationJob#sanitize_string).

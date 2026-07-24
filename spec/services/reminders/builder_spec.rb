@@ -4,6 +4,11 @@ RSpec.describe Reminders::Builder do
   let(:workspace) { create(:workspace) }
   let(:source)    { create(:document, workspace: workspace) }
 
+  # The fixtures use absolute due dates, and the builder drops past-due items
+  # (Builder#due_at gate) — pin the clock so the dates stay in the future
+  # instead of the suite going red by calendar drift (it did, on 2026-07-16).
+  around { |ex| travel_to(Time.zone.parse("2026-07-01 10:00:00")) { ex.run } }
+
   def build(items)
     described_class.call(workspace: workspace, source: source, raw_items: items, anchor_tz: Time.zone)
   end
@@ -139,6 +144,124 @@ RSpec.describe Reminders::Builder do
       build_for(src_a, base.merge("title" => "Bill"))
       expect { build_for(src_b, base.merge("title" => "Invoice")) }
         .not_to change(Reminder, :count)
+    end
+
+    # ── Type-agnostic sibling matching ─────────────────────────────────────────
+    it "adopts a sibling of a DIFFERENT reminder_type when the title-key matches" do
+      # First build creates a "deadline" reminder for this commitment.
+      build_for(src_a, "reminder_type" => "deadline", "title" => "Report due",
+                       "all_day" => true, "due_time" => nil)
+      # Second source extracts the same commitment but classifies it as "event".
+      expect {
+        build_for(src_b, "reminder_type" => "event", "title" => "Report due",
+                         "all_day" => true, "due_time" => nil)
+      }.not_to change(Reminder, :count)
+    end
+
+    # ── Dismissed sibling suppression ──────────────────────────────────────────
+    it "returns nil and does not create a new row when the sibling is dismissed" do
+      build_for(src_a)
+      Reminder.where(workspace: ws2).first.update!(status: :dismissed)
+
+      result = Reminders::Builder.call(
+        workspace: ws2, source: src_b,
+        raw_items: [ travel_item ],
+        anchor_tz: Time.zone
+      )
+      expect(result).to eq([])
+      expect(Reminder.where(workspace: ws2).count).to eq(1)
+    end
+  end
+
+  # ── Timed calendar-event check ──────────────────────────────────────────────
+  describe "timed candidate suppressed by an existing workspace calendar event" do
+    let(:ws3)     { Workspace.create!(name: "Cal Dedup WS") }
+    let(:src)     { ws3.users.create!(name: "Src", email_address: "src-cal@example.com", password: "password123") }
+    let(:account) { ws3.calendar_accounts.create!(email_address: "cal@example.com", refresh_token: "tok", provider: :google) }
+    let(:cal)     { account.calendars.create!(provider_calendar_id: "pc-cal-dedup", name: "Primary") }
+    let(:due_at)  { Time.zone.parse("2026-07-15 14:30:00") }
+
+    def timed_item
+      { "reminder_type" => "appointment", "title" => "Doctor visit",
+        "due_date" => "2026-07-15", "due_time" => "14:30", "all_day" => false,
+        "confidence" => 0.9 }
+    end
+
+    it "does not stage a reminder when a non-cancelled event exists at the exact start_at" do
+      cal.calendar_events.create!(
+        provider_event_id: "evt-dedup-1", title: "Doctor visit",
+        start_at: due_at, end_at: due_at + 1.hour, status: :confirmed
+      )
+
+      result = Reminders::Builder.call(workspace: ws3, source: src, raw_items: [ timed_item ], anchor_tz: Time.zone)
+      expect(result).to eq([])
+      expect(Reminder.where(workspace: ws3).count).to eq(0)
+    end
+  end
+
+  # ── Novelty gate (Ai::CommitmentMatcher) ────────────────────────────────────
+  describe "novelty gate via Ai::CommitmentMatcher" do
+    let(:ws4)     { Workspace.create!(name: "Novelty WS") }
+    let(:src)     { ws4.users.create!(name: "S", email_address: "src-novelty@example.com", password: "password123") }
+    let(:due_at)  { Time.zone.parse("2026-07-15 09:00:00") }
+    let(:task_src) { ws4.users.create!(name: "T", email_address: "task-novelty@example.com", password: "password123") }
+
+    let!(:existing_task) do
+      Task.create!(workspace: ws4, title: "Submit report", due_at: due_at, status: :todo, priority: :normal, confidence: 0.9)
+    end
+
+    def reminder_item
+      { "reminder_type" => "deadline", "title" => "Submit report",
+        "due_date" => "2026-07-15", "all_day" => true, "confidence" => 0.9 }
+    end
+
+    it "does not stage the reminder when the matcher returns an existing Task" do
+      matcher_double = instance_double(Ai::CommitmentMatcher, match: existing_task, failed?: false)
+      allow(Ai::CommitmentMatcher).to receive(:new).and_return(matcher_double)
+
+      result = Reminders::Builder.call(workspace: ws4, source: src, raw_items: [ reminder_item ], anchor_tz: Time.zone)
+      expect(result).to eq([])
+      expect(Reminder.where(workspace: ws4).count).to eq(0)
+    end
+
+    it "stages with verdict 'no_match' when matcher returns nil and failed? false" do
+      matcher_double = instance_double(Ai::CommitmentMatcher, match: nil, failed?: false)
+      allow(Ai::CommitmentMatcher).to receive(:new).and_return(matcher_double)
+
+      reminders = Reminders::Builder.call(workspace: ws4, source: src, raw_items: [ reminder_item ], anchor_tz: Time.zone)
+      expect(reminders.size).to eq(1)
+      novelty = reminders.first.extracted_data["_novelty"]
+      expect(novelty["verdict"]).to eq("no_match")
+      expect(novelty["neighbors"]).to be_a(Integer)
+    end
+
+    it "stages with verdict 'check_failed' when matcher failed? true" do
+      matcher_double = instance_double(Ai::CommitmentMatcher, match: nil, failed?: true)
+      allow(Ai::CommitmentMatcher).to receive(:new).and_return(matcher_double)
+
+      reminders = Reminders::Builder.call(workspace: ws4, source: src, raw_items: [ reminder_item ], anchor_tz: Time.zone)
+      expect(reminders.size).to eq(1)
+      expect(reminders.first.extracted_data["_novelty"]["verdict"]).to eq("check_failed")
+    end
+
+    it "does not call CommitmentMatcher when there are no neighbors" do
+      # No reminders/tasks/events in ws4 yet except the task, which we remove.
+      existing_task.destroy!
+      expect(Ai::CommitmentMatcher).not_to receive(:new)
+
+      Reminders::Builder.call(workspace: ws4, source: src, raw_items: [ reminder_item ], anchor_tz: Time.zone)
+    end
+  end
+
+  # ── Publish-once fix ─────────────────────────────────────────────────────────
+  describe "publish-once for reminder.created" do
+    it "publishes the event only once even when the same item is built twice" do
+      expect(Events).to receive(:publish).with("reminder.created", anything).once
+
+      build([ item ])
+      # Second run: fingerprint matches, reminder is persisted+pending,
+      # assign_attributes re-saves it — must NOT re-publish.
+      build([ item ])
     end
   end
 end

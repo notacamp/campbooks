@@ -85,7 +85,8 @@ module Feed
             .where("received_at < ?", now - AGED_DAYS.days)
             .merge(expects_reply)
             .select(:id, :received_at, :ai_priority, :category, :email_account_id,
-                    :email_thread_id, :contact_id)
+                    :email_thread_id, :contact_id,
+                    :subject, :from_address) # the Generator's conversation claim
         ))
       end
 

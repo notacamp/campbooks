@@ -135,7 +135,8 @@ class SkimController < ApplicationController
     return render json: { error: t(".empty_body") }, status: :unprocessable_entity if body.strip.empty?
 
     client = email.email_account.mail_client
-    draft = client.save_draft(subject: "Re: #{email.subject}", body: body, to_address: email.from_address)
+    draft = client.save_draft(subject: "Re: #{email.subject}", body: body,
+                              to_address: Emails::ComposePrefill.reply_to_address(email))
     draft_id = draft && (draft["messageId"] || draft["id"])
     return render json: { error: t(".send_failed") }, status: :unprocessable_entity unless draft_id
 

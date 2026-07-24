@@ -27,7 +27,7 @@ module Campbooks
       form(
         method: "get",
         action: helpers.search_email_messages_path,
-        class: class_names("border-b border-gray-100 relative", @attrs.delete(:class)),
+        class: class_names("relative", @attrs.delete(:class)),
         data: {
           controller: "email-search",
           turbo_frame: "email_search_results",

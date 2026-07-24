@@ -21,7 +21,7 @@
   <!-- Email content -->
   <div id="email_content" class="flex-1 flex flex-col min-w-0">
     <!-- Mobile: back to list + Scout toggle (sidebar/thread list are hidden here) -->
-    <div class="lg:hidden flex items-center justify-between px-3 py-2 border-b border-border bg-card flex-shrink-0">
+    <div class="lg:hidden flex items-center justify-between px-3 py-2 bg-card flex-shrink-0">
       <button type="button" data-action="click->email-mobile#showList"
               class="inline-flex items-center gap-1 min-h-[40px] px-1.5 -ml-1.5 rounded-md text-sm font-medium text-accent-600 hover:bg-accent-50 cursor-pointer">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
@@ -67,7 +67,7 @@
 
   <!-- Discussion panel (hidden on mobile; opened as an overlay via the Discussion button) -->
   <% comment_count = @comments.reject(&:draft?).size %>
-  <div class="hidden lg:flex flex-shrink-0 border-l border-border flex-col bg-card transition-all duration-200 w-12 js-inbox-chat relative"
+  <div class="hidden lg:flex flex-shrink-0 flex-col bg-card transition-all duration-200 w-12 js-inbox-chat relative"
        data-controller="chat-panel panel-resize"
        data-scout-mobile-target="panel"
        data-panel-resize-storage-key-value="campbooks:scout-panel-width"
@@ -96,7 +96,7 @@
     </button>
 
     <!-- Expanded header (shown when open) -->
-    <div class="hidden px-4 py-3 border-b border-border flex-shrink-0 flex items-center gap-1.5" data-chat-panel-target="header">
+    <div class="hidden px-4 py-3 flex-shrink-0 flex items-center gap-1.5" data-chat-panel-target="header">
       <svg class="w-4 h-4 flex-shrink-0 text-accent-600 dark:text-accent-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"/>
       </svg>
@@ -127,7 +127,7 @@
       <%= turbo_stream_from @thread %>
     <% end %>
     <div data-chat-panel-target="body" class="hidden flex flex-col flex-1 min-h-0">
-    <div class="flex-1 overflow-y-auto min-h-0 divide-y divide-border" id="comments_list" data-chat-input-target="list">
+    <div class="flex-1 overflow-y-auto min-h-0 divide-y divide-border/60" id="comments_list" data-chat-input-target="list">
       <% if @comments.any? %>
         <% @comments.each do |comment| %>
           <% if comment.draft? %>
@@ -152,7 +152,7 @@
       <% end %>
     </div>
 
-    <div class="px-4 py-3 border-t border-gray-200 flex-shrink-0">
+    <div class="px-4 pb-3 pt-1 flex-shrink-0">
       <%= render "email_comments/form", email_message: @message %>
     </div>
     </div>

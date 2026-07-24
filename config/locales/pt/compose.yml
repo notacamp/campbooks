@@ -49,6 +49,7 @@ pt:
         send: Enviar
         signature_default: "%{name} (predefinição)"
       pill:
+        dismiss_title: Dispensar
         draft_saved: Rascunho guardado
         resume_aria: Retomar o rascunho
         untitled: Rascunho

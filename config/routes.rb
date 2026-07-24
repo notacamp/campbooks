@@ -564,8 +564,14 @@ Rails.application.routes.draw do
   post "compose_attachments", to: "compose_attachments#create", as: :compose_attachments
 
   # Composer draft autosave (Dock + Desk). JSON create/update/destroy from the
-  # compose-autosave controller; :show re-opens a parked draft in the Dock.
-  resources :draft_emails, only: [ :show, :create, :update, :destroy ]
+  # compose-autosave controller; :show re-opens a parked draft in the Dock;
+  # :dismiss/:undismiss hide and restore the parked-draft pill (× + Undo).
+  resources :draft_emails, only: [ :show, :create, :update, :destroy ] do
+    member do
+      post :dismiss
+      post :undismiss
+    end
+  end
 
   resources :email_messages, only: [ :index, :show ] do
     collection do

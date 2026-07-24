@@ -119,4 +119,89 @@ RSpec.describe Tasks::Builder do
     expect(EmailActions.definition("create_task_from_email")).to be_truthy
     expect(EmailActions.definition("link_task_to_email")).to be_truthy
   end
+
+  # ── Cross-source deterministic sibling (same date + title-key) ───────────────
+  # Pin the clock so due-date arithmetic stays future-dated.
+  describe "deterministic sibling dedup (same due date + title-key)" do
+    around { |ex| travel_to(Time.zone.parse("2026-07-01 10:00:00")) { ex.run } }
+
+    let(:ws5)    { Workspace.create!(name: "Task Sibling WS") }
+    let(:user_a) { ws5.users.create!(name: "A", email_address: "a-task-sibling@example.com", password: "password123") }
+    let(:user_b) { ws5.users.create!(name: "B", email_address: "b-task-sibling@example.com", password: "password123") }
+
+    def build_task(source, title, extra = {})
+      Tasks::Builder.call(
+        workspace: ws5, source: source,
+        raw_items: [ { "title" => title, "confidence" => 0.9, "due_date" => "2026-07-20" }.merge(extra) ],
+        anchor_tz: Time.zone
+      )
+    end
+
+    it "adopts an existing live task with the same due date and title-key from a different source" do
+      first = build_task(user_a, "Submit the report").first
+      expect(first).to be_persisted
+
+      result = build_task(user_b, "Submit the report on 2026-07-20")
+      expect(result.size).to eq(1)
+      expect(result.first).to eq(first)
+      expect(Task.where(workspace: ws5).count).to eq(1)
+    end
+
+    it "returns nil and does not create a new row when the sibling is done" do
+      first = build_task(user_a, "Submit the report").first
+      first.update!(status: :done)
+
+      result = build_task(user_b, "Submit the report")
+      expect(result).to eq([])
+      expect(Task.where(workspace: ws5).count).to eq(1)
+    end
+
+    it "returns nil and does not create a new row when the sibling is cancelled" do
+      first = build_task(user_a, "Submit the report").first
+      first.update!(status: :cancelled)
+
+      result = build_task(user_b, "Submit the report")
+      expect(result).to eq([])
+      expect(Task.where(workspace: ws5).count).to eq(1)
+    end
+  end
+
+  # ── Novelty gate for tasks via Ai::CommitmentMatcher ────────────────────────
+  describe "novelty gate via Ai::CommitmentMatcher" do
+    around { |ex| travel_to(Time.zone.parse("2026-07-01 10:00:00")) { ex.run } }
+
+    let(:ws6) { Workspace.create!(name: "Task Novelty WS") }
+    let(:src) { ws6.users.create!(name: "Src", email_address: "src-tn@example.com", password: "password123") }
+
+    let!(:existing_reminder) do
+      Reminder.create!(
+        workspace: ws6, source: src, reminder_type: :deadline,
+        title: "Submit report", due_at: Time.zone.parse("2026-07-20 09:00:00"),
+        status: :pending, confidence: 0.9
+      )
+    end
+
+    def task_item
+      { "title" => "Submit report", "confidence" => 0.9, "due_date" => "2026-07-20" }
+    end
+
+    it "does not create a task when matcher returns a Reminder" do
+      matcher_double = instance_double(Ai::CommitmentMatcher, match: existing_reminder, failed?: false)
+      allow(Ai::CommitmentMatcher).to receive(:new).and_return(matcher_double)
+
+      result = Tasks::Builder.call(workspace: ws6, source: src, raw_items: [ task_item ], anchor_tz: Time.zone)
+      expect(result).to eq([])
+      expect(Task.where(workspace: ws6).count).to eq(0)
+    end
+
+    it "does not call CommitmentMatcher for a dateless item" do
+      expect(Commitments::Neighbors).not_to receive(:around)
+
+      Tasks::Builder.call(
+        workspace: ws6, source: src,
+        raw_items: [ { "title" => "Follow up", "confidence" => 0.9 } ],
+        anchor_tz: Time.zone
+      )
+    end
+  end
 end

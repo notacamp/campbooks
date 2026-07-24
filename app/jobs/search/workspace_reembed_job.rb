@@ -67,12 +67,15 @@ module Search
           vectors = EmbeddingService.embed_batch(embeddable.map(&:content), workspace: workspace, entry: entry)
 
           if vectors.blank?
-            # Adapter gone or unavailable — a transient API error raises and
-            # hits retry_on instead of reaching here, so blank means the
-            # adapter is genuinely missing. Halt without re-enqueueing.
-            Rails.logger.warn("[Search::WorkspaceReembedJob] workspace=#{workspace.id} " \
-                              "embed_batch returned blank in phase 1 — halting")
-            return
+            # The workspace passed the entry-gate but embed_batch returned nothing
+            # mid-sweep — the provider became unavailable after the run started
+            # (e.g. quota exhausted). Fail loudly so the job lands in the failed
+            # set and is visible to operators, rather than vanishing silently with
+            # work remaining.
+            Rails.logger.error("[Search::WorkspaceReembedJob] workspace=#{workspace.id} " \
+                               "embed_batch returned blank in phase 1 — provider unavailable mid-sweep")
+            raise Ai::EmbeddingUnavailableError,
+                  "embed_batch returned blank in phase 1 (workspace #{workspace.id})"
           end
 
           check_vectors!(vectors, embeddable.size, entry, workspace)
@@ -160,9 +163,10 @@ module Search
           title_vectors = if present_texts.any?
             raw = EmbeddingService.embed_batch(present_texts, workspace: workspace, entry: entry)
             if raw.blank?
-              Rails.logger.warn("[Search::WorkspaceReembedJob] workspace=#{workspace.id} " \
-                                "embed_batch returned blank in phase 2 — halting")
-              return
+              Rails.logger.error("[Search::WorkspaceReembedJob] workspace=#{workspace.id} " \
+                                 "embed_batch returned blank in phase 2 — provider unavailable mid-sweep")
+              raise Ai::EmbeddingUnavailableError,
+                    "embed_batch returned blank in phase 2 (workspace #{workspace.id})"
             end
 
             check_vectors!(raw, present_texts.size, entry, workspace)
@@ -239,9 +243,10 @@ module Search
           vectors  = EmbeddingService.embed_batch(contents, workspace: workspace, entry: entry)
 
           if vectors.blank?
-            Rails.logger.warn("[Search::WorkspaceReembedJob] workspace=#{workspace.id} " \
-                              "embed_batch returned blank in phase 3 — halting")
-            return
+            Rails.logger.error("[Search::WorkspaceReembedJob] workspace=#{workspace.id} " \
+                               "embed_batch returned blank in phase 3 — provider unavailable mid-sweep")
+            raise Ai::EmbeddingUnavailableError,
+                  "embed_batch returned blank in phase 3 (workspace #{workspace.id})"
           end
 
           check_vectors!(vectors, contents.size, entry, workspace)

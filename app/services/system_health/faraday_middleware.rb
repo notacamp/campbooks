@@ -31,7 +31,24 @@
 #   encoded the body and written it to env[:request_body] — so at on_complete
 #   time response_env[:request_body] is the wire-format string. We capture
 #   from there, falling back to serialising pre_body only when it is nil.
+#
+# Body size limits:
+#   AI services carry large payloads (embedding texts in requests, full vector
+#   arrays in responses). To keep the call-log table manageable:
+#   - Successful ai_* calls: bodies capped at AI_SUCCESS_BODY_LIMIT (500 chars).
+#     This prevents email-derived content from sitting verbatim in an ops log.
+#   - Error calls (any service): capped at the standard 10k SystemHealth::BODY_LIMIT
+#     so error details needed for diagnosis are preserved.
+#   - Non-AI success: standard 10k cap via SystemHealth.sanitize_body.
 class SystemHealth::FaradayMiddleware < Faraday::Middleware
+  # Maximum characters stored per request/response body for a SUCCESSFUL call
+  # to an AI service (service name starting with "ai_"). AI requests carry full
+  # email text chunks; responses carry vector arrays — both are large and contain
+  # email-derived content that should not sit verbatim in an operational log.
+  # Errors on AI services keep the standard 10k cap (SystemHealth::BODY_LIMIT)
+  # so that failure payloads remain useful for incident diagnosis.
+  AI_SUCCESS_BODY_LIMIT = 500
+
   def initialize(app, service:, expected_statuses: [], workspace: nil)
     super(app)
     @service           = service
@@ -54,6 +71,14 @@ class SystemHealth::FaradayMiddleware < Faraday::Middleware
 
       resp_ct = response_env.response_headers&.[]("content-type").to_s
 
+      req_body  = SystemHealth.sanitize_body(wire_request_body(response_env, pre_body), content_type: req_ct)
+      resp_body = SystemHealth.sanitize_body(response_env[:body], content_type: resp_ct)
+
+      if success && ai_service?
+        req_body  = cap_ai_success_body(req_body)
+        resp_body = cap_ai_success_body(resp_body)
+      end
+
       SystemHealth.record(
         service:          @service,
         status:           success ? :success : :error,
@@ -63,14 +88,8 @@ class SystemHealth::FaradayMiddleware < Faraday::Middleware
         workspace_id:     resolved_workspace_id,
         request_headers:  req_headers,
         response_headers: SystemHealth.sanitize_headers(response_env.response_headers.to_h),
-        request_body:     SystemHealth.sanitize_body(
-                            wire_request_body(response_env, pre_body),
-                            content_type: req_ct
-                          ),
-        response_body:    SystemHealth.sanitize_body(
-                            response_env[:body],
-                            content_type: resp_ct
-                          ),
+        request_body:     req_body,
+        response_body:    resp_body,
         metadata:         build_metadata(response_env)
       )
     end
@@ -85,6 +104,14 @@ class SystemHealth::FaradayMiddleware < Faraday::Middleware
     req_body_str = wire_request_body(env, pre_body)
 
     if http_status && @expected_statuses.include?(http_status)
+      req_body_sanitized  = SystemHealth.sanitize_body(req_body_str, content_type: req_ct)
+      resp_body_sanitized = resp_body
+
+      if ai_service?
+        req_body_sanitized  = cap_ai_success_body(req_body_sanitized)
+        resp_body_sanitized = cap_ai_success_body(resp_body_sanitized)
+      end
+
       SystemHealth.record(
         service:          @service,
         status:           :success,
@@ -94,8 +121,8 @@ class SystemHealth::FaradayMiddleware < Faraday::Middleware
         workspace_id:     resolved_workspace_id,
         request_headers:  req_headers,
         response_headers: resp_headers,
-        request_body:     SystemHealth.sanitize_body(req_body_str, content_type: req_ct),
-        response_body:    resp_body
+        request_body:     req_body_sanitized,
+        response_body:    resp_body_sanitized
       )
     else
       SystemHealth.record(
@@ -118,6 +145,29 @@ class SystemHealth::FaradayMiddleware < Faraday::Middleware
   end
 
   private
+
+  # Returns true when this middleware instance is attached to an AI service.
+  # Used to decide whether to apply the tighter AI_SUCCESS_BODY_LIMIT cap.
+  def ai_service?
+    @service.start_with?("ai_")
+  end
+
+  # Applies the AI success body cap (AI_SUCCESS_BODY_LIMIT) to an already-
+  # sanitized body string. Called only for successful AI service calls so that
+  # email-derived content (embedding texts, vector arrays) does not accumulate
+  # verbatim in the operational log. The marker makes the truncation explicit.
+  # Returns nil unchanged; other non-string values are coerced via to_s first.
+  def cap_ai_success_body(body)
+    return body if body.nil?
+
+    str = body.to_s
+    return str if str.length <= AI_SUCCESS_BODY_LIMIT
+
+    original_length = str.length
+    "#{str[0, AI_SUCCESS_BODY_LIMIT]} ... [truncated #{original_length} bytes]"
+  rescue StandardError
+    body
+  end
 
   # The workspace option wins over ambient context; SystemHealth.record falls
   # back to Current.workspace when this returns nil. Never raises — attribution

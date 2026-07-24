@@ -45,7 +45,7 @@ module Campbooks
         # (EmailComposeController#compose_area_stream / EmailToolsController draft).
         # Drawer-specific id so it never collides with the full page's
         # thread_compose_target, which is also in the DOM in List/Board layout.
-        div(id: "drawer_compose_target", class: "flex-shrink-0 max-h-[55%] overflow-y-auto border-t border-gray-100 empty:hidden")
+        div(id: "drawer_compose_target", class: "flex-shrink-0 max-h-[55%] overflow-y-auto empty:hidden")
         drawer_footer
       end
     end
@@ -64,8 +64,11 @@ module Campbooks
 
     # ── Sections ────────────────────────────────────────────────
 
+    # Header + tags + attachments read as ONE breathing block — spacing between
+    # rows, no hairline stack (separation is whitespace, not lines; the message
+    # bubbles below are their own bounded cards).
     def header_section(&block)
-      div(class: "px-5 py-4 border-b border-gray-100 flex-shrink-0") do
+      div(class: "px-5 pt-5 pb-2 flex-shrink-0") do
         div(class: "flex items-center justify-between gap-2") do
           h2(class: "text-sm font-semibold text-gray-900 leading-snug truncate") do
             plain(@message.subject.presence || t(".no_subject"))
@@ -94,7 +97,7 @@ module Campbooks
     end
 
     def tags_section
-      div(class: "px-5 py-2.5 border-b border-gray-100 flex items-center gap-2 flex-shrink-0") do
+      div(class: "px-5 py-1.5 flex items-center gap-2 flex-shrink-0") do
         span(class: "text-[11px] font-medium text-gray-400 flex-shrink-0") { t(".tags_label") }
         # One unified picker: local tags + provider labels (see _tags partial).
         raw(helpers.render("email_messages/tags", message: @message))
@@ -106,7 +109,7 @@ module Campbooks
     def notion_export_section
       return unless @account&.workspace&.notion_integrations&.active&.exists?
 
-      div(class: "px-5 py-2 border-b border-gray-100 flex-shrink-0") do
+      div(class: "px-5 py-1.5 flex-shrink-0") do
         a(href: helpers.new_email_message_notion_export_path(@message),
           class: "inline-flex items-center gap-1.5 text-[11px] font-medium text-gray-600 hover:text-gray-900 no-underline") do
           render(Campbooks::BrandLogo.new(brand: :notion, size: :xs))
@@ -131,7 +134,7 @@ module Campbooks
     def attachments_section
       return unless @thread_documents.any? || @thread_files&.any?
 
-      details(class: "px-5 py-2.5 border-b border-gray-100 group flex-shrink-0") do
+      details(class: "px-5 py-1.5 group flex-shrink-0") do
         summary(class: "flex items-center gap-1.5 cursor-pointer select-none list-none") do
           raw(safe('<svg class="w-3 h-3 text-gray-400 flex-shrink-0 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>'))
           raw(safe('<svg class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>'))
@@ -289,7 +292,7 @@ module Campbooks
     # the scroll container and an opaque sticky bar is the reliable way to pin.
     # Frosted like the app's other docked bars — it floats over the scrolling body.
     def drawer_footer
-      div(class: "px-4 py-3 border-t border-gray-100 flex-shrink-0 sticky bottom-0 bg-card/90 backdrop-blur-md space-y-2.5") do
+      div(class: "px-4 py-3 flex-shrink-0 sticky bottom-0 bg-card/90 backdrop-blur-md space-y-2.5") do
         if @can_send
           div(class: "flex items-center gap-2") do
             compose_button("reply", t(".reply"), REPLY_ICON, primary: true)

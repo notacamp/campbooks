@@ -72,6 +72,49 @@ RSpec.describe "DraftEmails", type: :request do
     expect(foreign.reload.subject).to eq("theirs")
   end
 
+  it "update revives a dismissed draft" do
+    draft = DraftEmail.create!(workspace: @workspace, user: @user, subject: "parked", dismissed_at: 1.hour.ago)
+
+    patch draft_email_path(draft), params: { draft_email: { subject: "back at it" } }, as: :json
+
+    expect(response).to have_http_status(:ok)
+    expect(draft.reload.dismissed_at).to be_nil, "editing a dismissed draft must bring its pill back"
+  end
+
+  # ── Dismiss / undismiss (the pill's ×) ────────────────────────────────────
+
+  it "dismiss stamps the draft and streams the pill away with an Undo toast" do
+    draft = DraftEmail.create!(workspace: @workspace, user: @user, subject: "nag")
+
+    post dismiss_draft_email_path(draft), headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+    expect(response).to have_http_status(:ok)
+    expect(draft.reload.dismissed_at).to be_present
+    expect(response.body).to include('action="remove" target="compose_draft_pill"')
+    expect(response.body).to include(undismiss_draft_email_path(draft)), "the toast must carry the Undo endpoint"
+  end
+
+  it "undismiss clears the stamp and streams the pill back" do
+    draft = DraftEmail.create!(workspace: @workspace, user: @user, subject: "oops", dismissed_at: Time.current)
+
+    post undismiss_draft_email_path(draft), headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+    expect(response).to have_http_status(:ok)
+    expect(draft.reload.dismissed_at).to be_nil
+    expect(response.body).to include('target="compose_dock_root"')
+    expect(response.body).to include("compose_draft_pill")
+  end
+
+  it "dismiss never touches another user's draft" do
+    other   = create_user("naggee")
+    foreign = DraftEmail.create!(workspace: @workspace, user: other, subject: "theirs")
+
+    post dismiss_draft_email_path(foreign), headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+    expect(response).to have_http_status(:not_found)
+    expect(foreign.reload.dismissed_at).to be_nil
+  end
+
   # ── Destroy ───────────────────────────────────────────────────────────────
 
   it "destroy removes the draft" do

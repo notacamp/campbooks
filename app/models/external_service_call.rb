@@ -19,7 +19,11 @@ class ExternalServiceCall < ApplicationRecord
 
   validates :service, presence: true
 
-  scope :recent,      -> { order(created_at: :desc) }
-  scope :since,       ->(time) { where(created_at: time..) }
-  scope :for_service, ->(service) { where(service: service) }
+  scope :recent,       -> { order(created_at: :desc) }
+  scope :since,        ->(time) { where(created_at: time..) }
+  scope :for_service,  ->(service) { where(service: service) }
+  # Matches all AI-provider service keys (ai_openai, ai_mistral, ai_anthropic, …).
+  # The backslash escapes the underscore so it is matched literally, not as the
+  # SQL LIKE wildcard that would otherwise match any single character.
+  scope :ai_services,  -> { where("service LIKE 'ai\\_%'") }
 end

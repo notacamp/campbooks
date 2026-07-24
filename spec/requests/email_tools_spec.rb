@@ -139,9 +139,10 @@ RSpec.describe "Email tools (Scout suggested actions)", type: :request do
     let(:thread) { create(:email_thread, email_account: account) }
     let(:replied_message) { create(:email_message, email_account: account, email_thread: thread) }
 
+    # Stub the provider so nothing is actually sent.
+    let(:client) { double("mail_client", save_draft: { "id" => "draft-1" }, send_draft: true) }
+
     before do
-      # Stub the provider so nothing is actually sent.
-      client = double("mail_client", save_draft: { "id" => "draft-1" }, send_draft: true)
       allow_any_instance_of(EmailAccount).to receive(:mail_client).and_return(client)
     end
 
@@ -154,6 +155,18 @@ RSpec.describe "Email tools (Scout suggested actions)", type: :request do
       expect(response.body).to include("scout_actions_#{replied_message.id}")
       expect(response.body).to include("Draft follow-up")
       expect(response.body).not_to include("Suggest reply")
+    end
+
+    it "addresses the original recipient, not the user, when the source message is the user's own" do
+      own_message = create(:email_message, email_account: account, email_thread: thread,
+                           from_address: account.email_address, to_address: "client@example.com")
+
+      post tool_email_message_path(own_message, surface: "detail"),
+           params: { tool: "send_reply", body: "Just following up." }, as: :turbo_stream
+
+      expect(response).to have_http_status(:ok)
+      expect(client).to have_received(:save_draft)
+        .with(hash_including(to_address: "client@example.com"))
     end
   end
 end

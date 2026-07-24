@@ -252,5 +252,91 @@ RSpec.describe CalendarEvent, type: :model do
       create(:calendar_event, calendar: calendar, source_email_message: email, created_at: 1.day.ago)
       expect(CalendarEvent.duplicate_for(email: email)).to eq(older)
     end
+
+    context "thread-mate matching" do
+      let(:account) { create(:email_account) }
+      let(:thread)  { create(:email_thread, email_account: account) }
+      let(:first_email) { create(:email_message, email_account: account, email_thread: thread) }
+      let(:probe_email) { create(:email_message, email_account: account, email_thread: thread) }
+      let(:unrelated_email) { create(:email_message, email_account: account) }
+
+      it "finds an event sourced from a thread-mate of the probe email" do
+        # Event was created from the first message of the thread; probing with a later
+        # message of the same thread must still find it.
+        event = create(:calendar_event, calendar: calendar, source_email_message: first_email)
+        expect(CalendarEvent.duplicate_for(email: probe_email)).to eq(event)
+      end
+
+      it "returns nil for an unrelated email (different thread)" do
+        create(:calendar_event, calendar: calendar, source_email_message: first_email)
+        expect(CalendarEvent.duplicate_for(email: unrelated_email)).to be_nil
+      end
+
+      it "still applies the start_at date filter in thread-mate mode" do
+        day1 = 2.days.from_now.change(hour: 10)
+        create(:calendar_event, calendar: calendar, source_email_message: first_email,
+               start_at: day1, end_at: day1 + 1.hour)
+
+        # A probe for a different day should not find the event.
+        expect(CalendarEvent.duplicate_for(email: probe_email, start_at: day1 + 5.days)).to be_nil
+        # A probe for the same day should find it.
+        expect(CalendarEvent.duplicate_for(email: probe_email, start_at: day1)).not_to be_nil
+      end
+    end
+  end
+
+  describe "guests" do
+    let(:event) do
+      build(:calendar_event, attendees: [
+        { "email" => "maya@example.com", "name" => "Maya", "rsvp_status" => "accepted", "organizer" => true },
+        { "email" => "Me@Example.com", "rsvp_status" => "needsAction", "self" => true }
+      ])
+    end
+
+    describe "#guests" do
+      it "normalizes provider status vocabularies and skips email-less rows" do
+        event.attendees << { "email" => "z@example.com", "rsvp_status" => "NEEDS-ACTION" } << { "name" => "ghost" }
+        expect(event.guests.map(&:rsvp_status)).to eq(%w[accepted needs_action needs_action])
+        expect(event.guests.map(&:email)).to eq(%w[maya@example.com Me@Example.com z@example.com])
+      end
+
+      it "carries organizer/self flags and falls back to the email as display name" do
+        expect(event.guests.first).to have_attributes(organizer: true, self_row: false, display_name: "Maya")
+        expect(event.guests.last).to have_attributes(organizer: false, self_row: true, display_name: "Me@Example.com")
+      end
+    end
+
+    describe "#attendee_emails=" do
+      it "keeps stored rows (name, response, flags) for guests that stay" do
+        event.attendee_emails = "maya@example.com, new@example.com"
+        expect(event.attendees).to eq([
+          { "email" => "maya@example.com", "name" => "Maya", "rsvp_status" => "accepted", "organizer" => true },
+          { "email" => "new@example.com", "rsvp_status" => "needs_action" },
+          { "email" => "Me@Example.com", "rsvp_status" => "needsAction", "self" => true }
+        ])
+      end
+
+      it "drops guests left out, but never the account holder's own row" do
+        event.attendee_emails = "new@example.com"
+        expect(event.attendees.map { |a| a["email"] }).to eq(%w[new@example.com Me@Example.com])
+      end
+
+      it "matches case-insensitively (keeping the stored row), dedupes, and discards invalid addresses" do
+        event.attendee_emails = "MAYA@example.com maya@example.com not-an-email me@example.com"
+        expect(event.attendees.map { |a| a["email"] }).to eq(%w[maya@example.com Me@Example.com])
+        expect(event.attendees.first["rsvp_status"]).to eq("accepted")
+      end
+
+      it "clears everyone but self on an empty submission" do
+        event.attendee_emails = ""
+        expect(event.attendees.map { |a| a["email"] }).to eq(%w[Me@Example.com])
+      end
+    end
+
+    describe "#attendee_emails" do
+      it "round-trips the stored list for the form" do
+        expect(event.attendee_emails).to eq("maya@example.com,Me@Example.com")
+      end
+    end
   end
 end

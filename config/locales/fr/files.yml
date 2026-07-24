@@ -125,10 +125,19 @@ fr:
         all_files: Tous les fichiers
         label: Dossiers
         new_folder: Nouveau dossier
+      sort_menu:
+        added: Ajouté
+        aria_label: Trier les fichiers
+        name: Nom
+        sort: Trier
       sortable_header:
         sort_asc: Trier %{label} par ordre croissant
         sort_by: Trier par %{label}
         sort_desc: Trier %{label} par ordre décroissant
+      view_switcher:
+        aria_label: Disposition des fichiers
+        grid: Grille
+        list: Liste
   files:
     index:
       ai_analyze: Analyser avec l'IA

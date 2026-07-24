@@ -16,10 +16,13 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
-## [0.26.2] - 2026-07-13
-
 ### Fixed
 
+- Replying to a message you sent yourself — the natural click when a thread is
+  awaiting the other side's answer — no longer addresses the reply to your own
+  inbox. Reply now targets that message's recipients (like Gmail), consistently
+  across the composer (Dock and Desk), Scout's send/save-draft actions, Skim's
+  inline reply, and the API's reply default.
 - **Alerts and other mail sent from the same address as your Campbooks
   notifications are now triaged and matched by inbox rules.** Messages whose
   sender matched the app's own `MAILER_FROM` (for example a monitoring service
@@ -29,6 +32,186 @@ major, minor, or patch change here.
   `X-Campbooks-Kind` marker Campbooks stamps on its outgoing mail (with an
   address-only fallback for Zoho, which strips headers), so third-party mail from
   a shared sending address is handled like any other inbound message.
+
+## [0.28.7] - 2026-07-24
+
+### Changed
+
+- The inbox breathes like the calendar now. The mail surface dropped the grid of
+  hairline separators that made it feel cramped — the frame borders around the
+  folder rail, thread list, reading pane and Scout rail, the rules under the
+  search band and toolbars, and the stacked lines between an email's subject,
+  tags and attachments are gone; whitespace and alignment do the separating,
+  matching the calendar and home. Sticky date headers traded their bordered
+  pill for the calendar's quiet uppercase label (a soft blur keeps them legible
+  over scrolling rows). The compose Desk follows suit: its top bar is frosted
+  instead of ruled, and the context and Scout rails lost their pane frames.
+
+## [0.28.6] - 2026-07-23
+
+### Fixed
+
+- The home feed no longer repeats one conversation as several cards. When a
+  correspondent's replies land in separate threads (reply hops that re-encode
+  accented subjects — "saúde" → "saÃƒÂºde" — or drop the reply headers), each
+  fragment used to surface its own card. The feed now also collapses by
+  sender + subject, tolerant of encoding-mangled variants, and keeps the
+  newest message of the conversation as the single surviving card. Unknown
+  senders and blank subjects never collapse, so unrelated mail can't be
+  lumped together.
+
+## [0.28.5] - 2026-07-22
+
+### Fixed
+
+- One commitment, one card: the AI task and reminder extractors no longer double
+  up. Both prompts now see what the workspace already tracks (open tasks, staged
+  reminders, upcoming calendar events) and skip re-extracting it; a dated action
+  is extracted as a task rather than also becoming a "deadline" reminder (when
+  the task module is on); and before staging anything, a new AI novelty check
+  compares the candidate against same-timeframe neighbors — matching an existing
+  task, reminder, or calendar event (even worded differently, or tracked as a
+  different kind) means nothing new is inserted. Deterministic matching got wider
+  too: tasks now dedupe across conversations (same due date + normalized title),
+  reminders match across reminder types, and a timed reminder is skipped when an
+  event already sits at that exact time. The check fails open — if the AI call
+  errors, the item is staged rather than lost, and the verdict is recorded on
+  the row for auditability.
+- Dismissals stick: a second email about a commitment you dismissed no longer
+  resurrects the reminder card, and a task you completed or cancelled is not
+  re-suggested by a lookalike email on the same date.
+- Confirming a reminder from a second email in a conversation no longer creates
+  a duplicate calendar event: duplicate detection now looks across the whole
+  thread, and the Scout / command-palette "add to calendar" action gets the same
+  guard.
+- Reminder activity noise: `reminder.created` is published only when a reminder
+  is first staged, not again on every re-scan of the same mail.
+
+## [0.28.4] - 2026-07-22
+
+### Fixed
+
+- Gmail attachments are ingested again: every Gmail message synced with
+  "no attachments", so files were never downloaded and never became Documents.
+  Gmail's metadata fetch carries no MIME part tree — attachment presence is now
+  derived from the message's Content-Type (`multipart/mixed`), and the ingest
+  path accepts boolean provider flags so a type drift can't silently zero the
+  flag again. A new maintenance task
+  (`bin/rails emails:backfill_gmail_attachments`, dry-run by default) repairs
+  already-synced Gmail mail by re-checking the provider and ingesting the
+  missed attachments. (Previously listed under 0.28.3 in error — that build
+  predates the fix; it ships here.)
+- Tag chips in the inbox and open conversation now show the whole thread's tags
+  (previously only the newest message's, so tags vanished when you replied);
+  removing a tag removes it from the entire conversation; Scout's remove-tag
+  tool now only matches tags in the email's workspace.
+
+## [0.28.3] - 2026-07-20
+
+### Security
+
+- Patched `loofah` (2.25.2) and `rails-html-sanitizer` (1.7.1) — upstream
+  sanitizer-bypass advisories (`javascript:` URI and SVG `href` filter
+  evasion). These gems sanitize untrusted email HTML in Campbooks.
+
+## [0.28.2] - 2026-07-14
+
+### Fixed
+
+- Reply All on a Zoho mailbox no longer adds you as a recipient of your own
+  reply. Zoho returns message metadata HTML-escaped (`&lt;you@example.com&gt;`),
+  which slipped past the composer's own-address exclusion — addresses and
+  subjects are now decoded when mail is synced, the composer decodes
+  already-stored messages, and a one-time background sweep repairs existing
+  rows (fixes stray `&amp;`/`&lt;` showing in senders and subjects too, no
+  manual steps).
+
+## [0.28.1] - 2026-07-14
+
+### Added
+
+- The bottom-right "Draft saved" pill can now be dismissed. A new × control
+  hides it without deleting anything — the draft stays saved, an Undo in the
+  confirmation toast brings the pill straight back, and editing the draft
+  again revives it on its own.
+
+### Fixed
+
+- Events created inside Campbooks before v0.28.0 — including AI-generated
+  ones from emails — now offer the guests editor. They were stored without
+  the "you organize this" flag, and sync's change-detection skip meant the
+  provider could never correct it; a one-time backfill repairs existing
+  events (no manual steps), and provider write responses now keep the
+  organizer flag and guest list up to date going forward.
+
+## [0.28.0] - 2026-07-14
+
+### Added
+
+- You can now invite guests to calendar events. The event form gained a
+  guests field with contact autocomplete — invitees get a regular email
+  invitation from your calendar provider, and their yes/maybe/no responses
+  sync back and show live next to each guest. Events you were invited to
+  show the full guest list read-only, and your own response is a one-tap
+  Yes / Maybe / No control.
+
+### Changed
+
+- The event create/edit form was redesigned: a promoted title field,
+  compact date and time chips that keep the event duration when you move
+  the start, an all-day switch that hides the times, icon-led rows for
+  guests/location/description, and the calendar + event-type pickers
+  tucked into a compact settings row. Events on calendars you can't edit
+  get a cleaner read-only view with the guest list and a join-video link.
+
+### Fixed
+
+- Calendar sync no longer corrupts an event's guest list when writing to the
+  provider: editing a synced event with guests used to push empty attendee
+  entries to Google (breaking the update), updates and RSVP changes reset the
+  other guests' responses to "pending", and Zoho writes dropped attendees
+  entirely. Guest lists are now only written back for events you organize.
+
+## [0.27.0] - 2026-07-14
+
+### Added
+
+- Files can now be browsed as a grid of thumbnail tiles: a new List/Grid
+  switcher on the Files page (remembered per browser) shows each file's first
+  page — PDFs and images render a real preview, other types keep their icon —
+  with a sort menu replacing the table headers in grid mode. Thumbnails are
+  generated on the worker as documents arrive; existing documents are swept
+  by a one-shot background backfill on upgrade (no manual steps). (#307)
+
+## [0.26.2] - 2026-07-13
+
+### Fixed
+
+- Marking mail read/unread in Campbooks now reaches the Zoho mailbox — Zoho
+  rejected the previous API mode string on every call, so read state silently
+  never synced back. (#296)
+- Zoho Calendar events sync into Campbooks again: event pulls are issued in
+  ≤31-day slices (Zoho caps the requested range), where previously every pull
+  was rejected and no Zoho events ever appeared. The minute-cadence poll stays
+  a single request covering the next month. (#297)
+- Creating, updating and deleting events on a Zoho calendar now works: the
+  event payload no longer contains JSON nulls (which Zoho answers with a 500),
+  and the concurrency etag is sent as a request header as Zoho requires —
+  previously updates and deletes were rejected outright. (#298)
+- Embedding ingest now survives provider outages: transient errors (rate
+  limits, timeouts) retry with backoff instead of permanently skipping the
+  chunk, and the re-embed sweep fails visibly instead of halting silently when
+  the provider becomes unavailable mid-run. New managed workspaces default to
+  the EU Mistral embedding model so semantic search works out of the box. (#295)
+- The System Health call log no longer stores full AI request/response bodies
+  for successful calls (they carried email-derived text and vector arrays) and
+  prunes successful AI rows after 7 days — the log had grown to several
+  gigabytes in about a week. (#299)
+- Managed document analysis works again: Mistral retired the `pixtral-large`
+  model id (the API now rejects it), so the managed vision default moves to the
+  multimodal `mistral-medium-latest`. Embedding requests are also packed to a
+  per-request character budget — Mistral rejects oversized batches outright,
+  which previously stalled the re-embed sweep. (#295)
 
 ## [0.26.1] - 2026-07-13
 
@@ -1642,7 +1825,17 @@ major, minor, or patch change here.
 
 - Initial public, source-available release of Campbooks.
 
-[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.26.1...HEAD
+[Unreleased]: https://github.com/notacamp/campbooks/compare/v0.28.7...HEAD
+[0.28.7]: https://github.com/notacamp/campbooks/compare/v0.28.6...v0.28.7
+[0.28.6]: https://github.com/notacamp/campbooks/compare/v0.28.5...v0.28.6
+[0.28.5]: https://github.com/notacamp/campbooks/compare/v0.28.4...v0.28.5
+[0.28.4]: https://github.com/notacamp/campbooks/compare/v0.28.3...v0.28.4
+[0.28.3]: https://github.com/notacamp/campbooks/compare/v0.28.2...v0.28.3
+[0.28.2]: https://github.com/notacamp/campbooks/compare/v0.28.1...v0.28.2
+[0.28.1]: https://github.com/notacamp/campbooks/compare/v0.28.0...v0.28.1
+[0.28.0]: https://github.com/notacamp/campbooks/compare/v0.27.0...v0.28.0
+[0.27.0]: https://github.com/notacamp/campbooks/compare/v0.26.2...v0.27.0
+[0.26.2]: https://github.com/notacamp/campbooks/compare/v0.26.1...v0.26.2
 [0.26.1]: https://github.com/notacamp/campbooks/compare/v0.26.0...v0.26.1
 [0.21.1]: https://github.com/notacamp/campbooks/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/notacamp/campbooks/compare/v0.20.0...v0.21.0

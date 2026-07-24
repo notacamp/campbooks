@@ -1222,6 +1222,29 @@ dialog[open] {
   display: flex !important;
 }
 
+/* ── Files layout modes ──────────────────────────────────────────────────────
+   data-files-layout lives on the Files page root (set by the files-layout
+   controller from localStorage; the server always renders list). "list" is the
+   table (md+) / cards (below md); "grid" swaps both for the thumbnail tiles and
+   reveals the toolbar's sort menu (the table's sortable headers are gone in
+   grid). The grid + sort panes are hidden by default — with no JS the page
+   stays on the list exactly as before. Unlayered, so these win over the
+   panes' Tailwind display utilities without !important. */
+[data-files-pane="grid"],
+[data-files-pane="sort"] {
+  display: none;
+}
+[data-files-layout="grid"] [data-files-pane="table"],
+[data-files-layout="grid"] [data-files-pane="cards"] {
+  display: none;
+}
+[data-files-layout="grid"] [data-files-pane="grid"] {
+  display: grid;
+}
+[data-files-layout="grid"] [data-files-pane="sort"] {
+  display: inline-block;
+}
+
 /* ── Conversation view: Classic ──────────────────────────────────────────────
    The reading pane renders each message as a directional chat bubble by default
    (Campbooks::EmailDetail). The inbox setting "Conversation view → Classic" sets

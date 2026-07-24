@@ -69,6 +69,44 @@ RSpec.describe Zoho::MailClient, type: :service do
       expect(result.first["summary"]).to eq("gift �")
       expect(result.last["subject"]).to eq("ok 🎉") # valid pairs survive untouched
     end
+
+    it "decodes Zoho's HTML-entity-escaped metadata fields" do
+      # Zoho HTML-escapes fromAddress/toAddress/subject/summary in its list
+      # responses. Stored verbatim, "&lt;me@x.com&gt;" slips past reply-all's
+      # own-address exclusion and the user ends up emailing themselves.
+      allow(conn).to receive(:get)
+                       .with("https://mail.zoho.eu/api/accounts/ACC123/messages/view")
+                       .and_yield(fake_request_with_params)
+                       .and_return(response("data" => [ {
+                         "messageId" => "msg_1",
+                         "fromAddress" => "&quot;Supplier&quot; &lt;geral@supplier.example.com&gt;",
+                         "toAddress" => "&lt;me@example.com&gt;,&lt;other@example.com&gt;",
+                         "subject" => "Quote &amp; delivery &#39;24",
+                         "summary" => "Wood &gt; steel",
+                         "hasAttachment" => "0"
+                       } ]))
+
+      msg = client.list_messages(folder_id: "fold_1").first
+      expect(msg["fromAddress"]).to eq('"Supplier" <geral@supplier.example.com>')
+      expect(msg["toAddress"]).to eq("<me@example.com>,<other@example.com>")
+      expect(msg["subject"]).to eq("Quote & delivery '24")
+      expect(msg["summary"]).to eq("Wood > steel")
+      expect(msg["hasAttachment"]).to eq("0") # non-escaped fields untouched
+    end
+
+    it "decodes double-escaped entities exactly once" do
+      # A sender who literally wrote "&lt;" arrives from Zoho as "&amp;lt;" —
+      # one decode must restore "&lt;", not collapse it to "<".
+      allow(conn).to receive(:get)
+                       .with("https://mail.zoho.eu/api/accounts/ACC123/messages/view")
+                       .and_yield(fake_request_with_params)
+                       .and_return(response("data" => [
+                         { "messageId" => "msg_1", "subject" => "Escaping &amp;lt;div&amp;gt; tags" }
+                       ]))
+
+      msg = client.list_messages(folder_id: "fold_1").first
+      expect(msg["subject"]).to eq("Escaping &lt;div&gt; tags")
+    end
   end
 
   describe "#list_messages_with_attachments" do
@@ -137,6 +175,38 @@ RSpec.describe Zoho::MailClient, type: :service do
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # Fix 1 - mark_read / mark_unread use the correct Zoho mode strings
+  # ---------------------------------------------------------------------------
+
+  describe "#mark_read" do
+    it "sends mode markAsRead (not markRead)" do
+      captured_body = nil
+      allow(conn).to receive(:put)
+                       .with("https://mail.zoho.eu/api/accounts/ACC123/updatemessage")
+                       .and_yield(fake_put_request { |b| captured_body = b })
+                       .and_return(response("status" => { "code" => 200, "description" => "success" }))
+
+      client.mark_read([ "msg_1" ])
+
+      expect(JSON.parse(captured_body)["mode"]).to eq("markAsRead")
+    end
+  end
+
+  describe "#mark_unread" do
+    it "sends mode markAsUnread (not markUnread)" do
+      captured_body = nil
+      allow(conn).to receive(:put)
+                       .with("https://mail.zoho.eu/api/accounts/ACC123/updatemessage")
+                       .and_yield(fake_put_request { |b| captured_body = b })
+                       .and_return(response("status" => { "code" => 200, "description" => "success" }))
+
+      client.mark_unread([ "msg_1" ])
+
+      expect(JSON.parse(captured_body)["mode"]).to eq("markAsUnread")
+    end
+  end
+
   private
 
   def response(body_hash)
@@ -147,6 +217,15 @@ RSpec.describe Zoho::MailClient, type: :service do
     double("request").tap do |req|
       params_hash = {}
       allow(req).to receive(:params).and_return(params_hash)
+    end
+  end
+
+  # Yields a request double whose body= setter invokes the provided block.
+  def fake_put_request(&capture)
+    double("put_request").tap do |req|
+      headers_hash = {}
+      allow(req).to receive(:headers).and_return(headers_hash)
+      allow(req).to receive(:body=) { |v| capture.call(v) }
     end
   end
 end

@@ -152,4 +152,124 @@ RSpec.describe "EmailMessageTags", type: :request do
     # Provider is called for both add and remove
     expect(WebMock).to have_requested(:put, "#{zoho_base}/accounts/#{account.provider_account_id}/updatemessage").twice
   end
+
+  # 8. Removing a local tag carried ONLY by a sibling message succeeds (no 404).
+  it "removing a sibling-only local tag returns success and deletes the join row" do
+    account = create_zoho_account
+    thread  = account.email_threads.create!(subject: "Thread")
+    older   = account.email_messages.create!(
+      email_thread: thread,
+      provider_message_id: "msg-old-#{SecureRandom.hex(4)}",
+      provider_folder_id: "INBOX",
+      from_address: "other@example.com",
+      to_address: account.email_address,
+      subject: "Thread",
+      received_at: 2.hours.ago,
+      read: false,
+      has_attachment: false
+    )
+    newer = account.email_messages.create!(
+      email_thread: thread,
+      provider_message_id: "msg-new-#{SecureRandom.hex(4)}",
+      provider_folder_id: "INBOX",
+      from_address: account.email_address,
+      to_address: "other@example.com",
+      subject: "Re: Thread",
+      received_at: 1.hour.ago,
+      read: false,
+      has_attachment: false
+    )
+    tag = create_local_tag(name: "Suppliers")
+    older.email_message_tags.create!(tag: tag)
+
+    # DELETE is called on the newer (untagged) message's path
+    expect {
+      delete email_message_tag_path(newer, tag), as: :turbo_stream
+    }.to change { older.reload.tags.count }.by(-1)
+
+    expect(response.status).to be < 500
+  end
+
+  # 9. Removing a local tag carried by multiple thread messages removes it from all.
+  it "removing a local tag shared across thread messages removes all join rows" do
+    account = create_zoho_account
+    thread  = account.email_threads.create!(subject: "Thread")
+    msg1    = account.email_messages.create!(
+      email_thread: thread,
+      provider_message_id: "msg-a-#{SecureRandom.hex(4)}",
+      provider_folder_id: "INBOX",
+      from_address: "other@example.com",
+      to_address: account.email_address,
+      subject: "Thread",
+      received_at: 2.hours.ago,
+      read: false,
+      has_attachment: false
+    )
+    msg2 = account.email_messages.create!(
+      email_thread: thread,
+      provider_message_id: "msg-b-#{SecureRandom.hex(4)}",
+      provider_folder_id: "INBOX",
+      from_address: account.email_address,
+      to_address: "other@example.com",
+      subject: "Re: Thread",
+      received_at: 1.hour.ago,
+      read: false,
+      has_attachment: false
+    )
+    tag = create_local_tag(name: "Finance2")
+    msg1.email_message_tags.create!(tag: tag)
+    msg2.email_message_tags.create!(tag: tag)
+
+    delete email_message_tag_path(msg1, tag), as: :turbo_stream
+
+    expect(response.status).to be < 500
+    expect(msg1.reload.tags).not_to include(tag)
+    expect(msg2.reload.tags).not_to include(tag)
+  end
+
+  # 10. External tag on two thread messages: provider remove called for each.
+  it "removing an external tag from a thread calls the provider for each tagged message" do
+    account = create_zoho_account
+    stub_zoho_token_refresh(refresh_token: account.refresh_token)
+    thread  = account.email_threads.create!(subject: "Thread")
+    msg1    = account.email_messages.create!(
+      email_thread: thread,
+      provider_message_id: "msg-e1-#{SecureRandom.hex(4)}",
+      provider_folder_id: "INBOX",
+      from_address: "other@example.com",
+      to_address: account.email_address,
+      subject: "Thread",
+      received_at: 2.hours.ago,
+      read: false,
+      has_attachment: false
+    )
+    msg2 = account.email_messages.create!(
+      email_thread: thread,
+      provider_message_id: "msg-e2-#{SecureRandom.hex(4)}",
+      provider_folder_id: "INBOX",
+      from_address: account.email_address,
+      to_address: "other@example.com",
+      subject: "Re: Thread",
+      received_at: 1.hour.ago,
+      read: false,
+      has_attachment: false
+    )
+    tag = create_external_tag(account, name: "ExtTag")
+    msg1.email_message_tags.create!(tag: tag)
+    msg2.email_message_tags.create!(tag: tag)
+
+    zoho_base = "https://mail.zoho.eu/api"
+    stub_request(:put, "#{zoho_base}/accounts/#{account.provider_account_id}/updatemessage")
+      .to_return(
+        status: 200,
+        body: { status: { code: 200 } }.to_json,
+        headers: { "Content-Type" => "application/json" }
+      )
+
+    delete email_message_tag_path(msg1, tag), as: :turbo_stream
+
+    expect(response.status).to be < 500
+    # Provider called once per tagged message in the thread
+    expect(WebMock).to have_requested(:put, "#{zoho_base}/accounts/#{account.provider_account_id}/updatemessage").twice
+  end
 end
