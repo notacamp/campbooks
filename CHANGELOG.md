@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.28.8] - 2026-07-24
+
 ### Fixed
 
 - Replying to a message you sent yourself — the natural click when a thread is
