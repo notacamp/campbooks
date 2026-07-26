@@ -91,6 +91,21 @@ module Imap
       drop_state
     end
 
+    # Connect-time credential check: proves the IMAP login works (STATUS on
+    # INBOX exercises auth + mailbox access) and that the SMTP endpoint accepts
+    # the same credentials, WITHOUT sending or changing anything. Raises
+    # PermanentAuthError / AuthenticationError / HostGuard::BlockedError /
+    # network errors for the caller to translate into form feedback.
+    def verify!
+      SystemHealth.track(service: "imap", operation: "verify", workspace_id: workspace_id) do
+        imap.status("INBOX", %w[UIDVALIDITY])
+        verify_smtp!
+        true
+      end
+    ensure
+      disconnect
+    end
+
     # --- Folder model ---
 
     def list_folders
@@ -476,7 +491,18 @@ module Imap
                       open_timeout: 15)
       end
 
-      authenticate!(conn)
+      begin
+        authenticate!(conn)
+      rescue StandardError
+        # Auth failed before the connection was memoized — close the raw socket
+        # here or nothing ever will (disconnect only knows about @imap_conn).
+        begin
+          conn.disconnect
+        rescue StandardError
+          nil
+        end
+        raise
+      end
       conn
     end
 
@@ -984,6 +1010,26 @@ module Imap
       end
 
       mail
+    end
+
+    # Opens and closes an authenticated SMTP session without sending anything.
+    # Same auth fallback as deliver_smtp so a LOGIN-only server verifies too.
+    def verify_smtp!(auth_method: :plain)
+      Imap::HostGuard.validate!(@email_account.smtp_host)
+
+      smtp = Net::SMTP.new(@email_account.smtp_host, @email_account.smtp_port)
+      case @email_account.smtp_security
+      when "ssl"      then smtp.enable_tls
+      when "starttls" then smtp.enable_starttls
+      end
+      smtp.open_timeout = 15
+      helo = @email_account.email_address.to_s.split("@").last.presence || "localhost"
+
+      smtp.start(helo, @email_account.imap_login_username, @email_account.imap_password, auth_method) { true }
+    rescue Net::SMTPAuthenticationError
+      raise PermanentAuthError, "SMTP authentication failed for #{@email_account.imap_login_username}" if auth_method == :login
+
+      verify_smtp!(auth_method: :login)
     end
 
     def deliver_smtp(mail, auth_method: :plain)

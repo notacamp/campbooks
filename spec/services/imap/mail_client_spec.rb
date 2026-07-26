@@ -716,4 +716,46 @@ RSpec.describe Imap::MailClient, type: :service do
       end
     end
   end
+
+  describe "#verify!" do
+    let(:smtp) { instance_double(Net::SMTP) }
+
+    before do
+      allow(Net::SMTP).to receive(:new).and_return(smtp)
+      allow(smtp).to receive(:enable_tls)
+      allow(smtp).to receive(:enable_starttls)
+      allow(smtp).to receive(:open_timeout=)
+      allow(smtp).to receive(:start).and_return(true)
+      allow(imap).to receive(:status).and_return({ "UIDVALIDITY" => 1 })
+    end
+
+    it "checks INBOX over IMAP, opens an SMTP session, and disconnects" do
+      expect(client.verify!).to be(true)
+      expect(imap).to have_received(:status).with("INBOX", %w[UIDVALIDITY])
+      expect(smtp).to have_received(:start)
+      expect(imap).to have_received(:logout)
+    end
+
+    it "propagates PermanentAuthError from a rejected IMAP login, still disconnecting" do
+      resp_text = instance_double(Net::IMAP::ResponseText,
+                                  code: instance_double(Net::IMAP::ResponseCode, name: "AUTHENTICATIONFAILED"),
+                                  text: "AUTHENTICATIONFAILED bad credentials")
+      resp = instance_double(Net::IMAP::TaggedResponse, data: resp_text)
+      allow(imap).to receive(:login).and_raise(Net::IMAP::NoResponseError.new(resp))
+
+      expect { client.verify! }.to raise_error(PermanentAuthError) do |e|
+        expect(e.message).not_to include(account.imap_password)
+      end
+      expect(imap).to have_received(:disconnect)
+    end
+
+    it "falls back to LOGIN auth when the SMTP server rejects PLAIN, then fails permanently" do
+      allow(smtp).to receive(:start)
+        .and_raise(Net::SMTPAuthenticationError.new("535 5.7.8 rejected"))
+
+      expect { client.verify! }.to raise_error(PermanentAuthError)
+      # :plain first, :login retry — a LOGIN-only server would succeed on the second call.
+      expect(smtp).to have_received(:start).twice
+    end
+  end
 end
