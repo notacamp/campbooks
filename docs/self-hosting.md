@@ -129,6 +129,21 @@ own in **Settings → AI** (stored encrypted per workspace).
 - For attachment/document analysis and the best search: set **`OPENAI_API_KEY`**.
 - With no embeddings provider (OpenAI or Gemini), search falls back to keyword matching.
 
+### IMAP — any other mail provider
+
+No registration or ENV needed: **Settings → Accounts → IMAP** connects any
+mailbox that speaks IMAP/SMTP — iCloud, Fastmail, Yahoo, GMX, or a mail server
+you run yourself. Sign in with an **app password** (most providers require one
+when IMAP is used; your normal password rarely works). The form has presets for
+common providers and lets you choose how much history to sync (default 90 days).
+
+- Self-hosted installs may point at mail servers on **private or local hosts**
+  (e.g. a Dovecot next to Campbooks). The hosted cloud blocks internal
+  addresses for safety.
+- IMAP accounts sync mail and folders and send over SMTP; provider **labels and
+  calendars** are OAuth-only features (Zoho/Google).
+- To hide the IMAP connect option entirely, set `ENABLE_IMAP=0`.
+
 ### Google — Gmail & Calendar
 
 Lets users sign in with Google and connect a Gmail mailbox (which also syncs

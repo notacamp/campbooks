@@ -28,8 +28,21 @@ class EmailAccount < ApplicationRecord
   # settings instead (ports/security are defaulted by the connect form).
   validates :refresh_token, presence: true, unless: :imap?
   validates :imap_password, :imap_host, :imap_port, :smtp_host, :smtp_port, presence: true, if: :imap?
-  validates :imap_security, :smtp_security, inclusion: { in: %w[ssl starttls] }, if: :imap?
+  validates :imap_security, :smtp_security,
+            inclusion: { in: ->(_account) { allowed_imap_security_modes } }, if: :imap?
   validates :name, length: { maximum: 100 }, allow_blank: true
+
+  # "none" (plaintext IMAP/SMTP) is only for mail servers on the operator's own
+  # network — a docker-internal Dovecot next to a self-hosted Campbooks. The
+  # hosted cloud never offers it: cleartext credentials to an external host are
+  # indefensible there. Same signal Imap::HostGuard uses to allow private hosts.
+  def self.allowed_imap_security_modes
+    if Rails.application.config.self_hosted || Rails.env.development?
+      %w[ssl starttls none]
+    else
+      %w[ssl starttls]
+    end
+  end
 
   before_create :assign_color
 
