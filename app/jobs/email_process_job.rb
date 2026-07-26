@@ -279,10 +279,33 @@ class EmailProcessJob < ApplicationJob
 
   def process_inline_images(email, mail_client)
     urls = email.body.scan(%r{src=["'](/mail/ImageDisplay\?[^"']+)["']}).flatten
-    return if urls.empty?
+    cids = email.body.scan(%r{src=["']cid:([^"']+)["']}).flatten.uniq
+    return if urls.empty? && cids.empty?
 
     new_body = email.body.dup
     changed = false
+
+    # Raw cid: references (IMAP bodies keep them verbatim; other providers rewrite
+    # them server-side). Attachments::Ingester also rewrites cid: refs, but only
+    # runs when the attachment FLAG is set — a message whose only MIME extras are
+    # inline images (signature logos) never gets there, so resolve them here.
+    cids.each do |cid|
+      begin
+        raw = mail_client.download_inline_image(email.provider_message_id, email.provider_folder_id, CGI.unescape(cid))
+        next if raw.nil? || raw.empty?
+
+        # No filename in a cid: URI — sniff the type from the bytes.
+        content_type = Marcel::MimeType.for(StringIO.new(raw), declared_type: "image/png")
+        email.files.attach(io: StringIO.new(raw), filename: "inline_image", content_type: content_type)
+        blob = email.files_attachments.last&.blob
+        next unless blob
+
+        new_body.gsub!("cid:#{cid}", blob_path(blob))
+        changed = true
+      rescue => e
+        Rails.logger.warn("[EmailProcessJob] Inline cid image download failed for email #{email.id}: #{e.message}")
+      end
+    end
 
     urls.each do |url|
       query = (url.split("?", 2).last || "").gsub("&amp;", "&")
