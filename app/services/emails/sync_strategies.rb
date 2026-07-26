@@ -19,12 +19,13 @@ module Emails
     end
 
     # Resolve the per-vendor sync strategy for an account. Vendor capability lives
-    # in the strategy, not the engine: Gmail and Microsoft do true delta, Zoho —
-    # which has no change feed — windows new mail and reconciles on a slower pass.
+    # in the strategy, not the engine: Gmail and Microsoft do true delta, Zoho and
+    # IMAP — which have no change feed — window new mail and reconcile on a slower pass.
     def self.for(account)
       case account.provider.to_sym
       when :google    then Google.new(account)
       when :microsoft then Microsoft.new(account)
+      when :imap      then Imap.new(account)
       else                 Zoho.new(account)
       end
     end
