@@ -866,6 +866,7 @@ DEPENDENCIES
   mission_control-jobs
   money-rails
   neighbor (~> 0.4)
+  net-imap
   opensearch-ruby
   pagy (~> 9.0)
   pg (~> 1.1)

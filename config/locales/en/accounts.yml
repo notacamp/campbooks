@@ -3,3 +3,4 @@ en:
     deactivation_reasons:
       mail_service_unavailable: "This Google account has no Gmail mailbox, so its mail can't be synced. Connect the account where this address actually receives email."
       calendar_service_unavailable: "This Google account isn't signed up for Google Calendar, so there's nothing here to sync."
+      credentials_invalid: "The password for this account was rejected by the mail server. Re-enter it to reconnect."

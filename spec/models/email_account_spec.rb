@@ -137,4 +137,43 @@ RSpec.describe EmailAccount, type: :model do
       expect(raw).not_to include("secret-token-123")
     end
   end
+
+  describe "IMAP provider" do
+    describe "validations" do
+      it "is valid with the :imap trait" do
+        expect(build(:email_account, :imap)).to be_valid
+      end
+
+      it "is invalid when imap_password is blank" do
+        expect(build(:email_account, :imap, imap_password: nil)).not_to be_valid
+      end
+
+      it "allows a nil refresh_token for an IMAP account" do
+        expect(build(:email_account, :imap, refresh_token: nil)).to be_valid
+      end
+
+      it "requires refresh_token for a zoho account" do
+        expect(build(:email_account, provider: :zoho, refresh_token: nil)).not_to be_valid
+      end
+    end
+
+    describe "#imap_login_username" do
+      it "falls back to email_address when imap_username is not set" do
+        account = build(:email_account, :imap, email_address: "user@example.com", imap_username: nil)
+        expect(account.imap_login_username).to eq("user@example.com")
+      end
+
+      it "returns imap_username when set" do
+        account = build(:email_account, :imap, email_address: "user@example.com", imap_username: "apple_id@icloud.com")
+        expect(account.imap_login_username).to eq("apple_id@icloud.com")
+      end
+    end
+
+    describe "#oauth_client" do
+      it "returns nil for an IMAP account" do
+        account = build(:email_account, :imap)
+        expect(account.oauth_client).to be_nil
+      end
+    end
+  end
 end

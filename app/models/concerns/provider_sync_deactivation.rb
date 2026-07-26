@@ -12,7 +12,7 @@ module ProviderSyncDeactivation
   # Machine reasons stored in `deactivation_reason`; each has a matching
   # `accounts.deactivation_reasons.<reason>` translation. NULL means a plain
   # disconnect (token revoked / user removed), which stays generic.
-  DEACTIVATION_REASONS = %w[mail_service_unavailable calendar_service_unavailable].freeze
+  DEACTIVATION_REASONS = %w[mail_service_unavailable calendar_service_unavailable credentials_invalid].freeze
 
   included do
     # A reactivated account must never keep a stale "service unavailable" note.

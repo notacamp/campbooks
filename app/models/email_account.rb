@@ -4,11 +4,12 @@ class EmailAccount < ApplicationRecord
   belongs_to :workspace
 
   encrypts :refresh_token
+  encrypts :imap_password
 
   # Harmonized OKLCH family (see app/assets/tailwind/application.css tones).
   COLORS = %w[#595dec #0584da #00a8a8 #2ea55c #dca81c #e76e08 #de3b3d #d44996].freeze
 
-  enum :provider, { zoho: 0, google: 1, microsoft: 2 }, default: :zoho
+  enum :provider, { zoho: 0, google: 1, microsoft: 2, imap: 3 }, default: :zoho
 
   has_many :email_threads, dependent: :destroy
   has_many :email_messages, dependent: :restrict_with_error
@@ -23,7 +24,11 @@ class EmailAccount < ApplicationRecord
   has_many :signatures, through: :email_account_signatures
 
   validates :email_address, presence: true, uniqueness: true
-  validates :refresh_token, presence: true
+  # OAuth providers hold a refresh token; IMAP accounts hold a password + server
+  # settings instead (ports/security are defaulted by the connect form).
+  validates :refresh_token, presence: true, unless: :imap?
+  validates :imap_password, :imap_host, :imap_port, :smtp_host, :smtp_port, presence: true, if: :imap?
+  validates :imap_security, :smtp_security, inclusion: { in: %w[ssl starttls] }, if: :imap?
   validates :name, length: { maximum: 100 }, allow_blank: true
 
   before_create :assign_color
@@ -82,6 +87,12 @@ class EmailAccount < ApplicationRecord
     name.present? ? "#{name} (#{email_address})" : email_address
   end
 
+  # The IMAP/SMTP login. Most servers use the mailbox address itself; a custom
+  # username (e.g. iCloud's Apple-ID form) overrides it.
+  def imap_login_username
+    imap_username.presence || email_address
+  end
+
   # Single-character initial for account avatars, derived from the display name.
   def avatar_initial
     display_name.strip.first.to_s.upcase
@@ -91,6 +102,7 @@ class EmailAccount < ApplicationRecord
     case provider.to_sym
     when :google then Google::MailClient.new(self)
     when :microsoft then Microsoft::MailClient.new(self)
+    when :imap then Imap::MailClient.new(self)
     else Zoho::MailClient.new(self)
     end
   end
@@ -111,6 +123,7 @@ class EmailAccount < ApplicationRecord
 
   def oauth_client
     case provider.to_sym
+    when :imap then nil # password auth — no OAuth grant to refresh or revoke
     when :google then Google::OauthClient.new(refresh_token: refresh_token)
     when :microsoft then Microsoft::OauthClient.new(refresh_token: refresh_token)
     else Zoho::OauthClient.new(refresh_token: refresh_token)
