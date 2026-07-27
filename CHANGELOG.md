@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.29.0] - 2026-07-27
+
 ### Added
 
 - **Connect any mailbox over IMAP.** Beyond the Zoho and Google OAuth connects,
