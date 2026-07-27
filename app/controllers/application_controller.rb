@@ -16,8 +16,9 @@ class ApplicationController < ActionController::Base
   before_action :redirect_to_onboarding_if_incomplete
 
   helper_method :current_user, :self_hosted?, :signup_mode, :public_signup_allowed?, :beta_code_required?,
-                :workflows_enabled?, :email_board_enabled?, :microsoft_enabled?, :document_templates_enabled?, :email_templates_enabled?, :tasks_enabled?, :accounting_enabled?, :ai_provider_available?,
-                :show_beta_banner?, :current_entitlements
+                :workflows_enabled?, :email_board_enabled?, :microsoft_enabled?, :imap_enabled?,
+                :document_templates_enabled?, :email_templates_enabled?, :tasks_enabled?, :accounting_enabled?,
+                :ai_provider_available?, :show_beta_banner?, :current_entitlements
 
   private
 
@@ -77,6 +78,11 @@ class ApplicationController < ActionController::Base
   # set while the Entra app registration is still incomplete.
   def microsoft_enabled?
     Features.microsoft?
+  end
+
+  # Generic IMAP/SMTP connect: ON by default, ENABLE_IMAP=0 opts out.
+  def imap_enabled?
+    Features.imap?
   end
 
   def document_templates_enabled?

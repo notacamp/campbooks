@@ -37,6 +37,12 @@ module Emails
         errors = []
         result = Emails::FolderSync.call(account).reduce(Result.empty) do |acc, folder|
           acc.merge(yield(folder, up))
+        rescue AuthenticationError
+          # A rejected login is account-level, not a bad folder: isolating it
+          # would retry LOGIN once per folder per minute forever and starve the
+          # engine's PermanentAuthError -> deactivate_for!(:credentials_invalid)
+          # path of the signal it exists for. Let it abort the run.
+          raise
         rescue => e
           Rails.logger.error("[Emails::SyncStrategies::Imap] #{account.email_address} folder #{folder.name}: #{e.class}: #{e.message}")
           errors << { folder: folder.name, error: "#{e.class}: #{e.message.to_s.first(200)}" }

@@ -187,5 +187,12 @@ RSpec.describe Emails::SyncStrategies::Imap do
       expect(client).to receive(:disconnect)
       strategy.sync!(scan_log: scan_log)
     end
+
+    it "re-raises auth errors instead of isolating them (account-level, feeds engine deactivation)" do
+      allow(client).to receive(:folder_status).with("bad-folder")
+        .and_raise(PermanentAuthError, "password rejected")
+
+      expect { strategy.sync!(scan_log: scan_log) }.to raise_error(PermanentAuthError)
+    end
   end
 end

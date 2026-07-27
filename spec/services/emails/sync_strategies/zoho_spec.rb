@@ -62,6 +62,13 @@ RSpec.describe Emails::SyncStrategies::Zoho do
     it "#full_resync! keeps walking the folders after one that raises" do
       expect { strategy.full_resync!(scan_log: scan_log) }.to change(EmailMessage, :count).by(1)
     end
+
+    it "re-raises auth errors instead of isolating them (account-level, feeds engine deactivation)" do
+      allow(client).to receive(:list_messages).with(hash_including(folder_id: "f_bad"))
+                                              .and_raise(PermanentAuthError, "grant revoked")
+
+      expect { strategy.sync!(scan_log: scan_log) }.to raise_error(PermanentAuthError)
+    end
   end
 
   describe "#full_resync! walks every folder fully" do

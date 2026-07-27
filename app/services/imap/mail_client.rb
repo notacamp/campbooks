@@ -885,7 +885,9 @@ module Imap
         part = parsed.text_part
         return nil if part.nil?
         part.decoded
-      elsif parsed.mime_type == "text/plain"
+      elsif parsed.mime_type.nil? || parsed.mime_type == "text/plain"
+        # A message with no Content-Type header at all IS text/plain by RFC 5322
+        # default — mail#mime_type returns nil for it, not "text/plain".
         parsed.decoded
       end
     rescue Mail::UnknownEncodingType, Encoding::UndefinedConversionError

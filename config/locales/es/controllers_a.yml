@@ -80,6 +80,7 @@ es:
       saved: Documento actualizado correctamente.
   email_accounts:
     create:
+      imap_unavailable: Las conexiones IMAP no están disponibles.
       microsoft_unavailable: Las conexiones con Microsoft 365 aún no están disponibles.
     destroy:
       owner_only: Solo el propietario de la cuenta puede desconectarla.
