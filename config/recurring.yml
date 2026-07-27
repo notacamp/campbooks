@@ -22,6 +22,12 @@ production:
     # callback host or with DISABLE_CALENDAR_PUSH). See Calendars::WebhookRenewalJob.
     class: Calendars::WebhookRenewalJob
     schedule: every 6 hours
+  gmail_watch_renew:
+    # Register/renew Gmail users.watch Pub/Sub push channels (no-op without
+    # GMAIL_PUBSUB_TOPIC + GMAIL_PUBSUB_TOKEN or with DISABLE_GMAIL_PUSH).
+    # See Emails::WatchRenewalJob. Production-only: dev boxes poll every minute.
+    class: Emails::WatchRenewalJob
+    schedule: every 6 hours
   provider_token_refresh:
     class: ProviderTokenRefreshJob
     schedule: every 45 minutes

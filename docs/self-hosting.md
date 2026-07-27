@@ -155,6 +155,25 @@ their Google Calendar on the same grant).
 3. Add the redirect URI: `<your-app-url>/oauth/gmail/callback`.
 4. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
 
+#### Real-time Gmail push (optional)
+
+By default Gmail accounts are polled every minute. You can switch to near-
+real-time delivery via Google Cloud Pub/Sub:
+
+1. Enable the **Cloud Pub/Sub API** on the same Google Cloud project.
+2. Create a Pub/Sub **topic** (e.g. `projects/<project>/topics/gmail-push`).
+3. Grant the service account `gmail-api-push@system.gserviceaccount.com` the
+   **Pub/Sub Publisher** role on that topic (this lets Gmail write pings to it).
+4. Create a **Push subscription** on the topic pointing at:
+   `https://<your-app>/email_webhooks/gmail?token=<random-secret>`
+   Generate a strong random string for `<random-secret>` (e.g. `openssl rand -hex 32`).
+5. Set two environment variables:
+   - `GMAIL_PUBSUB_TOPIC` — the full topic name (`projects/<project>/topics/<name>`)
+   - `GMAIL_PUBSUB_TOKEN` — the same secret you appended to the subscription URL
+
+Without these variables, Gmail stays on the minute poll — there is no degradation.
+Set `DISABLE_GMAIL_PUSH=1` to force-disable push even when the variables are present.
+
 ### Google Drive — "Send to Drive"
 
 The interactive Drive export uses the **full `drive` scope**, which is a Google

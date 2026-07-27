@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_26_224343) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_27_104206) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -629,6 +629,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_26_224343) do
     t.string "name"
     t.integer "provider", default: 0, null: false
     t.string "provider_account_id"
+    t.datetime "push_watch_expires_at", comment: "Gmail users.watch channel expiry (renewed by Emails::WatchRenewalJob); nil = no active push channel"
     t.string "refresh_token"
     t.datetime "scan_started_at"
     t.boolean "scanning", default: false, null: false

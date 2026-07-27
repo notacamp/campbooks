@@ -30,6 +30,16 @@ module Accounts
 
       # Network I/O — must run outside the delete transaction. Best-effort:
       # TokenRevoker swallows its own errors and only revokes when unshared.
+
+      # Stop any active Gmail push channel before revoking the grant so Google
+      # does not keep sending dead-letter pings for the remaining 7-day watch
+      # lifetime. Wrapped in its own rescue: stop_watch already swallows
+      # errors internally, but mail_client itself may raise if the account
+      # object is in a bad state. Never let this block the removal path.
+      if @account.google? && Emails::GmailPush.configured?
+        @account.mail_client.stop_watch rescue nil
+      end
+
       Accounts::TokenRevoker.revoke_if_unshared(@account)
 
       ApplicationRecord.transaction do

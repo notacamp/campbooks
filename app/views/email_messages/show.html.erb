@@ -57,7 +57,7 @@
     <%# Below lg the whole pane scrolls so the folder bar + search scroll away
         with the list; at lg+ the pane is fixed and only the inner list scrolls. %>
     <div class="group/select hidden lg:flex w-full lg:w-64 flex-shrink-0 flex-col bg-card relative overflow-y-auto lg:overflow-visible"
-         data-controller="email-selection panel-resize"
+         data-controller="email-selection panel-resize inbox-live"
          data-email-mobile-target="list"
          data-inbox-pane="list"
          data-select-mode="off"
@@ -78,10 +78,14 @@
           when the row isn't on this page — so every inbox view subscribes. The
           new-mail/restore INSERT ("inbox_feed_#{id}") is subscribed only on the
           unfiltered default inbox, so a folder/group/search view never gets a row
-          floated in where it doesn't belong. %>
+          floated in where it doesn't belong. Filtered views get a "new mail" pill
+          via the filter-safe stream that prompts a reload instead. %>
+      <% live_feed = !(@search_active || @current_group.present? || params[:folder_id].present? || params[:folder_name].present?) %>
       <%= turbo_stream_from "inbox_#{current_user.id}" %>
-      <% unless @search_active || @current_group.present? || params[:folder_id].present? || params[:folder_name].present? %>
+      <% if live_feed %>
         <%= turbo_stream_from "inbox_feed_#{current_user.id}" %>
+      <% else %>
+        <div id="new_mail_pill"></div>
       <% end %>
       <%# Skim tray, Search and Compose now live in the content-spanning top band
           above the panes (see top of this file). %>

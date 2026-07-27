@@ -121,6 +121,10 @@ class Oauth::GoogleMailController < ApplicationController
       workspace: Current.workspace, owner: Current.user
     )
 
+    # Start the Gmail push channel immediately rather than waiting up to 6h for
+    # the recurring renewal cron. The job is a no-op when unconfigured.
+    Emails::WatchRenewalJob.perform_later
+
     Events.publish("email_account.connected", subject: account, payload: { "email_address" => account.email_address, "provider" => account.provider })
 
     # Kick the first sync now rather than waiting up to a minute for the poll —

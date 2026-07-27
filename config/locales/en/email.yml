@@ -44,6 +44,9 @@ en:
       toolbar_send_to_scout_title: Send to Scout
       toolbar_snooze_title: Snooze
       toolbar_tag_title: Tag
+    new_mail_pill:
+      label: New mail
+      refresh: Tap to refresh
     mobile_folder_bar:
       all: All
       folders: Folders
