@@ -80,6 +80,14 @@ module Features
       flag?("ENABLE_ACCOUNTING")
     end
 
+    # Generic IMAP/SMTP mailbox connect (any provider via app password). Unlike the
+    # other gates this one is ON by default — it ships enabled and ENABLE_IMAP=0 is
+    # the opt-OUT for deployments that want to hide it (connect UI + controller;
+    # already-connected accounts keep syncing either way).
+    def imap?
+      ENV.fetch("ENABLE_IMAP", "1") == "1"
+    end
+
     private
 
     def flag?(name)

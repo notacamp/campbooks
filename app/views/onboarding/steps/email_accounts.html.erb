@@ -40,6 +40,11 @@
             data: { turbo: false },
             class: "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-accent-600 hover:bg-accent-700 transition-colors cursor-pointer border-0" %>
       <% end %>
+      <% if imap_enabled? %>
+        <%= button_to "IMAP", email_accounts_path(provider: "imap"), method: :post,
+            data: { turbo: false },
+            class: "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-gray-600 hover:bg-gray-700 transition-colors cursor-pointer border-0" %>
+      <% end %>
     </div>
   <% end %>
 

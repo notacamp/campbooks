@@ -57,6 +57,9 @@ en:
       google:
         description: Gmail and Google Workspace
         label: Google
+      imap:
+        description: iCloud, Fastmail, Yahoo, or any mail server
+        label: IMAP
       microsoft:
         description: Outlook and Microsoft 365
         label: Microsoft 365

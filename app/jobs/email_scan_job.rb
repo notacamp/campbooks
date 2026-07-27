@@ -109,6 +109,14 @@ class EmailScanJob < ApplicationJob
       scan_log&.update!(status: :failed, completed_at: Time.current,
                         error_messages: [ { error: e.message } ])
       account.deactivate_for!(:mail_service_unavailable)
+    rescue PermanentAuthError => e
+      # The credential is genuinely dead (revoked grant, changed IMAP password).
+      # Deactivate instead of re-hitting LOGIN every minute — repeated failures
+      # can trip provider lockouts — and record a reason the accounts panel can
+      # explain. Reconnect/re-auth clears it. Not retryable, so don't re-raise.
+      scan_log&.update!(status: :failed, completed_at: Time.current,
+                        error_messages: [ { error: e.message } ])
+      account.deactivate_for!(:credentials_invalid)
     rescue => e
       scan_log&.update!(
         status: :failed,

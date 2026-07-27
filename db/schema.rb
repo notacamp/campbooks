@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_07_14_132000) do
+ActiveRecord::Schema[8.1].define(version: 2026_07_26_224343) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -614,18 +614,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_07_14_132000) do
 
   create_table "email_accounts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.boolean "active", default: true, null: false
+    t.datetime "backfill_since", comment: "Only ingest mail received after this time (connect-time sync-history choice); nil = full history"
     t.string "color", default: "#3b82f6", null: false
     t.datetime "created_at", null: false
     t.string "deactivation_reason"
     t.string "email_address", null: false
     t.string "history_id"
+    t.string "imap_host"
+    t.text "imap_password", comment: "ActiveRecord-encrypted app password, shared by IMAP and SMTP"
+    t.integer "imap_port"
+    t.string "imap_security", comment: "ssl or starttls"
+    t.string "imap_username", comment: "IMAP/SMTP login when it differs from email_address; nil = use email_address"
     t.datetime "last_scanned_at"
     t.string "name"
     t.integer "provider", default: 0, null: false
     t.string "provider_account_id"
-    t.string "refresh_token", null: false
+    t.string "refresh_token"
     t.datetime "scan_started_at"
     t.boolean "scanning", default: false, null: false
+    t.string "smtp_host"
+    t.integer "smtp_port"
+    t.string "smtp_security", comment: "ssl or starttls"
     t.datetime "updated_at", null: false
     t.uuid "workspace_id"
     t.index ["email_address"], name: "index_email_accounts_on_email_address", unique: true

@@ -5,6 +5,16 @@ class EmailAccountsController < ApplicationController
   def create
     provider = params[:provider] || "zoho"
 
+    # IMAP: redirect to the dedicated connect form (or refuse if disabled).
+    if provider == "imap"
+      if Features.imap?
+        redirect_to new_imap_account_path and return
+      else
+        back = session[:onboarding_return_to] || email_messages_path(inbox_settings: "accounts")
+        redirect_to(back, alert: t(".imap_unavailable", default: "IMAP connections aren't available.")) and return
+      end
+    end
+
     # Microsoft is gated end-to-end (Features.microsoft?) — refuse the connect
     # server-side too so a stale link can't reach the half-wired Entra flow.
     # (Toggle with ENABLE_MICROSOFT=1.)

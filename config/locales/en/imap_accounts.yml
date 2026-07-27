@@ -1,0 +1,59 @@
+en:
+  imap_accounts:
+    errors:
+      blocked_host: That mail server isn't allowed. Contact support if you believe this is in error.
+      auth_rejected: Campbooks couldn't sign in with those credentials. Make sure you're using an app password.
+      unreachable: Couldn't reach the mail server (%{error}). Check the host name and try again.
+    new:
+      title: Connect your mailbox
+      explainer: Works with iCloud, Fastmail, Yahoo, or any mail server. Use an app password for best results.
+    edit:
+      title: Reconnect %{email}
+      explainer: Update your server settings or app password to restore the connection.
+      not_permitted: You don't have permission to manage this account.
+    create:
+      connected: "%{email} connected. Campbooks is syncing your inbox."
+      already_connected_other_provider: That email address is already connected in Campbooks.
+    update:
+      updated: Account settings saved.
+      not_permitted: You don't have permission to manage this account.
+    form:
+      preset_label: Provider
+      preset_custom: Custom / Other
+      preset_icloud: iCloud Mail
+      preset_fastmail: Fastmail
+      preset_yahoo: Yahoo Mail
+      preset_gmx: GMX
+      preset_zoho_imap: Zoho Mail (IMAP)
+      email_label: Email address
+      email_placeholder: you@example.com
+      password_label: App password
+      password_hint_new: Use an app password — your main account password may not work.
+      password_hint_edit: Leave blank to keep your current password.
+      sync_history_label: Sync history
+      sync_30d: Last 30 days
+      sync_90d: Last 90 days (recommended)
+      sync_1y: Last year
+      sync_all: Everything
+      advanced_label: Advanced settings
+      imap_heading: Incoming (IMAP)
+      imap_host_label: IMAP server
+      imap_host_placeholder: imap.example.com
+      imap_port_label: Port
+      imap_security_label: Security
+      smtp_heading: Outgoing (SMTP)
+      smtp_host_label: SMTP server
+      smtp_host_placeholder: smtp.example.com
+      smtp_port_label: Port
+      smtp_security_label: Security
+      username_heading: Login name
+      username_label: Username override
+      username_placeholder: Leave blank to use your email address
+      username_hint: Only set this if your server uses a different login name than your email address.
+      security_ssl: SSL / TLS
+      security_starttls: STARTTLS
+      security_none: None (unencrypted - local servers only)
+      test_and_connect: Test and connect
+      save: Save changes
+      verify_note: Campbooks will sign in to verify your settings before saving anything.
+      zoho_imap_hint: "Zoho EU accounts use .eu hosts: imappro.zoho.eu / smtppro.zoho.eu."

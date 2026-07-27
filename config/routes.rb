@@ -252,6 +252,7 @@ Rails.application.routes.draw do
   end
   post "scout/tool", to: "agent_tools#create", as: :scout_tool
 
+  resources :imap_accounts, only: [ :new, :create, :edit, :update ]
   resources :email_accounts, only: [ :create, :update, :destroy ] do
     member do
       get :sharing

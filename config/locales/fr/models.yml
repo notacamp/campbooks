@@ -120,6 +120,7 @@ fr:
       email_account:
         providers:
           google: Gmail
+          imap: IMAP
           microsoft: Microsoft 365
           zoho: Zoho Mail
       email_account_user:

@@ -16,6 +16,21 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Connect any mailbox over IMAP.** Beyond the Zoho and Google OAuth connects,
+  Campbooks can now sync any mail provider that speaks IMAP/SMTP — iCloud,
+  Fastmail, Yahoo, GMX, or your own mail server — signed in with an app
+  password. Included: minute-by-minute new-mail sync with per-folder UID
+  cursors, read-state reconciliation on the periodic sweep, bodies, attachments
+  and inline images, folder mirroring (create/rename/move/archive/trash), and
+  full outbound over SMTP (send, reply, drafts, forward) with a copy filed to
+  the provider's Sent folder. The connect form has presets for common providers
+  and a sync-history choice (30 days, 90 days, 1 year, or everything — default
+  90 days). Enabled by default; set `ENABLE_IMAP=0` to hide the connect
+  surfaces. Self-hosted installs may point it at mail servers on private hosts;
+  the hosted cloud blocks internal addresses.
+
 ## [0.28.8] - 2026-07-24
 
 ### Fixed
