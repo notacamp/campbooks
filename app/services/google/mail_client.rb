@@ -132,6 +132,45 @@ module Google
       Array(message_ids).filter_map { |id| fetch_message_metadata(id, nil) }
     end
 
+    # --- Gmail push watch ---
+
+    # Register this mailbox for Pub/Sub push notifications (users.watch).
+    # Google POSTs a change ping to the operator-configured push subscription
+    # URL whenever the mailbox changes (new mail, label changes, reads).
+    #
+    # No labelFilter: we watch the full mailbox so read/label changes are
+    # included in real time. The delta scan this triggers is cheap (one
+    # history.list call), so the extra notification volume is worth it.
+    #
+    # Returns { history_id:, expires_at: Time } parsed from the API response.
+    # Gmail returns `expiration` as epoch-milliseconds in a STRING — we coerce
+    # it to a proper Time. Raises on any connection failure; callers rescue.
+    def watch(topic_name)
+      response = connection.post("#{BASE_URL}/watch") do |req|
+        req.headers["Content-Type"] = "application/json"
+        req.body = { topicName: topic_name }.to_json
+      end
+      raise_if_mailbox_unavailable!(response)
+      data = JSON.parse(response.body)
+      {
+        history_id: data["historyId"],
+        expires_at: Time.at(data["expiration"].to_i / 1000.0)
+      }
+    end
+
+    # Cancel this mailbox's active push watch (users.stop). Best-effort: called
+    # before OAuth grant revocation so the channel does not keep sending
+    # dead-letter pings for the remaining 7-day watch lifetime after the account
+    # is removed. Swallows all errors — the caller's main path must never be
+    # interrupted by a watch-stop failure.
+    def stop_watch
+      connection.post("#{BASE_URL}/stop")
+      true
+    rescue => e
+      Rails.logger.warn("[Google::MailClient] stop_watch failed (non-fatal): #{e.class}: #{e.message}")
+      false
+    end
+
     # --- Message content ---
 
     def get_message_content(message_id, folder_id = nil)
