@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.30.0] - 2026-07-27
+
 ### Added
 
 - **Real-time Gmail sync (optional).** Gmail mailboxes can now push changes the
