@@ -46,8 +46,7 @@ RSpec.describe Emails::InboxBroadcaster do
   end
 
   it "#upsert floats an inbox thread to the top of the default inbox with one (de-duping) prepend" do
-    # A single prepend on the feed stream only — Turbo's prepend de-dups by id.
-    # Nothing hits the always-on inbox stream.
+    # Feed stream gets a prepend AND the filter-safe inbox stream gets the pill replace.
     with_inbox_folders([ "INBOX" ]) do
       before_inbox = broadcasts("inbox_#{@user.id}").count
       before_feed  = broadcasts("inbox_feed_#{@user.id}").count
@@ -55,11 +54,55 @@ RSpec.describe Emails::InboxBroadcaster do
       described_class.upsert(@thread)
 
       expect(broadcasts("inbox_feed_#{@user.id}").count).to eq(before_feed + 1)
-      expect(broadcasts("inbox_#{@user.id}").count).to eq(before_inbox)
+      # Pill broadcast arrives on the filter-safe inbox stream.
+      expect(broadcasts("inbox_#{@user.id}").count).to eq(before_inbox + 1)
     end
   end
 
-  it "#upsert of a non-inbox (archived/sent) thread is a no-op — never injected into the inbox" do
+  it "#upsert broadcasts the new-mail pill on the filter-safe inbox stream" do
+    with_inbox_folders([ "INBOX" ]) do
+      described_class.upsert(@thread)
+
+      pill_broadcast = broadcasts("inbox_#{@user.id}").last
+      expect(pill_broadcast).to include("new_mail_pill")
+    end
+  end
+
+  it "#upsert when InboxFolders.ids_for returns [] broadcasts the pill but skips the feed-stream prepend" do
+    # Simulates a transient provider failure: folder ids are unknown, so we cannot
+    # determine with certainty that the thread is in the inbox. The pill (filter-safe)
+    # is broadcast as a fail-open hint; the prepend (fail-closed) is skipped.
+    with_inbox_folders([]) do
+      before_inbox = broadcasts("inbox_#{@user.id}").count
+      before_feed  = broadcasts("inbox_feed_#{@user.id}").count
+
+      described_class.upsert(@thread)
+
+      expect(broadcasts("inbox_#{@user.id}").count).to eq(before_inbox + 1)
+      expect(broadcasts("inbox_feed_#{@user.id}").count).to eq(before_feed)
+    end
+  end
+
+  it "#upsert of a bundled (tag-grouped) thread broadcasts the pill but not the feed-stream prepend" do
+    # Tag-grouped threads live under a group row, not the main list — don't float
+    # them in. The pill is still sent as a refresh hint.
+    workspace = @account.workspace
+    # `grouped` scope is where.not(group_name: nil) — set group_name to make the tag grouped.
+    tag = Tag.create!(workspace: workspace, name: "Newsletter", color: "#ff0000", group_name: "Bulk")
+    @message.tags << tag
+
+    with_inbox_folders([ "INBOX" ]) do
+      before_inbox = broadcasts("inbox_#{@user.id}").count
+      before_feed  = broadcasts("inbox_feed_#{@user.id}").count
+
+      described_class.upsert(@thread)
+
+      expect(broadcasts("inbox_#{@user.id}").count).to eq(before_inbox + 1)
+      expect(broadcasts("inbox_feed_#{@user.id}").count).to eq(before_feed)
+    end
+  end
+
+  it "#upsert of a non-inbox (archived/sent) thread broadcasts neither the pill nor the feed prepend" do
     @message.update!(provider_folder_id: "ARCHIVE")
     with_inbox_folders([ "INBOX" ]) do
       before_inbox = broadcasts("inbox_#{@user.id}").count

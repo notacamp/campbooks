@@ -74,10 +74,38 @@ module Emails
     def upsert
       reload!
       return if @thread&.latest_message.nil?
-      # Only a thread that actually belongs in an inbox folder floats into the inbox
-      # — a sent-only or still-archived thread is never injected (a reload wouldn't
-      # show it there either).
-      return unless inbox_thread?
+
+      # Resolve inbox folder ids ONCE — shared by both the pill broadcast and the
+      # feed-stream gate below, so we only hit the cache (or provider) one time.
+      inbox_ids = Emails::InboxFolders.ids_for([ @thread.email_account ])
+
+      # A thread is "inboundish" when it has a message in an inbox folder.
+      # When folder resolution returned nothing (a transient provider failure),
+      # we conservatively treat the thread as inboundish so the pill still fires —
+      # the pill is filter-safe (shows a "refresh" hint, never inserts a row) so a
+      # rare false positive is harmless. A thread with resolved folder ids that has
+      # no inbox message (sent-only, archived) exits here: neither a pill nor a float.
+      inboundish = inbox_ids.blank? || @thread.email_messages.any? { |m| inbox_ids.include?(m.provider_folder_id) }
+      return unless inboundish
+
+      # Broadcast a "new mail" pill to the filter-safe stream every inbox view
+      # subscribes to. Views that can't live-insert rows (folder/group/search) render
+      # an empty hidden placeholder with id="new_mail_pill"; this replace swaps in
+      # the visible chip. The default inbox renders no placeholder, so the replace
+      # is a silent no-op there (Turbo ignores missing targets).
+      each_user do |user|
+        Turbo::StreamsChannel.broadcast_replace_to(
+          stream(user),
+          target: "new_mail_pill",
+          html: pill_html(user)
+        )
+      end
+
+      # The feed-stream prepend is fail-closed: we only float a thread into the live
+      # list when we KNOW it belongs in an inbox folder. If folder resolution failed
+      # (inbox_ids blank) we skip the prepend — a mis-inserted row is worse than a
+      # missed one; the pill already nudges the user to refresh.
+      return if inbox_ids.blank?
       # A thread collapsed into a tag group (it carries a grouped tag and no guard
       # applies) lives in a group row, not the main list — don't float it in; it
       # appears under its group on reload.
@@ -150,14 +178,17 @@ module Emails
                       .each { |user| yield user }
     end
 
-    # True when the thread still has a message in one of its account's inbox
-    # folders — the gate for the default-inbox prepend (keeps sent-only / archived
-    # threads out of the live inbox list).
-    def inbox_thread?
-      inbox_ids = Emails::InboxFolders.ids_for([ @thread.email_account ])
-      return false if inbox_ids.blank?
-
-      @thread.email_messages.any? { |m| inbox_ids.include?(m.provider_folder_id) }
+    # The "new mail" pill HTML is locale-memoized like row_html. The pill partial
+    # renders a visible chip with id="new_mail_pill" so subsequent broadcasts replace
+    # it in place (idempotent on the receiving side too).
+    def pill_html(user)
+      (@pill_html_by_locale ||= {})[locale_for(user)] ||=
+        I18n.with_locale(locale_for(user)) do
+          ApplicationController.render(
+            partial: "email_messages/new_mail_pill",
+            layout: false
+          )
+        end
     end
 
     # The row HTML is identical for all recipients except for locale, so render

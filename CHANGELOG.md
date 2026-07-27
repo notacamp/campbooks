@@ -16,6 +16,24 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Real-time Gmail sync (optional).** Gmail mailboxes can now push changes the
+  moment they happen via Google Cloud Pub/Sub (`users.watch`), instead of
+  waiting for the minute poll: set `GMAIL_PUBSUB_TOPIC` and
+  `GMAIL_PUBSUB_TOKEN` after a one-time topic + push-subscription setup in your
+  Google Cloud console (see the self-hosting guide). Without configuration,
+  nothing changes — Gmail stays on the poll.
+
+### Fixed
+
+- **New mail no longer hides on filtered inbox views.** Folder, group, and
+  search views — which deliberately don't live-insert rows — now show a "New
+  mail" pill the moment something arrives, and the inbox refreshes itself after
+  a dropped connection comes back (sleeping laptop, flaky mobile) instead of
+  sitting stale until a manual reload. A provider hiccup while resolving inbox
+  folders also no longer silences live updates for five minutes.
+
 ## [0.29.0] - 2026-07-27
 
 ### Added

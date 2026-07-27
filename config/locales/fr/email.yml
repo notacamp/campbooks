@@ -45,6 +45,9 @@ fr:
       toolbar_send_to_scout_title: Envoyer à Scout
       toolbar_snooze_title: Reporter
       toolbar_tag_title: Étiquette
+    new_mail_pill:
+      label: Nouveau courrier
+      refresh: Touchez pour actualiser
     mobile_folder_bar:
       all: Tous
       folders: Dossiers
