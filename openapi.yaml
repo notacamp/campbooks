@@ -306,6 +306,9 @@ paths:
                   type: string
                 body:
                   type: string
+                  description: >-
+                    HTML body. Sent as HTML — plain-text line breaks are
+                    ignored, so use markup (<p>, <br>) for formatting.
                 cc_address:
                   type: string
                 bcc_address:
@@ -425,6 +428,9 @@ paths:
               properties:
                 body:
                   type: string
+                  description: >-
+                    HTML body. Sent as HTML — plain-text line breaks are
+                    ignored, so use markup (<p>, <br>) for formatting.
                 to_address:
                   type: string
                 cc_address:
@@ -2369,6 +2375,9 @@ components:
           type: string
         body:
           type: string
+          description: >-
+            HTML body. Sent as HTML — plain-text line breaks are ignored, so
+            use markup (<p>, <br>) for formatting.
         scheduled_at:
           type: string
           format: date-time

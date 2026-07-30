@@ -394,7 +394,7 @@ module Mcp
             email_account_id: { type: "string", description: "Id of the sending account (must be one the caller may send from)" },
             to_address: { type: "string", description: "Recipient address(es), comma-separated" },
             subject: { type: "string" },
-            body: { type: "string", description: "HTML or plain-text body" },
+            body: { type: "string", description: "HTML body. Sent as HTML — plain-text line breaks are ignored, so use markup (<p>, <br>) for formatting" },
             cc_address: { type: "string" },
             bcc_address: { type: "string" }
           },
@@ -422,7 +422,7 @@ module Mcp
         input_schema: object_schema(
           properties: {
             id: { type: "string", description: "The email to reply to" },
-            body: { type: "string" },
+            body: { type: "string", description: "HTML body. Sent as HTML — plain-text line breaks are ignored, so use markup (<p>, <br>) for formatting" },
             to_address: { type: "string", description: "Override recipient (defaults to the original sender)" },
             cc_address: { type: "string" },
             bcc_address: { type: "string" },
@@ -1758,7 +1758,7 @@ module Mcp
             email_account_id: { type: "string" },
             to_address: { type: "string" },
             subject: { type: "string" },
-            body: { type: "string" },
+            body: { type: "string", description: "HTML body. Sent as HTML — plain-text line breaks are ignored, so use markup (<p>, <br>) for formatting" },
             scheduled_at: { type: "string", description: "ISO-8601 first send time" },
             rrule: { type: "string", description: "Optional iCal RRULE, e.g. FREQ=WEEKLY;INTERVAL=1" },
             cc_address: { type: "string" },
