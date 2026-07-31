@@ -16,6 +16,36 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **REST API: single-message email triage actions.** A new
+  `POST /api/v1/emails/:id/actions/:name` endpoint exposes the inbox triage
+  actions — `archive`/`unarchive`, `trash`, `snooze`/`unsnooze`, `pin`/`unpin`,
+  `forward_email`, and the `star`/`block`/`allow` sender actions — over the
+  public API, dispatched through the same action registry the web UI uses so
+  behaviour and permissions match exactly. Mailbox actions require
+  `emails:write`, forwarding requires `emails:send`, and the sender actions
+  require `contacts:write`. First step toward full API parity with the web UI.
+- **REST API: bulk email actions.** A new `POST /api/v1/emails/bulk/:name`
+  endpoint applies archive/unarchive, mark read/unread, move-to-folder, tag,
+  delete, and snooze/unsnooze across a selection of message ids (and/or
+  smart-group names), sharing the exact selection-expansion, dispatch, and
+  live-inbox broadcast the web bulk toolbar uses (extracted into
+  `Emails::BulkActions`). Mailbox actions require `emails:write`; tagging
+  requires `tags:write`.
+- **REST API: compose drafts.** A new `drafts` resource
+  (`GET/POST/PATCH/DELETE /api/v1/drafts`) exposes the composer's autosaved draft
+  state — list, read, create, update, and delete — behind two new scopes
+  `drafts:read` / `drafts:write`. Drafts stay private to the acting user, and
+  foreign reply/account references are dropped rather than leaked, matching the
+  web autosave endpoint.
+- **REST API: email threads.** A new `threads` resource
+  (`GET /api/v1/threads`, `GET /api/v1/threads/:id`) exposes the
+  conversation-level view — thread list and a thread with all its messages in
+  order — plus `POST`/`DELETE /api/v1/threads/:id/follow` to subscribe to a
+  thread's discussion. Reads need `emails:read`; follow/unfollow need
+  `emails:write`. Backs a thread-centric client.
+
 ## [0.30.1] - 2026-07-31
 
 ### Fixed

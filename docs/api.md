@@ -103,8 +103,10 @@ above.
 | Scope | Grants |
 |-------|--------|
 | `emails:read` | List/read email messages, threads, folders (for accounts the credential's user can read) |
-| `emails:write` | Mark emails read/unread |
-| `emails:send` | Send and reply to email (from accounts the user can send from) |
+| `emails:write` | Mark emails read/unread; archive, trash, snooze, and pin threads |
+| `emails:send` | Send, reply to, and forward email (from accounts the user can send from) |
+| `drafts:read` | List and read the acting user's compose drafts |
+| `drafts:write` | Create, update, and delete compose drafts |
 | `email_accounts:read` | List connected email accounts |
 | `email_accounts:write` | Connect an email account (upload an OAuth refresh token) |
 | `documents:read` | List/read documents and download files |
@@ -220,6 +222,127 @@ Body: `body` (required, HTML — same rule as send), optional `to_address`
 (defaults to the original sender), `cc_address`, `bcc_address`,
 `email_account_id` (defaults to the source message's account). Threads
 automatically.
+
+### `POST /api/v1/emails/:id/actions/:name` — triage actions
+
+One endpoint for the single-message triage actions the inbox UI offers, keyed by
+`:name`. The action name is a path segment; any parameters go in a JSON `args`
+object in the body. Returns the updated email plus the action outcome:
+`{ "data": { …email… }, "meta": { "action": "archive", "result": { … } } }`.
+An unknown `:name` returns `422` `invalid_action`; a failed action returns `422`
+`action_failed` with the reason in `error.message`.
+
+Each action requires the scope for what it changes:
+
+| `:name` | Scope | Effect | `args` |
+| --- | --- | --- | --- |
+| `archive` / `unarchive` | `emails:write` | Archive / restore the thread | — |
+| `trash` | `emails:write` | Move the thread to Trash | — |
+| `snooze` | `emails:write` | Snooze until a time | `snoozed_until` (ISO 8601) |
+| `unsnooze` | `emails:write` | Wake a snoozed thread | — |
+| `pin` / `unpin` | `emails:write` | Add / remove from the Priority section | — |
+| `forward_email` | `emails:send` | Forward the message | `to_address` (required) |
+| `star_sender` / `unstar_sender` | `contacts:write` | Star / unstar the sender contact | — |
+| `block_sender` / `unblock_sender` | `contacts:write` | Block / unblock the sender | — |
+| `allow_sender` | `contacts:write` | Allow (whitelist) the sender | — |
+
+```bash
+# Archive a thread
+curl -X POST https://app.campbooks.not-a-camp.com/api/v1/emails/123/actions/archive \
+  -H "Authorization: Bearer $TOKEN"
+
+# Snooze until tomorrow morning
+curl -X POST https://app.campbooks.not-a-camp.com/api/v1/emails/123/actions/snooze \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"args": {"snoozed_until": "2026-08-01T09:00:00Z"}}'
+```
+
+These dispatch through the same action registry as the web UI, so behaviour and
+permission checks are identical. `forward_email` additionally returns `403` when
+the acting user can't send from the message's account. To **add or remove tags**
+on a message, use the dedicated `…/tags` endpoints below.
+
+### `POST /api/v1/emails/bulk/:name` — bulk actions
+
+Apply one action to many messages at once. Provide `email_ids` (an array) and/or
+`groups` (smart-group names, expanded to their inbox messages); the selection is
+thread-expanded, so a thread-scoped action hits the whole conversation. Returns
+`{ "data": { "action": "archive", "ids": ["…"], "result": { … } } }`, where
+`result` is the tool's own summary (e.g. `archived_count`). `422`
+`no_emails_selected` when nothing matched.
+
+| `:name` | Scope | `body` |
+| --- | --- | --- |
+| `archive` / `unarchive` | `emails:write` | — |
+| `mark_read` / `mark_unread` | `emails:write` | — |
+| `move_to_folder` | `emails:write` | `folder_id` or `folder_name` |
+| `delete` | `emails:write` | — |
+| `snooze` | `emails:write` | `snoozed_until` (ISO 8601) |
+| `unsnooze` | `emails:write` | — |
+| `tag` | `tags:write` | `tag_name`, `tag_action` (`add`/`remove`, default `add`) |
+
+```bash
+curl -X POST https://app.campbooks.not-a-camp.com/api/v1/emails/bulk/archive \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"email_ids": [101, 102, 103]}'
+```
+
+## Drafts
+
+Compose drafts (unsent, autosaved messages) behind the web composer. **Private to
+the acting user** — a token only ever sees its own user's drafts. Sending is a
+separate step: `POST` a finished draft's fields to `/emails` or
+`/emails/:id/reply`.
+
+### `GET /api/v1/drafts` — list (scope `drafts:read`)
+
+Newest first, paginated. Each draft carries `id`, `mode`
+(`new_message`/`reply`/`reply_all`/`forward`), `to`/`cc`/`bcc`, `subject`,
+`body`, `quoted_body`, `signature_id`, `email_account_id`, `in_reply_to_id`,
+`dismissed`, `display_title`, `attachments`, and timestamps.
+
+### `GET /api/v1/drafts/:id` — show (scope `drafts:read`)
+
+### `POST /api/v1/drafts` — create (scope `drafts:write`)
+
+Body (all optional): `mode`, `to`, `cc`, `bcc`, `subject`, `body`,
+`quoted_body`, `signature_id`, `email_account_id`, `in_reply_to_id`,
+`attachments` (array of `{ signed_id, filename, byte_size }`). A `signature_id`
+that isn't the user's, an `email_account_id` the user can't send from, or an
+`in_reply_to_id` they can't read are silently dropped (not an error). Returns
+`201` with the draft.
+
+### `PATCH /api/v1/drafts/:id` — update (scope `drafts:write`)
+
+Same fields as create, plus `dismissed` (boolean — park/unpark the draft).
+
+### `DELETE /api/v1/drafts/:id` — discard (scope `drafts:write`)
+
+Returns `204`.
+
+## Threads
+
+Conversation-level view of email, for a thread-centric client.
+
+### `GET /api/v1/threads` — list (scope `emails:read`)
+
+Threads from the acting user's readable mailboxes, most-recently-active first,
+paginated. Each carries `id`, `subject`, `account_id`, `message_count`,
+`unread`, `pinned`, `snoozed` (+ `snoozed_until`), `last_message_at`,
+`participants` (`[{ email, contact_id }]`), `tags` (the thread-level union),
+`holds_last_word`, and timestamps.
+
+### `GET /api/v1/threads/:id` — show (scope `emails:read`)
+
+Adds `following` (does the acting user follow this thread's discussion?) and
+`messages` — every message in the thread, oldest first, each in the detailed
+email shape (with `body`). A thread the token can neither read nor follow `404`s.
+
+### `POST /api/v1/threads/:id/follow` · `DELETE …/follow` (scope `emails:write`)
+
+Subscribe/unsubscribe the acting user to the thread's discussion (the same
+follow the web `@mention` flow uses), so they're notified of new activity even
+without mailbox access. `POST` is idempotent. Both return the thread.
 
 ## Documents
 

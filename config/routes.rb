@@ -659,6 +659,32 @@ Rails.application.routes.draw do
         resources :tags, only: [ :create, :destroy ], controller: "email_tags"
       end
 
+      # Single-message triage actions (archive, trash, snooze, pin, sender
+      # allow/block/star, forward) dispatched through the shared EmailActions
+      # registry. The action name is the URL segment — not a param called
+      # :action, which Rails reserves for the controller action.
+      #   POST /api/v1/emails/:email_id/actions/:name   body: { args: {...} }
+      post "emails/:email_id/actions/:name", to: "email_actions#create", as: :email_actions
+
+      # Bulk actions over a selection of message ids (+ optional smart-group
+      # names), dispatched through the shared Emails::BulkActions engine.
+      #   POST /api/v1/emails/bulk/:name   body: { email_ids: [...], groups: [...] }
+      post "emails/bulk/:name", to: "email_bulk#create", as: :email_bulk
+
+      # Compose drafts (DraftEmail) — private per-author autosave state behind the
+      # composer. Sending is a separate step (POST /emails or /emails/:id/reply).
+      resources :drafts, only: [ :index, :show, :create, :update, :destroy ]
+
+      # Email threads (conversations). Read the thread + its ordered messages, and
+      # follow/unfollow its discussion (ThreadFollow).
+      #   POST /api/v1/threads/:id/follow  ·  DELETE /api/v1/threads/:id/follow
+      resources :threads, only: [ :index, :show ], controller: "email_threads" do
+        member do
+          post :follow
+          delete :follow, action: :unfollow
+        end
+      end
+
       resources :documents, only: [ :index, :show, :create, :update ] do
         member do
           get :file
