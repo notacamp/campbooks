@@ -105,6 +105,8 @@ above.
 | `emails:read` | List/read email messages, threads, folders (for accounts the credential's user can read) |
 | `emails:write` | Mark emails read/unread; archive, trash, snooze, and pin threads |
 | `emails:send` | Send, reply to, and forward email (from accounts the user can send from) |
+| `drafts:read` | List and read the acting user's compose drafts |
+| `drafts:write` | Create, update, and delete compose drafts |
 | `email_accounts:read` | List connected email accounts |
 | `email_accounts:write` | Connect an email account (upload an OAuth refresh token) |
 | `documents:read` | List/read documents and download files |
@@ -284,6 +286,39 @@ curl -X POST https://app.campbooks.not-a-camp.com/api/v1/emails/bulk/archive \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"email_ids": [101, 102, 103]}'
 ```
+
+## Drafts
+
+Compose drafts (unsent, autosaved messages) behind the web composer. **Private to
+the acting user** — a token only ever sees its own user's drafts. Sending is a
+separate step: `POST` a finished draft's fields to `/emails` or
+`/emails/:id/reply`.
+
+### `GET /api/v1/drafts` — list (scope `drafts:read`)
+
+Newest first, paginated. Each draft carries `id`, `mode`
+(`new_message`/`reply`/`reply_all`/`forward`), `to`/`cc`/`bcc`, `subject`,
+`body`, `quoted_body`, `signature_id`, `email_account_id`, `in_reply_to_id`,
+`dismissed`, `display_title`, `attachments`, and timestamps.
+
+### `GET /api/v1/drafts/:id` — show (scope `drafts:read`)
+
+### `POST /api/v1/drafts` — create (scope `drafts:write`)
+
+Body (all optional): `mode`, `to`, `cc`, `bcc`, `subject`, `body`,
+`quoted_body`, `signature_id`, `email_account_id`, `in_reply_to_id`,
+`attachments` (array of `{ signed_id, filename, byte_size }`). A `signature_id`
+that isn't the user's, an `email_account_id` the user can't send from, or an
+`in_reply_to_id` they can't read are silently dropped (not an error). Returns
+`201` with the draft.
+
+### `PATCH /api/v1/drafts/:id` — update (scope `drafts:write`)
+
+Same fields as create, plus `dismissed` (boolean — park/unpark the draft).
+
+### `DELETE /api/v1/drafts/:id` — discard (scope `drafts:write`)
+
+Returns `204`.
 
 ## Documents
 

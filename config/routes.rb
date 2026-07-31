@@ -671,6 +671,10 @@ Rails.application.routes.draw do
       #   POST /api/v1/emails/bulk/:name   body: { email_ids: [...], groups: [...] }
       post "emails/bulk/:name", to: "email_bulk#create", as: :email_bulk
 
+      # Compose drafts (DraftEmail) — private per-author autosave state behind the
+      # composer. Sending is a separate step (POST /emails or /emails/:id/reply).
+      resources :drafts, only: [ :index, :show, :create, :update, :destroy ]
+
       resources :documents, only: [ :index, :show, :create, :update ] do
         member do
           get :file

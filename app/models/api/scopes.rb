@@ -12,6 +12,8 @@ module Api
       "emails:read"          => "Read email messages, threads, and folders",
       "emails:write"         => "Mark emails read/unread; archive, trash, snooze, and pin threads",
       "emails:send"          => "Compose, send, reply to, and forward email",
+      "drafts:read"          => "List and read compose drafts",
+      "drafts:write"         => "Create, update, and delete compose drafts",
       "email_accounts:read"  => "List connected email accounts",
       "email_accounts:write" => "Connect an email account (upload an OAuth refresh token)",
       "documents:read"       => "List and download documents",

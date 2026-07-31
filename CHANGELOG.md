@@ -33,6 +33,12 @@ major, minor, or patch change here.
   live-inbox broadcast the web bulk toolbar uses (extracted into
   `Emails::BulkActions`). Mailbox actions require `emails:write`; tagging
   requires `tags:write`.
+- **REST API: compose drafts.** A new `drafts` resource
+  (`GET/POST/PATCH/DELETE /api/v1/drafts`) exposes the composer's autosaved draft
+  state — list, read, create, update, and delete — behind two new scopes
+  `drafts:read` / `drafts:write`. Drafts stay private to the acting user, and
+  foreign reply/account references are dropped rather than leaked, matching the
+  web autosave endpoint.
 
 ## [0.30.1] - 2026-07-31
 

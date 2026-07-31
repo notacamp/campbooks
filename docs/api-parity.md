@@ -48,10 +48,13 @@ the API controller now both call it (web behaviour proven unchanged by
 `spec/requests/email_messages/bulk_group_spec.rb`). UI-only tools (`forward`
 compose, `process_ai`, `scout_chat`) intentionally not exposed. **Shipped.**
 
-### ☐ Chunk 3 — drafts & compose
-`resources :drafts` (DraftEmail CRUD + dismiss/undismiss), compose attachments
-and inline images upload endpoints. Backs the React composer. Reuses
-`Emails::Sender` for the send path (already wired).
+### ◑ Chunk 3 — drafts & compose
+`resources :drafts` (DraftEmail CRUD, `dismissed` as a settable boolean) shipped
+behind new `drafts:read`/`drafts:write` scopes. Sending reuses the existing
+`/emails` + `/emails/:id/reply` endpoints (`Emails::Sender`). **Still to do
+(chunk 3b):** attachment + inline-image upload endpoints (ActiveStorage direct
+upload) so an API client can populate `attachments` signed ids, and an optional
+`POST /drafts/:id/send` convenience.
 
 ### ☐ Chunk 4 — threads & folders read model
 Thread show (messages in order, participants), `follow`/`unfollow`
