@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.30.1] - 2026-07-31
+
 ### Fixed
 
 - **Docs: email `body` is sent as HTML across all send surfaces.** The
