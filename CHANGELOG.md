@@ -39,6 +39,12 @@ major, minor, or patch change here.
   `drafts:read` / `drafts:write`. Drafts stay private to the acting user, and
   foreign reply/account references are dropped rather than leaked, matching the
   web autosave endpoint.
+- **REST API: email threads.** A new `threads` resource
+  (`GET /api/v1/threads`, `GET /api/v1/threads/:id`) exposes the
+  conversation-level view — thread list and a thread with all its messages in
+  order — plus `POST`/`DELETE /api/v1/threads/:id/follow` to subscribe to a
+  thread's discussion. Reads need `emails:read`; follow/unfollow need
+  `emails:write`. Backs a thread-centric client.
 
 ## [0.30.1] - 2026-07-31
 

@@ -675,6 +675,16 @@ Rails.application.routes.draw do
       # composer. Sending is a separate step (POST /emails or /emails/:id/reply).
       resources :drafts, only: [ :index, :show, :create, :update, :destroy ]
 
+      # Email threads (conversations). Read the thread + its ordered messages, and
+      # follow/unfollow its discussion (ThreadFollow).
+      #   POST /api/v1/threads/:id/follow  ·  DELETE /api/v1/threads/:id/follow
+      resources :threads, only: [ :index, :show ], controller: "email_threads" do
+        member do
+          post :follow
+          delete :follow, action: :unfollow
+        end
+      end
+
       resources :documents, only: [ :index, :show, :create, :update ] do
         member do
           get :file

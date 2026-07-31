@@ -320,6 +320,30 @@ Same fields as create, plus `dismissed` (boolean — park/unpark the draft).
 
 Returns `204`.
 
+## Threads
+
+Conversation-level view of email, for a thread-centric client.
+
+### `GET /api/v1/threads` — list (scope `emails:read`)
+
+Threads from the acting user's readable mailboxes, most-recently-active first,
+paginated. Each carries `id`, `subject`, `account_id`, `message_count`,
+`unread`, `pinned`, `snoozed` (+ `snoozed_until`), `last_message_at`,
+`participants` (`[{ email, contact_id }]`), `tags` (the thread-level union),
+`holds_last_word`, and timestamps.
+
+### `GET /api/v1/threads/:id` — show (scope `emails:read`)
+
+Adds `following` (does the acting user follow this thread's discussion?) and
+`messages` — every message in the thread, oldest first, each in the detailed
+email shape (with `body`). A thread the token can neither read nor follow `404`s.
+
+### `POST /api/v1/threads/:id/follow` · `DELETE …/follow` (scope `emails:write`)
+
+Subscribe/unsubscribe the acting user to the thread's discussion (the same
+follow the web `@mention` flow uses), so they're notified of new activity even
+without mailbox access. `POST` is idempotent. Both return the thread.
+
 ## Documents
 
 ### `GET /api/v1/documents` — list (scope `documents:read`)

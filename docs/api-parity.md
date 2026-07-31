@@ -56,10 +56,14 @@ behind new `drafts:read`/`drafts:write` scopes. Sending reuses the existing
 upload) so an API client can populate `attachments` signed ids, and an optional
 `POST /drafts/:id/send` convenience.
 
-### ☐ Chunk 4 — threads & folders read model
-Thread show (messages in order, participants), `follow`/`unfollow`
-(`ThreadFollow`), custom-folder create/rename/delete (`MailFolder`) with the
-provider-label side effects. Fills the read side a message-list client needs.
+### ◑ Chunk 4 — threads read + follow/unfollow
+`GET /api/v1/threads` (list) + `GET /api/v1/threads/:id` (thread with ordered
+messages + `following`) + `POST`/`DELETE /threads/:id/follow` (`ThreadFollow`).
+Scopes: `emails:read` / `emails:write`. **Shipped.** **Deliberately deferred:**
+custom-folder create/rename/delete (`MailFolder`) — these fire provider-label
+side effects (`MailFolders::Provisioner`) and were intentionally excluded from
+the API's existing `folders` resource; revisit as its own chunk with a clear
+decision on whether the API should mutate provider folders.
 
 ### ☐ Chunk 5 — email accounts resource
 `resources :email_accounts` (index/show + status). The `email_accounts:read`
