@@ -25,6 +25,11 @@ major, minor, or patch change here.
   MCP tool schemas, the agent sending guide, `docs/api.md`, and the OpenAPI
   spec now state this explicitly and show the `<p>`/`<br>` convention.
 
+### Security
+
+- **Rails 8.1.3 → 8.1.3.1** — patches CVE-2026-66066 (possible arbitrary file
+  read and remote code execution in Active Storage variant processing).
+
 ## [0.30.0] - 2026-07-27
 
 ### Added
