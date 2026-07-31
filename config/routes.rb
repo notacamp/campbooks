@@ -666,6 +666,11 @@ Rails.application.routes.draw do
       #   POST /api/v1/emails/:email_id/actions/:name   body: { args: {...} }
       post "emails/:email_id/actions/:name", to: "email_actions#create", as: :email_actions
 
+      # Bulk actions over a selection of message ids (+ optional smart-group
+      # names), dispatched through the shared Emails::BulkActions engine.
+      #   POST /api/v1/emails/bulk/:name   body: { email_ids: [...], groups: [...] }
+      post "emails/bulk/:name", to: "email_bulk#create", as: :email_bulk
+
       resources :documents, only: [ :index, :show, :create, :update ] do
         member do
           get :file

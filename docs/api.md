@@ -260,6 +260,31 @@ permission checks are identical. `forward_email` additionally returns `403` when
 the acting user can't send from the message's account. To **add or remove tags**
 on a message, use the dedicated `…/tags` endpoints below.
 
+### `POST /api/v1/emails/bulk/:name` — bulk actions
+
+Apply one action to many messages at once. Provide `email_ids` (an array) and/or
+`groups` (smart-group names, expanded to their inbox messages); the selection is
+thread-expanded, so a thread-scoped action hits the whole conversation. Returns
+`{ "data": { "action": "archive", "ids": ["…"], "result": { … } } }`, where
+`result` is the tool's own summary (e.g. `archived_count`). `422`
+`no_emails_selected` when nothing matched.
+
+| `:name` | Scope | `body` |
+| --- | --- | --- |
+| `archive` / `unarchive` | `emails:write` | — |
+| `mark_read` / `mark_unread` | `emails:write` | — |
+| `move_to_folder` | `emails:write` | `folder_id` or `folder_name` |
+| `delete` | `emails:write` | — |
+| `snooze` | `emails:write` | `snoozed_until` (ISO 8601) |
+| `unsnooze` | `emails:write` | — |
+| `tag` | `tags:write` | `tag_name`, `tag_action` (`add`/`remove`, default `add`) |
+
+```bash
+curl -X POST https://app.campbooks.not-a-camp.com/api/v1/emails/bulk/archive \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"email_ids": [101, 102, 103]}'
+```
+
 ## Documents
 
 ### `GET /api/v1/documents` — list (scope `documents:read`)

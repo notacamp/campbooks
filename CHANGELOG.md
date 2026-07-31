@@ -26,6 +26,13 @@ major, minor, or patch change here.
   behaviour and permissions match exactly. Mailbox actions require
   `emails:write`, forwarding requires `emails:send`, and the sender actions
   require `contacts:write`. First step toward full API parity with the web UI.
+- **REST API: bulk email actions.** A new `POST /api/v1/emails/bulk/:name`
+  endpoint applies archive/unarchive, mark read/unread, move-to-folder, tag,
+  delete, and snooze/unsnooze across a selection of message ids (and/or
+  smart-group names), sharing the exact selection-expansion, dispatch, and
+  live-inbox broadcast the web bulk toolbar uses (extracted into
+  `Emails::BulkActions`). Mailbox actions require `emails:write`; tagging
+  requires `tags:write`.
 
 ## [0.30.1] - 2026-07-31
 

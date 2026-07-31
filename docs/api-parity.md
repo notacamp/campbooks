@@ -39,14 +39,14 @@ star/unstar/block/unblock/allow sender. Scopes: emails:write / emails:send /
 contacts:write. **Shipped.** No new services needed — the registry already
 existed.
 
-### ☐ Chunk 2 — bulk email actions
-`POST /api/v1/emails/bulk` mirroring `EmailMessages::BulkController`: archive,
-unarchive, mark_read/unread, move_to_folder, tag, delete, snooze/unsnooze.
-- **Extract first:** the group-expansion + thread-expansion + tool dispatch out
-  of `EmailMessages::BulkController` into `Emails::BulkActions` (a service taking
-  `email_ids`/`groups` + tool + user). Web controller and API both call it.
-- Skip the UI-only tools (`forward` compose, `process_ai`, `scout_chat`) or map
-  them to their own endpoints later.
+### ✅ Chunk 2 — bulk email actions
+`POST /api/v1/emails/bulk/:name` mirroring `EmailMessages::BulkController`:
+archive, unarchive, mark_read/unread, move_to_folder, tag, delete,
+snooze/unsnooze. Group-expansion + thread-expansion + tool dispatch + inbox
+broadcast were **extracted into `Emails::BulkActions`**; the web controller and
+the API controller now both call it (web behaviour proven unchanged by
+`spec/requests/email_messages/bulk_group_spec.rb`). UI-only tools (`forward`
+compose, `process_ai`, `scout_chat`) intentionally not exposed. **Shipped.**
 
 ### ☐ Chunk 3 — drafts & compose
 `resources :drafts` (DraftEmail CRUD + dismiss/undismiss), compose attachments
