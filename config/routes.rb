@@ -659,6 +659,13 @@ Rails.application.routes.draw do
         resources :tags, only: [ :create, :destroy ], controller: "email_tags"
       end
 
+      # Single-message triage actions (archive, trash, snooze, pin, sender
+      # allow/block/star, forward) dispatched through the shared EmailActions
+      # registry. The action name is the URL segment — not a param called
+      # :action, which Rails reserves for the controller action.
+      #   POST /api/v1/emails/:email_id/actions/:name   body: { args: {...} }
+      post "emails/:email_id/actions/:name", to: "email_actions#create", as: :email_actions
+
       resources :documents, only: [ :index, :show, :create, :update ] do
         member do
           get :file

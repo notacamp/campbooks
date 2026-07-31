@@ -103,8 +103,8 @@ above.
 | Scope | Grants |
 |-------|--------|
 | `emails:read` | List/read email messages, threads, folders (for accounts the credential's user can read) |
-| `emails:write` | Mark emails read/unread |
-| `emails:send` | Send and reply to email (from accounts the user can send from) |
+| `emails:write` | Mark emails read/unread; archive, trash, snooze, and pin threads |
+| `emails:send` | Send, reply to, and forward email (from accounts the user can send from) |
 | `email_accounts:read` | List connected email accounts |
 | `email_accounts:write` | Connect an email account (upload an OAuth refresh token) |
 | `documents:read` | List/read documents and download files |
@@ -220,6 +220,45 @@ Body: `body` (required, HTML — same rule as send), optional `to_address`
 (defaults to the original sender), `cc_address`, `bcc_address`,
 `email_account_id` (defaults to the source message's account). Threads
 automatically.
+
+### `POST /api/v1/emails/:id/actions/:name` — triage actions
+
+One endpoint for the single-message triage actions the inbox UI offers, keyed by
+`:name`. The action name is a path segment; any parameters go in a JSON `args`
+object in the body. Returns the updated email plus the action outcome:
+`{ "data": { …email… }, "meta": { "action": "archive", "result": { … } } }`.
+An unknown `:name` returns `422` `invalid_action`; a failed action returns `422`
+`action_failed` with the reason in `error.message`.
+
+Each action requires the scope for what it changes:
+
+| `:name` | Scope | Effect | `args` |
+| --- | --- | --- | --- |
+| `archive` / `unarchive` | `emails:write` | Archive / restore the thread | — |
+| `trash` | `emails:write` | Move the thread to Trash | — |
+| `snooze` | `emails:write` | Snooze until a time | `snoozed_until` (ISO 8601) |
+| `unsnooze` | `emails:write` | Wake a snoozed thread | — |
+| `pin` / `unpin` | `emails:write` | Add / remove from the Priority section | — |
+| `forward_email` | `emails:send` | Forward the message | `to_address` (required) |
+| `star_sender` / `unstar_sender` | `contacts:write` | Star / unstar the sender contact | — |
+| `block_sender` / `unblock_sender` | `contacts:write` | Block / unblock the sender | — |
+| `allow_sender` | `contacts:write` | Allow (whitelist) the sender | — |
+
+```bash
+# Archive a thread
+curl -X POST https://app.campbooks.not-a-camp.com/api/v1/emails/123/actions/archive \
+  -H "Authorization: Bearer $TOKEN"
+
+# Snooze until tomorrow morning
+curl -X POST https://app.campbooks.not-a-camp.com/api/v1/emails/123/actions/snooze \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"args": {"snoozed_until": "2026-08-01T09:00:00Z"}}'
+```
+
+These dispatch through the same action registry as the web UI, so behaviour and
+permission checks are identical. `forward_email` additionally returns `403` when
+the acting user can't send from the message's account. To **add or remove tags**
+on a message, use the dedicated `…/tags` endpoints below.
 
 ## Documents
 

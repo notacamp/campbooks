@@ -16,6 +16,17 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **REST API: single-message email triage actions.** A new
+  `POST /api/v1/emails/:id/actions/:name` endpoint exposes the inbox triage
+  actions — `archive`/`unarchive`, `trash`, `snooze`/`unsnooze`, `pin`/`unpin`,
+  `forward_email`, and the `star`/`block`/`allow` sender actions — over the
+  public API, dispatched through the same action registry the web UI uses so
+  behaviour and permissions match exactly. Mailbox actions require
+  `emails:write`, forwarding requires `emails:send`, and the sender actions
+  require `contacts:write`. First step toward full API parity with the web UI.
+
 ## [0.30.1] - 2026-07-31
 
 ### Fixed
