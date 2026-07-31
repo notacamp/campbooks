@@ -16,6 +16,15 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Docs: email `body` is sent as HTML across all send surfaces.** The
+  `send_email` / `reply_email` / `create_scheduled_email` MCP tools and the
+  matching REST endpoints transmit the body as HTML, so plain-text line breaks
+  were silently lost on the recipient side while the stored copy kept them. The
+  MCP tool schemas, the agent sending guide, `docs/api.md`, and the OpenAPI
+  spec now state this explicitly and show the `<p>`/`<br>` convention.
+
 ### Security
 
 - **Rails 8.1.3 → 8.1.3.1** — patches CVE-2026-66066 (possible arbitrary file

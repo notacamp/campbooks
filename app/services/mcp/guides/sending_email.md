@@ -15,9 +15,14 @@ it will return a ToolError.
 
 ## Send a new email
 
-send_email(email_account_id, to_address, subject, body) — body can be HTML or
-plain text. `to_address` accepts comma-separated addresses. cc_address and
-bcc_address are optional.
+send_email(email_account_id, to_address, subject, body) — `to_address` accepts
+comma-separated addresses. cc_address and bcc_address are optional.
+
+**The body is sent as HTML.** Plain-text line breaks are ignored by the
+recipient's mail client — a multi-paragraph plain-text body arrives as one
+run-together paragraph. Always write the body as HTML markup: `<p>` for
+paragraphs, `<br>` for line breaks, `<ul>`/`<li>` for lists. This applies
+equally to send_email, reply_email, and create_scheduled_email.
 
 Show the full composed email in the chat (from, to, subject, body) and wait for
 explicit user confirmation before calling this tool.
