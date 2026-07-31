@@ -16,6 +16,11 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Security
+
+- **Rails 8.1.3 → 8.1.3.1** — patches CVE-2026-66066 (possible arbitrary file
+  read and remote code execution in Active Storage variant processing).
+
 ## [0.30.0] - 2026-07-27
 
 ### Added
