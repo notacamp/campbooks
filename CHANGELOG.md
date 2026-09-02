@@ -20,6 +20,14 @@ major, minor, or patch change here.
 
 ### Fixed
 
+- **Sign-in page: the Google/Zoho (and Microsoft) buttons are clickable again.**
+  Passing a `class:` to the `Campbooks::Divider` component clobbered its
+  structural classes, dropping `relative` from the "or" divider's wrapper. Its
+  full-width line (`absolute inset-0`) then escaped to the nearest positioned
+  ancestor and stretched an invisible layer over everything below the divider —
+  the social sign-in buttons and the sign-up link — swallowing every click. The
+  component now merges a caller's class instead of replacing its own.
+
 - **Docs: email `body` is sent as HTML across all send surfaces.** The
   `send_email` / `reply_email` / `create_scheduled_email` MCP tools and the
   matching REST endpoints transmit the body as HTML, so plain-text line breaks
