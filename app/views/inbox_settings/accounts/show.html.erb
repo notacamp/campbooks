@@ -13,7 +13,9 @@
       <!-- Connect -->
       <div class="flex flex-wrap items-center gap-2">
         <span class="text-xs font-medium text-foreground mr-1"><%= t(".connect_label") %></span>
-        <% providers = microsoft_enabled? ? %w[zoho google microsoft] : %w[zoho google] %>
+        <% providers = %w[zoho google]
+           providers << "microsoft" if microsoft_enabled?
+           providers << "imap" if imap_enabled? %>
         <% providers.each do |provider| %>
           <%= button_to human_enum(EmailAccount, :provider, provider), email_accounts_path(provider: provider), method: :post,
                 data: { turbo: false },
@@ -58,9 +60,14 @@
                             data: { turbo_frame: "inbox_settings_panel" },
                             class: "px-2 py-0.5 text-xs font-medium text-accent-700 hover:bg-accent-50 dark:text-accent-300 dark:hover:bg-accent-500/10 rounded cursor-pointer transition-colors" %>
                     <% end %>
-                    <%= button_to t(".re_auth"), email_accounts_path(provider: account.provider), method: :post,
-                          data: { turbo: false },
-                          class: "px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded cursor-pointer transition-colors" %>
+                    <% if account.imap? %>
+                      <%= link_to t(".re_auth"), edit_imap_account_path(account),
+                            class: "px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded cursor-pointer transition-colors" %>
+                    <% else %>
+                      <%= button_to t(".re_auth"), email_accounts_path(provider: account.provider), method: :post,
+                            data: { turbo: false },
+                            class: "px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded cursor-pointer transition-colors" %>
+                    <% end %>
                     <% if account.owned_by?(Current.user) %>
                       <%# turbo_frame: _top — the delete redirects to a full email_messages page %>
                       <%# (a different layout) which Turbo can't swap into this frame, so without %>

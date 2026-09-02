@@ -2,7 +2,8 @@ class ProviderTokenRefreshJob < ApplicationJob
   queue_as :default
 
   def perform
-    refresh_accounts(EmailAccount.active)
+    # IMAP accounts have no OAuth grant to refresh.
+    refresh_accounts(EmailAccount.active.where.not(provider: :imap))
     refresh_accounts(CalendarAccount.active)
   end
 

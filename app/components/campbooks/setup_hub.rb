@@ -158,6 +158,10 @@ module Campbooks
         if helpers.microsoft_enabled?
           render Campbooks::ConnectProviderCard.new(provider: :microsoft, compact: true)
         end
+        # Generic IMAP: ON by default, ENABLE_IMAP=0 opts out.
+        if Features.imap?
+          render Campbooks::ConnectProviderCard.new(provider: :imap, compact: true)
+        end
       end
     end
 

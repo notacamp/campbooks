@@ -79,6 +79,7 @@ fr:
       saved: Document mis à jour avec succès.
   email_accounts:
     create:
+      imap_unavailable: Les connexions IMAP ne sont pas disponibles.
       microsoft_unavailable: Les connexions Microsoft 365 ne sont pas encore disponibles.
     destroy:
       owner_only: Seul le propriétaire du compte peut déconnecter ce compte.

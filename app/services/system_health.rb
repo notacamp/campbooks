@@ -23,6 +23,7 @@ module SystemHealth
     "google_mail"       => :email,
     "zoho_mail"         => :email,
     "microsoft_mail"    => :email,
+    "imap"              => :email,
     "smtp"              => :email,
     "google_calendar"   => :calendar,
     "zoho_calendar"     => :calendar,

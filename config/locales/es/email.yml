@@ -45,6 +45,9 @@ es:
       toolbar_send_to_scout_title: Enviar a Scout
       toolbar_snooze_title: Posponer
       toolbar_tag_title: Etiqueta
+    new_mail_pill:
+      label: Nuevo correo
+      refresh: Toca para actualizar
     mobile_folder_bar:
       all: Todo
       folders: Carpetas

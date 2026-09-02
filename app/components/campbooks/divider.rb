@@ -9,8 +9,14 @@ module Campbooks
     end
 
     def view_template
+      # Merge (don't clobber) a caller's class: a bare `**@attrs` lets a passed
+      # `class:` override the structural classes — dropping `relative` from the
+      # wrapper here would let the `absolute inset-0` line escape to the nearest
+      # positioned ancestor and overlay whatever sits below the divider.
+      custom_class = @attrs.delete(:class)
+
       if @label
-        div(class: "relative my-5", **@attrs) do
+        div(class: class_names("relative my-5", custom_class), **@attrs) do
           div(class: "absolute inset-0 flex items-center") do
             div(class: "w-full border-t border-border")
           end
@@ -19,7 +25,7 @@ module Campbooks
           end
         end
       else
-        hr(class: "border-border", **@attrs)
+        hr(class: class_names("border-border", custom_class), **@attrs)
       end
     end
   end

@@ -129,6 +129,21 @@ own in **Settings → AI** (stored encrypted per workspace).
 - For attachment/document analysis and the best search: set **`OPENAI_API_KEY`**.
 - With no embeddings provider (OpenAI or Gemini), search falls back to keyword matching.
 
+### IMAP — any other mail provider
+
+No registration or ENV needed: **Settings → Accounts → IMAP** connects any
+mailbox that speaks IMAP/SMTP — iCloud, Fastmail, Yahoo, GMX, or a mail server
+you run yourself. Sign in with an **app password** (most providers require one
+when IMAP is used; your normal password rarely works). The form has presets for
+common providers and lets you choose how much history to sync (default 90 days).
+
+- Self-hosted installs may point at mail servers on **private or local hosts**
+  (e.g. a Dovecot next to Campbooks). The hosted cloud blocks internal
+  addresses for safety.
+- IMAP accounts sync mail and folders and send over SMTP; provider **labels and
+  calendars** are OAuth-only features (Zoho/Google).
+- To hide the IMAP connect option entirely, set `ENABLE_IMAP=0`.
+
 ### Google — Gmail & Calendar
 
 Lets users sign in with Google and connect a Gmail mailbox (which also syncs
@@ -139,6 +154,25 @@ their Google Calendar on the same grant).
 2. Enable the **Gmail API** and **Google Calendar API** for the project.
 3. Add the redirect URI: `<your-app-url>/oauth/gmail/callback`.
 4. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+
+#### Real-time Gmail push (optional)
+
+By default Gmail accounts are polled every minute. You can switch to near-
+real-time delivery via Google Cloud Pub/Sub:
+
+1. Enable the **Cloud Pub/Sub API** on the same Google Cloud project.
+2. Create a Pub/Sub **topic** (e.g. `projects/<project>/topics/gmail-push`).
+3. Grant the service account `gmail-api-push@system.gserviceaccount.com` the
+   **Pub/Sub Publisher** role on that topic (this lets Gmail write pings to it).
+4. Create a **Push subscription** on the topic pointing at:
+   `https://<your-app>/email_webhooks/gmail?token=<random-secret>`
+   Generate a strong random string for `<random-secret>` (e.g. `openssl rand -hex 32`).
+5. Set two environment variables:
+   - `GMAIL_PUBSUB_TOPIC` — the full topic name (`projects/<project>/topics/<name>`)
+   - `GMAIL_PUBSUB_TOKEN` — the same secret you appended to the subscription URL
+
+Without these variables, Gmail stays on the minute poll — there is no degradation.
+Set `DISABLE_GMAIL_PUSH=1` to force-disable push even when the variables are present.
 
 ### Google Drive — "Send to Drive"
 

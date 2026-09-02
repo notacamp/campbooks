@@ -1,0 +1,145 @@
+<% new_record = email_account.new_record?
+   form_url = new_record ? imap_accounts_path : imap_account_path(email_account)
+   form_method = new_record ? :post : :patch
+   # "none" only exists on self-hosted/dev installs (see EmailAccount) — the
+   # select must mirror the validation or the option 422s.
+   security_options = EmailAccount.allowed_imap_security_modes.map { |mode| [ t(".security_#{mode}"), mode ] } %>
+
+<%= form_with url: form_url, method: form_method,
+              data: { turbo: false, controller: "imap-preset" },
+              class: "space-y-5" do %>
+
+  <%# Model validation errors %>
+  <% if email_account.errors.any? %>
+    <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+      <%= email_account.errors.full_messages.to_sentence %>
+    </div>
+  <% end %>
+
+  <%# Provider preset (new only) — autofills the advanced host/port/security fields. %>
+  <% if new_record %>
+    <div class="space-y-1">
+      <label class="block text-sm font-medium text-gray-700"><%= t(".preset_label") %></label>
+      <select name="preset"
+              data-action="change->imap-preset#apply"
+              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-accent-500 focus:ring-accent-500">
+        <option value="custom"><%= t(".preset_custom") %></option>
+        <option value="icloud"><%= t(".preset_icloud") %></option>
+        <option value="fastmail"><%= t(".preset_fastmail") %></option>
+        <option value="yahoo"><%= t(".preset_yahoo") %></option>
+        <option value="gmx"><%= t(".preset_gmx") %></option>
+        <option value="zoho"><%= t(".preset_zoho_imap") %></option>
+      </select>
+    </div>
+  <% end %>
+
+  <%# Email address (read-only on edit — it's the stable identifier). %>
+  <%= render(Campbooks::Input.new("email_account[email_address]",
+        type: :email,
+        label: t(".email_label"),
+        placeholder: t(".email_placeholder"),
+        value: email_account.email_address,
+        required: true,
+        disabled: !new_record,
+        autocomplete: "email")) %>
+
+  <%# App password — never pre-filled so existing credentials aren't leaked.
+      On edit a blank submission means "keep the current password". %>
+  <%= render(Campbooks::Input.new("email_account[imap_password]",
+        type: :password,
+        label: t(".password_label"),
+        value: nil,
+        required: new_record,
+        hint: new_record ? t(".password_hint_new") : t(".password_hint_edit"),
+        autocomplete: "new-password")) %>
+
+  <%# Sync history (new only — edit keeps whatever window was set at connect time). %>
+  <% if new_record %>
+    <%= render(Campbooks::Select.new("sync_history",
+          label: t(".sync_history_label"),
+          options: [
+            [t(".sync_30d"), "30d"],
+            [t(".sync_90d"), "90d"],
+            [t(".sync_1y"),  "1y"],
+            [t(".sync_all"), "all"]
+          ],
+          selected: "90d")) %>
+  <% end %>
+
+  <%# Advanced: IMAP + SMTP server settings, collapsed by default. %>
+  <details>
+    <summary class="cursor-pointer select-none text-sm font-medium text-accent-700 hover:text-accent-800 list-none">
+      <%= t(".advanced_label") %>
+    </summary>
+
+    <div class="mt-4 space-y-5 rounded-lg border border-border bg-muted/30 p-4">
+      <%# IMAP (incoming) %>
+      <div>
+        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".imap_heading") %></p>
+        <div class="space-y-3">
+          <%= render(Campbooks::Input.new("email_account[imap_host]",
+                label: t(".imap_host_label"),
+                placeholder: t(".imap_host_placeholder"),
+                value: email_account.imap_host,
+                data: { imap_preset_target: "imapHost" })) %>
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <%= render(Campbooks::Input.new("email_account[imap_port]",
+                  type: :number,
+                  label: t(".imap_port_label"),
+                  value: email_account.imap_port,
+                  data: { imap_preset_target: "imapPort" })) %>
+            <%= render(Campbooks::Select.new("email_account[imap_security]",
+                  label: t(".imap_security_label"),
+                  options: security_options,
+                  selected: email_account.imap_security,
+                  data: { imap_preset_target: "imapSecurity" })) %>
+          </div>
+        </div>
+      </div>
+
+      <%# SMTP (outgoing) %>
+      <div>
+        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".smtp_heading") %></p>
+        <div class="space-y-3">
+          <%= render(Campbooks::Input.new("email_account[smtp_host]",
+                label: t(".smtp_host_label"),
+                placeholder: t(".smtp_host_placeholder"),
+                value: email_account.smtp_host,
+                data: { imap_preset_target: "smtpHost" })) %>
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <%= render(Campbooks::Input.new("email_account[smtp_port]",
+                  type: :number,
+                  label: t(".smtp_port_label"),
+                  value: email_account.smtp_port,
+                  data: { imap_preset_target: "smtpPort" })) %>
+            <%= render(Campbooks::Select.new("email_account[smtp_security]",
+                  label: t(".smtp_security_label"),
+                  options: security_options,
+                  selected: email_account.smtp_security,
+                  data: { imap_preset_target: "smtpSecurity" })) %>
+          </div>
+        </div>
+      </div>
+
+      <%# Optional username override %>
+      <div>
+        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".username_heading") %></p>
+        <%= render(Campbooks::Input.new("email_account[imap_username]",
+              label: t(".username_label"),
+              placeholder: t(".username_placeholder"),
+              value: email_account.imap_username,
+              hint: t(".username_hint"))) %>
+      </div>
+
+      <%# Zoho IMAP-specific note %>
+      <p class="text-xs text-muted-foreground"><%= t(".zoho_imap_hint") %></p>
+    </div>
+  </details>
+
+  <div>
+    <%= render(Campbooks::Button.new(variant: :primary, type: "submit", size: :md, class: "w-full justify-center")) do %>
+      <%= new_record ? t(".test_and_connect") : t(".save") %>
+    <% end %>
+    <p class="mt-2 text-center text-xs text-muted-foreground"><%= t(".verify_note") %></p>
+  </div>
+<% end %>

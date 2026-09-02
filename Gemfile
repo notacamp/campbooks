@@ -58,6 +58,7 @@ gem "anthropic"
 # HTTP client for Zoho APIs
 gem "faraday"
 gem "faraday-multipart"
+gem "net-imap" # IMAP mailbox sync (Imap::MailClient) — required directly, not just via mail
 
 # PDF generation
 gem "prawn"

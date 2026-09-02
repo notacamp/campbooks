@@ -22,9 +22,18 @@ module Emails
       accounts = Array(accounts)
       return [] if accounts.empty?
 
-      Rails.cache.fetch("skim/inbox_folder_ids/#{accounts.map(&:id).sort.join('_')}", expires_in: 5.minutes) do
-        accounts.flat_map { |account| inbox_ids(account) }.compact
-      end
+      cache_key = "skim/inbox_folder_ids/#{accounts.map(&:id).sort.join('_')}"
+      cached = Rails.cache.read(cache_key)
+      return cached if cached
+
+      # An empty result is indistinguishable from a transient provider failure
+      # (the mail client returned nothing or errored). Caching empty for 5 minutes
+      # would silence live-inbox broadcasts and skim filters for that entire window.
+      # Only write the cache when the result is non-empty so a transient failure
+      # retries on the very next call rather than pinning 5 minutes of blindness.
+      result = accounts.flat_map { |account| inbox_ids(account) }.compact
+      Rails.cache.write(cache_key, result, expires_in: 5.minutes) if result.any?
+      result
     end
 
     def self.inbox_ids(account)

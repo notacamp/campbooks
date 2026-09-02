@@ -252,6 +252,7 @@ Rails.application.routes.draw do
   end
   post "scout/tool", to: "agent_tools#create", as: :scout_tool
 
+  resources :imap_accounts, only: [ :new, :create, :edit, :update ]
   resources :email_accounts, only: [ :create, :update, :destroy ] do
     member do
       get :sharing
@@ -303,6 +304,10 @@ Rails.application.routes.draw do
 
   # Public push receiver for Google Calendar watch channels (no session auth).
   post "calendar_webhooks/google", to: "calendar_webhooks#google_receive", as: :calendar_webhooks_google
+
+  # Public push receiver for Gmail Pub/Sub notifications (no session auth).
+  # The shared secret rides the push-subscription URL as ?token=<value>.
+  post "email_webhooks/gmail", to: "email_webhooks#gmail_receive", as: :email_webhooks_gmail
 
   namespace :settings do
     root to: "general#show"

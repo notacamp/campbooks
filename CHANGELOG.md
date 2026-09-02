@@ -24,6 +24,71 @@ major, minor, or patch change here.
   surfacing on the Reminders page and calendar. Previously Scout could only talk
   about the task.
 
+## [0.30.2] - 2026-09-02
+
+### Fixed
+
+- **Sign-in page: the Google/Zoho (and Microsoft) buttons are clickable again.**
+  Passing a `class:` to the `Campbooks::Divider` component clobbered its
+  structural classes, dropping `relative` from the "or" divider's wrapper. Its
+  full-width line (`absolute inset-0`) then escaped to the nearest positioned
+  ancestor and stretched an invisible layer over everything below the divider —
+  the social sign-in buttons and the sign-up link — swallowing every click. The
+  component now merges a caller's class instead of replacing its own.
+
+## [0.30.1] - 2026-07-31
+
+### Fixed
+
+- **Docs: email `body` is sent as HTML across all send surfaces.** The
+  `send_email` / `reply_email` / `create_scheduled_email` MCP tools and the
+  matching REST endpoints transmit the body as HTML, so plain-text line breaks
+  were silently lost on the recipient side while the stored copy kept them. The
+  MCP tool schemas, the agent sending guide, `docs/api.md`, and the OpenAPI
+  spec now state this explicitly and show the `<p>`/`<br>` convention.
+
+### Security
+
+- **Rails 8.1.3 → 8.1.3.1** — patches CVE-2026-66066 (possible arbitrary file
+  read and remote code execution in Active Storage variant processing).
+
+## [0.30.0] - 2026-07-27
+
+### Added
+
+- **Real-time Gmail sync (optional).** Gmail mailboxes can now push changes the
+  moment they happen via Google Cloud Pub/Sub (`users.watch`), instead of
+  waiting for the minute poll: set `GMAIL_PUBSUB_TOPIC` and
+  `GMAIL_PUBSUB_TOKEN` after a one-time topic + push-subscription setup in your
+  Google Cloud console (see the self-hosting guide). Without configuration,
+  nothing changes — Gmail stays on the poll.
+
+### Fixed
+
+- **New mail no longer hides on filtered inbox views.** Folder, group, and
+  search views — which deliberately don't live-insert rows — now show a "New
+  mail" pill the moment something arrives, and the inbox refreshes itself after
+  a dropped connection comes back (sleeping laptop, flaky mobile) instead of
+  sitting stale until a manual reload. A provider hiccup while resolving inbox
+  folders also no longer silences live updates for five minutes.
+
+## [0.29.0] - 2026-07-27
+
+### Added
+
+- **Connect any mailbox over IMAP.** Beyond the Zoho and Google OAuth connects,
+  Campbooks can now sync any mail provider that speaks IMAP/SMTP — iCloud,
+  Fastmail, Yahoo, GMX, or your own mail server — signed in with an app
+  password. Included: minute-by-minute new-mail sync with per-folder UID
+  cursors, read-state reconciliation on the periodic sweep, bodies, attachments
+  and inline images, folder mirroring (create/rename/move/archive/trash), and
+  full outbound over SMTP (send, reply, drafts, forward) with a copy filed to
+  the provider's Sent folder. The connect form has presets for common providers
+  and a sync-history choice (30 days, 90 days, 1 year, or everything — default
+  90 days). Enabled by default; set `ENABLE_IMAP=0` to hide the connect
+  surfaces. Self-hosted installs may point it at mail servers on private hosts;
+  the hosted cloud blocks internal addresses.
+
 ## [0.28.8] - 2026-07-24
 
 ### Fixed

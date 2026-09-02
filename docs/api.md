@@ -209,15 +209,17 @@ mailbox. Returns the updated email (`{ "data": { … } }`).
 ### `POST /api/v1/emails` — send (scope `emails:send`)
 
 Body: `email_account_id` (required), `to_address` (required), `subject`, `body`,
-`cc_address`, `bcc_address`. Returns `201` with
+`cc_address`, `bcc_address`. `body` is sent as **HTML** — plain-text line breaks
+are ignored, so use markup (`<p>`, `<br>`) for formatting. Returns `201` with
 `{ "data": { "id": …, "provider_message_id": "…" } }`. Returns `403`
 `no_sendable_account` if the acting user can't send from that account.
 
 ### `POST /api/v1/emails/:id/reply` — reply (scope `emails:send`)
 
-Body: `body` (required), optional `to_address` (defaults to the original
-sender), `cc_address`, `bcc_address`, `email_account_id` (defaults to the source
-message's account). Threads automatically.
+Body: `body` (required, HTML — same rule as send), optional `to_address`
+(defaults to the original sender), `cc_address`, `bcc_address`,
+`email_account_id` (defaults to the source message's account). Threads
+automatically.
 
 ## Documents
 

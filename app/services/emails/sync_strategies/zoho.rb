@@ -32,6 +32,11 @@ module Emails
         errors = []
         result = Emails::FolderSync.call(account).reduce(Result.empty) do |acc, folder|
           acc.merge(yield(folder, up))
+        rescue AuthenticationError
+          # A dead grant is account-level, not a bad folder: isolating it would
+          # re-hit the token endpoint per folder per minute and starve the
+          # engine's PermanentAuthError deactivation path. Let it abort the run.
+          raise
         rescue => e
           Rails.logger.error("[Emails::SyncStrategies::Zoho] #{account.email_address} folder #{folder.name}: #{e.class}: #{e.message}")
           errors << { folder: folder.name, error: "#{e.class}: #{e.message.to_s.first(200)}" }
