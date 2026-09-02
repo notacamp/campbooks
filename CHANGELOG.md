@@ -16,6 +16,16 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Security
+
+- **Dependency advisory bumps.** `json` 2.20.0 → 2.21.2 (CVE-2026-71847 — parser
+  crash on truncated duplicate-key input) and `mail` 2.9.0 → 2.9.1
+  (GHSA-mvxr-6m87-mv2q — address spoofing via malformed RFC 2047 encoded-words).
+  The remaining bundler-audit finding, `css_parser` CVE-2026-53727, affects a
+  **development-only** dependency (pulled in by lookbook) that is not in the
+  production bundle; it's documented in `config/bundler-audit.yml` and cleared
+  when lookbook can move to css_parser 3.x.
+
 ## [0.30.2] - 2026-09-02
 
 ### Fixed
