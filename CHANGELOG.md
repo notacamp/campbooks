@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.30.2] - 2026-09-02
+
 ### Fixed
 
 - **Sign-in page: the Google/Zoho (and Microsoft) buttons are clickable again.**
