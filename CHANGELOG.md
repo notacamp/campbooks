@@ -16,6 +16,16 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Sign-in page: the Google/Zoho (and Microsoft) buttons are clickable again.**
+  Passing a `class:` to the `Campbooks::Divider` component clobbered its
+  structural classes, dropping `relative` from the "or" divider's wrapper. Its
+  full-width line (`absolute inset-0`) then escaped to the nearest positioned
+  ancestor and stretched an invisible layer over everything below the divider —
+  the social sign-in buttons and the sign-up link — swallowing every click. The
+  component now merges a caller's class instead of replacing its own.
+
 ## [0.30.1] - 2026-07-31
 
 ### Fixed
