@@ -46,6 +46,28 @@ major, minor, or patch change here.
   thread's discussion. Reads need `emails:read`; follow/unfollow need
   `emails:write`. Backs a thread-centric client.
 
+### Security
+
+- **Dependency advisory bumps.** `json` 2.20.0 → 2.21.2 (CVE-2026-71847 — parser
+  crash on truncated duplicate-key input) and `mail` 2.9.0 → 2.9.1
+  (GHSA-mvxr-6m87-mv2q — address spoofing via malformed RFC 2047 encoded-words).
+  The remaining bundler-audit finding, `css_parser` CVE-2026-53727, affects a
+  **development-only** dependency (pulled in by lookbook) that is not in the
+  production bundle; it's documented in `config/bundler-audit.yml` and cleared
+  when lookbook can move to css_parser 3.x.
+
+## [0.30.2] - 2026-09-02
+
+### Fixed
+
+- **Sign-in page: the Google/Zoho (and Microsoft) buttons are clickable again.**
+  Passing a `class:` to the `Campbooks::Divider` component clobbered its
+  structural classes, dropping `relative` from the "or" divider's wrapper. Its
+  full-width line (`absolute inset-0`) then escaped to the nearest positioned
+  ancestor and stretched an invisible layer over everything below the divider —
+  the social sign-in buttons and the sign-up link — swallowing every click. The
+  component now merges a caller's class instead of replacing its own.
+
 ## [0.30.1] - 2026-07-31
 
 ### Fixed

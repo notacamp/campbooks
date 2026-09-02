@@ -7,3 +7,9 @@ ignore:
   # never WEBrick. CVE-2026-38969 concerns WEBrick's HTTP trailer reparsing, a path
   # the app never runs. No patched webrick is released yet; drop this when one ships.
   - CVE-2026-38969
+  # css_parser is pulled in ONLY by lookbook (group :development) — it is not in the
+  # production bundle, so CVE-2026-53727 (SSRF/local-file disclosure in
+  # CssParser::Parser#read_remote_file) is unreachable in prod. The fix is css_parser
+  # >= 3.0.0, but lookbook 2.3.x constrains it to < 3; drop this ignore when lookbook
+  # is upgraded to a release that allows css_parser 3.x.
+  - CVE-2026-53727
