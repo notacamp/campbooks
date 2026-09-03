@@ -80,12 +80,17 @@ export default class extends Controller {
     this.dialogTarget.close()
   }
 
-  // Reset to a clean browse state whenever the dialog closes (any path).
+  // Fired by the dialog's close event (Esc / backdrop / close()). Browse mode:
+  // forget the half-typed query so reopening on the same page shows idle again.
+  // Conversation mode: leave the thread + foot input in place, so reopening on
+  // the same page shows the same conversation (a full page load resets to idle).
   onClose() {
     this.dialogTarget.removeEventListener("mousemove", this.boundMouseMove, true)
     this.engine.reset()
-    this.inputTarget.value = ""
-    this._enterBrowseMode()
+    if (this.mode !== "conversation") {
+      if (this.hasInputTarget) this.inputTarget.value = ""
+      if (this.hasIdleTarget) this.idleTarget.hidden = false
+    }
   }
 
   _handleDialogClick(event) {
@@ -299,6 +304,9 @@ export default class extends Controller {
       group: "Scout",
       title: `${this.dialogTarget.dataset.askLabel || "Ask Scout"}: "${query}"`,
       icon: "sparkles",
+      // keepOpen: asking enters the conversation in place; the engine must not
+      // close the dialog after running this row.
+      keepOpen: true,
       run: () => this.askScout(query)
     }]
   }

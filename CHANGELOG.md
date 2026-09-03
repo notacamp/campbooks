@@ -32,6 +32,17 @@ major, minor, or patch change here.
   `ENABLE_BOLD_LAYOUT=1`; each user then chooses **Bold** or **Classic** in
   Settings › Account (Classic stays the default). Off by default and not yet
   production-ready; the Scout command overlay is a follow-up.
+- **Scout everywhere (bold layout).** In the opt-in bold layout, the docked Scout
+  bar and `⌘K` now open a single **Scout overlay** in place over whatever you were
+  doing, merging the Scout conversation and the command palette into one input: a
+  sentence asks Scout, a verb runs a command, a name finds a person, email, or
+  document. Replies stream in with the tools Scout ran and one-tap actions and
+  follow-ups; the conversation follows you across screens, with recent threads one
+  click away under Recent. The bar rides every bold surface (a compact floating
+  launcher on the full-height inbox/compose panes), and without an AI provider the
+  overlay still searches and navigates and says in one line what it can't do yet.
+  Opt in with `ENABLE_BOLD_LAYOUT=1` plus the per-user Bold choice; the classic
+  command palette and Scout page are unchanged.
 - **REST API: single-message email triage actions.** A new
   `POST /api/v1/emails/:id/actions/:name` endpoint exposes the inbox triage
   actions — `archive`/`unarchive`, `trash`, `snooze`/`unsnooze`, `pin`/`unpin`,
