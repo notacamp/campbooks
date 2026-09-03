@@ -87,8 +87,14 @@ module Emails
 
     SECURITY_SUBJECT = /verification\s+code|security\s+alert|\b2fa\b|one-?time|c[oó]digo|password\s+reset|sign-?in\s+(code|link)|new\s+(login|device|sign)/i
 
-    def initialize(email)
+    # `provider_hints: false` skips the provider's category verdict (see
+    # #provider_noise_hint) — for callers that judge already-loaded rows in bulk
+    # and must not trip the tags fallback behind EmailMessage#provider_category_hint.
+    # Triage keeps the default; the persisted `category` it writes already carries
+    # the hint, so a rank-time caller loses nothing by reading that column too.
+    def initialize(email, provider_hints: true)
       @email = email
+      @provider_hints = provider_hints
     end
 
     # Class-level signal for other pipelines (e.g. the task-extraction gate): an
@@ -170,7 +176,7 @@ module Emails
     # Gmail Promotions/Social/Updates only). Duck-typed + re-whitelisted here so
     # the class stays dependency-free and safe against a widened hint source.
     def provider_noise_hint
-      return nil unless email.respond_to?(:provider_category_hint)
+      return nil unless @provider_hints && email.respond_to?(:provider_category_hint)
 
       hint = email.provider_category_hint
       hint if %i[promotions social updates].include?(hint)
