@@ -50,7 +50,8 @@ module Campbooks
         class: class_names("flex items-start", ("gap-3" if @glyph)),
         data: {
           controller: "local-greeting",
-          local_greeting_greetings_value: greetings.to_json
+          local_greeting_greetings_value: greetings.to_json,
+          **zone_capture_data
         }
       ) do
         BUCKETS.each_key { |bucket| icon_tile(bucket) } if @glyph
@@ -68,6 +69,17 @@ module Campbooks
     end
 
     private
+
+    # When the signed-in user has no stored time_zone yet, hand the controller the
+    # capture endpoint so it PATCHes the device zone once (drives the bold Time
+    # surface's day bucketing + focus slots). Omitted once a zone is stored, so the
+    # controller stays a no-op thereafter.
+    def zone_capture_data
+      user = helpers.current_user
+      return {} unless user && user.time_zone.blank?
+
+      { local_greeting_save_zone_url_value: helpers.account_time_zone_path }
+    end
 
     # All four headlines, pre-interpolated, handed to the controller so it can
     # swap to the device-local one without another server round-trip.
