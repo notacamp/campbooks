@@ -1,0 +1,16 @@
+---
+fr:
+  components:
+    scout_overlay:
+      dialog_aria_label: Demander à Scout ou lancer une commande
+      input_aria_label: Demandez ce que vous voulez à Scout, ou tapez une commande
+      close: Fermer
+      placeholder: Demandez ce que vous voulez à Scout, ou tapez une commande…
+      followup_placeholder: Posez une question de suivi…
+      recent: Récents
+      open_scout: Ouvrir Scout
+      ask_prefix: Demander à Scout
+      no_ai_lead: Scout ne peut pas encore répondre aux questions.
+      no_ai_link: Ajoutez un fournisseur d'IA dans les Paramètres.
+    scout_launcher:
+      aria_label: Demander à Scout

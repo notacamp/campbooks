@@ -705,6 +705,59 @@ dialog[open] {
   to   { opacity: 1; }
 }
 
+/* ── Scout overlay (bold layout) ──────────────────────────────
+   A glass <dialog> like the command palette. Below sm it's a top-anchored
+   full-width sheet (so the head input stays above the keyboard); from sm it's a
+   centred, top-anchored panel that grows to the mock's 1180px at lg. The scrim
+   is allowed to blur here (a focused Scout surface, like the skim overlay). The
+   rise-in travel is neutralised by the global prefers-reduced-motion guard. */
+.scout-overlay-dialog {
+  margin: 0;                 /* mobile: full-width sheet anchored to the top */
+  width: 100%;
+  max-width: 100%;
+  max-height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+}
+
+.scout-overlay-dialog::backdrop {
+  background: color-mix(in oklch, var(--color-gray-950) 45%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.scout-overlay-dialog[open] {
+  animation: scout-overlay-in 0.18s var(--ease-out-expo);
+}
+
+.scout-overlay-dialog[open]::backdrop {
+  animation: scout-overlay-fade 0.15s ease-out;
+}
+
+@keyframes scout-overlay-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scout-overlay-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@media (min-width: 640px) {
+  .scout-overlay-dialog {
+    margin: 6vh auto auto;   /* top-anchored, horizontally centred */
+    width: calc(100% - 2rem);
+    max-width: 46rem;
+    max-height: 84dvh;
+    padding-top: 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .scout-overlay-dialog {
+    max-width: 1180px;
+  }
+}
+
 /* ── TipTap / ProseMirror editor ──────────────────────────── */
 .tiptap-editor .ProseMirror {
   min-height: 120px;

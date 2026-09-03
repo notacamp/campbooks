@@ -99,6 +99,9 @@ fr:
       auto_action_failures_prefix: 'Cependant, je n''ai pas pu effectuer ces actions
         :'
       conversation_archived: Cette conversation a été archivée.
+    task_chat_reply:
+      auto_action_failures_prefix: 'Cependant, je n''ai pas pu effectuer ces actions
+        :'
   notifier:
     account_disconnected:
       body: Ré-authentifiez-vous pour reprendre la synchronisation des e-mails.

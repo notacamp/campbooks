@@ -1,0 +1,35 @@
+<%# The Scout overlay's conversation body: the thread's last 20 messages, wired to
+    the SAME turbo-stream target ids the reply job broadcasts to (agent_messages_list
+    / agent_typing) and subscribed via turbo_stream_from, so asking a question and
+    its streamed reply land here exactly as they do on the Scout page. The overlay
+    is never rendered on /scout, so these ids stay unique. %>
+<%= turbo_frame_tag "scout_overlay_body" do %>
+  <div data-scout-overlay-mode="conversation"
+       data-thread-id="<%= @thread.id %>"
+       data-thread-title="<%= @thread.title %>"
+       data-ai-available="<%= @ai_available %>"
+       data-recent-count="<%= @recent_count %>">
+
+    <%= turbo_stream_from "agent_chat_#{current_user.id}" %>
+
+    <div class="px-3 py-4 sm:px-5">
+      <div id="agent_messages_list" class="mx-auto flex w-full max-w-2xl flex-col">
+        <% if @messages.any? %>
+          <% last_index = @messages.length - 1 %>
+          <% @messages.each_with_index do |msg, i| %>
+            <%= render "agent_chat/message", agent_message: msg, latest: (i == last_index) %>
+          <% end %>
+          <%# A trailing user message means its reply is in flight (spinner) or it
+              failed (persisted error card) — never a phantom spinner. %>
+          <% if @messages.last&.from_user? %>
+            <% if @messages.last.failed? %>
+              <%= render "agent_chat/error", retry_content: @messages.last.content %>
+            <% else %>
+              <%= render "agent_chat/typing" %>
+            <% end %>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>

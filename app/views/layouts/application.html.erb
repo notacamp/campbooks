@@ -13,8 +13,12 @@
     <%= javascript_importmap_tags %>
   </head>
 
+  <%# Bold layout swaps the classic command palette for the Scout overlay: the
+      overlay binds ⌘K + opens on the bar/rail-search, and the command palette
+      dialog/controller is not mounted (both read the same data-command-palette-*
+      context attributes below). Classic + native are unchanged. %>
   <body class="h-full <%= "hotwire-native" if hotwire_native_app? %>"
-        data-controller="<%= "command-palette " unless hotwire_native_app? %>email-shortcuts theme skim-overlay product-tour<%= " nav-shortcuts" if authenticated? && !hotwire_native_app? %>"
+        data-controller="<%= "#{bold_layout? ? "scout-overlay" : "command-palette"} " unless hotwire_native_app? %>email-shortcuts theme skim-overlay product-tour<%= " nav-shortcuts" if authenticated? && !hotwire_native_app? %>"
         data-command-palette-context-value="<%= content_for?(:cp_context) ? yield(:cp_context) : '' %>"
         data-command-palette-message-id-value="<%= content_for?(:cp_message_id) ? yield(:cp_message_id) : '' %>"
         data-command-palette-folders-value="<%= content_for?(:cp_folders) ? yield(:cp_folders) : '[]' %>"
@@ -27,7 +31,10 @@
       <%= render(Campbooks::NavRail.new) %>
     <% end %>
 
-    <div id="app-shell" class="<%= "lg:pl-20 pb-16 lg:pb-0" if authenticated? %>">
+    <%# When the docked Scout bar is rendered (bold layout), the shell reserves
+        extra bottom room so nothing hides under it — pb-36 on mobile (bottom nav
+        + the bar docked above it), pb-24 on desktop (the centred bar at bottom-4). %>
+    <div id="app-shell" class="<%= authenticated? ? (layout_scout_bar? ? "lg:pl-20 pb-36 lg:pb-24" : "lg:pl-20 pb-16 lg:pb-0") : "" %>">
       <%# Cloud-only "early beta" stripe. Sits at the top of the content column
           (clear of the fixed left rail); suppressed in native shells, which
           carry their own chrome. %>
@@ -56,6 +63,18 @@
     <% if authenticated? %>
       <%= render(Campbooks::BottomNav.new) %>
 
+      <%# The docked Scout bar on every bold surface (opens the overlay). Home
+          keeps its own classic bar, so it's suppressed there (layout_scout_bar?). %>
+      <% if layout_scout_bar? %>
+        <%= render Campbooks::ScoutBar.new(
+              placeholder: t("components.scout_bar.placeholder_command"),
+              mobile_placeholder: t("components.scout_bar.placeholder_ask"),
+              mobile: true,
+              keycap: true,
+              overlay: true,
+              desktop_max_width: "max-w-[680px]") %>
+      <% end %>
+
       <%= render "shared/email_drawer" %>
       <%= render "shared/compose_dock" %>
 
@@ -66,9 +85,14 @@
       <%= render(Campbooks::BugReportModal.new) %>
     <% end %>
 
-    <%# Command palette + keyboard-shortcuts cheat sheet are keyboard-driven — omit them in the native app. %>
+    <%# Command palette + keyboard-shortcuts cheat sheet are keyboard-driven — omit them in the native app.
+        Bold layout renders the Scout overlay in the palette's place (⌘K + the bar/search open it). %>
     <% unless hotwire_native_app? %>
-      <%= render(Campbooks::CommandPalette.new) %>
+      <% if bold_layout? %>
+        <%= render(Campbooks::ScoutOverlay.new) %>
+      <% else %>
+        <%= render(Campbooks::CommandPalette.new) %>
+      <% end %>
       <%= render(Campbooks::KeyboardShortcutsModal.new) %>
     <% end %>
     <%= render "shared/flash_toast_region" %>

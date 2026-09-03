@@ -18,6 +18,11 @@ major, minor, or patch change here.
 
 ### Added
 
+- Scout can now act in a task discussion: asking it to set the task's due date
+  or a reminder ("@scout set a reminder for August") sets the date and creates
+  the task's deadline reminder — the same one as the task page's Remind button,
+  surfacing on the Reminders page and calendar. Previously Scout could only talk
+  about the task.
 - **Bold layout (preview): the Now page and a five-place navigation.** An opt-in
   reframing of the home experience as a queue of decisions you clear, not a feed
   you scroll. Scout opens with an honest **ledger** of what it did in the last 24
@@ -39,6 +44,17 @@ major, minor, or patch change here.
   something" turns a sentence like "treat GitHub notifications as a stream" into a
   real rule. The bold settings sidebar collapses to five places (Scout's memory,
   Connections, Workspace & people, Account, Plan). Gated on `ENABLE_BOLD_LAYOUT`.
+- **Scout everywhere (bold layout).** In the opt-in bold layout, the docked Scout
+  bar and `⌘K` now open a single **Scout overlay** in place over whatever you were
+  doing, merging the Scout conversation and the command palette into one input: a
+  sentence asks Scout, a verb runs a command, a name finds a person, email, or
+  document. Replies stream in with the tools Scout ran and one-tap actions and
+  follow-ups; the conversation follows you across screens, with recent threads one
+  click away under Recent. The bar rides every bold surface (a compact floating
+  launcher on the full-height inbox/compose panes), and without an AI provider the
+  overlay still searches and navigates and says in one line what it can't do yet.
+  Opt in with `ENABLE_BOLD_LAYOUT=1` plus the per-user Bold choice; the classic
+  command palette and Scout page are unchanged.
 - **REST API: single-message email triage actions.** A new
   `POST /api/v1/emails/:id/actions/:name` endpoint exposes the inbox triage
   actions — `archive`/`unarchive`, `trash`, `snooze`/`unsnooze`, `pin`/`unpin`,

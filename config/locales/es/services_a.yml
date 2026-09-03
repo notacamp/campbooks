@@ -97,6 +97,8 @@ es:
     email_reply_daemon:
       auto_action_failures_prefix: 'Sin embargo, no he podido completar estas acciones:'
       conversation_archived: Esta conversación ha sido archivada.
+    task_chat_reply:
+      auto_action_failures_prefix: 'Sin embargo, no he podido completar estas acciones:'
   notifier:
     account_disconnected:
       body: Vuelva a autenticarse para reanudar la sincronización del correo.

@@ -1,7 +1,8 @@
 module Tasks
-  # Scout's reply in a task discussion. Mirrors EmailChatReplyJob but leaner: no
-  # auto-actions (tasks have no inbox tools) and no record write-back. Replies only
-  # when the triggering comment @scout-tagged Scout; broadcasts to the Task stream.
+  # Scout's reply in a task discussion. Mirrors EmailChatReplyJob but leaner: the
+  # only tools are the task-side Tasks::ScoutActions (due date + deadline reminder)
+  # and there is no record write-back. Replies only when the triggering comment
+  # @scout-tagged Scout; broadcasts to the Task stream.
   class ChatReplyJob < ApplicationJob
     queue_as :default
     retry_on StandardError, wait: :polynomially_longer, attempts: 2
@@ -31,10 +32,21 @@ module Tasks
         return
       end
 
+      auto_results = execute_auto_actions(task, result[:auto_actions] || [])
+
+      reply_content = result[:reply]
+      failures = auto_results.reject { |r| r[:success] }
+      if failures.any?
+        prefix = I18n.t("jobs.task_chat_reply.auto_action_failures_prefix",
+                        locale: thread.user&.locale.presence || I18n.default_locale)
+        reply_content += "\n\n#{prefix}\n#{failures.map { |f| "- #{f[:message]}" }.join("\n")}"
+      end
+
       reply = thread.agent_messages.create!(
-        content: result[:reply],
+        content: reply_content,
         author_type: :ai,
         ai_suggested_actions: [],
+        ai_auto_actions: auto_results.map { |r| { "tool" => r[:tool], "message" => r[:message], "success" => r[:success] } },
         ai_provenance: result[:provenance] || {},
         user: thread.user
       )
@@ -49,6 +61,23 @@ module Tasks
     end
 
     private
+
+    # Model output is untrusted — only whitelisted, reversible task actions run
+    # unconfirmed (mirrors EmailChatReplyJob#execute_auto_actions).
+    def execute_auto_actions(task, auto_actions)
+      auto_actions.filter_map do |action|
+        next unless action.is_a?(Hash)
+
+        action = action.stringify_keys
+        tool = action["tool"].to_s
+        unless Tasks::ScoutActions.auto_safe?(tool)
+          Rails.logger.warn("[Tasks::ChatReplyJob] Blocked auto-execution of unknown action '#{tool}'")
+          next
+        end
+
+        Tasks::ScoutActions.run(tool, task: task, args: action["args"] || {})
+      end
+    end
 
     def broadcast_reply(task, reply)
       Turbo::StreamsChannel.broadcast_remove_to(task, target: "scout_typing")

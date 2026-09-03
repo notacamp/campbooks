@@ -25,6 +25,10 @@ class HomeController < ApplicationController
       redirect_to(now_path) and return
     end
 
+    # Home renders its own (classic, link) docked Scout bar, so the bold layout
+    # must not also drop the overlay bar on top of it (layout_scout_bar?).
+    @renders_own_scout_bar = true
+
     @reader = Feed::Reader.new(current_user)
     # Past the curated spine, the same infinite scroll falls into Rewind — the
     # scroll-back through past highlights. A keyset cursor (?before=) or the first

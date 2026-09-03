@@ -1,0 +1,16 @@
+---
+es:
+  components:
+    scout_overlay:
+      dialog_aria_label: Pregúntale a Scout o ejecuta un comando
+      input_aria_label: Pregúntale lo que sea a Scout, o escribe un comando
+      close: Cerrar
+      placeholder: Pregúntale lo que sea a Scout, o escribe un comando…
+      followup_placeholder: Haz una pregunta de seguimiento…
+      recent: Recientes
+      open_scout: Abrir Scout
+      ask_prefix: Preguntar a Scout
+      no_ai_lead: Scout todavía no puede responder preguntas.
+      no_ai_link: Añade un proveedor de IA en Configuración.
+    scout_launcher:
+      aria_label: Preguntar a Scout
