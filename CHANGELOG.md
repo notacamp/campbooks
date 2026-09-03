@@ -18,6 +18,19 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Money — what you're owed, what you owe, and what the bank settled (bold
+  layout).** A new `/money` surface where the accounting module is enabled: Scout
+  derives **obligations** from money documents (amount, direction, due date;
+  settled by a confirmed bank match or Mark paid) and from payment-due and renewal
+  reminders, in both directions, with Late · Due · Settled sections, a Scout read in
+  sentences (never solvency claims), and a 30-day inline-SVG **timeline** (owed to
+  you above the axis, you owe below, overdue left of today). Row actions: Mark
+  paid (with undo), Send reminder on a late receivable (a drafted chase in the
+  compose Dock, nothing sent), Remind on a date, Keep / Cancel it on a renewal, Pay
+  when the document carries a payment link, and a quarterly CSV export (or the
+  accountant ZIP when a reconciliation exists). Subscriptions are recognized from
+  repeated invoices at a monthly or yearly cadence, and every late receivable
+  becomes a **card on Now** with the reminder already drafted.
 - **Paper — every document as what it says (bold layout).** A new document surface
   that reads the extraction schema instead of the filesystem: each document is a row
   of facts (who it's from, what it is, the amount, the date that matters) with a
