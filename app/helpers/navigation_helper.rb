@@ -124,8 +124,8 @@ module NavigationHelper
         also_active_for: [ files_path, documents_path ], badge: nav_attention.dot?(:files)),
       (nav_item(:money, t("shared.nav.money"), money_path,
         also_active_for: [ accounting_path, "/reconciliations" ]) if Features.accounting?),
-      nav_item(:time, t("shared.nav.time"), calendar_path,
-        also_active_for: [ calendar_events_path, reminders_path, tasks_path ],
+      nav_item(:time, t("shared.nav.time"), time_path,
+        also_active_for: [ calendar_path, calendar_events_path, reminders_path, tasks_path ],
         badge: nav_attention.dot?(:calendar))
     ].compact
   end

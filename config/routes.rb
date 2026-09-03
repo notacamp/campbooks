@@ -100,6 +100,26 @@ Rails.application.routes.draw do
     post   "decide", to: "money#decide",   as: :money_obligation_decide
   end
 
+  # The bold Time surface: one agenda interleaving calendar events, deadlines Scout
+  # found in mail, tasks and Scout's proposed focus blocks (agenda|week|month).
+  # Gated on Features.bold_layout? (TimeController). The classic /calendar stays.
+  get "time", to: "time#index", as: :time
+
+  # Scout's focus blocks — Keep (→ a real calendar event), Move (to another free
+  # slot) or dismiss a proposed block. Rows live on the Time agenda; no index.
+  resources :focus_blocks, only: [] do
+    member do
+      post :keep
+      post :move
+      post :dismiss
+    end
+  end
+
+  # One-shot capture of the visitor's device time zone (the local-greeting Stimulus
+  # controller PATCHes it once when User#time_zone is still nil) — drives the Time
+  # surface's day bucketing + focus slot finding. Top-level so any page can call it.
+  patch "account/time_zone", to: "settings/account#time_zone", as: :account_time_zone
+
   # Workspace activity feed — a retrospective timeline of domain Events (distinct
   # from the prospective home feed). Read-only; turbo_stream serves pagination.
   get "activity", to: "activity#index", as: :activity

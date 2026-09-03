@@ -45,6 +45,9 @@ class CommandPaletteCatalog
       cmd("email-scans", I18n.t("command_palette.commands.email_scans"), I18n.t("command_palette.categories.navigate"), "search", email_messages_path(inbox_settings: "accounts")),
       cmd("notifications", I18n.t("command_palette.commands.notifications"), I18n.t("command_palette.categories.navigate"), "bell", notifications_path),
       cmd("calendar", I18n.t("command_palette.commands.calendar"), I18n.t("command_palette.categories.navigate"), "calendar", calendar_path),
+      # Time (the bold agenda) is reachable from Cmd+K even for a classic user on a
+      # flag-on build, like Now above.
+      *(Features.bold_layout? ? [ cmd("time", I18n.t("command_palette.commands.time"), I18n.t("command_palette.categories.navigate"), "calendar", time_path) ] : []),
       cmd("contacts", I18n.t("command_palette.commands.settings_contacts"), I18n.t("command_palette.categories.navigate"), "users", contacts_path)
     ]
   end
