@@ -105,7 +105,8 @@ module PeopleLayout
   end
 
   def org_subtitle(people_count, services_count)
-    parts = [ t("people.index.organization"), t("people.index.people_count", count: people_count) ]
+    parts = [ t("people.index.organization") ]
+    parts << t("people.index.people_count", count: people_count) if people_count.positive?
     parts << t("people.index.services_count", count: services_count) if services_count.positive?
     parts.join(" · ")
   end

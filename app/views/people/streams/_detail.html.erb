@@ -18,9 +18,7 @@
     </div>
 
     <div class="flex flex-wrap items-center gap-3 border-b border-border px-5 py-4 sm:px-7">
-      <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">
-        <svg class="h-[18px] w-[18px]" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><%= raw Campbooks::People::StreamRow::ICONS.fetch(@stream_icon, Campbooks::People::StreamRow::ICONS[:mail]) %></svg>
-      </div>
+      <%= render Campbooks::People::StreamIcon.new(kind: @stream_icon) %>
       <div class="min-w-0">
         <div class="truncate text-[16px] font-semibold text-foreground"><%= @stream_title %></div>
         <div class="text-xs text-muted-foreground"><%= t("people.streams.threads_meta", count: @stream_total) %></div>
