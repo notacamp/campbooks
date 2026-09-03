@@ -182,6 +182,8 @@ module NavigationHelper
   # current_section is in its active_keys list (the user menu ignores active_keys
   # since it renders outside the settings controllers).
   def settings_nav_groups
+    return bold_settings_nav_groups if bold_layout?
+
     [
       [ t("navigation.settings.groups.workspace"), [
         [ settings_root_path, %w[general], t("navigation.settings.items.general"), "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" ],
@@ -211,6 +213,41 @@ module NavigationHelper
         [ settings_account_path, %w[account], t("navigation.settings.items.account"), "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" ],
         [ settings_security_path, %w[security totp passkeys recovery_codes email_otp audit_log], t("navigation.settings.items.security"), "M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" ],
         [ settings_notifications_path, %w[notifications], t("navigation.settings.items.notifications"), "M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" ]
+      ] ]
+    ]
+  end
+
+  # Bold-layout settings nav: the twenty-odd pages collapse to FIVE places, since
+  # nine of them are now Scout's behaviour expressed as sentences on the Scout's
+  # memory page (the old inbox/AI pages stay routable — reached from each
+  # sentence's edit link — so their controllers are folded into "Scout's memory"'s
+  # active keys). One flat group (no heading), matching the mock. Each item is
+  # [path, active_keys, label, icon_path].
+  def bold_settings_nav_groups
+    behaviour_sections = InboxSettings::Sections::ALL
+      .map { |section| "inbox_#{section[:key]}" }
+      .reject { |key| key == "inbox_accounts" }
+
+    [
+      [ nil, [
+        [ settings_memory_path,
+          %w[memory ai ai_prompts pipelines document_templates email_templates] + behaviour_sections,
+          t("navigation.settings.bold.memory"),
+          "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.456-2.456L14.25 6l1.035-.259a3.375 3.375 0 002.456-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" ],
+        [ settings_integrations_root_path,
+          %w[integrations notion google_drive zoho_drive calendars inbox_accounts api_clients],
+          t("navigation.settings.bold.connections"),
+          "M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" ],
+        [ settings_root_path,
+          %w[general setup_template members data_privacy system_health],
+          t("navigation.settings.bold.workspace_people"),
+          "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" ],
+        [ settings_account_path,
+          %w[account security totp passkeys recovery_codes email_otp audit_log notifications],
+          t("navigation.settings.bold.account"),
+          "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" ],
+        [ settings_plan_path, %w[plan], t("navigation.settings.bold.plan"),
+          "M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 18.75z" ]
       ] ]
     ]
   end

@@ -48,10 +48,13 @@ module Scout
         end
 
         # First sentence of a longer free-text blob (a tag prompt, a stated
-        # writing style), collapsed to one line for the memory sentence.
+        # writing style), collapsed to one line for the memory sentence. Trailing
+        # sentence punctuation is dropped so the surrounding template controls the
+        # final period (no "voice.." doubling when the fragment sits mid-sentence
+        # or before the template's own ".").
         def first_sentence(text)
           one = text.to_s.strip.split(/(?<=[.!?])\s+/).first.to_s.strip.tr("\n", " ").squeeze(" ")
-          one.presence
+          one.sub(/[.!?]+\z/, "").presence
         end
 
         def routes

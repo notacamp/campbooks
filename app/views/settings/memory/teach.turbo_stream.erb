@@ -1,0 +1,14 @@
+<%# Teach response: prepend the new sentence (when Scout learned it) and refresh
+    the teach box with the result message (cleared input). %>
+<% if @result.created? && @entry %>
+  <%= turbo_stream.prepend "memory_list" do %>
+    <%= render(Campbooks::Memory::SentenceRow.new(entry: @entry)) %>
+  <% end %>
+  <%= turbo_stream.replace "memory_teach" do %>
+    <%= render(Campbooks::Memory::TeachBox.new(message: t("scout_memory.teach.created"))) %>
+  <% end %>
+<% else %>
+  <%= turbo_stream.replace "memory_teach" do %>
+    <%= render(Campbooks::Memory::TeachBox.new(message: @result.message, error: true)) %>
+  <% end %>
+<% end %>

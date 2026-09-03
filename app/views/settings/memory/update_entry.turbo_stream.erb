@@ -1,0 +1,11 @@
+<%# Confirm re-renders the row (updated origin); remove drops it. A nil entry
+    means the action was rejected (unknown id / cross-workspace) — no-op. %>
+<% if @entry %>
+  <% if @action == :remove %>
+    <%= turbo_stream.remove Campbooks::Memory::SentenceRow.dom_id(@entry) %>
+  <% else %>
+    <%= turbo_stream.replace Campbooks::Memory::SentenceRow.dom_id(@entry) do %>
+      <%= render(Campbooks::Memory::SentenceRow.new(entry: @entry)) %>
+    <% end %>
+  <% end %>
+<% end %>
