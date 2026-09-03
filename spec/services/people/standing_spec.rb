@@ -116,14 +116,18 @@ RSpec.describe People::Standing do
     expect(st.text).to start_with("Last exchange")
   end
 
-  it "composes an organization from its people's standings" do
+  it "composes an organization from its people's standings, leading with the reply you owe" do
     org = create(:organization, workspace: workspace, name: "Cloudhost")
     owe = person_with(name: "Rui", last_inbound: 3.days.ago, last_outbound: nil)
+    nudge = person_with(name: "Ana", last_inbound: 25.days.ago, last_outbound: 19.days.ago)
     create(:organization_membership, person: owe, organization: org)
+    create(:organization_membership, person: nudge, organization: org)
 
     st = described_class.for_organization(org, user: user)
     expect(st.needs_you).to be true
-    expect(st.text).to include("Waiting on your reply")
+    expect(st.kind).to eq(:you_owe)
+    expect(st.overdue_days).to eq(3)
+    expect(st.text).to start_with("Waiting on your reply for 3 days.").and include("Nudge?")
   end
 
   # The batched list path (prime + reuse one instance) must return byte-for-byte

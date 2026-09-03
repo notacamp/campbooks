@@ -8,25 +8,31 @@ module People
   # Deterministic and query-free: it scores a Facts record the caller builds from
   # data the page already loads — the person's inbox threads, their contacts, the
   # newest inbound message, and their People::Standing. No new AI at rank time;
-  # the AI reads it consults (action prompt, priority, follow-up) are already on
-  # the rows. Same vocabulary as Feed::Ranking and Emails::SkimBuilder: a starred
-  # sender tops, client/partner/colleague are VIP, an engaged thread is one you
-  # wrote in.
+  # the AI reads it consults (action prompt, priority, follow-up verdicts) are
+  # already on the rows. Same vocabulary as Feed::Ranking and Emails::SkimBuilder:
+  # a starred sender tops, client/partner/colleague are VIP, an engaged thread is
+  # one you wrote in.
   #
   # Strength (0..~9) — evidence of a real relationship: threads with mail both
   # ways (dominant), threads you wrote in at all, mail volume, an explicit star,
   # a whitelist, a sender-kind verdict (vs the never-classified default), and the
   # labelled relationship. Every term saturates, so no single signal runs away.
   #
-  # Need you = kind × (0.5 + wait) × (1 + strength) + bonuses
+  # Need you = urgency × (1 + strength) + bonuses, where urgency is
+  #   a reply you owe          1 + wait            an obligation — always ahead of
+  #   a nudge you could send   0.7  × (0.5 + wait) an option, and of
+  #   …one the AI hasn't vetted 0.45 × (0.5 + wait) a pure-data guess at one.
   #   `wait` saturates over the first week: between two genuine asks from equally
   #   important people the one waiting longer comes first, but an ask from someone
-  #   you barely know never outranks one from a real correspondent. A reply you
-  #   owe outranks a nudge you could send. Which asks are genuine is decided
-  #   upstream by People::Standing (a human message, addressed to you, not stale).
+  #   you barely know never outranks one from a real correspondent. Which asks are
+  #   genuine is decided upstream by People::Standing (a human message, addressed
+  #   to you, not stale).
   # Recent   = recency × (1 + ½ × strength) + bonuses
   #   Recency-led (14-day half-life), relationship-tiebroken: a week-old regular
   #   beats yesterday's one-off; a month-old regular does not.
+  #
+  # An organization ranks as its most pressing sampled person (see PeopleLayout),
+  # so it sits right behind them instead of outscoring them on headcount.
   class Priority
     HALF_LIFE_DAYS = 14.0
     WAIT_SATURATION_DAYS = 7.0
@@ -48,7 +54,10 @@ module People
     THREAD_SATURATION = 2.0    # one real exchange already counts; three is a relationship
     VOLUME_SATURATION = 10.0
 
-    KIND_WEIGHTS = { you_owe: 1.0, nudge: 0.7 }.freeze
+    YOU_OWE_BASE = 1.0
+    NUDGE_WEIGHT = 0.7
+    UNVETTED_NUDGE_WEIGHT = 0.45
+    OBLIGATION_FLOOR = 0.5
     RECENT_STRENGTH_WEIGHT = 0.5
     PROMPT_BONUS = 0.5       # the latest message carries a Scout action prompt
     IMPORTANT_BONUS = 0.5    # …or the AI read it as high priority / important
@@ -66,6 +75,7 @@ module People
       :action_prompt,      # latest inbound carries a Scout action prompt
       :important,          # latest inbound is high priority / important
       :follow_up_due,      # a thread's AI-confirmed follow-up has come due
+      :follow_up_vetted,   # the standing's nudge thread carries an AI follow-up verdict
       :last_activity       # Time or nil
     )
 
@@ -90,30 +100,8 @@ module People
           action_prompt: latest_inbound&.ai_action_prompt.to_s.strip.present?,
           important: important?(latest_inbound),
           follow_up_due: threads.any? { |t| t.follow_up_due?(now) },
+          follow_up_vetted: threads.any? { |t| t.id == standing.thread_id && t.follow_up_last_analyzed_at.present? },
           last_activity: last_activity
-        )
-      end
-
-      # Folds several people's facts (an organization's members) into one: the
-      # relationship evidence adds up, the liveliest thread wins, and the
-      # standing is the one the caller composed for the group.
-      def merge_facts(facts_list, standing:)
-        return nil if facts_list.empty?
-
-        Facts.new(
-          standing: standing,
-          two_way_threads: facts_list.sum(&:two_way_threads),
-          outbound_threads: facts_list.sum(&:outbound_threads),
-          email_count: facts_list.sum(&:email_count),
-          starred: facts_list.any?(&:starred),
-          allowed: facts_list.any?(&:allowed),
-          classified: facts_list.any?(&:classified),
-          relationship_type: facts_list.map(&:relationship_type).find { |r| VIP_RELATIONSHIPS.include?(r) } ||
-                             facts_list.filter_map(&:relationship_type).first,
-          action_prompt: facts_list.any?(&:action_prompt),
-          important: facts_list.any?(&:important),
-          follow_up_due: facts_list.any?(&:follow_up_due),
-          last_activity: facts_list.filter_map(&:last_activity).max
         )
       end
 
@@ -164,9 +152,18 @@ module People
     def needs_you? = @facts.standing.needs_you
 
     def obligation_score
-      kind = KIND_WEIGHTS.fetch(@facts.standing.kind, KIND_WEIGHTS[:nudge])
+      urgency * (1 + strength) + bonuses
+    end
+
+    # A reply you owe is an obligation and always leads; a nudge is an option,
+    # and an unvetted one (no Ai::FollowUpAnalyzer verdict yet) only a guess.
+    def urgency
       wait = saturate(@facts.standing.overdue_days, WAIT_SATURATION_DAYS)
-      kind * (0.5 + wait) * (1 + strength) + bonuses
+      case @facts.standing.kind
+      when :you_owe then YOU_OWE_BASE + wait
+      when :nudge then (@facts.follow_up_vetted ? NUDGE_WEIGHT : UNVETTED_NUDGE_WEIGHT) * (OBLIGATION_FLOOR + wait)
+      else OBLIGATION_FLOOR
+      end
     end
 
     def recent_score

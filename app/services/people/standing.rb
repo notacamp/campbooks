@@ -112,14 +112,16 @@ module People
       standings = organization_person_standings(organization).select(&:present?)
       return Result.none if standings.empty?
 
-      needing = standings.select(&:needs_you)
-      chosen = (needing.sort_by { |s| -s.overdue_days } + (standings - needing)).first(2)
+      # Lead with the most pressing member: a reply you owe before a nudge you
+      # could send, then the longer wait.
+      needing = standings.select(&:needs_you).sort_by { |s| [ s.kind == :you_owe ? 0 : 1, -s.overdue_days ] }
+      chosen = (needing + (standings - needing)).first(2)
 
       Result.new(
         text: chosen.map(&:text).join(" "),
         needs_you: needing.any?,
         thread_id: chosen.first&.thread_id,
-        overdue_days: (needing.map(&:overdue_days).max || 0),
+        overdue_days: needing.first&.overdue_days || 0,
         kind: chosen.first&.kind || :none
       )
     end
