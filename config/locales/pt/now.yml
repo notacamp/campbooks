@@ -1,0 +1,74 @@
+---
+pt:
+  now:
+    index:
+      classic_feed: Vista clássica
+      need_you_chip:
+        zero: nada precisa de si
+        one: "%{count} precisa de si"
+        other: "%{count} precisam de si"
+      ledger:
+        lead_html: "Nas últimas 24 horas o Scout %{actions}."
+        empty: Nada de novo do Scout nas últimas 24 horas.
+        and: e
+        need_you:
+          zero: Nada precisa de si.
+          one: Uma coisa precisa de si.
+          other: "%{count} precisam de si."
+        buckets:
+          archived_html:
+            one: arquivou %{n_html} email
+            other: arquivou %{n_html} emails
+          archived_by_rules_html:
+            one: arquivou %{n_html} email pelas suas regras
+            other: arquivou %{n_html} emails pelas suas regras
+          tagged_html:
+            one: etiquetou %{n_html}
+            other: etiquetou %{n_html}
+          filed_html:
+            one: organizou %{n_html} documento
+            other: organizou %{n_html} documentos
+          reminders_html:
+            one: encontrou %{n_html} lembrete
+            other: encontrou %{n_html} lembretes
+          tasks_html:
+            one: sugeriu %{n_html} tarefa
+            other: sugeriu %{n_html} tarefas
+          events_html:
+            one: adicionou %{n_html} evento ao calendário
+            other: adicionou %{n_html} eventos ao calendário
+      rings:
+        all: Tudo
+        priority: Prioritário
+        follow_ups: Seguimentos
+        mail: Correio
+        time: Tempo
+        docs: Docs
+      log:
+        title: Registo do Scout
+        meta: "últimas 24 horas · %{count}"
+        empty: Nada do Scout nas últimas 24 horas.
+        all_activity: Toda a atividade
+    undo_log:
+      undone: Desfeito.
+      failed: Não foi possível desfazer.
+      not_reversible: Esta ação não pode ser desfeita.
+  components:
+    scout_bar:
+      placeholder_ask: Pergunte qualquer coisa ao Scout…
+      placeholder_command: Pergunte qualquer coisa ao Scout ou escreva um comando…
+    now:
+      deck:
+        counter: 1 de {n}
+        cleared_title: Pilha limpa.
+        cleared_body: O Scout continua a organizar o correio novo e a arquivar o que
+          consegue. Tudo o que precisar de si ficará aqui.
+        segment_empty_title: Nada precisa de si aqui.
+        show_everything: Mostrar tudo
+      setup_card:
+        chip: Configurar
+        later: Mais tarde
+      log_row:
+        undo: Desfazer
+        open: Abrir
+        undone: Desfeito

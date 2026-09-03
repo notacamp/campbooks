@@ -23,6 +23,20 @@ major, minor, or patch change here.
   the task's deadline reminder — the same one as the task page's Remind button,
   surfacing on the Reminders page and calendar. Previously Scout could only talk
   about the task.
+- **Bold layout (preview): the Now page and a five-place navigation.** An opt-in
+  reframing of the home experience as a queue of decisions you clear, not a feed
+  you scroll. Scout opens with an honest **ledger** of what it did in the last 24
+  hours — counts drawn only from the workspace event log, never overstated;
+  **segment rings** (All · Priority · Follow-ups · Mail · Time · Docs) filter one
+  **decision deck** — the home feed reframed as a stack of cards you clear one at
+  a time, with the same keyboard and swipe actions, a fly-out as each card leaves,
+  and Undo; **setup steps ride along as cards** in the same stack; **Scout's log**
+  lists every automated action with a timestamp and an Undo where a reverse
+  exists; and a docked **Scout bar** sits under the column. The primary navigation
+  becomes **Now · People · Paper · Money · Time**. Opt in per build with
+  `ENABLE_BOLD_LAYOUT=1`; each user then chooses **Bold** or **Classic** in
+  Settings › Account (Classic stays the default). Off by default and not yet
+  production-ready; the Scout command overlay is a follow-up.
 - **REST API: single-message email triage actions.** A new
   `POST /api/v1/emails/:id/actions/:name` endpoint exposes the inbox triage
   actions — `archive`/`unarchive`, `trash`, `snooze`/`unsnooze`, `pin`/`unpin`,

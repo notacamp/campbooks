@@ -22,7 +22,17 @@ module NavigationHelper
     workflows:     "w",
     contacts:      "p",
     organizations: "o",
-    activity:      "a"
+    activity:      "a",
+    # Bold-layout chords. The nav-shortcuts controller resolves `g <key>` against
+    # the RENDERED nav links (data-nav-shortcut-key in the DOM, preferring the
+    # visible one), and only one layout's items are ever rendered at a time — so
+    # these deliberately reuse letters the classic-only items also claim (p/d/m/t)
+    # with no collision.
+    now:           "n",
+    people:        "p",
+    paper:         "d",
+    money:         "m",
+    time:          "t"
   }.freeze
 
   # Inline SVG bodies for the primary nav icons (rendered raw, mirroring the
@@ -40,7 +50,14 @@ module NavigationHelper
     activity: '<path d="M3 12h4l2 6 4-13 2 7h6"/>',
     tasks:      '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/><path d="m9 14 2 2 4-4"/>',
     digests:    '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/>',
-    accounting: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M7 15h1m4 0h1m-7-2h1m4 0h1"/>'
+    accounting: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M7 15h1m4 0h1m-7-2h1m4 0h1"/>',
+    # Bold-layout nav (Now/People/Paper/Money/Time) — stroked to match the rest,
+    # icon shapes lifted from the approved mock.
+    now: '<path d="m12 3 9 4.5-9 4.5-9-4.5z"/><path d="m3 12 9 4.5 9-4.5"/><path d="m3 16.5 9 4.5 9-4.5"/>',
+    people: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    paper: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+    money: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
+    time: '<rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 3v4M16 3v4"/>'
   }.freeze
   # Four-point spark, centered in the 24×24 box (tips at 12,5 · 19.5,12 · 12,19 ·
   # 4.5,12 → center 12,12) so it sits dead-center inside the Ember tile.
@@ -67,6 +84,8 @@ module NavigationHelper
   # rendered in near-black ink, never Ember. Admin/Settings are intentionally
   # absent here: they live in the avatar menu, not the primary nav.
   def primary_nav_items
+    return bold_nav_items if bold_layout?
+
     [
       nav_item(:home, t("shared.nav.home"), root_path, exact: true, also_active_for: [ home_path ], badge: nav_attention.dot?(:home)),
       nav_item(:mail, t("shared.nav.mail"), email_messages_path(show_list: 1), badge: nav_attention.dot?(:mail)),
@@ -84,6 +103,29 @@ module NavigationHelper
       (nav_item(:contacts, t("shared.nav.contacts"), contacts_path) if workspace_module_visible?(:contacts)),
       (nav_item(:organizations, t("shared.nav.organizations"), organizations_path) if current_entitlements.feature?(:organizations) && workspace_module_visible?(:organizations)),
       (nav_item(:activity, t("shared.nav.activity"), activity_path) if workspace_module_visible?(:activity))
+    ].compact
+  end
+
+  # The rethought "bold" navigation (opt-in, gated on Features.bold_layout? + the
+  # user's layout_mode — see ApplicationController#bold_layout?). Five places that
+  # reframe the app around decisions rather than folders: Now (the decision deck),
+  # People (mail + contacts + organizations), Paper (files + documents), Money
+  # (accounting) and Time (calendar + reminders + tasks). There is no Ember/Scout
+  # tile — Scout is reached from the Now page's docked bar, Cmd+K, the rail's
+  # search, and the `g s` chord (the overlay PR makes the bar global). Money rides
+  # the exact same gate as the classic :accounting item.
+  def bold_nav_items
+    [
+      nav_item(:now, t("shared.nav.now"), now_path, exact: false, badge: nav_attention.dot?(:home)),
+      nav_item(:people, t("shared.nav.people"), email_messages_path(show_list: 1),
+        also_active_for: [ email_messages_path, contacts_path, organizations_path ],
+        badge: nav_attention.dot?(:mail)),
+      nav_item(:paper, t("shared.nav.paper"), files_path,
+        also_active_for: [ documents_path ], badge: nav_attention.dot?(:files)),
+      (nav_item(:money, t("shared.nav.money"), accounting_path) if Features.accounting?),
+      nav_item(:time, t("shared.nav.time"), calendar_path,
+        also_active_for: [ calendar_events_path, reminders_path, tasks_path ],
+        badge: nav_attention.dot?(:calendar))
     ].compact
   end
 

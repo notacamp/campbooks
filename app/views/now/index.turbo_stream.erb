@@ -1,0 +1,17 @@
+<%# One more page of the deck's timeline leg (the now-deck controller's lazy
+    load-more, fetched when the stack runs low). Append the next cards into the
+    deck's #feed_timeline, then refresh the hidden pagination-state node the
+    controller reads for the following fetch. Only the timeline leg pages — the
+    ledger, rings and log stay put. %>
+<%= turbo_stream.append "feed_timeline" do %>
+  <% @timeline_pairs.each do |pair| %>
+    <%= render Campbooks::Feed::Card.new(item: pair[:item], subject: pair[:subject]) %>
+  <% end %>
+<% end %>
+
+<%= turbo_stream.replace "now_deck_state" do %>
+  <div id="now_deck_state" hidden
+       data-now-deck-target="state"
+       data-next-page="<%= @pagy&.next %>"
+       data-has-more="<%= @pagy&.next.present? %>"></div>
+<% end %>

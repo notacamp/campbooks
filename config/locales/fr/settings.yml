@@ -39,6 +39,9 @@ fr:
       language:
         failed: Impossible de mettre à jour votre langue. Veuillez réessayer.
         updated: Langue mise à jour.
+      layout_preference:
+        failed: Impossible de mettre à jour votre disposition. Veuillez réessayer.
+        updated: Disposition mise à jour.
       show:
         change_password: Changer le mot de passe
         compose_desk: Pleine page — la rédaction occupe tout l'écran
@@ -60,8 +63,17 @@ fr:
         language_title: Langue
         new_password: Nouveau mot de passe
         privacy_policy: Politique de confidentialité
+        layout_bold_desc: "Maintenant, Personnes, Papiers, Argent et Temps. Le Campbooks\
+          \ repensé ; certaines sections ouvrent encore les écrans classiques pour\
+          \ l'instant."
+        layout_bold_title: Audacieux
+        layout_classic_desc: "Accueil, Courrier, Agenda, Scout et Fichiers."
+        layout_classic_title: Classique
+        layout_intro: "Choisissez comment Campbooks est organisé. La disposition Audacieux est en aperçu."
+        layout_title: Disposition
         save_compose: Enregistrer
         save_language: Enregistrer
+        save_layout: Enregistrer
         subtitle: Gérez votre mot de passe et vos préférences de compte.
         terms_of_service: Conditions d'utilisation
         title: Paramètres du compte

@@ -164,8 +164,13 @@ en:
         nav_files: Go to Files
         nav_home: Go to Home
         nav_mail: Go to Mail
+        nav_money: Go to Money
+        nav_now: Go to Now
         nav_organizations: Go to Organizations
+        nav_paper: Go to Paper
+        nav_people: Go to People
         nav_scout: Go to Scout
+        nav_time: Go to Time
         navigate_threads: Navigate threads
         reminders_confirm: Add to calendar
         reminders_dismiss: Dismiss

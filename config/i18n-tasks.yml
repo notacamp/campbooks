@@ -39,6 +39,23 @@ ignore_unused:
   - 'contacts.skim.*'       # skim deck copy; `emails` is rendered by Campbooks::ContactSkimCard (components/* excluded from scan)
   - 'events.*'              # activity-feed labels: resolved dynamically (events.names.<key>) and in Campbooks::Activity::EventRow (components/* excluded from scan)
   - 'accounts.deactivation_reasons.*' # resolved dynamically by deactivation_reason column (ProviderSyncDeactivation#deactivation_reason_label)
+  - 'now.index.ledger.buckets.*' # Scout's ledger phrases — the bucket key is built dynamically from the event name (NowHelper#now_ledger_bucket)
+  - 'now.undo_log.not_reversible' # NowController's private #not_reversible resolves t('.not_reversible') against the undo_log action at runtime; the static scan can't see it
+  # The inbox zero-state copy moved from home/index.html.erb into
+  # Campbooks::InboxEmptyState (a Phlex component, and app/components is excluded
+  # from the scan), shared by Home and the Now deck. The keys stay under
+  # home.index.* — Home owns them and its request spec asserts them.
+  - 'home.index.syncing_title'
+  - 'home.index.syncing_body'
+  - 'home.index.syncing_cta'
+  - 'home.index.disconnected_title'
+  - 'home.index.disconnected_body'
+  - 'home.index.disconnected_cta'
+  - 'home.index.connect_title'
+  - 'home.index.connect_body'
+  - 'home.index.connect_demo'
+  - 'home.index.empty_title'
+  - 'home.index.empty_body'
 
 # Enum value keys are built dynamically (human_enum_name), so don't flag them as
 # missing from the static scan — parity across locales still covers them.
@@ -62,4 +79,5 @@ ignore_missing:
   - 'email_tools.clear_thread_from_view.*'
   - 'oauth.*.handle_*.*'
   - 'setup.update_*.*'
+  - 'now.not_reversible.*' # t('.not_reversible') lives in NowController's private #not_reversible; the real key is now.undo_log.not_reversible
   - 'registrations.gate_signup!.*'

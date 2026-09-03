@@ -1417,3 +1417,63 @@ dialog[open] {
   border-radius: 0.875rem;
   box-shadow: 0 2px 6px oklch(20% 0.03 40 / 0.10), 0 14px 30px oklch(20% 0.03 40 / 0.16);
 }
+
+/* ── Now decision deck ────────────────────────────────────────────────────
+   The stack (#feed_timeline) holds the existing Campbooks::Feed::Card renders;
+   only the top one shows, and it wears the raised card frame. Undo-reinjected
+   and load-more cards inherit the same treatment with no change to Feed::Card
+   (the spec's "wrapper class + targeted overrides"). Unlayered, so it beats the
+   feed card's own list-only utilities (py-9, dividers). ──────────────────── */
+.now-deck-stack > * { display: none; }
+.now-deck-stack > *:first-child { display: block; }
+#now_deck_state { display: none !important; } /* the pagination cursor is never a card */
+
+.now-deck-stack > *:first-child {
+  position: relative;
+  z-index: 10;
+  padding: 1rem; /* mobile p-4 — overrides the feed card's list-only py-9 */
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: 0 20px 50px -30px oklch(20% 0.03 60 / 0.45), 0 1px 2px oklch(20% 0.03 60 / 0.06);
+}
+@media (min-width: 640px) {
+  .now-deck-stack > *:first-child { padding: 20px 22px; } /* p-5 sm:px-[22px] */
+}
+
+/* A card that carries its own frame in the list (the starred-sender hero:
+   rounded-2xl + border + p-5 + shadow) would double-frame inside the deck's
+   raised card — flatten it so the deck frame is the only one. */
+.now-deck-stack > *:first-child article {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+/* The deck shows each card's own action keycaps (E, ↵, →) on the focused card,
+   but not the feed-focus hint rows ("↑↓ navigate" / swipe hint) — the deck is
+   one card, so vertical-nav hints would mislead. */
+.now-deck [data-feed-keyhint]:not(kbd),
+.now-deck [data-feed-swipe-hint] { display: none !important; }
+
+/* Acting flies the top card out; the next one rises in. Direction (left for an
+   escape, right for a primary) is set inline by now_deck_controller. The global
+   prefers-reduced-motion guard above neutralises both to an instant swap. */
+@keyframes now-fly-out {
+  to {
+    transform: translateX(var(--now-exit-x, -44px)) rotate(var(--now-exit-rot, -3deg));
+    opacity: 0;
+  }
+}
+.now-fly-out {
+  animation: now-fly-out 0.22s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@keyframes now-rise {
+  from { transform: translateY(-10px) scale(0.985); opacity: 0.35; }
+  to   { transform: none; opacity: 1; }
+}
+.now-rise { animation: now-rise 0.26s cubic-bezier(0.32, 0.72, 0, 1) both; }
