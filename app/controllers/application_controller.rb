@@ -18,7 +18,8 @@ class ApplicationController < ActionController::Base
   helper_method :current_user, :self_hosted?, :signup_mode, :public_signup_allowed?, :beta_code_required?,
                 :workflows_enabled?, :email_board_enabled?, :microsoft_enabled?, :imap_enabled?,
                 :document_templates_enabled?, :email_templates_enabled?, :tasks_enabled?, :accounting_enabled?,
-                :ai_provider_available?, :show_beta_banner?, :current_entitlements, :bold_layout?
+                :ai_provider_available?, :show_beta_banner?, :current_entitlements, :bold_layout?,
+                :layout_scout_bar?, :layout_scout_launcher?
 
   private
 
@@ -148,6 +149,21 @@ class ApplicationController < ActionController::Base
   # bold nav. 404 (not redirect) keeps a disabled feature from advertising itself.
   def require_bold_layout_enabled
     head :not_found unless Features.bold_layout?
+  end
+
+  # Whether the application layout should render the docked Scout bar for this
+  # request. The bar opens the global Scout overlay (bold layout only). Suppressed
+  # on a page that renders its own bar (Home sets @renders_own_scout_bar so its
+  # classic bar stays untouched).
+  def layout_scout_bar?
+    bold_layout? && !@renders_own_scout_bar
+  end
+
+  # Whether the email layout should render the compact Scout launcher (the
+  # floating spark that opens the overlay). Bold layout only, and never on the
+  # Scout page itself, which sets @hide_scout_launcher.
+  def layout_scout_launcher?
+    bold_layout? && !@hide_scout_launcher
   end
 
   # ── Signup gating (see config/initializers/registration.rb) ──

@@ -32,4 +32,19 @@ RSpec.describe Campbooks::ScoutBar, type: :component do
     expect(html).to include('href="/somewhere"')
     expect(html).to include("max-w-[680px]")
   end
+
+  it "is a button that opens the overlay in overlay mode (bold layout)" do
+    html = render_bar(overlay: true, mobile: true, keycap: true)
+    expect(html).to include("<button")
+    expect(html).to include("scout-overlay#open")
+    # Typing a character into the focused bar carries the text into the overlay.
+    expect(html).to include("scout-overlay#openFromKey")
+    # It no longer navigates to the Scout page.
+    expect(html).not_to include(%(href="#{scout_path}"))
+    expect(html).to include("⌘K")
+  end
+
+  it "stays a link (never an overlay trigger) in the default mode" do
+    expect(render_bar).not_to include("scout-overlay#open")
+  end
 end
