@@ -168,7 +168,7 @@ class Time::Agenda
     if email
       [ I18n.t("time.agenda.source.from_email", name: sender_first_name(email)), email_message_path(email) ]
     elsif document
-      [ I18n.t("time.agenda.source.from_document", title: document.title.presence || I18n.t("time.agenda.untitled")),
+      [ I18n.t("time.agenda.source.from_document", title: document.display_title.presence || I18n.t("time.agenda.untitled")),
         document_path(document) ]
     end
   end
