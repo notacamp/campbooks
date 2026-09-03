@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-09-04
+
 ### Changed
 
 - **People ranks by relationship, not by age.** The bold-layout People list now
