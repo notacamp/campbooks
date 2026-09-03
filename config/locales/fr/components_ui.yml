@@ -165,8 +165,13 @@ fr:
         nav_files: Aller aux Fichiers
         nav_home: Aller à l'accueil
         nav_mail: Aller au Courrier
+        nav_money: Aller à Argent
+        nav_now: Aller à Maintenant
         nav_organizations: Aller aux Organisations
+        nav_paper: Aller à Papiers
+        nav_people: Aller à Personnes
         nav_scout: Aller à Scout
+        nav_time: Aller à Temps
         navigate_threads: Naviguer dans les conversations
         reminders_confirm: Ajouter au calendrier
         reminders_dismiss: Ignorer

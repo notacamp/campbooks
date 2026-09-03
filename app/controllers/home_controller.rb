@@ -18,6 +18,13 @@ class HomeController < ApplicationController
   PAGE_SIZE = 8
 
   def index
+    # Bold-layout users land on the Now page at the root. `/home` stays the classic
+    # feed and never redirects, so it's always reachable (the Now page links to it
+    # as its "Classic feed" escape hatch). Native shells keep their own root.
+    if bold_layout? && request.path == "/" && !hotwire_native_app?
+      redirect_to(now_path) and return
+    end
+
     @reader = Feed::Reader.new(current_user)
     # Past the curated spine, the same infinite scroll falls into Rewind — the
     # scroll-back through past highlights. A keyset cursor (?before=) or the first
@@ -53,20 +60,11 @@ class HomeController < ApplicationController
     # in the rings strip (the doc-review queue lives there now, not the timeline).
     @doc_review_count = Current.workspace ? Current.workspace.documents.needs_review.count : 0
     # Only when the feed is empty: distinguish the zero-states so the copy points
-    # the right way. "Disconnected" is its own state — a user with inboxes that
-    # have all gone inactive must NOT be told to "connect your inbox" as if brand new.
+    # the right way (see Home::InboxState). "Disconnected" is its own state — a
+    # user with inboxes that have all gone inactive must NOT be told to "connect
+    # your inbox" as if brand new. Shared with the Now deck's cleared/connect states.
     if @attention.empty? && @timeline.empty?
-      accounts = Current.workspace&.email_accounts
-      @inbox_state =
-        if accounts&.active&.exists? && @first_sync.stage?
-          :syncing          # scan is still running but user skipped the wait screen
-        elsif accounts&.active&.exists?
-          :caught_up        # a live inbox; the queue is genuinely clear
-        elsif accounts&.exists?
-          :disconnected     # connected before, but every inbox is disconnected
-        else
-          :none             # brand-new — never connected an inbox
-        end
+      @inbox_state = Home::InboxState.for(current_user)
     end
 
     # Keep the spine fresh without blocking the render — a debounced background

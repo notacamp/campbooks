@@ -1,0 +1,108 @@
+<%# The Now surface — the rethought "bold" home: Scout's ledger, the segment
+    rings, the decision deck over the same materialized feed, Scout's log, and the
+    docked Scout bar. Gated on Features.bold_layout? (NowController). The Scout
+    overlay is a follow-up PR; the bar here just links to /scout. %>
+<% content_for :main_class, "mx-auto w-full max-w-[680px] px-4 pb-40 pt-8 sm:pt-10 lg:pb-32" %>
+<%
+  name = (current_user.try(:name).presence ||
+          current_user.try(:email_address).to_s.split("@").first).to_s.split(/\s+/).first.presence || "there"
+  deck_total = @segment_counts[@segment].to_i + @setup_items.size
+%>
+
+<%# ── Header: Scout's avatar + greeting + the honest ledger ───────────────── %>
+<div class="flex items-start gap-3">
+  <%= render Campbooks::ScoutAvatar.new(size: :xl) %>
+  <div class="min-w-0 flex-1">
+    <div class="flex items-start justify-between gap-3">
+      <%= render Campbooks::TimeOfDayGreeting.new(name: name, glyph: false) %>
+      <%# Desktop escape hatch to the classic feed (never redirects). %>
+      <%= link_to t(".classic_feed"), home_path,
+            class: "hidden shrink-0 pt-1 text-[13px] text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground lg:inline-flex" %>
+    </div>
+
+    <%# Mobile: the "N need you" chip carries what the desktop sentence says, plus
+        the classic-feed escape hatch under the greeting. %>
+    <div class="mt-2 flex items-center gap-2.5 lg:hidden">
+      <span class="inline-flex items-center rounded-md bg-secondary px-2 py-0.5 text-[11.5px] font-medium text-muted-foreground">
+        <%= t(".need_you_chip", count: @segment_counts[:priority].to_i) %>
+      </span>
+      <%= link_to t(".classic_feed"), home_path,
+            class: "text-xs text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground" %>
+    </div>
+
+    <p class="mt-1.5 text-[14.5px] leading-relaxed text-foreground/80">
+      <%= now_ledger_html(@ledger) %>
+    </p>
+  </div>
+</div>
+
+<%# ── Rings + deck: one turbo-frame so a segment change re-renders both in place
+    (counts stay right). The doc-skim-overlay controller wraps the frame so the
+    Docs ring can open the review walk while the overlay itself stays put. ───── %>
+<div data-controller="doc-skim-overlay">
+  <%= turbo_frame_tag "now_deck" do %>
+    <div id="now_rings"
+         class="mt-6 flex items-start gap-2.5 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <% [ :all, :priority, :follow_ups, :mail, :time ].each do |seg| %>
+        <%= render Campbooks::Now::SegmentRing.new(
+              segment: seg,
+              label: t(".rings.#{seg}"),
+              count: @segment_counts[seg].to_i,
+              active: @segment == seg,
+              href: now_path(segment: seg),
+              data: { turbo_frame: "now_deck", turbo_action: "advance" }) %>
+      <% end %>
+      <%# Docs rides the existing document-review overlay (like Home), not the deck. %>
+      <%= render Campbooks::DocSkimRing.new(
+            category: "other",
+            label: t(".rings.docs"),
+            count: @doc_review_count,
+            done: @doc_review_count.to_i.zero?,
+            data: { action: "click->doc-skim-overlay#open" }) %>
+    </div>
+
+    <%= render Campbooks::Now::Deck.new(
+          attention_pairs: @attention_pairs,
+          timeline_pairs: @timeline_pairs,
+          setup_items: @setup_items,
+          inbox_state: @inbox_state,
+          segment: @segment,
+          total: deck_total,
+          next_page: @pagy&.next,
+          has_more: @pagy&.next.present?) %>
+  <% end %>
+
+  <%= render "shared/doc_skim_overlay" %>
+</div>
+
+<%# ── Scout's log: everything Scout did in the last 24h, with Undo where a
+    reverse exists and Open where the subject has a page. ──────────────────── %>
+<section class="mt-8" aria-labelledby="now_log_heading">
+  <div class="flex items-baseline gap-2.5 border-b border-border pb-2">
+    <h2 id="now_log_heading" class="text-[13px] font-semibold text-foreground"><%= t(".log.title") %></h2>
+    <span class="text-xs text-muted-foreground"><%= t(".log.meta", count: @log.count) %></span>
+  </div>
+
+  <% if @log.any? %>
+    <div id="now_log_rows">
+      <% @log.events.each do |event| %>
+        <%= render Campbooks::Now::LogRow.new(event: event) %>
+      <% end %>
+    </div>
+  <% else %>
+    <p class="py-3 text-[13.5px] text-muted-foreground"><%= t(".log.empty") %></p>
+  <% end %>
+
+  <%= link_to t(".log.all_activity"), activity_path,
+        class: "mt-3 inline-flex text-xs text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground" %>
+</section>
+
+<%# ── Docked Scout bar (desktop centred under the 680px column with a ⌘K chip;
+    mobile docked above the bottom nav). Links to /scout — the inline overlay is
+    the next PR. ──────────────────────────────────────────────────────────── %>
+<%= render Campbooks::ScoutBar.new(
+      placeholder: t("components.scout_bar.placeholder_command"),
+      mobile_placeholder: t("components.scout_bar.placeholder_ask"),
+      mobile: true,
+      keycap: true,
+      desktop_max_width: "max-w-[680px]") %>

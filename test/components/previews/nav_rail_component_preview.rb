@@ -30,7 +30,25 @@ class NavRailComponentPreview < ViewComponent::Preview
     render(Campbooks::NavRail.new(items: sample_items(active: :home, badges: %i[mail scout])))
   end
 
+  # The rethought "bold" navigation (Features.bold_layout? + a bold-mode user):
+  # Now / People / Paper / Money / Time, with no Ember/Scout tile — Scout is
+  # reached from the Now page's docked bar and Cmd+K instead.
+  def bold
+    render(Campbooks::NavRail.new(items: bold_sample_items(active: :now)))
+  end
+
   private
+
+  def bold_sample_items(active:, badges: [])
+    shortcuts = NavigationHelper::NAV_SHORTCUT_KEYS
+    [
+      { key: :now,    label: "Now",    path: "#", ember: false, shortcut: shortcuts[:now] },
+      { key: :people, label: "People", path: "#", ember: false, shortcut: shortcuts[:people] },
+      { key: :paper,  label: "Paper",  path: "#", ember: false, shortcut: shortcuts[:paper] },
+      { key: :money,  label: "Money",  path: "#", ember: false, shortcut: shortcuts[:money] },
+      { key: :time,   label: "Time",   path: "#", ember: false, shortcut: shortcuts[:time] }
+    ].map { |item| item.merge(active: item[:key] == active, badge: badges.include?(item[:key])) }
+  end
 
   def sample_items(active:, badges: [])
     shortcuts = NavigationHelper::NAV_SHORTCUT_KEYS

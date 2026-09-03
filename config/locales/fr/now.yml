@@ -1,0 +1,74 @@
+---
+fr:
+  now:
+    index:
+      classic_feed: Vue classique
+      need_you_chip:
+        zero: rien ne requiert votre attention
+        one: "%{count} requiert votre attention"
+        other: "%{count} requièrent votre attention"
+      ledger:
+        lead_html: "Au cours des 24 dernières heures Scout %{actions}."
+        empty: Rien de nouveau de la part de Scout au cours des 24 dernières heures.
+        and: et
+        need_you:
+          zero: Rien ne requiert votre attention.
+          one: Une chose requiert votre attention.
+          other: "%{count} requièrent votre attention."
+        buckets:
+          archived_html:
+            one: a archivé %{n_html} e-mail
+            other: a archivé %{n_html} e-mails
+          archived_by_rules_html:
+            one: a archivé %{n_html} e-mail selon vos règles
+            other: a archivé %{n_html} e-mails selon vos règles
+          tagged_html:
+            one: a étiqueté %{n_html}
+            other: a étiqueté %{n_html}
+          filed_html:
+            one: a classé %{n_html} document
+            other: a classé %{n_html} documents
+          reminders_html:
+            one: a trouvé %{n_html} rappel
+            other: a trouvé %{n_html} rappels
+          tasks_html:
+            one: a suggéré %{n_html} tâche
+            other: a suggéré %{n_html} tâches
+          events_html:
+            one: a ajouté %{n_html} événement au calendrier
+            other: a ajouté %{n_html} événements au calendrier
+      rings:
+        all: Tout
+        priority: Prioritaire
+        follow_ups: Suivis
+        mail: Courrier
+        time: Temps
+        docs: Docs
+      log:
+        title: Journal de Scout
+        meta: "24 dernières heures · %{count}"
+        empty: Rien de Scout au cours des 24 dernières heures.
+        all_activity: Toute l'activité
+    undo_log:
+      undone: Annulé.
+      failed: Impossible d'annuler.
+      not_reversible: "Cette action ne peut pas être annulée."
+  components:
+    scout_bar:
+      placeholder_ask: Posez n'importe quelle question à Scout…
+      placeholder_command: Posez n'importe quelle question à Scout ou tapez une commande…
+    now:
+      deck:
+        counter: 1 sur {n}
+        cleared_title: Pile vidée.
+        cleared_body: Scout continue de trier le nouveau courrier et de classer ce
+          qu'il peut. Tout ce qui requiert votre attention apparaîtra ici.
+        segment_empty_title: Rien ne requiert votre attention ici.
+        show_everything: Tout afficher
+      setup_card:
+        chip: Configurer
+        later: Plus tard
+      log_row:
+        undo: Annuler
+        open: Ouvrir
+        undone: Annulé

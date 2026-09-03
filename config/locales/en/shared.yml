@@ -34,12 +34,17 @@ en:
       files: Files
       home: Home
       mail: Mail
+      money: Money
       more: More
       new_items: New
+      now: Now
       organizations: Organizations
+      paper: Paper
+      people: People
       scout: Scout
       settings: Settings
       tasks: Tasks
+      time: Time
       workflows: Flows
     swipe_dialogs:
       confirm_action: Delete

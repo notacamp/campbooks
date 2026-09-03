@@ -164,8 +164,13 @@ es:
         nav_files: Ir a Archivos
         nav_home: Ir a Inicio
         nav_mail: Ir a Correo
+        nav_money: Ir a Dinero
+        nav_now: Ir a Ahora
         nav_organizations: Ir a Organizaciones
+        nav_paper: Ir a Papeles
+        nav_people: Ir a Personas
         nav_scout: Ir a Scout
+        nav_time: Ir a Tiempo
         navigate_threads: Navegar conversaciones
         reminders_confirm: Añadir al calendario
         reminders_dismiss: Descartar

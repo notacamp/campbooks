@@ -13,14 +13,7 @@ module Campbooks
     def shortcuts
       [
         { key: "↓ ↑", label: t(".shortcuts.navigate_threads"), context: t(".contexts.navigation") },
-        { key: "g h",   label: t(".shortcuts.nav_home"),         context: t(".contexts.navigation") },
-        { key: "g m",   label: t(".shortcuts.nav_mail"),         context: t(".contexts.navigation") },
-        { key: "g c",   label: t(".shortcuts.nav_calendar"),     context: t(".contexts.navigation") },
-        { key: "g s",   label: t(".shortcuts.nav_scout"),        context: t(".contexts.navigation") },
-        { key: "g f",   label: t(".shortcuts.nav_files"),        context: t(".contexts.navigation") },
-        { key: "g p",   label: t(".shortcuts.nav_contacts"),     context: t(".contexts.navigation") },
-        { key: "g o",   label: t(".shortcuts.nav_organizations"), context: t(".contexts.navigation") },
-        { key: "g a",   label: t(".shortcuts.nav_activity"),     context: t(".contexts.navigation") },
+        *nav_shortcuts,
         { key: "↑↓ / j k", label: t(".shortcuts.feed_navigate"), context: t(".contexts.feed") },
         { key: "→ / ⏎",    label: t(".shortcuts.feed_primary"),  context: t(".contexts.feed") },
         { key: "←",         label: t(".shortcuts.feed_dismiss"),  context: t(".contexts.feed") },
@@ -98,6 +91,39 @@ module Campbooks
           end
         end
       end
+    end
+
+    private
+
+    # The `g <key>` navigation chords, matching whichever primary nav is actually
+    # rendered: the bold five (Now/People/Paper/Money/Time + Scout) when the bold
+    # layout is active for this user, otherwise the classic destinations. Money
+    # rides the same accounting gate as its nav item, so no phantom chord.
+    def nav_shortcuts
+      ctx = t(".contexts.navigation")
+      return classic_nav_shortcuts(ctx) unless helpers.bold_layout?
+
+      [
+        { key: "g n", label: t(".shortcuts.nav_now"),    context: ctx },
+        { key: "g p", label: t(".shortcuts.nav_people"), context: ctx },
+        { key: "g d", label: t(".shortcuts.nav_paper"),  context: ctx },
+        *(Features.accounting? ? [ { key: "g m", label: t(".shortcuts.nav_money"), context: ctx } ] : []),
+        { key: "g t", label: t(".shortcuts.nav_time"),   context: ctx },
+        { key: "g s", label: t(".shortcuts.nav_scout"),  context: ctx }
+      ]
+    end
+
+    def classic_nav_shortcuts(ctx)
+      [
+        { key: "g h", label: t(".shortcuts.nav_home"),          context: ctx },
+        { key: "g m", label: t(".shortcuts.nav_mail"),          context: ctx },
+        { key: "g c", label: t(".shortcuts.nav_calendar"),      context: ctx },
+        { key: "g s", label: t(".shortcuts.nav_scout"),         context: ctx },
+        { key: "g f", label: t(".shortcuts.nav_files"),         context: ctx },
+        { key: "g p", label: t(".shortcuts.nav_contacts"),      context: ctx },
+        { key: "g o", label: t(".shortcuts.nav_organizations"), context: ctx },
+        { key: "g a", label: t(".shortcuts.nav_activity"),      context: ctx }
+      ]
     end
   end
 end

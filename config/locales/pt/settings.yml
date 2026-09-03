@@ -36,6 +36,9 @@ pt:
       language:
         failed: Não foi possível atualizar o idioma. Tente novamente.
         updated: Idioma atualizado.
+      layout_preference:
+        failed: Não foi possível atualizar o seu esquema. Tente novamente.
+        updated: Esquema atualizado.
       show:
         change_password: Alterar palavra-passe
         compose_desk: Página inteira — a escrita ocupa o ecrã todo
@@ -57,8 +60,16 @@ pt:
         language_title: Idioma
         new_password: Nova palavra-passe
         privacy_policy: Política de Privacidade
+        layout_bold_desc: "Agora, Pessoas, Papéis, Dinheiro e Tempo. O Campbooks repensado;\
+          \ alguns ecrãs ainda abrem a vista clássica por agora."
+        layout_bold_title: Arrojado
+        layout_classic_desc: Início, Correio, Calendário, Scout e Ficheiros.
+        layout_classic_title: Clássico
+        layout_intro: Escolha como o Campbooks está organizado. O esquema Arrojado está em pré-visualização.
+        layout_title: Esquema
         save_compose: Guardar
         save_language: Guardar
+        save_layout: Guardar
         subtitle: Gira a sua palavra-passe e as preferências da conta.
         terms_of_service: Termos de Serviço
         title: Definições da conta

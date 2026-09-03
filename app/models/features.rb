@@ -35,6 +35,17 @@ module Features
       flag?("ENABLE_EMAIL_BOARD")
     end
 
+    # The rethought five-place navigation (Now / People / Paper / Money / Time)
+    # and the Now page — Scout's ledger, the segment rings, and the decision deck
+    # over the home feed. Not production-ready, so it ships OFF by default. The
+    # flag is the gate; each user then picks Bold or Classic in Settings › Account
+    # (User#layout_mode), and the rethought UI only shows for a bold-mode user on a
+    # flag-on build (ApplicationController#bold_layout?). The /now page itself works
+    # for classic-mode users too when the flag is on — its gate is the flag.
+    def bold_layout?
+      flag?("ENABLE_BOLD_LAYOUT")
+    end
+
     # AI-generated, reusable document templates: the Settings → Document templates
     # manager plus the fill/preview/send surfaces. Gated until production-ready;
     # orthogonal to the per-workspace `:document_templates` billing entitlement.

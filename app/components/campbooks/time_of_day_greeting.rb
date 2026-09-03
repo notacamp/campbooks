@@ -35,21 +35,25 @@ module Campbooks
     # @param name [String] the first name to greet
     # @param subtitle [String, nil] the orienting line under the headline
     # @param now [Time] server-side time for the no-JS / first-paint default
-    def initialize(name:, subtitle: nil, now: Time.current)
+    # @param glyph [Boolean] show the time-of-day glyph tile (Home). The Now page
+    #   pairs the greeting with Scout's avatar instead, so it renders glyph: false —
+    #   just the device-corrected headline, no tile.
+    def initialize(name:, subtitle: nil, now: Time.current, glyph: true)
       @name = name
       @subtitle = subtitle
       @now = now
+      @glyph = glyph
     end
 
     def view_template
       div(
-        class: "flex items-start gap-3",
+        class: class_names("flex items-start", ("gap-3" if @glyph)),
         data: {
           controller: "local-greeting",
           local_greeting_greetings_value: greetings.to_json
         }
       ) do
-        BUCKETS.each_key { |bucket| icon_tile(bucket) }
+        BUCKETS.each_key { |bucket| icon_tile(bucket) } if @glyph
 
         div do
           h1(

@@ -35,7 +35,25 @@ class BottomNavComponentPreview < ViewComponent::Preview
     render(Campbooks::BottomNav.new(items: sample_items(active: :home, badges: %i[mail scout])))
   end
 
+  # The rethought "bold" navigation: exactly five tabs (Now / People / Paper /
+  # Money / Time) with no center Scout tab and no overflow "More" — verifies the
+  # bar lays out cleanly without assuming an Ember center tile.
+  def bold
+    render(Campbooks::BottomNav.new(items: bold_sample_items(active: :now)))
+  end
+
   private
+
+  def bold_sample_items(active:, badges: [])
+    shortcuts = NavigationHelper::NAV_SHORTCUT_KEYS
+    [
+      { key: :now,    label: "Now",    path: "#", ember: false, shortcut: shortcuts[:now] },
+      { key: :people, label: "People", path: "#", ember: false, shortcut: shortcuts[:people] },
+      { key: :paper,  label: "Paper",  path: "#", ember: false, shortcut: shortcuts[:paper] },
+      { key: :money,  label: "Money",  path: "#", ember: false, shortcut: shortcuts[:money] },
+      { key: :time,   label: "Time",   path: "#", ember: false, shortcut: shortcuts[:time] }
+    ].map { |item| item.merge(active: item[:key] == active, badge: badges.include?(item[:key])) }
+  end
 
   # Mirrors the live primary nav: five dock tabs plus overflow destinations the
   # "More" tab folds away. Shortcut keys are included so the preview HTML has
