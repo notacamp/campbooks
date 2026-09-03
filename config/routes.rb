@@ -622,6 +622,9 @@ Rails.application.routes.draw do
 
   get "email_messages/new", to: "email_messages#new", as: :new_email_message
   post "email_messages/compose_chat", to: "email_compose_chat#create"
+  # Rewrite the composer's current body to a tone (Shorter / Warmer / Firmer) —
+  # the bold editor footer buttons. JSON in/out; needs a text AI provider.
+  post "email_messages/rewrite_draft", to: "email_compose#rewrite", as: :rewrite_draft_email_messages
 
   # Inline image upload for the compose / signature rich-text editor. Stores the
   # image and returns a stable, app-served (proxy) URL recipients can load.

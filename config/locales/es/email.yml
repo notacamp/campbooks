@@ -64,6 +64,7 @@ es:
       no_sendable_accounts_title: Sin cuentas de envío
       scout_keyboard_hint: Cmd+Shift+E para manual
       scout_label: Scout
+      show_conversation: Mostrar conversación
       toggle_chat_aria: Alternar chat
     notion_exports:
       create:

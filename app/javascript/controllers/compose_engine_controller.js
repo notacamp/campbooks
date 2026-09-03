@@ -1,5 +1,12 @@
 import { Controller } from "@hotwired/stimulus"
 
+// The text content of an HTML fragment, via the parser (never a tag-stripping
+// regex): used only to ask "is there any text here?".
+function textOf(html) {
+  if (!html) return ""
+  return new DOMParser().parseFromString(html, "text/html").body.textContent.trim()
+}
+
 // Shell-agnostic behavior of the composer engine (Campbooks::Compose::Engine):
 // envelope collapse/expand, Cc/Bcc reveal, quoted-thread expansion, submit
 // validation + busy state, ⌘↵ send, focus-on-open, and discard. Draft
@@ -9,10 +16,16 @@ export default class extends Controller {
   static targets = [
     "summary", "summaryRecipients", "summarySubject", "fields",
     "ccRow", "bccRow", "ccToggle", "bccToggle",
-    "subjectInput", "collapseButton", "quoteWrap", "quotedInput", "sendButton",
-    "scoutDraft", "scoutText", "scoutSpark"
+    "subjectInput", "subjectInferred", "collapseButton", "quoteWrap", "quotedInput", "sendButton",
+    "scoutDraft", "scoutText", "scoutSpark", "scoutChip"
   ]
-  static values = { messageId: { type: String, default: "" } }
+  static values = {
+    messageId: { type: String, default: "" },
+    rewriteUrl: { type: String, default: "" },
+    rewriteDoneText: { type: String, default: "Rewrote your draft" },
+    rewriteFailedText: { type: String, default: "Could not rewrite the draft" },
+    undoRewriteText: { type: String, default: "Undo rewrite" }
+  }
 
   connect() {
     this._focusInitial()
@@ -189,8 +202,125 @@ export default class extends Controller {
     this.collapseButtonTarget.classList.toggle("hidden", !this._complete())
   }
 
-  changedAnywhere() {
+  changedAnywhere(event) {
     this._syncCollapseButton()
+    this._maybeClearScoutMark(event)
+  }
+
+  // ── bold editor footer (formatting delegates + tone rewrite) ──
+  // The bold composer's footer buttons sit outside the tiptap-editor element, so
+  // they route through here to the resolved controller.
+  formatBold()   { this._editorController()?.toggleBold() }
+  formatItalic() { this._editorController()?.toggleItalic() }
+  formatLink(event) { this._editorController()?.openLink(event) }
+
+  attach(event) {
+    event?.preventDefault()
+    this.element.querySelector("[data-compose-attachments-target='fileInput']")?.click()
+  }
+
+  // The subject was inferred from context; editing it makes it the writer's own.
+  clearSubjectInferred() {
+    if (this.hasSubjectInferredTarget) this.subjectInferredTarget.remove()
+  }
+
+  // ── Scout's-draft mark (bold) ────────────────────────────────
+  // Set when Scout's intent draft lands in the editor (compose-chat:body-set);
+  // the chip clears the moment the writer edits the body — then it's theirs.
+  markScoutDraft() {
+    this.element.dataset.scoutDraft = "true"
+    if (this.hasScoutChipTarget) this.scoutChipTarget.classList.remove("hidden")
+  }
+
+  _maybeClearScoutMark(event) {
+    if (this.element.dataset.scoutDraft !== "true") return
+    const target = event?.target
+    const fromEditor = target && (target.name === "body" || target.closest?.(".ProseMirror"))
+    if (!fromEditor) return
+    this.element.dataset.scoutDraft = "false"
+    if (this.hasScoutChipTarget) this.scoutChipTarget.classList.add("hidden")
+  }
+
+  // Rewrite the current body to a tone (Shorter / Warmer / Firmer). Replaces the
+  // editor content and offers a one-step "Undo rewrite" toast.
+  rewriteDraft(event) {
+    event?.preventDefault()
+    const tone = event.params?.tone
+    const editor = this._editorController()
+    if (!tone || !editor) return
+
+    const previous = editor.getHTML()
+    if (!this._hasText(previous)) return
+
+    const button = event.currentTarget
+    button?.setAttribute("disabled", "disabled")
+    button?.classList.add("opacity-60")
+
+    fetch(this.rewriteUrlValue || "/email_messages/rewrite_draft", {
+      method: "POST",
+      headers: {
+        "X-CSRF-Token": document.querySelector("meta[name='csrf-token']")?.content || "",
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ body: previous, tone })
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((data) => {
+        if (!data?.body) return
+        editor.setContent(data.body) // _sync fires a bubbling input → autosave
+        this._rewriteToast(editor, previous)
+      })
+      .catch(() => this._toast(this.rewriteFailedTextValue, "warning"))
+      .finally(() => {
+        button?.removeAttribute("disabled")
+        button?.classList.remove("opacity-60")
+      })
+  }
+
+  _hasText(html) {
+    return Boolean(textOf(html))
+  }
+
+  _rewriteToast(editor, previousHtml) {
+    const toast = this._toast(this.rewriteDoneTextValue, "success", { undo: true })
+    if (!toast) return
+    toast.querySelector("[data-undo]")?.addEventListener("click", () => {
+      editor.setContent(previousHtml)
+      toast.remove()
+    })
+  }
+
+  // Minimal client-side toast into the shared #action_toasts region (mirrors
+  // Campbooks::ActionToast's capsule + the action-toast auto-dismiss).
+  _toast(message, variant = "success", { undo = false } = {}) {
+    const region = document.getElementById("action_toasts")
+    if (!region) return null
+    const toast = document.createElement("div")
+    toast.className =
+      "pointer-events-auto inline-flex max-w-full items-center gap-2.5 rounded-full border border-border " +
+      "bg-card/95 py-1.5 pl-3 pr-3 text-sm font-medium text-foreground shadow-lg backdrop-blur animate-fade-in"
+    toast.setAttribute("role", "status")
+    toast.dataset.actionToastDuration = undo ? "7000" : "4000"
+
+    const label = document.createElement("span")
+    label.className = "min-w-0"
+    label.textContent = message
+    toast.appendChild(label)
+
+    if (undo) {
+      const button = document.createElement("button")
+      button.type = "button"
+      button.dataset.undo = ""
+      button.className =
+        "-my-0.5 flex-shrink-0 cursor-pointer rounded-full px-2.5 py-1 text-sm font-semibold text-primary " +
+        "transition-colors hover:bg-primary/10"
+      button.textContent = this.undoRewriteTextValue
+      toast.appendChild(button)
+    }
+
+    region.appendChild(toast)
+    return toast
   }
 
   _focusInitial() {

@@ -1,117 +1,175 @@
-<%# The Desk — writing gets the whole screen. No folder rail, no thread list:
-    a minimal top bar, one centered column hosting the shared compose engine,
-    a context rail (original message / attachments / Scout chips) on the right,
-    and Scout waiting in a collapsible rail further right.
-    Desktop (lg+): three columns side-by-side. Mobile: editor then rail stacked. %>
+<%# The Desk — writing gets the whole screen. Bold layout: compose from intent
+    (one input + inferred chips + a bordered editor card, Scout's chat panel
+    tucked behind a quiet "Show conversation" link). Classic layout: the original
+    three-column Desk (writing column · context rail · Scout chat), unchanged. %>
 <%= turbo_frame_tag "email_detail", class: "block h-full" do %>
-  <div class="flex h-full flex-col bg-card" data-controller="scout-mobile">
-    <%# compose-chat drives the Cmd+Shift+E mode toggle and the Scout draft bridge %>
-    <div class="flex flex-1 min-h-0 overflow-y-auto lg:overflow-hidden" data-controller="compose-chat">
+  <% if bold_layout? %>
+    <%# ── Bold Desk: compose from intent ─────────────────────────── %>
+    <div class="flex h-full flex-col bg-card" data-controller="compose-chat">
+      <% if @account %>
+        <div class="flex-1 overflow-y-auto">
+          <%= render(Campbooks::Compose::Engine.new(
+                shell: :desk, bold: true, persistent_status: true,
+                mode: @mode,
+                action_url: @reply_source ? send_message_email_message_path(@reply_source) : send_new_email_messages_path,
+                message: @reply_source,
+                draft: @draft,
+                to: @to, cc: @cc, bcc: @bcc,
+                subject: @subject, body: @body, quoted_body: @quoted_body,
+                signatures: @signatures,
+                signature_id: @signature_id,
+                accounts: @reply_source ? [] : @sendable_accounts.to_a,
+                attachment_entries: @attachment_entries,
+                form_id: "compose_desk_form",
+                intent: @intent,
+                heading: t(".heading_#{@mode}"),
+                back_url: email_messages_path,
+                to_inferred: @to_inferred,
+                subject_inferred: @subject_inferred
+              )) %>
 
-      <%# Writing column + context rail — flex-col on mobile (stacked), flex-row at lg+ %>
-      <div class="flex flex-col lg:flex-row lg:flex-1 lg:min-h-0 min-w-0">
-
-        <%# ── Writing column ────────────────────────────────────── %>
-        <div class="flex flex-col lg:flex-1 lg:min-h-0 min-w-0">
-          <% if @account %>
-            <%# Top bar — sticky so it doesn't scroll off on mobile. Frosted instead
-                of ruled: content sliding under the translucent bar stays legible
-                without a hairline (separation is whitespace, not lines). %>
-            <div class="sticky top-0 z-10 flex items-center gap-3 px-4 sm:px-6 py-3 flex-shrink-0 bg-card/90 backdrop-blur-md">
-              <%= link_to email_messages_path, data: { turbo_frame: "_top" },
-                    class: "inline-flex items-center gap-2 text-[13px] font-semibold text-gray-600 hover:text-gray-900 transition-colors" do %>
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-                <%= t(".heading_#{@mode}") %>
-              <% end %>
-              <div class="flex-1"></div>
-              <%# Mobile-only Scout button (opens overlay) %>
-              <button type="button" data-action="click->scout-mobile#open"
-                      class="lg:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 cursor-pointer flex-shrink-0">
-                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5z" clip-rule="evenodd"/></svg>
-                <%= t(".scout_label") %>
-              </button>
-            </div>
-
-            <%# Centered writing surface. On desktop: constrained, scrollable.
-                On mobile: natural height (outer div handles scrolling). %>
-            <div class="lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
-              <div class="max-w-[680px] mx-auto w-full px-4 sm:px-6 pt-6 pb-10 flex flex-col min-h-full">
-                <%= render(Campbooks::Compose::Engine.new(
-                      shell: :desk,
-                      mode: @mode,
-                      action_url: @reply_source ? send_message_email_message_path(@reply_source) : send_new_email_messages_path,
-                      message: @reply_source,
-                      draft: @draft,
-                      to: @to, cc: @cc, bcc: @bcc,
-                      subject: @subject, body: @body, quoted_body: @quoted_body,
-                      signatures: @signatures,
-                      signature_id: @signature_id,
-                      accounts: @reply_source ? [] : @sendable_accounts.to_a,
-                      attachment_entries: @attachment_entries,
-                      form_id: "compose_desk_form",
-                      show_attachments: false
-                    )) %>
+          <%# The intent input posts to this Scout thread; its auto-actions fill
+              the editor + envelope above. Hidden by default — a quiet link opens
+              it for people who want the conversation. %>
+          <div class="mx-auto w-full max-w-[680px] px-4 pb-16 sm:px-6">
+            <button type="button" data-action="click->compose-chat#toggleConversation"
+                    class="text-[12.5px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline">
+              <%= t(".show_conversation") %>
+            </button>
+            <div data-compose-chat-target="conversation" class="mt-3 hidden overflow-hidden rounded-2xl border border-border">
+              <div class="flex items-center gap-1.5 border-b border-border px-4 py-2.5">
+                <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24" style="color: var(--ember-solid)" aria-hidden="true">
+                  <path d="M12 2l1.7 5.6L19.5 9l-5.8 1.4L12 16l-1.7-5.6L4.5 9l5.8-1.4z"/>
+                </svg>
+                <span class="text-[12px] font-semibold text-foreground"><%= t(".scout_label") %></span>
+              </div>
+              <%= turbo_stream_from "compose_chat_#{current_user.id}" %>
+              <div data-chat-panel-target="body" class="flex max-h-[420px] flex-col">
+                <div id="compose_messages_wrapper" class="flex flex-col">
+                  <%= render "email_compose_chat/messages_panel", thread: @compose_thread, messages: @compose_messages %>
+                </div>
               </div>
             </div>
-          <% else %>
-            <div class="flex items-center justify-center flex-1">
-              <%= render(Campbooks::EmptyState.new(variant: :card, title: t(".no_sendable_accounts_title"), description: t(".no_sendable_accounts_description"))) %>
-            </div>
-          <% end %>
+          </div>
         </div>
+      <% else %>
+        <div class="flex flex-1 items-center justify-center">
+          <%= render(Campbooks::EmptyState.new(variant: :card, title: t(".no_sendable_accounts_title"), description: t(".no_sendable_accounts_description"))) %>
+        </div>
+      <% end %>
+      <div id="redirect_script"></div>
+    </div>
+  <% else %>
+    <%# ── Classic Desk (unchanged): three columns side-by-side at lg+ ── %>
+    <div class="flex h-full flex-col bg-card" data-controller="scout-mobile">
+      <%# compose-chat drives the Cmd+Shift+E mode toggle and the Scout draft bridge %>
+      <div class="flex flex-1 min-h-0 overflow-y-auto lg:overflow-hidden" data-controller="compose-chat">
 
-        <%# ── Context rail (stacks below editor on mobile, side column at lg+) %>
-        <% if @account %>
-          <%= render(Campbooks::Compose::ContextRail.new(
-                message: @reply_source,
-                mode: @mode,
-                upload_url: compose_attachments_path,
-                form_id: "compose_desk_form",
-                attachment_entries: @attachment_entries,
-                ai_available: ai_provider_available?(:text)
-              )) %>
-        <% end %>
+        <%# Writing column + context rail — flex-col on mobile (stacked), flex-row at lg+ %>
+        <div class="flex flex-col lg:flex-row lg:flex-1 lg:min-h-0 min-w-0">
 
-      </div><%# end writing + rail wrapper %>
+          <%# ── Writing column ────────────────────────────────────── %>
+          <div class="flex flex-col lg:flex-1 lg:min-h-0 min-w-0">
+            <% if @account %>
+              <%# Top bar — sticky so it doesn't scroll off on mobile. Frosted instead
+                  of ruled: content sliding under the translucent bar stays legible
+                  without a hairline (separation is whitespace, not lines). %>
+              <div class="sticky top-0 z-10 flex items-center gap-3 px-4 sm:px-6 py-3 flex-shrink-0 bg-card/90 backdrop-blur-md">
+                <%= link_to email_messages_path, data: { turbo_frame: "_top" },
+                      class: "inline-flex items-center gap-2 text-[13px] font-semibold text-gray-600 hover:text-gray-900 transition-colors" do %>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                  <%= t(".heading_#{@mode}") %>
+                <% end %>
+                <div class="flex-1"></div>
+                <%# Mobile-only Scout button (opens overlay) %>
+                <button type="button" data-action="click->scout-mobile#open"
+                        class="lg:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 cursor-pointer flex-shrink-0">
+                  <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5z" clip-rule="evenodd"/></svg>
+                  <%= t(".scout_label") %>
+                </button>
+              </div>
 
-      <%# ── Scout chat panel (desktop side column / mobile overlay) ── %>
-      <div class="hidden lg:flex flex-shrink-0 flex-col bg-card transition-all duration-200 w-96"
-           data-controller="chat-panel"
-           data-scout-mobile-target="panel">
-        <div class="px-4 py-3 flex-shrink-0 flex items-center gap-1.5">
-          <div class="hidden lg:block">
-            <%= render(Campbooks::IconButton.new(aria_label: t(".toggle_chat_aria"), size: :sm, class: "hover:bg-gray-100", data: { action: "click->chat-panel#toggle" })) do %>
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-chat-panel-target="icon">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
-              </svg>
+              <%# Centered writing surface. On desktop: constrained, scrollable.
+                  On mobile: natural height (outer div handles scrolling). %>
+              <div class="lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+                <div class="max-w-[680px] mx-auto w-full px-4 sm:px-6 pt-6 pb-10 flex flex-col min-h-full">
+                  <%= render(Campbooks::Compose::Engine.new(
+                        shell: :desk,
+                        mode: @mode,
+                        action_url: @reply_source ? send_message_email_message_path(@reply_source) : send_new_email_messages_path,
+                        message: @reply_source,
+                        draft: @draft,
+                        to: @to, cc: @cc, bcc: @bcc,
+                        subject: @subject, body: @body, quoted_body: @quoted_body,
+                        signatures: @signatures,
+                        signature_id: @signature_id,
+                        accounts: @reply_source ? [] : @sendable_accounts.to_a,
+                        attachment_entries: @attachment_entries,
+                        form_id: "compose_desk_form",
+                        show_attachments: false
+                      )) %>
+                </div>
+              </div>
+            <% else %>
+              <div class="flex items-center justify-center flex-1">
+                <%= render(Campbooks::EmptyState.new(variant: :card, title: t(".no_sendable_accounts_title"), description: t(".no_sendable_accounts_description"))) %>
+              </div>
             <% end %>
           </div>
-          <svg class="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" fill="currentColor" viewBox="0 0 24 24">
-            <path fill-rule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5zM18 1.5a.75.75 0 01.728.568l.258 1.036c.236.94.88 1.584 1.82 1.82l1.036.258a.75.75 0 010 1.456l-1.036.258c-.94.236-1.584.88-1.82 1.82l-.258 1.036a.75.75 0 01-1.456 0l-.258-1.036a2.625 2.625 0 00-1.82-1.82l-1.036-.258a.75.75 0 010-1.456l1.036-.258a2.625 2.625 0 001.82-1.82l.258-1.036A.75.75 0 0118 1.5zM16.5 15a.75.75 0 01.712.513l.394 1.183c.15.447.5.799.948.948l1.183.395a.75.75 0 010 1.422l-1.183.395c-.447.15-.799.5-.948.948l-.395 1.183a.75.75 0 01-1.422 0l-.395-1.183a1.5 1.5 0 00-.948-.948l-1.183-.395a.75.75 0 010-1.422l1.183-.395a1.5 1.5 0 00.948-.948l.395-1.183A.75.75 0 0116.5 15z" clip-rule="evenodd"/>
-          </svg>
-          <span class="text-[12px] font-semibold text-gray-700"><%= t(".scout_label") %></span>
-          <span class="hidden lg:inline text-[10px] text-gray-400 ml-auto"><%= t(".scout_keyboard_hint") %></span>
-          <button type="button" data-action="click->scout-mobile#close" aria-label="<%= t(".close_scout_aria") %>"
-                  class="lg:hidden ml-auto inline-flex items-center justify-center w-7 h-7 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
-        </div>
 
-        <%= turbo_stream_from "compose_chat_#{current_user.id}" %>
+          <%# ── Context rail (stacks below editor on mobile, side column at lg+) %>
+          <% if @account %>
+            <%= render(Campbooks::Compose::ContextRail.new(
+                  message: @reply_source,
+                  mode: @mode,
+                  upload_url: compose_attachments_path,
+                  form_id: "compose_desk_form",
+                  attachment_entries: @attachment_entries,
+                  ai_available: ai_provider_available?(:text)
+                )) %>
+          <% end %>
 
-        <div data-chat-panel-target="body" class="flex flex-col flex-1 min-h-0">
-          <div id="compose_messages_wrapper" class="flex flex-col flex-1 min-h-0">
-            <%= render "email_compose_chat/messages_panel", thread: @compose_thread, messages: @compose_messages %>
+        </div><%# end writing + rail wrapper %>
+
+        <%# ── Scout chat panel (desktop side column / mobile overlay) ── %>
+        <div class="hidden lg:flex flex-shrink-0 flex-col bg-card transition-all duration-200 w-96"
+             data-controller="chat-panel"
+             data-scout-mobile-target="panel">
+          <div class="px-4 py-3 flex-shrink-0 flex items-center gap-1.5">
+            <div class="hidden lg:block">
+              <%= render(Campbooks::IconButton.new(aria_label: t(".toggle_chat_aria"), size: :sm, class: "hover:bg-gray-100", data: { action: "click->chat-panel#toggle" })) do %>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-chat-panel-target="icon">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
+                </svg>
+              <% end %>
+            </div>
+            <svg class="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" fill="currentColor" viewBox="0 0 24 24">
+              <path fill-rule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5zM18 1.5a.75.75 0 01.728.568l.258 1.036c.236.94.88 1.584 1.82 1.82l1.036.258a.75.75 0 010 1.456l-1.036.258c-.94.236-1.584.88-1.82 1.82l-.258 1.036a.75.75 0 01-1.456 0l-.258-1.036a2.625 2.625 0 00-1.82-1.82l-1.036-.258a.75.75 0 010-1.456l1.036-.258a2.625 2.625 0 001.82-1.82l.258-1.036A.75.75 0 0118 1.5zM16.5 15a.75.75 0 01.712.513l.394 1.183c.15.447.5.799.948.948l1.183.395a.75.75 0 010 1.422l-1.183.395c-.447.15-.799.5-.948.948l-.395 1.183a.75.75 0 01-1.422 0l-.395-1.183a1.5 1.5 0 00-.948-.948l-1.183-.395a.75.75 0 010-1.422l1.183-.395a1.5 1.5 0 00.948-.948l.395-1.183A.75.75 0 0116.5 15z" clip-rule="evenodd"/>
+            </svg>
+            <span class="text-[12px] font-semibold text-gray-700"><%= t(".scout_label") %></span>
+            <span class="hidden lg:inline text-[10px] text-gray-400 ml-auto"><%= t(".scout_keyboard_hint") %></span>
+            <button type="button" data-action="click->scout-mobile#close" aria-label="<%= t(".close_scout_aria") %>"
+                    class="lg:hidden ml-auto inline-flex items-center justify-center w-7 h-7 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          <%= turbo_stream_from "compose_chat_#{current_user.id}" %>
+
+          <div data-chat-panel-target="body" class="flex flex-col flex-1 min-h-0">
+            <div id="compose_messages_wrapper" class="flex flex-col flex-1 min-h-0">
+              <%= render "email_compose_chat/messages_panel", thread: @compose_thread, messages: @compose_messages %>
+            </div>
           </div>
         </div>
-      </div>
 
-    </div><%# end compose-chat %>
+      </div><%# end compose-chat %>
 
-    <%# Scout mobile overlay backdrop %>
-    <div data-scout-mobile-target="backdrop" data-action="click->scout-mobile#close"
-         class="hidden lg:hidden fixed inset-0 top-14 z-40 bg-black/40"></div>
+      <%# Scout mobile overlay backdrop %>
+      <div data-scout-mobile-target="backdrop" data-action="click->scout-mobile#close"
+           class="hidden lg:hidden fixed inset-0 top-14 z-40 bg-black/40"></div>
 
-    <div id="redirect_script"></div>
-  </div>
+      <div id="redirect_script"></div>
+    </div>
+  <% end %>
 <% end %>

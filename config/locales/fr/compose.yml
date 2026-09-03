@@ -18,6 +18,7 @@ fr:
         restore_aria: Reprendre la rédaction
         switch_mode: Changer le mode de réponse
       engine:
+        attach: Joindre
         bcc_button: Cci
         cc_button: Cc
         collapse_envelope: Replier les champs de destinataires
@@ -48,6 +49,21 @@ fr:
         scout_draft_title: Rédiger cette réponse avec Scout
         send: Envoyer
         signature_default: "%{name} (par défaut)"
+        format_bold: Gras
+        format_italic: Italique
+        format_link: Lien
+        inferred: déduit
+        rewrite_done: Brouillon réécrit
+        rewrite_failed: Impossible de réécrire le brouillon
+        rewrite_shorter: Plus court
+        rewrite_warmer: Plus chaleureux
+        saved_just_now: Enregistré à l'instant
+        scout_draft_chip: Brouillon de Scout · modifie librement
+        scout_draft_source: d'après ta note et le fil
+        undo_rewrite: Annuler la réécriture
+      intent_input:
+        draft: Rédiger
+        placeholder: Dis à Scout quoi écrire, ou commence à taper…
       pill:
         dismiss_title: Masquer
         draft_saved: Brouillon enregistré
@@ -72,3 +88,5 @@ fr:
         tone_shorter: Plus court
         tone_warmer: Plus chaleureux
         use_draft: Utiliser ce brouillon
+    contact_pill_input:
+      inferred: déduit

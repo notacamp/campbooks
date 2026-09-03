@@ -1,6 +1,6 @@
 class EmailComposeController < ApplicationController
   before_action :require_authentication
-  before_action :load_message
+  before_action :load_message, except: :rewrite
 
   MODES = %w[reply reply_all forward new_message].freeze
 
@@ -77,6 +77,29 @@ class EmailComposeController < ApplicationController
 
   def discard
     remove_compose_area
+  end
+
+  # Rewrite the editor's current body to a tone — the bold composer's
+  # "Shorter" / "Warmer" footer buttons (and "Firmer"). JSON in / JSON out; the
+  # editor replaces its content client-side and offers a one-step "Undo rewrite"
+  # toast. Best-effort: a failed rewrite leaves the draft untouched.
+  def rewrite
+    return if require_ai_provider!(:text)
+
+    tone = params[:tone].to_s
+    unless Ai::DraftRewriter::TONES.include?(tone)
+      return render json: { error: "invalid_tone" }, status: :unprocessable_entity
+    end
+
+    rewritten = Ai::DraftRewriter.new.rewrite(
+      params[:body].to_s, tone: tone, style: Current.user.writing_style_prompt
+    )
+
+    if rewritten.present?
+      render json: { body: rewritten }
+    else
+      render json: { error: "rewrite_failed" }, status: :unprocessable_entity
+    end
   end
 
   private
