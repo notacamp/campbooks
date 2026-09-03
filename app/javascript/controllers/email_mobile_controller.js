@@ -12,7 +12,9 @@ export default class extends Controller {
   static targets = ["list", "detail", "topband"]
   // Width (px) at/above which both panes show side by side and inline overrides
   // should be cleared. Email = 1024 (lg), Scout chat = 640 (sm, the default).
-  static values = { breakpoint: { type: Number, default: 640 } }
+  // `startOnList` makes a list-first surface (People index, no selection) show
+  // the list on mobile — the detail-first email show page leaves it false.
+  static values = { breakpoint: { type: Number, default: 640 }, startOnList: { type: Boolean, default: false } }
 
   connect() {
     this.boundResize = this.#onResize.bind(this)
@@ -23,7 +25,7 @@ export default class extends Controller {
     // (push notification, digest link) still opens the email as expected.
     // frameLoad() flips back to detail after a row tap loads the email_detail frame.
     const showList = new URLSearchParams(window.location.search).get("show_list") === "1"
-    if (window.innerWidth < this.breakpointValue && showList) this.showList()
+    if (window.innerWidth < this.breakpointValue && (showList || this.startOnListValue)) this.showList()
   }
 
   disconnect() {

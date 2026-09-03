@@ -1,0 +1,11 @@
+<%# Next page of a stream's threads: append rows, then advance/retire the sentinel. %>
+<%= turbo_stream.append "stream_thread_list" do %>
+  <%= render partial: "people/streams/thread_row", collection: @stream_threads, as: :thread %>
+<% end %>
+<% if @stream_pagy&.next %>
+  <%= turbo_stream.replace "stream_thread_pagination" do %>
+    <%= render "people/streams/thread_pagination", pagy: @stream_pagy %>
+  <% end %>
+<% else %>
+  <%= turbo_stream.remove "stream_thread_pagination" %>
+<% end %>

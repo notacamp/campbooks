@@ -107,12 +107,10 @@ en:
           other: " from %{count} messages in thread"
       discussion: Discussion
       forward: Forward
-      no_content: No content.
       no_subject: "(no subject)"
       open_full_view: Open in full view
       reply: Reply
       reply_all: Reply all
-      selected_badge: Selected
       send_to_notion: Save to Notion
       tags_label: Tags
     email_filter_panel:

@@ -1,0 +1,8 @@
+<%# Infinite-scroll sentinel for a stream's threads. %>
+<%= turbo_frame_tag "stream_thread_pagination",
+      src: people_stream_path(@stream_name, organization_id: @organization&.id, page: pagy.next, format: :turbo_stream),
+      loading: :lazy do %>
+  <div class="flex items-center justify-center py-6">
+    <%= render(Campbooks::Spinner.new(size: :sm)) %>
+  </div>
+<% end %>

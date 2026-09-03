@@ -1,0 +1,105 @@
+es:
+  components:
+    message_bubble:
+      selected_badge: Seleccionado
+      no_content: Sin contenido.
+      show_full: Ver todo
+      hide_full: Ocultar
+      open_thread: Abrir conversación
+      channel:
+        email: Email
+    people:
+      counterpart_row:
+        open: Abrir
+      search_bar:
+        placeholder: Buscar una persona o empresa…
+        clear: Borrar
+  people:
+    index:
+      tab_people: Personas
+      tab_streams: Streams
+      classic_inbox: Bandeja clásica
+      need_you: Te necesitan
+      recent: Recientes
+      organization: Organización
+      people_count:
+        one: "%{count} persona"
+        other: "%{count} personas"
+      services_count:
+        one: "%{count} servicio"
+        other: "%{count} servicios"
+      service_meta:
+        one: "Servicio · %{count} mensaje"
+        other: "Servicio · %{count} mensajes"
+      no_matches: Nadie coincide.
+      empty: Aún no hay personas.
+      empty_hint: Conecta un buzón y Scout ordena aquí a tus remitentes en personas y servicios.
+      placeholder_title: Elige a alguien para abrir
+      placeholder_body: Elige una persona o empresa para ver toda la conversación en un solo lugar.
+    standing:
+      you_owe:
+        zero: Esperando tu respuesta.
+        one: Esperando tu respuesta desde hace un día.
+        other: Esperando tu respuesta desde hace %{count} días.
+      awaiting_them:
+        zero: Sin respuesta a %{subject}. ¿Insistir?
+        one: Sin respuesta a %{subject} desde hace un día. ¿Insistir?
+        other: Sin respuesta a %{subject} desde hace %{count} días. ¿Insistir?
+      your_last_message: tu último mensaje
+      last_exchange: "Último intercambio %{date}."
+    conversation:
+      you: Tú
+      back: Personas
+      menu: Más
+      where_things_stand: cómo va todo
+      no_standing: Nada requiere tu atención ahora mismo.
+      emails_since:
+        one: "%{count} correo desde %{since}"
+        other: "%{count} correos desde %{since}"
+      empty: Aún no hay mensajes.
+      earlier: Anteriores
+      reply_to: "Responder a %{name}"
+      reply: Responder
+      send: Enviar
+      scout_draft_chip: Borrador de Scout · edítalo libremente
+      open_profile: Abrir perfil clásico
+      star: Marcar como favorito
+      unstar: Quitar de favoritos
+      block: Bloquear
+      mark_service: Esto es un servicio
+    streams:
+      threads_meta:
+        one: "%{count} conversación"
+        other: "%{count} conversaciones"
+      last: "última %{date}"
+      nothing_needs_you: Nada requiere tu atención.
+      may_need_you:
+        one: Una puede requerir tu atención.
+        other: "%{count} pueden requerir tu atención."
+      empty: Aún no hay streams.
+      placeholder_title: Abrir un stream
+      placeholder_body: "Un stream es el correo de un servicio: newsletters, recibos, notificaciones. Abre uno para revisarlo o déjalo pasar."
+      archive_all: Archivar todo
+      archive_all_confirm: ¿Archivar todas las conversaciones de este stream?
+      open_classic: Abrir en clásico
+      no_threads: Nada por aquí ahora mismo.
+      no_subject: (sin asunto)
+    stream_kinds:
+      billing: Facturación
+      notifications: Notificaciones
+      newsletters: Newsletters
+      updates: Actualizaciones
+      social: Redes sociales
+    org:
+      organization: Organización
+      since: "desde %{year}"
+      documents:
+        one: "%{count} documento"
+        other: "%{count} documentos"
+      open_classic: Abrir página clásica de la organización
+      no_standing: Nada requiere tu atención ahora mismo.
+      people_heading: "Personas en %{org} · %{count}"
+      no_people: Aún no hay personas.
+      streams_heading: "Streams de %{org} · %{count}"
+      no_streams: Aún no hay servicios.
+      open_stream: Abrir stream

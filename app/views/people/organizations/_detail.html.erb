@@ -1,0 +1,80 @@
+<%# An organization inside the People place: its people and its services side by
+    side. Header, Scout's standing, "People at …" and "Streams from …". %>
+<div class="flex h-full w-full min-w-0 flex-col">
+  <%# Mobile: back to the list. %>
+  <div class="flex items-center px-3 py-2 lg:hidden">
+    <button type="button" data-action="click->email-mobile#showList"
+            class="inline-flex min-h-[40px] items-center gap-1 -ml-1.5 rounded-md px-1.5 text-sm font-medium text-accent-600 hover:bg-accent-50">
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      <%= t("people.conversation.back") %>
+    </button>
+  </div>
+
+  <%# Header. %>
+  <div class="flex flex-wrap items-center gap-3 border-b border-border px-5 py-4 sm:px-7">
+    <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-[15px] font-semibold text-muted-foreground">
+      <%= @organization.name.to_s[0].to_s.upcase %>
+    </div>
+    <div class="min-w-0">
+      <div class="truncate text-[17px] font-semibold text-foreground"><%= @organization.name %></div>
+      <div class="truncate text-xs text-muted-foreground">
+        <%= [ t("people.org.organization"), @organization.domain.presence,
+              (@first_year ? t("people.org.since", year: @first_year) : nil) ].compact.join(" · ") %>
+      </div>
+    </div>
+    <span class="flex-1"></span>
+    <% if @doc_count.to_i.positive? %>
+      <%= link_to organization_documents_path(@organization), data: { turbo_frame: "_top" },
+            class: "inline-flex h-[26px] flex-shrink-0 items-center rounded-md bg-secondary px-2.5 text-[12px] font-medium text-muted-foreground no-underline hover:text-foreground" do %>
+        <%= t("people.org.documents", count: @doc_count) %>
+      <% end %>
+    <% end %>
+    <details class="relative flex-shrink-0">
+      <summary class="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/></svg>
+        <span class="sr-only"><%= t("people.conversation.menu") %></span>
+      </summary>
+      <div class="absolute right-0 top-full z-30 mt-1 min-w-[220px] overflow-hidden rounded-xl border border-border bg-card py-1 shadow-lg">
+        <%= link_to t("people.org.open_classic"), organization_path(@organization), data: { turbo_frame: "_top" },
+              class: "block px-3.5 py-2 text-[13px] text-foreground no-underline hover:bg-secondary" %>
+      </div>
+    </details>
+  </div>
+
+  <div class="flex-1 overflow-y-auto">
+    <div class="mx-auto w-full max-w-[760px] px-5 pb-10 pt-5 sm:px-6">
+      <%= render Campbooks::ScoutNote.new(message: @standing.text.presence || t("people.org.no_standing"),
+            time: t("people.conversation.where_things_stand")) %>
+
+      <%# People at <org>. %>
+      <div class="flex items-center gap-1.5 pb-1 pt-6 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <%= t("people.org.people_heading", org: @organization.name, count: @org_people.size) %>
+      </div>
+      <% if @org_people.any? %>
+        <div class="divide-y divide-border">
+          <% @org_people.each do |counterpart| %>
+            <%= render Campbooks::People::CounterpartRow.new(counterpart: counterpart, nested: true) %>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="py-3 text-sm text-muted-foreground"><%= t("people.org.no_people") %></p>
+      <% end %>
+
+      <%# Streams from <org>. %>
+      <div class="flex items-center gap-1.5 pb-1 pt-6 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <%= t("people.org.streams_heading", org: @organization.name, count: @org_streams.size) %>
+      </div>
+      <% if @org_streams.any? %>
+        <div class="divide-y divide-border">
+          <% @org_streams.each do |stream| %>
+            <%= render Campbooks::People::StreamRow.new(
+                  icon: stream[:icon], title: stream[:label], meta: stream[:meta], note: stream[:note],
+                  actions: [ { label: t("people.org.open_stream"), href: stream[:href], frame: "people_detail" } ]) %>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="py-3 text-sm text-muted-foreground"><%= t("people.org.no_streams") %></p>
+      <% end %>
+    </div>
+  </div>
+</div>

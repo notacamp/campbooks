@@ -39,6 +39,19 @@ namespace :contacts do
     puts "\nDone. #{total} jobs enqueued."
   end
 
+  desc "Classify every workspace's contacts as person/service (People place)"
+  task sender_kind_backfill: :environment do
+    total = Workspace.count
+    puts "Enqueuing sender-kind backfill for #{total} workspaces..."
+
+    Workspace.find_each.with_index do |workspace, i|
+      Contacts::SenderKindBackfillJob.perform_later(workspace.id)
+      puts "[#{i + 1}/#{total}] Enqueued Workspace ##{workspace.id} (#{workspace.name})"
+    end
+
+    puts "\nDone. #{total} jobs enqueued. They will be processed by Solid Queue."
+  end
+
   desc "Reindex all contacts in OpenSearch"
   task reindex: :environment do
     total = Contact.count

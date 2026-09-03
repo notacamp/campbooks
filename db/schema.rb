@@ -404,7 +404,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_03_150100) do
     t.uuid "person_id"
     t.text "raw_analysis"
     t.string "relationship_type"
+    t.integer "sender_kind", default: 0, null: false
+    t.string "sender_kind_source"
     t.datetime "starred_at"
+    t.string "stream_kind"
     t.float "suggested_confidence"
     t.uuid "suggested_person_id"
     t.text "suggested_reason"
@@ -417,6 +420,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_03_150100) do
     t.index ["last_email_at"], name: "index_contacts_on_last_email_at"
     t.index ["person_id"], name: "index_contacts_on_person_id"
     t.index ["relationship_type"], name: "index_contacts_on_relationship_type"
+    t.index ["sender_kind"], name: "index_contacts_on_sender_kind"
     t.index ["suggested_person_id"], name: "index_contacts_on_suggested_person_id"
     t.index ["workspace_id", "list_status"], name: "index_contacts_on_workspace_id_and_list_status"
     t.index ["workspace_id", "starred_at"], name: "index_contacts_on_workspace_and_starred", where: "(starred_at IS NOT NULL)"
@@ -685,6 +689,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_03_150100) do
     t.string "category"
     t.float "category_confidence"
     t.text "cc_address"
+    t.string "channel", default: "email", null: false
     t.uuid "contact_id"
     t.datetime "created_at", null: false
     t.uuid "email_account_id", null: false
@@ -713,6 +718,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_03_150100) do
     t.string "zoho_flag"
     t.index ["ai_analysis_message_id"], name: "index_email_messages_on_ai_analysis_message_id"
     t.index ["category"], name: "index_email_messages_on_category"
+    t.index ["channel"], name: "index_email_messages_on_channel"
     t.index ["contact_id"], name: "index_email_messages_on_contact_id"
     t.index ["email_account_id", "provider_message_id"], name: "index_emails_on_account_and_provider_message", unique: true
     t.index ["email_account_id", "provider_thread_id"], name: "index_email_messages_on_account_and_provider_thread"

@@ -52,6 +52,8 @@ en:
       complete:
         one: Scan complete. %{count} possible duplicate group.
         other: Scan complete. %{count} possible duplicate group(s).
+    sender_kind:
+      taught: Got it — Scout will treat them that way from now on.
     show:
       analyze: Analyze
       analyze_prompt_placeholder: Tell Scout who this is…

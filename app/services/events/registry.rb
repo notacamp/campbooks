@@ -151,6 +151,9 @@ module Events
         description: "A contact was blocked", subject_type: "Contact", payload_keys: %w[name email]),
       entry("contact.unblocked", "Contact unblocked", group: :contacts, icon: :ban,
         description: "A contact was unblocked", subject_type: "Contact", payload_keys: %w[name email]),
+      entry("contact.sender_kind_taught", "Sender type corrected", group: :contacts, icon: :user,
+        description: "You taught Scout a sender is a person or a service", subject_type: "Contact",
+        payload_keys: %w[name email sender_kind]),
 
       # --- Reminders -----------------------------------------------------------
       entry("reminder.created", "Reminder created", group: :reminders, icon: :bell,

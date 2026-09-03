@@ -52,6 +52,8 @@ es:
       complete:
         one: Análisis completado. %{count} posible grupo duplicado.
         other: Análisis completado. %{count} posibles grupos duplicados.
+    sender_kind:
+      taught: "Entendido: Scout los tratará así a partir de ahora."
     show:
       analyze: Analizar
       analyze_prompt_placeholder: Indique a Scout quién es esta persona…

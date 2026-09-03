@@ -125,6 +125,18 @@ class EmailProcessJob < ApplicationJob
 
     Contacts::Identifier.new(email).identify!
 
+    # Give a new sender its person/service verdict (the People place's "who is
+    # talking" axis) the moment it's seen, so it lands in the right list without
+    # waiting for the workspace backfill. Only the never-classified — an
+    # established verdict (and anything the user taught) is left to the backfill's
+    # periodic re-derivation. Fail-safe: never break ingest over a classification.
+    begin
+      contact = email.contact
+      Contacts::SenderKind.classify(contact) if contact&.sender_kind_source.nil?
+    rescue StandardError => e
+      Rails.logger.warn("[EmailProcessJob] sender-kind classify failed: #{e.class}: #{e.message}")
+    end
+
     # Profile the sender when they're someone worth profiling — a real person or
     # vendor — instead of after an arbitrary email count. Contacts::AnalysisGate is
     # a cheap, LLM-free deny-list over the triage category + bulk/automated headers

@@ -35,6 +35,8 @@ class CommandPaletteCatalog
       *(Features.bold_layout? ? [ cmd("paper", I18n.t("command_palette.commands.paper"), I18n.t("command_palette.categories.navigate"), "file", paper_path) ] : []),
       # Money (the obligations surface) lives wherever the accounting module does.
       *(Features.bold_layout? && Features.accounting? ? [ cmd("money", I18n.t("command_palette.commands.money"), I18n.t("command_palette.categories.navigate"), "credit-card", money_path) ] : []),
+      # People (the rethought conversations place) — bold layout only.
+      *(Features.bold_layout? ? [ cmd("people", I18n.t("command_palette.commands.people"), I18n.t("command_palette.categories.navigate"), "users", people_path) ] : []),
       cmd("inbox", I18n.t("command_palette.commands.inbox"), I18n.t("command_palette.categories.navigate"), "mail", root_path),
       cmd("scout", I18n.t("command_palette.commands.scout_ai_chat"), I18n.t("command_palette.categories.navigate"), "sparkles", scout_path),
       cmd("files", I18n.t("command_palette.commands.files"), I18n.t("command_palette.categories.navigate"), "folder", files_path),

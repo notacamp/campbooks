@@ -1,0 +1,6 @@
+<%# Frame-only response for opening a stream from the list. %>
+<%= turbo_frame_tag "people_detail",
+      class: "flex flex-1 min-w-0", style: "height:100%",
+      data: { email_mobile_target: "detail", inbox_pane: "detail" } do %>
+  <%= render "people/streams/detail" %>
+<% end %>

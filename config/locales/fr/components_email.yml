@@ -107,12 +107,10 @@ fr:
           other: " de %{count} messages dans la conversation"
       discussion: Discussion
       forward: Transférer
-      no_content: Aucun contenu.
       no_subject: "(sans objet)"
       open_full_view: Ouvrir en plein écran
       reply: Répondre
       reply_all: Répondre à tous
-      selected_badge: Sélectionné
       send_to_notion: Enregistrer dans Notion
       tags_label: Étiquettes
     email_filter_panel:

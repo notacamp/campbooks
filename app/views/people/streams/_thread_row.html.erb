@@ -1,0 +1,17 @@
+<%# One stream thread: subject, sender · date, one-line snippet. Opens the classic
+    thread in a top-level Turbo visit (never inside the People frame). %>
+<% latest = thread.latest_message %>
+<% if latest %>
+  <%= link_to email_message_path(latest), data: { turbo_frame: "_top" },
+        class: "block px-5 py-3 no-underline transition-colors hover:bg-secondary/50 sm:px-7" do %>
+    <div class="flex items-baseline gap-2">
+      <span class="min-w-0 flex-1 truncate text-sm font-medium text-foreground"><%= thread.display_subject.presence || t("people.streams.no_subject") %></span>
+      <span class="flex-shrink-0 text-[11.5px] text-muted-foreground"><%= latest.received_at ? l(latest.received_at.to_date, format: :day_month) : "" %></span>
+    </div>
+    <div class="mt-0.5 truncate text-[12.5px] text-muted-foreground"><%= latest.from_address %></div>
+    <% snippet = latest.summary.presence || strip_tags(latest.body.to_s).squish %>
+    <% if snippet.present? %>
+      <div class="mt-0.5 truncate text-[12.5px] text-muted-foreground/80"><%= snippet.truncate(120) %></div>
+    <% end %>
+  <% end %>
+<% end %>

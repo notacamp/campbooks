@@ -1,0 +1,12 @@
+<%# The "Earlier" loader at the top of the conversation. A turbo frame whose link
+    fetches the previous (older) page as a Turbo Stream that prepends it above and
+    swaps this control for the next one. Empty (invisible) once the oldest is loaded. %>
+<%= turbo_frame_tag "people_conversation_earlier" do %>
+  <% if @conversation_pagy&.next %>
+    <div class="mb-3 flex justify-center">
+      <%= link_to t("people.conversation.earlier"),
+            person_page_path(@person, page: @conversation_pagy.next, format: :turbo_stream),
+            class: "inline-flex items-center rounded-lg border border-border px-3 py-1 text-[12px] font-medium text-muted-foreground no-underline hover:bg-secondary" %>
+    </div>
+  <% end %>
+<% end %>

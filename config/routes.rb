@@ -119,6 +119,16 @@ Rails.application.routes.draw do
   # controller PATCHes it once when User#time_zone is still nil) — drives the Time
   # surface's day bucketing + focus slot finding. Top-level so any page can call it.
   patch "account/time_zone", to: "settings/account#time_zone", as: :account_time_zone
+  # The People place (Rethink Stage 2) — persons + organizations ordered by who
+  # needs you; a person opens as one conversation across all their threads;
+  # Streams hold the services (inbox groups). Gated on Features.bold_layout?
+  # (require_bold_layout_enabled in each controller). Streams + the org page must
+  # resolve BEFORE the /people/:id person catch-all.
+  get "people",                to: "people#index",               as: :people
+  get "people/streams",        to: "people/streams#index",       as: :people_streams
+  get "people/streams/:name",  to: "people/streams#show",        as: :people_stream, constraints: { name: %r{[^/]+} }, format: false
+  get "people/orgs/:id",       to: "people/organizations#show",  as: :people_organization
+  get "people/:id",            to: "people#show",                as: :person_page
 
   # Workspace activity feed — a retrospective timeline of domain Events (distinct
   # from the prospective home feed). Read-only; turbo_stream serves pagination.
@@ -560,10 +570,11 @@ Rails.application.routes.draw do
   # compose autocomplete hits /contacts/search.
   resources :contacts, only: [ :index, :show, :update ] do
     member do
-      get  :popover
-      post :analyze
-      post :resolve_duplicate
-      post :set_state          # star / unstar / block / unblock / allow
+      get   :popover
+      post  :analyze
+      post  :resolve_duplicate
+      post  :set_state          # star / unstar / block / unblock / allow
+      patch :sender_kind        # teach person/service (People place)
     end
     collection do
       get  :popover

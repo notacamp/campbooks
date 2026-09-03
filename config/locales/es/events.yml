@@ -19,6 +19,7 @@ es:
       calendar_event_deleted: Evento de calendario eliminado
       calendar_event_updated: Evento de calendario actualizado
       contact_blocked: Contacto bloqueado
+      contact_sender_kind_taught: Tipo de remitente corregido
       contact_starred: Contacto destacado
       contact_unblocked: Contacto desbloqueado
       contact_unstarred: Contacto sin destacar
