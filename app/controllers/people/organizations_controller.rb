@@ -32,19 +32,19 @@ module People
     private
 
     def build_org_detail
-      now = Time.current
-      @standing = People::Standing.for_organization(@organization, user: current_user, now: now)
-      @org_people = org_people_counterparts(now)
+      people = org_detail_people
+      prime_standing(people: people, organizations: [ @organization ])
+      @standing = people_standing.organization(@organization)
+      @org_people = people.map { |person| person_counterpart(person) }
+                          .sort_by { |counterpart| -(counterpart.last_activity&.to_i || 0) }
       @org_streams = org_stream_summaries
       @first_year = @organization.email_messages.minimum(:received_at)&.year
       @doc_count = @organization.documents.count
     end
 
-    def org_people_counterparts(now)
+    def org_detail_people
       @organization.active_people.includes(:contacts, :primary_organization)
                    .select { |person| person.contacts.any?(&:kind_person?) }
-                   .map { |person| person_counterpart(person, now) }
-                   .sort_by { |counterpart| -(counterpart.last_activity&.to_i || 0) }
     end
 
     # One row per stream kind among the org's service contacts.
