@@ -28,4 +28,16 @@ RSpec.describe Campbooks::Divider, type: :component do
     expect(html).to include("border-border")
     expect(html).to include("mt-4")
   end
+
+  it "backs the label with the canvas by default" do
+    expect(render_for(label: "or")).to include("bg-background")
+  end
+
+  # Inside a raised card (e.g. the auth screens) the label must match the card,
+  # not the darker page background, or a seam shows behind it in dark mode.
+  it "backs the label with the card surface when surface: :card" do
+    html = render_for(label: "or", surface: :card)
+    expect(html).to include("bg-card")
+    expect(html).not_to include("bg-background")
+  end
 end

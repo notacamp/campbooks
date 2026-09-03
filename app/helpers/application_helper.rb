@@ -2,6 +2,16 @@ module ApplicationHelper
   include Pagy::Frontend
   include EmailMessageHelpers
 
+  # The <main> class for the unauthenticated auth screens: a full-viewport,
+  # warm-grey canvas that vertically centers a single Campbooks::AuthCard and
+  # clips its Ember halo. Set via `content_for :main_class` so both the
+  # application and onboarding layouts pick it up. `relative` anchors the halo;
+  # `overflow-hidden` keeps it inside the canvas.
+  def auth_canvas_class
+    "auth-canvas relative flex min-h-svh w-full flex-col items-center " \
+      "justify-center overflow-hidden px-4 py-10"
+  end
+
   # `also_active_for` keeps a primary nav item highlighted while you're on one
   # of its sub-sections (e.g. "Docs" stays active on /document_types).
   def nav_link(text, path, also_active_for: [])
