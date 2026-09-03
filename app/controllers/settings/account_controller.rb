@@ -64,6 +64,17 @@ class Settings::AccountController < Settings::BaseController
     end
   end
 
+  # Bold vs Classic layout (the rethought Now/People/Paper/Money/Time nav + Now
+  # page vs today's Home/Mail/Calendar/Scout/Files) — a no-password preference,
+  # like #compose_preference. The section is only shown when Features.bold_layout?.
+  def layout_preference
+    if current_user.update(params.permit(:layout_mode))
+      redirect_to settings_account_path, success: t(".updated")
+    else
+      redirect_to settings_account_path, alert: t(".failed")
+    end
+  end
+
   # Personal writing style for Scout's reply drafts — a no-password preference,
   # like #language. Stamps writing_style_updated_at so the UI can show freshness.
   def writing_style

@@ -75,6 +75,13 @@ Rails.application.routes.draw do
   root "home#index"
   get "home", to: "home#index", as: :home
 
+  # The rethought "bold" home: Scout's ledger, the segment rings, the decision
+  # deck over the same home feed, and Scout's log. Gated on Features.bold_layout?
+  # (the page works for classic-mode users too when the flag is on). #undo_log
+  # reverses one Scout action from the log (archive → unarchive, tag → remove).
+  get "now", to: "now#index", as: :now
+  post "now/log/:id/undo", to: "now#undo_log", as: :now_log_undo
+
   # Workspace activity feed — a retrospective timeline of domain Events (distinct
   # from the prospective home feed). Read-only; turbo_stream serves pagination.
   get "activity", to: "activity#index", as: :activity
@@ -334,6 +341,7 @@ Rails.application.routes.draw do
     resource :account, only: [ :show, :update, :destroy ], controller: "account" do
       patch :language
       patch :compose_preference
+      patch :layout_preference
       patch :writing_style
       post :analyze_writing_style
       get :delete

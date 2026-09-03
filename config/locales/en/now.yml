@@ -1,0 +1,75 @@
+---
+en:
+  now:
+    index:
+      classic_feed: Classic feed
+      need_you_chip:
+        zero: nothing needs you
+        one: "%{count} needs you"
+        other: "%{count} need you"
+      ledger:
+        # Scout's opening ledger — assembled from the honest event buckets (see
+        # Now::Ledger + NowHelper). "Scout" is named once in the lead so every
+        # bucket combination stays grammatical; each bucket is a verb phrase with
+        # its count in full ink. Never says "handled"/"cleared" (docs/messaging.md).
+        lead_html: In the last 24 hours Scout %{actions}.
+        empty: Nothing new from Scout in the last 24 hours.
+        and: and
+        need_you:
+          zero: Nothing needs you.
+          one: One thing needs you.
+          other: "%{count} need you."
+        buckets:
+          archived_html:
+            one: archived %{n_html} email
+            other: archived %{n_html} emails
+          archived_by_rules_html:
+            one: archived %{n_html} email by your rules
+            other: archived %{n_html} emails by your rules
+          tagged_html:
+            one: tagged %{n_html}
+            other: tagged %{n_html}
+          filed_html:
+            one: filed %{n_html} document
+            other: filed %{n_html} documents
+          reminders_html:
+            one: found %{n_html} reminder
+            other: found %{n_html} reminders
+          tasks_html:
+            one: suggested %{n_html} task
+            other: suggested %{n_html} tasks
+          events_html:
+            one: put %{n_html} event on the calendar
+            other: put %{n_html} events on the calendar
+      rings:
+        all: All
+        priority: Priority
+        follow_ups: Follow-ups
+        mail: Mail
+        time: Time
+        docs: Docs
+      log:
+        title: Scout's log
+        meta: "last 24 hours · %{count}"
+        empty: Nothing from Scout in the last 24 hours.
+        all_activity: All activity
+    undo_log:
+      undone: Undone.
+      failed: Couldn't undo that.
+      not_reversible: That can't be undone.
+  components:
+    now:
+      deck:
+        counter: 1 of {n}
+        cleared_title: Stack cleared.
+        cleared_body: Scout keeps sorting new mail and filing what it can. Anything
+          that needs you lands here.
+        segment_empty_title: Nothing needs you here.
+        show_everything: Show everything
+      setup_card:
+        chip: Set up
+        later: Later
+      log_row:
+        undo: Undo
+        open: Open
+        undone: Undone
