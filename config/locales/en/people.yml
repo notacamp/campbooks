@@ -1,0 +1,13 @@
+en:
+  people:
+    standing:
+      you_owe:
+        zero: Waiting on your reply.
+        one: Waiting on your reply for a day.
+        other: Waiting on your reply for %{count} days.
+      awaiting_them:
+        zero: No reply to %{subject}. Nudge?
+        one: No reply to %{subject} for a day. Nudge?
+        other: No reply to %{subject} for %{count} days. Nudge?
+      your_last_message: your last message
+      last_exchange: "Last exchange %{date}."
