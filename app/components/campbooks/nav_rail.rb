@@ -45,7 +45,9 @@ module Campbooks
         # Footer: search · notifications · avatar menu
         button(
           type: "button",
-          data: { action: "click->command-palette#open" },
+          # Only one of these controllers is ever mounted (command-palette in classic,
+          # scout-overlay in bold), so listing both actions opens whichever exists.
+          data: { action: "click->command-palette#open click->scout-overlay#open" },
           aria_label: helpers.t("shared.topbar.search_and_commands"),
           class: footer_button_classes
         ) { raw(safe(SEARCH_SVG)) }

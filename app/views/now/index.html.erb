@@ -2,7 +2,9 @@
     rings, the decision deck over the same materialized feed, Scout's log, and the
     docked Scout bar. Gated on Features.bold_layout? (NowController). The Scout
     overlay is a follow-up PR; the bar here just links to /scout. %>
-<% content_for :main_class, "mx-auto w-full max-w-[680px] px-4 pb-40 pt-8 sm:pt-10 lg:pb-32" %>
+<%# Bottom clearance for the docked Scout bar is reserved by the shell now
+    (app-shell pb-36/lg:pb-24), so the column only needs normal breathing room. %>
+<% content_for :main_class, "mx-auto w-full max-w-[680px] px-4 pb-10 pt-8 sm:pt-10 lg:pb-12" %>
 <%
   name = (current_user.try(:name).presence ||
           current_user.try(:email_address).to_s.split("@").first).to_s.split(/\s+/).first.presence || "there"
@@ -97,12 +99,7 @@
         class: "mt-3 inline-flex text-xs text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground" %>
 </section>
 
-<%# ── Docked Scout bar (desktop centred under the 680px column with a ⌘K chip;
-    mobile docked above the bottom nav). Links to /scout — the inline overlay is
-    the next PR. ──────────────────────────────────────────────────────────── %>
-<%= render Campbooks::ScoutBar.new(
-      placeholder: t("components.scout_bar.placeholder_command"),
-      mobile_placeholder: t("components.scout_bar.placeholder_ask"),
-      mobile: true,
-      keycap: true,
-      desktop_max_width: "max-w-[680px]") %>
+<%# The docked Scout bar is rendered by the application layout on every bold
+    surface now (Campbooks::ScoutOverlay + Campbooks::ScoutBar overlay mode), so
+    the Now page no longer renders its own. The main_class above reserves room
+    (pb-40 / lg:pb-32) so nothing hides under it. %>

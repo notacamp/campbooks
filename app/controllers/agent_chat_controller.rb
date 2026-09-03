@@ -5,6 +5,9 @@ class AgentChatController < ApplicationController
   layout "email"
 
   def show
+    # The Scout page IS the conversation surface, so the bold layout must not also
+    # float the overlay launcher on top of it (layout_scout_launcher?).
+    @hide_scout_launcher = true
     @threads = current_user.agent_threads.scout_visible.with_messages.recent.limit(30)
     @thread = AgentThread.default_for(current_user)
     @messages = @thread.agent_messages.chronological.last(50)

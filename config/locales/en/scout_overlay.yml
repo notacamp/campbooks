@@ -1,0 +1,16 @@
+---
+en:
+  components:
+    scout_overlay:
+      dialog_aria_label: Ask Scout or run a command
+      input_aria_label: Ask Scout anything, or type a command
+      close: Close
+      placeholder: Ask Scout anything, or type a command…
+      followup_placeholder: Ask a follow-up…
+      recent: Recent
+      open_scout: Open Scout
+      ask_prefix: Ask Scout
+      no_ai_lead: Scout can't answer questions yet.
+      no_ai_link: Add an AI provider in Settings.
+    scout_launcher:
+      aria_label: Ask Scout

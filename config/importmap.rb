@@ -6,6 +6,7 @@ pin "@hotwired/stimulus", to: "stimulus.min.js"
 pin "@hotwired/stimulus-loading", to: "stimulus-loading.js"
 pin "@rails/actioncable", to: "@rails--actioncable.js" # @8.1.300
 pin_all_from "app/javascript/controllers", under: "controllers"
+pin_all_from "app/javascript/lib", under: "lib"
 pin "@tiptap/core", to: "https://esm.sh/@tiptap/core@2.11.2"
 pin "@tiptap/starter-kit", to: "https://esm.sh/@tiptap/starter-kit@2.11.2"
 pin "@tiptap/extension-placeholder", to: "https://esm.sh/@tiptap/extension-placeholder@2.11.2"

@@ -1,0 +1,54 @@
+<%# The Scout overlay's browse body: Scout suggestions, the last 6 threads, and
+    (rendered client-side into #list by scout_overlay_controller) the command
+    catalog / live search. Loaded lazily into the overlay's frame on first open.
+    The `data-scout-overlay-mode` wrapper carries the state the controller reads
+    on turbo:frame-load. %>
+<%= turbo_frame_tag "scout_overlay_body" do %>
+  <div data-scout-overlay-mode="idle"
+       data-ai-available="<%= @ai_available %>"
+       data-recent-count="<%= @recent_count %>">
+
+    <%# The idle section — hidden by the controller the moment the user types. %>
+    <div data-scout-overlay-target="idle">
+      <% if @ai_available && @suggestions.present? %>
+        <div class="px-4 pt-4 sm:px-5">
+          <%= render Campbooks::ChatSuggestions.new(prompts: @suggestions) %>
+        </div>
+      <% end %>
+
+      <% unless @ai_available %>
+        <p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 px-4 pt-4 text-[13px] text-muted-foreground sm:px-5" role="status">
+          <%= t("components.scout_overlay.no_ai_lead") %>
+          <%= link_to t("components.scout_overlay.no_ai_link"), settings_ai_path,
+                class: "font-medium text-foreground underline underline-offset-2 transition-colors hover:text-foreground/80" %>
+        </p>
+      <% end %>
+
+      <% if @recent.any? %>
+        <div class="px-4 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:px-5">
+          <%= t("components.scout_overlay.recent") %>
+        </div>
+        <div class="px-2">
+          <% @recent.each do |thread| %>
+            <button type="button"
+                    data-action="scout-overlay#openThread"
+                    data-scout-overlay-thread-id-param="<%= thread.id %>"
+                    class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-secondary/60">
+              <span class="flex-shrink-0 text-muted-foreground">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+              </span>
+              <span class="min-w-0 flex-1 truncate text-[13.5px] text-foreground/90"><%= thread.title %></span>
+              <span class="flex-shrink-0 text-[11.5px] text-muted-foreground"><%= time_ago_in_words(thread.updated_at) %></span>
+            </button>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+
+    <%# The command / find list — the shared command engine renders here. %>
+    <div data-scout-overlay-target="list"
+         role="listbox"
+         data-action="click->scout-overlay#selectItem mouseover->scout-overlay#hoverItem"
+         class="px-2 pb-3 pt-1"></div>
+  </div>
+<% end %>
