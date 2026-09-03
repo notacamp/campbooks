@@ -29,6 +29,17 @@ class Contact < ApplicationRecord
   # blocked = blacklisted (mail auto-archived). Independent of `starred_at`.
   enum :list_status, { neutral: 0, allowed: 1, blocked: 2 }
 
+  # Sender TYPE (the Rethink "who is talking" axis): a person you converse with,
+  # or a service — machine / bulk mail (newsletters, receipts, notifications,
+  # alerts) that emits a stream rather than a conversation. Derived by
+  # Contacts::SenderKind from the sender's recent mail; a `taught` source means
+  # the user corrected it by hand and the heuristic must never override it.
+  enum :sender_kind, { person: 0, service: 1 }, prefix: :kind
+
+  # True once a human has corrected the sender type (Contacts::SenderKind and the
+  # backfill leave these rows alone).
+  def sender_kind_taught? = sender_kind_source == "taught"
+
   validates :email, presence: true, uniqueness: { message: :taken }
 
   scope :analyzed, -> { where.not(analyzed_at: nil) }
