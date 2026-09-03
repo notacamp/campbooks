@@ -4,12 +4,14 @@ module Campbooks
       include TypeIcon
       MAX_CHIPS = 3
 
-      def initialize(date:, events:, reminders: [], snoozed_threads: [], scheduled_emails: [])
+      def initialize(date:, events:, reminders: [], snoozed_threads: [], scheduled_emails: [], tasks: [], focus_blocks: [])
         @date = date
         @events = events.to_a
         @reminders = reminders.to_a
         @snoozed_threads = snoozed_threads.to_a
         @scheduled_emails = scheduled_emails.to_a
+        @tasks = tasks.to_a
+        @focus_blocks = focus_blocks.to_a
       end
 
       def view_template
@@ -50,6 +52,14 @@ module Campbooks
         @scheduled_by_day ||= @scheduled_emails.group_by { |s| (s.next_occurrence_at || s.scheduled_at).to_date }
       end
 
+      def tasks_by_day
+        @tasks_by_day ||= @tasks.group_by { |t| t.due_at.to_date }
+      end
+
+      def focus_by_day
+        @focus_by_day ||= @focus_blocks.group_by { |f| f.start_at.to_date }
+      end
+
       def weekday_header
         today_wday = Date.current.wday
         div(class: "grid grid-cols-7 border-b border-border/70 bg-muted/40") do
@@ -76,7 +86,9 @@ module Campbooks
         reminders = reminders_by_day[day] || []
         snoozed = snoozed_by_day[day] || []
         scheduled = scheduled_by_day[day] || []
-        total = events.size + reminders.size + snoozed.size + scheduled.size
+        tasks = tasks_by_day[day] || []
+        focus = focus_by_day[day] || []
+        total = events.size + reminders.size + snoozed.size + scheduled.size + tasks.size + focus.size
 
         div(
           # The whole cell no longer creates an event on click — the "+" button does
@@ -95,7 +107,7 @@ module Campbooks
         ) do
           day_header(day, today:, in_month:)
           mobile_dots(events, total) if total.positive?
-          day_chips(events, reminders, snoozed, scheduled)
+          day_chips(day, events, reminders, snoozed, scheduled)
           day_popover(day, events, reminders, snoozed, scheduled) if total.positive?
         end
       end
@@ -144,8 +156,8 @@ module Campbooks
 
       # sm+ has room for the full chips (time + title). Shows the first few; the
       # rest live behind a "+N more" that opens the day popover.
-      def day_chips(events, reminders, snoozed, scheduled)
-        procs = chip_procs(events, reminders, snoozed, scheduled, draggable: true)
+      def day_chips(day, events, reminders, snoozed, scheduled)
+        procs = chip_procs(day, events, reminders, snoozed, scheduled, draggable: true)
         overflow = procs.size - MAX_CHIPS
 
         div(class: "hidden min-h-0 flex-col gap-0.5 overflow-hidden sm:flex") do
@@ -190,17 +202,19 @@ module Campbooks
             data: { action: "click->calendar-day-popover#close" },
             class: "max-h-[60vh] space-y-0.5 overflow-y-auto"
           ) do
-            chip_procs(events, reminders, snoozed, scheduled, draggable: false).each(&:call)
+            chip_procs(day, events, reminders, snoozed, scheduled, draggable: false).each(&:call)
           end
         end
       end
 
       # The day's items as an ordered list of render thunks: events, then reminders,
       # snoozed threads and scheduled mail (matching the chip fill order).
-      def chip_procs(events, reminders, snoozed, scheduled, draggable:)
+      def chip_procs(day, events, reminders, snoozed, scheduled, draggable:)
         procs = []
         events.each { |e| procs << -> { render_chip(e, draggable:) } }
         reminders.each { |r| procs << -> { render Campbooks::Calendar::ReminderChip.new(reminder: r) } }
+        (tasks_by_day[day] || []).each { |t| procs << -> { render Campbooks::Calendar::TaskChip.new(task: t) } }
+        (focus_by_day[day] || []).each { |f| procs << -> { render Campbooks::Calendar::FocusChip.new(focus_block: f) } }
         snoozed.each { |th| procs << -> { render Campbooks::Calendar::SnoozedChip.new(thread: th) } }
         scheduled.each { |s| procs << -> { render Campbooks::Calendar::ScheduledEmailChip.new(scheduled_email: s) } }
         procs

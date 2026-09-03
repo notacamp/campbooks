@@ -18,6 +18,19 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Time — the bold layout's merged agenda (opt-in).** A new `/time` surface
+  (behind `ENABLE_BOLD_LAYOUT` plus a per-user Bold layout preference) reframes
+  the calendar as one agenda that interleaves calendar events, the deadlines
+  Scout found in your mail, due-dated tasks, and focus blocks — each row showing
+  where it came from and linking back to the email or document. Scout's honest
+  day note (what's today, what's due, what it blocked time for) sits on top;
+  reminders become rows instead of a tab; Week and Month stay as toggles, now
+  carrying task and focus chips. For a deadline it finds, Scout proposes a
+  45-minute focus block in the earliest free working-hours slot before it, which
+  you Keep with one tap (it becomes a real calendar event), Move to another free
+  slot, or dismiss. Adds a device-captured `users.time_zone` (read once by the
+  greeting) so the agenda buckets "today"/"tomorrow" and finds slots in your own
+  zone, falling back to the primary calendar's zone then UTC.
 - **Money — what you're owed, what you owe, and what the bank settled (bold
   layout).** A new `/money` surface where the accounting module is enabled: Scout
   derives **obligations** from money documents (amount, direction, due date;

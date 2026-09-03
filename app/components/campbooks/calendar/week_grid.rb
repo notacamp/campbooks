@@ -3,12 +3,14 @@ module Campbooks
     class WeekGrid < Campbooks::Base
       include TypeIcon
 
-      def initialize(date:, events:, reminders: [], snoozed_threads: [], scheduled_emails: [])
+      def initialize(date:, events:, reminders: [], snoozed_threads: [], scheduled_emails: [], tasks: [], focus_blocks: [])
         @date = date
         @events = events.to_a
         @reminders = reminders.to_a
         @snoozed_threads = snoozed_threads.to_a
         @scheduled_emails = scheduled_emails.to_a
+        @tasks = tasks.to_a
+        @focus_blocks = focus_blocks.to_a
       end
 
       def view_template
@@ -39,13 +41,23 @@ module Campbooks
         @scheduled_by_day ||= @scheduled_emails.group_by { |s| (s.next_occurrence_at || s.scheduled_at).to_date }
       end
 
+      def tasks_by_day
+        @tasks_by_day ||= @tasks.group_by { |t| t.due_at.to_date }
+      end
+
+      def focus_by_day
+        @focus_by_day ||= @focus_blocks.group_by { |f| f.start_at.to_date }
+      end
+
       def render_day(day)
         today = day == Date.current
         events = by_day[day] || []
         reminders = reminders_by_day[day] || []
         snoozed = snoozed_by_day[day] || []
         scheduled = scheduled_by_day[day] || []
-        empty = events.empty? && reminders.empty? && snoozed.empty? && scheduled.empty?
+        tasks = tasks_by_day[day] || []
+        focus = focus_by_day[day] || []
+        empty = events.empty? && reminders.empty? && snoozed.empty? && scheduled.empty? && tasks.empty? && focus.empty?
 
         div(class: class_names(
           "min-h-[120px] rounded-xl border p-2.5",
@@ -67,6 +79,8 @@ module Campbooks
             div(class: "space-y-1") do
               events.each { |event| render_chip(event) }
               reminders.each { |reminder| render Campbooks::Calendar::ReminderChip.new(reminder: reminder) }
+              tasks.each { |task| render Campbooks::Calendar::TaskChip.new(task: task) }
+              focus.each { |block| render Campbooks::Calendar::FocusChip.new(focus_block: block) }
               snoozed.each { |thread| render Campbooks::Calendar::SnoozedChip.new(thread: thread) }
               scheduled.each { |email| render Campbooks::Calendar::ScheduledEmailChip.new(scheduled_email: email) }
             end

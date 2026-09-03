@@ -5,7 +5,6 @@ class CalendarController < ApplicationController
   before_action :require_authentication
 
   VIEWS = %w[agenda day week month].freeze
-  AGENDA_LIMIT = 100 # how many upcoming events the agenda lists from the anchor date
 
   def index
     @view = VIEWS.include?(params[:view]) ? params[:view] : "month"
@@ -14,70 +13,20 @@ class CalendarController < ApplicationController
     # default) back to agenda there.
     @view = "agenda" if hotwire_native_app? && %w[week month].include?(@view)
     @date = parse_date(params[:date]) || Date.current
-    # Sidebar data: every readable account with its calendars, so the user can
-    # show/hide, recolor, and enable more calendars without leaving the page.
-    @calendar_accounts = Current.user.readable_calendar_accounts.active
-                                .includes(:calendars).order(:created_at)
-    @has_calendars = @calendar_accounts.any?
-    # Which of those the user can manage (sidebar recolor / syncing affordances) —
-    # one query instead of a permission check per account.
-    @managed_calendar_account_ids = Current.user.calendar_account_users
-                                           .where(can_manage: true).pluck(:calendar_account_id)
-    @range = range_for(@view, @date)
-    @prev_date, @next_date = adjacent_dates(@view, @date)
 
-    # Only calendars that are syncing render (off means off — matching the
-    # sidebar checkboxes), minus the ones this user personally hid.
-    base = CalendarEvent.accessible_to(Current.user).visible
-                        .where(calendars: { syncing: true })
-                        .includes(:event_type, calendar: :calendar_account)
-    hidden_ids = Array(Current.user.hidden_calendar_ids)
-    base = base.where.not(calendar_id: hidden_ids) if hidden_ids.any?
-
-    # Concrete rows (plain events + provider-materialized instances) render as-is;
-    # series masters (an app-created or Zoho series held as one row with an rrule)
-    # are expanded into occurrences below. Agenda lists your next events from the
-    # anchor forward (no hard window) so it never reads "nothing coming up" when
-    # your next event is just past the month edge; week/month query their range.
-    concrete = base.concrete.order(:start_at)
-    @events = if @view == "agenda"
-      # Upcoming = from the anchor forward, minus timed events that already ended,
-      # so the list never shows things that are over. All-day events stay.
-      concrete.where(start_at: @date.beginning_of_day..)
-              .where("COALESCE(calendar_events.end_at, calendar_events.start_at) >= :now OR calendar_events.all_day = :all_day",
-                     now: Time.current, all_day: true)
-              .limit(AGENDA_LIMIT)
-    else
-      concrete.in_range(@range.begin, @range.end)
-    end
-
-    # Fold each recurring series' occurrences into the window, letting a real synced
-    # instance win over a locally-expanded ghost of the same slot.
-    merged = Calendars::OccurrenceExpander.new(
-      concrete: @events, masters: base.series_masters, from: @range.begin, to: @range.end
-    ).events
-    @events = @view == "agenda" ? merged.first(AGENDA_LIMIT) : merged
-
-    # Pending reminders ride alongside events as distinct "suggestion" chips. Only
-    # unconfirmed ones (confirmed reminders already exist as real CalendarEvents).
-    @reminders = @has_calendars ? reminders_for_view : []
-
-    # Snoozed email threads shown on the calendar at their snooze-until time.
-    @snoozed_threads = if current_entitlements.feature?(:email_scheduling)
-      EmailThread.snoozed
-                 .where(email_account: Current.user.readable_email_accounts)
-                 .includes(:email_account)
-                 .then { |s| @view == "agenda" ? s.where(snoozed_until: @date.beginning_of_day..).order(:snoozed_until).limit(AGENDA_LIMIT) : s.where(snoozed_until: @range.begin..@range.end) }
-    else
-      EmailThread.none
-    end
-
-    # Scheduled emails shown on the calendar at their send time.
-    @scheduled_emails = if current_entitlements.feature?(:email_scheduling)
-      ScheduledEmail.accessible_to(Current.user).pending.then { |s| @view == "agenda" ? s.where("COALESCE(next_occurrence_at, scheduled_at) >= ?", @date.beginning_of_day).order(Arel.sql("COALESCE(next_occurrence_at, scheduled_at) ASC")).limit(AGENDA_LIMIT) : s.in_range(@range.begin, @range.end) }
-    else
-      ScheduledEmail.none
-    end
+    # Shared loading (events + reminders + snoozed + scheduled + accounts + window),
+    # identical to the bold Time surface — see Calendars::PageData.
+    data = Calendars::PageData.for(user: Current.user, view: @view, date: @date, entitlements: current_entitlements)
+    @calendar_accounts = data.calendar_accounts
+    @has_calendars = data.has_calendars
+    @managed_calendar_account_ids = data.managed_calendar_account_ids
+    @range = data.range
+    @prev_date = data.prev_date
+    @next_date = data.next_date
+    @events = data.events
+    @reminders = data.reminders
+    @snoozed_threads = data.snoozed_threads
+    @scheduled_emails = data.scheduled_emails
 
     # Visiting the calendar clears its nav dot: stamp the pending reminders that
     # drive it (Navigation::Attention#new_calendar?).
@@ -90,43 +39,5 @@ class CalendarController < ApplicationController
     Date.iso8601(str) if str.present?
   rescue ArgumentError
     nil
-  end
-
-  # Pending, not-yet-confirmed reminders in the current view's window, to overlay on
-  # the grid. Agenda lists forward from the anchor (like @events); grids use @range.
-  def reminders_for_view
-    # Never surface past-due reminders — they're no longer actionable. Floor at the
-    # start of today so all-day reminders due today still show.
-    scope = Reminder.accessible_to(Current.user).pending.where(calendar_event_id: nil)
-                    .where(due_at: Time.current.beginning_of_day..).order(:due_at)
-    if @view == "agenda"
-      scope.limit(AGENDA_LIMIT)
-    else
-      scope.where(due_at: @range.begin..@range.end)
-    end
-  end
-
-  # Time bounds for the events query, widened to whole days (and, for month, to
-  # the full calendar grid including leading/trailing days).
-  def range_for(view, date)
-    case view
-    when "month"
-      (date.beginning_of_month.beginning_of_week.beginning_of_day)..(date.end_of_month.end_of_week.end_of_day)
-    when "week"
-      date.beginning_of_week.beginning_of_day..date.end_of_week.end_of_day
-    when "day"
-      date.beginning_of_day..date.end_of_day
-    else # agenda — the next 30 days from the anchor date
-      date.beginning_of_day..(date + 30.days).end_of_day
-    end
-  end
-
-  def adjacent_dates(view, date)
-    case view
-    when "month" then [ date.prev_month, date.next_month ]
-    when "week"  then [ date - 7, date + 7 ]
-    when "day"   then [ date - 1, date + 1 ]
-    else [ date - 30, date + 30 ]
-    end
   end
 end

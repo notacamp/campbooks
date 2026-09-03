@@ -69,31 +69,10 @@ module Reminders
 
     # Prefer the calendar of the SAME mailbox the reminder came from, so the event
     # pushes back to that Google/Zoho calendar (it shares the source email account's
-    # OAuth grant). Fall back to the user's primary writable calendar.
+    # OAuth grant). Fall back to the user's primary writable calendar. Shared with
+    # Time::FocusKeeper via Calendars::WritableTarget.
     def target_calendar
-      source_account_calendar || primary_writable_calendar
-    end
-
-    def source_account_calendar
-      account = source_calendar_account
-      return nil unless account && @user&.writable_calendar_accounts&.exists?(account.id)
-
-      account.calendars.where(is_writable: true, syncing: true).order(is_primary: :desc).first
-    end
-
-    def primary_writable_calendar
-      return nil unless @user
-      Calendar.where(calendar_account: @user.writable_calendar_accounts, is_writable: true, syncing: true)
-              .order(is_primary: :desc).first
-    end
-
-    # The CalendarAccount provisioned from the reminder's source mailbox — matched on
-    # email_address + provider (Calendars::AccountProvisioner pairs them that way).
-    def source_calendar_account
-      ea = source_email_account
-      return nil unless ea && CalendarAccount.providers.key?(ea.provider)
-
-      CalendarAccount.find_by(workspace_id: ea.workspace_id, email_address: ea.email_address, provider: ea.provider)
+      Calendars::WritableTarget.for(user: @user, source_email_account: source_email_account)
     end
 
     # The email account behind the reminder: the source email, or the email a

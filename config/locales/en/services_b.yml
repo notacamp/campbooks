@@ -14,6 +14,7 @@ en:
       admin_signups: Signup requests
       admin_users: Users
       calendar: Calendar
+      time: Time
       calendar_agenda: 'Calendar: agenda view'
       calendar_day: 'Calendar: day view'
       calendar_month: 'Calendar: month view'

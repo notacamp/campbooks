@@ -75,6 +75,18 @@ class Settings::AccountController < Settings::BaseController
     end
   end
 
+  # One-shot capture of the device time zone, PATCHed by the local-greeting Stimulus
+  # controller when User#time_zone is still blank. Only sets it when currently blank
+  # (never overwrites a chosen zone) and only for a zone Rails can resolve; always
+  # answers 204 since it's a fire-and-forget background call.
+  def time_zone
+    zone = params[:time_zone].to_s
+    if current_user.time_zone.blank? && zone.present? && Time.find_zone(zone)
+      current_user.update(time_zone: zone)
+    end
+    head :no_content
+  end
+
   # Personal writing style for Scout's reply drafts — a no-password preference,
   # like #language. Stamps writing_style_updated_at so the UI can show freshness.
   def writing_style

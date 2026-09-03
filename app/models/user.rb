@@ -21,6 +21,8 @@ class User < ApplicationRecord
   has_many :notification_preferences, dependent: :destroy
   has_many :devices, dependent: :destroy
   has_many :feed_items, dependent: :delete_all
+  # Scout-proposed / user-kept focus blocks (the bold Time agenda). Personal.
+  has_many :focus_blocks, dependent: :destroy
   has_many :bug_reports, dependent: :destroy
   # Unsent composer drafts (Dock/Desk autosave). Private to their author.
   has_many :draft_emails, dependent: :destroy
@@ -81,6 +83,9 @@ class User < ApplicationRecord
   validates :email_address, presence: true, uniqueness: true
   validates :name, presence: true
   validates :locale, inclusion: { in: ->(_user) { I18n.available_locales.map(&:to_s) } }, allow_blank: true
+  # Device-captured IANA time zone (e.g. "Europe/Lisbon"); must be a zone Rails can
+  # resolve. Blank is fine — effective_time_zone falls back below.
+  validate :time_zone_is_resolvable
   # Single source of truth for password strength across every path (registration,
   # settings change, reset). has_secure_password only checks presence/confirmation;
   # allow_nil so updates that don't change the password skip the length check.
@@ -88,6 +93,16 @@ class User < ApplicationRecord
 
   def admin?
     role == "admin"
+  end
+
+  # The zone the bold Time surface buckets days and finds focus slots in. There is
+  # no per-workspace zone, so: the user's device-captured zone, else the primary
+  # calendar's provider zone, else UTC. Always returns a real ActiveSupport::TimeZone.
+  def effective_time_zone
+    resolved = Time.find_zone(time_zone.presence) ||
+               Time.find_zone(workspace_calendar_time_zone) ||
+               Time.find_zone("UTC")
+    resolved || ActiveSupport::TimeZone["UTC"]
   end
 
   def unread_notifications_count
@@ -226,5 +241,26 @@ class User < ApplicationRecord
 
   def any_sign_in_method?
     sign_in_methods_count.positive?
+  end
+
+  private
+
+  # The time_zone of the workspace's primary (else any) calendar, used as the
+  # fallback zone when the user hasn't got a device zone yet.
+  def workspace_calendar_time_zone
+    return nil unless workspace_id
+
+    Calendar.joins(:calendar_account)
+            .where(calendar_accounts: { workspace_id: workspace_id })
+            .where.not(time_zone: [ nil, "" ])
+            .order(is_primary: :desc)
+            .limit(1)
+            .pick(:time_zone)
+  end
+
+  def time_zone_is_resolvable
+    return if time_zone.blank?
+
+    errors.add(:time_zone, :invalid) unless Time.find_zone(time_zone)
   end
 end
