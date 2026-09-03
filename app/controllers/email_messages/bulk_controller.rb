@@ -2,30 +2,22 @@ class EmailMessages::BulkController < ApplicationController
   before_action :require_authentication
 
   def create
-    email_ids = Array(params[:email_ids]).map(&:to_s).reject(&:blank?).uniq
-    group_names = Array(params[:groups]).map(&:to_s).reject(&:blank?).uniq
+    outcome = Emails::BulkActions.call(
+      tool: params[:tool],
+      user: Current.user,
+      email_ids: params[:email_ids],
+      groups: params[:groups],
+      options: bulk_options
+    )
 
-    # Expand collapsed group rows to their constituent inbox message IDs, using
-    # the same guarded scope as the drill-in view so the permission boundary and
-    # the "never collapse this" guards are consistent. Merged with explicit ids.
-    group_message_ids = expand_groups_to_message_ids(group_names)
-    email_ids = (email_ids + group_message_ids).uniq
+    return render_error(t(".no_emails_selected")) if outcome.empty_selection?
 
-    return render_error(t(".no_emails_selected")) if email_ids.empty?
-
-    # Expand to all messages in the selected threads
-    all_ids = expand_to_threads(email_ids)
-
-    result = dispatch_tool(params[:tool], all_ids, email_ids)
-
-    # Live inbox: reflect the bulk change on every reader's open inbox (other
-    # tabs/devices, teammates) the same way single-thread actions do.
-    broadcast_inbox_bulk(params[:tool], all_ids) if result
+    result = outcome.result
 
     respond_to do |format|
       format.turbo_stream do
         if result
-          streams = build_response(params[:tool], result, email_ids, all_ids)
+          streams = build_response(params[:tool], result, outcome.selected_ids, outcome.all_ids)
           render turbo_stream: streams
         else
           render_error(t(".action_failed"))
@@ -43,39 +35,16 @@ class EmailMessages::BulkController < ApplicationController
 
   private
 
-  def dispatch_tool(tool, all_ids, selected_ids)
-    case tool
-    when "archive"
-      Tools::BulkArchive.call("email_ids" => all_ids)
-    when "unarchive"
-      Tools::BulkUnarchive.call("email_ids" => all_ids)
-    when "mark_read"
-      Tools::BulkMarkRead.call(email_ids: selected_ids, read: true)
-    when "mark_unread"
-      Tools::BulkMarkRead.call(email_ids: selected_ids, read: false)
-    when "move_to_folder"
-      folder_name = params[:folder_name].presence
-      folder_id = params[:folder_id].presence
-      return nil unless folder_name || folder_id
-      Tools::BulkMoveToFolder.call(email_ids: selected_ids, folder_id: folder_id, folder_name: folder_name)
-    when "tag"
-      action = params[:tag_action] || "add"
-      Tools::BulkTag.call("email_ids" => all_ids, "tag_name" => params[:tag_name], "action" => action)
-    when "delete"
-      Tools::BulkDelete.call(email_ids: selected_ids)
-    when "process_ai"
-      Tools::BulkProcessAi.call(email_ids: selected_ids)
-    when "scout_chat"
-      Tools::BulkScoutChat.call(email_ids: selected_ids, user: Current.user)
-    when "snooze"
-      snoozed_until = params[:snoozed_until].presence
-      return nil unless snoozed_until
-      Tools::BulkSnooze.call("email_ids" => all_ids, "snoozed_until" => snoozed_until)
-    when "unsnooze"
-      Tools::BulkUnsnooze.call("email_ids" => all_ids)
-    else
-      nil
-    end
+  # Tool-specific parameters handed to Emails::BulkActions (folder target, tag
+  # name/action, snooze time). The engine ignores the ones a given tool doesn't use.
+  def bulk_options
+    {
+      folder_name: params[:folder_name],
+      folder_id: params[:folder_id],
+      tag_name: params[:tag_name],
+      tag_action: params[:tag_action],
+      snoozed_until: params[:snoozed_until]
+    }
   end
 
   def build_response(tool, result, selected_ids, all_ids = [])
@@ -180,52 +149,6 @@ class EmailMessages::BulkController < ApplicationController
 
     streams << notify_stream(toast[:message], severity: toast[:variant]) if toast
     streams
-  end
-
-  def expand_to_threads(email_ids)
-    base = EmailMessage.accessible_to(Current.user)
-    thread_ids = base.where(id: email_ids).where.not(email_thread_id: nil).pluck(:email_thread_id).uniq
-    base.where(email_thread_id: thread_ids).pluck(:id)
-  end
-
-  # Resolve each group name to the inbox message IDs that belong to it, using
-  # the same guarded TagGroups scope as the drill-in view and BulkAction. The
-  # inbox-folder constraint mirrors Emails::TagGroupBulkAction#message_ids so
-  # the permission boundary is identical regardless of which tool is called.
-  # Returns an array of string IDs (matching the email_ids convention).
-  def expand_groups_to_message_ids(group_names)
-    return [] if group_names.empty?
-
-    accounts = Current.user.readable_email_accounts.to_a
-    tag_groups = Emails::TagGroups.new(Current.user.workspace, accounts.map(&:id))
-
-    group_names.flat_map do |group_name|
-      threads = tag_groups.group_scope(group_name)
-      next [] unless threads
-
-      messages = EmailMessage.where(email_thread_id: threads.select(:id))
-      Emails::InboxFolders.constrain(messages, accounts).pluck(:id).map(&:to_s)
-    end.uniq
-  end
-
-  # Push the bulk change to every reader's open inbox, one broadcast per affected
-  # thread. Removals are cheap (no render); read/tag re-render the row. Tools that
-  # don't change the inbox list (forward, process_ai, scout_chat) are skipped.
-  INBOX_BULK_REMOVE  = %w[archive snooze delete move_to_folder].freeze
-  INBOX_BULK_UPSERT  = %w[unarchive unsnooze].freeze
-  INBOX_BULK_REPLACE = %w[mark_read mark_unread tag].freeze
-
-  def broadcast_inbox_bulk(tool, message_ids)
-    kind = if INBOX_BULK_REMOVE.include?(tool) then :remove
-    elsif INBOX_BULK_UPSERT.include?(tool) then :upsert
-    elsif INBOX_BULK_REPLACE.include?(tool) then :replace
-    end
-    return unless kind
-
-    thread_ids = EmailMessage.where(id: message_ids).where.not(email_thread_id: nil).distinct.pluck(:email_thread_id)
-    EmailThread.where(id: thread_ids).find_each { |thread| Emails::InboxBroadcaster.public_send(kind, thread) }
-  rescue => e
-    Rails.logger.error("[BulkController] inbox broadcast failed for #{tool}: #{e.class}: #{e.message}")
   end
 
   def reload_threads

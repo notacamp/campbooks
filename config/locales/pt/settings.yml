@@ -182,6 +182,7 @@ pt:
         contacts: Contactos
         document_types: Tipos de documento
         documents: Documentos
+        drafts: Rascunhos
         email_accounts: Contas de email
         emails: Email
         folders: Pastas
