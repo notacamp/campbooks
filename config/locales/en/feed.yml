@@ -43,6 +43,18 @@ en:
           high_priority: High priority
           important: Important
           starred: Starred sender
+      late_receivable_card:
+        owed: "Owed to you"
+        days_late:
+          one: "%{count} day late"
+          other: "%{count} days late"
+        headline: "%{name} hasn't paid %{reference}"
+        invoice_ref: "invoice #%{number}"
+        an_invoice: "an invoice"
+        scout_note: "I drafted a reminder."
+        send_reminder: "Send reminder"
+        mark_paid: "Mark paid"
+        later: "Later"
       reminder_card:
         confirm: Add to calendar
         dismiss: Dismiss
@@ -109,6 +121,7 @@ en:
       reminder_confirmed_no_calendar: Reminder confirmed. Connect a calendar to sync
         it automatically.
       reminder_dismissed: Reminder dismissed.
+      receivable_marked_paid: Marked paid.
       restored: Restored.
       task_accepted: 'Added to your tasks: %{title}'
       task_completed: 'Task completed: %{title}'

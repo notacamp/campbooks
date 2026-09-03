@@ -146,7 +146,22 @@ module Feed
       when "EmailMessage" then run_email_action(subject)
       when "Reminder"     then run_reminder_action(subject)
       when "Task"         then run_task_action(subject)
+      when "Document"     then run_document_action(subject)
       else failure(t("feed.items.unsupported"))
+      end
+    end
+
+    # Act on a Document card (the late-receivable chase card): "Mark paid" settles
+    # it manually (a bank match, when it lands, still wins). Workspace-scoped.
+    def run_document_action(document)
+      return failure(t("feed.items.gone")) unless document.workspace_id == current_user.workspace_id
+
+      case params[:tool].to_s
+      when "mark_paid"
+        document.mark_settled!
+        { success: true, message: t("feed.items.receivable_marked_paid") }
+      else
+        failure(t("feed.items.unsupported"))
       end
     end
 
