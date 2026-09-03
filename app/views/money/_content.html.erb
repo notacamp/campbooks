@@ -1,0 +1,14 @@
+<div id="money_content" class="mt-4">
+  <% if @ledger.any? %>
+    <%= render Campbooks::Money::Summary.new(summary: @summary, class: "mt-1 max-w-[900px]") %>
+    <%= render Campbooks::Money::Timeline.new(ledger: @ledger, summary: @summary, today: @today, class: "mt-6") %>
+    <%= render Campbooks::Money::Ledger.new(ledger: @ledger, class: "mt-6") %>
+  <% else %>
+    <div class="mt-10 rounded-2xl border border-border bg-card px-6 py-12 text-center">
+      <p class="text-[15px] font-semibold text-foreground"><%= t("money.index.empty_title") %></p>
+      <p class="mx-auto mt-1.5 max-w-md text-sm text-muted-foreground"><%= t("money.index.empty_body") %></p>
+      <%= link_to t("money.index.classic"), accounting_path,
+            class: "mt-4 inline-block text-sm font-medium text-foreground underline underline-offset-4" %>
+    </div>
+  <% end %>
+</div>

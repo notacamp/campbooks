@@ -33,6 +33,8 @@ class CommandPaletteCatalog
       # users whenever the flag is on, so they can try it without switching layout.
       *(Features.bold_layout? ? [ cmd("now", I18n.t("command_palette.commands.now"), I18n.t("command_palette.categories.navigate"), "grid", now_path) ] : []),
       *(Features.bold_layout? ? [ cmd("paper", I18n.t("command_palette.commands.paper"), I18n.t("command_palette.categories.navigate"), "file", paper_path) ] : []),
+      # Money (the obligations surface) lives wherever the accounting module does.
+      *(Features.bold_layout? && Features.accounting? ? [ cmd("money", I18n.t("command_palette.commands.money"), I18n.t("command_palette.categories.navigate"), "credit-card", money_path) ] : []),
       cmd("inbox", I18n.t("command_palette.commands.inbox"), I18n.t("command_palette.categories.navigate"), "mail", root_path),
       cmd("scout", I18n.t("command_palette.commands.scout_ai_chat"), I18n.t("command_palette.categories.navigate"), "sparkles", scout_path),
       cmd("files", I18n.t("command_palette.commands.files"), I18n.t("command_palette.categories.navigate"), "folder", files_path),

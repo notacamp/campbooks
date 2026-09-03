@@ -75,3 +75,53 @@ en:
       kept: "Renewal kept."
       cancelled: "Cancellation draft ready in the composer."
       gone: "That obligation is no longer here."
+      undo: "Undo"
+  components:
+    money:
+      summary:
+        today: "today"
+        owed_html: "You're owed %{amount}."
+        owe_html:
+          one: "You owe %{amount}, one bill."
+          other: "You owe %{amount} across %{count} bills."
+        late_receivable_html: "%{name}'s invoice is %{overdue}, so I drafted a reminder."
+        late_payable_html: "%{name} is %{overdue}."
+        renewal_html: "A renewal (%{amount}) lands %{date}."
+        nothing_else: "Nothing else is due this month."
+        clear: "Nothing is owed or due right now."
+      timeline:
+        title: "Next %{days} days"
+        hint: "each bar is one obligation at its due date; the ledger below is the table view"
+        today: "Today"
+        owed: "Owed to you"
+        owe: "You owe"
+        open_amount: "%{amount} open"
+        none_open: "nothing open"
+        due: "due %{date}"
+        renews: "renews %{date}"
+        legend:
+          open: "open"
+          late: "late"
+          settled: "settled"
+      ledger:
+        col:
+          counterpart: "Counterpart"
+          what: "What"
+          amount: "Amount"
+          due: "Due"
+          status: "Status"
+          source: "Source"
+          actions: "Actions"
+        section:
+          late: "Late"
+          due: "Due"
+          settled: "Settled"
+        mark_paid: "Mark paid"
+        send_reminder: "Send reminder"
+        pay: "Pay"
+        remind_on: "Remind on %{date}"
+        keep: "Keep"
+        cancel: "Cancel it"
+        next_renews: "next renews %{date}"
+        source_email: "Open the source email"
+        source_document: "Open the document"
