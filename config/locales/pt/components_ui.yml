@@ -164,8 +164,13 @@ pt:
         nav_files: Ir para Ficheiros
         nav_home: Ir para Início
         nav_mail: Ir para Correio
+        nav_money: Ir para Dinheiro
+        nav_now: Ir para Agora
         nav_organizations: Ir para Organizações
+        nav_paper: Ir para Papéis
+        nav_people: Ir para Pessoas
         nav_scout: Ir para Scout
+        nav_time: Ir para Tempo
         navigate_threads: Navegar conversas
         reminders_confirm: Adicionar ao calendário
         reminders_dismiss: Dispensar
