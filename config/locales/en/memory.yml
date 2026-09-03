@@ -1,0 +1,104 @@
+---
+en:
+  scout_memory:
+    facets:
+      filing: Filing
+      stack: Stack
+      replies: Replies
+      streams: Streams
+      style: Style
+    origins:
+      taught: Taught by you
+      taught_on: "Taught by you · %{date}"
+      learned_skim: Learned from how you skim
+      learned_style: Learned from your sent mail
+      learned_labels: Learned from your labels
+      learned_corrections:
+        one: Learned from %{count} correction
+        other: Learned from %{count} corrections
+      default: Default
+    sources:
+      email_rules:
+        lead: File anything
+        from: "from %{value}"
+        to: "sent to %{value}"
+        subject: "with %{value} in the subject"
+        body: "mentioning %{value}"
+        category: "in %{value}"
+        attachment: with an attachment
+        folder: "under %{value}"
+        archive: archive it
+        mark_read: mark it read
+        tag: "tag it %{value}"
+        connector_and: and
+      tags:
+        topic: "Tag mail about **%{topic}** as **%{tag}**."
+        hidden: "Provider label **%{name}** stays hidden."
+      document_habits:
+        sentence: "Documents from **%{sender}** are usually **%{type}**."
+      document_types:
+        sentence: "Documents that look like **%{name}** go to Paper › %{name}."
+        sentence_starred: "Documents that look like **%{name}** go to Paper › %{name}, and I star them."
+      group_rules:
+        sender: "Mail from **%{value}** is a stream: **%{group}**."
+        organization: "Mail from **%{value}** is a stream: **%{group}**."
+        document_type: "**%{value}** documents are a stream: **%{group}**."
+        query: "Mail matching **%{value}** is a stream: **%{group}**."
+        default_bucket: "**%{group}** stays out of your priority stack."
+      filtering:
+        whitelist: Only mail from people I've allowed enters the stack.
+        blacklist: Blocked senders never enter the stack.
+        starred: "Mail from **%{name}** is priority."
+        blocked: "**%{name}** is blocked."
+        allowed: "Mail from **%{name}** is allowed in."
+      skim_habits:
+        archive:
+          sender: "You usually archive mail from **%{key}** (%{count} of your last %{total})."
+          category: "You usually archive **%{key}** mail (%{count} of your last %{total})."
+        keep:
+          sender: "You usually keep mail from **%{key}** (%{count} of your last %{total})."
+          category: "You usually keep **%{key}** mail (%{count} of your last %{total})."
+        promote:
+          sender: "You usually make mail from **%{key}** priority (%{count} of your last %{total})."
+          category: "You usually make **%{key}** mail priority (%{count} of your last %{total})."
+      replies:
+        signature: "Sign replies with **%{name}**."
+        writing_stated: "Write replies **%{style}**."
+        writing_learned: "I write like you: **%{summary}**."
+        template: "**%{name}** is a saved reply template."
+      prompts:
+        custom: "When reading %{purpose}, also: **%{instruction}**."
+        default: "For %{purpose}, Scout uses the built-in guidance."
+      defaults:
+        review: Every document I read waits for your review before it's filed for good.
+    teach:
+      unknown: I can't learn that one yet. Try filing mail from a sender, tagging it, treating a sender as a stream, marking someone priority, blocking a sender, or setting your reply signature.
+      error: Something went wrong saving that. Please try again.
+  settings:
+    memory:
+      show:
+        title: Scout's memory
+        subtitle: What I've learned about how you work. Edit anything; I'll apply it from now on.
+        search_placeholder: Find a rule…
+        facet_all: All
+        teach_placeholder: Teach Scout something, e.g. "treat GitHub notifications as a stream"
+        teach_button: Teach
+        teach_aria: Teach Scout something
+        empty_title: Nothing here yet.
+        empty_body: As you file, tag and skim your mail, what I learn shows up here as sentences you can edit.
+  components:
+    memory:
+      sentence_row:
+        edit: Edit
+        remove: Remove
+        confirm: Confirm
+        remove_confirm: "Remove this from Scout's memory?"
+        remove_habit_confirm: This only forgets the habit — your mail stays where it is.
+  navigation:
+    settings:
+      bold:
+        memory: Scout's memory
+        connections: Connections
+        workspace_people: Workspace & people
+        account: Account
+        plan: Plan
