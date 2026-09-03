@@ -2,9 +2,19 @@
 
 module Campbooks
   class Divider < Campbooks::Base
+    # The label sits in a small "punched-out" pill over the line, so its
+    # background must match the surface BEHIND the divider. On a plain page
+    # that's the canvas (:background); inside a raised card it's :card — and the
+    # two differ in dark mode (card is a step lighter than the background), so
+    # the wrong one leaves a visible darker patch behind the label.
+    SURFACE_BG = { background: "bg-background", card: "bg-card" }.freeze
+
     # @param label [String, nil] optional centered text (e.g. "or")
-    def initialize(label: nil, **attrs)
+    # @param surface [Symbol] the surface the divider sits on — :background
+    #   (default) or :card, controlling the label's background
+    def initialize(label: nil, surface: :background, **attrs)
       @label = label
+      @surface = surface
       @attrs = attrs
     end
 
@@ -21,7 +31,7 @@ module Campbooks
             div(class: "w-full border-t border-border")
           end
           div(class: "relative flex justify-center text-sm") do
-            span(class: "bg-background px-3 text-muted-foreground") { @label }
+            span(class: class_names(SURFACE_BG.fetch(@surface, "bg-background"), "px-3 text-muted-foreground")) { @label }
           end
         end
       else

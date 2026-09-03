@@ -1,31 +1,31 @@
-<% content_for :main_class, "mx-auto flex w-full max-w-[26.5rem] flex-col justify-center px-5 py-10 min-h-svh" %>
+<% content_for :main_class, auth_canvas_class %>
 
-<%= render "shared/auth_header", title: t(".title"), subtitle: t(".subtitle") %>
+<%= render(Campbooks::AuthCard.new(title: t(".title"), subtitle: t(".subtitle"))) do %>
+  <%= form_with url: registration_path, class: "mt-9 space-y-5 animate-stage-in", html: { style: "--stage-delay: .16s" } do |form| %>
+    <%= render(Campbooks::Input.new(:name, type: :text, label: t(".name_label"), placeholder: t(".name_placeholder"), required: true, value: params[:name], autofocus: true, autocomplete: "name")) %>
 
-<%= form_with url: registration_path, class: "mt-9 space-y-5 animate-stage-in", html: { style: "--stage-delay: .16s" } do |form| %>
-  <%= render(Campbooks::Input.new(:name, type: :text, label: t(".name_label"), placeholder: t(".name_placeholder"), required: true, value: params[:name], autofocus: true, autocomplete: "name")) %>
+    <%= render(Campbooks::Input.new(:email_address, type: :email, label: t(".email_label"), placeholder: t(".email_placeholder"), required: true, value: params[:email_address], autocomplete: "email")) %>
 
-  <%= render(Campbooks::Input.new(:email_address, type: :email, label: t(".email_label"), placeholder: t(".email_placeholder"), required: true, value: params[:email_address], autocomplete: "email")) %>
+    <% if beta_code_required? %>
+      <%= render(Campbooks::Input.new(:beta_code, type: :text, label: t(".beta_code_label"), placeholder: t(".beta_code_placeholder"), required: true, value: params[:beta_code], hint: t(".beta_code_hint"), autocomplete: "off")) %>
+    <% end %>
 
-  <% if beta_code_required? %>
-    <%= render(Campbooks::Input.new(:beta_code, type: :text, label: t(".beta_code_label"), placeholder: t(".beta_code_placeholder"), required: true, value: params[:beta_code], hint: t(".beta_code_hint"), autocomplete: "off")) %>
+    <label class="flex items-start gap-2 text-xs text-muted-foreground">
+      <input type="checkbox" name="terms_accepted" value="1" required
+             class="mt-0.5 rounded border-border text-accent-600 focus:ring-accent-500">
+      <span><%= t(".terms_consent_html",
+                  terms: link_to(t(".terms"), marketing_url("/terms"), target: "_blank", rel: "noopener", class: "font-medium text-foreground underline underline-offset-2 hover:text-accent-700"),
+                  privacy: link_to(t(".privacy"), marketing_url("/privacy"), target: "_blank", rel: "noopener", class: "font-medium text-foreground underline underline-offset-2 hover:text-accent-700")) %></span>
+    </label>
+
+    <div class="pt-1">
+      <%= render(Campbooks::Button.new(variant: :primary, type: "submit", size: :lg, class: "w-full justify-center")) { t(".submit") } %>
+      <p class="mt-2.5 text-center text-xs text-muted-foreground"><%= t(".code_hint") %></p>
+    </div>
   <% end %>
 
-  <label class="flex items-start gap-2 text-xs text-muted-foreground">
-    <input type="checkbox" name="terms_accepted" value="1" required
-           class="mt-0.5 rounded border-border text-accent-600 focus:ring-accent-500">
-    <span><%= t(".terms_consent_html",
-                terms: link_to(t(".terms"), marketing_url("/terms"), target: "_blank", rel: "noopener", class: "font-medium text-foreground underline underline-offset-2 hover:text-accent-700"),
-                privacy: link_to(t(".privacy"), marketing_url("/privacy"), target: "_blank", rel: "noopener", class: "font-medium text-foreground underline underline-offset-2 hover:text-accent-700")) %></span>
-  </label>
-
-  <div class="pt-1">
-    <%= render(Campbooks::Button.new(variant: :primary, type: "submit", size: :lg, class: "w-full justify-center")) { t(".submit") } %>
-    <p class="mt-2.5 text-center text-xs text-muted-foreground"><%= t(".code_hint") %></p>
-  </div>
+  <p class="mt-8 text-center text-sm text-muted-foreground animate-stage-in" style="--stage-delay: .2s">
+    <%= t(".have_account") %>
+    <%= link_to t(".sign_in"), new_session_path, class: "font-medium text-foreground hover:text-accent-700" %>
+  </p>
 <% end %>
-
-<p class="mt-8 text-center text-sm text-muted-foreground animate-stage-in" style="--stage-delay: .2s">
-  <%= t(".have_account") %>
-  <%= link_to t(".sign_in"), new_session_path, class: "font-medium text-foreground hover:text-accent-700" %>
-</p>

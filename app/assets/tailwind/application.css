@@ -75,6 +75,13 @@
   --scout-bg: linear-gradient(135deg, oklch(97.6% 0.032 26), oklch(99% 0.012 55) 75%);
   --scout-border: color-mix(in oklch, oklch(64% 0.21 20) 16%, transparent);
 
+  /* Auth screens (sign in / sign up / reset) — a warm-grey canvas the white
+     paper card lifts off, plus one faint ambient Ember halo above it. Glass
+     stays with Scout/topbar/docked bar; the warmth here is light, not a slab. */
+  --auth-canvas: oklch(96.4% 0.003 60);
+  --auth-halo: radial-gradient(70% 52% at 50% -8%, oklch(72% 0.18 32 / 0.10), transparent 66%);
+  --auth-card-shadow: 0 1px 2px oklch(20% 0.03 60 / 0.05), 0 20px 48px -24px oklch(64% 0.2 22 / 0.28);
+
   /* Chrome layer — a hair off white so topbar / side panels separate from content */
   --sidebar: oklch(99.2% 0.001 60);
   --sidebar-foreground: oklch(18% 0.005 60);
@@ -139,6 +146,12 @@
   --ember-glow: 0 8px 22px -6px oklch(64% 0.22 20 / 0.6);
   --scout-bg: linear-gradient(135deg, oklch(26% 0.055 26), oklch(19% 0.02 50) 80%);
   --scout-border: color-mix(in oklch, oklch(64% 0.21 20) 30%, transparent);
+
+  /* Auth canvas sits BELOW the card (14% card lifts off a 12.5% ground); the
+     Ember halo glows stronger here, where Ember is meant to. */
+  --auth-canvas: oklch(12.5% 0.004 60);
+  --auth-halo: radial-gradient(70% 52% at 50% -8%, oklch(66% 0.21 24 / 0.24), transparent 62%);
+  --auth-card-shadow: 0 1px 2px oklch(0% 0 0 / 0.4), 0 28px 64px -28px oklch(64% 0.22 22 / 0.42);
 
   --sidebar: oklch(16% 0.005 60);
   --sidebar-foreground: oklch(97% 0.003 60);
@@ -316,6 +329,11 @@
 .bg-ember-gradient { background-image: var(--ember); }
 .scout-glass { background-image: var(--scout-bg); border: 1px solid var(--scout-border); }
 .shadow-ember { box-shadow: var(--ember-glow); }
+
+/* Auth screens — the warm-grey canvas behind the centered paper card (see the
+   --auth-* tokens). The Ember halo + card shadow live on Campbooks::AuthCard. */
+.auth-canvas { background-color: var(--auth-canvas); }
+.auth-card { box-shadow: var(--auth-card-shadow); }
 
 /* ── Compact Skim tray — smaller story-rings in the dense inbox view. Scoped to
    a `.skim-compact` wrapper (the inbox's skim_tray frame) so the same tray

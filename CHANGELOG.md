@@ -46,6 +46,16 @@ major, minor, or patch change here.
   thread's discussion. Reads need `emails:read`; follow/unfollow need
   `emails:write`. Backs a thread-centric client.
 
+### Changed
+
+- **Auth screens now sit in a centered card.** Sign in, the three sign-up steps,
+  pending-approval, and the two password-reset pages render on a raised "paper"
+  card over a warm-grey canvas with one faint ambient Ember halo, replacing the
+  forms that used to float on a plain white page (and the older grey card on the
+  reset pages). Consistent in light and dark and down to 375px. Introduces a
+  reusable `Campbooks::AuthCard` component; the `Campbooks::Divider` gains a
+  `surface:` option so its label matches a card background.
+
 ### Security
 
 - **Dependency advisory bumps.** `json` 2.20.0 → 2.21.2 (CVE-2026-71847 — parser
