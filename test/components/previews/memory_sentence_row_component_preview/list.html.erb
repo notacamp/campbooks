@@ -1,0 +1,5 @@
+<div class="divide-y divide-border">
+  <% entries.each do |entry| %>
+    <%= render(Campbooks::Memory::SentenceRow.new(entry: entry)) %>
+  <% end %>
+</div>

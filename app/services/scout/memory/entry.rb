@@ -25,7 +25,9 @@ module Scout
     #               confirm/remove back to that source.
     class Entry
       ORIGINS = %i[taught learned default].freeze
-      FACETS = %i[filing stack replies streams style].freeze
+      # Automations rides last and only surfaces when Features.workflows? is on
+      # (its source yields nothing otherwise, so the facet chip stays hidden).
+      FACETS = %i[filing stack replies streams style automations].freeze
 
       attr_reader :id, :facet, :sentence, :origin, :origin_detail, :record, :form_path, :actions, :source_key
 

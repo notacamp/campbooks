@@ -13,7 +13,7 @@ RSpec.describe Scout::Memory::Sources::EmailRules do
       let!(:rule) do
         ws.email_rules.create!(
           name: "EDP",
-          criteria: { "from" => ["@edp.pt"] },
+          criteria: { "from" => [ "@edp.pt" ] },
           archive: true,
           mail_folder: folder,
           created_by: user
@@ -61,10 +61,10 @@ RSpec.describe Scout::Memory::Sources::EmailRules do
       let!(:rule) do
         ws.email_rules.create!(
           name: "Tag invoices",
-          criteria: { "subject" => ["invoice"] },
+          criteria: { "subject" => [ "invoice" ] },
           archive: false,
           created_by: user,
-          tags: [tag]
+          tags: [ tag ]
         )
       end
 
@@ -84,7 +84,7 @@ RSpec.describe Scout::Memory::Sources::EmailRules do
     let!(:rule) do
       ws.email_rules.create!(
         name: "To remove",
-        criteria: { "from" => ["@test.com"] },
+        criteria: { "from" => [ "@test.com" ] },
         archive: true,
         created_by: user
       )
@@ -100,7 +100,7 @@ RSpec.describe Scout::Memory::Sources::EmailRules do
       other_user = other_ws.users.create!(name: "O", email_address: "o-#{SecureRandom.hex(4)}@example.com", password: "password123")
       other_rule = other_ws.email_rules.create!(
         name: "Foreign rule",
-        criteria: { "from" => ["@foreign.com"] },
+        criteria: { "from" => [ "@foreign.com" ] },
         archive: true,
         created_by: other_user
       )

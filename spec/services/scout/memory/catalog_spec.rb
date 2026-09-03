@@ -9,7 +9,7 @@ RSpec.describe Scout::Memory::Catalog do
   let!(:rule) do
     ws.email_rules.create!(
       name: "EDP Rule",
-      criteria: { "from" => ["@edp.pt"] },
+      criteria: { "from" => [ "@edp.pt" ] },
       archive: true,
       created_by: user
     )

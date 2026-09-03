@@ -7,6 +7,7 @@ en:
       replies: Replies
       streams: Streams
       style: Style
+      automations: Automations
     origins:
       taught: Taught by you
       taught_on: "Taught by you · %{date}"
@@ -71,6 +72,14 @@ en:
         default: "For %{purpose}, Scout uses the built-in guidance."
       defaults:
         review: Every document I read waits for your review before it's filed for good.
+      workflows:
+        sentence: "When %{trigger}, %{actions}."
+        and: and
+        no_actions: do nothing yet
+        trigger:
+          email_received: an email arrives
+          webhook: a webhook fires
+          event: an event happens
     teach:
       created: Got it — I'll apply that from now on.
       unknown: I can't learn that one yet. Try filing mail from a sender, tagging it, treating a sender as a stream, marking someone priority, blocking a sender, or setting your reply signature.

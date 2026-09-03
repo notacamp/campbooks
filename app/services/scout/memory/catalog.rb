@@ -23,6 +23,7 @@ module Scout
         Sources::SkimHabits,
         Sources::Replies,
         Sources::Prompts,
+        Sources::Workflows,
         Sources::Defaults
       ].freeze
 

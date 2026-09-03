@@ -46,13 +46,13 @@ module Scout
         # otherwise) — see the honesty of the mock: no invented behaviour, just
         # the rule's own conditions and actions.
         def assemble(conditions, actions, folder:)
-          lead = t("lead")
+          lead = phrase("lead")
           prefix = conditions.blank? ? lead : "#{lead} #{conditions}"
 
           if folder
             "#{prefix} #{join_and(actions)}"
           elsif conditions.blank?
-            "#{prefix} #{t('connector_and')} #{join_and(actions)}"
+            "#{prefix} #{phrase('connector_and')} #{join_and(actions)}"
           else
             "#{prefix}, #{join_and(actions)}"
           end
@@ -60,26 +60,26 @@ module Scout
 
         def condition_clause(criteria)
           parts = []
-          parts << fill(t("from"), bold_join(criteria["from"])) if present?(criteria["from"])
-          parts << fill(t("to"), bold_join(criteria["to"])) if present?(criteria["to"])
-          parts << fill(t("subject"), bold_join(criteria["subject"], quote: true)) if present?(criteria["subject"])
-          parts << fill(t("body"), bold_join(criteria["body"], quote: true)) if present?(criteria["body"])
-          parts << fill(t("category"), bold_join(category_labels(criteria["category"]))) if present?(criteria["category"])
-          parts << t("attachment") if criteria["has_attachment"] == true
+          parts << fill(phrase("from"), bold_join(criteria["from"])) if present?(criteria["from"])
+          parts << fill(phrase("to"), bold_join(criteria["to"])) if present?(criteria["to"])
+          parts << fill(phrase("subject"), bold_join(criteria["subject"], quote: true)) if present?(criteria["subject"])
+          parts << fill(phrase("body"), bold_join(criteria["body"], quote: true)) if present?(criteria["body"])
+          parts << fill(phrase("category"), bold_join(category_labels(criteria["category"]))) if present?(criteria["category"])
+          parts << phrase("attachment") if criteria["has_attachment"] == true
           parts.join(", ")
         end
 
         # Folder first (renders as "under X"), then archive / mark read / tag.
         def action_phrases(rule)
           phrases = []
-          phrases << fill(t("folder"), bold(rule.mail_folder.name)) if rule.mail_folder
-          phrases << t("archive") if rule.archive?
-          phrases << t("mark_read") if rule.mark_read?
-          phrases << fill(t("tag"), bold_join(rule.tags.map { |tag| "##{tag.name}" })) if rule.tags.any?
+          phrases << fill(phrase("folder"), bold(rule.mail_folder.name)) if rule.mail_folder
+          phrases << phrase("archive") if rule.archive?
+          phrases << phrase("mark_read") if rule.mark_read?
+          phrases << fill(phrase("tag"), bold_join(rule.tags.map { |tag| "##{tag.name}" })) if rule.tags.any?
           phrases
         end
 
-        def t(key) = I18n.t("scout_memory.sources.email_rules.#{key}")
+        def phrase(key) = I18n.t("scout_memory.sources.email_rules.#{key}")
 
         def fill(template, value) = template.gsub("%{value}") { value }
 
@@ -95,7 +95,7 @@ module Scout
           return "" if list.empty?
           return list.first if list.one?
 
-          "#{list[0..-2].join(', ')} #{t('connector_and')} #{list.last}"
+          "#{list[0..-2].join(', ')} #{phrase('connector_and')} #{list.last}"
         end
 
         def category_labels(values)
