@@ -377,7 +377,10 @@ class Document < ApplicationRecord
                              .maximum("bank_transactions.booked_on")
 
     if booked
-      new_at = booked.to_time
+      # Anchor the settlement to the booked DATE in the app's zone, so settled_at.to_date
+      # reads back as that date (a bare Date#to_time uses system-local midnight, which a
+      # UTC offset can shift a day).
+      new_at = booked.in_time_zone
       return if settled_bank_match? && settled_at == new_at
 
       update_columns(settled_at: new_at, settled_source: "bank_match")

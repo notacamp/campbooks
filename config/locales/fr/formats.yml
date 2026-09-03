@@ -9,6 +9,7 @@ fr:
       day_month: "%-d %b"
       full: "%-d %b %Y"
       numeric: "%d/%m/%Y"
+      month_year: "%b %Y"
       section: "%B %Y"
       thread: "%H:%M"
   time:
@@ -20,5 +21,6 @@ fr:
       day_month: "%-d %b"
       full: "%-d %b %Y"
       numeric: "%d/%m/%Y"
+      month_year: "%b %Y"
       section: "%B %Y"
       thread: "%H:%M"
