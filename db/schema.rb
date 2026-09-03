@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_03_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_03_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -528,6 +528,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_03_120000) do
     t.integer "review_status", default: 0, null: false
     t.datetime "reviewed_at"
     t.uuid "reviewed_by_id"
+    t.datetime "settled_at"
+    t.string "settled_source"
     t.integer "source", default: 0, null: false
     t.boolean "starred", default: false, null: false
     t.datetime "updated_at", null: false

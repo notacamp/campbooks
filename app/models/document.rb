@@ -79,6 +79,12 @@ class Document < ApplicationRecord
     credit_note: 14
   }
 
+  # Money documents — the ones that carry an amount and a direction (something is
+  # owed, one way or the other). Paper's status/facts and the future Money surface
+  # (`Documents::Status`, `Document#direction`) build on this set.
+  MONEY_TYPES = %w[expense_invoice revenue_invoice credit_note receipt].freeze
+  scope :money_types, -> { where(document_type: MONEY_TYPES) }
+
   # Two orthogonal lifecycles, split out of a single overloaded `status` enum:
   # ai_status is the AI processing pipeline, review_status is the human sign-off.
   # Both share the keys `pending`/`failed`, so each is prefixed to keep the generated
@@ -322,6 +328,62 @@ class Document < ApplicationRecord
     return "processing" if ai_processing?
     return "failed" if ai_failed?
     review_status
+  end
+
+  # Which way the money flows, for the money documents (nil for everything else).
+  # Revenue invoices are owed TO you (receivable); expenses/receipts/credit notes
+  # are what YOU owe (payable). Exposed for Paper's status and the Money surface.
+  def direction
+    case document_type
+    when "revenue_invoice"                          then :receivable
+    when "expense_invoice", "receipt", "credit_note" then :payable
+    end
+  end
+
+  def settled?
+    settled_at.present?
+  end
+
+  def settled_bank_match?
+    settled_source == "bank_match"
+  end
+
+  def settled_manual?
+    settled_source == "manual"
+  end
+
+  # "Mark paid" by hand (Paper row menu). Records the manual settlement instant.
+  def mark_settled!(at: Time.current)
+    update!(settled_at: at, settled_source: "manual")
+  end
+
+  # "Mark unpaid" — clears a manual settlement. A bank-match settlement is owned by
+  # the reconciliation (recompute_bank_settlement!), so it is not cleared here.
+  def mark_unsettled!
+    update!(settled_at: nil, settled_source: nil)
+  end
+
+  # Re-derive the bank-match settlement from the document's confirmed transaction
+  # matches. Called from TransactionMatch#sync_document_settlement after a match is
+  # confirmed/rejected/reset. A confirmed match sets settled_at to the latest matched
+  # transaction's booked date (source `bank_match`, overriding a prior manual settle —
+  # a real bank match is stronger evidence); losing the last confirmed match clears a
+  # bank-match settlement but never a manual one. Uses update_columns to stay out of
+  # callbacks/validations (avoids re-triggering the match callback loop).
+  def recompute_bank_settlement!
+    booked = TransactionMatch.confirmed
+                             .where(document_id: id)
+                             .joins(:bank_transaction)
+                             .maximum("bank_transactions.booked_on")
+
+    if booked
+      new_at = booked.to_time
+      return if settled_bank_match? && settled_at == new_at
+
+      update_columns(settled_at: new_at, settled_source: "bank_match")
+    elsif settled_bank_match?
+      update_columns(settled_at: nil, settled_source: nil)
+    end
   end
 
   def image?

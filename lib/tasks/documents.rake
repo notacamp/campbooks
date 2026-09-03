@@ -39,4 +39,25 @@ namespace :documents do
 
     puts "\nDone: #{totals.sort.map { |k, v| "#{k}=#{v}" }.join(', ')}"
   end
+
+  desc "Backfill documents.settled_at/settled_source from existing confirmed bank " \
+       "transaction matches (Paper's `paid` status). Idempotent — re-derives each " \
+       "document from its confirmed matches, so a re-run is a no-op once settled."
+  task backfill_settled: :environment do
+    document_ids = TransactionMatch.confirmed.distinct.pluck(:document_id)
+    total = document_ids.size
+    if total.zero?
+      puts "No confirmed transaction matches. Nothing to settle."
+      next
+    end
+
+    puts "Backfilling settlement for #{total} document(s) with confirmed matches..."
+    settled = 0
+    Document.where(id: document_ids).find_each do |document|
+      document.recompute_bank_settlement!
+      settled += 1 if document.reload.settled_bank_match?
+    end
+
+    puts "Done. #{settled}/#{total} document(s) now marked paid via bank match."
+  end
 end
