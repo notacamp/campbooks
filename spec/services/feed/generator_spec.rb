@@ -153,4 +153,26 @@ RSpec.describe Feed::Generator do
       expect(user.feed_items.active.count).to eq(2)
     end
   end
+
+  describe "#inserted_items" do
+    it "returns the FeedItems genuinely inserted this run (new dedupe keys)" do
+      message = create(:email_message, email_account: account, ai_action_prompt: "Reply", received_at: 1.hour.ago)
+
+      generator = Feed::Generator.new(user)
+      generator.call
+
+      expect(generator.inserted_items.map(&:class).uniq).to eq([ FeedItem ])
+      expect(generator.inserted_items.map { |i| i.subject_id }).to include(message.id)
+    end
+
+    it "returns an empty array on a re-run when nothing was inserted (updates only)" do
+      create(:email_message, email_account: account, ai_action_prompt: "Reply", received_at: 1.hour.ago)
+      Feed::Generator.for_user(user) # first run materialises items
+
+      generator = Feed::Generator.new(user)
+      generator.call # re-run — everything already exists
+
+      expect(generator.inserted_items).to be_empty
+    end
+  end
 end

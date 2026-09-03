@@ -78,6 +78,40 @@ RSpec.describe "Now page", type: :request do
       expect(response.body).to include(I18n.t("components.now.deck.cleared_title"))
     end
 
+    it "includes actionable notifications (notices) in the deck as attention cards" do
+      create(:notification, user: user, category: :system, priority: :action_required,
+             title: "Reconnect your inbox", link_url: "/email_accounts/1")
+      Feed::Generator.for_user(user)
+
+      get now_path
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Reconnect your inbox")
+      # The notice is attention=true, so it counts under priority
+      expect(response.body).to include("data-feed-attention=\"true\"")
+    end
+
+    it "counts notices in the priority ring" do
+      create(:notification, user: user, category: :system, priority: :action_required,
+             title: "Reconnect your inbox", link_url: "/email_accounts/1")
+      Feed::Generator.for_user(user)
+
+      get now_path
+
+      # The priority segment count must be at least 1 (the notice).
+      # Rendered as the now_deck_total_value or inside ring labels.
+      expect(response.body).to match(/data-now-deck-total-value="[1-9]/)
+    end
+
+    it "stamps the deck with segment_kinds for the live-append filter" do
+      get now_path(segment: :mail)
+
+      # The deck controller needs segment_kinds to decide whether a live-broadcast
+      # card belongs on screen. The mail segment carries email-kind strings.
+      expect(response.body).to include("now-deck-segment-kinds-value")
+      expect(response.body).to include("email_action")
+    end
+
     it "lists in Scout's log only system events from the last 24h the user can access" do
       mine = create(:email_message, email_account: account, subject: "Mine archived")
       create(:event, workspace: workspace, name: "email.archived", subject: mine, actor: nil,

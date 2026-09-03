@@ -38,6 +38,12 @@
   </div>
 </div>
 
+<%# Live deck: new mail that needs you slides into the back of the deck via this
+    per-user stream (Feed::LiveDeck appends to #feed_timeline). It sits OUTSIDE the
+    now_deck frame so it survives segment re-renders — the subscription must not be
+    torn down and recreated every time the deck reloads. %>
+<%= turbo_stream_from "now_#{current_user.id}" %>
+
 <%# ── Rings + deck: one turbo-frame so a segment change re-renders both in place
     (counts stay right). The doc-skim-overlay controller wraps the frame so the
     Docs ring can open the review walk while the overlay itself stays put. ───── %>
@@ -69,6 +75,7 @@
           setup_items: @setup_items,
           inbox_state: @inbox_state,
           segment: @segment,
+          segment_kinds: @segment_kinds,
           total: deck_total,
           next_page: @pagy&.next,
           has_more: @pagy&.next.present?) %>

@@ -55,6 +55,13 @@ en:
         send_reminder: "Send reminder"
         mark_paid: "Mark paid"
         later: "Later"
+      notice_card:
+        done: Done
+        label: Needs you
+        later: Later
+        open: Open
+        reconnect: Reconnect
+        review: Review
       reminder_card:
         confirm: Add to calendar
         dismiss: Dismiss
@@ -117,6 +124,7 @@ en:
       dismissed: Dismissed.
       follow_up_dismissed: Follow-up dismissed.
       gone: That is no longer available.
+      notice_done: Cleared.
       reminder_confirmed: "%{title} added to your calendar."
       reminder_confirmed_no_calendar: Reminder confirmed. Connect a calendar to sync
         it automatically.

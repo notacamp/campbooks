@@ -13,6 +13,7 @@ module Campbooks
     # the focused card; touch shows a swipe hint instead — see #focus_hints.
     class Card < Campbooks::Base
       CARDS = {
+        "notice"          => Campbooks::Feed::NoticeCard,
         "calendar_event"  => Campbooks::Feed::CalendarEventCard,
         "starred_email"   => Campbooks::Feed::StarredEmailCard,
         "email_action"    => Campbooks::Feed::EmailActionCard,
@@ -25,9 +26,14 @@ module Campbooks
         "late_receivable" => Campbooks::Feed::LateReceivableCard
       }.freeze
 
-      def initialize(item:, subject:)
+      # @param live [Boolean] tag this render as a live-broadcast insertion
+      #   (data-feed-live) so the now-deck controller knows to tick the deck for it
+      #   rather than treat it like a load-more/undo append. Set only by
+      #   Feed::LiveDeck; the home feed and page render leave it false.
+      def initialize(item:, subject:, live: false)
         @item = item
         @subject = subject
+        @live = live
       end
 
       def view_template
@@ -46,7 +52,7 @@ module Campbooks
         render Campbooks::Swipeable.new(
           id: "feed_item_#{@item.id}",
           class: "animate-fade-in scroll-mt-24 py-9",
-          data: { feed_card: true, feed_focus_unit: true, feed_dismiss_url: helpers.dismiss_feed_item_path(@item) },
+          data: card_data,
           surface: "var(--color-background)",
           left: sides[:left],
           right: sides[:right]
@@ -58,6 +64,23 @@ module Campbooks
 
       private
 
+      # The wrapper's data hooks. Beyond the feed-keyboard/dismiss hooks, every card
+      # carries data-feed-kind and data-feed-attention so the now-deck controller can
+      # decide whether a live-appended card belongs to the active segment; a live
+      # broadcast additionally stamps data-feed-live so the controller ticks the deck
+      # for it. Harmless on the home feed (nothing reads them there).
+      def card_data
+        data = {
+          feed_card: true,
+          feed_focus_unit: true,
+          feed_dismiss_url: helpers.dismiss_feed_item_path(@item),
+          feed_kind: @item.kind,
+          feed_attention: (@item.attention ? "true" : "false")
+        }
+        data[:feed_live] = "true" if @live
+        data
+      end
+
       # The escape (swipe-left) + primary (swipe-right) actions per kind, as
       # Swipeable stages. They mirror the card's ← and → buttons exactly — same
       # endpoint, same params — so a swipe and a keypress do the identical thing.
@@ -65,6 +88,10 @@ module Campbooks
       # Reply / View) have no swipe-right: on touch you tap the card to open.
       def swipe_sides
         case @item.kind
+        when "notice"
+          # Swipe-left is Later (dismiss just this card); the primary (Open) is
+          # navigation, so no swipe-right. Done stays a button/keyboard action.
+          { left: [ notice_later_stage ], right: [] }
         when "email_action"
           { left: [ archive_stage ], right: [ file_stage ].compact }
         when "starred_email"
@@ -140,6 +167,12 @@ module Campbooks
       def feed_dismiss_stage(label = t("components.swipeable.dismiss"))
         { key: "dismiss", label: label, icon: :dismiss, color: "neutral",
           endpoint: helpers.dismiss_feed_item_path(@item), params: {} }
+      end
+
+      # "Later" on a notice — the generic dismiss (hides this card; the notification
+      # is untouched and can resurface), labelled to match the card's button.
+      def notice_later_stage
+        feed_dismiss_stage(t("components.feed.notice_card.later"))
       end
 
       # Follow-up dismiss goes through act (not the generic feed dismiss) so it

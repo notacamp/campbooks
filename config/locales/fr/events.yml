@@ -8,6 +8,7 @@ fr:
       account: Compte
       calendar: Calendrier
       contacts: Contacts
+      digests: Récapitulatifs
       documents: Documents
       email: E-mail
       files: Fichiers
@@ -23,6 +24,7 @@ fr:
       contact_starred: Contact mis en favori
       contact_unblocked: Contact débloqué
       contact_unstarred: Contact retiré des favoris
+      digest_generated: Récapitulatif généré
       document_approved: Document approuvé
       document_linked_to_thread: Document lié au fil
       document_processed: Document traité

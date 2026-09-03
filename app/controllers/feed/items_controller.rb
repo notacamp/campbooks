@@ -147,6 +147,7 @@ module Feed
       when "Reminder"     then run_reminder_action(subject)
       when "Task"         then run_task_action(subject)
       when "Document"     then run_document_action(subject)
+      when "Notification"  then run_notice_action(subject)
       else failure(t("feed.items.unsupported"))
       end
     end
@@ -160,6 +161,22 @@ module Feed
       when "mark_paid"
         document.mark_settled!
         { success: true, message: t("feed.items.receivable_marked_paid") }
+      else
+        failure(t("feed.items.unsupported"))
+      end
+    end
+
+    # Resolve a notice from the deck: mark it read and archive it, so it leaves the
+    # "Needs you" set and won't regenerate as a card. The feed item is already the
+    # user's; guard the notification's ownership too. Non-reversible — a plain toast.
+    def run_notice_action(notification)
+      return failure(t("feed.items.gone")) unless notification.user_id == current_user.id
+
+      case params[:tool].to_s
+      when "notice_done"
+        notification.mark_as_read!
+        notification.archive!
+        { success: true, message: t("feed.items.notice_done") }
       else
         failure(t("feed.items.unsupported"))
       end

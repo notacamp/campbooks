@@ -37,6 +37,9 @@ es:
           events_html:
             one: añadió %{n_html} evento al calendario
             other: añadió %{n_html} eventos al calendario
+          digests_html:
+            one: envió %{n_html} resumen
+            other: envió %{n_html} resúmenes
       rings:
         all: Todo
         priority: Prioritario

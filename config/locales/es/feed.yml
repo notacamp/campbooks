@@ -43,6 +43,13 @@ es:
           high_priority: Prioridad alta
           important: Importante
           starred: Remitente con estrella
+      notice_card:
+        done: Hecho
+        label: Requiere atención
+        later: Más tarde
+        open: Abrir
+        reconnect: Reconectar
+        review: Revisar
       reminder_card:
         confirm: Añadir al calendario
         dismiss: Descartar
@@ -105,6 +112,7 @@ es:
       dismissed: Descartado.
       follow_up_dismissed: Seguimiento descartado.
       gone: Esto ya no está disponible.
+      notice_done: Resuelto.
       reminder_confirmed: "%{title} añadido a tu calendario."
       reminder_confirmed_no_calendar: Recordatorio confirmado. Conecta un calendario
         para sincronizar automáticamente.

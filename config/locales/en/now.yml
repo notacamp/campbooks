@@ -41,6 +41,9 @@ en:
           events_html:
             one: put %{n_html} event on the calendar
             other: put %{n_html} events on the calendar
+          digests_html:
+            one: sent %{n_html} digest
+            other: sent %{n_html} digests
       rings:
         all: All
         priority: Priority

@@ -250,3 +250,56 @@ RSpec.describe Digests::Generator do
     }.to raise_error(Faraday::TooManyRequestsError)
   end
 end
+
+RSpec.describe "Digests::Generator — digest.generated event" do
+  let(:ws) { Workspace.create!(name: "Event WS") }
+  let(:user) { ws.users.create!(name: "Eventer", email_address: "eventer@example.com", password: "password123") }
+  let(:digest) do
+    ws.scheduled_digests.create!(
+      user:             user,
+      name:             "Weekly digest",
+      rrule:            "FREQ=WEEKLY",
+      next_run_at:      1.week.from_now,
+      config:           { "sources" => [ { "type" => "emails", "query" => "" } ] },
+      ai_enabled:       false,
+      deliver_by_email: false,
+      show_in_feed:     false
+    )
+  end
+
+  before do
+    digest
+    Current.workspace = ws
+    allow_any_instance_of(Digests::Sources::Emails).to receive(:items).and_return([
+      Digests::Item.new(source_type: "email", source_id: "1", title: "Test email",
+                        subtitle: "From: someone", summary: nil, timestamp: nil)
+    ])
+  end
+
+  after { Current.workspace = nil }
+
+  it "publishes a digest.generated SYSTEM event (actor: nil) when the issue is generated" do
+    expect {
+      Digests::Generator.new(digest).generate!(period_end: Time.current)
+    }.to change { ws.events.where(name: "digest.generated", actor_id: nil).count }.by(1)
+  end
+
+  it "stores the digest title and recipients_count in the event payload" do
+    Digests::Generator.new(digest).generate!(period_end: Time.current)
+
+    event = ws.events.find_by(name: "digest.generated")
+    expect(event.payload["title"]).to eq("Weekly digest")
+    expect(event.payload["recipients_count"]).to eq(1)
+  end
+
+  it "does not publish a second event when re-run on an already-generated issue (idempotency)" do
+    period_end = Time.current.beginning_of_hour
+
+    Digests::Generator.new(digest).generate!(period_end: period_end)
+    first_count = ws.events.where(name: "digest.generated").count
+
+    Digests::Generator.new(digest).generate!(period_end: period_end)
+
+    expect(ws.events.where(name: "digest.generated").count).to eq(first_count)
+  end
+end

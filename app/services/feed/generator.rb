@@ -28,7 +28,15 @@ module Feed
     def initialize(user, now: Time.current)
       @user = user
       @now = now
+      # The rows this run genuinely INSERTED (a brand-new dedupe_key), reloaded as
+      # FeedItems — what Feed::RefreshJob streams into the live deck. A refreshed or
+      # revived (expired→active) row is an update, not an insert, so it's excluded.
+      @inserted_items = []
+      @existing_keys = Set.new
     end
+
+    # Feed items freshly inserted this run (see #load_inserted). Empty until #call.
+    attr_reader :inserted_items
 
     def call
       return 0 unless @user&.workspace_id
@@ -77,6 +85,7 @@ module Feed
       picked.reject! { |_kind, c| c[:score].to_i < MIN_SCORE }
       rows = picked.map { |kind, c| row_for(kind, c, c[:subject]) }
       persist(rows, ran_kinds)
+      @inserted_items = load_inserted(rows)
       rows.size
     end
 
@@ -90,7 +99,21 @@ module Feed
       return if keys.empty?
 
       seen = @user.feed_items.where(dedupe_key: keys).pluck(:dedupe_key, :seen_at).to_h
+      # The keys that already had a row this run — used by #load_inserted to tell a
+      # genuine insert from a refresh/revival without a second query.
+      @existing_keys = seen.keys.to_set
       picked.each { |_kind, c| c[:seen_at] = seen[c[:dedupe_key]] }
+    end
+
+    # The subset of the persisted rows whose dedupe_key had no prior row — the
+    # cards that appeared this run. Reloaded as active FeedItems so the live-deck
+    # broadcast can present and render them. A revived expired row (its key existed)
+    # is an update, not an insert, so it's deliberately not resurfaced live.
+    def load_inserted(rows)
+      new_keys = rows.filter_map { |r| r[:dedupe_key] }.reject { |k| @existing_keys.include?(k) }
+      return [] if new_keys.empty?
+
+      @user.feed_items.active.where(dedupe_key: new_keys).to_a
     end
 
     # One card per email *conversation* (not per message) across all sources, so

@@ -22,6 +22,9 @@ export default class extends Controller {
   static targets = ["backSheet", "counter", "state", "cleared", "stack"]
   static values = {
     segment: String,
+    // Kinds the active non-priority segment gathers (all/priority are handled by
+    // name, so their list is empty). A live card whose kind isn't here is dropped.
+    segmentKinds: { type: Array, default: [] },
     total: Number,
     url: String,
     counterFormat: { type: String, default: "{n}" }
@@ -67,12 +70,37 @@ export default class extends Controller {
 
   // ── Bookkeeping ──────────────────────────────────────────────────────────
 
+  // A card node is any element child of the stack that isn't the hidden
+  // pagination-state marker (which also lives in #feed_timeline).
+  isCard(node) {
+    return node && node.nodeType === 1 && node.id !== "now_deck_state"
+  }
+
   cards() {
-    return Array.from(this.stack.children).filter((el) => el.nodeType === 1 && el.id !== "now_deck_state")
+    return Array.from(this.stack.children).filter((el) => this.isCard(el))
   }
 
   cardCount() {
     return this.cards().length
+  }
+
+  hasCard(id) {
+    return !!(id && this.stack.querySelector(`#${CSS.escape(id)}`))
+  }
+
+  clearedEl() {
+    return this.hasClearedTarget ? this.clearedTarget : this.element.querySelector("#now_deck_cleared")
+  }
+
+  // Does a live-broadcast card belong in the segment currently on screen? `all`
+  // takes everything; `priority` only the attention cluster; a kind segment only
+  // its own kinds. Mirrors NowController's segment split so a card can't slide into
+  // a segment it wouldn't have been rendered into.
+  acceptsLive(node) {
+    const seg = this.segmentValue
+    if (seg === "all") return true
+    if (seg === "priority") return node.dataset.feedAttention === "true"
+    return this.segmentKindsValue.includes(node.dataset.feedKind)
   }
 
   topCard() {
@@ -116,11 +144,17 @@ export default class extends Controller {
   onChildMutations(mutations) {
     let removed = 0
     let prepended = false
+    const liveAdded = []
 
     for (const m of mutations) {
-      m.removedNodes.forEach((node) => { if (node.nodeType === 1 && node.id !== "now_deck_state") removed += 1 })
+      m.removedNodes.forEach((node) => { if (this.isCard(node)) removed += 1 })
       m.addedNodes.forEach((node) => {
-        if (node.nodeType === 1 && node.id !== "now_deck_state" && node === this.stack.firstElementChild) prepended = true
+        if (!this.isCard(node)) return
+        // A live broadcast slid a new card into the back (or, if the deck was
+        // cleared, onto the top). It's tagged so we don't confuse it with the
+        // load-more append (already counted) or the undo prepend below.
+        if (node.dataset && node.dataset.feedLive === "true") liveAdded.push(node)
+        else if (node === this.stack.firstElementChild) prepended = true
       })
     }
 
@@ -129,7 +163,24 @@ export default class extends Controller {
     // Each removed card is one cleared; the newly exposed top rises in.
     if (removed) { this.remaining -= removed; this.riseTop() }
 
+    // New live cards: count them in, and un-hide the stack if the deck was cleared.
+    const wasCleared = liveAdded.length ? this.stack.hidden : false
+    liveAdded.forEach((node) => {
+      node.removeAttribute("data-feed-live") // consume the marker (idempotent re-renders)
+      this.remaining += 1
+    })
+    if (wasCleared) this.reviveFromCleared()
+
     this.sync()
+
+    // Motion runs AFTER sync so the back sheets are already un-hidden if the new
+    // card crossed a threshold. Cleared-then-filled rises as the new top; a card
+    // added behind existing ones pulses the back sheets. Either way the counter ticks.
+    if (liveAdded.length) {
+      if (wasCleared || this.cardCount() === liveAdded.length) this.riseTop()
+      else this.pulseBack()
+      this.tickCounter()
+    }
   }
 
   // ── Motion ───────────────────────────────────────────────────────────────
@@ -139,7 +190,14 @@ export default class extends Controller {
   // default.
   beforeStreamRender(event) {
     const stream = event.target
-    if (!stream || stream.getAttribute("action") !== "remove") return
+    if (!stream) return
+
+    // A live-broadcast append: keep it only if the card belongs to the active
+    // segment and isn't already in the deck. Otherwise drop the render entirely
+    // (a no-op render never touches the DOM, so the observer never sees it).
+    if (stream.getAttribute("action") === "append") { this.gateLiveAppend(event, stream); return }
+
+    if (stream.getAttribute("action") !== "remove") return
 
     const id = stream.getAttribute("target")
     if (!id) return
@@ -169,6 +227,50 @@ export default class extends Controller {
     void top.offsetWidth // restart the animation on a card reused as the new top
     top.classList.add("now-rise")
     top.addEventListener("animationend", () => top.classList.remove("now-rise"), { once: true })
+  }
+
+  // Only the top card is visible, so a card sliding into the BACK reads as the
+  // peeking back sheets pulsing once.
+  pulseBack() {
+    if (this.reduceMotion) return
+    this.backSheetTargets.forEach((el) => {
+      if (el.hidden) return
+      el.classList.remove("now-back-pulse")
+      void el.offsetWidth
+      el.classList.add("now-back-pulse")
+      el.addEventListener("animationend", () => el.classList.remove("now-back-pulse"), { once: true })
+    })
+  }
+
+  // A quick scale on the "1 of N" counter as N ticks up.
+  tickCounter() {
+    if (this.reduceMotion || !this.hasCounterTarget || this.counterTarget.hidden) return
+    this.counterTarget.classList.remove("now-counter-tick")
+    void this.counterTarget.offsetWidth
+    this.counterTarget.classList.add("now-counter-tick")
+    this.counterTarget.addEventListener("animationend", () => this.counterTarget.classList.remove("now-counter-tick"), { once: true })
+  }
+
+  // The deck had been cleared (stack hidden, cleared block shown); a live card
+  // arrived, so bring the stack back and hide the cleared moment.
+  reviveFromCleared() {
+    const cleared = this.clearedEl()
+    if (cleared) cleared.hidden = true
+    this.stack.hidden = false
+  }
+
+  // Gate a live-broadcast append (see beforeStreamRender): drop it when the card
+  // isn't for the active segment, or a card with its id is already on the deck
+  // (a re-broadcast). A non-live append (load-more) passes straight through.
+  gateLiveAppend(event, stream) {
+    if (stream.getAttribute("target") !== "feed_timeline") return
+    const template = stream.querySelector("template")
+    const card = template && template.content.firstElementChild
+    if (!card || card.dataset.feedLive !== "true") return
+
+    if (!this.acceptsLive(card) || this.hasCard(card.id)) {
+      event.detail.render = () => {}
+    }
   }
 
   trackDirection(event) {
@@ -201,7 +303,7 @@ export default class extends Controller {
   // ── Cleared ──────────────────────────────────────────────────────────────
 
   revealCleared() {
-    const cleared = this.hasClearedTarget ? this.clearedTarget : this.element.querySelector("#now_deck_cleared")
+    const cleared = this.clearedEl()
     if (cleared) cleared.hidden = false
     if (this.hasCounterTarget) this.counterTarget.hidden = true
     this.backSheetTargets.forEach((el) => { el.hidden = true })

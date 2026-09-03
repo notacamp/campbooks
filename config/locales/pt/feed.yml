@@ -43,6 +43,13 @@ pt:
           high_priority: Prioridade alta
           important: Importante
           starred: Remetente com estrela
+      notice_card:
+        done: Concluído
+        label: Precisa de si
+        later: Mais tarde
+        open: Abrir
+        reconnect: Voltar a ligar
+        review: Rever
       reminder_card:
         confirm: Adicionar ao calendário
         dismiss: Dispensar
@@ -105,6 +112,7 @@ pt:
       dismissed: Dispensado.
       follow_up_dismissed: Acompanhamento dispensado.
       gone: Isto já não está disponível.
+      notice_done: Resolvido.
       reminder_confirmed: "%{title} adicionado ao seu calendário."
       reminder_confirmed_no_calendar: Lembrete confirmado. Ligue um calendário para
         sincronizar automaticamente.

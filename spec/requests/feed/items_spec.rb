@@ -162,6 +162,46 @@ RSpec.describe "Feed::Items", type: :request do
     expect(item.reload.dismissed_at).to be_nil
   end
 
+  # -- notice (actionable notification) feed items ----------------------------
+
+  context "with notice feed items" do
+    let(:notification) do
+      create(:notification, user: user, category: :system, priority: :action_required,
+             title: "Reconnect your inbox", link_url: "/email_accounts/1")
+    end
+    let(:notice_item) do
+      FeedItem.create!(
+        user: user, workspace: workspace, kind: "notice", subject: notification,
+        dedupe_key: "notice:#{notification.id}", sort_at: Time.current,
+        generated_at: Time.current
+      )
+    end
+
+    before { sign_in(user) }
+
+    it "notice_done marks the notification read and archives it" do
+      post act_feed_item_path(notice_item, format: :turbo_stream), params: { tool: "notice_done" }
+
+      expect(response).to have_http_status(:ok)
+      expect(notice_item.reload.acted?).to be true
+      expect(notification.reload.read).to be true
+      expect(notification.reload.archived?).to be true
+    end
+
+    it "returns the Cleared toast on success" do
+      post act_feed_item_path(notice_item, format: :turbo_stream), params: { tool: "notice_done" }
+
+      expect(response.body).to include(I18n.t("feed.items.notice_done"))
+    end
+
+    it "rejects an unknown tool with 422 and does not touch the notification" do
+      post act_feed_item_path(notice_item, format: :turbo_stream), params: { tool: "bad_tool" }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(notification.reload.archived?).to be false
+    end
+  end
+
   # -- task feed items (from feed/items_controller_test.rb) -------------------
 
   context "with task feed items" do

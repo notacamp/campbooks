@@ -18,6 +18,15 @@ major, minor, or patch change here.
 
 ### Added
 
+- **Bold layout: live deck, actionable notices, and digests in Scout's log.**
+  New cards slide into the back of the Now deck in real time via a Turbo stream
+  channel — a `FeedRefreshJob` run that inserts genuinely new rows broadcasts
+  them instantly rather than waiting for the next poll. `action_required`
+  notifications surface as first-class deck cards (`Campbooks::Feed::NoticeCard`)
+  with Done / Later / Open actions so they can be resolved without leaving the
+  deck. Scheduled digest generation now publishes a `digest.generated` workspace
+  event, which the ledger counts in a new `:digests` bucket ("sent N digests") so
+  Scout can account for digest delivery in its opening tally.
 - **People (bold layout).** The rethought conversations place, opt-in via
   `ENABLE_BOLD_LAYOUT=1` + a per-user Bold layout. Every sender is now a person
   or a **service** (machine/bulk mail) — classified from its recent mail
