@@ -103,6 +103,13 @@ en:
           open: "open"
           late: "late"
           settled: "settled"
+        overflow:
+          older: "%{count} older"
+          later: "%{count} later"
+          older_axis: "‹ older"
+          later_axis: "later ›"
+          older_title: "%{count} overdue by more than three weeks · %{amount}. Open the ledger below."
+          later_title: "%{count} due beyond the next month · %{amount}. Open the ledger below."
       ledger:
         col:
           counterpart: "Counterpart"

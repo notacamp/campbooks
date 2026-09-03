@@ -54,4 +54,46 @@ RSpec.describe Campbooks::Money::Timeline, type: :component do
     expense(vendor_name: "Zero", amount_cents: 0, due_date: today - 1)
     expect(render_timeline).not_to include("NaN")
   end
+
+  describe "overflow (a deep backlog of old bills)" do
+    it "folds obligations older than the window into an 'older' marker, not a clamped bar" do
+      old = expense(vendor_name: "Ancient Co", amount_cents: 500_000, due_date: today - 400)
+      html = render_timeline
+
+      expect(html).to include("older")                 # the overflow marker label
+      expect(html).to include("#money_ledger")         # links to the full ledger
+      expect(html).not_to include("#ob-doc:#{old.id}") # never drawn as an on-axis bar
+    end
+
+    it "still draws recent overdue bills (inside the window) as individual bars" do
+      recent = expense(vendor_name: "Cloudhost", amount_cents: 24_800, due_date: today - 10)
+      expect(render_timeline).to include("#ob-doc:#{recent.id}")
+    end
+
+    it "caps labels to at most the two largest bars per lane" do
+      6.times do |i|
+        revenue(client_name: "Client #{i}", invoice_number: i.to_s, amount_cents: (i + 1) * 10_000, due_date: today + 3 + i)
+      end
+      html = render_timeline
+
+      # Only bar labels use font-size 11.5; markers/ticks/lane labels use other sizes.
+      expect(html.scan('font-size="11.5"').size).to be <= 2
+    end
+
+    it "folds far-future due dates into a 'later' marker on the right" do
+      future = expense(vendor_name: "Annual Co", amount_cents: 120_000, due_date: today + 75)
+      html = render_timeline
+
+      expect(html).to include("later")
+      expect(html).not_to include("#ob-doc:#{future.id}")
+    end
+
+    it "keeps the axis unchanged when nothing overflows" do
+      revenue(client_name: "Acme", invoice_number: "1", amount_cents: 222_000, due_date: today + 12)
+      html = render_timeline
+
+      expect(html).not_to include("stroke-dasharray") # no gutter divider
+      expect(html).not_to include("#money_ledger")    # no overflow markers
+    end
+  end
 end

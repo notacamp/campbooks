@@ -18,6 +18,17 @@ class MoneyComponentsPreview < ViewComponent::Preview
     render Campbooks::Money::Timeline.new(ledger: build_ledger, summary: build_summary, today: Date.current)
   end
 
+  # The overflow case: a deep backlog of old bills folds into one "older" marker
+  # per lane, and a far-future bill into a "later" marker, so the window stays
+  # legible no matter how many old bills there are.
+  # @label Timeline (backlog)
+  def timeline_with_backlog
+    today = Date.current
+    obligations = sample_obligations(today) + backlog_obligations(today)
+    ledger = FakeLedger.new(obligations, today)
+    render Campbooks::Money::Timeline.new(ledger: ledger, summary: Money::Summary.for(nil, nil, today: today, ledger: ledger), today: today)
+  end
+
   # Late / Due / Settled, with status chips (icon + label) and per-row actions.
   # @label Ledger table
   def ledger
@@ -64,6 +75,17 @@ class MoneyComponentsPreview < ViewComponent::Preview
       obligation("doc:lumen", :receivable, "Lumen Studio", "Invoice #0233 you sent", 64_000, today - 2, :settled, [], settled_on: today - 2, settled_via: "Millennium BCP · line 14"),
       obligation("doc:edp", :payable, "EDP", "August bill · subscription", 9_640, today - 6, :settled, [], settled_on: today - 6, settled_via: "Millennium BCP · line 9")
     ]
+  end
+
+  # A deep backlog: ~40 old payable bills + one long-overdue receivable, plus a
+  # far-future payable — the case the on-axis clamp used to turn into a blur.
+  def backlog_obligations(today)
+    older = (1..40).map do |i|
+      obligation("doc:old#{i}", :payable, "Vendor #{i}", "Invoice ##{1000 + i}", 8_000 + i * 900, today - (30 + i * 25), :late, %i[mark_paid])
+    end
+    older << obligation("doc:oldrx", :receivable, "Old Client", "Invoice #0099 you sent", 22_800, today - 176, :late, %i[send_reminder])
+    later = obligation("doc:future", :payable, "Annual Hosting", "2027 renewal", 120_000, today + 75, :due, %i[mark_paid])
+    older + [ later ]
   end
 
   def obligation(id, direction, counterpart, what, cents, due, status, actions, recurring: false, pay_url: nil, settled_on: nil, settled_via: nil)
