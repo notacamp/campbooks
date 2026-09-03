@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_03_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_03_130100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -945,6 +945,28 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_03_130000) do
     t.index ["workspace_id"], name: "index_file_share_links_on_workspace_id"
   end
 
+  create_table "focus_blocks", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "calendar_event_id"
+    t.datetime "created_at", null: false
+    t.datetime "end_at", null: false
+    t.string "reason"
+    t.uuid "reminder_id"
+    t.datetime "start_at", null: false
+    t.integer "status", default: 0, null: false
+    t.uuid "task_id"
+    t.string "title", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["calendar_event_id"], name: "index_focus_blocks_on_calendar_event_id"
+    t.index ["reminder_id"], name: "index_focus_blocks_on_reminder", unique: true, where: "(reminder_id IS NOT NULL)"
+    t.index ["task_id"], name: "index_focus_blocks_on_task_id"
+    t.index ["user_id", "start_at"], name: "index_focus_blocks_on_user_id_and_start_at"
+    t.index ["user_id"], name: "index_focus_blocks_on_user_id"
+    t.index ["workspace_id", "status", "start_at"], name: "index_focus_blocks_on_workspace_id_and_status_and_start_at"
+    t.index ["workspace_id"], name: "index_focus_blocks_on_workspace_id"
+  end
+
   create_table "folder_memberships", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.uuid "folderable_id", null: false
@@ -1854,6 +1876,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_03_130000) do
     t.integer "role", default: 0, null: false
     t.jsonb "section_seen_at", default: {}, null: false
     t.datetime "terms_accepted_at"
+    t.string "time_zone"
     t.datetime "totp_enabled_at"
     t.text "totp_secret"
     t.datetime "updated_at", null: false
@@ -2064,6 +2087,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_03_130000) do
   add_foreign_key "feed_items", "workspaces"
   add_foreign_key "file_share_links", "users", column: "created_by_id"
   add_foreign_key "file_share_links", "workspaces"
+  add_foreign_key "focus_blocks", "calendar_events"
+  add_foreign_key "focus_blocks", "reminders"
+  add_foreign_key "focus_blocks", "tasks"
+  add_foreign_key "focus_blocks", "users"
+  add_foreign_key "focus_blocks", "workspaces"
   add_foreign_key "folder_memberships", "mail_folders"
   add_foreign_key "google_drive_accounts", "workspaces"
   add_foreign_key "google_drive_configs", "document_types"
