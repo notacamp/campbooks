@@ -1,0 +1,94 @@
+---
+en:
+  time:
+    index:
+      previous: Previous
+      today: Today
+      next: Next
+      calendars: Calendars
+      new_event: New
+    agenda:
+      untitled: Untitled
+      # Provenance shown after a row's title, e.g. "30 min · Google Calendar" or
+      # "deadline · from Ana's email". Built by Time::Agenda.
+      source:
+        from_email: from %{name}'s email
+        from_document: "from %{title}"
+        scout_suggested: Scout suggested
+        task: Task
+        someone: someone
+        google_calendar: Google Calendar
+        zoho_calendar: Zoho Calendar
+        calendar: Calendar
+    focus:
+      # The title Scout gives a focus block it holds for a deadline.
+      title: "Focus: %{subject}"
+  focus_blocks:
+    keep:
+      kept: Kept — added to your calendar.
+      kept_local: Kept.
+    move:
+      moved: Moved.
+      failed: Couldn't move that block.
+    dismiss:
+      dismissed: Dismissed.
+  components:
+    time:
+      agenda_row:
+        all_day: all day
+        overdue: overdue
+        deadline: deadline
+        minutes:
+          one: "%{count} min"
+          other: "%{count} min"
+        hours:
+          one: "%{count} h"
+          other: "%{count} h"
+        hours_minutes: "%{hours} h %{minutes} min"
+        meet: Meet
+        open_thread: Open thread
+        open: Open
+        done: Done
+        move: Move
+        move_to: Move to
+        keep: Keep
+        add_to_calendar: Add to calendar
+        dismiss: Dismiss
+        today: Today
+        tomorrow: Tomorrow
+      agenda_list:
+        today: Today
+        tomorrow: Tomorrow
+        empty_today: Nothing scheduled.
+      day_note:
+        today: today
+        clear: Your day is clear — nothing due and no meetings.
+        meetings:
+          one: "%{count} meeting"
+          other: "%{count} meetings"
+        deadlines:
+          one: "%{count} deadline"
+          other: "%{count} deadlines"
+        summary_both: "%{meetings} and %{deadlines} today."
+        summary_one: "%{phrase} today."
+        focus: I held %{duration} %{when} for %{subject}.
+        minutes:
+          one: "%{count} minute"
+          other: "%{count} minutes"
+        at: at
+        today_word: today
+        tomorrow_word: tomorrow
+        late:
+          one: "%{name} is %{count} day overdue."
+          other: "%{name} is %{count} days overdue."
+    calendar:
+      task_chip:
+        scout_suggested: Scout suggested
+        task: Task
+  activerecord:
+    errors:
+      models:
+        focus_block:
+          attributes:
+            end_at:
+              after_start: must be after the start

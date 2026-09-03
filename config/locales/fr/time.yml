@@ -1,0 +1,91 @@
+---
+fr:
+  time:
+    index:
+      previous: Précédent
+      today: Aujourd'hui
+      next: Suivant
+      calendars: Agendas
+      new_event: Nouveau
+    agenda:
+      untitled: Sans titre
+      source:
+        from_email: de l'e-mail de %{name}
+        from_document: "de %{title}"
+        scout_suggested: Suggéré par Scout
+        task: Tâche
+        someone: quelqu'un
+        google_calendar: Google Agenda
+        zoho_calendar: Zoho Calendar
+        calendar: Agenda
+    focus:
+      title: "Focus : %{subject}"
+  focus_blocks:
+    keep:
+      kept: Conservé — ajouté à votre agenda.
+      kept_local: Conservé.
+    move:
+      moved: Déplacé.
+      failed: Impossible de déplacer ce bloc.
+    dismiss:
+      dismissed: Ignoré.
+  components:
+    time:
+      agenda_row:
+        all_day: toute la journée
+        overdue: en retard
+        deadline: échéance
+        minutes:
+          one: "%{count} min"
+          other: "%{count} min"
+        hours:
+          one: "%{count} h"
+          other: "%{count} h"
+        hours_minutes: "%{hours} h %{minutes} min"
+        meet: Rejoindre
+        open_thread: Ouvrir le fil
+        open: Ouvrir
+        done: Terminé
+        move: Déplacer
+        move_to: Déplacer vers
+        keep: Conserver
+        add_to_calendar: Ajouter à l'agenda
+        dismiss: Ignorer
+        today: Aujourd'hui
+        tomorrow: Demain
+      agenda_list:
+        today: Aujourd'hui
+        tomorrow: Demain
+        empty_today: Rien de prévu.
+      day_note:
+        today: aujourd'hui
+        clear: Votre journée est libre — rien à échéance et aucune réunion.
+        meetings:
+          one: "%{count} réunion"
+          other: "%{count} réunions"
+        deadlines:
+          one: "%{count} échéance"
+          other: "%{count} échéances"
+        summary_both: "%{meetings} et %{deadlines} aujourd'hui."
+        summary_one: "%{phrase} aujourd'hui."
+        focus: J'ai réservé %{duration} %{when} pour %{subject}.
+        minutes:
+          one: "%{count} minute"
+          other: "%{count} minutes"
+        at: à
+        today_word: aujourd'hui
+        tomorrow_word: demain
+        late:
+          one: "%{name} est en retard de %{count} jour."
+          other: "%{name} est en retard de %{count} jours."
+    calendar:
+      task_chip:
+        scout_suggested: Suggéré par Scout
+        task: Tâche
+  activerecord:
+    errors:
+      models:
+        focus_block:
+          attributes:
+            end_at:
+              after_start: doit être postérieure au début

@@ -14,6 +14,7 @@ es:
       admin_signups: Solicitudes de registro
       admin_users: Usuarios
       calendar: Calendario
+      time: Tiempo
       calendar_agenda: 'Calendario: vista de agenda'
       calendar_day: 'Calendario: vista de día'
       calendar_month: 'Calendario: vista de mes'

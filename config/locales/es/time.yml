@@ -1,0 +1,91 @@
+---
+es:
+  time:
+    index:
+      previous: Anterior
+      today: Hoy
+      next: Siguiente
+      calendars: Calendarios
+      new_event: Nuevo
+    agenda:
+      untitled: Sin título
+      source:
+        from_email: del correo de %{name}
+        from_document: "de %{title}"
+        scout_suggested: Sugerido por Scout
+        task: Tarea
+        someone: alguien
+        google_calendar: Google Calendar
+        zoho_calendar: Zoho Calendar
+        calendar: Calendario
+    focus:
+      title: "Enfoque: %{subject}"
+  focus_blocks:
+    keep:
+      kept: "Guardado: añadido a tu calendario."
+      kept_local: Guardado.
+    move:
+      moved: Movido.
+      failed: No se pudo mover ese bloque.
+    dismiss:
+      dismissed: Descartado.
+  components:
+    time:
+      agenda_row:
+        all_day: todo el día
+        overdue: atrasado
+        deadline: fecha límite
+        minutes:
+          one: "%{count} min"
+          other: "%{count} min"
+        hours:
+          one: "%{count} h"
+          other: "%{count} h"
+        hours_minutes: "%{hours} h %{minutes} min"
+        meet: Unirse
+        open_thread: Abrir conversación
+        open: Abrir
+        done: Hecho
+        move: Mover
+        move_to: Mover a
+        keep: Mantener
+        add_to_calendar: Añadir al calendario
+        dismiss: Descartar
+        today: Hoy
+        tomorrow: Mañana
+      agenda_list:
+        today: Hoy
+        tomorrow: Mañana
+        empty_today: Nada programado.
+      day_note:
+        today: hoy
+        clear: "Tu día está despejado: nada pendiente ni reuniones."
+        meetings:
+          one: "%{count} reunión"
+          other: "%{count} reuniones"
+        deadlines:
+          one: "%{count} fecha límite"
+          other: "%{count} fechas límite"
+        summary_both: "%{meetings} y %{deadlines} hoy."
+        summary_one: "%{phrase} hoy."
+        focus: Reservé %{duration} %{when} para %{subject}.
+        minutes:
+          one: "%{count} minuto"
+          other: "%{count} minutos"
+        at: a las
+        today_word: hoy
+        tomorrow_word: mañana
+        late:
+          one: "%{name} lleva %{count} día de retraso."
+          other: "%{name} lleva %{count} días de retraso."
+    calendar:
+      task_chip:
+        scout_suggested: Sugerido por Scout
+        task: Tarea
+  activerecord:
+    errors:
+      models:
+        focus_block:
+          attributes:
+            end_at:
+              after_start: debe ser posterior al inicio
