@@ -40,4 +40,74 @@ RSpec.describe TransactionMatch, type: :model do
       expect(match).to be_valid
     end
   end
+
+  describe "settlement sync (Paper's paid status)" do
+    def match!(status)
+      TransactionMatch.create!(bank_transaction: bank_tx, document: document, status: status,
+                               matched_by: :manual, match_reasons: {})
+    end
+
+    it "writes settled_at (from the transaction's booked_on) + bank_match source on confirm" do
+      match!(:confirmed)
+      document.reload
+      expect(document.settled_at.to_date).to eq(bank_tx.booked_on)
+      expect(document.settled_source).to eq("bank_match")
+    end
+
+    it "does not settle a merely suggested match" do
+      match!(:suggested)
+      expect(document.reload.settled_at).to be_nil
+    end
+
+    it "clears a bank-match settlement when the confirmed match is rejected" do
+      match = match!(:confirmed)
+      expect(document.reload).to be_settled
+      match.update!(status: :rejected)
+      expect(document.reload.settled_at).to be_nil
+      expect(document.settled_source).to be_nil
+    end
+
+    it "clears a bank-match settlement when the match is destroyed (reset)" do
+      match = match!(:confirmed)
+      match.destroy!
+      expect(document.reload.settled_at).to be_nil
+    end
+
+    it "keeps a settlement while another confirmed match remains" do
+      other_tx = BankTransaction.create!(reconciliation: reconciliation, workspace: workspace, position: 1,
+                                         booked_on: Date.today - 1, description: "B", amount_cents: -100,
+                                         currency: "EUR", raw_data: {})
+      first = match!(:confirmed)
+      TransactionMatch.create!(bank_transaction: other_tx, document: document, status: :confirmed,
+                               matched_by: :manual, match_reasons: {})
+      first.update!(status: :rejected)
+      expect(document.reload).to be_settled_bank_match
+    end
+
+    it "does not clear a manual settlement (that belongs to the user, not the bank)" do
+      document.mark_settled!
+      expect(document.reload).to be_settled_manual
+      match!(:suggested).update!(status: :rejected)
+      expect(document.reload).to be_settled_manual
+    end
+  end
+
+  describe "documents:backfill_settled task" do
+    before(:all) do
+      Rails.application.load_tasks unless Rake::Task.task_defined?("documents:backfill_settled")
+    end
+
+    it "settles documents from existing confirmed matches, idempotently" do
+      # Simulate pre-migration data: a confirmed match whose document isn't settled yet.
+      TransactionMatch.create!(bank_transaction: bank_tx, document: document, status: :confirmed,
+                               matched_by: :manual, match_reasons: {})
+      document.update_columns(settled_at: nil, settled_source: nil)
+
+      task = Rake::Task["documents:backfill_settled"]
+      task.reenable
+      task.invoke
+
+      expect(document.reload.settled_source).to eq("bank_match")
+    end
+  end
 end

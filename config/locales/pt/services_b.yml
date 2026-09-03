@@ -22,6 +22,8 @@ pt:
       email_scans: Análises de e-mail
       files: Ficheiros
       inbox: Caixa de entrada
+      now: Agora
+      paper: Papéis
       new_calendar_event: Novo evento de calendário
       new_email: Novo e-mail
       new_workflow: Criar fluxo de trabalho

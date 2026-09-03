@@ -1,4 +1,6 @@
 class FilesController < ApplicationController
+  include Files::Searchable
+
   # The Files area — a unified file manager over the workspace's files (Documents)
   # organized into custom folders (MailFolder). #index lists everything ("All
   # files"); #show scopes to a single folder (its subfolders + filed contents).
@@ -93,22 +95,6 @@ class FilesController < ApplicationController
         end
       end
     end
-  end
-
-  # Build one Documents::Search per request, deriving @filters and @search_query.
-  # text_query? drives bounded-vs-paginated in the action.
-  # Also exposes @sorter, @single_type, and @field_columns so the view and the
-  # turbo_stream pagination append render the same column layout.
-  def build_search
-    @search       = Documents::Search.new(
-      user: Current.user, workspace: Current.workspace, params: params, folder: @folder
-    )
-    @filters      = @search.filters
-    @search_query = @search.search_text # parsed free text (modifiers stripped)
-    @sorter       = @search.sorter
-    @single_type  = @filters.single_type(Current.workspace)
-    # Cap at 3 so the fixed-layout table keeps Name readable (see index name_width).
-    @field_columns = @single_type ? DocumentTypes::Schema.for(@single_type).fields.first(3) : []
   end
 
   def load_folders

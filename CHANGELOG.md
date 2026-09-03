@@ -16,6 +16,20 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Paper — every document as what it says (bold layout).** A new document surface
+  that reads the extraction schema instead of the filesystem: each document is a row
+  of facts (who it's from, what it is, the amount, the date that matters) with a
+  meaning-bearing status — unpaid, late, paid, signed, expiring, needs review,
+  reconciled, filed. Scout's line at the top sums up what's open (unpaid total,
+  the worst overdue counterpart, documents needing a second look); type buckets and
+  an ask box ("unpaid invoices over 100") narrow the list; "Mark paid" settles a
+  document by hand and a confirmed bank reconciliation settles it automatically.
+  Classic Files stays a click away, and Drive/Notion exports move into the row menu.
+  Opt-in, part of the bold layout (`ENABLE_BOLD_LAYOUT=1` + per-user Bold in
+  Settings › Account).
+
 ## [0.31.0] - 2026-09-03
 
 ### Added

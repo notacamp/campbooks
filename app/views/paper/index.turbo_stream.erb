@@ -1,0 +1,28 @@
+<%# The lazy pagination append (requested by the paper_pagination sentinel, ?page=N).
+    Appends the next page to both the desktop tbody and the mobile card list, then
+    advances or removes the sentinel. %>
+<%= turbo_stream.append "paper_rows" do %>
+  <% @documents.each do |document| %>
+    <%= render Campbooks::Paper::Row.new(document: document, folders: @folders, layout: :table) %>
+  <% end %>
+<% end %>
+
+<%= turbo_stream.append "paper_cards" do %>
+  <% @documents.each do |document| %>
+    <%= render Campbooks::Paper::Row.new(document: document, folders: @folders, layout: :card) %>
+  <% end %>
+<% end %>
+
+<% if @pagy&.next %>
+  <%= turbo_stream.replace "paper_pagination" do %>
+    <%= turbo_frame_tag "paper_pagination",
+          src: paper_path(q: params[:q].presence, type: params[:type].presence, status: params[:status].presence, page: @pagy.next, format: :turbo_stream),
+          loading: :lazy do %>
+      <div class="flex items-center justify-center py-6">
+        <%= render Campbooks::Spinner.new(size: :md) %>
+      </div>
+    <% end %>
+  <% end %>
+<% else %>
+  <%= turbo_stream.remove "paper_pagination" %>
+<% end %>

@@ -1,0 +1,112 @@
+---
+en:
+  paper:
+    index:
+      title: "Paper"
+      subtitle: "Every document, as what it says."
+      classic_files: "Classic files"
+      export: "Export"
+      export_confirm: "Export the documents that match these filters?"
+      add: "Add"
+      add_title: "Add documents"
+      close: "Close"
+      ask_placeholder: "Ask, e.g. unpaid invoices over 100"
+      review:
+        one: "Review it"
+        other: "Review them"
+      connect: "Connect an AI provider and Scout will read your documents."
+      connect_cta: "Connect AI"
+      filters:
+        all: "All"
+        invoices: "Invoices"
+        receipts: "Receipts"
+        contracts: "Contracts"
+        other: "Other"
+      empty:
+        none_title: "Nothing on paper yet."
+        none_body: "Documents from your email land here automatically."
+        no_matches_title: "Nothing matches."
+        no_matches_clear: "Clear filters"
+    status:
+      processing: "Processing"
+      failed: "Failed"
+      needs_review: "Needs review"
+      unpaid: "Unpaid"
+      late: "Unpaid"
+      paid: "Paid %{date}"
+      signed: "Signed"
+      expiring: "Expiring"
+      expired: "Expired"
+      reconciled: "Reconciled"
+      filed: "Filed"
+      days:
+        one: "%{count} day"
+        other: "%{count} days"
+    kinds:
+      expense_invoice: "Invoice"
+      revenue_invoice: "Invoice"
+      credit_note: "Credit note"
+      receipt: "Receipt"
+      bank_statement: "Statement"
+      contract: "Contract"
+      insurance_policy: "Policy"
+      certificate: "Certificate"
+      identification: "ID"
+      vehicle_document: "Vehicle"
+      tax_document: "Tax document"
+      proposal: "Proposal"
+      correspondence: "Letter"
+      bank_journal_entry: "Journal entry"
+      other: "Document"
+    facts:
+      due: "due %{date}"
+      renews: "renews %{date}"
+      ends: "ends %{date}"
+      months:
+        one: "%{count} month"
+        other: "%{count} months"
+      transactions:
+        one: "%{count} transaction"
+        other: "%{count} transactions"
+      matched:
+        one: "%{count} matched"
+        other: "%{count} matched"
+    summary:
+      unpaid:
+        one: "One invoice is unpaid, %{total}."
+        other: "%{count} invoices are unpaid, %{total} in total."
+      overdue: "%{name} is %{days} overdue."
+      needs_review:
+        one: "One document needs a second look."
+        other: "%{count} documents need a second look."
+      clear: "Nothing on paper needs you right now."
+    settle:
+      paid_toast: "Marked %{name} paid."
+      unpaid_toast: "Marked %{name} unpaid."
+      undo: "Undo"
+  components:
+    paper:
+      table:
+        document: "Document"
+        scout_read: "Scout read"
+        status: "Status"
+        added: "Added"
+        added_short: "Added"
+      row:
+        today: "Today"
+        open: "Open %{title}"
+      row_menu:
+        actions: "Actions"
+        open: "Open"
+        download: "Download"
+        mark_paid: "Mark paid"
+        mark_unpaid: "Mark unpaid"
+        send_to_drive: "Send to Drive"
+        send_to_notion: "Send to Notion"
+        move_to: "Move to folder"
+        reprocess: "Reprocess"
+        delete: "Delete"
+        delete_confirm: "Delete %{name}? This can't be undone."
+    scout_note_row:
+      name: "Scout"
+      ai: "AI"

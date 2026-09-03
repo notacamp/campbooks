@@ -82,6 +82,11 @@ Rails.application.routes.draw do
   get "now", to: "now#index", as: :now
   post "now/log/:id/undo", to: "now#undo_log", as: :now_log_undo
 
+  # Paper — the rethought "bold" document surface (every document as what it says, not
+  # a filename). Gated on Features.bold_layout? in PaperController. Params: q, type
+  # (bucket), status, page.
+  get "paper", to: "paper#index", as: :paper
+
   # Workspace activity feed — a retrospective timeline of domain Events (distinct
   # from the prospective home feed). Read-only; turbo_stream serves pagination.
   get "activity", to: "activity#index", as: :activity
@@ -224,6 +229,9 @@ Rails.application.routes.draw do
       post :reject
       patch :toggle_star
       post :reprocess
+      # Paper "Mark paid / unpaid" — a manual settlement (settled_source: manual).
+      post :settle
+      delete :unsettle
       post :push_to_notion
       post :push_to_drive
       post :push_to_zoho_drive

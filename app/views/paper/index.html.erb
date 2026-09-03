@@ -1,0 +1,117 @@
+<%# Paper — every document as what it SAYS: a row of facts (kind, amount, the date that
+    matters, a meaning-bearing status), Scout's read of what's open at the top, buckets +
+    an ask box, and Classic files as the escape hatch. Gated on Features.bold_layout?.
+    The `upload` controller drives the Add dialog; `doc-skim-overlay` drives Review. %>
+<% content_for :main_class, "mx-auto w-full max-w-[1180px] px-4 sm:px-6 lg:px-8 py-8" %>
+
+<div data-controller="upload doc-skim-overlay">
+  <%# Document Skim — the review overlay the Scout note's "Review" button opens. %>
+  <%= turbo_stream_from "doc_skim_#{Current.workspace.id}" if Current.workspace %>
+  <%= turbo_frame_tag "doc_skim_tray", src: document_skim_tray_path, loading: :lazy, class: "hidden" %>
+  <%= render "shared/doc_skim_overlay" %>
+
+  <%# ── Header ─────────────────────────────────────────────────────────────── %>
+  <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+      <h1 class="text-[28px] font-semibold leading-tight tracking-tight"><%= t(".title") %></h1>
+      <p class="mt-1 text-sm text-muted-foreground"><%= t(".subtitle") %></p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <%= link_to t(".classic_files"), files_path,
+            class: "px-2 text-[13px] text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground" %>
+      <%= form_tag export_documents_path, method: :post, class: "inline" do %>
+        <%= render "files/filter_hidden_fields", filters: @filters, q: params[:q] %>
+        <%= render Campbooks::Button.new(variant: :outline, size: :sm, type: :submit, data: { turbo_confirm: t(".export_confirm") }) { t(".export") } %>
+      <% end %>
+      <%= render Campbooks::Button.new(variant: :primary, size: :sm, data: { action: "click->upload#toggle" }) { t(".add") } %>
+    </div>
+  </header>
+
+  <%# ── Scout's read of what's open ────────────────────────────────────────── %>
+  <div class="mt-5">
+    <% if @summary.sentence %>
+      <%= render Campbooks::ScoutNoteRow.new(text: @summary.sentence) do %>
+        <% if @summary.needs_review_count.positive? %>
+          <%= render Campbooks::Button.new(variant: :outline, size: :sm, data: { action: "click->doc-skim-overlay#open" }) do %>
+            <%= t(".review", count: @summary.needs_review_count) %>
+          <% end %>
+        <% end %>
+      <% end %>
+    <% else %>
+      <%= render Campbooks::ScoutNoteRow.new(text: t(".connect")) do %>
+        <%= render Campbooks::Button.new(variant: :outline, size: :sm, href: settings_ai_path) { t(".connect_cta") } %>
+      <% end %>
+    <% end %>
+  </div>
+
+  <%# ── Add dialog: the shared upload form, shown as an overlay via upload#toggle ── %>
+  <div data-upload-target="container"
+       class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+    <div class="w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-xl" role="dialog" aria-modal="true">
+      <div class="mb-4 flex items-center justify-between">
+        <h2 class="text-lg font-semibold"><%= t(".add_title") %></h2>
+        <button type="button" data-action="click->upload#toggle" aria-label="<%= t(".close") %>"
+                class="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <%= render "files/upload_form" %>
+    </div>
+  </div>
+
+  <%# ── Buckets + ask box + the results (one frame so counts + active state refresh) ── %>
+  <%= turbo_frame_tag "paper_results" do %>
+    <div class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div class="inline-flex flex-wrap gap-1 rounded-[9px] bg-secondary p-[3px]">
+        <% [ :all, :invoices, :receipts, :contracts, :other ].each do |bucket| %>
+          <%= link_to paper_path(type: (bucket == :all ? nil : bucket), q: params[:q].presence, status: params[:status].presence),
+                data: { turbo_action: "advance" },
+                class: class_names(
+                  "rounded-[7px] px-2.5 py-[3px] text-[12.5px] font-medium transition-colors",
+                  @bucket == bucket ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground") do %>
+            <%= t(".filters.#{bucket}") %> · <span class="tabular-nums"><%= @bucket_counts[bucket].to_i %></span>
+          <% end %>
+        <% end %>
+      </div>
+
+      <%= form_with url: paper_path, method: :get, data: { turbo_action: "advance" },
+            class: "flex h-[34px] w-full items-center gap-2 rounded-[10px] border border-input bg-card px-3 sm:w-[320px]" do |f| %>
+        <svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4 flex-shrink-0 text-[color:var(--ember-solid)]" aria-hidden="true"><path d="M12 5l1.7 5.6L19.5 12l-5.8 1.4L12 19l-1.7-5.6L4.5 12l5.8-1.4z"/></svg>
+        <% if @bucket != :all %><%= hidden_field_tag :type, @bucket %><% end %>
+        <% if params[:status].present? %><%= hidden_field_tag :status, params[:status] %><% end %>
+        <%= f.search_field :q, value: params[:q], placeholder: t(".ask_placeholder"),
+              class: "min-w-0 flex-1 border-0 bg-transparent p-0 text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0" %>
+      <% end %>
+    </div>
+
+    <% if @documents.any? %>
+      <div class="mt-3">
+        <%= render Campbooks::Paper::Table.new(documents: @documents, folders: @folders) %>
+      </div>
+
+      <% if @pagy&.next %>
+        <%= turbo_frame_tag "paper_pagination",
+              src: paper_path(q: params[:q].presence, type: params[:type].presence, status: params[:status].presence, page: @pagy.next, format: :turbo_stream),
+              loading: :lazy do %>
+          <div class="flex items-center justify-center py-6">
+            <%= render Campbooks::Spinner.new(size: :md) %>
+          </div>
+        <% end %>
+      <% end %>
+    <% elsif @has_any %>
+      <div class="mt-10 rounded-xl border border-dashed border-border px-6 py-12 text-center">
+        <p class="text-sm font-medium text-foreground"><%= t(".empty.no_matches_title") %></p>
+        <%= link_to t(".empty.no_matches_clear"), paper_path, data: { turbo_action: "advance" },
+              class: "mt-2 inline-flex text-[13px] text-muted-foreground underline decoration-border underline-offset-4 hover:text-foreground" %>
+      </div>
+    <% else %>
+      <div class="mt-10 rounded-xl border border-dashed border-border px-6 py-14 text-center">
+        <p class="text-base font-medium text-foreground"><%= t(".empty.none_title") %></p>
+        <p class="mx-auto mt-1 max-w-sm text-sm text-muted-foreground"><%= t(".empty.none_body") %></p>
+        <div class="mt-4">
+          <%= render Campbooks::Button.new(variant: :primary, size: :sm, data: { action: "click->upload#toggle" }) { t(".add") } %>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+</div>
