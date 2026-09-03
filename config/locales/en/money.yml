@@ -1,0 +1,127 @@
+---
+en:
+  money:
+    index:
+      title: "Money"
+      subtitle: "What you're owed, what you owe, and what the bank says."
+      classic: "Classic accounting"
+      export: "Export %{quarter}"
+      add: "Add"
+      add_title: "Add documents"
+      close: "Close"
+      empty_title: "Nothing owed or due."
+      empty_body: "Invoices and bills you receive or send will show up here as Scout reads them."
+    what:
+      invoice_sent: "Invoice #%{number} you sent"
+      invoice: "Invoice #%{number}"
+      recurring: "%{base} · subscription"
+      renewal: "Policy renewal · %{period}"
+      payment_due: "Payment due"
+    cadence:
+      monthly: "monthly"
+      yearly: "yearly"
+    settled:
+      line: "line %{number}"
+    status:
+      late:
+        one: "%{count} day late"
+        other: "%{count} days late"
+      due:
+        one: "in %{count} day"
+        other: "in %{count} days"
+      due_today: "due today"
+      decide: "Renews · decide"
+      paid: "Paid %{date}"
+      estimated: "est."
+    export:
+      filename: "money-%{quarter}"
+      headers:
+        counterpart: "Counterpart"
+        what: "What"
+        direction: "Direction"
+        amount: "Amount"
+        currency: "Currency"
+        due: "Due"
+        status: "Status"
+        settled_on: "Settled on"
+        source: "Source"
+      direction:
+        receivable: "owed to you"
+        payable: "you owe"
+      status:
+        late: "late"
+        due: "due"
+        settled: "settled"
+        decide: "decide"
+    reminder_draft:
+      chase:
+        subject: "Invoice #%{reference} · payment reminder"
+        subject_generic: "Payment reminder"
+        invoice_ref: "invoice #%{reference}"
+        this_invoice: "this invoice"
+        body: "Hi %{counterpart}, I hope you're well. This is a friendly reminder that %{reference} for %{amount} was due on %{due} (%{days_ago}). If it's already on its way, thank you and please ignore this note — otherwise, could you let me know when to expect it? Thanks so much."
+      cancellation:
+        subject: "%{counterpart} · cancellation request"
+        body: "Hi, I'm writing about %{counterpart}, which is set to renew on %{date}. I'd like to cancel it before it renews. Could you tell me what you need from me to stop the renewal? Thank you for your help."
+      days_ago:
+        zero: "today"
+        one: "%{count} day ago"
+        other: "%{count} days ago"
+    actions:
+      marked_paid: "Marked paid."
+      marked_unpaid: "Marked unpaid."
+      reminder_created: "Reminder set for %{date}."
+      reminder_opened: "Draft ready in the composer."
+      kept: "Renewal kept."
+      cancelled: "Cancellation draft ready in the composer."
+      gone: "That obligation is no longer here."
+      undo: "Undo"
+  components:
+    money:
+      summary:
+        today: "today"
+        owed_html: "You're owed %{amount}."
+        owe_html:
+          one: "You owe %{amount}, one bill."
+          other: "You owe %{amount} across %{count} bills."
+        late_receivable_html: "%{name}'s invoice is %{overdue}, so I drafted a reminder."
+        late_payable_html: "%{name} is %{overdue}."
+        renewal_html: "A renewal (%{amount}) lands %{date}."
+        nothing_else: "Nothing else is due this month."
+        clear: "Nothing is owed or due right now."
+      timeline:
+        title: "Next %{days} days"
+        hint: "each bar is one obligation at its due date; the ledger below is the table view"
+        today: "Today"
+        owed: "Owed to you"
+        owe: "You owe"
+        open_amount: "%{amount} open"
+        none_open: "nothing open"
+        due: "due %{date}"
+        renews: "renews %{date}"
+        legend:
+          open: "open"
+          late: "late"
+          settled: "settled"
+      ledger:
+        col:
+          counterpart: "Counterpart"
+          what: "What"
+          amount: "Amount"
+          due: "Due"
+          status: "Status"
+          source: "Source"
+          actions: "Actions"
+        section:
+          late: "Late"
+          due: "Due"
+          settled: "Settled"
+        mark_paid: "Mark paid"
+        send_reminder: "Send reminder"
+        pay: "Pay"
+        remind_on: "Remind on %{date}"
+        keep: "Keep"
+        cancel: "Cancel it"
+        next_renews: "next renews %{date}"
+        source_email: "Open the source email"
+        source_document: "Open the document"

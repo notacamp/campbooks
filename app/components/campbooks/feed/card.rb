@@ -21,7 +21,8 @@ module Campbooks
         "tag_suggestion"  => Campbooks::Feed::TagSuggestionCard,
         "reminder"        => Campbooks::Feed::ReminderCard,
         "task"            => Campbooks::Feed::TaskCard,
-        "digest_issue"    => Campbooks::Feed::DigestCard
+        "digest_issue"    => Campbooks::Feed::DigestCard,
+        "late_receivable" => Campbooks::Feed::LateReceivableCard
       }.freeze
 
       def initialize(item:, subject:)

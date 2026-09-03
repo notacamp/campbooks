@@ -24,6 +24,7 @@ module Feed
         Feed::Sources::FollowUp,
         Feed::Sources::ReplyReminder,
         Feed::Sources::TagSuggestion,
+        Feed::Sources::LateReceivable,
         Feed::Sources::EmailAction
       ]
     end

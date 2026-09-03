@@ -86,6 +86,19 @@ Rails.application.routes.draw do
   # a filename). Gated on Features.bold_layout? in PaperController. Params: q, type
   # (bucket), status, page.
   get "paper", to: "paper#index", as: :paper
+  # Money — the bold-layout obligations surface: what you're owed, what you owe,
+  # and what the bank settled, on one 30-day timeline. Built on the accounting
+  # substrate; gated by Features.bold_layout? AND the accounting gate/entitlement.
+  # An obligation id is "doc:<uuid>" or "rem:<uuid>", so :id carries a colon.
+  get "money", to: "money#index", as: :money
+  get "money/export", to: "money#export", as: :money_export
+  scope "money/obligations/:id", constraints: { id: %r{[a-z]+:[^/]+} } do
+    post   "remind", to: "money#remind",   as: :money_obligation_remind
+    post   "chase",  to: "money#chase",    as: :money_obligation_chase
+    post   "settle", to: "money#settle",   as: :money_obligation_settle
+    delete "settle", to: "money#unsettle"
+    post   "decide", to: "money#decide",   as: :money_obligation_decide
+  end
 
   # Workspace activity feed — a retrospective timeline of domain Events (distinct
   # from the prospective home feed). Read-only; turbo_stream serves pagination.

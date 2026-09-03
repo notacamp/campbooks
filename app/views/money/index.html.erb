@@ -1,0 +1,21 @@
+<% content_for :main_class, "mx-auto w-full max-w-[1180px] px-4 sm:px-6 lg:px-8 py-8" %>
+<% content_for :title, t("money.index.title") %>
+
+<header class="flex flex-col gap-3 sm:flex-row sm:items-start">
+  <div>
+    <h1 class="text-2xl font-semibold tracking-tight text-foreground sm:text-[28px]"><%= t("money.index.title") %></h1>
+    <p class="mt-1 text-muted-foreground"><%= t("money.index.subtitle") %></p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
+    <%= link_to t("money.index.classic"), accounting_path,
+          class: "rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground" %>
+    <%= render(Campbooks::Button.new(variant: :outline, size: :sm, href: money_export_path, data: { turbo: false })) do %>
+      <%= t("money.index.export", quarter: @quarter_label) %>
+    <% end %>
+    <%= render(Campbooks::Button.new(variant: :primary, size: :sm, href: files_path)) do %>
+      <%= t("money.index.add") %>
+    <% end %>
+  </div>
+</header>
+
+<%= render "money/content" %>

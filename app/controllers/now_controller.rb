@@ -29,7 +29,7 @@ class NowController < ApplicationController
   # kind list, so it's handled specially.
   SEGMENT_KINDS = {
     follow_ups: %w[follow_up reply_reminder],
-    mail:       %w[email_action starred_email tag_suggestion],
+    mail:       %w[email_action starred_email tag_suggestion late_receivable],
     time:       %w[calendar_event reminder task]
   }.freeze
 
@@ -146,7 +146,7 @@ class NowController < ApplicationController
       all:        by_kind.values.sum,
       priority:   active.attention.count,
       follow_ups: kind.call("follow_up", "reply_reminder"),
-      mail:       kind.call("email_action", "starred_email", "tag_suggestion"),
+      mail:       kind.call("email_action", "starred_email", "tag_suggestion", "late_receivable"),
       time:       kind.call("calendar_event", "reminder", "task"),
       docs:       @doc_review_count
     }
