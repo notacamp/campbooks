@@ -1,0 +1,21 @@
+<%# The Streams tab: the workspace's services grouped by kind (inbox groups).
+    Shares the People shell — left pane is the stream list, right pane the selected
+    stream's threads. Backs streams#index and streams#show (full load). %>
+<div class="block h-full overflow-hidden">
+  <div class="flex h-full"
+       data-controller="email-mobile"
+       data-email-mobile-breakpoint-value="1024"
+       data-email-mobile-start-on-list-value="<%= @selected_stream.blank? %>">
+    <div data-email-mobile-target="list" data-inbox-pane="list"
+         class="hidden w-full flex-col overflow-y-auto border-r border-border bg-card lg:flex lg:w-[400px] lg:shrink-0">
+      <%= render "people/segmented_header" %>
+      <%= render "people/streams/stream_list" %>
+    </div>
+
+    <%= turbo_frame_tag "people_detail",
+          class: "flex flex-1 min-w-0", style: "height:100%",
+          data: { email_mobile_target: "detail", inbox_pane: "detail" } do %>
+      <%= render "people/streams/detail" %>
+    <% end %>
+  </div>
+</div>

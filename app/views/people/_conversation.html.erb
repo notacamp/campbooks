@@ -1,0 +1,80 @@
+<%# One person as ONE conversation across all their threads: Scout's summary
+    pinned on top, every message (their inbound + your outbound) ascending with
+    the newest at the bottom, and the reply box docked at the bottom. "Earlier"
+    loads the older page above. %>
+<div class="flex h-full w-full min-w-0 flex-col">
+  <%# Mobile: back to the list. %>
+  <div class="flex items-center px-3 py-2 lg:hidden">
+    <button type="button" data-action="click->email-mobile#showList"
+            class="inline-flex min-h-[40px] items-center gap-1 -ml-1.5 rounded-md px-1.5 text-sm font-medium text-accent-600 hover:bg-accent-50">
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      <%= t("people.conversation.back") %>
+    </button>
+  </div>
+
+  <%# Header: avatar, name, meta, sender tags, kebab. %>
+  <div class="flex items-center gap-3 border-b border-border px-5 py-4 sm:px-7">
+    <%= render Campbooks::ContactAvatar.new(email: (@primary_contact&.email || @person.display_name).to_s, size: :lg, variant: :neutral) %>
+    <div class="min-w-0">
+      <div class="truncate text-[17px] font-semibold text-foreground"><%= @person.display_name %></div>
+      <div class="truncate text-xs text-muted-foreground"><%= people_conversation_meta(@person, @primary_contact, @email_total, @first_seen) %></div>
+    </div>
+    <span class="flex-1"></span>
+    <% @sender_tags.each do |tag| %>
+      <span class="hidden flex-shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium sm:inline-flex"
+            style="color: <%= tag.color %>; background-color: <%= tag.color %>1f;"><%= tag.name %></span>
+    <% end %>
+    <%= render "people/conversation_menu" %>
+  </div>
+
+  <%# Scrollable conversation column, scrolled to the bottom on open. %>
+  <div class="flex-1 overflow-y-auto" data-controller="people-conversation">
+    <div class="mx-auto w-full max-w-[720px] px-5 pb-6 pt-5">
+      <%= render "people/conversation_earlier" %>
+
+      <%= render Campbooks::ScoutNote.new(message: @standing.text.presence || t("people.conversation.no_standing"),
+            time: t("people.conversation.where_things_stand"), class: "mb-1") %>
+
+      <div id="people_conversation">
+        <% @conversation_messages.each do |message| %>
+          <%= render Campbooks::MessageBubble.new(
+                message: message, sent: message.sent?, variant: :flow,
+                name: people_bubble_name(message), channel_chip: true,
+                full: (message == @newest_message), attachments: true, open_thread: true) %>
+        <% end %>
+      </div>
+
+      <% if @conversation_messages.blank? %>
+        <p class="py-10 text-center text-sm text-muted-foreground"><%= t("people.conversation.empty") %></p>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Docked reply: opens the existing Compose Dock in reply mode against the most
+      recent inbound message. When Scout has a draft ready, it previews here under
+      the "edit freely" chip — you still review and send from the Dock. %>
+  <% if @can_send && @reply_target %>
+    <div class="flex-shrink-0 border-t border-border bg-card px-4 py-3">
+      <div class="mx-auto w-full max-w-[720px]">
+        <% if @scout_draft %>
+          <div class="scout-glass rounded-2xl px-4 pb-2 pt-3">
+            <p class="text-sm leading-relaxed text-foreground/90"><%= @scout_draft %></p>
+            <div class="mt-2 flex items-center gap-2">
+              <span class="inline-flex items-center gap-1.5 rounded-md border border-[color:var(--scout-border)] px-2 py-1 text-[11.5px] font-medium text-foreground">
+                <svg viewBox="0 0 24 24" fill="currentColor" class="h-3 w-3" style="color: var(--ember-solid)" aria-hidden="true"><path d="M12 5l1.7 5.6L19.5 12l-5.8 1.4L12 19l-1.7-5.6L4.5 12l5.8-1.4z"/></svg>
+                <%= t("people.conversation.scout_draft_chip") %>
+              </span>
+              <span class="flex-1"></span>
+              <%= render "people/reply_button", label: t("people.conversation.send"), keycap: true %>
+            </div>
+          </div>
+        <% else %>
+          <div class="flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2">
+            <span class="flex-1 truncate text-sm text-muted-foreground"><%= t("people.conversation.reply_to", name: people_first_name(@person)) %></span>
+            <%= render "people/reply_button", label: t("people.conversation.reply") %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>

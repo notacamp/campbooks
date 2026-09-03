@@ -1,0 +1,22 @@
+<%# The left-pane header shared by the People and Streams tabs: a segmented
+    control (People | Streams · N) and the quiet escape hatch to the classic
+    three-pane inbox. rendered from PeopleLayout#people_active_tab. %>
+<div class="flex items-center gap-2 px-3.5 pb-2.5 pt-3.5">
+  <div class="inline-flex gap-0.5 rounded-lg bg-secondary p-[3px]">
+    <%= link_to people_path,
+          class: class_names(
+            "rounded-md px-2.5 py-[3px] text-[12.5px] font-medium no-underline transition-colors",
+            people_active_tab == :people ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground") do %>
+      <%= t("people.index.tab_people") %>
+    <% end %>
+    <%= link_to people_streams_path,
+          class: class_names(
+            "rounded-md px-2.5 py-[3px] text-[12.5px] font-medium no-underline transition-colors",
+            people_active_tab == :streams ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground") do %>
+      <%= t("people.index.tab_streams") %><span class="ml-1 text-muted-foreground tabular-nums"><%= streams_count %></span>
+    <% end %>
+  </div>
+  <span class="flex-1"></span>
+  <%= link_to t("people.index.classic_inbox"), email_messages_path(show_list: 1),
+        class: "flex-shrink-0 text-[12.5px] text-muted-foreground no-underline hover:text-foreground" %>
+</div>

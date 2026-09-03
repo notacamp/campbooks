@@ -1,0 +1,12 @@
+<%# Opens the existing Compose Dock in reply mode against the person's most recent
+    inbound message — the send path is unchanged. `label` required; `keycap` shows
+    the ⌘↵ chip. %>
+<%= form_with url: compose_email_message_path(@reply_target, mode: :reply), method: :post, class: "inline-flex flex-shrink-0" do %>
+  <button type="submit"
+          class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90">
+    <%= label %>
+    <% if local_assigns[:keycap] %>
+      <span class="rounded border border-white/30 px-1 font-mono text-[10px] leading-none opacity-80">&#8984;&#9166;</span>
+    <% end %>
+  </button>
+<% end %>

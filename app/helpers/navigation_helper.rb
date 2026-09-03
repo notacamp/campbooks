@@ -117,7 +117,7 @@ module NavigationHelper
   def bold_nav_items
     [
       nav_item(:now, t("shared.nav.now"), now_path, exact: false, badge: nav_attention.dot?(:home)),
-      nav_item(:people, t("shared.nav.people"), email_messages_path(show_list: 1),
+      nav_item(:people, t("shared.nav.people"), people_path,
         also_active_for: [ email_messages_path, contacts_path, organizations_path ],
         badge: nav_attention.dot?(:mail)),
       nav_item(:paper, t("shared.nav.paper"), paper_path,

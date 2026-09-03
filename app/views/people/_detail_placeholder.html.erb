@@ -1,0 +1,9 @@
+<%# No counterpart selected (People index on desktop). Hidden on mobile, where the
+    list fills the screen. %>
+<div class="hidden flex-1 items-center justify-center p-10 lg:flex">
+  <div class="max-w-xs text-center">
+    <div class="mx-auto mb-4 w-fit"><%= render Campbooks::ScoutAvatar.new(size: :xl) %></div>
+    <p class="text-[15px] font-semibold text-foreground"><%= t("people.index.placeholder_title") %></p>
+    <p class="mt-1.5 text-sm text-muted-foreground"><%= t("people.index.placeholder_body") %></p>
+  </div>
+</div>

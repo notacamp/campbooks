@@ -21,7 +21,7 @@ module Contacts
       return unless workspace
 
       workspace.contacts
-               .where.not(sender_kind_source: "taught")
+               .where("sender_kind_source IS DISTINCT FROM ?", "taught")
                .where.not(email_count: 0)
                .in_batches(of: BATCH_SIZE) do |batch|
         batch.each { |contact| Contacts::SenderKind.classify(contact) }

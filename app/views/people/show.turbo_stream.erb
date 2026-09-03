@@ -1,0 +1,13 @@
+<%# "Earlier": prepend the older page above the conversation and refresh the
+    Earlier control (hidden once the oldest message is loaded). %>
+<%= turbo_stream.prepend "people_conversation" do %>
+  <% @conversation_messages.each do |message| %>
+    <%= render Campbooks::MessageBubble.new(
+          message: message, sent: message.sent?, variant: :flow,
+          name: people_bubble_name(message), channel_chip: true,
+          full: false, attachments: true, open_thread: true) %>
+  <% end %>
+<% end %>
+<%= turbo_stream.replace "people_conversation_earlier" do %>
+  <%= render "people/conversation_earlier" %>
+<% end %>

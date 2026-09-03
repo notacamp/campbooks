@@ -1,0 +1,8 @@
+<%# Frame-only response for in-place navigation from a People-list row: Turbo
+    swaps just the "people_detail" pane, leaving the list's scroll + selection. %>
+<%= turbo_frame_tag "people_detail",
+      class: "flex flex-1 min-w-0",
+      style: "height:100%",
+      data: { email_mobile_target: "detail", inbox_pane: "detail" } do %>
+  <%= render "people/detail" %>
+<% end %>

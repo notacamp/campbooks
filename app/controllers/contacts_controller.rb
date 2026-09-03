@@ -8,7 +8,7 @@
 # human (one Person ↔ many Contacts). The index lists People; a profile page is
 # keyed by a Contact, matching the popover's "View profile" link.
 class ContactsController < ApplicationController
-  before_action :set_contact, only: [ :show, :update, :analyze, :resolve_duplicate, :set_state ]
+  before_action :set_contact, only: [ :show, :update, :analyze, :resolve_duplicate, :set_state, :sender_kind ]
 
   def index
     # Self-heal: enqueue analysis for any contact with enough history that was never
@@ -168,6 +168,27 @@ class ContactsController < ApplicationController
       format.turbo_stream # -> set_state.turbo_stream.erb (streams no-op when off-page)
       format.json { head :ok } # contact skim advances client-side
       format.html { redirect_back fallback_location: contact_path(@contact) }
+    end
+  end
+
+  # Teach the People place a sender's type (person or service). Sets the `taught`
+  # source so Contacts::SenderKind / the backfill never re-derive over the human's
+  # correction, refreshes a service's stream kind + org link, and records the
+  # correction as an Event. Moves the contact between the People and Streams lists.
+  def sender_kind
+    kind = params[:kind].to_s
+    return head(:unprocessable_entity) unless Contact.sender_kinds.key?(kind)
+
+    stream = kind == "service" ? Contacts::StreamKind.classify(@contact) : nil
+    @contact.update!(sender_kind: kind, sender_kind_source: "taught", stream_kind: stream)
+    Organizations::FromDomain.link(@contact) if @contact.kind_service?
+    Events.publish("contact.sender_kind_taught", subject: @contact,
+      payload: { "name" => @contact.name, "email" => @contact.email, "sender_kind" => kind })
+
+    respond_to do |format|
+      format.turbo_stream { head :ok }
+      format.json { head :ok }
+      format.html { redirect_back fallback_location: people_path, notice: t(".taught") }
     end
   end
 

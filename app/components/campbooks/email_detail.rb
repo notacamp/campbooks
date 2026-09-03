@@ -204,84 +204,15 @@ module Campbooks
       # Conversation view: each message is a light chat bubble aligned by direction
       # (received ← left, sent → right) so a thread reads like a conversation. The
       # `thread-*` hook classes let the inbox setting flatten these back to a classic
-      # full-width list via CSS ([data-thread-view="classic"]).
+      # full-width list via CSS ([data-thread-view="classic"]). The bubble itself is
+      # Campbooks::MessageBubble (:chat), shared with the People conversation.
       div(class: "thread-conversation flex flex-col gap-3.5 px-4 py-4 text-left") do
         messages.each do |msg|
-          render_message_bubble(msg, sent: msg.sent?, expanded: expand_default.include?(msg), show_selected: show_selected)
-        end
-      end
-    end
-
-    CHEVRON_ICON = '<svg class="w-3 h-3 text-gray-400 flex-shrink-0 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>'
-
-    # One message as a directional chat bubble: avatar on the sender's side, a
-    # rounded bubble with a small tail toward that side. Sent is tinted with the
-    # ink-family accent (never Ember — that's Scout's), received sits on a bordered
-    # card. Still a <details> so long threads stay scannable and wide HTML emails
-    # scroll inside the bubble rather than breaking the layout.
-    def render_message_bubble(msg, sent:, expanded:, show_selected:)
-      bubble = if sent
-        "bg-accent-100 dark:bg-accent-500/15 rounded-br-md"
-      else
-        "bg-card border border-border rounded-bl-md"
-      end
-      # Each bubble shows its actual author (from_address) — your address on the
-      # messages you sent, the sender's on theirs — so alignment + author never
-      # disagree. Direction (left/right + tint) carries who-sent-what.
-      name = msg.from_address || "-"
-
-      div(class: "thread-msg flex items-start gap-2 #{'flex-row-reverse' if sent}") do
-        div(class: "flex-shrink-0 mt-0.5") do
-          render(ContactAvatar.new(
-            email: msg.from_address || "?",
-            sent: sent, size: :sm, contact_id: msg.contact_id, variant: :neutral, show_direction: true
+          render(Campbooks::MessageBubble.new(
+            message: msg, sent: msg.sent?, variant: :chat,
+            expanded: expand_default.include?(msg),
+            selected: show_selected && msg == @message
           ))
-        end
-
-        details(class: "thread-bubble group min-w-0 max-w-[85%] rounded-2xl #{bubble}", open: expanded) do
-          # Header row (always visible — click to expand/collapse), plus a one-line
-          # preview that shows only while collapsed so a folded bubble still reads as
-          # a message rather than an empty pill.
-          summary(class: "block px-3.5 py-2 cursor-pointer select-none list-none") do
-            div(class: "flex items-center gap-2") do
-              span(class: "text-[12px] font-semibold text-foreground truncate") { name }
-              span(class: "text-[10px] text-gray-400 flex-shrink-0") do
-                plain(msg.received_at ? l(msg.received_at, format: :at) : "")
-              end
-              if show_selected && msg == @message
-                span(class: "text-[9px] text-accent-600 font-medium bg-accent-50 dark:bg-accent-500/15 rounded px-1.5 py-0.5 flex-shrink-0") { t(".selected_badge") }
-              end
-              div(class: "flex-1")
-              raw(safe(CHEVRON_ICON))
-            end
-            preview = msg.summary.presence || helpers.strip_tags(msg.body.to_s).squish
-            if preview.present?
-              div(class: "mt-0.5 text-[12px] text-muted-foreground line-clamp-1 group-open:hidden") { plain(preview.truncate(140)) }
-            end
-          end
-
-          # Body (hidden when collapsed). overflow-x-auto so wide HTML emails
-          # (fixed-width newsletter tables) scroll within the bubble instead of
-          # breaking the page layout on mobile.
-          div(class: "px-3.5 pb-3 overflow-x-auto") do
-            if msg.body.present?
-              div(class: "text-sm leading-relaxed text-foreground/90 text-left", style: "word-wrap:break-word;font-family:system-ui,sans-serif") do
-                # Email bodies are attacker-controlled: sanitise with the full
-                # Loofah :prune safelist (drops <script>, on*= handlers and
-                # javascript: URLs; rewrites inline image URLs through the proxy)
-                # BEFORE rendering, then apply the left-align tweak for narrow
-                # viewports and linkify @mentions. Never regex-strip + raw().
-                cleaned = safe_email_body_full(msg)
-                  .gsub(/text-align:\s*right/i, "text-align: left")
-                  .gsub(/text-align:\s*center/i, "text-align: left")
-                raw(safe(linkify_mentions(cleaned)))
-              end
-            elsif msg.summary.present?
-              div(class: "text-sm text-foreground/70 whitespace-pre-wrap leading-relaxed") { msg.summary }
-            else
-              div(class: "text-sm text-gray-400 italic") { t(".no_content") }
-            end
-          end
         end
       end
     end

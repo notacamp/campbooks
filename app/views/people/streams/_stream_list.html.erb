@@ -1,0 +1,16 @@
+<%# The left-pane stream list: one row per non-empty inbox group. %>
+<% if @streams.blank? %>
+  <div class="px-6 py-10 text-center">
+    <p class="text-sm text-muted-foreground"><%= t("people.streams.empty") %></p>
+  </div>
+<% else %>
+  <div class="space-y-0.5 px-1.5 py-1">
+    <% @streams.each do |stream| %>
+      <% meta = t("people.streams.threads_meta", count: stream[:count]) %>
+      <% meta += " · " + t("people.streams.last", date: l(stream[:last_at].to_date, format: :day_month)) if stream[:last_at] %>
+      <%= render Campbooks::People::StreamRow.new(
+            icon: stream[:icon], title: stream[:name], meta: meta, note: stream[:note],
+            href: stream[:href], selected: stream[:selected]) %>
+    <% end %>
+  </div>
+<% end %>

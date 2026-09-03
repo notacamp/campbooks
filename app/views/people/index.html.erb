@@ -1,0 +1,36 @@
+<%# The People place shell: a two-pane layout on the "email" fixed-height shell.
+    Left = the counterpart list (segmented People | Streams control, search, and
+    the Need-you / Recent sections); right = the selected person or organization,
+    loaded into the "people_detail" turbo frame (mirrors the email_detail pattern).
+    Below lg the email-mobile controller collapses to a single pane: the list opens
+    the detail, and the detail's header carries a back button. This same view backs
+    people#index, people#show (full load) and people/organizations#show (full load);
+    @person / @organization drive what the detail renders. %>
+<div class="block h-full overflow-hidden">
+  <div class="flex h-full"
+       data-controller="email-mobile"
+       data-email-mobile-breakpoint-value="1024"
+       data-email-mobile-start-on-list-value="<%= @selected_id.blank? %>">
+    <%# ── Left pane: the counterpart list ─────────────────────────────────── %>
+    <div data-email-mobile-target="list" data-inbox-pane="list"
+         class="hidden w-full flex-col overflow-y-auto border-r border-border bg-card lg:flex lg:w-[400px] lg:shrink-0">
+      <%= render "people/segmented_header" %>
+      <%# The search form sits OUTSIDE the results frame so it keeps focus while the
+          list filters in place (list-search + pagy_countless pattern). %>
+      <div class="px-3.5 pb-2">
+        <%= render Campbooks::People::SearchBar.new(q: @query) %>
+      </div>
+      <%= turbo_frame_tag "people_results", class: "block flex-1" do %>
+        <%= render "people/counterpart_list" %>
+      <% end %>
+    </div>
+
+    <%# ── Right pane: the selected person / organization ──────────────────── %>
+    <%= turbo_frame_tag "people_detail",
+          class: "flex flex-1 min-w-0",
+          style: "height:100%",
+          data: { email_mobile_target: "detail", inbox_pane: "detail" } do %>
+      <%= render "people/detail" %>
+    <% end %>
+  </div>
+</div>

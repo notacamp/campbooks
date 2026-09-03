@@ -1,0 +1,9 @@
+<%# Right-pane dispatch: an organization page, a person conversation, or the
+    empty placeholder. Shared by the full-page shell and the frame-only swap. %>
+<% if @organization %>
+  <%= render "people/organizations/detail" %>
+<% elsif @person %>
+  <%= render "people/conversation" %>
+<% else %>
+  <%= render "people/detail_placeholder" %>
+<% end %>

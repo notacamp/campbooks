@@ -1,0 +1,10 @@
+<%# Infinite-scroll sentinel for the Recent list. Lazily streams the next page
+    (carrying the current query) when it scrolls into view. `pagy` + `query`
+    required. %>
+<%= turbo_frame_tag "people_recent_pagination",
+      src: people_path(q: query.presence, page: pagy.next, format: :turbo_stream),
+      loading: :lazy do %>
+  <div class="flex items-center justify-center py-6">
+    <%= render(Campbooks::Spinner.new(size: :sm)) %>
+  </div>
+<% end %>
