@@ -35,6 +35,30 @@ RSpec.describe Contacts::SenderKind do
     end
   end
 
+  describe ".broadcast?" do
+    it "is the strict subset no person writes — a transactional read (updates) stays answerable" do
+      invoice = msg.new(from_address: "ines@almeidasa.example", subject: "Re: clause 7.2", category: "updates")
+      expect(described_class.broadcast?(invoice)).to be false
+      expect(described_class.service_message?(invoice)).to be true
+
+      expect(described_class.broadcast?(bulk)).to be true
+      expect(described_class.broadcast?(msg.new(from_address: "a@x.example", subject: "hi", category: "notifications"))).to be true
+      expect(described_class.broadcast?(msg.new(from_address: "no-reply@x.example", subject: "hi", category: "personal"))).to be true
+      expect(described_class.broadcast?(human)).to be false
+    end
+
+    it "can judge without the provider hint, for callers ranking loaded rows in bulk" do
+      hinted = Struct.new(:from_address, :subject, :category, :header_list_unsubscribe, :header_precedence,
+                          :header_auto_submitted, :provider_category_hint, keyword_init: true)
+      m = hinted.new(from_address: "sofia@brightloop.example", subject: "Re: the deck", category: nil,
+                     provider_category_hint: :promotions)
+
+      expect(described_class.broadcast?(m)).to be true
+      expect(described_class.broadcast?(m, provider_hints: false)).to be false
+      expect(described_class.service?([ m ], provider_hints: false)).to be false
+    end
+  end
+
   describe ".classify" do
     let(:workspace) { create(:workspace) }
     let(:account) { create(:email_account, workspace: workspace) }
