@@ -10,15 +10,24 @@ RSpec.describe "People", type: :request do
   end
 
   # A person of the workspace with a person-kind contact and one inbound message.
-  # `owe: true` makes their last message unanswered (lands them under Need you).
-  def make_person(name:, email:, kind: :person, org_name: nil, inbound_at: 2.days.ago, owe: false)
+  # `owe: true` makes their last message unanswered (lands them under Need you);
+  # `replied: true` adds an earlier reply of yours (a two-way thread); `source: nil`
+  # leaves the sender kind at its never-classified column default.
+  def make_person(name:, email:, kind: :person, org_name: nil, inbound_at: 2.days.ago, owe: false,
+                  source: "heuristic", emails: 1, replied: false, unsubscribe: nil)
     person = create(:person, workspace: workspace, name: name, organization: org_name)
     contact = create(:contact, workspace: workspace, email_account: account, person: person,
-                               name: name, email: email, sender_kind: kind, sender_kind_source: "heuristic")
+                               name: name, email: email, sender_kind: kind, sender_kind_source: source)
     thread = create(:email_thread, email_account: account, subject: "Re: #{name}")
     create(:email_message, email_account: account, email_thread: thread, contact: contact,
-                           from_address: email, subject: "Re: #{name}", received_at: inbound_at)
-    contact.update_columns(email_count: 1, last_email_at: inbound_at)
+                           from_address: email, subject: "Re: #{name}", received_at: inbound_at,
+                           header_list_unsubscribe: unsubscribe)
+    if replied
+      create(:email_message, email_account: account, email_thread: thread, contact: nil,
+                             from_address: account.email_address, subject: "Re: #{name}", received_at: inbound_at - 8.days)
+      thread.update_columns(last_outbound_at: inbound_at - 8.days)
+    end
+    contact.update_columns(email_count: emails, last_email_at: inbound_at)
     thread.update_columns(last_inbound_at: inbound_at) if owe
     [ person, contact, thread ]
   end
@@ -59,6 +68,26 @@ RSpec.describe "People", type: :request do
         get people_path(q: "Sofia")
         expect(response.body).to include("Sofia Martins")
         expect(response.body).not_to include("Ana Reis")
+      end
+
+      it "ranks a real correspondent's fresh ask above a stranger's older one" do
+        make_person(name: "Sofia Martins", email: "sofia@brightloop.example", owe: true, inbound_at: 2.days.ago,
+                    replied: true, emails: 12)
+        make_person(name: "Cold Sender", email: "cold@unknown.example", owe: true, inbound_at: 14.days.ago)
+
+        get people_path
+        expect(response.body).to include("Sofia Martins").and include("Cold Sender")
+        expect(response.body.index("Sofia Martins")).to be < response.body.index("Cold Sender")
+      end
+
+      it "keeps an unclassified newsletter out until the backfill judges it, but lists an unclassified person" do
+        make_person(name: "The Weekly Byte", email: "news@bytemedia.example", source: nil, owe: true,
+                    inbound_at: 40.days.ago, unsubscribe: "<mailto:unsub@bytemedia.example>")
+        make_person(name: "Nadia Costa", email: "nadia@costa.example", source: nil, owe: true, inbound_at: 3.days.ago)
+
+        get people_path
+        expect(response.body).not_to include("The Weekly Byte")
+        expect(response.body).to include("Nadia Costa")
       end
     end
 

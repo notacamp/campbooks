@@ -16,8 +16,31 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-09-04
+
+### Changed
+
+- **People ranks by relationship, not by age.** The bold-layout People list now
+  orders its rows with a deterministic priority (`People::Priority`). *Need you*
+  weighs a genuine ask by how much the relationship matters — threads you've
+  replied in, mail volume, a star, a whitelist, Scout's relationship label — and
+  by how long it has waited, so a client's two-day-old question outranks a
+  stranger's fortnight-old one, and a reply you owe outranks a nudge you could
+  send. *Recent* is recency-led (14-day half-life) and relationship-tiebroken,
+  so a week-old regular beats yesterday's one-off. No new AI: it reads the
+  standing, reply state and profile the app already computes, from the same
+  batched loads.
+
 ### Fixed
 
+- **Old promotional mail topped the People list.** "Waiting on your reply"
+  treated any unanswered message as a reply you owe — newsletters, receipts and
+  alerts included — and sorted the oldest first, so a months-old promotion could
+  sit above a real client. A reply is now owed only for a message a person would
+  answer: not a broadcast, not a thread you were merely copied on, and not one
+  that has gone stale (60 days). Never-classified senders that read as services
+  stay off the list until the sender-kind backfill judges them, and the mailbox
+  owner's own contact and blocked senders are kept out.
 - **Money timeline stays legible under a deep backlog of old bills.** On the bold
   Money surface (`/money`), obligations dated before the 3-week overdue window
   used to clamp onto a single pixel and overprint every label into an unreadable

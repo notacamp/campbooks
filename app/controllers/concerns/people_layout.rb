@@ -28,8 +28,10 @@ module PeopleLayout
 
   # ── Left pane: the counterpart list ───────────────────────────────────────
   # Persons (with a person-kind contact that has mail) + organizations (with a
-  # member contact that has mail), each carrying its Scout standing. Need-you
-  # first (by urgency), then Recent (by last activity, paginated + infinite scroll).
+  # member contact that has mail), each carrying its Scout standing and a
+  # People::Priority score. Need-you first — genuine asks, weighted by how much
+  # the relationship matters and how long they've waited — then Recent, recency-
+  # led and relationship-tiebroken (paginated + infinite scroll).
   def build_people_list
     @query = params[:q].to_s.strip
     lazy_backfill_sender_kinds
@@ -38,16 +40,87 @@ module PeopleLayout
     orgs    = eligible_orgs
     prime_standing(people: persons, organizations: orgs)
 
-    counterparts = persons.map { |person| person_counterpart(person) } +
-                   orgs.map { |org| org_counterpart(org) }
-    need_you, recent = counterparts.partition(&:needs_you?)
+    person_rows = persons.select { |person| listable_person?(person) }
+                         .map { |person| person_counterpart(person) }
+    person_rows_by_id = person_rows.index_by(&:id)
+    org_rows = orgs.map { |org| org_counterpart(org, person_rows_by_id) }
 
-    @need_you = need_you.sort_by { |c| [ -c.overdue_days, -activity_epoch(c) ] }
-    recent_sorted = recent.sort_by { |c| -activity_epoch(c) }
+    need_you, recent = (person_rows + org_rows).partition(&:needs_you?)
+    @need_you = need_you.sort_by { |c| rank_key(c) }
+    recent_sorted = recent.sort_by { |c| rank_key(c) }
     @recent_pagy, @recent = pagy_array(recent_sorted, limit: PEOPLE_PER_PAGE)
   end
 
   def activity_epoch(counterpart) = counterpart.last_activity&.to_i || 0
+
+  # Highest priority first; on a tie the person ahead of their organization,
+  # then the livelier row.
+  def rank_key(counterpart)
+    [ -counterpart.priority, counterpart.organization? ? 1 : 0, -activity_epoch(counterpart) ]
+  end
+
+  def list_now = (@now ||= Time.current)
+
+  # Defense in depth over the eligibility query. `sender_kind` is :person by
+  # column default until Contacts::SenderKindBackfillJob (debounced, async) has
+  # judged the contact — so until then a newsletter passes as a person. Judge the
+  # never-classified ones here, in memory, by the backfill's own majority rule
+  # over the newest message of each loaded thread (a thread you replied in ends
+  # on your message, which reads as a person — rightly). Also keep out the
+  # mailbox owner, whose own contact Contacts::Identifier creates from outbound
+  # mail, and senders you blocked.
+  def listable_person?(person)
+    contacts = person.contacts.to_a
+    return false if owner_person?(person, contacts)
+    return false if contacts.all?(&:blocked?)
+
+    judged = contacts.select { |contact| contact.kind_person? && contact.email_count.to_i.positive? }
+    return true if judged.any? { |contact| contact.sender_kind_source.present? }
+
+    sample = people_standing.threads_for(person).filter_map(&:latest_message)
+    sample = [ people_standing.latest_inbound_for(person) ].compact if sample.empty?
+    !Contacts::SenderKind.service?(sample, provider_hints: false)
+  end
+
+  def owner_person?(person, contacts)
+    return true if person.relationship_type == "self"
+
+    owner = readable_accounts.map { |account| account.email_address.to_s.downcase }
+    contacts.any? { |contact| owner.include?(contact.email.to_s.downcase) }
+  end
+
+  # People::Priority's inputs for one person, all from rows the primed standing
+  # and the eligibility query already loaded — no queries.
+  def person_facts(person, standing)
+    People::Priority.facts_for(
+      standing: standing,
+      threads: people_standing.threads_for(person),
+      contacts: person.contacts.to_a,
+      latest_inbound: people_standing.latest_inbound_for(person),
+      relationship_type: person.relationship_type,
+      last_activity: person.last_email_at,
+      now: list_now
+    )
+  end
+
+  # An organization ranks as its most pressing sampled person — the people its
+  # standing is composed from — so it sits right behind them instead of
+  # outscoring them on headcount. Members already on the list reuse their row;
+  # the rest are scored from the same primed data. Nil when the org has no
+  # person members (services only).
+  def org_lead(org, person_rows_by_id)
+    people_standing.sampled_people_for(org)
+                   .map { |member| person_rows_by_id[member.id] || person_counterpart(member) }
+                   .max_by(&:priority)
+  end
+
+  # With no people behind it an organization has no relationship evidence: it
+  # ranks on its own recency alone.
+  def standing_only_score(standing, last_activity)
+    facts = People::Priority.facts_for(standing: standing, threads: [], contacts: [], latest_inbound: nil,
+                                       relationship_type: nil, last_activity: last_activity, now: list_now)
+    People::Priority.score(facts, now: list_now)
+  end
 
   # One Scout-standing service per request, shared by every person/org row so the
   # user-scoped work (readable accounts, inbox folders, the awaiting-reply set) and
@@ -90,6 +163,9 @@ module PeopleLayout
   end
 
   def person_counterpart(person)
+    standing = people_standing.person(person)
+    facts = person_facts(person, standing)
+
     People::Counterpart.new(
       kind: :person,
       record: person,
@@ -98,7 +174,9 @@ module PeopleLayout
       avatar_email: person_primary_email(person).presence || person.display_name,
       avatar_initial: nil,
       last_activity: person.last_email_at,
-      standing: people_standing.person(person)
+      standing: standing,
+      facts: facts,
+      score: People::Priority.score(facts, now: list_now)
     )
   end
 
@@ -111,10 +189,13 @@ module PeopleLayout
     person.contacts.max_by { |contact| contact.email_count.to_i }&.email
   end
 
-  def org_counterpart(org)
+  def org_counterpart(org, person_rows_by_id = {})
     people_count = org.active_people.joins(:contacts)
                       .where(contacts: { sender_kind: Contact.sender_kinds[:person] }).distinct.count
     services_count = org.contacts.kind_service.count
+    standing = people_standing.organization(org)
+    last_activity = org.email_messages.maximum(:received_at)
+    lead = org_lead(org, person_rows_by_id)
 
     People::Counterpart.new(
       kind: :organization,
@@ -123,8 +204,10 @@ module PeopleLayout
       subtitle: org_subtitle(people_count, services_count),
       avatar_email: nil,
       avatar_initial: org.name.to_s[0].to_s.upcase.presence || "?",
-      last_activity: org.email_messages.maximum(:received_at),
-      standing: people_standing.organization(org)
+      last_activity: last_activity,
+      standing: standing,
+      facts: lead&.facts,
+      score: lead&.score || standing_only_score(standing, last_activity)
     )
   end
 

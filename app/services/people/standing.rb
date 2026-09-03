@@ -23,12 +23,19 @@ module People
   # nothing, they've gone quiet), so it drives priority 2 here. Mapping the copy
   # to the branch it describes keeps the surface honest and matches the mock.
   class Standing
-    Result = Data.define(:text, :needs_you, :thread_id, :overdue_days) do
-      def self.none = new(text: nil, needs_you: false, thread_id: nil, overdue_days: 0)
+    # `kind` names the rung that produced the text (:you_owe, :nudge, :prompt,
+    # :summary, :last_exchange, :none) so a ranker (People::Priority) can weigh a
+    # reply you owe differently from a nudge you could send without parsing copy.
+    Result = Data.define(:text, :needs_you, :thread_id, :overdue_days, :kind) do
+      def initialize(text:, needs_you: false, thread_id: nil, overdue_days: 0, kind: :none) = super
+      def self.none = new(text: nil)
       def present? = text.present?
     end
 
     GRACE = EmailThread::AWAITING_REPLY_GRACE
+    # An unanswered message older than this is no longer "waiting on your reply" —
+    # silence was the triage. Mirrors the nudge horizon on the other side.
+    STALE_AFTER = Emails::AwaitingReply::MAX_NUDGE_AGE
     ORG_PEOPLE_SAMPLE = 5
 
     def self.for_person(person, user:, now: Time.current)
@@ -75,27 +82,27 @@ module People
 
       if (thread = you_owe_thread(threads))
         days = days_since(thread.last_inbound_at)
-        return result(I18n.t("people.standing.you_owe", count: days), needs_you: true, thread: thread, days: days)
+        return result(I18n.t("people.standing.you_owe", count: days), needs_you: true, thread: thread, days: days, kind: :you_owe)
       end
 
       if (thread = nudge_thread(threads))
         days = days_since(thread.last_outbound_at)
         subject = thread.display_subject.to_s.strip
         subject = subject.present? ? subject.truncate(48) : I18n.t("people.standing.your_last_message")
-        return result(I18n.t("people.standing.awaiting_them", subject: subject, count: days), needs_you: true, thread: thread, days: days)
+        return result(I18n.t("people.standing.awaiting_them", subject: subject, count: days), needs_you: true, thread: thread, days: days, kind: :nudge)
       end
 
       latest = latest_inbound_message(person)
       if latest&.ai_action_prompt.to_s.strip.present?
-        return result(latest.ai_action_prompt.strip, thread: latest.email_thread)
+        return result(latest.ai_action_prompt.strip, thread: latest.email_thread, kind: :prompt)
       end
 
       if (summary = profile_summary(person)).present?
-        return result(first_sentence(summary), thread: latest&.email_thread)
+        return result(first_sentence(summary), thread: latest&.email_thread, kind: :summary)
       end
 
       if (last = person.last_email_at)
-        return result(I18n.t("people.standing.last_exchange", date: I18n.l(last.to_date, format: :short)), thread: latest&.email_thread)
+        return result(I18n.t("people.standing.last_exchange", date: I18n.l(last.to_date, format: :short)), thread: latest&.email_thread, kind: :last_exchange)
       end
 
       Result.none
@@ -105,21 +112,37 @@ module People
       standings = organization_person_standings(organization).select(&:present?)
       return Result.none if standings.empty?
 
-      needing = standings.select(&:needs_you)
-      chosen = (needing.sort_by { |s| -s.overdue_days } + (standings - needing)).first(2)
+      # Lead with the most pressing member: a reply you owe before a nudge you
+      # could send, then the longer wait.
+      needing = standings.select(&:needs_you).sort_by { |s| [ s.kind == :you_owe ? 0 : 1, -s.overdue_days ] }
+      chosen = (needing + (standings - needing)).first(2)
 
       Result.new(
         text: chosen.map(&:text).join(" "),
         needs_you: needing.any?,
         thread_id: chosen.first&.thread_id,
-        overdue_days: (needing.map(&:overdue_days).max || 0)
+        overdue_days: needing.first&.overdue_days || 0,
+        kind: chosen.first&.kind || :none
       )
+    end
+
+    # The rows behind a standing, for callers that rank or explain the list
+    # (People::Priority): a person's inbox threads (messages preloaded), their
+    # newest inbound message, and the people an organization's standing is
+    # composed from. Primed-or-live, exactly like the standing itself.
+    def threads_for(person) = person_threads(person)
+    def latest_inbound_for(person) = latest_inbound_message(person)
+
+    def sampled_people_for(organization)
+      return @org_sample[organization.id] if @primed && @org_sample&.key?(organization.id)
+
+      org_sample_from(organization.active_people.includes(:contacts).to_a)
     end
 
     private
 
-    def result(text, thread: nil, needs_you: false, days: 0)
-      Result.new(text: text, needs_you: needs_you, thread_id: thread&.id, overdue_days: days)
+    def result(text, thread: nil, needs_you: false, days: 0, kind: :none)
+      Result.new(text: text, needs_you: needs_you, thread_id: thread&.id, overdue_days: days, kind: kind)
     end
 
     # The counterpart's inbox threads on mailboxes the user can read, messages
@@ -142,14 +165,43 @@ module People
                  .to_a
     end
 
-    # You owe a reply: they had the last word (thread does not hold_last_word) and
-    # it has sat past the grace window. Newest such thread wins.
+    # You owe a reply: they had the last word (thread does not hold_last_word), it
+    # has sat past the grace window without going stale, and the unanswered
+    # message is one you'd actually answer (#reply_owed?). Newest such thread wins.
     def you_owe_thread(threads)
       threads.select { |thread|
         !thread.holds_last_word? &&
           thread.last_inbound_at.present? &&
-          thread.last_inbound_at <= @now - GRACE
+          thread.last_inbound_at <= @now - GRACE &&
+          thread.last_inbound_at > @now - STALE_AFTER &&
+          reply_owed?(thread)
       }.max_by(&:last_inbound_at)
+    end
+
+    # The unanswered message — the thread's latest, since they hold the last word
+    # — is one a person answers: not a newsletter, receipt or alert (Skim's
+    # per-message broadcast verdict), and addressed to you rather than a thread
+    # you were merely copied on. Without this every unanswered promotion reads as
+    # "waiting on your reply", and the oldest of them tops the People list.
+    def reply_owed?(thread)
+      message = thread.latest_message
+      return true if message.nil?
+
+      !Contacts::SenderKind.broadcast?(message, provider_hints: false) && !copied_only?(message)
+    end
+
+    # You are in Cc and not in To. Positive evidence only: when your address
+    # appears nowhere (an alias in To, a list) nothing is demoted.
+    def copied_only?(message)
+      owner = owner_address_for(message.email_account_id)
+      return false if owner.blank?
+
+      message.cc_address.to_s.downcase.include?(owner) && !message.to_address.to_s.downcase.include?(owner)
+    end
+
+    def owner_address_for(account_id)
+      @owner_addresses ||= readable_accounts.to_h { |account| [ account.id, account.email_address.to_s.downcase ] }
+      @owner_addresses[account_id]
     end
 
     # They owe you and the nudge is due (the AwaitingReply proactive subset),
@@ -214,6 +266,10 @@ module People
 
     def awaiting_reply
       @awaiting_reply ||= Emails::AwaitingReply.new(@user, now: @now)
+    end
+
+    def readable_accounts
+      @readable_accounts ||= @user&.readable_email_accounts&.to_a || []
     end
 
     # ── Priming (batched loads shared by every counterpart on a list) ──────────
@@ -307,7 +363,7 @@ module People
     end
 
     def inbox_folder_ids
-      @inbox_folder_ids ||= Emails::InboxFolders.ids_for(@user&.readable_email_accounts&.to_a || [])
+      @inbox_folder_ids ||= Emails::InboxFolders.ids_for(readable_accounts)
     end
   end
 end

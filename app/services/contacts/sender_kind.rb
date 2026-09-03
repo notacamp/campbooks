@@ -22,6 +22,11 @@ module Contacts
     # coarser than Contacts::AnalysisGate: `updates` counts here, so a receipts
     # service reads as a service even though we'd still profile a real vendor).
     SERVICE_CATEGORIES = %w[notifications promotions social updates].freeze
+    # The subset no person ever writes: a promotion, a social ping, an alert.
+    # `updates` is left out on purpose — the rules file any transactional subject
+    # (invoice, order, receipt…) there, and that is exactly what a real vendor or
+    # client writes about.
+    BROADCAST_CATEGORIES = %w[notifications promotions social].freeze
 
     class << self
       # Classify and persist the contact's sender_kind (+ stream_kind for a
@@ -39,22 +44,31 @@ module Contacts
       end
 
       # Pure verdict for a sampled message set (no persistence) — the unit under test.
-      def service?(messages)
+      # `provider_hints: false` for callers judging loaded rows in bulk (see
+      # Emails::Categorizer#initialize); the backfill keeps the default.
+      def service?(messages, provider_hints: true)
         return false if messages.empty?
 
-        service_flavoured = messages.count { |msg| service_message?(msg) }
+        service_flavoured = messages.count { |msg| service_message?(msg, provider_hints: provider_hints) }
         service_flavoured * 2 > messages.size
       end
 
       # One message reads as service traffic: automated sender, bulk/list/auto-
       # submitted headers, or a machine triage category.
-      def service_message?(msg)
+      def service_message?(msg, provider_hints: true)
+        broadcast?(msg, provider_hints: provider_hints) || msg.category.to_s == "updates"
+      end
+
+      # One message nobody expects the reader to answer — the strict subset of
+      # #service_message? that never comes from a person. People::Standing uses
+      # it to decide whether an unanswered message is a reply you owe.
+      def broadcast?(msg, provider_hints: true)
         Emails::Categorizer.machine_sender?(msg) ||
-          Emails::Categorizer.new(msg).call.noise? ||
+          Emails::Categorizer.new(msg, provider_hints: provider_hints).call.noise? ||
           msg.header_list_unsubscribe.to_s.strip.present? ||
           %w[bulk list junk].include?(msg.header_precedence.to_s.strip.downcase) ||
           auto_submitted?(msg) ||
-          SERVICE_CATEGORIES.include?(msg.category.to_s)
+          BROADCAST_CATEGORIES.include?(msg.category.to_s)
       end
 
       private
