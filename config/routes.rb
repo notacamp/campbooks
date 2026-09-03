@@ -332,6 +332,15 @@ Rails.application.routes.draw do
     # redirects to the first panel; unknown sections 404 in the controller.
     get "inbox", to: redirect("/settings/inbox/tags"), as: :inbox
     get "inbox/:section", to: "inbox#show", as: :inbox_section
+    # Scout's memory — the bold-layout collapse of the inbox/AI settings into
+    # editable sentences (gated on Features.bold_layout? in the controller). The
+    # underlying forms still live at their existing settings paths, reached from
+    # each sentence's edit link. Entry ids are stable strings ("rule:<uuid>",
+    # "skim:<tier>:<label>:<token>") — colon-separated, base64url'd, never dotted.
+    get "memory", to: "memory#show", as: :memory
+    post "memory/teach", to: "memory#teach", as: :memory_teach
+    post "memory/entries/:id/confirm", to: "memory#confirm", as: :memory_entry_confirm
+    delete "memory/entries/:id", to: "memory#destroy", as: :memory_entry
     resource :plan, only: [ :show ], controller: "plan"
     resource :ai, only: [ :show ], controller: "ai" do
       post :switch_mode

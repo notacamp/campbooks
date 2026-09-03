@@ -56,6 +56,7 @@ ignore_unused:
   - 'home.index.connect_demo'
   - 'home.index.empty_title'
   - 'home.index.empty_body'
+  - 'scout_memory.*'        # Scout's-memory sentence templates + facets/origins/triggers are built dynamically by Scout::Memory::Sources::* (facet/rule_type/tier/label keys); parity across locales still covers them
 
 # Enum value keys are built dynamically (human_enum_name), so don't flag them as
 # missing from the static scan — parity across locales still covers them.

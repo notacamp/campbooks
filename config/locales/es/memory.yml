@@ -1,0 +1,116 @@
+---
+es:
+  scout_memory:
+    facets:
+      filing: Archivo
+      stack: Pila
+      replies: Respuestas
+      streams: Flujos
+      style: Estilo
+      automations: Automatizaciones
+    origins:
+      taught: Enseñado por ti
+      taught_on: "Enseñado por ti · %{date}"
+      learned_skim: Aprendido de cómo revisas
+      learned_style: Aprendido de tu correo enviado
+      learned_labels: Aprendido de tus etiquetas
+      learned_corrections:
+        one: Aprendido de %{count} corrección
+        other: Aprendido de %{count} correcciones
+      default: Predeterminado
+    sources:
+      email_rules:
+        lead: Archivar todo
+        from: "de %{value}"
+        to: "enviado a %{value}"
+        subject: "con %{value} en el asunto"
+        body: "que menciona %{value}"
+        category: "en %{value}"
+        attachment: con un adjunto
+        folder: "en %{value}"
+        archive: archivarlo
+        mark_read: marcarlo como leído
+        tag: "etiquetarlo con %{value}"
+        connector_and: y
+      tags:
+        topic_clause: "Etiquetar correo como **%{tag}** cuando %{clause}."
+        topic_about: "Etiquetar correo como **%{tag}** cuando trate de **%{topic}**."
+        hidden: "La etiqueta del proveedor **%{name}** permanece oculta."
+      document_habits:
+        sentence: "Los documentos de **%{sender}** suelen ser **%{type}**."
+      document_types:
+        sentence: "Los documentos que parecen **%{name}** van a Papeles › %{name}."
+        sentence_starred: "Los documentos que parecen **%{name}** van a Papeles › %{name}, y los destaco."
+      group_rules:
+        sender: "El correo de **%{value}** es un flujo: **%{group}**."
+        organization: "El correo de **%{value}** es un flujo: **%{group}**."
+        document_type: "Los documentos **%{value}** son un flujo: **%{group}**."
+        query: "El correo que coincide con **%{value}** es un flujo: **%{group}**."
+        default_bucket: "**%{group}** se mantiene fuera de tu pila prioritaria."
+      filtering:
+        whitelist: Solo el correo de personas que he permitido entra en la pila.
+        blacklist: Los remitentes bloqueados nunca entran en la pila.
+        starred: "El correo de **%{name}** es prioritario."
+        blocked: "**%{name}** está bloqueado."
+        allowed: "El correo de **%{name}** está permitido."
+      skim_habits:
+        archive:
+          sender: "Sueles archivar correo de **%{key}** (%{count} de tus últimos %{total})."
+          category: "Sueles archivar correo **%{key}** (%{count} de tus últimos %{total})."
+        keep:
+          sender: "Sueles conservar correo de **%{key}** (%{count} de tus últimos %{total})."
+          category: "Sueles conservar correo **%{key}** (%{count} de tus últimos %{total})."
+        promote:
+          sender: "Sueles priorizar el correo de **%{key}** (%{count} de tus últimos %{total})."
+          category: "Sueles priorizar el correo **%{key}** (%{count} de tus últimos %{total})."
+      replies:
+        signature: "Firmar respuestas con **%{name}**."
+        writing_stated: "Escribir respuestas **%{style}**."
+        writing_learned: "Escribo como tú: **%{summary}**."
+        template: "**%{name}** es una plantilla de respuesta guardada."
+      prompts:
+        custom: "Al leer %{purpose}, además: **%{instruction}**."
+        default: "Para %{purpose}, Scout usa la guía integrada."
+      defaults:
+        review: Cada documento que leo espera tu revisión antes de archivarse definitivamente.
+      workflows:
+        sentence: "Cuando %{trigger}, %{actions}."
+        and: y
+        no_actions: aún no hacen nada
+        trigger:
+          email_received: llega un correo
+          webhook: se dispara un webhook
+          event: ocurre un evento
+    teach:
+      created: Entendido — lo aplicaré de ahora en adelante.
+      unknown: Aún no puedo aprender eso. Prueba a archivar correo de un remitente, etiquetarlo, tratar a un remitente como un flujo, marcar a alguien como prioritario, bloquear a un remitente o definir tu firma de respuesta.
+      error: Algo salió mal al guardar. Inténtalo de nuevo.
+  settings:
+    memory:
+      show:
+        title: Memoria de Scout
+        subtitle: Lo que he aprendido sobre cómo trabajas. Edita lo que quieras; lo aplicaré de ahora en adelante.
+        search_placeholder: Buscar una regla…
+        facet_all: Todo
+        no_matches: Ninguna regla coincide con tu búsqueda.
+        empty_title: Aún no hay nada aquí.
+        empty_body: A medida que archivas, etiquetas y revisas tu correo, lo que aprendo aparece aquí como frases que puedes editar.
+  components:
+    memory:
+      sentence_row:
+        edit: Editar
+        remove: Eliminar
+        confirm: Confirmar
+        remove_confirm: "¿Eliminar esto de la memoria de Scout?"
+        remove_habit_confirm: Esto solo olvida el hábito — tu correo se queda donde está.
+      teach_box:
+        placeholder: Enseña algo a Scout, p. ej. "tratar las notificaciones de GitHub como un flujo"
+        button: Enseñar
+  navigation:
+    settings:
+      bold:
+        memory: Memoria de Scout
+        connections: Conexiones
+        workspace_people: Espacio y personas
+        account: Cuenta
+        plan: Plan

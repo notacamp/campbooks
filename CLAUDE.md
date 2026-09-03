@@ -70,6 +70,10 @@ Self-serve registration lives in `RegistrationsController` (3 steps: name/email 
 
 Invited users always bypass the gate. Helpers `signup_mode`, `public_signup_allowed?`, and `beta_code_required?` are available in controllers and views. The cloud "Beta" badge (topbar + auth pages) is gated on `!self_hosted?`.
 
+## Scout's memory (bold layout)
+
+Settings → Scout's memory (`Settings::MemoryController`, gated on `ENABLE_BOLD_LAYOUT`) re-expresses the inbox/AI settings as editable sentences derived on demand from the behaviour records — email rules, tags, document types, inbox group rules, filtering, signatures, writing style, AI prompts, workflows, plus the learned skim/document-classification corrections — by `Scout::Memory::Catalog` (`Scout::Memory::Sources::*`, one adapter per behaviour), each tagged taught/learned/default with confirm/remove for learned habits, while "Teach Scout something" (`Scout::Memory::Teacher` + deterministic `Parsers::*`) turns a sentence into a real rule; the bold settings sidebar collapses to five places.
+
 ## Running the app
 
 ```

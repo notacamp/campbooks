@@ -1,0 +1,52 @@
+<%# Scout's memory — the inbox/AI settings re-expressed as editable sentences.
+    Settings sidebar via content_for (never a lazy t(".") inside a layout block). %>
+<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+
+<div data-controller="memory">
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <%# Facet segmented chips with counts (server round-trip; counts stay exact). %>
+    <div class="inline-flex flex-wrap items-center gap-0.5 rounded-[10px] bg-secondary p-[3px]">
+      <% chip_classes = ->(active) { "rounded-lg px-2.5 py-1 text-[12.5px] font-medium transition-colors #{active ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}" } %>
+      <%= link_to settings_memory_path, class: chip_classes.call(@facet.nil?), "aria-current": (@facet.nil? ? "page" : nil) do %>
+        <%= t(".facet_all") %> · <%= @total %>
+      <% end %>
+      <% @facet_counts.each do |facet, count| %>
+        <%= link_to settings_memory_path(facet: facet), class: chip_classes.call(@facet == facet), "aria-current": (@facet == facet ? "page" : nil) do %>
+          <%= t("scout_memory.facets.#{facet}") %> · <%= count %>
+        <% end %>
+      <% end %>
+    </div>
+
+    <%# Client-side search filter (no server round-trip). %>
+    <div class="flex h-9 items-center gap-2 rounded-[10px] border border-input bg-card px-3 sm:w-64">
+      <svg class="h-4 w-4 flex-shrink-0 text-muted-foreground" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3" stroke-linecap="round"/></svg>
+      <input type="search" autocomplete="off"
+             placeholder="<%= t(".search_placeholder") %>"
+             aria-label="<%= t(".search_placeholder") %>"
+             class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-0"
+             data-memory-target="search" data-action="input->memory#filter">
+    </div>
+  </div>
+
+  <div id="memory_list" class="mt-4 divide-y divide-border" data-memory-target="list">
+    <% @entries.each do |entry| %>
+      <%= render(Campbooks::Memory::SentenceRow.new(entry: entry)) %>
+    <% end %>
+  </div>
+
+  <%# Shown by the memory controller when a search matches nothing. %>
+  <p class="hidden py-8 text-center text-sm text-muted-foreground" data-memory-target="empty">
+    <%= t(".no_matches") %>
+  </p>
+
+  <% if @entries.empty? %>
+    <div class="py-12 text-center">
+      <p class="text-sm font-medium text-foreground"><%= t(".empty_title") %></p>
+      <p class="mt-1 text-sm text-muted-foreground"><%= t(".empty_body") %></p>
+    </div>
+  <% end %>
+
+  <%= render(Campbooks::Memory::TeachBox.new) %>
+</div>

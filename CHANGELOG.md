@@ -37,6 +37,13 @@ major, minor, or patch change here.
   `ENABLE_BOLD_LAYOUT=1`; each user then chooses **Bold** or **Classic** in
   Settings › Account (Classic stays the default). Off by default and not yet
   production-ready; the Scout command overlay is a follow-up.
+- **Scout's memory (bold layout).** The inbox and AI settings pages are
+  re-expressed as editable sentences on one page (Settings → Scout's memory),
+  each showing its origin — taught by you, learned from your corrections, or a
+  built-in default — with learned habits you can confirm or forget. "Teach Scout
+  something" turns a sentence like "treat GitHub notifications as a stream" into a
+  real rule. The bold settings sidebar collapses to five places (Scout's memory,
+  Connections, Workspace & people, Account, Plan). Gated on `ENABLE_BOLD_LAYOUT`.
 - **Scout everywhere (bold layout).** In the opt-in bold layout, the docked Scout
   bar and `⌘K` now open a single **Scout overlay** in place over whatever you were
   doing, merging the Scout conversation and the command palette into one input: a

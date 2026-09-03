@@ -1,0 +1,116 @@
+---
+fr:
+  scout_memory:
+    facets:
+      filing: Classement
+      stack: Pile
+      replies: Réponses
+      streams: Flux
+      style: Style
+      automations: Automatisations
+    origins:
+      taught: Appris de vous
+      taught_on: "Appris de vous · %{date}"
+      learned_skim: Appris de votre façon de trier
+      learned_style: Appris de vos courriels envoyés
+      learned_labels: Appris de vos étiquettes
+      learned_corrections:
+        one: Appris de %{count} correction
+        other: Appris de %{count} corrections
+      default: Par défaut
+    sources:
+      email_rules:
+        lead: Tout classer
+        from: "de %{value}"
+        to: "envoyé à %{value}"
+        subject: "avec %{value} dans l'objet"
+        body: "mentionnant %{value}"
+        category: "dans %{value}"
+        attachment: avec une pièce jointe
+        folder: "dans %{value}"
+        archive: l'archiver
+        mark_read: le marquer comme lu
+        tag: "l'étiqueter avec %{value}"
+        connector_and: et
+      tags:
+        topic_clause: "Étiqueter le courrier comme **%{tag}** quand %{clause}."
+        topic_about: "Étiqueter le courrier comme **%{tag}** quand il s'agit de **%{topic}**."
+        hidden: "L'étiquette du fournisseur **%{name}** reste masquée."
+      document_habits:
+        sentence: "Les documents de **%{sender}** sont généralement des **%{type}**."
+      document_types:
+        sentence: "Les documents qui ressemblent à **%{name}** vont dans Papiers › %{name}."
+        sentence_starred: "Les documents qui ressemblent à **%{name}** vont dans Papiers › %{name}, et je les marque d'une étoile."
+      group_rules:
+        sender: "Le courrier de **%{value}** est un flux : **%{group}**."
+        organization: "Le courrier de **%{value}** est un flux : **%{group}**."
+        document_type: "Les documents **%{value}** sont un flux : **%{group}**."
+        query: "Le courrier correspondant à **%{value}** est un flux : **%{group}**."
+        default_bucket: "**%{group}** reste hors de votre pile prioritaire."
+      filtering:
+        whitelist: Seul le courrier des personnes que j'ai autorisées entre dans la pile.
+        blacklist: Les expéditeurs bloqués n'entrent jamais dans la pile.
+        starred: "Le courrier de **%{name}** est prioritaire."
+        blocked: "**%{name}** est bloqué."
+        allowed: "Le courrier de **%{name}** est autorisé."
+      skim_habits:
+        archive:
+          sender: "Vous archivez habituellement le courrier de **%{key}** (%{count} de vos %{total} derniers)."
+          category: "Vous archivez habituellement le courrier **%{key}** (%{count} de vos %{total} derniers)."
+        keep:
+          sender: "Vous conservez habituellement le courrier de **%{key}** (%{count} de vos %{total} derniers)."
+          category: "Vous conservez habituellement le courrier **%{key}** (%{count} de vos %{total} derniers)."
+        promote:
+          sender: "Vous mettez habituellement en priorité le courrier de **%{key}** (%{count} de vos %{total} derniers)."
+          category: "Vous mettez habituellement en priorité le courrier **%{key}** (%{count} de vos %{total} derniers)."
+      replies:
+        signature: "Signer les réponses avec **%{name}**."
+        writing_stated: "Écrire les réponses **%{style}**."
+        writing_learned: "J'écris comme vous : **%{summary}**."
+        template: "**%{name}** est un modèle de réponse enregistré."
+      prompts:
+        custom: "En lisant %{purpose}, aussi : **%{instruction}**."
+        default: "Pour %{purpose}, Scout utilise les instructions intégrées."
+      defaults:
+        review: Chaque document que je lis attend votre révision avant d'être classé définitivement.
+      workflows:
+        sentence: "Quand %{trigger}, %{actions}."
+        and: et
+        no_actions: ne font encore rien
+        trigger:
+          email_received: un courriel arrive
+          webhook: un webhook se déclenche
+          event: un événement se produit
+    teach:
+      created: C'est noté — je l'appliquerai désormais.
+      unknown: Je ne peux pas encore apprendre cela. Essayez de classer le courrier d'un expéditeur, de l'étiqueter, de traiter un expéditeur comme un flux, de marquer quelqu'un comme prioritaire, de bloquer un expéditeur ou de définir votre signature de réponse.
+      error: Un problème est survenu lors de l'enregistrement. Réessayez.
+  settings:
+    memory:
+      show:
+        title: Mémoire de Scout
+        subtitle: Ce que j'ai appris sur votre façon de travailler. Modifiez ce que vous voulez ; je l'appliquerai désormais.
+        search_placeholder: Trouver une règle…
+        facet_all: Tout
+        no_matches: Aucune règle ne correspond à votre recherche.
+        empty_title: Rien ici pour l'instant.
+        empty_body: À mesure que vous classez, étiquetez et triez votre courrier, ce que j'apprends apparaît ici sous forme de phrases modifiables.
+  components:
+    memory:
+      sentence_row:
+        edit: Modifier
+        remove: Supprimer
+        confirm: Confirmer
+        remove_confirm: "Supprimer ceci de la mémoire de Scout ?"
+        remove_habit_confirm: Cela oublie seulement l'habitude — votre courrier reste où il est.
+      teach_box:
+        placeholder: Apprenez quelque chose à Scout, par ex. "traiter les notifications GitHub comme un flux"
+        button: Apprendre
+  navigation:
+    settings:
+      bold:
+        memory: Mémoire de Scout
+        connections: Connexions
+        workspace_people: Espace et personnes
+        account: Compte
+        plan: Forfait
