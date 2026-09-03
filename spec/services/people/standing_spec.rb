@@ -80,4 +80,49 @@ RSpec.describe People::Standing do
     expect(st.needs_you).to be true
     expect(st.text).to include("Waiting on your reply")
   end
+
+  # The batched list path (prime + reuse one instance) must return byte-for-byte
+  # the same Result as the single-record path (for_person/for_organization). This
+  # guards against drift between person_threads / latest_inbound_message /
+  # profile_summary / organization sampling and their primed equivalents.
+  describe "priming parity (batched list path == single-record path)" do
+    def primed(person)
+      described_class.new(user, now: Time.current).prime(people: [ person ]).person(person)
+    end
+
+    it "matches the single-record path for every person priority" do
+      cases = {
+        you_owe:       person_with(name: "Sofia", last_inbound: 2.days.ago),
+        nudge:         person_with(name: "Miguel", last_inbound: 12.days.ago, last_outbound: 6.days.ago),
+        action_prompt: person_with(name: "Ana", last_inbound: 5.days.ago, last_outbound: 1.day.ago, ai_action_prompt: "She needs one receipt."),
+        own_profile:   person_with(name: "David", last_inbound: 5.days.ago, last_outbound: 1.day.ago, context_summary: "Long-time client. Prefers phone."),
+        last_exchange: person_with(name: "Quiet", last_email_at: 3.days.ago),
+        nothing:       create(:person, workspace: workspace, name: "Empty", context_summary: nil)
+      }
+
+      cases.each do |label, person|
+        expect(primed(person)).to eq(described_class.for_person(person, user: user)),
+          "primed result diverged from live for #{label}"
+      end
+    end
+
+    it "matches when the profile summary comes from a contact (not the person)" do
+      person = create(:person, workspace: workspace, name: "Nadia", context_summary: nil)
+      create(:contact, workspace: workspace, email_account: account, person: person,
+             email: "nadia@x.example", sender_kind: :person, email_count: 4,
+             last_email_at: 2.days.ago, context_summary: "Founder at Acme. Two open invoices.")
+
+      expect(primed(person)).to eq(described_class.for_person(person, user: user))
+    end
+
+    it "matches for an organization" do
+      org = create(:organization, workspace: workspace, name: "Cloudhost")
+      owe = person_with(name: "Rui", last_inbound: 3.days.ago)
+      create(:organization_membership, person: owe, organization: org)
+
+      live = described_class.for_organization(org, user: user)
+      primed = described_class.new(user, now: Time.current).prime(organizations: [ org ]).organization(org)
+      expect(primed).to eq(live)
+    end
+  end
 end
