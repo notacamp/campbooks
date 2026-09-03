@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.31.0] - 2026-09-03
+
 ### Added
 
 - Scout can now act in a task discussion: asking it to set the task's due date
