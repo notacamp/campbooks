@@ -5,12 +5,14 @@ module Campbooks
       include TypeIcon
       DAY_W = 100.0 / 7
 
-      def initialize(date:, events:, reminders: [], snoozed_threads: [], scheduled_emails: [])
+      def initialize(date:, events:, reminders: [], snoozed_threads: [], scheduled_emails: [], tasks: [], focus_blocks: [])
         @date = date
         @events = events.to_a
         @reminders = reminders.to_a
         @snoozed_threads = snoozed_threads.to_a
         @scheduled_emails = scheduled_emails.to_a
+        @tasks = tasks.to_a
+        @focus_blocks = focus_blocks.to_a
       end
 
       def view_template
@@ -63,6 +65,10 @@ module Campbooks
       def snoozed_for(day) = snoozed_by_day[day] || []
       def scheduled_by_day = @scheduled_by_day ||= @scheduled_emails.group_by { |s| (s.next_occurrence_at || s.scheduled_at).to_date }
       def scheduled_for(day) = scheduled_by_day[day] || []
+      def tasks_by_day = @tasks_by_day ||= @tasks.group_by { |t| t.due_at.to_date }
+      def tasks_for(day) = tasks_by_day[day] || []
+      def focus_by_day = @focus_by_day ||= @focus_blocks.group_by { |f| f.start_at.to_date }
+      def focus_for(day) = focus_by_day[day] || []
 
       # Open on the working hours (or an hour before "now" when today is in view)
       # rather than midnight, so the busy part of the day is what you see first.
@@ -87,7 +93,7 @@ module Campbooks
       end
 
       def render_all_day_row
-        return unless days.any? { |d| events_for(d).any?(&:all_day) } || @reminders.any? || @snoozed_threads.any? || @scheduled_emails.any?
+        return unless days.any? { |d| events_for(d).any?(&:all_day) } || @reminders.any? || @snoozed_threads.any? || @scheduled_emails.any? || @tasks.any? || @focus_blocks.any?
         div(class: "flex border-t border-border/60") do
           div(class: "w-14 shrink-0 px-2 py-1 text-[10px] text-muted-foreground") { t("components.calendar.event_row.all_day") }
           days.each do |day|
@@ -104,6 +110,8 @@ module Campbooks
                 end
               end
               reminders_for(day).each { |reminder| render Campbooks::Calendar::ReminderChip.new(reminder: reminder) }
+              tasks_for(day).each { |task| render Campbooks::Calendar::TaskChip.new(task: task) }
+              focus_for(day).each { |block| render Campbooks::Calendar::FocusChip.new(focus_block: block) }
               snoozed_for(day).each { |thread| render Campbooks::Calendar::SnoozedChip.new(thread: thread) }
               scheduled_for(day).each { |email| render Campbooks::Calendar::ScheduledEmailChip.new(scheduled_email: email) }
             end

@@ -16,9 +16,11 @@ export default class extends Controller {
     if (this.#stored() === "1") this.#applyCollapsed(true)
   }
 
-  // The header button: opens the dialog below lg, toggles the aside at lg+.
+  // The header button: opens the dialog below lg, toggles the aside at lg+. On a
+  // page with no aside (the bold Time surface, where "Calendars" is only ever a
+  // popover) it always opens the dialog.
   toggle() {
-    if (window.innerWidth < this.breakpointValue) {
+    if (!this.hasAsideTarget || window.innerWidth < this.breakpointValue) {
       if (this.hasDialogTarget) this.dialogTarget.showModal()
     } else {
       const collapsed = !this.#collapsed()

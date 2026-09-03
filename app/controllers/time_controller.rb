@@ -37,6 +37,8 @@ class TimeController < ApplicationController
     if @view == "agenda"
       @agenda = Time::Agenda.for(current_user, from: agenda_from, to: agenda_to)
       @move_slots = agenda_move_slots(@agenda)
+      # Scout's note is about today, so it rides the default (today) agenda only.
+      @day_note = Time::DayNote.for(current_user) if @date == Date.current
     else
       @range = data.range
       @events = data.events

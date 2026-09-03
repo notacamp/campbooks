@@ -1,0 +1,94 @@
+<% content_for :cp_context, "time" %>
+<% grid_view = %w[month week].include?(@view) %>
+<%# Grid views stretch nearly edge-to-edge; the agenda stays column-width. %>
+<% content_for :main_class, grid_view ?
+     "mx-auto w-full max-w-[100rem] px-4 sm:px-6 lg:px-8 py-5" :
+     "mx-auto w-full max-w-4xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8" %>
+
+<div data-controller="calendar-nav calendar-sidebar" data-action="click@window->calendar-sidebar#closeMenus">
+  <%# ── Header: date + navigation + Agenda|Week|Month + New ──────────────────── %>
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div class="flex min-w-0 flex-wrap items-center gap-3">
+      <h1 class="text-2xl font-semibold tracking-tight text-foreground sm:text-[28px]"><%= l(@date, format: "%A, %b %-d") %></h1>
+      <div class="inline-flex items-center overflow-hidden rounded-lg border border-border">
+        <%= link_to time_path(view: @view, date: @prev_date.iso8601),
+              class: "px-2 py-1.5 text-muted-foreground hover:bg-muted transition-colors", "aria-label": t(".previous"),
+              data: { "calendar-prev": "" } do %>
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        <% end %>
+        <%= link_to t(".today"), time_path(view: @view, date: Date.current.iso8601),
+              class: "border-x border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors",
+              data: { "calendar-today": "" } %>
+        <%= link_to time_path(view: @view, date: @next_date.iso8601),
+              class: "px-2 py-1.5 text-muted-foreground hover:bg-muted transition-colors", "aria-label": t(".next"),
+              data: { "calendar-next": "" } do %>
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <%= render(Campbooks::Calendar::ViewTabs.new(current: @view, date: @date, reminders: false, base: :time)) %>
+      <% if @has_calendars %>
+        <button type="button" data-action="calendar-sidebar#toggle"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+          <%= t(".calendars") %>
+        </button>
+      <% end %>
+      <%= render(Campbooks::Button.new(variant: :primary, size: :sm,
+            href: new_calendar_event_path(view: @view),
+            data: { "calendar-event-modal-open": new_calendar_event_path(view: @view) })) do %>
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        <%= t(".new_event") %>
+      <% end %>
+    </div>
+  </div>
+
+  <%# ── Scout's day note (agenda, today only) ────────────────────────────────── %>
+  <% if @day_note %>
+    <div class="mt-5"><%= render(Campbooks::Time::DayNote.new(note: @day_note, zone: @zone)) %></div>
+  <% end %>
+
+  <%# ── Body: the merged agenda, or the Week/Month grids with task + focus chips ─ %>
+  <% case @view %>
+  <% when "month" %>
+    <div class="mt-5">
+      <%= render(Campbooks::Calendar::MonthGrid.new(date: @date, events: @events, reminders: @reminders,
+            snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails, tasks: @tasks, focus_blocks: @focus_blocks)) %>
+    </div>
+  <% when "week" %>
+    <div class="mt-5 hidden md:block">
+      <%= render(Campbooks::Calendar::WeekTimeGrid.new(date: @date, events: @events, reminders: @reminders,
+            snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails, tasks: @tasks, focus_blocks: @focus_blocks)) %>
+    </div>
+    <div class="mt-5 md:hidden">
+      <%= render(Campbooks::Calendar::WeekGrid.new(date: @date, events: @events, reminders: @reminders,
+            snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails, tasks: @tasks, focus_blocks: @focus_blocks)) %>
+    </div>
+  <% else %>
+    <%= render(Campbooks::Time::AgendaList.new(items: @agenda, zone: @zone, move_slots: @move_slots,
+          snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails, has_calendars: @has_calendars)) %>
+  <% end %>
+
+  <%= render(Campbooks::Calendar::EventModal.new) %>
+
+  <%# The classic Day view has no tab here; the calendar-nav `d` shortcut opens it. %>
+  <%= link_to "", calendar_path(view: "day", date: @date.iso8601), data: { "calendar-view": "day" },
+        class: "hidden", "aria-hidden": "true", tabindex: "-1" %>
+
+  <% if @has_calendars %>
+    <%# The calendars manager, opened as a dialog by the header "Calendars" button. %>
+    <dialog data-calendar-sidebar-target="dialog" data-action="click->calendar-sidebar#backdropClose"
+            class="m-auto max-h-[85vh] w-[min(92vw,20rem)] overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-xl backdrop:bg-black/40">
+      <div class="mb-3 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-foreground"><%= t(".calendars") %></h2>
+        <button type="button" data-action="calendar-sidebar#closeDialog" aria-label="<%= t("calendar.index.close_sidebar") %>"
+                class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-muted transition-colors">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <%= render(Campbooks::Calendar::Sidebar.new(accounts: @calendar_accounts, user: Current.user, view: @view, date: @date, managed_account_ids: @managed_calendar_account_ids)) %>
+    </dialog>
+  <% end %>
+</div>

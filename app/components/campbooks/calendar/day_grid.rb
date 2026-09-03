@@ -4,12 +4,14 @@ module Campbooks
       include TimeGrid
       include TypeIcon
 
-      def initialize(date:, events:, reminders: [], snoozed_threads: [], scheduled_emails: [])
+      def initialize(date:, events:, reminders: [], snoozed_threads: [], scheduled_emails: [], tasks: [], focus_blocks: [])
         @date = date
         @events = events.to_a
         @reminders = reminders.to_a
         @snoozed_threads = snoozed_threads.to_a
         @scheduled_emails = scheduled_emails.to_a
+        @tasks = tasks.to_a
+        @focus_blocks = focus_blocks.to_a
       end
 
       def view_template
@@ -51,7 +53,7 @@ module Campbooks
 
       def render_all_day_row
         all_day = @events.select(&:all_day)
-        return if all_day.empty? && @reminders.empty? && @snoozed_threads.empty? && @scheduled_emails.empty?
+        return if all_day.empty? && @reminders.empty? && @snoozed_threads.empty? && @scheduled_emails.empty? && @tasks.empty? && @focus_blocks.empty?
         div(class: "sticky top-0 z-20 flex gap-2 border-b border-border/70 bg-card/80 px-3 py-2 backdrop-blur") do
           span(class: "w-11 shrink-0 pt-0.5 text-[11px] text-muted-foreground") { t("components.calendar.event_row.all_day") }
           div(class: "flex flex-1 flex-wrap gap-1") do
@@ -67,6 +69,8 @@ module Campbooks
               end
             end
             @reminders.each { |reminder| render Campbooks::Calendar::ReminderChip.new(reminder: reminder) }
+            @tasks.each { |task| render Campbooks::Calendar::TaskChip.new(task: task) }
+            @focus_blocks.each { |block| render Campbooks::Calendar::FocusChip.new(focus_block: block) }
             @snoozed_threads.each { |thread| render Campbooks::Calendar::SnoozedChip.new(thread: thread) }
             @scheduled_emails.each { |email| render Campbooks::Calendar::ScheduledEmailChip.new(scheduled_email: email) }
           end
