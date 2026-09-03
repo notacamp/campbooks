@@ -1,0 +1,112 @@
+---
+fr:
+  paper:
+    index:
+      title: "Papiers"
+      subtitle: "Chaque document, pour ce qu'il dit."
+      classic_files: "Fichiers classiques"
+      export: "Exporter"
+      export_confirm: "Exporter les documents correspondant à ces filtres ?"
+      add: "Ajouter"
+      add_title: "Ajouter des documents"
+      close: "Fermer"
+      ask_placeholder: "Demandez, p. ex. : factures impayées de plus de 100"
+      review:
+        one: "Examiner"
+        other: "Examiner"
+      connect: "Connectez un fournisseur d'IA et Scout lira vos documents."
+      connect_cta: "Connecter l'IA"
+      filters:
+        all: "Tous"
+        invoices: "Factures"
+        receipts: "Reçus"
+        contracts: "Contrats"
+        other: "Autres"
+      empty:
+        none_title: "Encore aucun papier."
+        none_body: "Les documents de votre e-mail arrivent ici automatiquement."
+        no_matches_title: "Aucune correspondance."
+        no_matches_clear: "Effacer les filtres"
+    status:
+      processing: "En cours"
+      failed: "Échec"
+      needs_review: "À examiner"
+      unpaid: "Impayée"
+      late: "Impayée"
+      paid: "Payée %{date}"
+      signed: "Signé"
+      expiring: "Bientôt expiré"
+      expired: "Expiré"
+      reconciled: "Rapproché"
+      filed: "Classé"
+      days:
+        one: "%{count} jour"
+        other: "%{count} jours"
+    kinds:
+      expense_invoice: "Facture"
+      revenue_invoice: "Facture"
+      credit_note: "Avoir"
+      receipt: "Reçu"
+      bank_statement: "Relevé"
+      contract: "Contrat"
+      insurance_policy: "Police"
+      certificate: "Certificat"
+      identification: "Pièce d'identité"
+      vehicle_document: "Véhicule"
+      tax_document: "Document fiscal"
+      proposal: "Proposition"
+      correspondence: "Courrier"
+      bank_journal_entry: "Écriture"
+      other: "Document"
+    facts:
+      due: "échéance %{date}"
+      renews: "renouvelle %{date}"
+      ends: "se termine %{date}"
+      months:
+        one: "%{count} mois"
+        other: "%{count} mois"
+      transactions:
+        one: "%{count} transaction"
+        other: "%{count} transactions"
+      matched:
+        one: "%{count} rapprochée"
+        other: "%{count} rapprochées"
+    summary:
+      unpaid:
+        one: "Une facture est impayée, %{total}."
+        other: "%{count} factures sont impayées, %{total} au total."
+      overdue: "%{name} a %{days} de retard."
+      needs_review:
+        one: "Un document mérite un second regard."
+        other: "%{count} documents méritent un second regard."
+      clear: "Rien dans les papiers ne vous attend pour l'instant."
+    settle:
+      paid_toast: "%{name} marquée comme payée."
+      unpaid_toast: "%{name} marquée comme impayée."
+      undo: "Annuler"
+  components:
+    paper:
+      table:
+        document: "Document"
+        scout_read: "Lecture de Scout"
+        status: "Statut"
+        added: "Ajouté"
+        added_short: "Ajouté"
+      row:
+        today: "Aujourd'hui"
+        open: "Ouvrir %{title}"
+      row_menu:
+        actions: "Actions"
+        open: "Ouvrir"
+        download: "Télécharger"
+        mark_paid: "Marquer payée"
+        mark_unpaid: "Marquer impayée"
+        send_to_drive: "Envoyer vers Drive"
+        send_to_notion: "Envoyer vers Notion"
+        move_to: "Déplacer vers un dossier"
+        reprocess: "Retraiter"
+        delete: "Supprimer"
+        delete_confirm: "Supprimer %{name} ? Action irréversible."
+    scout_note_row:
+      name: "Scout"
+      ai: "IA"
