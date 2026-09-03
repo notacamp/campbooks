@@ -121,6 +121,17 @@ pt:
       remind_failed: Não foi possível definir o lembrete.
       reminded: Lembrete definido — confirme-o na página de Lembretes para adicionar
         ao seu calendário.
+    scout_actions:
+      error: Algo correu mal ao executar essa acção.
+      invalid_date: Não consegui perceber essa data.
+      set_due_date:
+        success: Data de entrega definida para %{due}.
+      set_reminder:
+        no_due: A tarefa precisa primeiro de uma data de entrega — diga-me para quando
+          devo definir o lembrete.
+        success: Lembrete definido para %{due} — confirme-o na página de Lembretes
+          para adicionar ao seu calendário.
+      unknown: Essa acção não está disponível numa discussão de tarefa.
     show:
       activity: Atividade
       add_document: Anexar um documento

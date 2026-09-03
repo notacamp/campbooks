@@ -18,6 +18,11 @@ major, minor, or patch change here.
 
 ### Added
 
+- Scout can now act in a task discussion: asking it to set the task's due date
+  or a reminder ("@scout set a reminder for August") sets the date and creates
+  the task's deadline reminder — the same one as the task page's Remind button,
+  surfacing on the Reminders page and calendar. Previously Scout could only talk
+  about the task.
 - **Bold layout (preview): the Now page and a five-place navigation.** An opt-in
   reframing of the home experience as a queue of decisions you clear, not a feed
   you scroll. Scout opens with an honest **ledger** of what it did in the last 24
