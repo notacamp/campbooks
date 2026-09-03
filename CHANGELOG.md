@@ -97,6 +97,17 @@ major, minor, or patch change here.
   overlay still searches and navigates and says in one line what it can't do yet.
   Opt in with `ENABLE_BOLD_LAYOUT=1` plus the per-user Bold choice; the classic
   command palette and Scout page are unchanged.
+- **Compose from intent (bold layout).** The Desk composer
+  (`/email_messages/new`) now opens from what you mean instead of three empty
+  fields: one intent line ("Tell Scout what to say, or start typing…") posts to
+  Scout, whose draft lands in the editor marked "Scout's draft · edit freely" and
+  becomes yours — the mark clears — the moment you touch it. To and Subject are
+  inferred from the context you came from (an overlay note, or a "Reply to
+  <name>") and shown as chips with a muted "· inferred" suffix that clears on
+  edit; autosave stays visible as "Saved just now"; and "✦ Shorter" / "✦ Warmer"
+  rewrite the draft in place with a one-step undo. Bold layout only (opt-in via
+  `ENABLE_BOLD_LAYOUT=1` plus the per-user Bold preference); the classic composer
+  is unchanged.
 - **REST API: single-message email triage actions.** A new
   `POST /api/v1/emails/:id/actions/:name` endpoint exposes the inbox triage
   actions — `archive`/`unarchive`, `trash`, `snooze`/`unsnooze`, `pin`/`unpin`,
