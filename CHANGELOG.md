@@ -108,6 +108,20 @@ major, minor, or patch change here.
   overlay still searches and navigates and says in one line what it can't do yet.
   Opt in with `ENABLE_BOLD_LAYOUT=1` plus the per-user Bold choice; the classic
   command palette and Scout page are unchanged.
+- **People (bold layout).** The rethought conversations place, opt-in via
+  `ENABLE_BOLD_LAYOUT=1` + a per-user Bold layout. Every sender is now a person
+  or a **service** (machine/bulk mail) — classified from its recent mail
+  (`Contacts::SenderKind`) and correctable by hand. `/people` lists persons and
+  organizations ordered by who needs you, each with Scout's one-liner about where
+  things stand (`People::Standing`); a person opens as **one conversation across
+  all their threads** with Scout's summary pinned on top and the reply box docked
+  at the bottom (reusing the existing Compose Dock — the send path is unchanged).
+  An organization page shows its people and its **services** side by side, and a
+  service is linked to its organization by domain. **Streams** hold the services
+  (newsletters, receipts, notifications, alerts) over the existing inbox groups,
+  with archive-all and open-in-classic. Every message now carries a `channel`
+  (email today) so a second channel is purely additive. The classic three-pane
+  inbox stays one toggle away.
 - **REST API: single-message email triage actions.** A new
   `POST /api/v1/emails/:id/actions/:name` endpoint exposes the inbox triage
   actions — `archive`/`unarchive`, `trash`, `snooze`/`unsnooze`, `pin`/`unpin`,
