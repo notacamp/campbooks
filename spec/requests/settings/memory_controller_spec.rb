@@ -20,7 +20,8 @@ RSpec.describe "Settings::MemoryController", type: :request do
   # Feature gate
   # ---------------------------------------------------------------------------
   describe "GET settings_memory_path — gate" do
-    it "returns 404 when the bold-layout flag is off (default in test)" do
+    it "returns 404 when the bold-layout flag is off" do
+      allow(Features).to receive(:bold_layout?).and_return(false)
       get settings_memory_path
       expect(response).to have_http_status(:not_found)
     end

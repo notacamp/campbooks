@@ -29,23 +29,46 @@ module Scout
           elsif (topic = first_sentence(tag.prompt)).present?
             # Tag prompts are free-text classification hints and can be long — keep
             # the memory sentence to a readable phrase.
-            [ topic_entry(tag, topic.truncate(60)) ]
+            [ topic_entry(tag, topic) ]
           else
             []
           end
         end
 
+        # Prompts are usually written as a test ("The email contains content
+        # related to accounting"), so the sentence reads "Tag mail as #accounting
+        # when it contains content related to accounting." A prompt that isn't
+        # phrased that way ("Invoices and receipts from vendors") reads "… when
+        # it's about invoices and receipts from vendors."
+        PROMPT_PREFIX = /\A(?:the\s+)?(?:e-?mails?|mail|messages?)\s+(is|are|contains?|relates?\s+to|concerns?|mentions?|includes?)\s+/i
+        VERB_FORMS = { "are" => "is", "contain" => "contains", "relate to" => "relates to",
+                       "concern" => "concerns", "mention" => "mentions", "include" => "includes" }.freeze
+
         def topic_entry(tag, topic)
+          key, args = topic_phrase(topic.sub(/[.!]\z/, ""))
           build(
             id: "tag:#{tag.id}",
             facet: :filing,
-            sentence: sentence("scout_memory.sources.tags.topic", topic: topic, tag: "##{tag.name}"),
+            sentence: sentence("scout_memory.sources.tags.#{key}", tag: "##{tag.name}", **args),
             origin: :taught,
             origin_detail: taught_detail(tag.created_at),
             record: tag,
             form_path: routes.settings_inbox_section_path("tags"),
             actions: %i[edit]
           )
+        end
+
+        def topic_phrase(topic)
+          if (match = topic.match(PROMPT_PREFIX))
+            verb = match[1].downcase.squeeze(" ")
+            verb = VERB_FORMS.fetch(verb, verb)
+            rest = topic.sub(PROMPT_PREFIX, "").strip
+            [ "topic_clause", { clause: "it #{verb} #{rest}".truncate(80) } ]
+          else
+            about = topic.dup
+            about[0] = about[0].downcase
+            [ "topic_about", { topic: about.truncate(70) } ]
+          end
         end
 
         def hidden_entry(tag)

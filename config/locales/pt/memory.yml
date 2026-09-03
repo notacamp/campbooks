@@ -33,7 +33,8 @@ pt:
         tag: "etiquetá-lo com %{value}"
         connector_and: e
       tags:
-        topic: "Etiquetar correio sobre **%{topic}** como **%{tag}**."
+        topic_clause: "Etiquetar correio como **%{tag}** quando %{clause}."
+        topic_about: "Etiquetar correio como **%{tag}** quando for sobre **%{topic}**."
         hidden: "A etiqueta do fornecedor **%{name}** permanece oculta."
       document_habits:
         sentence: "Os documentos de **%{sender}** são normalmente **%{type}**."

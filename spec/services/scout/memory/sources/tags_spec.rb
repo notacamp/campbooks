@@ -20,7 +20,7 @@ RSpec.describe Scout::Memory::Sources::Tags do
       end
 
       it "has the correct plain sentence" do
-        expect(source.entries.first.plain).to eq("Tag mail about Invoices and receipts as #invoice.")
+        expect(source.entries.first.plain).to eq("Tag mail as #invoice when it's about invoices and receipts.")
       end
 
       it "has :taught origin" do
@@ -33,6 +33,19 @@ RSpec.describe Scout::Memory::Sources::Tags do
 
       it "has only edit action" do
         expect(source.entries.first.actions).to eq(%i[edit])
+      end
+    end
+
+    context "with a prompt phrased as a test on the email" do
+      let!(:tag) do
+        create(:tag, workspace: ws, name: "accounting").tap do |t|
+          t.update!(prompt: "The email contains content or attachments related to accounting, bookkeeping or tax. Second sentence.")
+        end
+      end
+
+      it "reads as a clause about the mail, not a spliced prompt" do
+        expect(source.entries.first.plain)
+          .to eq("Tag mail as #accounting when it contains content or attachments related to accounting, bookkeeping or tax.")
       end
     end
 

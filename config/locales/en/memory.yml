@@ -33,7 +33,8 @@ en:
         tag: "tag it %{value}"
         connector_and: and
       tags:
-        topic: "Tag mail about **%{topic}** as **%{tag}**."
+        topic_clause: "Tag mail as **%{tag}** when %{clause}."
+        topic_about: "Tag mail as **%{tag}** when it's about **%{topic}**."
         hidden: "Provider label **%{name}** stays hidden."
       document_habits:
         sentence: "Documents from **%{sender}** are usually **%{type}**."
