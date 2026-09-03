@@ -38,6 +38,16 @@ export default class extends Controller {
     document.removeEventListener("keydown", this._onKeydown)
   }
 
+  // Bold Desk: reveal / hide the tucked-away Scout conversation panel.
+  toggleConversation() {
+    const panel = this.element.querySelector("[data-compose-chat-target='conversation']")
+    if (!panel) return
+    panel.classList.toggle("hidden")
+    if (!panel.classList.contains("hidden")) {
+      setTimeout(() => document.getElementById("compose_chat_input")?.focus(), 50)
+    }
+  }
+
   // ── Mode toggle: Cmd+Shift+E ──────────────────────────────
 
   _handleKeydown(event) {
@@ -94,6 +104,24 @@ export default class extends Controller {
     input.value = text
     input.dispatchEvent(new Event("input", { bubbles: true }))
     setTimeout(() => input.focus(), 150)
+  }
+
+  // Post an intent note to the compose-chat thread from the bold composer's
+  // IntentInput. The panel may be hidden — the thread form still submits and its
+  // auto-actions fill the editor + envelope. Returns false when the form is
+  // absent (no AI provider) so the caller can bail.
+  submitIntent(text) {
+    const trimmed = (text || "").trim()
+    if (!trimmed) return false
+    const input = document.getElementById("compose_chat_input")
+    const form = document.getElementById("agent_chat_form")
+    if (!input || !form) return false
+
+    input.value = trimmed
+    input.dispatchEvent(new Event("input", { bubbles: true }))
+    if (typeof form.requestSubmit === "function") form.requestSubmit()
+    else form.submit()
+    return true
   }
 
   // Opens the FileLinkPicker (compose toolbar "Insert file link") from the
@@ -187,7 +215,12 @@ export default class extends Controller {
     const editorEl = this.element.querySelector("[data-controller~='tiptap-editor']")
     if (!editorEl) return
     const tc = this.application.getControllerForElementAndIdentifier(editorEl, "tiptap-editor")
-    if (tc?.setContent) tc.setContent(body)
+    if (tc?.setContent) {
+      tc.setContent(body)
+      // The bold composer marks this as Scout's draft (a chip that clears on the
+      // first edit) and restores the Draft button — see compose-engine / -intent.
+      this.dispatch("body-set")
+    }
   }
 
   // ── Signature management ─────────────────────────────────

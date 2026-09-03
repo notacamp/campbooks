@@ -4,18 +4,27 @@ module Campbooks
   class ContactPillInput < Campbooks::Base
     # bare: renders without the boxed border — for the hairline envelope rows of
     # the new compose surfaces, where the row (not the control) carries focus.
-    def initialize(name:, value: "", placeholder: "Search contacts...", label: nil, bare: false, **attrs)
+    # inferred: mark the server-seeded pills with a muted "· inferred" suffix
+    # (the bold "compose from intent" surface) that clears on the first edit; the
+    # pill also shows the friendly display name parsed from a "Name <email>" value.
+    def initialize(name:, value: "", placeholder: "Search contacts...", label: nil, bare: false, inferred: false, **attrs)
       @name = name
       @value = value
       @placeholder = placeholder
       @label = label
       @bare = bare
+      @inferred = inferred
       @attrs = attrs
     end
 
     def view_template
+      data = { controller: "contact-pill-input" }
+      if @inferred
+        data[:contact_pill_input_inferred_value] = "true"
+        data[:contact_pill_input_inferred_label] = t(".inferred")
+      end
       div(
-        data: { controller: "contact-pill-input" },
+        data: data,
         class: "relative flex-1 min-w-0"
       ) do
         # Hidden input that stores comma-separated addresses for form submission

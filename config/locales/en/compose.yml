@@ -18,6 +18,7 @@ en:
         restore_aria: Resume writing
         switch_mode: Change reply mode
       engine:
+        attach: Attach
         bcc_button: Bcc
         cc_button: Cc
         collapse_envelope: Collapse recipient fields
@@ -48,6 +49,21 @@ en:
         scout_draft_title: Draft this reply with Scout
         send: Send
         signature_default: "%{name} (default)"
+        format_bold: Bold
+        format_italic: Italic
+        format_link: Link
+        inferred: inferred
+        rewrite_done: Rewrote your draft
+        rewrite_failed: Could not rewrite the draft
+        rewrite_shorter: Shorter
+        rewrite_warmer: Warmer
+        saved_just_now: Saved just now
+        scout_draft_chip: Scout's draft · edit freely
+        scout_draft_source: from your note and the thread
+        undo_rewrite: Undo rewrite
+      intent_input:
+        draft: Draft
+        placeholder: Tell Scout what to say, or start typing…
       pill:
         dismiss_title: Dismiss
         draft_saved: Draft saved
@@ -72,3 +88,5 @@ en:
         tone_shorter: Shorter
         tone_warmer: Warmer
         use_draft: Use this draft
+    contact_pill_input:
+      inferred: inferred

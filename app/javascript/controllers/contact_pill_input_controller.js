@@ -2,7 +2,7 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static targets = ["search", "hidden", "dropdown", "pills"]
-  static values = { url: String }
+  static values = { url: String, inferred: Boolean }
 
   connect() {
     this.debounceTimer = null
@@ -22,16 +22,39 @@ export default class extends Controller {
     // opening a prefilled reply would immediately autosave a phantom draft.
     this._initializing = true
     raw.split(",").forEach(part => {
-      const email = part.trim()
-      if (email) this.addPill(email, email)
+      const value = part.trim()
+      if (!value) return
+      if (this.inferredValue) {
+        // Show the friendly name from a "Name <email>" value; keep the full value
+        // as data-email so the sent address is unchanged. Mark it inferred.
+        this.addPill(value, this._displayName(value), true)
+      } else {
+        this.addPill(value, value)
+      }
     })
     this._initializing = false
+  }
+
+  // Parse "Sofia Martins <sofia@example.com>" → "Sofia Martins"; a bare address
+  // stays as-is.
+  _displayName(value) {
+    const match = value.match(/^\s*(.+?)\s*<[^>]+>\s*$/)
+    return match ? match[1].replace(/^"|"$/g, "") : value
+  }
+
+  // The "· inferred" suffix is a courtesy of the prefill — any edit makes the
+  // recipients the user's own, so drop every suffix on the first change.
+  _clearInferred() {
+    if (!this.inferredValue) return
+    this.inferredValue = false
+    this.pillsTarget.querySelectorAll("[data-inferred-suffix]").forEach(el => el.remove())
   }
 
   // --- Search ---
 
   search() {
     clearTimeout(this.debounceTimer)
+    this._clearInferred()
     const query = this.searchTarget.value.trim()
 
     if (query.length < 2) {
@@ -83,6 +106,7 @@ export default class extends Controller {
   }
 
   selectResult(btn) {
+    this._clearInferred()
     const email = btn.dataset.email
     const display = btn.dataset.display || email
     this.addPill(email, display)
@@ -98,7 +122,7 @@ export default class extends Controller {
 
   // --- Pills ---
 
-  addPill(email, display) {
+  addPill(email, display, inferred = false) {
     // Dedup against the pills already rendered, not the hidden input. The hidden
     // input is server-seeded with the initial recipients, so checking it here
     // would make loadInitialPills() bail on every pre-filled address.
@@ -109,8 +133,11 @@ export default class extends Controller {
     const pill = document.createElement("span")
     pill.className = "inline-flex items-center gap-1 px-1.5 py-0.5 text-xs bg-accent-100 text-accent-800 rounded-md border border-accent-200 whitespace-nowrap"
     pill.dataset.email = email
+    const suffix = inferred
+      ? `<span data-inferred-suffix class="text-accent-500/70">· ${this.escapeHtml(this.inferredLabel())}</span>`
+      : ""
     pill.innerHTML = `
-      <span class="max-w-[160px] truncate">${this.escapeHtml(display)}</span>
+      <span class="max-w-[160px] truncate">${this.escapeHtml(display)}</span>${suffix}
       <button type="button" class="flex-shrink-0 text-accent-500 hover:text-accent-700" data-action="click->contact-pill-input#removePill" tabindex="-1">
         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
       </button>
@@ -119,7 +146,14 @@ export default class extends Controller {
     this.updateHidden()
   }
 
+  // The suffix label — read from a data attribute so it stays localized; falls
+  // back to English for the rare case the attribute is absent.
+  inferredLabel() {
+    return this.element.dataset.contactPillInputInferredLabel || "inferred"
+  }
+
   removePill(event) {
+    this._clearInferred()
     const pill = event.currentTarget.closest("[data-email]")
     if (pill) {
       pill.remove()

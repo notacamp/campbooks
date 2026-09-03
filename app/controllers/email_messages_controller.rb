@@ -249,6 +249,7 @@ class EmailMessagesController < ApplicationController
     @sendable_accounts = Current.user.sendable_email_accounts
     @account = @sendable_accounts.first
     @signatures = Current.user.signatures.ordered.includes(:email_accounts)
+    @intent = params[:intent].to_s
 
     @draft = Current.user.draft_emails.find_by(id: params[:draft_id]) if params[:draft_id].present?
     @reply_source = @draft&.in_reply_to
@@ -282,6 +283,7 @@ class EmailMessagesController < ApplicationController
       @to = @cc = @bcc = @subject = @body = @quoted_body = ""
       @attachment_entries = []
       @signature_id = (Signature.default_for(Current.user, @account)&.id if @account)
+      prefill_from_intent
     end
 
     # Thread created lazily on first message — avoids empty threads in sidebar
@@ -376,6 +378,21 @@ class EmailMessagesController < ApplicationController
   end
 
   private
+
+  # Bold-layout "compose from intent": infer To/Subject from the context the user
+  # came from (an overlay "write to Sofia about…" note → ?intent=, People's
+  # "Reply to <name>" → ?to=). Inferred fields carry a muted "· inferred" suffix
+  # in the composer. No-op in classic layout, or when there's nothing to infer.
+  def prefill_from_intent
+    return unless bold_layout?
+    return if @intent.blank? && params[:to].blank?
+
+    intent = Emails::IntentPrefill.for(user: Current.user, intent: @intent, to: params[:to])
+    @to = intent.to if intent.to.present?
+    @subject = intent.subject if intent.subject.present?
+    @to_inferred = intent.to_inferred?
+    @subject_inferred = intent.subject_inferred?
+  end
 
   # Opening a thread marks every message read — clears the inbox unread dot/bold,
   # the "unread" filters, and the unread counts — and stamps viewed_at, which

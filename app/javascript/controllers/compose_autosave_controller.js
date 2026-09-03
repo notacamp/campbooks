@@ -9,14 +9,16 @@ import { Controller } from "@hotwired/stimulus"
 // send re-arms on the next keystroke). Leaving the page flushes with a
 // keepalive fetch. Discard is explicit and deletes the row.
 export default class extends Controller {
-  static targets = ["status", "draftIdInput"]
+  static targets = ["status", "statusIcon", "draftIdInput"]
   static values = {
     url: String,                       // /draft_emails
     draftId: { type: String, default: "" },
     mode: { type: String, default: "new_message" },
     inReplyToId: { type: String, default: "" },
     savingText: { type: String, default: "Saving…" },
-    savedText: { type: String, default: "Draft saved" }
+    savedText: { type: String, default: "Draft saved" },
+    // Bold layout: keep the saved status visible (no fade), with a check glyph.
+    persistentStatus: { type: Boolean, default: false }
   }
 
   static DEBOUNCE_MS = 1500
@@ -192,7 +194,13 @@ export default class extends Controller {
     el.style.transition = ""
     el.style.opacity = "1"
     el.textContent = text
-    if (text === this.savedTextValue) {
+
+    const saved = text === this.savedTextValue
+    // Bold: a check appears with "Saved just now" and both stay put.
+    if (this.hasStatusIconTarget) {
+      this.statusIconTarget.classList.toggle("hidden", !(saved && this.persistentStatusValue))
+    }
+    if (saved && !this.persistentStatusValue) {
       this._statusTimer = setTimeout(() => this._fadeStatus(), this.constructor.SAVED_STATUS_MS)
     }
   }

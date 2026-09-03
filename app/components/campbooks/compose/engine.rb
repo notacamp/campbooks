@@ -23,11 +23,21 @@ module Campbooks
       #   HTML5 `form` attribute.
       # show_attachments: set to false when the context rail already renders the
       #   ComposeAttachments card (avoids duplicate upload UI on the Desk).
+      # bold: the rethought "compose from intent" layout (bold layout only) — a top
+      #   bar, the IntentInput, a chip envelope (subject-as-chip, inferred suffixes),
+      #   a From·Signature meta line, and a bordered editor card with a tone-rewrite
+      #   footer. Classic renders exactly as before.
+      # persistent_status: keep the autosave status visible with a check ("Saved
+      #   just now") instead of the fading "Draft saved".
+      # intent/heading/back_url: bold top-bar + IntentInput inputs.
+      # to_inferred/subject_inferred: mark the prefilled chips "· inferred".
       def initialize(shell:, mode:, action_url:, message: nil, draft: nil,
                      to: "", cc: "", bcc: "", subject: "", body: "", quoted_body: "",
                      signatures: [], signature_id: nil, account: nil, accounts: [],
                      attachment_entries: [], scout_draft: nil,
-                     form_id: nil, show_attachments: true)
+                     form_id: nil, show_attachments: true,
+                     bold: false, persistent_status: false, intent: "",
+                     heading: nil, back_url: nil, to_inferred: false, subject_inferred: false)
         @shell = shell
         @mode = mode.to_sym
         @action_url = action_url
@@ -47,14 +57,26 @@ module Campbooks
         @scout_draft = scout_draft
         @form_id = form_id
         @show_attachments = show_attachments
+        @bold = bold
+        @persistent_status = persistent_status
+        @intent = intent.to_s
+        @heading = heading
+        @back_url = back_url
+        @to_inferred = to_inferred
+        @subject_inferred = subject_inferred
       end
 
       def view_template
+        action = "submit->compose-engine#validate submit->compose-autosave#suspend " \
+                 "input->compose-autosave#changed input->compose-engine#changedAnywhere " \
+                 "keydown->compose-engine#keydown turbo:submit-end->compose-engine#restoreButton"
+        # Bold: Scout's intent draft lands in the editor → mark it (a chip that
+        # clears on the first edit) and restore the intent's Draft button.
+        action += " compose-chat:body-set@window->compose-engine#markScoutDraft" if bold?
+
         form_data = {
           controller: "compose-engine compose-autosave",
-          action: "submit->compose-engine#validate submit->compose-autosave#suspend " \
-                  "input->compose-autosave#changed input->compose-engine#changedAnywhere " \
-                  "keydown->compose-engine#keydown turbo:submit-end->compose-engine#restoreButton",
+          action: action,
           # The Dock stays on the page (Turbo Stream clears it); the Desk
           # leaves the page after send, and a Turbo submit would swallow
           # the cross-layout redirect (known gotcha) — full request there.
@@ -65,10 +87,19 @@ module Campbooks
           compose_autosave_mode_value: @mode.to_s,
           compose_autosave_in_reply_to_id_value: @message&.id.to_s,
           compose_autosave_saving_text_value: t(".saving"),
-          compose_autosave_saved_text_value: t(".draft_saved")
+          compose_autosave_saved_text_value: bold? ? t(".saved_just_now") : t(".draft_saved")
         }
+        if bold?
+          form_data[:scout_draft] = "false"
+          form_data[:compose_autosave_persistent_status_value] = "true"
+          form_data[:compose_engine_rewrite_url_value] = helpers.rewrite_draft_email_messages_path
+          form_data[:compose_engine_rewrite_done_text_value] = t(".rewrite_done")
+          form_data[:compose_engine_rewrite_failed_text_value] = t(".rewrite_failed")
+          form_data[:compose_engine_undo_rewrite_text_value] = t(".undo_rewrite")
+        end
+
         form_attrs = { action: @action_url, method: "post",
-                       class: "flex flex-col min-h-0 flex-1", data: form_data }
+                       class: bold? ? "flex flex-col" : "flex flex-col min-h-0 flex-1", data: form_data }
         form_attrs[:id] = @form_id if @form_id.present?
 
         form(**form_attrs) do
@@ -79,21 +110,26 @@ module Campbooks
             input(type: "hidden", name: "email_account_id", value: (@account || @accounts.first).id)
           end
 
-          envelope
-          editor_block
-          if @show_attachments
-            div(class: dock? ? "px-5" : nil) do
-              render(ComposeAttachments.new(upload_url: helpers.compose_attachments_path,
-                                            entries: @attachment_entries))
+          if bold?
+            bold_body
+          else
+            envelope
+            editor_block
+            if @show_attachments
+              div(class: dock? ? "px-5" : nil) do
+                render(ComposeAttachments.new(upload_url: helpers.compose_attachments_path,
+                                              entries: @attachment_entries))
+              end
             end
+            footer
           end
-          footer
         end
       end
 
       private
 
       def dock? = @shell == :dock
+      def bold? = @bold
 
       # A fixed sending identity (reply flows resolve the account server-side
       # from the source message; new-message with one account pins it here).
@@ -392,6 +428,269 @@ module Campbooks
             stroke_linecap: "round", stroke_linejoin: "round", viewBox: "0 0 24 24") do
           raw(safe(%(<path d="#{path}"/>)))
         end
+      end
+
+      # ══ bold layout — "compose from intent" ══════════════════════
+      # The whole bold composer body: a full-width sticky top bar (back · title ·
+      # saved · Send), then a centred column with the intent input, chip envelope,
+      # the From·Signature meta line, and the editor card.
+      def bold_body
+        bold_top_bar
+        div(class: "mx-auto w-full max-w-[680px] space-y-4 px-4 py-6 sm:px-6") do
+          render(IntentInput.new(intent: @intent))
+          bold_envelope
+          bold_meta_line
+          bold_editor_card
+        end
+      end
+
+      def bold_top_bar
+        div(class: "sticky top-0 z-10 flex items-center gap-3 bg-card/90 px-4 py-3 backdrop-blur-md sm:px-6") do
+          bold_heading
+          div(class: "flex-1")
+          bold_saved_status
+          bold_send_button
+        end
+      end
+
+      def bold_heading
+        classes = "inline-flex items-center gap-2 text-[15px] font-semibold text-foreground"
+        if @back_url
+          a(href: @back_url, data: { turbo_frame: "_top" }, class: class_names(classes, "transition-opacity hover:opacity-70")) do
+            back_arrow
+            plain @heading.to_s
+          end
+        else
+          span(class: classes) { @heading.to_s }
+        end
+      end
+
+      def back_arrow
+        svg(class: "h-4 w-4", fill: "none", stroke: "currentColor", stroke_width: "2.2",
+            stroke_linecap: "round", stroke_linejoin: "round", viewBox: "0 0 24 24") do
+          raw(safe('<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>'))
+        end
+      end
+
+      def bold_saved_status
+        span(class: "hidden items-center gap-1.5 text-[13px] text-muted-foreground sm:inline-flex") do
+          span(class: "hidden text-green-600 dark:text-green-400",
+               data: { compose_autosave_target: "statusIcon" }, aria_hidden: "true") do
+            svg(class: "h-3.5 w-3.5", fill: "none", stroke: "currentColor", stroke_width: "2.4",
+                stroke_linecap: "round", stroke_linejoin: "round", viewBox: "0 0 24 24") do
+              raw(safe('<polyline points="20 6 9 17 4 12"/>'))
+            end
+          end
+          span(data: { compose_autosave_target: "status" })
+        end
+      end
+
+      def bold_send_button
+        button(type: "submit", name: "send_action", value: "send_now",
+               data: { compose_engine_target: "sendButton" },
+               class: "inline-flex flex-shrink-0 items-center gap-2 rounded-xl bg-primary px-4 py-2 " \
+                      "text-[13px] font-semibold text-primary-foreground transition hover:opacity-90") do
+          plain t(".send")
+          span(class: "hidden items-center rounded border border-primary-foreground/25 px-1 font-mono text-[10px] font-normal opacity-70 sm:inline-flex") { "⌘↵" }
+        end
+      end
+
+      # ── bold envelope (To pills · Subject chip · Cc/Bcc) ─────────
+      def bold_envelope
+        div(class: "space-y-2.5") do
+          div(class: "flex flex-wrap items-center gap-x-4 gap-y-2.5") do
+            div(class: "flex min-w-0 flex-1 basis-[220px] items-center gap-2.5") do
+              span(class: "flex-shrink-0 text-[13px] text-muted-foreground") { t(".label_to") }
+              render(ContactPillInput.new(name: "to_address", value: @to, bare: true,
+                                          inferred: @to_inferred, placeholder: t(".placeholder_to")))
+            end
+            div(class: "flex min-w-0 flex-1 basis-[220px] items-center gap-2.5") do
+              span(class: "flex-shrink-0 text-[13px] text-muted-foreground") { t(".label_subject") }
+              bold_subject_chip
+            end
+            div(class: "flex flex-shrink-0 items-center gap-3") do
+              unless @cc.present?
+                button(type: "button", class: bold_toggle_classes,
+                       data: { compose_engine_target: "ccToggle", action: "click->compose-engine#showCc" }) { t(".cc_button") }
+              end
+              unless @bcc.present?
+                button(type: "button", class: bold_toggle_classes,
+                       data: { compose_engine_target: "bccToggle", action: "click->compose-engine#showBcc" }) { t(".bcc_button") }
+              end
+            end
+          end
+          bold_extra_row(:cc, @cc, "ccRow")
+          bold_extra_row(:bcc, @bcc, "bccRow")
+        end
+      end
+
+      def bold_toggle_classes
+        "text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+      end
+
+      def bold_subject_chip
+        div(class: "inline-flex h-7 min-w-0 flex-1 items-center gap-1 rounded-lg bg-secondary px-2.5") do
+          data = { compose_engine_target: "subjectInput" }
+          data[:action] = "input->compose-engine#clearSubjectInferred" if @subject_inferred
+          input(type: "text", name: "subject", value: @subject, placeholder: t(".placeholder_subject"),
+                data: data,
+                class: "min-w-0 flex-1 border-none bg-transparent p-0 text-[13px] text-foreground " \
+                       "placeholder:text-muted-foreground focus:outline-none focus:shadow-none")
+          if @subject_inferred
+            span(class: "flex-shrink-0 whitespace-nowrap text-[11.5px] text-muted-foreground",
+                 data: { compose_engine_target: "subjectInferred" }) { "· #{t('.inferred')}" }
+          end
+        end
+      end
+
+      def bold_extra_row(kind, value, target)
+        div(class: class_names("flex items-center gap-2.5", value.present? ? "flex" : "hidden"),
+            data: { compose_engine_target: target }) do
+          span(class: "flex-shrink-0 text-[13px] text-muted-foreground") { t(".label_#{kind}") }
+          render(ContactPillInput.new(name: "#{kind}_address", value: value, bare: true, placeholder: t(".placeholder_#{kind}")))
+        end
+      end
+
+      # ── quiet From · Signature line ──────────────────────────────
+      def bold_meta_line
+        show_from = @mode == :new_message && @accounts.size > 1
+        return unless show_from || @signatures.any?
+
+        div(class: "flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-muted-foreground") do
+          if show_from
+            span { t(".label_from") }
+            bold_account_select
+          end
+          span(class: "text-muted-foreground/50") { "·" } if show_from && @signatures.any?
+          if @signatures.any?
+            span { t(".label_signature") }
+            bold_signature_select
+          end
+        end
+      end
+
+      def bold_account_select
+        select(name: "email_account_id", data: { action: "change->compose-chat#onFromAccountChange" },
+               class: bold_select_classes) do
+          @accounts.each do |acct|
+            attrs = { value: acct.id }
+            attrs[:selected] = "selected" if acct == (@account || @accounts.first)
+            option(**attrs) { acct.select_label }
+          end
+        end
+      end
+
+      def bold_signature_select
+        select(name: "signature_id", aria_label: t(".label_signature"),
+               data: { compose_chat_target: "signatureSelect" }, class: bold_select_classes) do
+          option(value: "") { t(".no_signature") }
+          @signatures.each do |sig|
+            attrs = { value: sig.id, data: { account_ids: sig.email_account_ids.join(","), default: sig.is_default? } }
+            attrs[:selected] = "selected" if sig.id == @signature_id
+            option(**attrs) { sig.is_default? ? t(".signature_default", name: sig.name) : sig.name }
+          end
+        end
+      end
+
+      def bold_select_classes
+        "max-w-[12rem] cursor-pointer border-none bg-transparent p-0 text-[12.5px] font-medium " \
+          "text-foreground focus:outline-none focus:shadow-none"
+      end
+
+      # ── editor card ──────────────────────────────────────────────
+      def bold_editor_card
+        div(class: "overflow-hidden rounded-2xl border border-border bg-card") do
+          div(class: "px-4 pt-4 sm:px-5") do
+            bold_scout_chip
+            render(RichTextEditor.new(
+              input_name: "body", content: @body, placeholder: t(".placeholder_body"),
+              upload_url: helpers.compose_images_path, toolbar: false, bubble: true, frameless: true,
+              editor_class: "min-h-[220px] overflow-y-auto py-1 text-[15px] leading-relaxed"
+            ))
+            quote_pill if @quoted_body.present?
+            render(ComposeAttachments.new(upload_url: helpers.compose_attachments_path,
+                                          entries: @attachment_entries, variant: :tray))
+          end
+          bold_footer
+        end
+      end
+
+      # Shown when Scout's intent draft lands in the editor; clears on first edit.
+      def bold_scout_chip
+        div(class: "mb-2.5 flex flex-wrap items-center gap-2 hidden", data: { compose_engine_target: "scoutChip" }) do
+          span(class: "scout-glass inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11.5px] font-medium text-foreground") do
+            span(style: "color: var(--ember-solid)", aria_hidden: "true") { spark_svg }
+            plain t(".scout_draft_chip")
+          end
+          span(class: "text-[11.5px] text-muted-foreground") { t(".scout_draft_source") }
+        end
+      end
+
+      def bold_footer
+        div(class: "mt-3 flex items-center gap-0.5 border-t border-border px-2 py-1.5 sm:px-3") do
+          bold_text_tool("B", "compose-engine#formatBold", t(".format_bold"), weight: "font-bold")
+          bold_text_tool("I", "compose-engine#formatItalic", t(".format_italic"), weight: "italic font-serif")
+          bold_icon_tool(link_icon, "compose-engine#formatLink", t(".format_link"))
+          bold_attach_tool
+          div(class: "flex-1")
+          if helpers.ai_provider_available?(:text)
+            bold_tone_button("shorter")
+            bold_tone_button("warmer")
+          end
+        end
+      end
+
+      def bold_tool_classes
+        "inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-2 text-[13px] " \
+          "text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+      end
+
+      def bold_text_tool(glyph, action, label, weight:)
+        button(type: "button", aria_label: label, title: label, data: { action: "click->#{action}" },
+               class: class_names(bold_tool_classes, "w-8")) do
+          span(class: weight) { glyph }
+        end
+      end
+
+      def bold_icon_tool(icon_svg, action, label)
+        button(type: "button", aria_label: label, title: label, data: { action: "click->#{action}" },
+               class: class_names(bold_tool_classes, "w-8")) do
+          raw(safe(icon_svg))
+        end
+      end
+
+      def bold_attach_tool
+        button(type: "button", aria_label: t(".attach"), title: t(".attach"),
+               data: { action: "click->compose-engine#attach" }, class: bold_tool_classes) do
+          raw(safe(paperclip_icon_svg))
+          span { t(".attach") }
+        end
+      end
+
+      def bold_tone_button(tone)
+        button(type: "button",
+               data: { action: "click->compose-engine#rewriteDraft", compose_engine_tone_param: tone },
+               class: "inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-medium " \
+                      "text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground") do
+          span(style: "color: var(--ember-solid)", aria_hidden: "true") { spark_svg }
+          plain t(".rewrite_#{tone}")
+        end
+      end
+
+      def spark_svg
+        raw(safe('<svg viewBox="0 0 24 24" fill="currentColor" class="h-[13px] w-[13px]" aria-hidden="true">' \
+                 '<path d="M12 2l1.7 5.6L19.5 9l-5.8 1.4L12 16l-1.7-5.6L4.5 9l5.8-1.4z"/></svg>'))
+      end
+
+      def link_icon
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">' \
+          '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>' \
+          '<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>'
+      end
+
+      def paperclip_icon_svg
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true">' \
+          '<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>'
       end
     end
   end

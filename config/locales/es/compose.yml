@@ -18,6 +18,7 @@ es:
         restore_aria: Seguir escribiendo
         switch_mode: Cambiar el modo de respuesta
       engine:
+        attach: Adjuntar
         bcc_button: Cco
         cc_button: Cc
         collapse_envelope: Contraer los campos de destinatarios
@@ -48,6 +49,21 @@ es:
         scout_draft_title: Redactar esta respuesta con Scout
         send: Enviar
         signature_default: "%{name} (predeterminada)"
+        format_bold: Negrita
+        format_italic: Cursiva
+        format_link: Enlace
+        inferred: inferido
+        rewrite_done: Borrador reescrito
+        rewrite_failed: No se pudo reescribir el borrador
+        rewrite_shorter: Más corto
+        rewrite_warmer: Más cálido
+        saved_just_now: Guardado ahora mismo
+        scout_draft_chip: Borrador de Scout · edita con libertad
+        scout_draft_source: a partir de tu nota y la conversación
+        undo_rewrite: Deshacer reescritura
+      intent_input:
+        draft: Redactar
+        placeholder: Dile a Scout qué decir, o empieza a escribir…
       pill:
         dismiss_title: Ocultar
         draft_saved: Borrador guardado
@@ -72,3 +88,5 @@ es:
         tone_shorter: Más corto
         tone_warmer: Más cálido
         use_draft: Usar este borrador
+    contact_pill_input:
+      inferred: inferido

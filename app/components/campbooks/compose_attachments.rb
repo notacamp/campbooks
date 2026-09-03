@@ -39,10 +39,10 @@ module Campbooks
           hidden: true,
           data: { compose_attachments_target: "fileInput", action: "change->compose-attachments#upload" }
         )
-        if card?
-          card_layout
-        else
-          inline_layout
+        case @variant
+        when :card then card_layout
+        when :tray then tray_layout
+        else inline_layout
         end
       end
     end
@@ -50,6 +50,17 @@ module Campbooks
     private
 
     def card? = @variant == :card
+
+    # ── Tray-only variant (bold composer) ───────────────────────
+    # Just the chip tray — no button. The editor-footer "Attach" button clicks
+    # the (always-rendered) hidden file input via compose-engine#attach. The tray
+    # stays collapsed (empty:hidden) until there are chips.
+    def tray_layout
+      div(data: { compose_attachments_target: "tray" },
+          class: "compose-attachments-tray mb-3 flex-wrap empty:hidden") do
+        @entries.each { |entry| seeded_chip(entry) }
+      end
+    end
 
     def controller_classes
       return "compose-attachments" unless card?
