@@ -47,7 +47,7 @@
 
   <%# ── Scout's day note (agenda, today only) ────────────────────────────────── %>
   <% if @day_note %>
-    <div class="mt-5"><%= render(Campbooks::Time::DayNote.new(note: @day_note, zone: @zone)) %></div>
+    <div class="mt-5"><%= render(Campbooks::TimePage::DayNote.new(note: @day_note, zone: @zone)) %></div>
   <% end %>
 
   <%# ── Body: the merged agenda, or the Week/Month grids with task + focus chips ─ %>
@@ -67,7 +67,7 @@
             snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails, tasks: @tasks, focus_blocks: @focus_blocks)) %>
     </div>
   <% else %>
-    <%= render(Campbooks::Time::AgendaList.new(items: @agenda, zone: @zone, move_slots: @move_slots,
+    <%= render(Campbooks::TimePage::AgendaList.new(items: @agenda, zone: @zone, move_slots: @move_slots,
           snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails, has_calendars: @has_calendars)) %>
   <% end %>
 

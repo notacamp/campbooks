@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Campbooks
-  module Time
+  module TimePage
     # One row of the bold Time agenda — a Time::AgendaItem, whatever it came from
     # (event / deadline / task / focus), in one grammar: time · colour dot · title ·
     # muted provenance meta · the row's action(s). Mobile stacks the time above the

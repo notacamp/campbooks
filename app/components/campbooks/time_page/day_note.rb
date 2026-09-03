@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Campbooks
-  module Time
+  module TimePage
     # Scout's day note at the top of the agenda: the warm scout-glass card from the
     # mock (Ember avatar · "Scout" · AI badge · "today") over one to three honest
     # sentences assembled from Time::DayNote's facts — counts of today's meetings and

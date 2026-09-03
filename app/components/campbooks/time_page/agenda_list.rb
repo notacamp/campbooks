@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Campbooks
-  module Time
+  module TimePage
     # The bold Time agenda: day sections (TODAY / TOMORROW / FRIDAY / a full date)
     # each listing the merged Time::AgendaItem rows, then the snoozed threads and
     # scheduled emails that already rode the classic agenda (nothing lost). Empty
@@ -46,7 +46,7 @@ module Campbooks
       end
 
       def render_item(item)
-        render Campbooks::Time::AgendaRow.new(
+        render Campbooks::TimePage::AgendaRow.new(
           item: item, zone: @zone,
           move_slots: item.focus? ? Array(@move_slots[item.record.id]) : []
         )

@@ -33,7 +33,7 @@ en:
     dismiss:
       dismissed: Dismissed.
   components:
-    time:
+    time_page:
       agenda_row:
         all_day: all day
         overdue: overdue

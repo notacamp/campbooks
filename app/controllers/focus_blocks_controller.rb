@@ -73,7 +73,7 @@ class FocusBlocksController < ApplicationController
   end
 
   def agenda_list
-    Campbooks::Time::AgendaList.new(
+    Campbooks::TimePage::AgendaList.new(
       items: @agenda, move_slots: @move_slots,
       snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails,
       zone: @zone, has_calendars: @has_calendars

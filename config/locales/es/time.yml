@@ -30,7 +30,7 @@ es:
     dismiss:
       dismissed: Descartado.
   components:
-    time:
+    time_page:
       agenda_row:
         all_day: todo el día
         overdue: atrasado

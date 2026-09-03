@@ -30,7 +30,7 @@ fr:
     dismiss:
       dismissed: Ignoré.
   components:
-    time:
+    time_page:
       agenda_row:
         all_day: toute la journée
         overdue: en retard

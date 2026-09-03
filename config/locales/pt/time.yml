@@ -30,7 +30,7 @@ pt:
     dismiss:
       dismissed: Dispensado.
   components:
-    time:
+    time_page:
       agenda_row:
         all_day: dia inteiro
         overdue: em atraso
