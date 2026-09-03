@@ -68,7 +68,7 @@ export default class extends Controller {
     const editor = this._editor()
     if (!editor) return
     // Never clobber a body the writer (or Scout) already has.
-    if ((editor.getHTML?.() || "").replace(/<[^>]*>/g, "").trim()) return
+    if (new DOMParser().parseFromString(editor.getHTML?.() || "", "text/html").body.textContent.trim()) return
 
     const html = text
       .split(/\n{2,}/)

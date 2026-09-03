@@ -41,7 +41,6 @@ module Emails
       message send hi hey hello thanks thank regarding
     ].to_set.freeze
 
-    EMAIL_RE = /\A[^@\s]+@[^@\s]+\.[^@\s]+\z/
 
     def self.for(user:, intent: nil, to: nil)
       new(user: user, intent: intent, to: to).call
@@ -77,7 +76,14 @@ module Emails
       contact_from_intent
     end
 
-    def explicit_to? = @to.present? && @to.match?(EMAIL_RE)
+    # A plausible address without a backtracking regex: exactly one "@", no
+    # whitespace, a dot somewhere after it, and a sane length.
+    def explicit_to?
+      return false if @to.blank? || @to.length > 254 || @to.match?(/\s/)
+
+      local, domain = @to.split("@", 2)
+      local.present? && domain.present? && !domain.include?("@") && domain.include?(".")
+    end
 
     def contact_by_email(email)
       workspace_contacts.where("lower(email) = ?", email.downcase).first
@@ -134,7 +140,7 @@ module Emails
       end
 
       (capitalized + cued)
-        .map { |w| w.downcase.gsub(/[.'\-]+\z/, "") }
+        .map { |w| strip_trailing_punct(w.downcase) }
         .uniq
         .reject { |w| w.length < 2 || STOPWORDS.include?(w) }
     end
@@ -175,8 +181,19 @@ module Emails
 
     # The trailing "about …" clause of the intent, sans terminal punctuation.
     def about_clause
-      match = @intent.match(/\babout\s+(.+?)[.?!]*\z/i)
-      match && match[1].strip.presence
+      idx = @intent =~ /\babout\b/i
+      return nil unless idx
+
+      clause = @intent[(idx + "about".length)..].to_s.strip
+      clause = clause[0...-1] while clause.end_with?(".", "?", "!")
+      clause.strip.presence
+    end
+
+    # Trailing ".", "'" or "-" off a name token, one character at a time (no
+    # end-anchored quantifier over user text).
+    def strip_trailing_punct(word)
+      word = word[0...-1] while word.end_with?(".", "'", "-")
+      word
     end
 
     def capitalize_first(text)

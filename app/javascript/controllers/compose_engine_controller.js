@@ -1,5 +1,12 @@
 import { Controller } from "@hotwired/stimulus"
 
+// The text content of an HTML fragment, via the parser (never a tag-stripping
+// regex): used only to ask "is there any text here?".
+function textOf(html) {
+  if (!html) return ""
+  return new DOMParser().parseFromString(html, "text/html").body.textContent.trim()
+}
+
 // Shell-agnostic behavior of the composer engine (Campbooks::Compose::Engine):
 // envelope collapse/expand, Cc/Bcc reveal, quoted-thread expansion, submit
 // validation + busy state, ⌘↵ send, focus-on-open, and discard. Draft
@@ -272,7 +279,7 @@ export default class extends Controller {
   }
 
   _hasText(html) {
-    return Boolean((html || "").replace(/<[^>]*>/g, "").trim())
+    return Boolean(textOf(html))
   }
 
   _rewriteToast(editor, previousHtml) {
