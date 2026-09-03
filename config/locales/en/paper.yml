@@ -11,8 +11,9 @@ en:
       add_title: "Add documents"
       close: "Close"
       ask_placeholder: "Ask, e.g. unpaid invoices over 100"
-      review_one: "Review it"
-      review_other: "Review them"
+      review:
+        one: "Review it"
+        other: "Review them"
       connect: "Connect an AI provider and Scout will read your documents."
       connect_cta: "Connect AI"
       filters:

@@ -1,5 +1,5 @@
 class DocumentsController < ApplicationController
-  before_action :set_document, only: [ :show, :file, :rename, :update, :approve, :reject, :toggle_star, :reprocess, :push_to_notion, :push_to_drive, :push_to_zoho_drive ]
+  before_action :set_document, only: [ :show, :file, :rename, :update, :approve, :reject, :toggle_star, :reprocess, :settle, :unsettle, :push_to_notion, :push_to_drive, :push_to_zoho_drive ]
 
   def index
     @document_types = Current.workspace.document_types.order(:name)
@@ -174,6 +174,36 @@ class DocumentsController < ApplicationController
     respond_to do |format|
       format.turbo_stream { render turbo_stream: document_row_streams(@document) }
       format.html { redirect_back fallback_location: files_path }
+    end
+  end
+
+  # Paper "Mark paid" — a manual settlement. Refreshes the Paper row's derived status and
+  # shows an undoable toast.
+  def settle
+    @document.mark_settled!
+    respond_to do |format|
+      format.turbo_stream do
+        render turbo_stream: paper_settle_streams(
+          message: t("paper.settle.paid_toast", name: @document.display_title),
+          undo_endpoint: unsettle_document_path(@document), undo_method: "delete"
+        )
+      end
+      format.html { redirect_back fallback_location: paper_path }
+    end
+  end
+
+  # Paper "Mark unpaid" — clears a manual settlement (a bank-match settlement belongs to
+  # the reconciliation and isn't cleared here; the menu only offers this for manual settles).
+  def unsettle
+    @document.mark_unsettled!
+    respond_to do |format|
+      format.turbo_stream do
+        render turbo_stream: paper_settle_streams(
+          message: t("paper.settle.unpaid_toast", name: @document.display_title),
+          undo_endpoint: settle_document_path(@document), undo_method: nil
+        )
+      end
+      format.html { redirect_back fallback_location: paper_path }
     end
   end
 
@@ -379,6 +409,26 @@ class DocumentsController < ApplicationController
     [
       turbo_stream.replace(document, partial: "documents/row", locals: { doc: document }),
       turbo_stream.replace(helpers.dom_id(document, :card), partial: "documents/card", locals: { doc: document })
+    ]
+  end
+
+  # Refresh the Paper row (desktop + mobile) with its new derived status, and append an
+  # undoable toast. Undo POSTs the reverse endpoint (unsettle carries _method=delete).
+  def paper_settle_streams(message:, undo_endpoint:, undo_method:)
+    folders = Current.workspace.mail_folders.accessible_to(Current.user).ordered.to_a
+    undo_params = undo_method ? { "_method" => undo_method } : {}
+    [
+      turbo_stream.replace(helpers.dom_id(@document, :paper_row),
+        render_to_string(Campbooks::Paper::Row.new(document: @document, folders: folders, layout: :table), layout: false)),
+      turbo_stream.replace(helpers.dom_id(@document, :paper_card),
+        render_to_string(Campbooks::Paper::Row.new(document: @document, folders: folders, layout: :card), layout: false)),
+      turbo_stream.append(Campbooks::ActionToast::REGION_ID,
+        render_to_string(
+          Campbooks::ActionToast.new(
+            message: message, variant: :success,
+            undo: { endpoint: undo_endpoint, params: undo_params, label: t("paper.settle.undo") }
+          ), layout: false
+        ))
     ]
   end
 
