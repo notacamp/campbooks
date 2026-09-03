@@ -31,11 +31,15 @@ module PeopleLayout
   # member contact that has mail), each carrying its Scout standing. Need-you
   # first (by urgency), then Recent (by last activity, paginated + infinite scroll).
   def build_people_list
-    now = Time.current
     @query = params[:q].to_s.strip
     lazy_backfill_sender_kinds
 
-    counterparts = eligible_person_counterparts(now) + eligible_org_counterparts(now)
+    persons = eligible_persons
+    orgs    = eligible_orgs
+    prime_standing(people: persons, organizations: orgs)
+
+    counterparts = persons.map { |person| person_counterpart(person) } +
+                   orgs.map { |org| org_counterpart(org) }
     need_you, recent = counterparts.partition(&:needs_you?)
 
     @need_you = need_you.sort_by { |c| [ -c.overdue_days, -activity_epoch(c) ] }
@@ -45,24 +49,35 @@ module PeopleLayout
 
   def activity_epoch(counterpart) = counterpart.last_activity&.to_i || 0
 
-  def eligible_person_counterparts(now)
+  # One Scout-standing service per request, shared by every person/org row so the
+  # user-scoped work (readable accounts, inbox folders, the awaiting-reply set) and
+  # the batched per-person loads run once — not once per counterpart.
+  def people_standing
+    @people_standing ||= People::Standing.new(current_user, now: (@now ||= Time.current))
+  end
+
+  def prime_standing(people: [], organizations: [])
+    people_standing.prime(people: people, organizations: organizations)
+  end
+
+  def eligible_persons
     person_ids = Contact.where(workspace_id: Current.workspace.id, sender_kind: Contact.sender_kinds[:person])
                         .where("email_count > 0")
                         .where.not(person_id: nil)
                         .select(:person_id)
     scope = Current.workspace.people.where(id: person_ids).includes(:contacts, :primary_organization)
     scope = filter_people(scope, @query) if @query.present?
-    scope.map { |person| person_counterpart(person, now) }
+    scope.to_a
   end
 
-  def eligible_org_counterparts(now)
+  def eligible_orgs
     org_ids = OrganizationMembership.joins(person: :contacts)
                                     .where(contacts: { workspace_id: Current.workspace.id })
                                     .where("contacts.email_count > 0")
                                     .select(:organization_id)
-    scope = Current.workspace.organizations.where(id: org_ids).includes(:active_people)
+    scope = Current.workspace.organizations.where(id: org_ids)
     scope = scope.search(@query) if @query.present?
-    scope.map { |org| org_counterpart(org, now) }
+    scope.to_a
   end
 
   def filter_people(scope, query)
@@ -74,20 +89,29 @@ module PeopleLayout
     )
   end
 
-  def person_counterpart(person, now)
+  def person_counterpart(person)
     People::Counterpart.new(
       kind: :person,
       record: person,
       name: person.display_name,
       subtitle: person.organization_name.presence,
-      avatar_email: person.primary_email.presence || person.display_name,
+      avatar_email: person_primary_email(person).presence || person.display_name,
       avatar_initial: nil,
       last_activity: person.last_email_at,
-      standing: People::Standing.for_person(person, user: current_user, now: now)
+      standing: people_standing.person(person)
     )
   end
 
-  def org_counterpart(org, now)
+  # The busiest contact's address, read from the already-loaded contacts (the list
+  # and detail paths both preload them) so the row costs no extra query; only an
+  # unloaded single record falls back to Person#primary_email's ordered query.
+  def person_primary_email(person)
+    return person.primary_email unless person.contacts.loaded?
+
+    person.contacts.max_by { |contact| contact.email_count.to_i }&.email
+  end
+
+  def org_counterpart(org)
     people_count = org.active_people.joins(:contacts)
                       .where(contacts: { sender_kind: Contact.sender_kinds[:person] }).distinct.count
     services_count = org.contacts.kind_service.count
@@ -100,7 +124,7 @@ module PeopleLayout
       avatar_email: nil,
       avatar_initial: org.name.to_s[0].to_s.upcase.presence || "?",
       last_activity: org.email_messages.maximum(:received_at),
-      standing: People::Standing.for_organization(org, user: current_user, now: now)
+      standing: people_standing.organization(org)
     )
   end
 

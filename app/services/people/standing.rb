@@ -44,6 +44,32 @@ module People
       @now = now
     end
 
+    # Bulk-load everything the per-record standings need so a whole People list
+    # resolves in a handful of queries instead of a few per counterpart. Without
+    # this each `person`/`organization` call falls back to its own queries (the
+    # single-record path used by the detail pages); with it they read from primed
+    # maps. Idempotent and additive — call it again with more people/orgs and only
+    # the newly-seen records are loaded. The decision logic is unchanged; only the
+    # data source moves from per-record to batched.
+    def prime(people: [], organizations: [])
+      @primed = true
+      @threads_by_person ||= {}
+      @latest_inbound_by_person ||= {}
+      @primed_person_ids ||= Set.new
+      @org_sample ||= {}
+
+      new_orgs = organizations.reject { |org| @org_sample.key?(org.id) }
+      if new_orgs.any?
+        active = load_org_active_people(new_orgs)
+        new_orgs.each { |org| @org_sample[org.id] = org_sample_from(active[org.id] || []) }
+      end
+
+      sampled = @org_sample.values_at(*organizations.map(&:id)).compact.flatten
+      to_prime = (people + sampled).reject { |person| @primed_person_ids.include?(person.id) }.uniq(&:id)
+      prime_person_data(to_prime) if to_prime.any?
+      self
+    end
+
     def person(person)
       threads = person_threads(person)
 
@@ -97,8 +123,12 @@ module People
     end
 
     # The counterpart's inbox threads on mailboxes the user can read, messages
-    # preloaded (the reply-state columns are read per thread).
+    # preloaded (the reply-state columns are read per thread). Served from the
+    # primed batch when this instance was primed for this person (the list path),
+    # else loaded on the spot (the single-record detail path).
     def person_threads(person)
+      return @threads_by_person[person.id] || [] if primed?(person)
+
       contact_ids = person.contacts.ids
       return [] if contact_ids.empty? || readable_account_ids.empty?
 
@@ -131,6 +161,8 @@ module People
     end
 
     def latest_inbound_message(person)
+      return @latest_inbound_by_person[person.id] if primed?(person)
+
       contact_ids = person.contacts.ids
       return nil if contact_ids.empty?
 
@@ -140,18 +172,33 @@ module People
                   .first
     end
 
+    # Scout's profile blurb: the person's own summary, else the busiest contact's.
+    # Reads loaded contacts in memory (the list path preloads them) so it costs no
+    # query; falls back to a query only for an unloaded single record.
     def profile_summary(person)
-      person.read_attribute(:context_summary).presence ||
+      own = person.read_attribute(:context_summary).presence
+      return own if own
+
+      if person.contacts.loaded?
+        person.contacts.select { |c| c.context_summary.present? }
+              .max_by { |c| c.email_count.to_i }&.context_summary
+      else
         person.contacts.where.not(context_summary: [ nil, "" ])
               .order(email_count: :desc).limit(1).pick(:context_summary)
+      end
     end
 
     def organization_person_standings(organization)
-      people = organization.active_people.includes(:contacts)
-                           .select { |person| person.contacts.any?(&:kind_person?) }
-                           .sort_by { |person| person.last_email_at || Time.at(0) }
-                           .reverse
-                           .first(ORG_PEOPLE_SAMPLE)
+      people =
+        if @primed && @org_sample&.key?(organization.id)
+          @org_sample[organization.id]
+        else
+          organization.active_people.includes(:contacts)
+                       .select { |person| person.contacts.any?(&:kind_person?) }
+                       .sort_by { |person| person.last_email_at || Time.at(0) }
+                       .reverse
+                       .first(ORG_PEOPLE_SAMPLE)
+        end
       people.map { |person| person(person) }
     end
 
@@ -167,6 +214,92 @@ module People
 
     def awaiting_reply
       @awaiting_reply ||= Emails::AwaitingReply.new(@user, now: @now)
+    end
+
+    # ── Priming (batched loads shared by every counterpart on a list) ──────────
+
+    def primed?(person)
+      @primed && @primed_person_ids&.include?(person.id)
+    end
+
+    # The org's up-to-ORG_PEOPLE_SAMPLE most-recent person-kind members — the same
+    # selection organization_person_standings makes, hoisted so prime can load
+    # their thread data in the same batch as the list's people.
+    def org_sample_from(people)
+      people.select { |person| person.contacts.any?(&:kind_person?) }
+            .sort_by { |person| person.last_email_at || Time.at(0) }
+            .reverse
+            .first(ORG_PEOPLE_SAMPLE)
+    end
+
+    def load_org_active_people(organizations)
+      return {} if organizations.empty?
+
+      OrganizationMembership.active
+                            .where(organization_id: organizations.map(&:id))
+                            .includes(person: :contacts)
+                            .group_by(&:organization_id)
+                            .transform_values { |memberships| memberships.map(&:person) }
+    end
+
+    def prime_person_data(people)
+      contact_to_person = {}
+      people.each do |person|
+        @primed_person_ids << person.id
+        person.contacts.each { |contact| contact_to_person[contact.id] = person.id }
+      end
+      contact_ids = contact_to_person.keys
+      return if contact_ids.empty?
+
+      prime_threads(contact_ids, contact_to_person)
+      prime_latest_inbound(contact_ids, contact_to_person)
+    end
+
+    # Mirrors person_threads for the whole batch: the inbox threads (on readable
+    # accounts) each person's contacts touch, messages preloaded — grouped by person.
+    def prime_threads(contact_ids, contact_to_person)
+      return if readable_account_ids.empty?
+
+      scope = EmailMessage.where(contact_id: contact_ids).where.not(email_thread_id: nil)
+      scope = scope.where(provider_folder_id: inbox_folder_ids) if inbox_folder_ids.present?
+      pairs = scope.distinct.pluck(:contact_id, :email_thread_id)
+
+      thread_ids_by_person = Hash.new { |h, k| h[k] = [] }
+      all_thread_ids = []
+      pairs.each do |contact_id, thread_id|
+        person_id = contact_to_person[contact_id] or next
+        thread_ids_by_person[person_id] << thread_id
+        all_thread_ids << thread_id
+      end
+
+      threads = EmailThread.where(id: all_thread_ids.uniq, email_account_id: readable_account_ids)
+                           .includes(:email_messages)
+                           .index_by(&:id)
+      thread_ids_by_person.each do |person_id, thread_ids|
+        @threads_by_person[person_id] = thread_ids.uniq.filter_map { |id| threads[id] }
+      end
+    end
+
+    # Mirrors latest_inbound_message for the whole batch: the newest accessible
+    # message per person (DISTINCT ON per contact, then the newest across the
+    # person's contacts), the email thread preloaded for the action-prompt read.
+    def prime_latest_inbound(contact_ids, contact_to_person)
+      return if readable_account_ids.empty?
+
+      latest_ids = EmailMessage.where(contact_id: contact_ids).accessible_to(@user)
+                               .select("DISTINCT ON (contact_id) id")
+                               .order("contact_id, received_at DESC, id DESC")
+                               .map(&:id)
+      return if latest_ids.empty?
+
+      by_person = Hash.new { |h, k| h[k] = [] }
+      EmailMessage.where(id: latest_ids).includes(:email_thread).each do |message|
+        person_id = contact_to_person[message.contact_id] or next
+        by_person[person_id] << message
+      end
+      by_person.each do |person_id, messages|
+        @latest_inbound_by_person[person_id] = messages.max_by { |m| [ m.received_at || Time.at(0), m.id ] }
+      end
     end
 
     def readable_account_ids

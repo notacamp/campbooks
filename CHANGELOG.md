@@ -16,6 +16,16 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **People page load time.** The bold-layout People directory (`/people`) rebuilt
+  Scout's standing once per person — and again for each sampled organization
+  member — with every pass re-deriving the awaiting-reply set and re-loading that
+  person's threads, so the page's query count grew with the directory and could
+  take up to a minute on a large mailbox. It now primes a single shared
+  `People::Standing` in a handful of batched queries, so load time no longer
+  scales with the number of people or organizations.
+
 ## [0.32.1] - 2026-09-03
 
 ### Fixed
