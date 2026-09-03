@@ -16,6 +16,16 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.32.1] - 2026-09-03
+
+### Fixed
+
+- **Time agenda 500 on a document-sourced deadline.** A renewal or payment
+  deadline Scout extracted from a document crashed `/time` (the agenda asked the
+  document for a `title` it does not have). It now reads the document's display
+  title, and the Time surface gained the request and agenda specs it shipped
+  without.
+
 ## [0.32.0] - 2026-09-03
 
 ### Added
