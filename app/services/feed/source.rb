@@ -16,6 +16,7 @@ module Feed
     # suggestion. Most-specific framing first.
     def self.all
       [
+        Feed::Sources::Notice,
         Feed::Sources::CalendarEvent,
         Feed::Sources::Reminder,
         Feed::Sources::Task,

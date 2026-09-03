@@ -1530,3 +1530,21 @@ dialog[open] {
   to   { transform: none; opacity: 1; }
 }
 .now-rise { animation: now-rise 0.26s cubic-bezier(0.32, 0.72, 0, 1) both; }
+
+/* Live insertion: new mail slid into the BACK of the deck. Only the top card is
+   visible, so we express the arrival as the peeking back sheets pulsing once and
+   the counter ticking. Transform-only (the back sheets keep their Tailwind
+   opacity), so the reduced-motion guard above cleanly neutralises both. */
+@keyframes now-back-pulse {
+  0%   { transform: none; }
+  45%  { transform: translateY(-2px) scaleX(1.02); }
+  100% { transform: none; }
+}
+.now-back-pulse { animation: now-back-pulse 0.3s ease-out; }
+
+@keyframes now-counter-tick {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+.now-counter-tick { animation: now-counter-tick 0.15s ease-out; }

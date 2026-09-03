@@ -37,6 +37,9 @@ fr:
           events_html:
             one: a ajouté %{n_html} événement au calendrier
             other: a ajouté %{n_html} événements au calendrier
+          digests_html:
+            one: a envoyé %{n_html} récapitulatif
+            other: a envoyé %{n_html} récapitulatifs
       rings:
         all: Tout
         priority: Prioritaire

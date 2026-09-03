@@ -15,7 +15,10 @@ module Feed
       user = User.find_by(id: user_id)
       return unless user&.workspace_id
 
-      Feed::Generator.for_user(user)
+      generator = Feed::Generator.new(user)
+      generator.call
+      # Slide any brand-new cards into an open Now page's deck (no-op when none).
+      Feed::LiveDeck.broadcast(user, generator.inserted_items)
     end
 
     # Enqueue a refresh for one user, at most once per DEBOUNCE window. The

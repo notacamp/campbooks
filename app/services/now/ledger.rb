@@ -18,11 +18,12 @@ module Now
       "document.processed"     => :filed,
       "reminder.created"       => :reminders,
       "task.created"           => :tasks,
-      "calendar_event.created" => :events
+      "calendar_event.created" => :events,
+      "digest.generated"       => :digests
     }.freeze
 
     # Stable tie-break order when two buckets share a count.
-    ORDER = %i[archived tagged filed reminders tasks events].freeze
+    ORDER = %i[archived tagged filed reminders tasks events digests].freeze
 
     MAX_BUCKETS = 3
 

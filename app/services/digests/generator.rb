@@ -81,7 +81,10 @@ module Digests
 
       issue.update!(status: :generated, content: content, ai_used: ai_used)
 
-      # 6. Deliver
+      # 6. Record it in Scout's log (a SYSTEM event — automation, no person acted)
+      #    and deliver. Idempotency above means a re-run of an already-generated
+      #    issue returns early, so the event fires once per issue.
+      publish_generated_event(issue)
       deliver(issue)
 
       issue
@@ -246,6 +249,21 @@ module Digests
       }
       h["note"] = note if note.present?
       h
+    end
+
+    # A SYSTEM event (actor: nil) so the digest shows up in Scout's log on Now and
+    # rolls into the ledger's "sent N digests" bucket. Workspace is passed
+    # explicitly — DigestRunJob sets Current, but the event bus prefers an explicit
+    # workspace in a job. Digests are personal, so a digest reaches one recipient
+    # (its owner). Publisher is fail-safe, so this never breaks generation.
+    def publish_generated_event(issue)
+      Events.publish(
+        "digest.generated",
+        subject: issue,
+        actor: nil,
+        workspace: digest.workspace,
+        payload: { "title" => digest.name, "recipients_count" => 1 }
+      )
     end
 
     def deliver(issue)

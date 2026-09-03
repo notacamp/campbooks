@@ -26,7 +26,9 @@ class NowController < ApplicationController
 
   # Which FeedItem kinds each non-priority segment gathers. `all` is every kind;
   # `priority` is the attention cluster (any kind, attention: true) rather than a
-  # kind list, so it's handled specially.
+  # kind list, so it's handled specially. A `notice` (an actionable notification)
+  # is always attention, so it counts under All and Priority but belongs to no kind
+  # segment here — it's not a follow-up, a piece of mail, or a time item.
   SEGMENT_KINDS = {
     follow_ups: %w[follow_up reply_reminder],
     mail:       %w[email_action starred_email tag_suggestion late_receivable],
@@ -59,6 +61,9 @@ class NowController < ApplicationController
 
     @attention_pairs = segment_attention_pairs
     @setup_items = deck_setup_items
+    # The active segment's kinds, for the deck controller's live-append filter
+    # (empty for all/priority — those are decided by name on the client).
+    @segment_kinds = SEGMENT_KINDS.fetch(@segment, [])
     @ledger = Now::Ledger.new(current_user, need_you: @segment_counts[:priority])
     @log = Now::Log.new(current_user)
 

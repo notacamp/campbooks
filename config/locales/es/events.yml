@@ -8,6 +8,7 @@ es:
       account: Cuenta
       calendar: Calendario
       contacts: Contactos
+      digests: Resúmenes
       documents: Documentos
       email: Correo
       files: Archivos
@@ -23,6 +24,7 @@ es:
       contact_starred: Contacto destacado
       contact_unblocked: Contacto desbloqueado
       contact_unstarred: Contacto sin destacar
+      digest_generated: Resumen generado
       document_approved: Documento aprobado
       document_linked_to_thread: Documento enlazado en el hilo
       document_processed: Documento procesado

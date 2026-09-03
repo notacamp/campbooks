@@ -50,7 +50,18 @@ module Campbooks
         when "MailFolder" then helpers.files_folder_path(@event.subject_id)
         when "AuthoredDocument" then helpers.written_document_path(@event.subject_id)
         when "EmailMessage" then helpers.email_message_path(@event.subject_id)
+        when "DigestIssue" then digest_issue_path
         end
+      end
+
+      # A digest issue's page is nested under its digest, so unlike the flat routes
+      # above this needs the parent id — read off the (preloaded, in Scout's log)
+      # subject. Nil for a deleted issue, which drops the link rather than 500ing.
+      def digest_issue_path
+        issue = @event.subject
+        return nil unless issue
+
+        helpers.digest_issue_path(issue.scheduled_digest_id, issue.id)
       end
 
       ICONS = {

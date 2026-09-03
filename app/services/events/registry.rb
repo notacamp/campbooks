@@ -185,6 +185,11 @@ module Events
         description: "An archived task was restored", subject_type: "Task",
         payload_keys: %w[title]),
 
+      # --- Digests -------------------------------------------------------------
+      entry("digest.generated", "Digest generated", group: :digests, icon: :send,
+        description: "A scheduled digest issue was generated and sent", subject_type: "DigestIssue",
+        payload_keys: %w[title recipients_count]),
+
       # --- Account / integrations ---------------------------------------------
       entry("email_account.connected", "Account connected", group: :account, icon: :plug,
         description: "An email account was connected", subject_type: "EmailAccount",

@@ -23,8 +23,11 @@ module Campbooks
       # @param total [Integer] the segment's total card count (the counter's N)
       # @param next_page [Integer, nil] the deck's next timeline page (load-more)
       # @param has_more [Boolean] whether more timeline pages exist
+      # @param segment_kinds [Array<String>] the FeedItem kinds the active segment
+      #   gathers (empty for all/priority) — the now-deck controller reads these to
+      #   drop a live-broadcast card that doesn't belong to the segment on screen.
       def initialize(attention_pairs:, timeline_pairs:, setup_items:, inbox_state:, segment:,
-                     total:, next_page: nil, has_more: false)
+                     total:, next_page: nil, has_more: false, segment_kinds: [])
         @attention_pairs = attention_pairs
         @timeline_pairs = timeline_pairs
         @setup_items = setup_items
@@ -33,16 +36,19 @@ module Campbooks
         @total = total.to_i
         @next_page = next_page
         @has_more = has_more
+        @segment_kinds = segment_kinds
         @card_count = @attention_pairs.size + @timeline_pairs.size + @setup_items.size
       end
 
+      # A pre-connect user (:none) sees the connect experience. Everyone else gets
+      # the deck stack — ALWAYS, even with zero cards: the stack (#feed_timeline)
+      # stays in the DOM as a live-append target, hidden with the cleared block shown
+      # in its place, and a broadcast card un-hides it as the new top.
       def view_template
         if @inbox_state == :none
           div(class: "mt-6") { render Campbooks::InboxEmptyState.new(state: :none, wrapper_class: "mt-4") }
-        elsif @card_count.positive?
-          deck_stack
         else
-          div(class: "mt-6") { cleared_block }
+          deck_stack
         end
       end
 
@@ -58,6 +64,7 @@ module Campbooks
             # visible card, and now-deck owns the focus mark here instead.
             controller: "now-deck feed-keyboard",
             now_deck_segment_value: @segment,
+            now_deck_segment_kinds_value: @segment_kinds.to_json,
             now_deck_total_value: @total,
             now_deck_url_value: helpers.now_path(segment: @segment),
             now_deck_counter_format_value: t(".counter")
@@ -85,14 +92,17 @@ module Campbooks
         span(
           id: "now_deck_counter",
           class: "absolute right-6 top-8 z-20 text-xs tabular-nums text-muted-foreground sm:right-[26px]",
-          data: { now_deck_target: "counter" }
+          data: { now_deck_target: "counter" },
+          hidden: @card_count.zero?
         ) { t(".counter").sub("{n}", @total.to_s) }
       end
 
       # KEEP id="feed_timeline": Feed::ItemsController#undo prepends the restored
-      # card here, so undo drops it back on top of the deck.
+      # card here, and Feed::LiveDeck appends live ones — both target this node, so
+      # it stays in the DOM even when empty (hidden, with the cleared block shown).
       def stack
-        div(id: "feed_timeline", class: "now-deck-stack relative", data: { now_deck_target: "stack" }) do
+        div(id: "feed_timeline", class: "now-deck-stack relative", data: { now_deck_target: "stack" },
+            hidden: @card_count.zero?) do
           @attention_pairs.each { |pair| feed_card(pair) }
           @timeline_pairs.each { |pair| feed_card(pair) }
           @setup_items.each { |item| render Campbooks::Now::SetupCard.new(item: item) }
@@ -113,10 +123,11 @@ module Campbooks
         )
       end
 
-      # Rendered but hidden; the controller reveals it (and hides the stack) when the
-      # last card leaves, so reaching the end is a moment without a round-trip.
+      # The cleared/empty moment. Shown outright when the deck loads with no cards;
+      # otherwise hidden, and the controller reveals it (hiding the stack) the instant
+      # the last card leaves — so reaching the end is a moment without a round-trip.
       def cleared_template
-        div(id: "now_deck_cleared", hidden: true, data: { now_deck_target: "cleared" }) { cleared_block }
+        div(id: "now_deck_cleared", hidden: @card_count.positive?, data: { now_deck_target: "cleared" }) { cleared_block }
       end
 
       def cleared_block
