@@ -107,12 +107,10 @@ es:
           other: " de %{count} mensajes en la conversación"
       discussion: Conversación
       forward: Reenviar
-      no_content: Sin contenido.
       no_subject: "(sin asunto)"
       open_full_view: Abrir en vista completa
       reply: Responder
       reply_all: Responder a todos
-      selected_badge: Seleccionado
       send_to_notion: Guardar en Notion
       tags_label: Etiquetas
     email_filter_panel:

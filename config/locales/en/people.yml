@@ -1,5 +1,41 @@
 en:
+  components:
+    message_bubble:
+      selected_badge: Selected
+      no_content: No content.
+      show_full: Show full
+      hide_full: Hide
+      open_thread: Open thread
+      channel:
+        email: Email
+    people:
+      counterpart_row:
+        open: Open
+      search_bar:
+        placeholder: Find a person or company…
+        clear: Clear
   people:
+    index:
+      tab_people: People
+      tab_streams: Streams
+      classic_inbox: Classic inbox
+      need_you: Need you
+      recent: Recent
+      organization: Organization
+      people_count:
+        one: "%{count} person"
+        other: "%{count} people"
+      services_count:
+        one: "%{count} service"
+        other: "%{count} services"
+      service_meta:
+        one: "Service · %{count} message"
+        other: "Service · %{count} messages"
+      no_matches: No one matches that.
+      empty: No people yet.
+      empty_hint: Connect a mailbox and Scout sorts your senders into people and services here.
+      placeholder_title: Pick someone to open
+      placeholder_body: Choose a person or company to see the whole conversation in one place.
     standing:
       you_owe:
         zero: Waiting on your reply.
@@ -11,3 +47,59 @@ en:
         other: No reply to %{subject} for %{count} days. Nudge?
       your_last_message: your last message
       last_exchange: "Last exchange %{date}."
+    conversation:
+      you: You
+      back: People
+      menu: More
+      where_things_stand: where things stand
+      no_standing: Nothing needs you here right now.
+      emails_since:
+        one: "%{count} email since %{since}"
+        other: "%{count} emails since %{since}"
+      empty: No messages yet.
+      earlier: Earlier
+      reply_to: "Reply to %{name}"
+      reply: Reply
+      send: Send
+      scout_draft_chip: Scout's draft · edit freely
+      open_profile: Open classic profile
+      star: Star
+      unstar: Unstar
+      block: Block
+      mark_service: This is a service
+    streams:
+      threads_meta:
+        one: "%{count} thread"
+        other: "%{count} threads"
+      last: "last %{date}"
+      nothing_needs_you: Nothing needs you.
+      may_need_you:
+        one: One may need you.
+        other: "%{count} may need you."
+      empty: No streams yet.
+      placeholder_title: Open a stream
+      placeholder_body: A stream is a service's mail — newsletters, receipts, notifications. Open one to skim it, or leave it be.
+      archive_all: Archive all
+      archive_all_confirm: Archive every thread in this stream?
+      open_classic: Open in classic
+      no_threads: Nothing here right now.
+      no_subject: (no subject)
+    stream_kinds:
+      billing: Billing
+      notifications: Notifications
+      newsletters: Newsletters
+      updates: Updates
+      social: Social
+    org:
+      organization: Organization
+      since: "since %{year}"
+      documents:
+        one: "%{count} document"
+        other: "%{count} documents"
+      open_classic: Open classic organization page
+      no_standing: Nothing needs you here right now.
+      people_heading: "People at %{org} · %{count}"
+      no_people: No people yet.
+      streams_heading: "Streams from %{org} · %{count}"
+      no_streams: No services yet.
+      open_stream: Open stream

@@ -52,6 +52,8 @@ pt:
       complete:
         one: Verificação concluída. %{count} grupo de possíveis duplicados.
         other: Verificação concluída. %{count} grupos de possíveis duplicados.
+    sender_kind:
+      taught: Entendido — o Scout vai tratá-los assim a partir de agora.
     show:
       analyze: Analisar
       analyze_prompt_placeholder: Diga ao Scout quem é esta pessoa…

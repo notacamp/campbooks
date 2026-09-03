@@ -19,6 +19,7 @@ en:
       calendar_event_deleted: Calendar event deleted
       calendar_event_updated: Calendar event updated
       contact_blocked: Contact blocked
+      contact_sender_kind_taught: Sender type corrected
       contact_starred: Contact starred
       contact_unblocked: Contact unblocked
       contact_unstarred: Contact unstarred

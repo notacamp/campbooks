@@ -52,6 +52,8 @@ fr:
       complete:
         one: Analyse terminée. %{count} groupe de doublons potentiels.
         other: Analyse terminée. %{count} groupes de doublons potentiels.
+    sender_kind:
+      taught: C'est noté — Scout les traitera ainsi désormais.
     show:
       analyze: Analyser
       analyze_prompt_placeholder: Dites à Scout qui c'est…

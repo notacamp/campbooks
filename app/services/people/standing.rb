@@ -49,14 +49,14 @@ module People
 
       if (thread = you_owe_thread(threads))
         days = days_since(thread.last_inbound_at)
-        return result(t("you_owe", count: days), needs_you: true, thread: thread, days: days)
+        return result(I18n.t("people.standing.you_owe", count: days), needs_you: true, thread: thread, days: days)
       end
 
       if (thread = nudge_thread(threads))
         days = days_since(thread.last_outbound_at)
         subject = thread.display_subject.to_s.strip
-        subject = subject.present? ? subject.truncate(48) : t("your_last_message")
-        return result(t("awaiting_them", subject: subject, count: days), needs_you: true, thread: thread, days: days)
+        subject = subject.present? ? subject.truncate(48) : I18n.t("people.standing.your_last_message")
+        return result(I18n.t("people.standing.awaiting_them", subject: subject, count: days), needs_you: true, thread: thread, days: days)
       end
 
       latest = latest_inbound_message(person)
@@ -69,7 +69,7 @@ module People
       end
 
       if (last = person.last_email_at)
-        return result(t("last_exchange", date: I18n.l(last.to_date, format: :short)), thread: latest&.email_thread)
+        return result(I18n.t("people.standing.last_exchange", date: I18n.l(last.to_date, format: :short)), thread: latest&.email_thread)
       end
 
       Result.none
@@ -91,8 +91,6 @@ module People
     end
 
     private
-
-    def t(key, **opts) = I18n.t("people.standing.#{key}", **opts)
 
     def result(text, thread: nil, needs_you: false, days: 0)
       Result.new(text: text, needs_you: needs_you, thread_id: thread&.id, overdue_days: days)

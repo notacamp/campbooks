@@ -19,6 +19,7 @@ fr:
       calendar_event_deleted: Événement de calendrier supprimé
       calendar_event_updated: Événement de calendrier mis à jour
       contact_blocked: Contact bloqué
+      contact_sender_kind_taught: Type d'expéditeur corrigé
       contact_starred: Contact mis en favori
       contact_unblocked: Contact débloqué
       contact_unstarred: Contact retiré des favoris

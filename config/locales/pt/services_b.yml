@@ -30,7 +30,11 @@ pt:
       new_email: Novo e-mail
       new_workflow: Criar fluxo de trabalho
       notifications: Notificações
+<<<<<<< HEAD
       now: Agora
+=======
+      people: Pessoas
+>>>>>>> 5b2dccee (i18n(people): pt-PT / es / fr translations + parity)
       scan_emails: Analisar e-mails agora
       scout_ai_chat: Scout AI Chat
       settings: Definições
