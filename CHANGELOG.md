@@ -16,6 +16,17 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Money timeline stays legible under a deep backlog of old bills.** On the bold
+  Money surface (`/money`), obligations dated before the 3-week overdue window
+  used to clamp onto a single pixel and overprint every label into an unreadable
+  blur. They now fold into one "N older" marker per lane in a left gutter (and
+  far-future due dates into an "N later" marker on the right), each linking to the
+  ledger, while on-axis labels are capped to the two largest bars per lane. The
+  window holds its shape at any backlog size, and is pixel-identical to before
+  when nothing overflows.
+
 ## [0.32.1] - 2026-09-03
 
 ### Fixed

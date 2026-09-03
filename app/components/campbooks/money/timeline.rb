@@ -8,9 +8,17 @@ module Campbooks
     # cleared them), linked to its ledger row. Pure inline SVG — no JS library — that
     # scrolls horizontally on a phone inside its own container.
     #
+    # Because a workspace can carry a deep backlog of very old bills, the axis does
+    # NOT stretch to fit them (they would clamp onto a single pixel and overprint).
+    # Anything dated before the window folds into one "N older" marker per lane in a
+    # left gutter, and anything dated after it into an "N later" marker on the right;
+    # both link to the ledger. The axis stays legible at any backlog size, and when
+    # there is no overflow it is pixel-identical to a bare 21-day-back / 30-day-ahead
+    # window.
+    #
     # Colour follows status (ink / destructive / muted), but every late marker also
-    # carries a warning glyph and every labelled bar its text, so colour is never the
-    # only signal (validated for protanopia in the mock).
+    # carries a warning glyph, so colour is never the only signal (validated for
+    # protanopia in the mock).
     class Timeline < Campbooks::Base
       include Campbooks::Money::Glyphs
 
@@ -24,6 +32,11 @@ module Campbooks
       BAR_W = 10
       MIN_BAR = 8
       MAX_BAR = LANE_H
+      # Reserved bands for the overflow markers (only when that side overflows).
+      GUTTER = 150   # left: obligations older than the window
+      TAIL = 118     # right: obligations later than the window
+      # Vertical centre of each lane's overflow marker.
+      MARKER_Y = { up: 72, down: 178 }.freeze
 
       def initialize(ledger:, summary:, today: Date.current, **attrs)
         @ledger = ledger
@@ -65,13 +78,14 @@ module Campbooks
       # ── SVG ──────────────────────────────────────────────────────────────────
       def svg
         %(<svg viewBox="0 0 #{W} #{H}" width="100%" height="#{H}" role="img" aria-label="#{esc(t('.title', days: horizon_days))}" class="text-foreground">) +
-          shaded_overdue + grid + axis + today_marker + lane_labels + bars_svg +
+          shaded_overdue + grid + axis + today_marker + overflow_dividers + lane_labels +
+          bars_svg + overflow_markers +
           "</svg>"
       end
 
       def shaded_overdue
         x = position(@today)
-        %(<rect x="#{PLOT_LEFT}" y="20" width="#{(x - PLOT_LEFT).round(1)}" height="210" rx="8" fill="var(--secondary)" opacity="0.6"/>)
+        %(<rect x="#{axis_left}" y="20" width="#{(x - axis_left).round(1)}" height="210" rx="8" fill="var(--secondary)" opacity="0.6"/>)
       end
 
       def grid
@@ -120,12 +134,21 @@ module Campbooks
         x = (bar[:x] - BAR_W / 2.0).round(1)
         rect = %(<rect x="#{x}" y="#{y.round(1)}" width="#{BAR_W}" height="#{height.round(1)}" rx="3" style="fill:#{bar[:fill]}"#{bar[:opacity]}/>)
         title = %(<title>#{esc(tooltip(o))}</title>)
-        label = bar[:label] ? bar_label(bar) : ""
-        %(<a href="#ob-#{esc(o.id)}">#{title}#{rect}</a>#{label})
+        # A labelled bar carries its text (and inline glyph for late); every other
+        # late bar still gets a small warning glyph at its tip, so lateness never
+        # rides on colour alone.
+        annotation = if bar[:label]
+          bar_label(bar)
+        elsif o.late?
+          tip_warning(bar)
+        else
+          ""
+        end
+        %(<a href="#ob-#{esc(o.id)}">#{title}#{rect}</a>#{annotation})
       end
 
-      # Text (and a warning glyph for late) beside the two largest per lane + every
-      # late bar; the rest carry only the <title> tooltip.
+      # Text (and an inline warning glyph for late) beside the two largest bars per
+      # lane; the rest carry only the <title> tooltip (and a tip glyph when late).
       def bar_label(bar)
         o = bar[:obligation]
         anchor = bar[:x] > W * 0.72 ? "end" : "start"
@@ -140,6 +163,13 @@ module Campbooks
 
       def warning_glyph(x, y)
         %(<g transform="translate(#{(x).round(1)}, #{(y - 11).round(1)}) scale(0.55)" fill="none" stroke="var(--destructive)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">#{Glyphs::ICONS[:warning]}</g>)
+      end
+
+      # A small centred warning glyph just past an unlabelled late bar's tip.
+      def tip_warning(bar)
+        gx = (bar[:x] - 6).round(1)
+        gy = bar[:up] ? (AXIS_Y - bar[:h] - 15) : (AXIS_Y + bar[:h] + 3)
+        %(<g transform="translate(#{gx}, #{gy.round(1)}) scale(0.5)" fill="none" stroke="var(--destructive)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">#{Glyphs::ICONS[:warning]}</g>)
       end
 
       # Rough advance for right-anchored glyph offset (monospace-ish estimate).
@@ -163,17 +193,102 @@ module Campbooks
         "#{o.counterpart} · #{o.what} · #{o.amount&.format} · #{label_detail(o)}"
       end
 
+      # ── Overflow markers ─────────────────────────────────────────────────────
+      # Dashed boundary + axis caption between the live window and each gutter.
+      def overflow_dividers
+        out = +""
+        if backlog_before.any?
+          out << dashed_rule(axis_left)
+          out << edge_caption(PLOT_LEFT + 12, t(".overflow.older_axis"), "start")
+        end
+        if tail_after.any?
+          out << dashed_rule(axis_right)
+          out << edge_caption(PLOT_RIGHT - 12, t(".overflow.later_axis"), "end")
+        end
+        out
+      end
+
+      def dashed_rule(x)
+        %(<line x1="#{x}" y1="26" x2="#{x}" y2="226" stroke="var(--border)" stroke-dasharray="3 4" stroke-width="1"/>)
+      end
+
+      def edge_caption(x, text, anchor)
+        %(<text x="#{x}" y="#{TICK_Y}" text-anchor="#{anchor}" font-family="JetBrains Mono, monospace" font-size="10.5" fill="var(--muted-foreground)">#{esc(text)}</text>)
+      end
+
+      def overflow_markers
+        out = +""
+        [ true, false ].each do |up|
+          out << overflow_marker(backlog_before, up, :older, PLOT_LEFT + 12) if backlog_before.any?
+          out << overflow_marker(tail_after, up, :later, axis_right + 12) if tail_after.any?
+        end
+        out
+      end
+
+      # One lane's overflow, read like a lane total: a stacked-bars glyph, then the
+      # count and the summed amount. Links to the ledger, where the full list lives.
+      def overflow_marker(list, up, kind, gx)
+        data = overflow_data(list, up)
+        return "" unless data
+
+        cy = MARKER_Y[up ? :up : :down]
+        tx = gx + 32
+        count = helpers.number_with_delimiter(data[:count])
+        fill = kind == :older ? "var(--destructive)" : "var(--foreground)"
+        %(<a href="#money_ledger">) +
+          %(<title>#{esc(t(".overflow.#{kind}_title", count: count, amount: data[:money].format))}</title>) +
+          stacked_glyph(gx, cy + 8, fill) +
+          %(<text x="#{tx}" y="#{cy - 1}" font-size="12.5" font-weight="650" fill="var(--foreground)">#{esc(t(".overflow.#{kind}", count: count))}</text>) +
+          %(<text x="#{tx}" y="#{cy + 14}" font-size="11" fill="var(--muted-foreground)">#{esc(data[:money].format(no_cents_if_whole: true))}</text>) +
+          "</a>"
+      end
+
+      def stacked_glyph(gx, base, fill)
+        [ [ 0, 10 ], [ 6, 16 ], [ 12, 12 ], [ 18, 20 ] ].map do |dx, h|
+          %(<rect x="#{gx + dx}" y="#{base - h}" width="4" height="#{h}" rx="1.5" fill="#{fill}"/>)
+        end.join
+      end
+
+      # Count + summed amount for one lane of an overflow list. The amount collapses
+      # to the primary currency (or, absent it, the largest), mirroring lane totals.
+      def overflow_data(list, up)
+        group = list.select { |o| o.receivable? == up }
+        return nil if group.empty?
+
+        by_currency = group.each_with_object(Hash.new(0)) { |o, acc| acc[o.currency] += o.amount_cents.to_i.abs }
+        primary = @summary.primary_currency
+        currency = by_currency.key?(primary) ? primary : by_currency.max_by { |_c, cents| cents }.first
+        { count: group.size, money: ::Money.new(by_currency[currency], currency) }
+      end
+
       # ── Geometry ───────────────────────────────────────────────────────────
+      # Obligations that fall inside the axis window (drawn as bars) vs. those that
+      # spill before it (older backlog) or after it (later, unsettled due dates).
+      def plotted
+        @plotted ||= @ledger.obligations.select do |o|
+          (date = bar_date(o)) && date >= @ledger.range_start && date <= @ledger.range_end
+        end
+      end
+
+      def backlog_before
+        @backlog_before ||= @ledger.obligations.select do |o|
+          !o.settled? && (date = bar_date(o)) && date < @ledger.range_start
+        end
+      end
+
+      def tail_after
+        @tail_after ||= @ledger.obligations.select do |o|
+          !o.settled? && (date = bar_date(o)) && date > @ledger.range_end
+        end
+      end
+
       def bars
         @bars ||= begin
-          max = @ledger.obligations.filter_map { |o| o.amount_cents&.abs }.max.to_i
+          max = plotted.filter_map { |o| o.amount_cents&.abs }.max.to_i
           labelled = labelled_ids
-          @ledger.obligations.filter_map do |o|
-            date = bar_date(o)
-            next unless date
-
+          plotted.map do |o|
             {
-              obligation: o, x: position(date), up: o.receivable?, h: bar_height(o, max),
+              obligation: o, x: position(bar_date(o)), up: o.receivable?, h: bar_height(o, max),
               fill: fill_for(o), opacity: (o.settled? ? %( fill-opacity="0.5") : ""),
               label: labelled.include?(o.id)
             }
@@ -181,12 +296,43 @@ module Campbooks
         end
       end
 
+      # Label the two largest bars per lane, then drop any that would overprint a
+      # kept one (left-to-right). Everything else keeps its tooltip (and tip glyph).
       def labelled_ids
-        ids = @ledger.obligations.select(&:late?).map(&:id)
-        @ledger.obligations.group_by(&:receivable?).each_value do |group|
-          ids += group.max_by(2) { |o| o.amount_cents.to_i }.map(&:id)
+        @labelled_ids ||= begin
+          candidates = plotted.group_by(&:receivable?).flat_map do |_receivable, group|
+            group.max_by(2) { |o| o.amount_cents.to_i.abs }
+          end.map(&:id).to_set
+
+          kept = Set.new
+          bars_for(candidates).group_by { |b| b[:up] }.each_value do |group|
+            occupied = []
+            # Largest first, so the more important bar keeps its label when two collide.
+            group.sort_by { |b| -b[:obligation].amount_cents.to_i.abs }.each do |b|
+              range = label_range(b)
+              next if occupied.any? { |lo, hi| range.first < hi + 8 && range.last > lo - 8 }
+
+              occupied << range
+              kept << b[:obligation].id
+            end
+          end
+          kept
         end
-        ids.to_set
+      end
+
+      # Bar geometry for the label candidates, without the label flag (used only to
+      # place labels, so it must not call #bars — which asks for #labelled_ids).
+      def bars_for(ids)
+        max = plotted.filter_map { |o| o.amount_cents&.abs }.max.to_i
+        plotted.select { |o| ids.include?(o.id) }
+               .map { |o| { obligation: o, x: position(bar_date(o)), up: o.receivable?, h: bar_height(o, max) } }
+      end
+
+      def label_range(bar)
+        w = label_width(bar[:obligation])
+        anchor_end = bar[:x] > W * 0.72
+        x1 = anchor_end ? bar[:x] - w : bar[:x]
+        [ x1, x1 + w ]
       end
 
       def bar_date(o)
@@ -207,11 +353,21 @@ module Campbooks
         "var(--foreground)"
       end
 
+      # The live axis contracts to leave a gutter for whichever side overflows; with
+      # no overflow it is the full PLOT_LEFT..PLOT_RIGHT span (identical to before).
+      def axis_left
+        @axis_left ||= PLOT_LEFT + (backlog_before.any? ? GUTTER : 0)
+      end
+
+      def axis_right
+        @axis_right ||= PLOT_RIGHT - (tail_after.any? ? TAIL : 0)
+      end
+
       def position(date)
         span = (@ledger.range_end - @ledger.range_start).to_f
         span = 1 if span.zero?
         ratio = (date.to_date - @ledger.range_start).to_f / span
-        x = PLOT_LEFT + ratio.clamp(0.0, 1.0) * (PLOT_RIGHT - PLOT_LEFT)
+        x = axis_left + ratio.clamp(0.0, 1.0) * (axis_right - axis_left)
         x.round(2)
       end
 
