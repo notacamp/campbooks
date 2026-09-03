@@ -52,7 +52,11 @@ module Campbooks
         div(
           class: "now-deck relative mt-6 pt-3.5",
           data: {
-            controller: "now-deck feed-keyboard feed-focus",
+            # feed-keyboard (→ primary, ← escape, letters) acts on the top card;
+            # now-deck pins its data-focused and keeps it there. feed-focus is
+            # deliberately NOT mounted — its scroll-dimming would fade the single
+            # visible card, and now-deck owns the focus mark here instead.
+            controller: "now-deck feed-keyboard",
             now_deck_segment_value: @segment,
             now_deck_total_value: @total,
             now_deck_url_value: helpers.now_path(segment: @segment),
@@ -88,7 +92,7 @@ module Campbooks
       # KEEP id="feed_timeline": Feed::ItemsController#undo prepends the restored
       # card here, so undo drops it back on top of the deck.
       def stack
-        div(id: "feed_timeline", class: "now-deck-stack relative") do
+        div(id: "feed_timeline", class: "now-deck-stack relative", data: { now_deck_target: "stack" }) do
           @attention_pairs.each { |pair| feed_card(pair) }
           @timeline_pairs.each { |pair| feed_card(pair) }
           @setup_items.each { |item| render Campbooks::Now::SetupCard.new(item: item) }

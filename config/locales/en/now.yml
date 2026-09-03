@@ -58,6 +58,9 @@ en:
       failed: Couldn't undo that.
       not_reversible: That can't be undone.
   components:
+    scout_bar:
+      placeholder_ask: Ask Scout anything…
+      placeholder_command: Ask Scout anything, or type a command…
     now:
       deck:
         counter: 1 of {n}
