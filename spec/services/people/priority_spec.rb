@@ -5,9 +5,12 @@ require "rails_helper"
 RSpec.describe People::Priority do
   let(:now) { Time.zone.local(2026, 9, 3, 12, 0, 0) }
 
-  def standing(needs_you: false, kind: :none, overdue_days: 0)
-    People::Standing::Result.new(text: "x", needs_you: needs_you, thread_id: nil, overdue_days: overdue_days, kind: kind)
+  def standing(needs_you: false, kind: :none, overdue_days: 0, thread_id: nil)
+    People::Standing::Result.new(text: "x", needs_you: needs_you, thread_id: thread_id, overdue_days: overdue_days, kind: kind)
   end
+
+  def owe(days) = standing(needs_you: true, kind: :you_owe, overdue_days: days)
+  def nudge(days) = standing(needs_you: true, kind: :nudge, overdue_days: days)
 
   # Facts with sensible zeros; override what a case is about.
   def facts(**overrides)
@@ -15,7 +18,8 @@ RSpec.describe People::Priority do
       **{
         standing: standing, two_way_threads: 0, outbound_threads: 0, email_count: 1,
         starred: false, allowed: false, classified: false, relationship_type: nil,
-        action_prompt: false, important: false, follow_up_due: false, last_activity: now - 1.day
+        action_prompt: false, important: false, follow_up_due: false, follow_up_vetted: false,
+        last_activity: now - 1.day
       }.merge(overrides)
     )
   end
@@ -53,32 +57,35 @@ RSpec.describe People::Priority do
 
   describe "Need you" do
     it "a genuine ask from a regular outranks a stranger's older one" do
-      client = regular(standing: standing(needs_you: true, kind: :you_owe, overdue_days: 2))
-      stranger = one_off(standing: standing(needs_you: true, kind: :you_owe, overdue_days: 14))
-      expect(score(client)).to be > score(stranger)
+      expect(score(regular(standing: owe(2)))).to be > score(one_off(standing: owe(14)))
     end
 
     it "between equals, the one waiting longer comes first" do
-      long = regular(standing: standing(needs_you: true, kind: :you_owe, overdue_days: 9))
-      short = regular(standing: standing(needs_you: true, kind: :you_owe, overdue_days: 2))
-      expect(score(long)).to be > score(short)
+      expect(score(regular(standing: owe(9)))).to be > score(regular(standing: owe(2)))
     end
 
-    it "a reply you owe outranks a nudge you could send" do
-      owe = regular(standing: standing(needs_you: true, kind: :you_owe, overdue_days: 5))
-      nudge = regular(standing: standing(needs_you: true, kind: :nudge, overdue_days: 5))
-      expect(score(owe)).to be > score(nudge)
+    it "a reply you owe — even a fresh one — outranks a nudge you could send, even a long-overdue one" do
+      expect(score(regular(standing: owe(1)))).to be > score(regular(standing: nudge(19), follow_up_vetted: true))
+    end
+
+    it "a nudge the AI vetted outranks one it hasn't" do
+      expect(score(regular(standing: nudge(6), follow_up_vetted: true))).to be > score(regular(standing: nudge(6)))
+    end
+
+    it "an unvetted nudge to a VIP still sits below a stranger's genuine ask" do
+      vip_nudge = regular(standing: nudge(6), relationship_type: "colleague")
+      expect(score(one_off(standing: owe(30), classified: true))).to be > score(vip_nudge)
     end
 
     it "a Scout prompt, an important read and a due follow-up each add a bonus" do
-      base = regular(standing: standing(needs_you: true, kind: :you_owe, overdue_days: 3))
+      base = regular(standing: owe(3))
       expect(score(base.with(action_prompt: true))).to be > score(base)
       expect(score(base.with(important: true))).to be > score(base)
       expect(score(base.with(follow_up_due: true))).to be > score(base)
     end
 
     it "flags needs_you on the score" do
-      expect(described_class.score(regular(standing: standing(needs_you: true, kind: :you_owe)), now: now).needs_you).to be true
+      expect(described_class.score(regular(standing: owe(1)), now: now).needs_you).to be true
       expect(described_class.score(regular, now: now).needs_you).to be false
     end
   end
@@ -104,11 +111,14 @@ RSpec.describe People::Priority do
 
   describe ".facts_for" do
     it "derives the relationship facts from loaded threads, contacts and the latest inbound" do
+      nudged = build_stubbed(:email_thread, last_inbound_at: now - 9.days, last_outbound_at: now - 6.days,
+                                            follow_up_last_analyzed_at: now - 5.days)
       threads = [
         build_stubbed(:email_thread, last_inbound_at: now - 3.days, last_outbound_at: now - 2.days),
         build_stubbed(:email_thread, last_inbound_at: now - 9.days, last_outbound_at: nil),
         build_stubbed(:email_thread, last_inbound_at: nil, last_outbound_at: now - 20.days,
-                                     follow_up_expected: true, follow_up_at: now - 1.day)
+                                     follow_up_expected: true, follow_up_at: now - 1.day),
+        nudged
       ]
       contacts = [
         build_stubbed(:contact, email_count: 12, starred_at: now, list_status: :allowed, sender_kind_source: "heuristic"),
@@ -116,44 +126,30 @@ RSpec.describe People::Priority do
       ]
       latest = build_stubbed(:email_message, ai_action_prompt: "Reply by Friday.", ai_priority: :high)
 
-      f = described_class.facts_for(standing: standing, threads: threads, contacts: contacts, latest_inbound: latest,
+      f = described_class.facts_for(standing: standing(needs_you: true, kind: :nudge, overdue_days: 6, thread_id: nudged.id),
+                                    threads: threads, contacts: contacts, latest_inbound: latest,
                                     relationship_type: "client", last_activity: now - 2.days, now: now)
 
-      expect(f.two_way_threads).to eq(1)
-      expect(f.outbound_threads).to eq(2)
+      expect(f.two_way_threads).to eq(2)
+      expect(f.outbound_threads).to eq(3)
       expect(f.email_count).to eq(15)
       expect(f).to have_attributes(starred: true, allowed: true, classified: true, relationship_type: "client",
-                                   action_prompt: true, important: true, follow_up_due: true)
+                                   action_prompt: true, important: true, follow_up_due: true, follow_up_vetted: true)
     end
 
-    it "reads an important category as important, and blank facts for a bare one-off" do
+    it "reads an important category as important, an unvetted nudge as unvetted, and blank facts for a bare one-off" do
       latest = build_stubbed(:email_message, category: "important", ai_priority: :medium)
-      f = described_class.facts_for(standing: standing, threads: [], contacts: [ build_stubbed(:contact, email_count: 1) ],
+      unvetted = build_stubbed(:email_thread, last_inbound_at: now - 9.days, last_outbound_at: now - 6.days)
+      f = described_class.facts_for(standing: standing(needs_you: true, kind: :nudge, overdue_days: 6, thread_id: unvetted.id),
+                                    threads: [ unvetted ], contacts: [ build_stubbed(:contact, email_count: 1) ],
                                     latest_inbound: latest, relationship_type: "", last_activity: nil, now: now)
-      expect(f).to have_attributes(two_way_threads: 0, outbound_threads: 0, email_count: 1, starred: false,
+      expect(f).to have_attributes(two_way_threads: 1, outbound_threads: 1, email_count: 1, starred: false,
                                    allowed: false, classified: false, relationship_type: nil, action_prompt: false,
-                                   important: true, follow_up_due: false, last_activity: nil)
+                                   important: true, follow_up_due: false, follow_up_vetted: false, last_activity: nil)
 
       bare = described_class.facts_for(standing: standing, threads: [], contacts: [], latest_inbound: nil,
                                        relationship_type: nil, last_activity: nil, now: now)
-      expect(bare).to have_attributes(email_count: 0, important: false)
-    end
-  end
-
-  describe ".merge_facts" do
-    it "folds an organization's people into the strongest, liveliest facts" do
-      a = regular(last_activity: now - 5.days, relationship_type: "vendor")
-      b = one_off(starred: true, last_activity: now - 1.day, relationship_type: "client")
-      org_standing = standing(needs_you: true, kind: :you_owe, overdue_days: 4)
-
-      m = described_class.merge_facts([ a, b ], standing: org_standing)
-      expect(m.two_way_threads).to eq(3)
-      expect(m.email_count).to eq(21)
-      expect(m.starred).to be true
-      expect(m.relationship_type).to eq("client")
-      expect(m.last_activity).to eq(now - 1.day)
-      expect(m.standing).to eq(org_standing)
-      expect(described_class.merge_facts([], standing: org_standing)).to be_nil
+      expect(bare).to have_attributes(email_count: 0, important: false, follow_up_vetted: false)
     end
   end
 end

@@ -42,16 +42,22 @@ module PeopleLayout
 
     person_rows = persons.select { |person| listable_person?(person) }
                          .map { |person| person_counterpart(person) }
-    facts_by_person = person_rows.to_h { |row| [ row.id, row.facts ] }
-    org_rows = orgs.map { |org| org_counterpart(org, facts_by_person) }
+    person_rows_by_id = person_rows.index_by(&:id)
+    org_rows = orgs.map { |org| org_counterpart(org, person_rows_by_id) }
 
     need_you, recent = (person_rows + org_rows).partition(&:needs_you?)
-    @need_you = need_you.sort_by { |c| [ -c.priority, -activity_epoch(c) ] }
-    recent_sorted = recent.sort_by { |c| [ -c.priority, -activity_epoch(c) ] }
+    @need_you = need_you.sort_by { |c| rank_key(c) }
+    recent_sorted = recent.sort_by { |c| rank_key(c) }
     @recent_pagy, @recent = pagy_array(recent_sorted, limit: PEOPLE_PER_PAGE)
   end
 
   def activity_epoch(counterpart) = counterpart.last_activity&.to_i || 0
+
+  # Highest priority first; on a tie the person ahead of their organization,
+  # then the livelier row.
+  def rank_key(counterpart)
+    [ -counterpart.priority, counterpart.organization? ? 1 : 0, -activity_epoch(counterpart) ]
+  end
 
   def list_now = (@now ||= Time.current)
 
@@ -97,16 +103,23 @@ module PeopleLayout
     )
   end
 
-  # An organization ranks by the people its standing is composed from: their
-  # relationship evidence adds up, and the org's own newest mail keeps it live
-  # even when that sample is quiet.
-  def org_facts(org, standing, facts_by_person, last_activity)
-    members = people_standing.sampled_people_for(org)
-    member_facts = members.map { |member| facts_by_person[member.id] || person_facts(member, people_standing.person(member)) }
-    facts = People::Priority.merge_facts(member_facts, standing: standing) ||
-            People::Priority.facts_for(standing: standing, threads: [], contacts: [], latest_inbound: nil,
-                                       relationship_type: nil, last_activity: nil, now: list_now)
-    facts.with(last_activity: [ facts.last_activity, last_activity ].compact.max)
+  # An organization ranks as its most pressing sampled person — the people its
+  # standing is composed from — so it sits right behind them instead of
+  # outscoring them on headcount. Members already on the list reuse their row;
+  # the rest are scored from the same primed data. Nil when the org has no
+  # person members (services only).
+  def org_lead(org, person_rows_by_id)
+    people_standing.sampled_people_for(org)
+                   .map { |member| person_rows_by_id[member.id] || person_counterpart(member) }
+                   .max_by(&:priority)
+  end
+
+  # With no people behind it an organization has no relationship evidence: it
+  # ranks on its own recency alone.
+  def standing_only_score(standing, last_activity)
+    facts = People::Priority.facts_for(standing: standing, threads: [], contacts: [], latest_inbound: nil,
+                                       relationship_type: nil, last_activity: last_activity, now: list_now)
+    People::Priority.score(facts, now: list_now)
   end
 
   # One Scout-standing service per request, shared by every person/org row so the
@@ -176,13 +189,13 @@ module PeopleLayout
     person.contacts.max_by { |contact| contact.email_count.to_i }&.email
   end
 
-  def org_counterpart(org, facts_by_person = {})
+  def org_counterpart(org, person_rows_by_id = {})
     people_count = org.active_people.joins(:contacts)
                       .where(contacts: { sender_kind: Contact.sender_kinds[:person] }).distinct.count
     services_count = org.contacts.kind_service.count
     standing = people_standing.organization(org)
     last_activity = org.email_messages.maximum(:received_at)
-    facts = org_facts(org, standing, facts_by_person, last_activity)
+    lead = org_lead(org, person_rows_by_id)
 
     People::Counterpart.new(
       kind: :organization,
@@ -193,8 +206,8 @@ module PeopleLayout
       avatar_initial: org.name.to_s[0].to_s.upcase.presence || "?",
       last_activity: last_activity,
       standing: standing,
-      facts: facts,
-      score: People::Priority.score(facts, now: list_now)
+      facts: lead&.facts,
+      score: lead&.score || standing_only_score(standing, last_activity)
     )
   end
 
