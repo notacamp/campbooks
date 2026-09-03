@@ -1441,6 +1441,17 @@ dialog[open] {
   .now-deck-stack > *:first-child { padding: 20px 22px; } /* p-5 sm:px-[22px] */
 }
 
+/* A card that carries its own frame in the list (the starred-sender hero:
+   rounded-2xl + border + p-5 + shadow) would double-frame inside the deck's
+   raised card — flatten it so the deck frame is the only one. */
+.now-deck-stack > *:first-child article {
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
 /* The deck shows each card's own action keycaps (E, ↵, →) on the focused card,
    but not the feed-focus hint rows ("↑↓ navigate" / swipe hint) — the deck is
    one card, so vertical-nav hints would mislead. */
