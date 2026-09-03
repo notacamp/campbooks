@@ -46,4 +46,31 @@ RSpec.describe Campbooks::Now::Deck, type: :component do
 
     expect(html).to include(I18n.t("home.index.connect_title"))
   end
+
+  it "stamps data-now-deck-segment-kinds-value with the segment's kind list (for live-append filtering)" do
+    html = render_deck(segment: :mail, segment_kinds: %w[email_action starred_email tag_suggestion])
+
+    expect(html).to include("now-deck-segment-kinds-value")
+    expect(html).to include("email_action")
+    expect(html).to include("starred_email")
+  end
+
+  it "stamps an empty JSON array for the all/priority segment (all kinds accepted)" do
+    html = render_deck(segment: :all, segment_kinds: [])
+
+    expect(html).to include("now-deck-segment-kinds-value=\"[]\"")
+  end
+
+  it "stamps data-feed-kind on each card so the deck controller can filter live inserts" do
+    # The card wrapper carries data-feed-kind so the now-deck JS can decide
+    # whether a broadcast card belongs to the active segment.
+    item = FeedItem.new(
+      id: SecureRandom.uuid, kind: "email_action", data: {},
+      attention: false, generated_at: 1.minute.ago
+    )
+    msg = EmailMessage.new(id: SecureRandom.uuid, subject: "Kind test", received_at: 1.hour.ago)
+    html = render_deck(attention_pairs: [ { item: item, subject: msg } ], total: 1)
+
+    expect(html).to include('data-feed-kind="email_action"')
+  end
 end

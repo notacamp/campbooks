@@ -106,4 +106,24 @@ RSpec.describe Now::Ledger do
       expect(described_class.new(user, need_you: 4).need_you).to eq(4)
     end
   end
+
+  describe "digest.generated bucket" do
+    it "counts digest.generated events in the :digests bucket" do
+      sys("digest.generated", payload: { "title" => "Weekly", "recipients_count" => 1 })
+      sys("digest.generated", payload: { "title" => "Daily", "recipients_count" => 1 })
+
+      buckets = described_class.new(user).buckets
+      digest_bucket = buckets.find { |b| b[:key] == :digests }
+
+      expect(digest_bucket).to be_present
+      expect(digest_bucket[:count]).to eq(2)
+    end
+
+    it "phrases digests as 'sent N digests' in the i18n bucket" do
+      # Confirm the bucket key :digests maps to the i18n key digests_html,
+      # used by the NowHelper to build the ledger sentence.
+      i18n_key = "now.index.ledger.buckets.digests_html"
+      expect(I18n.t(i18n_key, n_html: "2", count: 2)).to include("2")
+    end
+  end
 end

@@ -47,6 +47,12 @@ RSpec.describe Feed::LiveDeck do
 
     described_class.broadcast(user, [ item ])
 
-    expect(Turbo::StreamsChannel).not_to have_received(:broadcast_append_to)
+    # LiveDeck always appends to "now_<user_id>" with target: "feed_timeline".
+    # The Notification model's own after_create_commit callback fires a separate
+    # broadcast (to "notifications_<user_id>", target: "toasts") — we only assert
+    # that LiveDeck's own append to the now stream did NOT fire.
+    expect(Turbo::StreamsChannel).not_to have_received(:broadcast_append_to).with(
+      "now_#{user.id}", target: "feed_timeline", html: anything
+    )
   end
 end

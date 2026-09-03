@@ -161,6 +161,11 @@ module Feed
       when "mark_paid"
         document.mark_settled!
         { success: true, message: t("feed.items.receivable_marked_paid") }
+      else
+        failure(t("feed.items.unsupported"))
+      end
+    end
+
     # Resolve a notice from the deck: mark it read and archive it, so it leaves the
     # "Needs you" set and won't regenerate as a card. The feed item is already the
     # user's; guard the notification's ownership too. Non-reversible — a plain toast.

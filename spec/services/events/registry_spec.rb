@@ -29,4 +29,13 @@ RSpec.describe Events::Registry do
   it "builds an i18n-safe key fragment" do
     expect(described_class.definition("email.received").i18n_key).to eq("email_received")
   end
+
+  it "defines digest.generated in the :digests group with the expected payload keys" do
+    defn = described_class.definition("digest.generated")
+
+    expect(defn).to be_present
+    expect(defn.group).to eq(:digests)
+    expect(defn.payload_keys).to include("title", "recipients_count")
+    expect(defn.subject_type).to eq("DigestIssue")
+  end
 end
