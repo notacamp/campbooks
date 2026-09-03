@@ -12,6 +12,7 @@ RSpec.describe "Paper", type: :request do
 
   describe "the flag gate" do
     it "404s when the bold layout flag is off, even signed in" do
+      allow(Features).to receive(:bold_layout?).and_return(false)
       sign_in(user)
       get paper_path
       expect(response).to have_http_status(:not_found)

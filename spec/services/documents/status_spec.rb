@@ -43,10 +43,10 @@ RSpec.describe Documents::Status do
       expect(result.chip_text).to eq("Unpaid")
     end
 
-    it "is late (destructive) with an overdue-days detail once the due date passes" do
+    it "is late (warning, like the mock) with an overdue-days detail once the due date passes" do
       result = status_for(document_type: :expense_invoice, amount_cents: 24_800, due_date: today - 20)
       expect(result.status).to eq(:late)
-      expect(result.tone).to eq(:destructive)
+      expect(result.tone).to eq(:warning)
       expect(result.detail).to eq("20 days")
       expect(result.chip_text).to eq("Unpaid · 20 days")
     end

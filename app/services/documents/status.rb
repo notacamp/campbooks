@@ -16,9 +16,9 @@ module Documents
   #   5. bank statement with a ready reconciliation → reconciled
   #   6. everything else                    → filed
   #
-  # `tone` follows the Paper spec's table (warning for unpaid/expiring, destructive for
-  # late/expired/failed, success for paid/signed/reconciled, ember for needs_review,
-  # muted otherwise) — Campbooks::StatusChip maps a tone to the tone-* utilities.
+  # `tone` follows the approved Paper mock (warning for unpaid/late/expiring, destructive
+  # for expired/failed, success for paid/signed, ember for needs_review, muted for
+  # reconciled and the rest) — Campbooks::StatusChip maps a tone to the tone-* utilities.
   class Status
     include Documents::MatterDate
 
@@ -74,7 +74,7 @@ module Documents
       return build(:filed, :muted) if due.nil?
 
       if due < @today
-        build(:late, :destructive, detail: I18n.t("paper.status.days", count: (@today - due).to_i))
+        build(:late, :warning, detail: I18n.t("paper.status.days", count: (@today - due).to_i))
       else
         build(:unpaid, :warning)
       end
@@ -97,7 +97,7 @@ module Documents
       return nil unless @doc.bank_statement?
 
       reconciled = @doc.reconciliations_as_statement.any?(&:ready?)
-      reconciled ? build(:reconciled, :success) : build(:filed, :muted)
+      reconciled ? build(:reconciled, :muted) : build(:filed, :muted)
     end
 
     # The end/expiry date for an expiry-type document: the extracted period_end, else the
