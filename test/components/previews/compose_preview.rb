@@ -25,6 +25,25 @@ class ComposePreview < Lookbook::Preview
     ))
   end
 
+  # The bold composer's intent input: one Ember-glass line where you tell Scout
+  # what to say, or start typing the message. Enter/Draft posts to the compose
+  # chat; behaviour needs the session, so here it's the surface only.
+  def intent_input
+    render(Campbooks::Compose::IntentInput.new)
+  end
+
+  # Pre-filled from an overlay note ("write to Sofia about…").
+  def intent_input_prefilled
+    render(Campbooks::Compose::IntentInput.new(intent: "Confirm Friday for Sofia and ask which pricing assumptions she wants challenged"))
+  end
+
+  # The recipient pill input marked "inferred" (bold compose-from-intent): the
+  # server-seeded chip shows the friendly name + a muted "· inferred" suffix that
+  # clears the moment you edit the field.
+  def inferred_recipient
+    render(Campbooks::ContactPillInput.new(name: "to_address", value: "Sofia Martins <sofia@example.com>", bare: true, inferred: true))
+  end
+
   # The toolbar-less editor used by both compose shells — select text to see
   # the floating formatting bubble.
   def bubble_editor
