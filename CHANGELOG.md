@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.36.2] - 2026-09-04
+
 ### Changed
 
 - Money shows the year on its dates — due, paid and renewal dates in the ledger, the
