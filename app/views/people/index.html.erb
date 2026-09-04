@@ -16,7 +16,7 @@
     <%# ── Left pane: the counterpart list ─────────────────────────────────── %>
     <div data-email-mobile-target="list" data-inbox-pane="list"
          data-people-shortcuts-target="list"
-         class="hidden w-full flex-col overflow-y-auto border-r border-border bg-card lg:flex lg:w-[400px] lg:shrink-0">
+         class="relative hidden w-full flex-col overflow-y-auto border-r border-border bg-card lg:flex lg:w-[400px] lg:shrink-0">
       <%= render "people/segmented_header" %>
       <%# The search form sits OUTSIDE the results frame so it keeps focus while the
           list filters in place (list-search + pagy_countless pattern). %>

@@ -59,8 +59,10 @@
     <%= render "people/conversation_menu" %>
   </div>
 
-  <%# Scrollable threads column — newest at the top. %>
-  <div class="flex-1 overflow-y-auto">
+  <%# Scrollable threads column — newest at the top. Positioned so absolutely
+      placed descendants (the sentinel spinner's sr-only label) scroll with it
+      instead of anchoring to the page. %>
+  <div class="relative flex-1 overflow-y-auto">
     <div class="w-full px-6 pb-6 pt-5">
 
       <%# Scout's standing pinned above the threads. %>
