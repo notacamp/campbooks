@@ -30,8 +30,8 @@ class NowController < ApplicationController
   # is always attention, so it counts under All and Priority but belongs to no kind
   # segment here — it's not a follow-up, a piece of mail, or a time item.
   SEGMENT_KINDS = {
-    follow_ups: %w[follow_up reply_reminder],
-    mail:       %w[email_action starred_email tag_suggestion late_receivable],
+    follow_ups: %w[follow_up reply_reminder reply_owed],
+    mail:       %w[email_action starred_email tag_suggestion late_receivable late_payable],
     time:       %w[calendar_event reminder task]
   }.freeze
 
@@ -150,8 +150,8 @@ class NowController < ApplicationController
     {
       all:        by_kind.values.sum,
       priority:   active.attention.count,
-      follow_ups: kind.call("follow_up", "reply_reminder"),
-      mail:       kind.call("email_action", "starred_email", "tag_suggestion", "late_receivable"),
+      follow_ups: kind.call("follow_up", "reply_reminder", "reply_owed"),
+      mail:       kind.call("email_action", "starred_email", "tag_suggestion", "late_receivable", "late_payable"),
       time:       kind.call("calendar_event", "reminder", "task"),
       docs:       @doc_review_count
     }

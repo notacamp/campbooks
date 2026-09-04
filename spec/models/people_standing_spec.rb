@@ -104,8 +104,8 @@ RSpec.describe PeopleStanding do
       person = create(:person, workspace: workspace, name: "Ines")
       row = PeopleStanding.create!(
         workspace: workspace, user: user, counterpart: person,
-        needs_you: true, standing_kind: "you_owe",
-        text: "Waiting on your reply for 2 days.",
+        needs_you: true, standing_kind: "attention",
+        text: nil, verb: "reply", subject: "Q3 deck", wait_days: 2,
         score: 1.5, strength: 2.0,
         last_activity_at: 2.days.ago, name: "Ines",
         subtitle: "Brightloop", avatar_email: "ines@brightloop.example",
@@ -129,8 +129,9 @@ RSpec.describe PeopleStanding do
       expect(cp.subtitle).to eq("Brightloop")
       expect(cp.avatar_email).to eq("ines@brightloop.example")
       expect(cp.needs_you?).to be true
-      expect(cp.standing.text).to eq("Waiting on your reply for 2 days.")
-      expect(cp.standing.kind).to eq(:you_owe)
+      expect(cp.standing.kind).to eq(:attention)
+      expect(cp.standing.verb).to eq(:reply)
+      expect(cp.standing.subject).to eq("Q3 deck")
       expect(cp.score.value).to eq(1.5)
       expect(cp.score.strength).to eq(2.0)
     end

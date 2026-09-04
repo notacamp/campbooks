@@ -11,6 +11,11 @@ pt:
     people:
       counterpart_row:
         open: Abrir
+        new: Novo
+        wait_days:
+          zero: "0d"
+          one: "1d"
+          other: "%{count}d"
       search_bar:
         placeholder: Encontrar uma pessoa ou empresa…
         clear: Limpar
@@ -50,17 +55,20 @@ pt:
       empty_hint: Ligue uma caixa de correio e o Scout organiza aqui os seus remetentes em pessoas e serviços.
       placeholder_title: Escolha alguém para abrir
       placeholder_body: Escolha uma pessoa ou empresa para ver toda a conversa num só lugar.
+      lanes:
+        reply: Responder
+        decide: Decidir
+        pay: Pagar
+        chase: Cobrar
+        nudge: Insistir
+      streams_foot:
+        zero: Streams
+        one: "Streams · %{count}"
+        other: "Streams · %{count}"
+      new: Novo
     standing:
-      you_owe:
-        zero: À espera da sua resposta.
-        one: À espera da sua resposta há um dia.
-        other: À espera da sua resposta há %{count} dias.
-      awaiting_them:
-        zero: Sem resposta a %{subject}. Insistir?
-        one: Sem resposta a %{subject} há um dia. Insistir?
-        other: Sem resposta a %{subject} há %{count} dias. Insistir?
-      your_last_message: a sua última mensagem
-      last_exchange: "Última troca %{date}."
+      money_subject: "%{amount} · vence %{date}"
+      no_standing: Nada precisa de si por agora.
     conversation:
       you: Você
       back: Pessoas

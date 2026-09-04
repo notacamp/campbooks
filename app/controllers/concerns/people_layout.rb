@@ -38,9 +38,29 @@ module PeopleLayout
     ensure_standings_fresh              # inline on first visit, enqueue-and-serve when stale
     rows = PeopleStanding.for_user(current_user).ranked
     rows = rows.search(@query) if @query.present?
-    @need_you = rows.needing.map(&:to_counterpart)
+
+    # Build lane structure: Need-you rows grouped by verb, then Recent paginated.
+    needing = rows.needing.map(&:to_counterpart)
+    @lanes  = build_lanes(needing)
+    # Keep @need_you for backward-compat (detail pane, specs).
+    @need_you = needing
+
     @recent_pagy, recent_rows = pagy_countless(rows.recent, limit: PEOPLE_PER_PAGE)
     @recent = recent_rows.map(&:to_counterpart)
+  end
+
+  # Group Need-you counterparts into ordered verb lanes.
+  # Returns array of { verb:, label:, counterparts: [] }.
+  def build_lanes(need_you)
+    order = %i[reply decide pay chase nudge]
+    by_verb = need_you.group_by { |cp| cp.standing.verb }
+
+    order.filter_map do |verb|
+      counterparts = by_verb[verb]
+      next if counterparts.blank?
+
+      { verb: verb, label: t("people.index.lanes.#{verb}"), counterparts: counterparts }
+    end
   end
 
   # ── Standings freshness ────────────────────────────────────────────────────

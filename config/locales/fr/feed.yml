@@ -43,6 +43,29 @@ fr:
           high_priority: Priorité haute
           important: Important
           starred: Expéditeur favori
+      late_payable_card:
+        owed: "Vous devez"
+        days_late:
+          one: "%{count} jour de retard"
+          other: "%{count} jours de retard"
+        headline: "Vous devez %{reference} à %{name}"
+        invoice_ref: "la facture #%{number}"
+        an_invoice: "une facture"
+        mark_paid: "Marquer comme payé"
+        open_money: "Ouvrir dans Finance"
+        later: "Plus tard"
+      late_receivable_card:
+        owed: "Dû par"
+        days_late:
+          one: "%{count} jour de retard"
+          other: "%{count} jours de retard"
+        headline: "%{name} n'a pas payé %{reference}"
+        invoice_ref: "la facture #%{number}"
+        an_invoice: "une facture"
+        scout_note: "J'ai rédigé un rappel."
+        send_reminder: "Envoyer le rappel"
+        mark_paid: "Marquer comme payé"
+        later: "Plus tard"
       notice_card:
         done: Terminé
         label: À traiter
@@ -117,6 +140,7 @@ fr:
       reminder_confirmed_no_calendar: Rappel confirmé. Connectez un calendrier pour
         le synchroniser automatiquement.
       reminder_dismissed: Rappel ignoré.
+      receivable_marked_paid: Marqué comme payé.
       restored: Rétabli.
       task_accepted: 'Ajoutée à vos tâches : %{title}'
       task_completed: 'Tâche terminée : %{title}'

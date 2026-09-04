@@ -11,6 +11,11 @@ fr:
     people:
       counterpart_row:
         open: Ouvrir
+        new: Nouveau
+        wait_days:
+          zero: "0j"
+          one: "1j"
+          other: "%{count}j"
       search_bar:
         placeholder: Rechercher une personne ou une entreprise…
         clear: Effacer
@@ -50,17 +55,20 @@ fr:
       empty_hint: Connectez une boîte mail et Scout classe ici vos expéditeurs en personnes et services.
       placeholder_title: Choisissez qui ouvrir
       placeholder_body: Choisissez une personne ou une entreprise pour voir toute la conversation au même endroit.
+      lanes:
+        reply: Répondre
+        decide: Décider
+        pay: Payer
+        chase: Relancer
+        nudge: Rappeler
+      streams_foot:
+        zero: Streams
+        one: "Streams · %{count}"
+        other: "Streams · %{count}"
+      new: Nouveau
     standing:
-      you_owe:
-        zero: En attente de votre réponse.
-        one: En attente de votre réponse depuis un jour.
-        other: En attente de votre réponse depuis %{count} jours.
-      awaiting_them:
-        zero: Pas de réponse à %{subject}. Relancer ?
-        one: Pas de réponse à %{subject} depuis un jour. Relancer ?
-        other: Pas de réponse à %{subject} depuis %{count} jours. Relancer ?
-      your_last_message: votre dernier message
-      last_exchange: "Dernier échange %{date}."
+      money_subject: "%{amount} · dû le %{date}"
+      no_standing: Rien ne requiert votre attention pour le moment.
     conversation:
       you: Vous
       back: Personnes

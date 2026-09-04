@@ -30,7 +30,8 @@ module People
               update_only: %i[
                 needs_you standing_kind text email_thread_id overdue_days
                 score strength last_activity_at name subtitle avatar_email
-                avatar_initial data refreshed_at
+                avatar_initial data verb subject wait_days feed_item_id
+                email_message_id refreshed_at
               ]
             )
           end
@@ -63,16 +64,22 @@ module People
       private
 
       def build_row(cp, user:, workspace:, now:, directory:)
+        standing = cp.standing
         {
           workspace_id:      workspace.id,
           user_id:           user.id,
           counterpart_type:  cp.person? ? "Person" : "Organization",
           counterpart_id:    cp.id,
           needs_you:         cp.needs_you?,
-          standing_kind:     cp.standing.kind.to_s,
-          text:              cp.standing.text,
-          email_thread_id:   cp.standing.thread_id,
-          overdue_days:      cp.standing.overdue_days,
+          standing_kind:     standing.kind.to_s,
+          text:              standing.text,
+          email_thread_id:   standing.thread_id,
+          overdue_days:      standing.overdue_days,
+          verb:              standing.verb&.to_s,
+          subject:           standing.subject,
+          wait_days:         standing.wait_days.to_i,
+          feed_item_id:      standing.feed_item_id,
+          email_message_id:  nil, # reserved for PR 3 row actions
           score:             cp.score&.value || 0.0,
           strength:          cp.score&.strength || 0.0,
           last_activity_at:  cp.last_activity,
@@ -80,11 +87,20 @@ module People
           subtitle:          cp.subtitle,
           avatar_email:      cp.avatar_email,
           avatar_initial:    cp.avatar_initial,
-          data:              cp.organization? ? directory.org_row_data(cp.id) : {},
+          data:              build_data(cp, directory),
           refreshed_at:      now,
           updated_at:        now,
           created_at:        now
         }
+      end
+
+      def build_data(cp, directory)
+        base = cp.data || {}
+        if cp.organization?
+          directory.org_row_data(cp.id, extra: base.except("people_count", "services_count"))
+        else
+          base
+        end
       end
 
       def prune_stale!(user, counterparts)

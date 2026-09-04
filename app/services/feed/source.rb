@@ -24,8 +24,10 @@ module Feed
         Feed::Sources::StarredEmail,
         Feed::Sources::FollowUp,
         Feed::Sources::ReplyReminder,
+        Feed::Sources::ReplyOwed,
         Feed::Sources::TagSuggestion,
         Feed::Sources::LateReceivable,
+        Feed::Sources::LatePayable,
         Feed::Sources::EmailAction
       ]
     end

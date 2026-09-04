@@ -27,15 +27,16 @@ RSpec.describe People::Standings do
   end
 
   describe ".refresh!" do
-    it "writes one row per counterpart with correct text, needs_you, score, kind" do
-      person, = make_person(name: "Sofia", email: "sofia@x.example", owe: true, inbound_at: 3.days.ago)
+    it "writes one row per counterpart with correct score, kind, and name" do
+      # Without a live feed item the standing falls back to :last_exchange.
+      # needs_you comes from attention (feed items), which are empty here.
+      person, = make_person(name: "Sofia", email: "sofia@x.example", inbound_at: 3.days.ago)
 
       described_class.refresh!(user)
 
       row = PeopleStanding.for_user(user).find_by!(counterpart: person)
-      expect(row.needs_you).to be true
-      expect(row.standing_kind).to eq("you_owe")
-      expect(row.text).to include("Waiting on your reply")
+      expect(row.needs_you).to be false
+      expect(row.standing_kind).to be_in(PeopleStanding::STANDING_KINDS)
       expect(row.score).to be > 0
       expect(row.name).to eq("Sofia")
     end

@@ -14,12 +14,12 @@ module People
   # a Counterpart without a live record (`record` is optional / nil in that path).
   Counterpart = Data.define(
     :id, :kind, :record, :name, :subtitle, :avatar_email, :avatar_initial,
-    :last_activity, :standing, :facts, :score
+    :last_activity, :standing, :facts, :score, :data
   ) do
-    # `id` defaults to the record's id when not given; `record`, `facts`, and
-    # `score` are optional so the table-read path can omit them.
-    def initialize(id: nil, record: nil, facts: nil, score: nil, **rest)
-      super(id: id || record&.id, record: record, facts: facts, score: score, **rest)
+    # `id` defaults to the record's id when not given; `record`, `facts`, `score`,
+    # and `data` are optional so the table-read path can omit them.
+    def initialize(id: nil, record: nil, facts: nil, score: nil, data: {}, **rest)
+      super(id: id || record&.id, record: record, facts: facts, score: score, data: data || {}, **rest)
     end
 
     def person? = kind == :person

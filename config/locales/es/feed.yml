@@ -43,6 +43,29 @@ es:
           high_priority: Prioridad alta
           important: Importante
           starred: Remitente con estrella
+      late_payable_card:
+        owed: "Debes"
+        days_late:
+          one: "%{count} día de retraso"
+          other: "%{count} días de retraso"
+        headline: "Debes a %{name} %{reference}"
+        invoice_ref: "factura #%{number}"
+        an_invoice: "una factura"
+        mark_paid: "Marcar como pagado"
+        open_money: "Abrir en Dinero"
+        later: "Más tarde"
+      late_receivable_card:
+        owed: "Te deben"
+        days_late:
+          one: "%{count} día de retraso"
+          other: "%{count} días de retraso"
+        headline: "%{name} no pagó %{reference}"
+        invoice_ref: "factura #%{number}"
+        an_invoice: "una factura"
+        scout_note: "Redacté un recordatorio."
+        send_reminder: "Enviar recordatorio"
+        mark_paid: "Marcar como pagado"
+        later: "Más tarde"
       notice_card:
         done: Hecho
         label: Requiere atención
@@ -117,6 +140,7 @@ es:
       reminder_confirmed_no_calendar: Recordatorio confirmado. Conecta un calendario
         para sincronizar automáticamente.
       reminder_dismissed: Recordatorio descartado.
+      receivable_marked_paid: Marcado como pagado.
       restored: Restaurado.
       task_accepted: 'Añadida a tus tareas: %{title}'
       task_completed: 'Tarea completada: %{title}'

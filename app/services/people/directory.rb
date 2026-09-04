@@ -20,42 +20,54 @@ module People
     end
 
     # Returns every eligible People::Counterpart (persons + organizations) for
-    # this user, with standings and scores computed. Idempotent — repeated calls
+    # this user, with standings and scores computed. Idempotent - repeated calls
     # return the same set.
     def counterparts
-      persons = eligible_persons
-      orgs    = eligible_orgs
+      attention = People::Attention.new(@user, now: @now)
+      persons   = eligible_persons
+      orgs      = eligible_orgs
 
       prefetch_org_counts(orgs)
       prime_standing(people: persons, organizations: orgs)
 
       person_rows = persons.select { |person| listable_person?(person) }
-                           .map { |person| person_counterpart(person) }
-      person_rows_by_id = person_rows.index_by(&:id)
-      org_rows = orgs.map { |org| org_counterpart(org, person_rows_by_id) }
+                           .map { |person| person_counterpart(person, attention) }
+
+      # Add data flags: new sender, unread message, attachment.
+      add_person_flags!(person_rows, attention)
+
+      # Fold group threads: Need-you persons sharing a thread_id become one row.
+      person_rows = fold_group_threads(person_rows, attention)
+
+      # Orgs: a row ONLY when there is a money attention item for this org.
+      # No Recent org rows.
+      org_rows = orgs.filter_map do |org|
+        org_item = attention.for(org)
+        next unless org_item
+
+        org_counterpart(org, person_rows.index_by(&:id), org_item)
+      end
 
       person_rows + org_rows
     end
 
-    # Build a single counterpart for one person — used as a fallback when the
-    # standings table has no row for a person (e.g. right after deploy). Primes
-    # the shared standing instance for that person and builds the full counterpart.
+    # Build a single counterpart for one person.
     def counterpart_for(person)
+      attention = People::Attention.new(@user, now: @now)
       people_standing.prime(people: [ person ])
-      person_counterpart(person)
+      person_counterpart(person, attention)
     end
 
     # ── Exposed for People::Standings.refresh! ────────────────────────────────
     def readable_account_ids = @readable_account_ids ||= readable_accounts.map(&:id)
     def inbox_folder_ids     = @inbox_folder_ids     ||= Emails::InboxFolders.ids_for(readable_accounts)
 
-    # Org metadata for the `data` JSONB column (people_count + services_count),
-    # computed in batch by #prefetch_org_counts.
-    def org_row_data(org_id)
+    # Org metadata for the `data` JSONB column.
+    def org_row_data(org_id, extra: {})
       {
         "people_count"   => @org_people_counts&.dig(org_id) || 0,
         "services_count" => @org_services_counts&.dig(org_id) || 0
-      }
+      }.merge(extra)
     end
 
     private
@@ -78,7 +90,6 @@ module People
       @workspace.organizations.where(id: org_ids).to_a
     end
 
-    # Defense in depth over the eligibility query (mirrors PeopleLayout#listable_person?).
     def listable_person?(person)
       contacts = person.contacts.to_a
       return false if owner_person?(person, contacts)
@@ -101,33 +112,36 @@ module People
 
     # ── Counterpart construction ──────────────────────────────────────────────
 
-    def person_facts(person, standing)
+    def person_facts(person, standing, item_score: 0.0)
       People::Priority.facts_for(
         standing: standing,
         threads: people_standing.threads_for(person),
         contacts: person.contacts.to_a,
-        latest_inbound: people_standing.latest_inbound_for(person),
         relationship_type: person.relationship_type,
         last_activity: person.last_email_at,
-        now: @now
+        item_score: item_score
       )
     end
 
     def org_lead(org, person_rows_by_id)
       people_standing.sampled_people_for(org)
-                     .map { |member| person_rows_by_id[member.id] || person_counterpart(member) }
+                     .map { |member| person_rows_by_id[member.id] }
+                     .compact
                      .max_by(&:priority)
     end
 
     def standing_only_score(standing, last_activity)
-      facts = People::Priority.facts_for(standing: standing, threads: [], contacts: [], latest_inbound: nil,
-                                         relationship_type: nil, last_activity: last_activity, now: @now)
+      facts = People::Priority.facts_for(standing: standing, threads: [], contacts: [],
+                                         relationship_type: nil, last_activity: last_activity,
+                                         item_score: 0.0)
       People::Priority.score(facts, now: @now)
     end
 
-    def person_counterpart(person)
-      standing = people_standing.person(person)
-      facts = person_facts(person, standing)
+    def person_counterpart(person, attention)
+      attention_item = attention.for(person)
+      standing = people_standing.person(person, attention_item)
+      item_score = attention_item&.feed_item&.score.to_f
+      facts = person_facts(person, standing, item_score: item_score)
 
       People::Counterpart.new(
         kind: :person,
@@ -139,7 +153,8 @@ module People
         last_activity: person.last_email_at,
         standing: standing,
         facts: facts,
-        score: People::Priority.score(facts, now: @now)
+        score: People::Priority.score(facts, now: @now),
+        data: {}
       )
     end
 
@@ -149,12 +164,21 @@ module People
       person.contacts.max_by { |contact| contact.email_count.to_i }&.email
     end
 
-    def org_counterpart(org, person_rows_by_id = {})
+    def org_counterpart(org, person_rows_by_id = {}, org_attention_item = nil)
       people_count   = @org_people_counts&.dig(org.id) || 0
       services_count = @org_services_counts&.dig(org.id) || 0
       last_activity  = @org_last_activity&.dig(org.id)
-      standing       = people_standing.organization(org)
+      standing       = people_standing.organization(org, org_attention_item)
       lead           = org_lead(org, person_rows_by_id)
+      item_score     = org_attention_item&.feed_item&.score.to_f
+
+      facts = if lead
+                lead.facts
+      elsif standing.needs_you
+                People::Priority.facts_for(standing: standing, threads: [], contacts: [],
+                                           relationship_type: nil, last_activity: last_activity,
+                                           item_score: item_score)
+      end
 
       People::Counterpart.new(
         kind: :organization,
@@ -165,8 +189,9 @@ module People
         avatar_initial: org.name.to_s[0].to_s.upcase.presence || "?",
         last_activity: last_activity,
         standing: standing,
-        facts: lead&.facts,
-        score: lead&.score || standing_only_score(standing, last_activity)
+        facts: facts,
+        score: lead&.score || standing_only_score(standing, last_activity),
+        data: { "people_count" => people_count, "services_count" => services_count }
       )
     end
 
@@ -177,9 +202,106 @@ module People
       parts.join(" · ")
     end
 
+    # ── Person data flags (new / unread / has_attachment) ────────────────────
+
+    def add_person_flags!(rows, attention)
+      return if rows.empty?
+
+      # One grouped query: threads with at least one unread inbound message.
+      standing_thread_ids = rows.filter_map { |cp| cp.standing.thread_id }
+      unread_thread_set   = unread_thread_ids(standing_thread_ids)
+
+      rows.each do |cp|
+        person = cp.record
+        next unless person
+
+        contacts = person.contacts.to_a
+        item = attention.for(person)
+
+        data = cp.data.dup
+        data["new"]            = new_sender?(contacts, people_standing.threads_for(person))
+        data["unread"]         = unread_thread_set.include?(cp.standing.thread_id)
+        data["has_attachment"] = item&.message&.has_attachment? || false
+
+        # Rebuild with the enriched data field.
+        rows[rows.index(cp)] = cp.with(data: data)
+      end
+    end
+
+    # True for a person with at most 1 message and no outbound from you.
+    def new_sender?(contacts, threads)
+      email_count = contacts.sum { |c| c.email_count.to_i }
+      return false unless email_count <= 1
+
+      threads.none? { |t| t.last_outbound_at.present? }
+    end
+
+    # One query: thread ids that have at least one inbound message with read: false.
+    def unread_thread_ids(thread_ids)
+      return Set.new if thread_ids.empty?
+
+      set = EmailMessage.where(email_thread_id: thread_ids)
+                        .where(read: false)
+                        .where.not(from_address: readable_accounts.map(&:email_address).map(&:downcase))
+                        .distinct
+                        .pluck(:email_thread_id)
+                        .to_set
+      set
+    rescue StandardError
+      Set.new
+    end
+
+    # ── Group-thread folding ─────────────────────────────────────────────────
+    # Among Need-you person rows sharing a thread_id, keep the highest-scoring
+    # one, set its name to all participants (max 3 + "+N"), data["participant_ids"],
+    # and drop the others.
+
+    def fold_group_threads(rows, attention)
+      need_you_rows, recent_rows = rows.partition { |cp| cp.needs_you? }
+
+      # Group Need-you rows by thread_id.
+      by_thread = need_you_rows.group_by { |cp| cp.standing.thread_id }
+      grouped_thread_ids = by_thread.filter_map { |tid, grp| tid if grp.size > 1 }.to_set
+
+      # Persons to drop from Recent (they appear in a group row instead).
+      dropped_ids = Set.new
+
+      folded_need_you = need_you_rows.filter_map do |cp|
+        tid = cp.standing.thread_id
+        next nil if grouped_thread_ids.include?(tid) && by_thread[tid].max_by(&:priority) != cp
+
+        if grouped_thread_ids.include?(tid)
+          # This is the winner. Build the group row.
+          group = by_thread[tid].sort_by(&:priority).reverse
+          group.each { |member| dropped_ids << member.id if member != cp }
+
+          participants = attention.participants(tid)
+          name = group_name(participants, group)
+          participant_ids = group.map(&:id)
+
+          data = cp.data.merge("participant_ids" => participant_ids)
+          cp.with(name: name, data: data)
+        else
+          cp
+        end
+      end.compact
+
+      # Drop group participants from Recent too.
+      filtered_recent = recent_rows.reject { |cp| dropped_ids.include?(cp.id) }
+
+      folded_need_you + filtered_recent
+    end
+
+    def group_name(participants, group)
+      names = (participants.map(&:display_name) + group.map(&:name)).uniq
+      if names.size <= 3
+        names.join(", ")
+      else
+        "#{names.first(3).join(', ')} +#{names.size - 3}"
+      end
+    end
+
     # ── Batch org count queries ───────────────────────────────────────────────
-    # Called once before building org counterparts. Three queries for all orgs
-    # instead of three per org.
 
     def prefetch_org_counts(orgs)
       return if orgs.empty?
@@ -190,7 +312,6 @@ module People
       @org_last_activity   = batch_last_activity(org_ids)
     end
 
-    # COUNT of distinct active people with a person-kind contact per org.
     def batch_person_counts(org_ids)
       result = OrganizationMembership.active
                                      .where(organization_id: org_ids)
@@ -201,7 +322,6 @@ module People
       result.transform_keys(&:itself)
     end
 
-    # COUNT of service-kind contacts per org (via org -> people -> contacts).
     def batch_service_counts(org_ids)
       result = Contact.joins(person: :organization_memberships)
                       .where(organization_memberships: { organization_id: org_ids })

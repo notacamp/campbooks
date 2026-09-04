@@ -51,16 +51,16 @@ RSpec.describe "People", type: :request do
     end
 
     describe "GET /people" do
-      it "lists persons under Need you and Recent, by standing" do
-        make_person(name: "Sofia Martins", email: "sofia@brightloop.example", org_name: "Brightloop", owe: true)
-        make_person(name: "Ana Reis", email: "ana@accounting.example", org_name: "Accounting", owe: false)
+      it "lists persons and the Recent section (lanes appear only when feed items exist)" do
+        make_person(name: "Sofia Martins", email: "sofia@brightloop.example", org_name: "Brightloop")
+        make_person(name: "Ana Reis", email: "ana@accounting.example", org_name: "Accounting")
         refresh_standings!
 
         get people_path
         expect(response).to have_http_status(:ok)
-        expect(response.body).to include("Need you").and include("Recent")
+        # Without live feed items all persons fall to Recent (no attention standings).
+        expect(response.body).to include("Recent")
         expect(response.body).to include("Sofia Martins").and include("Ana Reis")
-        expect(response.body).to include("Waiting on your reply")
       end
 
       it "filters by ?q= through the standings table" do

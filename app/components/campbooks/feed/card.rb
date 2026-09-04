@@ -18,12 +18,14 @@ module Campbooks
         "starred_email"   => Campbooks::Feed::StarredEmailCard,
         "email_action"    => Campbooks::Feed::EmailActionCard,
         "reply_reminder"  => Campbooks::Feed::ReplyReminderCard,
+        "reply_owed"      => Campbooks::Feed::ReplyReminderCard,
         "follow_up"       => Campbooks::Feed::FollowUpCard,
         "tag_suggestion"  => Campbooks::Feed::TagSuggestionCard,
         "reminder"        => Campbooks::Feed::ReminderCard,
         "task"            => Campbooks::Feed::TaskCard,
         "digest_issue"    => Campbooks::Feed::DigestCard,
-        "late_receivable" => Campbooks::Feed::LateReceivableCard
+        "late_receivable" => Campbooks::Feed::LateReceivableCard,
+        "late_payable"    => Campbooks::Feed::LatePayableCard
       }.freeze
 
       # @param live [Boolean] tag this render as a live-broadcast insertion

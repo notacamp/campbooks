@@ -54,14 +54,7 @@ module People
     THREAD_SATURATION = 2.0    # one real exchange already counts; three is a relationship
     VOLUME_SATURATION = 10.0
 
-    YOU_OWE_BASE = 1.0
-    NUDGE_WEIGHT = 0.7
-    UNVETTED_NUDGE_WEIGHT = 0.45
-    OBLIGATION_FLOOR = 0.5
     RECENT_STRENGTH_WEIGHT = 0.5
-    PROMPT_BONUS = 0.5       # the latest message carries a Scout action prompt
-    IMPORTANT_BONUS = 0.5    # …or the AI read it as high priority / important
-    FOLLOW_UP_BONUS = 0.5    # an AI-confirmed follow-up has come due
 
     Facts = Data.define(
       :standing,           # People::Standing::Result
@@ -72,10 +65,7 @@ module People
       :allowed,
       :classified,         # any contact carries a sender_kind verdict
       :relationship_type,  # Person::RELATIONSHIP_TYPES value or nil
-      :action_prompt,      # latest inbound carries a Scout action prompt
-      :important,          # latest inbound is high priority / important
-      :follow_up_due,      # a thread's AI-confirmed follow-up has come due
-      :follow_up_vetted,   # the standing's nudge thread carries an AI follow-up verdict
+      :item_score,         # feed item's ranked score (0.0 when no attention item)
       :last_activity       # Time or nil
     )
 
@@ -84,10 +74,10 @@ module People
     class << self
       def score(facts, now: Time.current) = new(facts, now: now).score
 
-      # Builds the Facts for one person from already-loaded records: their inbox
-      # threads (reply-state columns), their contacts, and the newest inbound
-      # message. Pure over the records handed in — no queries.
-      def facts_for(standing:, threads:, contacts:, latest_inbound:, relationship_type:, last_activity:, now: Time.current)
+      # Builds the Facts for one person from already-loaded records. Pure over the
+      # records handed in — no queries. `item_score` is the feed item's ranked
+      # score for attention rows; 0.0 for recent rows.
+      def facts_for(standing:, threads:, contacts:, relationship_type:, last_activity:, item_score: 0.0, **_)
         Facts.new(
           standing: standing,
           two_way_threads: threads.count { |t| t.last_inbound_at.present? && t.last_outbound_at.present? },
@@ -97,20 +87,9 @@ module People
           allowed: contacts.any?(&:allowed?),
           classified: contacts.any? { |c| c.sender_kind_source.present? },
           relationship_type: relationship_type.presence,
-          action_prompt: latest_inbound&.ai_action_prompt.to_s.strip.present?,
-          important: important?(latest_inbound),
-          follow_up_due: threads.any? { |t| t.follow_up_due?(now) },
-          follow_up_vetted: threads.any? { |t| t.id == standing.thread_id && t.follow_up_last_analyzed_at.present? },
+          item_score: item_score.to_f,
           last_activity: last_activity
         )
-      end
-
-      private
-
-      def important?(message)
-        return false if message.nil?
-
-        message.ai_priority.to_s == "high" || message.category.to_s == "important"
       end
     end
 
@@ -151,29 +130,16 @@ module People
 
     def needs_you? = @facts.standing.needs_you
 
+    # Need-you score: feed item's ranked score + relationship strength (breaks
+    # ties toward real relationships). The feed rank already folds urgency,
+    # relevance and recency decay; strength ensures a genuine correspondent
+    # outranks a stranger with an equally-scored item.
     def obligation_score
-      urgency * (1 + strength) + bonuses
-    end
-
-    # A reply you owe is an obligation and always leads; a nudge is an option,
-    # and an unvetted one (no Ai::FollowUpAnalyzer verdict yet) only a guess.
-    def urgency
-      wait = saturate(@facts.standing.overdue_days, WAIT_SATURATION_DAYS)
-      case @facts.standing.kind
-      when :you_owe then YOU_OWE_BASE + wait
-      when :nudge then (@facts.follow_up_vetted ? NUDGE_WEIGHT : UNVETTED_NUDGE_WEIGHT) * (OBLIGATION_FLOOR + wait)
-      else OBLIGATION_FLOOR
-      end
+      @facts.item_score + strength
     end
 
     def recent_score
-      recency * (1 + RECENT_STRENGTH_WEIGHT * strength) + bonuses
-    end
-
-    def bonuses
-      (@facts.action_prompt ? PROMPT_BONUS : 0) +
-        (@facts.important ? IMPORTANT_BONUS : 0) +
-        (@facts.follow_up_due ? FOLLOW_UP_BONUS : 0)
+      recency * (1 + RECENT_STRENGTH_WEIGHT * strength)
     end
 
     def relationship_weight

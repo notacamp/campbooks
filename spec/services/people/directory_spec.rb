@@ -42,10 +42,32 @@ RSpec.describe People::Directory do
       expect(names).to include("Sofia")
     end
 
-    it "includes an org when it has a person member with mail" do
+    it "excludes an org without a money feed item (orgs only appear for pay/chase)" do
       org = create(:organization, workspace: workspace, name: "Cloudhost")
       person, = make_person(name: "Rui", email: "rui@cloudhost.example")
       create(:organization_membership, person: person, organization: org)
+
+      names = directory.counterparts.map(&:name)
+      expect(names).not_to include("Cloudhost")
+      expect(names).to include("Rui")
+    end
+
+    it "includes an org when attention returns a money item for it" do
+      org = create(:organization, workspace: workspace, name: "Cloudhost")
+      person, = make_person(name: "Rui", email: "rui@cloudhost.example")
+      create(:organization_membership, person: person, organization: org)
+
+      org_item = instance_double(People::Attention::Item,
+                                 verb: :chase, subject: "Invoice #1", wait_days: 14, text: nil,
+                                 thread_id: nil, message: nil, attention: true,
+                                 feed_item: instance_double(FeedItem, id: SecureRandom.uuid, score: 80.0, sort_at: Time.current))
+
+      attn = instance_double(People::Attention)
+      allow(attn).to receive(:for).with(kind_of(Person)).and_return(nil)
+      allow(attn).to receive(:for).with(org).and_return(org_item)
+      allow(attn).to receive(:participants).and_return([])
+      allow(attn).to receive(:items_by_counterpart).and_return({})
+      allow(People::Attention).to receive(:new).and_return(attn)
 
       names = directory.counterparts.map(&:name)
       expect(names).to include("Cloudhost")
@@ -99,19 +121,29 @@ RSpec.describe People::Directory do
       expect(names).not_to include("Blocked")
     end
 
-    it "ranks an org as its lead person" do
+    it "an org row has a positive priority when it has a money attention item" do
       org = create(:organization, workspace: workspace, name: "Cloudhost")
-      person, = make_person(name: "Rui Santos", email: "rui@cloudhost.example", owe: true,
+      person, = make_person(name: "Rui Santos", email: "rui@cloudhost.example",
                             inbound_at: 2.days.ago, emails: 5)
       create(:organization_membership, person: person, organization: org)
 
+      org_item = instance_double(People::Attention::Item,
+                                 verb: :chase, subject: "Invoice #1", wait_days: 14, text: nil,
+                                 thread_id: nil, message: nil, attention: true,
+                                 feed_item: instance_double(FeedItem, id: SecureRandom.uuid, score: 80.0, sort_at: Time.current))
+
+      attn = instance_double(People::Attention)
+      allow(attn).to receive(:for).with(kind_of(Person)).and_return(nil)
+      allow(attn).to receive(:for).with(org).and_return(org_item)
+      allow(attn).to receive(:participants).and_return([])
+      allow(attn).to receive(:items_by_counterpart).and_return({})
+      allow(People::Attention).to receive(:new).and_return(attn)
+
       counterparts = directory.counterparts
-      rui      = counterparts.find { |c| c.name == "Rui Santos" }
       cloudhost = counterparts.find { |c| c.name == "Cloudhost" }
 
-      # Org should have the same score as its lead person, so it sits right behind
+      expect(cloudhost).not_to be_nil
       expect(cloudhost.priority).to be > 0
-      expect(rui.priority).to be >= cloudhost.priority
     end
   end
 end

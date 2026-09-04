@@ -11,6 +11,11 @@ en:
     people:
       counterpart_row:
         open: Open
+        new: New
+        wait_days:
+          zero: "0d"
+          one: "1d"
+          other: "%{count}d"
       search_bar:
         placeholder: Find a person or company…
         clear: Clear
@@ -50,17 +55,20 @@ en:
       empty_hint: Connect a mailbox and Scout sorts your senders into people and services here.
       placeholder_title: Pick someone to open
       placeholder_body: Choose a person or company to see the whole conversation in one place.
+      lanes:
+        reply: Reply
+        decide: Decide
+        pay: Pay
+        chase: Chase
+        nudge: Nudge
+      streams_foot:
+        zero: Streams
+        one: "Streams · %{count}"
+        other: "Streams · %{count}"
+      new: New
     standing:
-      you_owe:
-        zero: Waiting on your reply.
-        one: Waiting on your reply for a day.
-        other: Waiting on your reply for %{count} days.
-      awaiting_them:
-        zero: No reply to %{subject}. Nudge?
-        one: No reply to %{subject} for a day. Nudge?
-        other: No reply to %{subject} for %{count} days. Nudge?
-      your_last_message: your last message
-      last_exchange: "Last exchange %{date}."
+      money_subject: "%{amount} · due %{date}"
+      no_standing: Nothing needs you here right now.
     conversation:
       you: You
       back: People

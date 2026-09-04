@@ -2,16 +2,19 @@
 
 module Campbooks
   module People
-    # One counterpart in the People list: a person or an organization. Avatar,
-    # name + time, a subtitle (the person's organization, or "Organization · N
-    # people · N services"), then Scout's Ember-spark one-liner about where things
-    # stand. Two shapes:
-    #   * default — the left-pane row; the whole row opens the counterpart in the
-    #     "people_detail" frame (and flips the mobile master-detail to the detail).
-    #   * nested  — the organization page's "People at …" rows: same body, but an
-    #     "Open" button on the right (the row isn't itself a link).
+    # One counterpart in the People list: a person or organization, inbox density.
+    #
+    # Line 1: avatar (30 px, unread dot) | name ["New" chip] [middot] subject (muted,
+    #         truncate) | wait (Need-you) or date (Recent)
+    # Line 2: spark + Scout text (only when standing.text present), one line.
+    #
+    # Two shapes:
+    #   * default  — the left-pane row; the whole row opens the counterpart.
+    #   * nested   — the organization page's "People at ..." rows: same body, but
+    #                an "Open" button on the right (the row is not itself a link).
     class CounterpartRow < Campbooks::Base
-      SPARK = '<svg viewBox="0 0 24 24" fill="currentColor" class="h-[13px] w-[13px]" aria-hidden="true"><path d="M12 5l1.7 5.6L19.5 12l-5.8 1.4L12 19l-1.7-5.6L4.5 12l5.8-1.4z"/></svg>'
+      SPARK = '<svg viewBox="0 0 24 24" fill="currentColor" class="h-[12px] w-[12px]" aria-hidden="true"><path d="M12 5l1.7 5.6L19.5 12l-5.8 1.4L12 19l-1.7-5.6L4.5 12l5.8-1.4z"/></svg>'
+      PAPERCLIP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-[11px] w-[11px]" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>'
 
       # @param counterpart [People::Counterpart]
       # @param selected [Boolean] lit (left-pane selection)
@@ -32,17 +35,17 @@ module Campbooks
         a(href: href,
           data: { turbo_frame: "people_detail", turbo_action: "advance", action: "click->email-mobile#showDetail" },
           class: class_names(
-            "flex items-start gap-3 rounded-xl px-3 py-2.5 no-underline transition-colors",
+            "flex items-start gap-2.5 rounded-xl px-3 py-[7px] no-underline transition-colors",
             @selected ? "bg-secondary" : "hover:bg-secondary/60"
           )) do
-          avatar
+          avatar_with_dot
           body
         end
       end
 
       def nested_row
-        div(class: "flex items-start gap-3 py-2.5") do
-          avatar
+        div(class: "flex items-start gap-2.5 py-[7px]") do
+          avatar_with_dot
           body
           a(href: href, data: { turbo_frame: "people_detail", turbo_action: "advance", action: "click->email-mobile#showDetail" },
             class: "mt-0.5 inline-flex h-[26px] flex-shrink-0 items-center rounded-lg border border-border px-2.5 text-[12px] font-medium text-foreground no-underline hover:bg-secondary") do
@@ -53,35 +56,67 @@ module Campbooks
 
       def body
         div(class: "min-w-0 flex-1") do
-          div(class: "flex items-baseline gap-2") do
-            span(class: "min-w-0 flex-1 truncate text-[13.5px] font-semibold text-foreground") { @counterpart.name }
-            if (time = @counterpart.last_activity)
-              span(class: "flex-shrink-0 text-[11.5px] text-muted-foreground") { row_time(time) }
+          # Line 1: name [chip] [dot] subject | wait/date
+          div(class: "flex items-baseline gap-1.5") do
+            div(class: "min-w-0 flex-1 flex items-baseline gap-1 truncate") do
+              span(class: "flex-shrink-0 text-[13.5px] font-semibold text-foreground") { @counterpart.name }
+              if new_sender?
+                span(class: "flex-shrink-0 rounded bg-ember-solid/15 px-1 py-px text-[9.5px] font-semibold uppercase tracking-wide text-ember-solid") { t(".new") }
+              end
+              if (subj = standing.subject).present?
+                span(class: "flex-shrink-0 text-muted-foreground/50 text-[12px]") { "·" }
+                span(class: "min-w-0 truncate text-[12.5px] text-muted-foreground") { subj }
+              end
             end
+            right_meta
           end
-          if @counterpart.subtitle.present?
-            div(class: "truncate text-[12px] text-muted-foreground") { @counterpart.subtitle }
-          end
+
+          # Line 2: spark text (when present)
           standing_line
         end
       end
 
-      def standing_line
-        text = @counterpart.standing.text
-        return if text.blank?
-
-        div(class: "mt-1 flex items-start gap-1.5 text-[12.5px] leading-snug text-foreground/80") do
-          span(class: "mt-[2px] flex-shrink-0", style: "color: var(--ember-solid)") { raw(safe(SPARK)) }
-          span(class: "min-w-0") { text }
+      def right_meta
+        if @counterpart.needs_you?
+          wait = standing.wait_days.to_i
+          urgent = wait >= 7
+          div(class: "flex flex-shrink-0 items-center gap-0.5") do
+            if has_attachment?
+              span(class: "text-muted-foreground/60") { raw(safe(PAPERCLIP)) }
+            end
+            span(class: class_names("text-[11.5px] font-semibold tabular-nums",
+                                    urgent ? "text-ember-solid" : "text-muted-foreground")) do
+              t(".wait_days", count: wait)
+            end
+          end
+        elsif (time = @counterpart.last_activity)
+          span(class: "flex-shrink-0 text-[11.5px] text-muted-foreground") { row_time(time) }
         end
       end
 
-      def avatar
-        if @counterpart.person?
-          render(ContactAvatar.new(email: @counterpart.avatar_email.to_s, size: :lg, contact_id: nil, variant: :neutral))
-        else
-          div(class: "flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-secondary text-[13px] font-semibold text-muted-foreground") do
-            plain(@counterpart.avatar_initial.to_s)
+      def standing_line
+        text = standing.text
+        return if text.blank?
+
+        div(class: "mt-0.5 flex items-start gap-1 text-[12px] leading-snug text-foreground/70 line-clamp-1") do
+          span(class: "mt-[2px] flex-shrink-0", style: "color: var(--ember-solid)") { raw(safe(SPARK)) }
+          span(class: "min-w-0 line-clamp-1") { text }
+        end
+      end
+
+      def avatar_with_dot
+        div(class: "relative flex-shrink-0") do
+          if @counterpart.person?
+            render(ContactAvatar.new(email: @counterpart.avatar_email.to_s, size: :sm,
+                                     contact_id: nil, variant: :neutral))
+          else
+            div(class: "flex h-[30px] w-[30px] items-center justify-center rounded-full bg-secondary text-[12px] font-semibold text-muted-foreground") do
+              plain(@counterpart.avatar_initial.to_s)
+            end
+          end
+          if unread?
+            span(class: "absolute bottom-0 right-0 h-2 w-2 rounded-full border border-background",
+                 style: "background-color: var(--ember-solid)") { }
           end
         end
       end
@@ -90,7 +125,14 @@ module Campbooks
         @counterpart.person? ? helpers.person_page_path(@counterpart.id) : helpers.people_organization_path(@counterpart.id)
       end
 
-      # Today → clock ("11:01 AM"); this year → "Jul 18"; older → full date.
+      def standing = @counterpart.standing
+      def data     = @counterpart.data || {}
+
+      def new_sender?   = data["new"] == true
+      def unread?       = data["unread"] == true
+      def has_attachment? = data["has_attachment"] == true
+
+      # Today -> clock ("11:01 AM"); this year -> "Jul 18"; older -> full date.
       def row_time(time)
         if time.to_date == Date.current
           l(time, format: :clock)
