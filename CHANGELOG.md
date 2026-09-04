@@ -34,6 +34,9 @@ major, minor, or patch change here.
 
 - Menus in People (a row's More menu, the conversation menu) close when you click
   anywhere else, and on Escape.
+- The People page no longer scrolls into blank space when the wheel lands between
+  the list and the conversation: the list's infinite-scroll spinner was stretching the
+  page below the viewport.
 
 ## [0.35.0] - 2026-09-04
 
