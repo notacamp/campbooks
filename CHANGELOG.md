@@ -16,6 +16,10 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **A person's details in People.** Their addresses, organization, relationship, Scout's read, the numbers, every thread, documents and events with them, and star / allow / block / merge — from the person's name, the row menu or the i key.
+
 ### Changed
 
 - **Conversations read newest to oldest.** In People, each thread opens on its latest
@@ -35,6 +39,9 @@ major, minor, or patch change here.
 
 - Menus in People (a row's More menu, the conversation menu) close when you click
   anywhere else, and on Escape.
+- The People page no longer scrolls into blank space when the wheel lands between
+  the list and the conversation: the list's infinite-scroll spinner was stretching the
+  page below the viewport.
 
 ## [0.35.0] - 2026-09-04
 

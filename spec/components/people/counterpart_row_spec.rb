@@ -152,8 +152,10 @@ RSpec.describe Campbooks::People::CounterpartRow, type: :component do
       expect(latest).to include("id=\"people_row_latest_#{person.id}\"")
       expect(latest).not_to include("id=\"people_row_#{person.id}\"")
       expect(latest).to include("Can you send the deck by Friday?")
-      expect(lane).to include("2d")        # the lane shape shows how long they have waited
-      expect(latest).not_to include("2d")  # the inbox shape shows when the message arrived
+      # Match the wait chip as element text ("…>2d<…"), not as a substring: the row's
+      # UUID id can contain "2d" and made this assertion flaky.
+      expect(lane).to match(%r{>\s*2d\s*<})        # the lane shape shows how long they have waited
+      expect(latest).not_to match(%r{>\s*2d\s*<})  # the inbox shape shows when the message arrived
     end
   end
 end

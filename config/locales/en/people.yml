@@ -23,9 +23,9 @@ en:
           star_hint: "Star"
           unstar_hint: "Unstar"
           more_hint: "More (.)"
+          details: Details
           archive: Archive thread
           block: Block sender
-          open_profile: Profile
       search_bar:
         placeholder: Find a person or company…
         clear: Clear
@@ -45,6 +45,66 @@ en:
         reply_hint: "Reply (r)"
         reply_all_hint: "Reply all (a)"
         forward_hint: "Forward (f)"
+      details:
+        title: Details
+        back: Back
+        save: Save
+        rename_label: Person name
+        person_singular: person
+        persons_plural: people
+        since: "since %{date}"
+        addresses:
+          one: "%{count} address"
+          other: "%{count} addresses"
+        no_relationship: "Relationship…"
+        starred: "Starred"
+        blocked: "Blocked"
+        allowed: "Allowed"
+        primary_badge: primary
+        copy_email: Copy email address
+        kind_person: Person
+        kind_service: Service
+        make_person: Mark as person
+        make_service: Mark as service
+        scout_not_read: "Scout hasn't read this person yet."
+        read_on: "Read on %{date}"
+        refresh: Refresh
+        refresh_hint: Ask Scout to re-read this person
+        all_in_paper: All in Paper
+        open_time: Open Time
+        no_event_title: "(untitled)"
+        unknown_kind: Document
+        thread_message_one: message
+        thread_messages_other: messages
+        sections:
+          scout_read: "Scout's read"
+          numbers: Numbers
+          threads: Threads
+          documents: Documents
+          events: Events
+        patterns:
+          topics: Topics
+          tone: Tone
+          urgency: Urgency
+          primary_role: Role
+        numbers:
+          received: Received
+          sent: Sent
+          threads: Threads
+          documents: Documents
+          first_contact: First contact
+          last_contact: Last contact
+        threads_more: "and %{count} more"
+        manage:
+          star: Star
+          unstar: Unstar
+          allow: Always allow
+          block: Block
+          block_confirm: Block this person? Their mail will be auto-archived.
+          unblock: Unblock
+          open_org: "Open %{org}"
+          same_person: Same person?
+          merge: "Merge with %{name}"
   people:
     index:
       tab_people: People
@@ -120,7 +180,6 @@ en:
       reply: Reply
       newer_threads: Newer threads
       older: Older conversations
-      open_profile: Profile
       star: Star
       unstar: Unstar
       block: Block
@@ -160,3 +219,14 @@ en:
       streams_heading: "Streams from %{org} · %{count}"
       no_streams: No services yet.
       open_stream: Open stream
+    details:
+      title: Details
+      toasts:
+        starred: Starred
+        unstarred: Unstarred
+        allowed: Always allowed
+        blocked: Blocked
+        unblocked: Unblocked
+        analysis_queued: Scout is re-reading this person
+        merged: "Merged with %{name}"
+        merge_dismissed: Dismissed
