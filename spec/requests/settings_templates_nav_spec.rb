@@ -25,14 +25,16 @@ RSpec.describe "SettingsTemplatesNav", type: :request do
     expect(response.body).not_to include(settings_email_templates_path)
   end
 
-  it "shows the template links when the readiness flags are on" do
-    # Features reads ENV at call time; flip the flags for this request and restore.
+  it "the template pages are accessible when the readiness flags are on" do
+    # In bold layout, templates are reached via Scout's memory edit links, not via
+    # direct sidebar entries. Verify the pages themselves are reachable when gated on.
     keys = %w[ENABLE_DOCUMENT_TEMPLATES ENABLE_EMAIL_TEMPLATES]
     with_env(keys.index_with { "1" }) do
-      get settings_root_path
+      get settings_document_templates_path
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include(settings_document_templates_path)
-      expect(response.body).to include(settings_email_templates_path)
+
+      get settings_email_templates_path
+      expect(response).to have_http_status(:ok)
     end
   end
 end

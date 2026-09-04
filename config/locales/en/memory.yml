@@ -108,9 +108,8 @@ en:
         button: Teach
   navigation:
     settings:
-      bold:
-        memory: Scout's memory
-        connections: Connections
-        workspace_people: Workspace & people
-        account: Account
-        plan: Plan
+      memory: Scout's memory
+      connections: Connections
+      workspace_people: Workspace & people
+      account: Account
+      plan: Plan

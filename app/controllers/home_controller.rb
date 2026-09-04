@@ -18,16 +18,9 @@ class HomeController < ApplicationController
   PAGE_SIZE = 8
 
   def index
-    # Bold-layout users land on the Now page at the root. `/home` stays the classic
-    # feed and never redirects, so it's always reachable (the Now page links to it
-    # as its "Classic feed" escape hatch). Native shells keep their own root.
-    if bold_layout? && request.path == "/" && !hotwire_native_app?
-      redirect_to(now_path) and return
-    end
-
-    # Home renders its own (classic, link) docked Scout bar, so the bold layout
-    # must not also drop the overlay bar on top of it (layout_scout_bar?).
-    @renders_own_scout_bar = true
+    # `/` and `/home` both land on Now (the decision deck).
+    # Native shells use their own root and are not redirected.
+    redirect_to(now_path) and return unless hotwire_native_app?
 
     @reader = Feed::Reader.new(current_user)
     # Past the curated spine, the same infinite scroll falls into Rewind — the

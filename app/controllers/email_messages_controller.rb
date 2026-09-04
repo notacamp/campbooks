@@ -379,12 +379,10 @@ class EmailMessagesController < ApplicationController
 
   private
 
-  # Bold-layout "compose from intent": infer To/Subject from the context the user
-  # came from (an overlay "write to Sofia about…" note → ?intent=, People's
-  # "Reply to <name>" → ?to=). Inferred fields carry a muted "· inferred" suffix
-  # in the composer. No-op in classic layout, or when there's nothing to infer.
+  # "Compose from intent": infer To/Subject from the context the user came from
+  # (an overlay "write to Sofia about…" note → ?intent=, People's "Reply to <name>"
+  # → ?to=). Inferred fields carry a muted "· inferred" suffix in the composer.
   def prefill_from_intent
-    return unless bold_layout?
     return if @intent.blank? && params[:to].blank?
 
     intent = Emails::IntentPrefill.for(user: Current.user, intent: @intent, to: params[:to])

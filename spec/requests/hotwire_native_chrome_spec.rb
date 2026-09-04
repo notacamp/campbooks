@@ -17,7 +17,7 @@ RSpec.describe "Hotwire Native chrome", type: :request do
   end
 
   it "renders the topbar and no native class for ordinary web requests" do
-    get root_path
+    get now_path
 
     expect(response).to have_http_status(:ok)
     expect(response.body).to include('class="h-full "')

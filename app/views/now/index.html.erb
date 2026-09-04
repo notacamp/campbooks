@@ -1,7 +1,5 @@
-<%# The Now surface — the rethought "bold" home: Scout's ledger, the segment
-    rings, the decision deck over the same materialized feed, Scout's log, and the
-    docked Scout bar. Gated on Features.bold_layout? (NowController). The Scout
-    overlay is a follow-up PR; the bar here just links to /scout. %>
+<%# The Now surface — Scout's ledger, the segment rings, the decision deck over
+    the same materialized feed, Scout's log, and the docked Scout bar. %>
 <%# Bottom clearance for the docked Scout bar is reserved by the shell now
     (app-shell pb-36/lg:pb-24), so the column only needs normal breathing room. %>
 <% content_for :main_class, "mx-auto w-full max-w-[680px] px-4 pb-10 pt-8 sm:pt-10 lg:pb-12" %>
@@ -17,19 +15,13 @@
   <div class="min-w-0 flex-1">
     <div class="flex items-start justify-between gap-3">
       <%= render Campbooks::TimeOfDayGreeting.new(name: name, glyph: false) %>
-      <%# Desktop escape hatch to the classic feed (never redirects). %>
-      <%= link_to t(".classic_feed"), home_path,
-            class: "hidden shrink-0 pt-1 text-[13px] text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground lg:inline-flex" %>
     </div>
 
-    <%# Mobile: the "N need you" chip carries what the desktop sentence says, plus
-        the classic-feed escape hatch under the greeting. %>
+    <%# Mobile: the "N need you" chip. %>
     <div class="mt-2 flex items-center gap-2.5 lg:hidden">
       <span class="inline-flex items-center rounded-md bg-secondary px-2 py-0.5 text-[11.5px] font-medium text-muted-foreground">
         <%= t(".need_you_chip", count: @segment_counts[:priority].to_i) %>
       </span>
-      <%= link_to t(".classic_feed"), home_path,
-            class: "text-xs text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground" %>
     </div>
 
     <p class="mt-1.5 text-[14.5px] leading-relaxed text-foreground/80">

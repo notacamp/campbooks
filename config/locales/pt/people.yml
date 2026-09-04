@@ -25,7 +25,7 @@ pt:
           more_hint: "Mais (.)"
           archive: Arquivar conversa
           block: Bloquear remetente
-          open_profile: Abrir perfil clássico
+          open_profile: Perfil
       search_bar:
         placeholder: Encontrar uma pessoa ou empresa…
         clear: Limpar
@@ -47,7 +47,6 @@ pt:
     index:
       tab_people: Pessoas
       tab_streams: Streams
-      classic_inbox: Caixa clássica
       latest: Mais recentes
       show_more:
         one: "Mostrar mais 1"
@@ -137,7 +136,6 @@ pt:
       placeholder_body: Um stream é o correio de um serviço — newsletters, recibos, notificações. Abra um para o percorrer, ou deixe-o estar.
       archive_all: Arquivar tudo
       archive_all_confirm: Arquivar todas as conversas deste stream?
-      open_classic: Abrir no clássico
       no_threads: Nada por aqui de momento.
       no_subject: (sem assunto)
     stream_kinds:
@@ -152,7 +150,7 @@ pt:
       documents:
         one: "%{count} documento"
         other: "%{count} documentos"
-      open_classic: Abrir página clássica da organização
+      open_page: Página da organização
       no_standing: Nada precisa de si por agora.
       people_heading: "Pessoas em %{org} · %{count}"
       no_people: Ainda sem pessoas.

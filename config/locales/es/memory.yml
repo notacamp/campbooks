@@ -108,9 +108,8 @@ es:
         button: Enseñar
   navigation:
     settings:
-      bold:
-        memory: Memoria de Scout
-        connections: Conexiones
-        workspace_people: Espacio y personas
-        account: Cuenta
-        plan: Plan
+      memory: Memoria de Scout
+      connections: Conexiones
+      workspace_people: Espacio y personas
+      account: Cuenta
+      plan: Plan

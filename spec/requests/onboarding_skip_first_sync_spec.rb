@@ -36,11 +36,14 @@ RSpec.describe "POST /onboarding/skip_first_sync", type: :request do
     end
   end
 
+  # Home feed is served to the native app shell; web users are redirected to /now.
+  NATIVE_UA_SKIP = "Campbooks/1.0 Hotwire Native iOS".freeze
+
   describe "home behaviour after skip" do
     it "does NOT render the first-sync stage even while stage? is true" do
       setup_mid_scan_account
-      # First visit without skip — stage is shown
-      get root_path
+      # First visit without skip — stage is shown (native UA to get the feed)
+      get root_path, headers: { "HTTP_USER_AGENT" => NATIVE_UA_SKIP }
       expect(response.body).to include("data-controller=\"first-sync\"")
 
       # Now skip
@@ -48,7 +51,7 @@ RSpec.describe "POST /onboarding/skip_first_sync", type: :request do
       follow_redirect!
 
       # Back to home — should render normal home, not the stage
-      get root_path
+      get root_path, headers: { "HTTP_USER_AGENT" => NATIVE_UA_SKIP }
       expect(response.body).not_to include("data-controller=\"first-sync\"")
     end
 
@@ -57,7 +60,7 @@ RSpec.describe "POST /onboarding/skip_first_sync", type: :request do
       post skip_first_sync_onboarding_path
       follow_redirect!
 
-      get root_path
+      get root_path, headers: { "HTTP_USER_AGENT" => NATIVE_UA_SKIP }
       # The syncing empty-state copy, NOT "All caught up"
       expect(response.body).to include("Scout is reading your inbox")
       expect(response.body).not_to include("All caught up")

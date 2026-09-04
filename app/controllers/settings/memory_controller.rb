@@ -5,7 +5,6 @@ module Settings
   # Reads the derived Scout::Memory::Catalog; teach creates a real record;
   # confirm/remove act on a learned-or-taught entry.
   class MemoryController < Settings::BaseController
-
     def show
       @facet = normalize_facet(params[:facet])
       @query = params[:q].to_s

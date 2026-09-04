@@ -9,7 +9,6 @@ RSpec.describe People::StandingsRefreshJob do
 
   before do
     create(:email_account_user, user: user, email_account: account, can_read: true)
-    allow(Features).to receive(:bold_layout?).and_return(true)
   end
 
   describe ".enqueue_for" do

@@ -25,7 +25,7 @@ en:
           more_hint: "More (.)"
           archive: Archive thread
           block: Block sender
-          open_profile: Open classic profile
+          open_profile: Profile
       search_bar:
         placeholder: Find a person or company…
         clear: Clear
@@ -47,7 +47,6 @@ en:
     index:
       tab_people: People
       tab_streams: Streams
-      classic_inbox: Classic inbox
       latest: Latest
       show_more:
         one: "Show 1 more"
@@ -118,7 +117,7 @@ en:
       empty: No messages yet.
       reply: Reply
       older: Older conversations
-      open_profile: Open classic profile
+      open_profile: Profile
       star: Star
       unstar: Unstar
       block: Block
@@ -137,7 +136,6 @@ en:
       placeholder_body: A stream is a service's mail — newsletters, receipts, notifications. Open one to skim it, or leave it be.
       archive_all: Archive all
       archive_all_confirm: Archive every thread in this stream?
-      open_classic: Open in classic
       no_threads: Nothing here right now.
       no_subject: (no subject)
     stream_kinds:
@@ -152,7 +150,7 @@ en:
       documents:
         one: "%{count} document"
         other: "%{count} documents"
-      open_classic: Open classic organization page
+      open_page: Organization page
       no_standing: Nothing needs you here right now.
       people_heading: "People at %{org} · %{count}"
       no_people: No people yet.

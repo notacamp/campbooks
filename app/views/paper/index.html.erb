@@ -1,7 +1,7 @@
 <%# Paper — every document as what it SAYS: a row of facts (kind, amount, the date that
     matters, a meaning-bearing status), Scout's read of what's open at the top, buckets +
-    an ask box, and Classic files as the escape hatch. Gated on Features.bold_layout?.
-    The `upload` controller drives the Add dialog; `doc-skim-overlay` drives Review. %>
+    an ask box, and a files escape hatch. The `upload` controller drives the Add dialog;
+    `doc-skim-overlay` drives Review. %>
 <% content_for :main_class, "mx-auto w-full max-w-[1180px] px-4 sm:px-6 lg:px-8 py-8" %>
 
 <div data-controller="upload doc-skim-overlay">
@@ -17,7 +17,7 @@
       <p class="mt-1 text-sm text-muted-foreground"><%= t(".subtitle") %></p>
     </div>
     <div class="flex flex-wrap items-center gap-2">
-      <%= link_to t(".classic_files"), files_path,
+      <%= link_to t(".files"), files_path,
             class: "px-2 text-[13px] text-muted-foreground underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground" %>
       <%= form_tag export_documents_path, method: :post, class: "inline" do %>
         <%= render "files/filter_hidden_fields", filters: @filters, q: params[:q] %>

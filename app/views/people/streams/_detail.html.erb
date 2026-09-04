@@ -31,9 +31,6 @@
               class: "inline-flex h-[30px] flex-shrink-0 items-center rounded-lg border border-border bg-transparent px-3 text-[12.5px] font-medium text-foreground hover:bg-secondary" do %>
           <%= t("people.streams.archive_all") %>
         <% end %>
-        <%= link_to t("people.streams.open_classic"), email_messages_path(group: @stream_name, show_list: 1),
-              data: { turbo_frame: "_top" },
-              class: "inline-flex h-[30px] flex-shrink-0 items-center rounded-lg border border-border px-3 text-[12.5px] font-medium text-foreground no-underline hover:bg-secondary" %>
       <% end %>
     </div>
 

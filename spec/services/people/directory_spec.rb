@@ -11,7 +11,6 @@ RSpec.describe People::Directory do
 
   before do
     create(:email_account_user, user: user, email_account: account, can_read: true)
-    allow(Features).to receive(:bold_layout?).and_return(true)
   end
 
   def directory = People::Directory.new(user, workspace: workspace, now: Time.current)
