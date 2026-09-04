@@ -51,7 +51,6 @@ module Campbooks
               end
             end
           end
-          span(class: "flex-1")
           if @ct.newest
             a(href: helpers.email_message_path(@ct.newest),
               data: { turbo_frame: "_top" },
