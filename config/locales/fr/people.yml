@@ -46,6 +46,7 @@ fr:
         reply_all_hint: "Répondre à tous (a)"
         forward_hint: "Transférer (f)"
       details:
+        close: Fermer
         title: Détails
         back: Retour
         save: Enregistrer

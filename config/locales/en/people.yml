@@ -46,6 +46,7 @@ en:
         reply_all_hint: "Reply all (a)"
         forward_hint: "Forward (f)"
       details:
+        close: Close
         title: Details
         back: Back
         save: Save

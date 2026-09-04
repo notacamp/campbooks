@@ -46,6 +46,7 @@ es:
         reply_all_hint: "Responder a todos (a)"
         forward_hint: "Reenviar (f)"
       details:
+        close: Cerrar
         title: Detalles
         back: Volver
         save: Guardar

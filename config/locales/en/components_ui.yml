@@ -132,6 +132,7 @@ en:
       title: Inbox settings
     keyboard_shortcuts_modal:
       contexts:
+        people: People
         calendar: Calendar
         email: Email
         feed: Feed
@@ -141,6 +142,15 @@ en:
         selection: Selection
       footer_hint: Press ? to open this dialog at any time.
       shortcuts:
+        people_move: "Move through people (opens after a pause)"
+        people_open: "Open the selected person"
+        people_reply: "Reply"
+        people_reply_all: "Reply all"
+        people_forward: "Forward"
+        people_done: "Done"
+        people_snooze: "Snooze until tomorrow"
+        people_more: "More actions"
+        people_details: "Show or hide details"
         archive: Archive
         cal_new: New event
         cal_next: Next period

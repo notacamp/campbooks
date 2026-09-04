@@ -86,16 +86,19 @@ export default class extends Controller {
   }
 
   _shouldIgnore (event) {
-    // Respect command palette.
-    const palette = document.querySelector(".command-palette-dialog[open]")
-    if (palette) return true
+    // Respect any open dialog — the Scout overlay (⌘K) above all: its arrow keys
+    // move through ITS results, not the People list behind it.
+    if (document.querySelector("dialog[open]")) return true
 
-    // Respect Scout/skim overlay.
+    // Respect the skim overlay (a role="dialog" panel, not a native <dialog>).
     if (skimOverlayOpen()) return true
 
     // Don't intercept typing in editable fields.
     const el = document.activeElement
     if (el && (el.matches(EDITABLE_SELECTOR) || el.closest(EDITABLE_SELECTOR))) return true
+
+    // Enter on a focused control activates that control, not the selected row.
+    if (event.key === "Enter" && el && el.matches("button, a, summary, select, [role=button]")) return true
 
     // Only handle unmodified keys.
     if (event.metaKey || event.ctrlKey || event.altKey) return true
@@ -166,9 +169,8 @@ export default class extends Controller {
     if (btn) btn.click()
   }
 
-  // Toggle the Details sheet — no-op at xl+ where the rail is always visible.
+  // Toggle the Details sheet (below xl) or collapse/expand the rail (xl+).
   _toggleDetails () {
-    if (window.matchMedia("(min-width: 1280px)").matches) return
     const detailPane = document.getElementById("people_details_pane")
     if (!detailPane) return
     // Find the people-details Stimulus controller on the conversation pane parent.

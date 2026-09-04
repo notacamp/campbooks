@@ -1,20 +1,20 @@
 import { Controller } from "@hotwired/stimulus"
 
-// Controls the Details rail / sheet:
-//   - xl+ (≥ 1280px): rail is always visible (static aside). Controller is a no-op for open/close.
-//   - lg to < xl: aside is a sheet (translate-x-full → translate-x-0) over the conversation.
-//   - < lg (phones): sheet is w-full (full screen) with a back button.
+// Controls the Details rail / sheet beside a People conversation:
+//   - xl+ (≥ 1280px): a static rail. open/close/toggle expand or collapse it (the
+//     `hidden` attribute); the choice is remembered per browser in localStorage so
+//     a collapsed rail stays collapsed from person to person.
+//   - lg to < xl: a sheet (translate-x-full → translate-x-0) over the conversation,
+//     closed by its Back/close control, Escape, or a click outside.
+//   - < lg (phones): the sheet is full screen with a back button.
 //
 // Values:
-//   personIdValue — used to match the turbo-frame src when lazy-loading.
-//   openValue     — when true and below xl, the sheet opens immediately on connect
-//                   (set from params[:details] in the conversation partial).
+//   personIdValue — used to set the lazy frame's src on first open when it has none.
+//   openValue     — when true and below xl, the sheet opens on connect (?details=1).
 //
-// Actions:
-//   open    — slide in the sheet (< xl only)
-//   close   — slide out the sheet
-//   toggle  — toggle open/close
-//   jump    — scroll to a thread in the conversation pane
+// Actions: open · close · toggle · jump (scroll to a thread in the conversation).
+
+const STORAGE_KEY = "people_details_rail_collapsed"
 
 export default class extends Controller {
   static targets = ["pane", "detailsBtn"]
@@ -26,8 +26,12 @@ export default class extends Controller {
       click:   this._onOutsideClick.bind(this)
     }
     window.addEventListener("keydown", this._bound.keydown)
-    // Open the sheet immediately when the page was loaded with ?details=1.
-    if (this.openValue && !this._atXl()) {
+    if (this._atXl()) {
+      // The rail: restore the remembered collapse. A hidden rail keeps its lazy
+      // frame unloaded until it is expanded (Turbo loads lazy frames on visibility).
+      if (this._storedCollapsed()) this._collapse({ remember: false })
+    } else if (this.openValue) {
+      // The sheet: open immediately when the page was loaded with ?details=1.
       this.open()
     }
   }
@@ -40,16 +44,12 @@ export default class extends Controller {
   // ── Public actions ────────────────────────────────────────────────────────
 
   open () {
-    if (this._atXl()) return
     if (!this.hasPaneTarget) return
+    if (this._atXl()) { this._expand(); return }
+
     this.paneTarget.classList.remove("translate-x-full")
     this.paneTarget.classList.add("translate-x-0")
-    // Lazy-load: set src on the frame if it hasn't been loaded yet.
-    const frame = this.paneTarget.querySelector("turbo-frame[id='people_details']")
-    if (frame && !frame.src) {
-      const personId = this.personIdValue
-      if (personId) frame.src = `/people/${personId}/details`
-    }
+    this._ensureFrameSrc()
     // Trap click-outside to close — defer so the current click doesn't immediately close it.
     setTimeout(() => document.addEventListener("click", this._bound.click, true), 0)
     // Move focus into the sheet.
@@ -59,6 +59,8 @@ export default class extends Controller {
 
   close () {
     if (!this.hasPaneTarget) return
+    if (this._atXl()) { this._collapse({ remember: true }); return }
+
     this.paneTarget.classList.remove("translate-x-0")
     this.paneTarget.classList.add("translate-x-full")
     document.removeEventListener("click", this._bound.click, true)
@@ -67,11 +69,12 @@ export default class extends Controller {
   }
 
   toggle () {
-    if (this._isOpen()) {
-      this.close()
-    } else {
-      this.open()
+    if (!this.hasPaneTarget) return
+    if (this._atXl()) {
+      this.paneTarget.hidden ? this.open() : this.close()
+      return
     }
+    this._isOpen() ? this.close() : this.open()
   }
 
   // Scrolls to a thread block in the conversation pane.
@@ -90,7 +93,7 @@ export default class extends Controller {
       // Ring highlight for 1.5 s.
       block.classList.add("ring-2", "ring-primary/40", "ring-offset-1", "rounded-xl", "transition-all")
       setTimeout(() => block.classList.remove("ring-2", "ring-primary/40", "ring-offset-1"), 1500)
-      // Close the sheet below xl.
+      // Close the sheet below xl; the rail stays where it is.
       if (!this._atXl()) this.close()
     }
     // If not in DOM, follow the link normally (navigate to person page with ?thread=).
@@ -104,6 +107,33 @@ export default class extends Controller {
 
   _isOpen () {
     return this.hasPaneTarget && this.paneTarget.classList.contains("translate-x-0")
+  }
+
+  _expand () {
+    this.paneTarget.hidden = false
+    this._ensureFrameSrc()
+    this._store(false)
+  }
+
+  _collapse ({ remember }) {
+    this.paneTarget.hidden = true
+    if (!remember) return
+    this._store(true)
+    if (this.hasDetailsBtnTarget) this.detailsBtnTarget.focus()
+  }
+
+  // The frame ships with a lazy src; this only covers a frame rendered without one.
+  _ensureFrameSrc () {
+    const frame = this.paneTarget.querySelector("turbo-frame#people_details")
+    if (frame && !frame.src && this.personIdValue) frame.src = `/people/${this.personIdValue}/details`
+  }
+
+  _storedCollapsed () {
+    try { return window.localStorage.getItem(STORAGE_KEY) === "1" } catch { return false }
+  }
+
+  _store (collapsed) {
+    try { window.localStorage.setItem(STORAGE_KEY, collapsed ? "1" : "0") } catch { /* private mode etc. */ }
   }
 
   _onKeydown (event) {

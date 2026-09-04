@@ -16,6 +16,16 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- The details rail beside a People conversation scrolls on its own and can be collapsed
+  (the close control in its header; the ⓘ button or the `i` key bring it back), and the
+  choice is remembered on that browser.
+- Keys on People: the `g` navigation chords (`g n`, `g p`, `g d`, `g m`, `g t`, `g s`) now work
+  there too, the list's arrow keys stay out of the way while the Scout overlay is open,
+  Enter on a focused button no longer also opens the selected row, and the `?` cheat
+  sheet lists the People keys.
+
 ## [0.36.0] - 2026-09-04
 
 ### Added
