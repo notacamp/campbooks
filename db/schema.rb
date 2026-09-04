@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_03_150100) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_04_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -1298,6 +1298,33 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_03_150100) do
     t.index ["workspace_id"], name: "index_people_on_workspace_id"
   end
 
+  create_table "people_standings", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "avatar_email"
+    t.string "avatar_initial"
+    t.uuid "counterpart_id", null: false
+    t.string "counterpart_type", null: false
+    t.datetime "created_at", null: false
+    t.jsonb "data", default: {}, null: false
+    t.uuid "email_thread_id"
+    t.datetime "last_activity_at"
+    t.string "name", null: false
+    t.boolean "needs_you", default: false, null: false
+    t.integer "overdue_days", default: 0, null: false
+    t.datetime "refreshed_at", null: false
+    t.float "score", default: 0.0, null: false
+    t.string "standing_kind", default: "none", null: false
+    t.float "strength", default: 0.0, null: false
+    t.string "subtitle"
+    t.text "text"
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["counterpart_type", "counterpart_id"], name: "index_people_standings_on_counterpart"
+    t.index ["user_id", "counterpart_type", "counterpart_id"], name: "index_people_standings_on_user_counterpart", unique: true
+    t.index ["user_id", "needs_you", "score", "last_activity_at"], name: "index_people_standings_list", order: { score: :desc, last_activity_at: :desc }
+    t.index ["workspace_id"], name: "index_people_standings_on_workspace_id"
+  end
+
   create_table "pipeline_memberships", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
     t.uuid "current_stage_id"
@@ -2134,6 +2161,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_03_150100) do
   add_foreign_key "organization_memberships", "people"
   add_foreign_key "organizations", "workspaces"
   add_foreign_key "people", "workspaces"
+  add_foreign_key "people_standings", "email_threads", on_delete: :nullify
+  add_foreign_key "people_standings", "users"
+  add_foreign_key "people_standings", "workspaces"
   add_foreign_key "pipeline_memberships", "pipeline_stages", column: "current_stage_id", on_delete: :nullify
   add_foreign_key "pipeline_memberships", "pipelines"
   add_foreign_key "pipeline_stages", "pipelines"

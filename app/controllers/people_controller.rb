@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "pagy/extras/countless"
-
 # The People place (Rethink Stage 2): the workspace's persons and organizations
 # ordered by who needs you, and a person opened as their email threads newest-first
 # (subject headings, folded older messages, inline reply through the Compose Dock).
@@ -100,7 +98,8 @@ class PeopleController < ApplicationController
     @can_send = @reply_target ? @reply_target.email_account.sendable_by?(current_user) : false
     @scout_draft = @newest_thread ? Emails::ScoutDraft.for(@newest_thread&.newest) : nil
 
-    @standing = People::Standing.for_person(@person, user: current_user)
+    @standing = PeopleStanding.for_user(current_user).find_by(counterpart: @person)&.standing ||
+                People::Standing.for_person(@person, user: current_user)
     @primary_contact = @person.contacts.max_by { |c| c.email_count.to_i }
     @email_total = @person.total_email_count
     @first_seen = contact_ids.any? ? EmailMessage.where(contact_id: contact_ids).minimum(:received_at) : nil

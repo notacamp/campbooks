@@ -26,6 +26,7 @@ module Contacts
                .in_batches(of: BATCH_SIZE) do |batch|
         batch.each { |contact| Contacts::SenderKind.classify(contact) }
       end
+      People::StandingsRefreshJob.enqueue_for_workspace(workspace)
     end
 
     # Enqueue at most once per DEBOUNCE window for a workspace (a set-if-absent

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-require "pagy/extras/array"
+require "pagy/extras/array" # PeopleController#build_conversation paginates thread ids
+require "pagy/extras/countless"
 
 # Shared chrome for the People place: the bold-layout gate, the "email" three-pane
 # layout, the readable-mailbox scoping the inbox uses, the streams count for the
@@ -27,200 +28,39 @@ module PeopleLayout
   private
 
   # ── Left pane: the counterpart list ───────────────────────────────────────
-  # Persons (with a person-kind contact that has mail) + organizations (with a
-  # member contact that has mail), each carrying its Scout standing and a
-  # People::Priority score. Need-you first — genuine asks, weighted by how much
-  # the relationship matters and how long they've waited — then Recent, recency-
-  # led and relationship-tiebroken (paginated + infinite scroll).
+  # Reads the materialized people_standings table for the current user. The table
+  # is refreshed in the background by People::StandingsRefreshJob; on first visit
+  # (or right after deploy) it is populated inline. The page costs one paginated
+  # read — no email_messages or email_threads queries at request time.
   def build_people_list
     @query = params[:q].to_s.strip
-    lazy_backfill_sender_kinds
-
-    persons = eligible_persons
-    orgs    = eligible_orgs
-    prime_standing(people: persons, organizations: orgs)
-
-    person_rows = persons.select { |person| listable_person?(person) }
-                         .map { |person| person_counterpart(person) }
-    person_rows_by_id = person_rows.index_by(&:id)
-    org_rows = orgs.map { |org| org_counterpart(org, person_rows_by_id) }
-
-    need_you, recent = (person_rows + org_rows).partition(&:needs_you?)
-    @need_you = need_you.sort_by { |c| rank_key(c) }
-    recent_sorted = recent.sort_by { |c| rank_key(c) }
-    @recent_pagy, @recent = pagy_array(recent_sorted, limit: PEOPLE_PER_PAGE)
+    lazy_backfill_sender_kinds          # cheap EXISTS; enqueues if unclassified contacts remain
+    ensure_standings_fresh              # inline on first visit, enqueue-and-serve when stale
+    rows = PeopleStanding.for_user(current_user).ranked
+    rows = rows.search(@query) if @query.present?
+    @need_you = rows.needing.map(&:to_counterpart)
+    @recent_pagy, recent_rows = pagy_countless(rows.recent, limit: PEOPLE_PER_PAGE)
+    @recent = recent_rows.map(&:to_counterpart)
   end
 
-  def activity_epoch(counterpart) = counterpart.last_activity&.to_i || 0
+  # ── Standings freshness ────────────────────────────────────────────────────
+  def ensure_standings_fresh
+    if People::Standings.missing?(current_user)
+      # First visit (or first visit after this deploy): compute inline, once.
+      return unless Contact.where(workspace_id: Current.workspace.id).where("email_count > 0").exists?
 
-  # Highest priority first; on a tie the person ahead of their organization,
-  # then the livelier row.
-  def rank_key(counterpart)
-    [ -counterpart.priority, counterpart.organization? ? 1 : 0, -activity_epoch(counterpart) ]
-  end
-
-  def list_now = (@now ||= Time.current)
-
-  # Defense in depth over the eligibility query. `sender_kind` is :person by
-  # column default until Contacts::SenderKindBackfillJob (debounced, async) has
-  # judged the contact — so until then a newsletter passes as a person. Judge the
-  # never-classified ones here, in memory, by the backfill's own majority rule
-  # over the newest message of each loaded thread (a thread you replied in ends
-  # on your message, which reads as a person — rightly). Also keep out the
-  # mailbox owner, whose own contact Contacts::Identifier creates from outbound
-  # mail, and senders you blocked.
-  def listable_person?(person)
-    contacts = person.contacts.to_a
-    return false if owner_person?(person, contacts)
-    return false if contacts.all?(&:blocked?)
-
-    judged = contacts.select { |contact| contact.kind_person? && contact.email_count.to_i.positive? }
-    return true if judged.any? { |contact| contact.sender_kind_source.present? }
-
-    sample = people_standing.threads_for(person).filter_map(&:latest_message)
-    sample = [ people_standing.latest_inbound_for(person) ].compact if sample.empty?
-    !Contacts::SenderKind.service?(sample, provider_hints: false)
-  end
-
-  def owner_person?(person, contacts)
-    return true if person.relationship_type == "self"
-
-    owner = readable_accounts.map { |account| account.email_address.to_s.downcase }
-    contacts.any? { |contact| owner.include?(contact.email.to_s.downcase) }
-  end
-
-  # People::Priority's inputs for one person, all from rows the primed standing
-  # and the eligibility query already loaded — no queries.
-  def person_facts(person, standing)
-    People::Priority.facts_for(
-      standing: standing,
-      threads: people_standing.threads_for(person),
-      contacts: person.contacts.to_a,
-      latest_inbound: people_standing.latest_inbound_for(person),
-      relationship_type: person.relationship_type,
-      last_activity: person.last_email_at,
-      now: list_now
-    )
-  end
-
-  # An organization ranks as its most pressing sampled person — the people its
-  # standing is composed from — so it sits right behind them instead of
-  # outscoring them on headcount. Members already on the list reuse their row;
-  # the rest are scored from the same primed data. Nil when the org has no
-  # person members (services only).
-  def org_lead(org, person_rows_by_id)
-    people_standing.sampled_people_for(org)
-                   .map { |member| person_rows_by_id[member.id] || person_counterpart(member) }
-                   .max_by(&:priority)
-  end
-
-  # With no people behind it an organization has no relationship evidence: it
-  # ranks on its own recency alone.
-  def standing_only_score(standing, last_activity)
-    facts = People::Priority.facts_for(standing: standing, threads: [], contacts: [], latest_inbound: nil,
-                                       relationship_type: nil, last_activity: last_activity, now: list_now)
-    People::Priority.score(facts, now: list_now)
-  end
-
-  # One Scout-standing service per request, shared by every person/org row so the
-  # user-scoped work (readable accounts, inbox folders, the awaiting-reply set) and
-  # the batched per-person loads run once — not once per counterpart.
-  def people_standing
-    @people_standing ||= People::Standing.new(current_user, now: (@now ||= Time.current))
-  end
-
-  def prime_standing(people: [], organizations: [])
-    people_standing.prime(people: people, organizations: organizations)
-  end
-
-  def eligible_persons
-    person_ids = Contact.where(workspace_id: Current.workspace.id, sender_kind: Contact.sender_kinds[:person])
-                        .where("email_count > 0")
-                        .where.not(person_id: nil)
-                        .select(:person_id)
-    scope = Current.workspace.people.where(id: person_ids).includes(:contacts, :primary_organization)
-    scope = filter_people(scope, @query) if @query.present?
-    scope.to_a
-  end
-
-  def eligible_orgs
-    org_ids = OrganizationMembership.joins(person: :contacts)
-                                    .where(contacts: { workspace_id: Current.workspace.id })
-                                    .where("contacts.email_count > 0")
-                                    .select(:organization_id)
-    scope = Current.workspace.organizations.where(id: org_ids)
-    scope = scope.search(@query) if @query.present?
-    scope.to_a
-  end
-
-  def filter_people(scope, query)
-    like = "%#{Contact.sanitize_sql_like(query)}%"
-    scope.where(
-      "people.name ILIKE :like OR people.organization ILIKE :like OR " \
-      "EXISTS (SELECT 1 FROM contacts c WHERE c.person_id = people.id AND (c.email ILIKE :like OR c.name ILIKE :like))",
-      like: like
-    )
-  end
-
-  def person_counterpart(person)
-    standing = people_standing.person(person)
-    facts = person_facts(person, standing)
-
-    People::Counterpart.new(
-      kind: :person,
-      record: person,
-      name: person.display_name,
-      subtitle: person.organization_name.presence,
-      avatar_email: person_primary_email(person).presence || person.display_name,
-      avatar_initial: nil,
-      last_activity: person.last_email_at,
-      standing: standing,
-      facts: facts,
-      score: People::Priority.score(facts, now: list_now)
-    )
-  end
-
-  # The busiest contact's address, read from the already-loaded contacts (the list
-  # and detail paths both preload them) so the row costs no extra query; only an
-  # unloaded single record falls back to Person#primary_email's ordered query.
-  def person_primary_email(person)
-    return person.primary_email unless person.contacts.loaded?
-
-    person.contacts.max_by { |contact| contact.email_count.to_i }&.email
-  end
-
-  def org_counterpart(org, person_rows_by_id = {})
-    people_count = org.active_people.joins(:contacts)
-                      .where(contacts: { sender_kind: Contact.sender_kinds[:person] }).distinct.count
-    services_count = org.contacts.kind_service.count
-    standing = people_standing.organization(org)
-    last_activity = org.email_messages.maximum(:received_at)
-    lead = org_lead(org, person_rows_by_id)
-
-    People::Counterpart.new(
-      kind: :organization,
-      record: org,
-      name: org.name,
-      subtitle: org_subtitle(people_count, services_count),
-      avatar_email: nil,
-      avatar_initial: org.name.to_s[0].to_s.upcase.presence || "?",
-      last_activity: last_activity,
-      standing: standing,
-      facts: lead&.facts,
-      score: lead&.score || standing_only_score(standing, last_activity)
-    )
-  end
-
-  def org_subtitle(people_count, services_count)
-    parts = [ t("people.index.organization") ]
-    parts << t("people.index.people_count", count: people_count) if people_count.positive?
-    parts << t("people.index.services_count", count: services_count) if services_count.positive?
-    parts.join(" · ")
+      People::Standings.refresh!(current_user)
+    elsif People::Standings.stale?(current_user)
+      # Rows exist but are old: serve what we have and refresh in the background.
+      People::StandingsRefreshJob.enqueue_for(current_user.id)
+    end
   end
 
   # ── Streams count for the segmented control ("Streams · N") ────────────────
   def streams_count
-    @streams_count ||= tag_groups_service.build_groups(inbox_folder_ids).size
+    @streams_count ||= Rails.cache.fetch("people_streams_count_#{current_user.id}", expires_in: 1.hour) do
+      tag_groups_service.build_groups(inbox_folder_ids).size
+    end
   end
 
   # ── Shared inbox scoping (mirrors EmailMessagesController) ─────────────────

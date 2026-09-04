@@ -19,6 +19,11 @@ major, minor, or patch change here.
 ### Changed
 
 - **A person's conversation reads as email threads.** Threads appear newest-first, each with its subject as a heading; older messages are folded to a one-line snippet and the newest message opens with From and To, attachments, and an inline Reply row. Scout's draft appears only when Scout actually drafted one — never from the message's action prompt.
+- **People loads from precomputed standings.** The People list (bold layout)
+  used to rank the whole workspace on every request, which took around ten
+  seconds on a large inbox. Standings are now refreshed in the background
+  right after the home feed, and the page reads a page of rows; the first
+  visit after upgrading computes them once.
 
 ### Fixed
 

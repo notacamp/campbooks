@@ -28,6 +28,11 @@ RSpec.describe "People", type: :request do
     [ person, contact, thread ]
   end
 
+  # Materialize the standings table for the test user so the read path has rows.
+  def refresh_standings!
+    People::Standings.refresh!(user)
+  end
+
   describe "the bold-layout gate" do
     it "404s when the flag is off" do
       allow(Features).to receive(:bold_layout?).and_return(false)
@@ -49,6 +54,7 @@ RSpec.describe "People", type: :request do
       it "lists persons under Need you and Recent, by standing" do
         make_person(name: "Sofia Martins", email: "sofia@brightloop.example", org_name: "Brightloop", owe: true)
         make_person(name: "Ana Reis", email: "ana@accounting.example", org_name: "Accounting", owe: false)
+        refresh_standings!
 
         get people_path
         expect(response).to have_http_status(:ok)
@@ -57,19 +63,31 @@ RSpec.describe "People", type: :request do
         expect(response.body).to include("Waiting on your reply")
       end
 
-      it "filters by ?q=" do
+      it "filters by ?q= through the standings table" do
         make_person(name: "Sofia Martins", email: "sofia@brightloop.example")
         make_person(name: "Ana Reis", email: "ana@accounting.example")
+        refresh_standings!
 
         get people_path(q: "Sofia")
         expect(response.body).to include("Sofia Martins")
         expect(response.body).not_to include("Ana Reis")
       end
 
+      it "filters by ?q= matching avatar_email" do
+        make_person(name: "Maria", email: "maria@brightloop.example")
+        make_person(name: "Other", email: "other@elsewhere.example")
+        refresh_standings!
+
+        get people_path(q: "brightloop")
+        expect(response.body).to include("Maria")
+        expect(response.body).not_to include("Other")
+      end
+
       it "ranks a real correspondent's fresh ask above a stranger's older one" do
         make_person(name: "Sofia Martins", email: "sofia@brightloop.example", owe: true, inbound_at: 2.days.ago,
                     replied: true, emails: 12)
         make_person(name: "Cold Sender", email: "cold@unknown.example", owe: true, inbound_at: 14.days.ago)
+        refresh_standings!
 
         get people_path
         expect(response.body).to include("Sofia Martins").and include("Cold Sender")
@@ -80,10 +98,42 @@ RSpec.describe "People", type: :request do
         make_person(name: "The Weekly Byte", email: "news@bytemedia.example", source: nil, owe: true,
                     inbound_at: 40.days.ago, unsubscribe: "<mailto:unsub@bytemedia.example>")
         make_person(name: "Nadia Costa", email: "nadia@costa.example", source: nil, owe: true, inbound_at: 3.days.ago)
+        refresh_standings!
 
         get people_path
         expect(response.body).not_to include("The Weekly Byte")
         expect(response.body).to include("Nadia Costa")
+      end
+
+      it "on first visit with no rows computes inline and lists people" do
+        make_person(name: "Inline Person", email: "inline@x.example")
+        # Do NOT call refresh_standings! — first visit should compute inline
+
+        get people_path
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("Inline Person")
+        expect(PeopleStanding.for_user(user).count).to be > 0
+      end
+
+      it "enqueues StandingsRefreshJob when standings are stale and still renders" do
+        make_person(name: "Stale Person", email: "stale@x.example")
+        refresh_standings!
+        # Make rows stale by back-dating refreshed_at
+        PeopleStanding.for_user(user).update_all(refreshed_at: 20.minutes.ago)
+
+        expect {
+          get people_path
+        }.to have_enqueued_job(People::StandingsRefreshJob)
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("Stale Person")
+      end
+
+      it "Recent paginates 30 per page via the turbo_stream format" do
+        31.times { |i| make_person(name: "Person #{i}", email: "person#{i}@x.example") }
+        refresh_standings!
+
+        get people_path(q: nil), headers: { "Accept" => "text/vnd.turbo-stream.html" }
+        expect(response).to have_http_status(:ok)
       end
     end
 
@@ -204,6 +254,7 @@ RSpec.describe "People", type: :request do
         create(:organization_membership, person: svc_person, organization: org)
         create(:email_message, email_account: account, contact: svc, from_address: svc.email, subject: "Invoice")
         svc.update_columns(email_count: 1)
+        refresh_standings!
 
         get people_organization_path(org)
         expect(response).to have_http_status(:ok)
