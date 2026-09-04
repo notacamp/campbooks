@@ -20,6 +20,8 @@ module People
 
     def create
       result = dispatch_kind(params[:kind])
+      return if performed? # do_done/etc may have rendered a 404 directly.
+
       if result[:success]
         # Refresh the single row so the list re-renders with the current state.
         People::Standings.refresh_counterpart!(current_user, @row.counterpart)

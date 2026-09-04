@@ -94,7 +94,7 @@ module People
             needs_you standing_kind text email_thread_id overdue_days
             score strength last_activity_at name subtitle avatar_email
             avatar_initial data verb subject wait_days feed_item_id
-            email_message_id refreshed_at updated_at
+            email_message_id refreshed_at
           ]
         )
 

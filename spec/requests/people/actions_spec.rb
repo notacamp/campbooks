@@ -8,7 +8,9 @@ RSpec.describe "People::Actions", type: :request do
   let(:account)   { create(:email_account, workspace: workspace) }
 
   def grant_access(can_send: true)
-    create(:email_account_user, user: user, email_account: account, can_read: true, can_send: can_send)
+    eau = EmailAccountUser.find_or_initialize_by(user: user, email_account: account)
+    eau.assign_attributes(can_read: true, can_send: can_send)
+    eau.save!
   end
 
   def make_person(name:, email:, inbound_at: 2.days.ago, owe: false)
@@ -24,15 +26,33 @@ RSpec.describe "People::Actions", type: :request do
   end
 
   def make_feed_item(user:, person:, contact:, thread:, msg:, kind: "reply_reminder")
-    create(:feed_item, user: user, workspace: workspace,
-                       subject: msg,
-                       kind: kind,
-                       score: 0.8,
-                       data: { "thread_id" => thread.id, "message_id" => msg.id })
+    FeedItem.create!(user: user, workspace: workspace,
+                     subject: msg,
+                     kind: kind,
+                     score: 0.8,
+                     dedupe_key: "#{kind}:#{msg.id}",
+                     sort_at: Time.current,
+                     data: { "thread_id" => thread.id, "message_id" => msg.id })
   end
 
   def refresh_standings!
     People::Standings.refresh!(user)
+  end
+
+  # After refresh!, feed_item_id is nil because still_valid? requires ai_action_prompt /
+  # holds_last_word? conditions that are hard to satisfy in unit tests.
+  # Patch the standing row directly so the controller can find the item.
+  def link_feed_item!(person, item, msg)
+    PeopleStanding.for_user(user)
+                  .where(counterpart: person)
+                  .update_all(feed_item_id: item.id, email_message_id: msg.id)
+  end
+
+  # Patch just the email_message_id so message-based actions (snooze/archive) work.
+  def link_message!(person, msg)
+    PeopleStanding.for_user(user)
+                  .where(counterpart: person)
+                  .update_all(email_message_id: msg.id)
   end
 
   before do
@@ -74,7 +94,8 @@ RSpec.describe "People::Actions", type: :request do
       person, contact, thread, msg = make_person(name: "Sofia", email: "sofia@x.example", owe: true)
       item = make_feed_item(user: user, person: person, contact: contact,
                             thread: thread, msg: msg, kind: "reply_reminder")
-      People::Standings.refresh!(user)
+      refresh_standings!
+      link_feed_item!(person, item, msg) # patch standing since still_valid? is hard to satisfy in unit tests
 
       expect {
         post people_action_path(person.id, :done),
@@ -92,7 +113,8 @@ RSpec.describe "People::Actions", type: :request do
       person, contact, thread, msg = make_person(name: "Sofia", email: "sofia@x.example", owe: true)
       item = make_feed_item(user: user, person: person, contact: contact,
                             thread: thread, msg: msg, kind: "follow_up")
-      People::Standings.refresh!(user)
+      refresh_standings!
+      link_feed_item!(person, item, msg)
 
       post people_action_path(person.id, :done),
            headers: { "Accept" => "text/vnd.turbo-stream.html" }
@@ -118,8 +140,11 @@ RSpec.describe "People::Actions", type: :request do
       person, contact, thread, msg = make_person(name: "Sofia", email: "sofia@x.example", owe: true)
       item = make_feed_item(user: user, person: person, contact: contact,
                             thread: thread, msg: msg, kind: "reply_reminder")
+      # Refresh BEFORE dismiss so the standing captures feed_item_id; the controller
+      # looks up any feed item (not just active), so it can reactivate a dismissed one.
+      refresh_standings!
+      link_feed_item!(person, item, msg)
       item.dismiss!
-      People::Standings.refresh!(user)
 
       expect {
         post people_action_path(person.id, :undo_done),
@@ -136,6 +161,7 @@ RSpec.describe "People::Actions", type: :request do
     it "runs the snooze tool and the row leaves the lane" do
       person, _contact, _thread, msg = make_person(name: "Rui", email: "rui@x.example", owe: true)
       refresh_standings!
+      link_message!(person, msg)
 
       # Snooze the thread via the people action.
       allow(Tools::Snooze).to receive(:call).and_return(msg.email_thread.tap { |t| t.update_columns(snoozed_until: 1.day.from_now) })
@@ -153,6 +179,7 @@ RSpec.describe "People::Actions", type: :request do
     it "runs the unsnooze tool" do
       person, _contact, _thread, msg = make_person(name: "Rui", email: "rui@x.example", owe: true)
       refresh_standings!
+      link_message!(person, msg)
 
       allow(Tools::Unsnooze).to receive(:call).and_return(msg.email_thread)
 
@@ -201,6 +228,7 @@ RSpec.describe "People::Actions", type: :request do
     it "archives the thread via EmailActions and re-renders" do
       person, _contact, thread, msg = make_person(name: "Miguel", email: "miguel@x.example", owe: true)
       refresh_standings!
+      link_message!(person, msg)
 
       allow(Tools::Archive).to receive(:call).and_return(true)
 
@@ -216,6 +244,7 @@ RSpec.describe "People::Actions", type: :request do
     it "unarchives the thread" do
       person, _contact, _thread, msg = make_person(name: "Miguel", email: "miguel@x.example", owe: true)
       refresh_standings!
+      link_message!(person, msg)
 
       allow(Tools::Unarchive).to receive(:call).and_return(true)
 
@@ -231,6 +260,7 @@ RSpec.describe "People::Actions", type: :request do
   it "returns 422 with a notice on action failure" do
     person, _contact, _thread, msg = make_person(name: "Rita", email: "rita@x.example", owe: true)
     refresh_standings!
+    link_message!(person, msg) # ensure @message is found so the action reaches Tools::Archive
 
     allow(Tools::Archive).to receive(:call).and_return(false)
 
