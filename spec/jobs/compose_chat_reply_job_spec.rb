@@ -83,4 +83,40 @@ RSpec.describe ComposeChatReplyJob, type: :job do
 
     expect(broadcast_html).to include("__executeAutoAction__('send_email',{})")
   end
+
+  it "persisted AI messages carry reply_status :replied" do
+    service_returning(reply: "Great draft.", auto_actions: [], suggested_actions: [])
+
+    described_class.perform_now(message.id)
+
+    reply = thread.agent_messages.where(author_type: :ai).last
+    expect(reply.reply_status).to eq("replied")
+  end
+
+  it "when an AI reply already exists, broadcasts the panel without creating a duplicate" do
+    create(:agent_message, agent_thread: thread, user: user, author_type: :ai,
+                           content: "Already here.", created_at: 1.second.after(message.created_at))
+
+    expect {
+      described_class.perform_now(message.id)
+    }.not_to change { thread.agent_messages.where(author_type: :ai).count }
+
+    expect(Turbo::StreamsChannel).to have_received(:broadcast_replace_to) do |_stream, **kwargs|
+      expect(kwargs[:target]).to eq("compose_messages_wrapper")
+    end
+  end
+
+  it "on the final attempt, marks the triggering message failed and reconciles the panel" do
+    allow(Ai::ComposeChatService).to receive(:new).and_raise(StandardError, "AI service down")
+
+    job = described_class.new
+    allow(job).to receive(:executions).and_return(2)
+
+    expect { job.perform(message.id) }.not_to raise_error
+
+    expect(message.reload).to be_failed
+    expect(Turbo::StreamsChannel).to have_received(:broadcast_replace_to) do |_stream, **kwargs|
+      expect(kwargs[:target]).to eq("compose_messages_wrapper")
+    end
+  end
 end

@@ -139,11 +139,11 @@ class EmailReplyDaemonJob < ApplicationJob
         )
         archived_msg = I18n.t("jobs.email_reply_daemon.conversation_archived",
                                locale: agent_thread.user.locale.presence || I18n.default_locale)
-        detail_html = ApplicationController.render(
-          partial: "email_messages/empty_detail",
+        notice_html = ApplicationController.render(
+          partial: "email_messages/archived_notice",
           locals: { message: archived_msg }
         )
-        Turbo::StreamsChannel.broadcast_replace_to(stream, target: "email_content", html: detail_html)
+        Turbo::StreamsChannel.broadcast_prepend_to(stream, target: "email_content", html: notice_html)
         thread_tags_html = ApplicationController.render(
           partial: "email_messages/thread_tags",
           locals: { message: email_message }

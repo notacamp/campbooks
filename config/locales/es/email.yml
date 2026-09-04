@@ -1,6 +1,9 @@
 ---
 es:
   email_messages:
+    archived_notice:
+      default: Esta conversación ha sido archivada.
+      dismiss_aria: Descartar aviso de archivo
     board:
       index:
         heading: Tablero
