@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.35.0] - 2026-09-04
+
 ### Added
 
 - **People is the inbox.** Under the verb lanes, People now lists everyone by their
