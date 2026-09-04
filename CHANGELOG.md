@@ -18,14 +18,11 @@ major, minor, or patch change here.
 
 ### Changed
 
-- **People page reads a pre-computed standings table.** `GET /people` no longer
-  touches `email_messages` or `email_threads` at request time. On first visit
-  the directory is computed inline (same latency as before); subsequent visits
-  read the `people_standings` table and enqueue a background refresh when rows
-  are older than 10 minutes. `People::StandingsRefreshJob` (30-second debounce)
-  is enqueued automatically after every `Feed::RefreshJob` and after
-  `SenderKindBackfillJob` finishes, so the table stays current without a
-  dedicated polling job.
+- **People loads from precomputed standings.** The People list (bold layout)
+  used to rank the whole workspace on every request, which took around ten
+  seconds on a large inbox. Standings are now refreshed in the background
+  right after the home feed, and the page reads a page of rows; the first
+  visit after upgrading computes them once.
 
 ### Fixed
 
