@@ -211,18 +211,13 @@ module People
       result.transform_keys(&:itself)
     end
 
-    # MAX(received_at) per org through the contacts → email_messages join.
+    # MAX(received_at) per org through contacts → people → memberships, as one
+    # grouped ActiveRecord query (no raw SQL).
     def batch_last_activity(org_ids)
-      rows = ActiveRecord::Base.connection.select_rows(<<~SQL.squish)
-        SELECT om.organization_id, MAX(em.received_at)
-        FROM email_messages em
-        INNER JOIN contacts c ON c.id = em.contact_id
-        INNER JOIN people p ON p.id = c.person_id
-        INNER JOIN organization_memberships om ON om.person_id = p.id
-        WHERE om.organization_id IN (#{org_ids.map { |id| ActiveRecord::Base.connection.quote(id) }.join(", ")})
-        GROUP BY om.organization_id
-      SQL
-      rows.to_h { |org_id, max_at| [ org_id, max_at ? Time.zone.parse(max_at.to_s) : nil ] }
+      EmailMessage.joins(contact: { person: :organization_memberships })
+                  .where(organization_memberships: { organization_id: org_ids })
+                  .group("organization_memberships.organization_id")
+                  .maximum(:received_at)
     end
 
     # ── Standing ─────────────────────────────────────────────────────────────
