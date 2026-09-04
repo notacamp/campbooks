@@ -220,3 +220,7 @@ fr:
         request_invoice_to_placeholder: "fournisseur@exemple.com"
         request_invoice_subject: Objet
         request_invoice_open_composer: Réviser dans le compositeur
+    money:
+      summary:
+        late_receivable_html: "La facture de %{name} est %{overdue}, j'ai donc rédigé un rappel."
+        late_payable_html: "%{name} est %{overdue}."

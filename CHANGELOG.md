@@ -16,7 +16,13 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Now shows replies you owe and bills you owe.** The People list highlights people you haven't replied to and expense invoices that are past due, grouped into verb lanes (Reply, Decide, Pay, Chase, Nudge).
+
 ### Changed
+
+- **People is sorted by what needs doing.** Counterparts with an active feed item appear first, in the lane that matches the required action; everyone else falls to Recent.
 
 - **A person's conversation reads as email threads.** Threads appear newest-first, each with its subject as a heading; older messages are folded to a one-line snippet and the newest message opens with From and To, attachments, and an inline Reply row. Scout's draft appears only when Scout actually drafted one — never from the message's action prompt.
 - **People loads from precomputed standings.** The People list (bold layout)

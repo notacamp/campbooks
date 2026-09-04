@@ -30,14 +30,6 @@ module People
       items_by_counterpart[counterpart_key(counterpart)]
     end
 
-    # All persons whose best item is on the given thread (for group-row folding).
-    def participants(thread_id)
-      return [] if thread_id.blank?
-
-      @person_items_by_thread ||= build_person_items_by_thread
-      @person_items_by_thread[thread_id] || []
-    end
-
     private
 
     def counterpart_key(counterpart)
@@ -204,21 +196,6 @@ module People
     def build_source(kind)
       klass = Feed::Source.for_kind(kind)
       klass&.new(@user, now: @now)
-    end
-
-    # Maps thread_id → [Person, ...] for the Need-you rows, for group-row folding.
-    def build_person_items_by_thread
-      by_thread = Hash.new { |h, k| h[k] = [] }
-      items_by_counterpart.each do |key, item|
-        type, = key
-        next unless type == "Person"
-        next unless item.thread_id.present?
-
-        person = item.message&.contact&.person
-        by_thread[item.thread_id] << [ person, item ] if person
-      end
-      # Sort each group by descending score.
-      by_thread.transform_values { |pairs| pairs.sort_by { |_, i| -i.feed_item.score }.map(&:first) }
     end
   end
 end

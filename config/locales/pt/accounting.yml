@@ -220,3 +220,7 @@ pt:
         request_invoice_to_placeholder: "fornecedor@exemplo.com"
         request_invoice_subject: Assunto
         request_invoice_open_composer: Rever no compositor
+    money:
+      summary:
+        late_receivable_html: "A fatura de %{name} está %{overdue}, por isso redigi um lembrete."
+        late_payable_html: "%{name} está %{overdue}."

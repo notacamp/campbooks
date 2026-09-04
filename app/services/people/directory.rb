@@ -131,13 +131,6 @@ module People
                      .max_by(&:priority)
     end
 
-    def standing_only_score(standing, last_activity)
-      facts = People::Priority.facts_for(standing: standing, threads: [], contacts: [],
-                                         relationship_type: nil, last_activity: last_activity,
-                                         item_score: 0.0)
-      People::Priority.score(facts, now: @now)
-    end
-
     def person_counterpart(person, attention)
       attention_item = attention.for(person)
       standing = people_standing.person(person, attention_item)

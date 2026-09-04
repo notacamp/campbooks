@@ -58,10 +58,19 @@ RSpec.describe People::Standing do
 
   # ── Attention path ─────────────────────────────────────────────────────────
 
-  it "with an attention item → needs_you true, kind :attention" do
+  it "with an attention item → needs_you true, kind :attention, feed_item_id and email_message_id set" do
     p = person_with(name: "Sofia", last_inbound: 2.days.ago)
-    item = stub_attention_item(verb: :reply, subject: "Q3 deck", wait_days: 2)
-    attn = stub_attention_with(item)
+
+    fi_id  = SecureRandom.uuid
+    msg_id = SecureRandom.uuid
+    fi     = instance_double(FeedItem, id: fi_id, score: 50.0, sort_at: Time.current,
+                             data: { "age_days" => 2 })
+    msg    = instance_double(EmailMessage, id: msg_id)
+    item   = instance_double(People::Attention::Item,
+                             feed_item: fi, verb: :reply, subject: "Q3 deck",
+                             wait_days: 2, text: nil, thread_id: nil,
+                             message: msg, attention: true)
+    attn   = stub_attention_with(item)
 
     st = described_class.for_person(p, user: user, attention: attn)
     expect(st.needs_you).to be true
@@ -69,6 +78,8 @@ RSpec.describe People::Standing do
     expect(st.verb).to eq(:reply)
     expect(st.subject).to eq("Q3 deck")
     expect(st.wait_days).to eq(2)
+    expect(st.feed_item_id).to eq(fi_id)
+    expect(st.email_message_id).to eq(msg_id)
   end
 
   it "verb :nudge from a follow_up attention item" do
