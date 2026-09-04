@@ -92,7 +92,7 @@ RSpec.describe "People::Details", type: :request do
             headers: { "Accept" => "text/vnd.turbo-stream.html" }
       expect(response).to have_http_status(:ok)
       expect(contact.reload.blocked?).to be true
-      # Response should include an undo stream for block.
+      # Response should include an undo stream; ActionToast POSTs state=unblock.
       expect(response.body).to include("unblock")
     end
 
@@ -103,6 +103,15 @@ RSpec.describe "People::Details", type: :request do
             headers: { "Accept" => "text/vnd.turbo-stream.html" }
       expect(response).to have_http_status(:ok)
       expect(contact.reload.neutral?).to be true
+    end
+
+    it "POST undo after star unstars via the state endpoint" do
+      contact.star!
+      post state_people_details_path(person),
+           params: { state: "unstar" },
+           headers: { "Accept" => "text/vnd.turbo-stream.html" }
+      expect(response).to have_http_status(:ok)
+      expect(contact.reload.starred?).to be false
     end
   end
 

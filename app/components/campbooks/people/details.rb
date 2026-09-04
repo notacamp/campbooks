@@ -22,17 +22,17 @@ module Campbooks
       ICON_CALENDAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'
       SPARK = '<svg viewBox="0 0 24 24" fill="currentColor" class="h-[12px] w-[12px]" aria-hidden="true"><path d="M12 5l1.7 5.6L19.5 12l-5.8 1.4L12 19l-1.7-5.6L4.5 12l5.8-1.4z"/></svg>'
 
-      RELATIONSHIP_OPTIONS = %w[client vendor partner service_provider colleague personal unknown].freeze
-
       def initialize(profile:, person: nil)
         @profile = profile
         @person  = person || profile.person
       end
 
       def view_template
-        div(id: "people_details",
-            class: "flex flex-col overflow-y-auto text-sm",
-            data: { controller: "people-details", "people-details-person-id-value": @person.id }) do
+        # id is people_details_body (not people_details — that's the turbo-frame id).
+        # No people-details Stimulus controller here; the controller lives on the outer
+        # wrapper in the conversation partial so it has a pane target.
+        div(id: "people_details_body",
+            class: "flex flex-col overflow-y-auto text-sm") do
           # Rail close/back header — hidden at xl+
           rail_header
 
@@ -103,15 +103,17 @@ module Campbooks
               # Org link
               if (org = @profile.organization)
                 a(href: helpers.people_organization_path(org.id),
-                  data: { turbo_frame: "people_detail" },
+                  data: { turbo_frame: "_top" },
                   class: "text-[12px] text-muted-foreground hover:text-foreground no-underline truncate block") do
                   plain(org.name)
                 end
               end
 
-              # Meta line
+              # Meta line — address count only when > 1, then first-contact date.
               meta_parts = []
-              meta_parts << helpers.pluralize(@profile.contacts.size, t(".person_singular"), plural: t(".persons_plural"))
+              if @profile.emails.size > 1
+                meta_parts << t(".addresses", count: @profile.emails.size)
+              end
               if @profile.counts[:first_contact_at]
                 meta_parts << t(".since", date: helpers.l(@profile.counts[:first_contact_at], format: :month_year))
               end
@@ -119,7 +121,7 @@ module Campbooks
             end
           end
 
-          # Relationship select chip
+          # Relationship select chip + kind segmented control
           div(class: "flex flex-wrap items-center gap-2 mb-2") do
             relationship_chip
             kind_control
@@ -168,16 +170,17 @@ module Campbooks
       end
 
       def relationship_chip
+        # Form has auto-submit controller so the select submits on change.
         form(action: helpers.relationship_people_details_path(@person), method: "patch",
-             data: { turbo_stream: true }) do
+             data: { controller: "auto-submit", turbo_stream: true }) do
           input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
           select(name: "relationship_type",
                  class: "appearance-none cursor-pointer rounded-full border border-border px-2 py-0.5 text-[11.5px] font-medium text-muted-foreground bg-transparent hover:bg-secondary focus:outline-none",
                  data: { action: "change->auto-submit#submit" }) do
             option(value: "", selected: @profile.relationship.blank?) { t(".no_relationship") }
-            RELATIONSHIP_OPTIONS.each do |rel|
-              option(value: rel, selected: @profile.relationship == rel) do
-                plain(t("activerecord.attributes.person.relationship_types.#{rel}", default: rel.humanize))
+            Person::RELATIONSHIP_TYPES.each do |rt|
+              option(value: rt, selected: @profile.relationship == rt) do
+                plain(t("activerecord.attributes.person.relationship_types.#{rt}", default: rt.humanize))
               end
             end
           end
@@ -188,24 +191,25 @@ module Campbooks
         return unless @profile.primary_contact
 
         is_service = @profile.sender_kind == "service"
+        # Two submit buttons — one per kind. The active one has the filled style;
+        # no hidden input, no invisible overlay, no nonexistent kind-toggle controller.
         form(action: helpers.kind_people_details_path(@person), method: "patch",
              data: { turbo_stream: true }) do
           input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
-          input(type: "hidden", name: "kind", value: is_service ? "person" : "service",
-                data: { controller: "kind-toggle" })
           div(class: "inline-flex rounded-full border border-border text-[11px] font-medium overflow-hidden") do
-            span(class: class_names("px-2.5 py-0.5",
-                                    !is_service ? "bg-foreground text-background" : "text-muted-foreground")) do
+            button(type: "submit", name: "kind", value: "person",
+                   class: class_names("px-2.5 py-0.5 transition-colors",
+                                      !is_service ? "bg-foreground text-background" : "text-muted-foreground hover:bg-secondary"),
+                   "aria-pressed": !is_service) do
               t(".kind_person")
             end
-            span(class: class_names("px-2.5 py-0.5",
-                                    is_service ? "bg-foreground text-background" : "text-muted-foreground")) do
+            button(type: "submit", name: "kind", value: "service",
+                   class: class_names("px-2.5 py-0.5 transition-colors",
+                                      is_service ? "bg-foreground text-background" : "text-muted-foreground hover:bg-secondary"),
+                   "aria-pressed": is_service) do
               t(".kind_service")
             end
           end
-          button(type: "submit",
-                 class: "absolute inset-0 opacity-0 cursor-pointer",
-                 "aria-label": is_service ? t(".make_person") : t(".make_service")) { }
         end
       end
 
@@ -407,11 +411,16 @@ module Campbooks
             raw(safe(ICON_CALENDAR))
           end
           div(class: "min-w-0 flex-1") do
-            p(class: "text-[12.5px] font-medium text-foreground truncate") { plain(ev.summary.presence || t(".no_event_title")) }
+            p(class: "text-[12.5px] font-medium text-foreground truncate") { plain(ev.title.presence || t(".no_event_title")) }
             span(class: "text-[11px] text-muted-foreground") do
               parts = []
               parts << helpers.l(ev.start_at.to_date, format: :day_month) if ev.start_at
-              attendee_names = ev.guests.reject(&:self_row).map(&:display_name).first(2)
+              # Attendees: skip self (profile's own emails) and user's own account addresses.
+              person_emails_set = @profile.emails.map { |addr, _| addr.downcase }.to_set
+              attendee_names = Array(ev.attendees)
+                .reject { |a| person_emails_set.include?(a["email"].to_s.downcase) }
+                .first(2)
+                .filter_map { |a| a["name"].presence || a["email"].presence }
               parts << attendee_names.join(", ") if attendee_names.any?
               plain(parts.join(" · "))
             end
@@ -448,7 +457,7 @@ module Campbooks
           # Organization link
           if (org = @profile.organization)
             a(href: helpers.people_organization_path(org.id),
-              data: { turbo_frame: "people_detail" },
+              data: { turbo_frame: "_top" },
               class: "#{ACTION_BTN} w-full justify-center no-underline") do
               plain(t(".manage.open_org", org: org.name))
             end
@@ -482,7 +491,6 @@ module Campbooks
              data: { turbo_stream: true }) do
           input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
           input(type: "hidden", name: "state", value: state)
-          btn_data = { "turbo-confirm": confirm } if confirm
           button(type: "submit",
                  class: "#{ACTION_BTN} w-full justify-center",
                  **(confirm ? { data: { "turbo-confirm": confirm } } : {})) do

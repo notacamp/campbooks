@@ -7,6 +7,9 @@ module People
   # Write actions (rename / relationship / kind / state / analyze / merge) re-render
   # the whole frame so the UI is always consistent with the record. Each action
   # delegates to the same mechanisms the classic ContactsController uses.
+  #
+  # The state action accepts both PATCH (from forms in the Details component) and
+  # POST (from ActionToast undo buttons — ActionToast always POSTs its undo form).
   class DetailsController < ApplicationController
     include PeopleLayout
 
@@ -47,30 +50,37 @@ module People
       after_write
     end
 
-    # PATCH /people/:id/details/state
+    # PATCH|POST /people/:id/details/state
+    # Accepts POST so that ActionToast undo buttons (which always POST) can hit this endpoint.
     def state
       contact = primary_contact
       return head(:not_found) unless contact
 
-      toast_key = nil
-      undo_endpoint = nil
+      toast_key  = nil
+      undo       = nil
 
       case params[:state]
       when "star"
         contact.star!
         toast_key = "people.details.toasts.starred"
-        undo_endpoint = undo_people_details_path(@person)
+        undo = { endpoint: state_people_details_path(@person),
+                 params: { state: "unstar" },
+                 label: t("people.actions.undo") }
       when "unstar"
         contact.unstar!
         toast_key = "people.details.toasts.unstarred"
-        undo_endpoint = undo_people_details_path(@person)
+        undo = { endpoint: state_people_details_path(@person),
+                 params: { state: "star" },
+                 label: t("people.actions.undo") }
       when "allow"
         contact.allow!
         toast_key = "people.details.toasts.allowed"
       when "block"
         Contacts::Block.call(contact, user: current_user)
         toast_key = "people.details.toasts.blocked"
-        undo_endpoint = unblock_people_details_path(@person)
+        undo = { endpoint: state_people_details_path(@person),
+                 params: { state: "unblock" },
+                 label: t("people.actions.undo") }
       when "unblock"
         Contacts::Unblock.call(contact, user: current_user)
         toast_key = "people.details.toasts.unblocked"
@@ -78,25 +88,7 @@ module People
         return head(:unprocessable_entity)
       end
 
-      after_write(toast_key: toast_key, undo_endpoint: undo_endpoint)
-    end
-
-    # PATCH /people/:id/details/undo
-    def undo
-      contact = primary_contact
-      return head(:not_found) unless contact
-
-      contact.unstar! if contact.starred?
-      after_write(toast_key: "people.details.toasts.unstarred")
-    end
-
-    # PATCH /people/:id/details/unblock
-    def unblock
-      contact = primary_contact
-      return head(:not_found) unless contact
-
-      Contacts::Unblock.call(contact, user: current_user)
-      after_write(toast_key: "people.details.toasts.unblocked")
+      after_write(toast_key: toast_key, undo: undo)
     end
 
     # POST /people/:id/details/analyze
@@ -117,7 +109,11 @@ module People
         target = contact.suggested_person
         contact.update!(person: target, suggested_person_id: nil,
                         suggested_reason: nil, suggested_confidence: nil)
-        after_write(toast_key: "people.details.toasts.merged", redirect_to: target)
+        # Navigate to the surviving person's page — redirect for both HTML and turbo-stream.
+        respond_to do |format|
+          format.turbo_stream { redirect_to person_page_path(target), status: :see_other }
+          format.html { redirect_to person_page_path(target) }
+        end
       else
         contact.update!(suggested_person_id: nil, suggested_reason: nil, suggested_confidence: nil)
         after_write(toast_key: "people.details.toasts.merge_dismissed")
@@ -136,11 +132,9 @@ module People
       @person.contacts.order(email_count: :desc).first
     end
 
-    def after_write(toast_key: nil, undo_endpoint: nil, redirect_to: nil)
+    def after_write(toast_key: nil, undo: nil)
       People::Standings.refresh_counterpart!(current_user, @person)
-
-      target_person = redirect_to || @person
-      @profile = People::Profile.for(target_person, user: current_user)
+      @profile = People::Profile.for(@person, user: current_user)
 
       respond_to do |format|
         format.turbo_stream do
@@ -148,21 +142,10 @@ module People
             "people/details/show", locals: { profile: @profile }, layout: false
           )) ]
           if toast_key
-            message = t(toast_key)
-            toast = if undo_endpoint
-              render_to_string(
-                Campbooks::ActionToast.new(
-                  message: message, variant: :success,
-                  undo: { endpoint: undo_endpoint, label: t("people.actions.undo") }
-                ),
-                layout: false
-              )
-            else
-              render_to_string(
-                Campbooks::ActionToast.new(message: message, variant: :success),
-                layout: false
-              )
-            end
+            toast = render_to_string(
+              Campbooks::ActionToast.new(message: t(toast_key), variant: :success, undo: undo),
+              layout: false
+            )
             streams << turbo_stream.append(Campbooks::ActionToast::REGION_ID, toast)
           end
           render turbo_stream: streams

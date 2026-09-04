@@ -250,8 +250,8 @@ module Campbooks
               end
             end
             if (contact_id = data["contact_id"])
-              # Details (opens the rail/sheet for this person)
-              a(href: helpers.people_details_path(@counterpart.id), data: { turbo_frame: "people_details" },
+              # Details — navigate to this person's page with ?details=1 so the sheet opens.
+              a(href: helpers.person_page_path(@counterpart.id, details: 1), data: { turbo_frame: "_top" },
                 class: "block px-4 py-2 text-[13px] no-underline hover:bg-secondary") do
                 plain(t(".actions.details"))
               end
@@ -262,11 +262,6 @@ module Campbooks
                 button(type: "submit", class: "w-full px-4 py-2 text-left text-[13px] hover:bg-secondary") do
                   plain(t(".actions.block"))
                 end
-              end
-              # Open classic profile
-              a(href: helpers.contact_path(contact_id), data: { turbo_frame: "_top" },
-                class: "block px-4 py-2 text-[13px] text-muted-foreground no-underline hover:bg-secondary") do
-                plain(t(".actions.open_profile"))
               end
             end
           end

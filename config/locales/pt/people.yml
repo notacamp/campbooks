@@ -26,7 +26,6 @@ pt:
           details: Detalhes
           archive: Arquivar conversa
           block: Bloquear remetente
-          open_profile: Abrir perfil clássico
       search_bar:
         placeholder: Encontrar uma pessoa ou empresa…
         clear: Limpar
@@ -54,6 +53,9 @@ pt:
         person_singular: pessoa
         persons_plural: pessoas
         since: "desde %{date}"
+        addresses:
+          one: "%{count} endereço"
+          other: "%{count} endereços"
         no_relationship: "Relação…"
         starred: "Favorito"
         blocked: "Bloqueado"
@@ -178,7 +180,6 @@ pt:
       empty: Ainda sem mensagens.
       reply: Responder
       older: Conversas anteriores
-      open_profile: Abrir perfil clássico
       star: Marcar como favorito
       unstar: Remover dos favoritos
       block: Bloquear
@@ -221,61 +222,6 @@ pt:
       open_stream: Abrir stream
     details:
       title: Detalhes
-      back: Voltar
-      save: Guardar
-      rename_label: Nome da pessoa
-      person_singular: pessoa
-      persons_plural: pessoas
-      since: "desde %{date}"
-      no_relationship: "Relação…"
-      starred: "Favorito"
-      blocked: "Bloqueado"
-      allowed: "Permitido"
-      primary_badge: principal
-      copy_email: Copiar endereço de e-mail
-      kind_person: Pessoa
-      kind_service: Serviço
-      make_person: Marcar como pessoa
-      make_service: Marcar como serviço
-      scout_not_read: "O Scout ainda não leu esta pessoa."
-      read_on: "Lido em %{date}"
-      refresh: Actualizar
-      refresh_hint: Pedir ao Scout para reler esta pessoa
-      all_in_paper: Tudo no Paper
-      open_time: Abrir Tempo
-      no_event_title: "(sem título)"
-      unknown_kind: Documento
-      thread_message_one: mensagem
-      thread_messages_other: mensagens
-      sections:
-        scout_read: "Leitura do Scout"
-        numbers: Números
-        threads: Conversas
-        documents: Documentos
-        events: Eventos
-      patterns:
-        topics: Temas
-        tone: Tom
-        urgency: Urgência
-        primary_role: Papel
-      numbers:
-        received: Recebidos
-        sent: Enviados
-        threads: Conversas
-        documents: Documentos
-        first_contact: Primeiro contacto
-        last_contact: Último contacto
-      threads_more: "e mais %{count}"
-      manage:
-        star: Favoritar
-        unstar: Remover favorito
-        allow: Sempre permitir
-        block: Bloquear
-        block_confirm: Bloquear esta pessoa? Os e-mails serão arquivados automaticamente.
-        unblock: Desbloquear
-        open_org: "Abrir %{org}"
-        same_person: Mesma pessoa?
-        merge: "Juntar com %{name}"
       toasts:
         starred: Adicionado aos favoritos
         unstarred: Removido dos favoritos

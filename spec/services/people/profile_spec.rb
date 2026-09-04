@@ -187,7 +187,9 @@ RSpec.describe People::Profile do
         make_message(contact: contact)
       end
 
-      it "resolves in ≤ 12 queries" do
+      it "resolves in ≤ 13 queries" do
+        # ≤ 13 because build_events now uses two queries (upcoming + past) to ensure
+        # upcoming events are never crowded out by a window full of past events.
         # Warm all caches first.
         described_class.for(person, user: user)
 
@@ -198,7 +200,7 @@ RSpec.describe People::Profile do
           described_class.for(person, user: user)
         end
 
-        expect(query_count).to be <= 12
+        expect(query_count).to be <= 13
       end
     end
   end

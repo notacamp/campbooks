@@ -3,10 +3,12 @@ import { Controller } from "@hotwired/stimulus"
 // Controls the Details rail / sheet:
 //   - xl+ (≥ 1280px): rail is always visible (static aside). Controller is a no-op for open/close.
 //   - lg to < xl: aside is a sheet (translate-x-full → translate-x-0) over the conversation.
-//   - < lg (phones): sheet is inset-0 (full screen) with a back button.
+//   - < lg (phones): sheet is w-full (full screen) with a back button.
 //
 // Values:
 //   personIdValue — used to match the turbo-frame src when lazy-loading.
+//   openValue     — when true and below xl, the sheet opens immediately on connect
+//                   (set from params[:details] in the conversation partial).
 //
 // Actions:
 //   open    — slide in the sheet (< xl only)
@@ -16,7 +18,7 @@ import { Controller } from "@hotwired/stimulus"
 
 export default class extends Controller {
   static targets = ["pane", "detailsBtn"]
-  static values  = { personId: String }
+  static values  = { personId: String, open: Boolean }
 
   connect () {
     this._bound = {
@@ -24,6 +26,10 @@ export default class extends Controller {
       click:   this._onOutsideClick.bind(this)
     }
     window.addEventListener("keydown", this._bound.keydown)
+    // Open the sheet immediately when the page was loaded with ?details=1.
+    if (this.openValue && !this._atXl()) {
+      this.open()
+    }
   }
 
   disconnect () {
@@ -44,7 +50,7 @@ export default class extends Controller {
       const personId = this.personIdValue
       if (personId) frame.src = `/people/${personId}/details`
     }
-    // Trap click-outside to close.
+    // Trap click-outside to close — defer so the current click doesn't immediately close it.
     setTimeout(() => document.addEventListener("click", this._bound.click, true), 0)
     // Move focus into the sheet.
     const focusable = this.paneTarget.querySelector("button, [href], input, select")
@@ -108,6 +114,9 @@ export default class extends Controller {
 
   _onOutsideClick (event) {
     if (!this.hasPaneTarget) return
+    // Ignore clicks on opener buttons — otherwise the capture-phase close fires
+    // first and the toggle immediately reopens, making the button unable to close.
+    if (event.target.closest("[data-action*='people-details#toggle'], [data-action*='people-details#open']")) return
     if (!this.paneTarget.contains(event.target)) {
       this.close()
     }

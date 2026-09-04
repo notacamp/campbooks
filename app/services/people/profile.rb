@@ -102,8 +102,8 @@ module People
     def build_counts_and_threads(contact_ids)
       return set_empty_counts_and_threads if contact_ids.empty?
 
-      # sent? is derived from from_address matching the account email.
-      # Pull from already-known accounts to avoid an extra query; fall back to a pluck.
+      # sent? is derived from from_address containing the account email (may be "Name <addr>").
+      # Use substring LIKE patterns so "Alice <alice@example.com>" still matches.
       account_emails = @user.readable_email_accounts.loaded? ?
                        @user.readable_email_accounts.map(&:email_address).compact :
                        EmailAccount.joins(:email_account_users)
@@ -113,21 +113,20 @@ module People
       base = EmailMessage.where(contact_id: contact_ids).accessible_to(@user)
 
       # One aggregate SQL call for received / sent / first / last.
-      placeholders = account_emails.map { "?" }.join(", ")
-      agg_sql = if account_emails.any?
-        "count(*) AS total, " \
-        "count(CASE WHEN from_address IN (#{placeholders}) THEN 1 END) AS sent_total, " \
-        "min(received_at) AS first_at, max(received_at) AS last_at"
+      # sent? logic mirrors EmailMessage#sent?: lower(from_address) LIKE '%addr%'.
+      agg_sql, bind_values = if account_emails.any?
+        like_clauses = account_emails.map { "lower(from_address) LIKE ?" }.join(" OR ")
+        patterns     = account_emails.map { |e| "%#{e.downcase}%" }
+        sql = "count(*) AS total, " \
+              "count(CASE WHEN (#{like_clauses}) THEN 1 END) AS sent_total, " \
+              "min(received_at) AS first_at, max(received_at) AS last_at"
+        [ sql, patterns ]
       else
-        "count(*) AS total, 0 AS sent_total, min(received_at) AS first_at, max(received_at) AS last_at"
+        [ "count(*) AS total, 0 AS sent_total, min(received_at) AS first_at, max(received_at) AS last_at", [] ]
       end
-      agg_scope = base.select(ActiveRecord::Base.sanitize_sql_array([ agg_sql, *account_emails ]))
-      agg = ApplicationRecord.connection.execute(agg_scope.to_sql).first
 
-      received_count = agg["total"].to_i
-      sent_count     = agg["sent_total"].to_i
-      first_at       = agg["first_at"] ? Time.parse(agg["first_at"].to_s) : nil
-      last_at        = agg["last_at"]  ? Time.parse(agg["last_at"].to_s) : nil
+      received_count, sent_count, first_at, last_at =
+        base.pick(Arel.sql(ActiveRecord::Base.sanitize_sql_array([ agg_sql, *bind_values ])))
 
       # Thread ids + meta in one group query (accessible base).
       threads_base = base.where.not(email_thread_id: nil)
@@ -203,15 +202,13 @@ module People
       end
       base = base.where(cond, *vals)
 
-      # Fetch upcoming + 5 past in a single query, sorted: upcoming asc, then past desc.
+      # Two queries: upcoming (asc) and past (desc, capped at 5).
+      # This ensures upcoming events are always included rather than being
+      # eclipsed by a 90-day window that happens to be full of past events.
       now = Time.current
-      all_events = base.where("start_at >= ?", now - 90.days)
-                       .order(:start_at)
-                       .limit(EVENT_CAP + 5)
-                       .to_a
-      upcoming = all_events.select { |e| e.start_at >= now }
-      past     = all_events.select { |e| e.start_at < now }.last(5)
-      @events  = (upcoming.first(EVENT_CAP) + past).first(EVENT_CAP)
+      upcoming = base.where("start_at >= ?", now).order(:start_at).limit(EVENT_CAP).to_a
+      past     = base.where("start_at < ?", now).order(start_at: :desc).limit(5).to_a
+      @events  = (upcoming + past).first(EVENT_CAP)
     end
   end
 end

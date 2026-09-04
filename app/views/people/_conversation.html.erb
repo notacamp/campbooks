@@ -4,7 +4,8 @@
     The Details rail (aside#people_details_pane) sits to the right at xl+. %>
 <div class="relative flex h-full w-full min-w-0"
      data-controller="people-details"
-     data-people-details-person-id-value="<%= @person.id %>">
+     data-people-details-person-id-value="<%= @person.id %>"
+     data-people-details-open-value="<%= params[:details].present? %>">
   <%# Main conversation column — narrows at xl to make room for the rail. %>
   <div class="flex h-full min-w-0 flex-1 flex-col">
   <%# Mobile: back to the list. %>
@@ -115,7 +116,7 @@
 
   <%# Details rail / sheet. Static at xl+; sheet (translate-x-full → translate-x-0) below xl. %>
   <aside id="people_details_pane"
-         class="absolute inset-y-0 right-0 z-20 w-[300px] max-w-full translate-x-full
+         class="absolute inset-y-0 right-0 z-20 w-full lg:w-[400px] xl:w-[300px] translate-x-full
                 border-l border-border bg-card transition-transform duration-200
                 xl:static xl:translate-x-0 xl:flex-none"
          data-people-details-target="pane">

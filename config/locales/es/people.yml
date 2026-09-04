@@ -26,7 +26,6 @@ es:
           details: Detalles
           archive: Archivar conversación
           block: Bloquear remitente
-          open_profile: Abrir perfil clásico
       search_bar:
         placeholder: Buscar una persona o empresa…
         clear: Borrar
@@ -54,6 +53,9 @@ es:
         person_singular: persona
         persons_plural: personas
         since: "desde %{date}"
+        addresses:
+          one: "%{count} dirección"
+          other: "%{count} direcciones"
         no_relationship: "Relación…"
         starred: "Destacado"
         blocked: "Bloqueado"
@@ -178,7 +180,6 @@ es:
       empty: Aún no hay mensajes.
       reply: Responder
       older: Conversaciones anteriores
-      open_profile: Abrir perfil clásico
       star: Marcar como favorito
       unstar: Quitar de favoritos
       block: Bloquear
@@ -221,61 +222,6 @@ es:
       open_stream: Abrir stream
     details:
       title: Detalles
-      back: Volver
-      save: Guardar
-      rename_label: Nombre de la persona
-      person_singular: persona
-      persons_plural: personas
-      since: "desde %{date}"
-      no_relationship: "Relación…"
-      starred: "Destacado"
-      blocked: "Bloqueado"
-      allowed: "Permitido"
-      primary_badge: principal
-      copy_email: Copiar dirección de correo
-      kind_person: Persona
-      kind_service: Servicio
-      make_person: Marcar como persona
-      make_service: Marcar como servicio
-      scout_not_read: "Scout aún no ha leído a esta persona."
-      read_on: "Leído el %{date}"
-      refresh: Actualizar
-      refresh_hint: Pedir a Scout que vuelva a leer a esta persona
-      all_in_paper: Todo en Paper
-      open_time: Abrir Tiempo
-      no_event_title: "(sin título)"
-      unknown_kind: Documento
-      thread_message_one: mensaje
-      thread_messages_other: mensajes
-      sections:
-        scout_read: "Lectura de Scout"
-        numbers: Números
-        threads: Conversaciones
-        documents: Documentos
-        events: Eventos
-      patterns:
-        topics: Temas
-        tone: Tono
-        urgency: Urgencia
-        primary_role: Rol
-      numbers:
-        received: Recibidos
-        sent: Enviados
-        threads: Conversaciones
-        documents: Documentos
-        first_contact: Primer contacto
-        last_contact: Último contacto
-      threads_more: "y %{count} más"
-      manage:
-        star: Destacar
-        unstar: Quitar destaque
-        allow: Permitir siempre
-        block: Bloquear
-        block_confirm: "¿Bloquear esta persona? Sus correos se archivarán automáticamente."
-        unblock: Desbloquear
-        open_org: "Abrir %{org}"
-        same_person: "¿La misma persona?"
-        merge: "Unir con %{name}"
       toasts:
         starred: Destacado
         unstarred: Destaque eliminado
