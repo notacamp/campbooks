@@ -4,7 +4,8 @@
     its streamed reply land here exactly as they do on the Scout page. The overlay
     is never rendered on /scout, so these ids stay unique. %>
 <%= turbo_frame_tag "scout_overlay_body" do %>
-  <div data-scout-overlay-mode="conversation"
+  <div data-controller="live-reconcile"
+       data-scout-overlay-mode="conversation"
        data-thread-id="<%= @thread.id %>"
        data-thread-title="<%= @thread.title %>"
        data-ai-available="<%= @ai_available %>"

@@ -2,9 +2,8 @@
 <% threads = local_assigns[:threads] || @threads %>
 <% messages = local_assigns[:messages] || @messages %>
 
-<%= turbo_stream_from "agent_chat_#{current_user.id}" %>
-
-<div class="flex h-[calc(100vh-4rem)] bg-card" data-controller="email-mobile">
+<div class="flex h-[calc(100vh-4rem)] bg-card" data-controller="email-mobile live-reconcile">
+  <%= turbo_stream_from "agent_chat_#{current_user.id}" %>
   <!-- Thread sidebar (mobile: shown in list mode via the Chats button; desktop: always shown) -->
   <div class="hidden sm:flex w-full sm:w-64 sm:flex-shrink-0 border-r border-border flex-col bg-sidebar" data-email-mobile-target="list">
     <div class="p-3">
