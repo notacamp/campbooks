@@ -9,10 +9,6 @@ RSpec.describe "People", type: :request do
     create(:email_account_user, user: user, email_account: account, can_read: true, can_send: can_send)
   end
 
-  # A person of the workspace with a person-kind contact and one inbound message.
-  # `owe: true` makes their last message unanswered (lands them under Need you);
-  # `replied: true` adds an earlier reply of yours (a two-way thread); `source: nil`
-  # leaves the sender kind at its never-classified column default.
   def make_person(name:, email:, kind: :person, org_name: nil, inbound_at: 2.days.ago, owe: false,
                   source: "heuristic", emails: 1, replied: false, unsubscribe: nil)
     person = create(:person, workspace: workspace, name: name, organization: org_name)
@@ -142,17 +138,101 @@ RSpec.describe "People", type: :request do
     end
 
     describe "GET /people/:id" do
-      it "renders the conversation with an outbound You bubble and the docked reply" do
-        person, _contact, thread = make_person(name: "Sofia Martins", email: "sofia@brightloop.example", owe: true)
-        create(:email_message, email_account: account, email_thread: thread, contact: nil,
-                               from_address: account.email_address, subject: "Re: Sofia Martins", received_at: 1.day.ago)
-        refresh_standings!
+      it "renders thread subjects as headings with the newest message open and older folded" do
+        person, contact, thread = make_person(name: "Sofia Martins", email: "sofia@brightloop.example", owe: true)
+        thread.update!(subject: "Q3 kickoff deck")
+        create(:email_message, email_account: account, email_thread: thread, contact: contact,
+               from_address: "sofia@brightloop.example", subject: "Q3 kickoff deck",
+               body: "Earlier message.", received_at: 5.days.ago)
+        newest = create(:email_message, email_account: account, email_thread: thread, contact: contact,
+                        from_address: "sofia@brightloop.example", subject: "Q3 kickoff deck",
+                        body: "Latest message from Sofia.", received_at: 1.day.ago)
 
         get person_page_path(person)
         expect(response).to have_http_status(:ok)
-        expect(response.body).to include("Sofia Martins")
+        expect(response.body).to include("Q3 kickoff deck")
+        expect(response.body).to match(/<details[^>]*open/)
+        expect(response.body).to include("Open in inbox")
+        expect(response.body).to include("/email_messages/#{newest.id}")
+      end
+
+      it "shows You and to <first name> for outbound, and to you for inbound" do
+        person, contact, thread = make_person(name: "Sofia Martins", email: "sofia@brightloop.example", owe: true)
+        create(:email_message, email_account: account, email_thread: thread, contact: nil,
+               from_address: account.email_address, body: "On it, Sofia.", received_at: 3.days.ago)
+        create(:email_message, email_account: account, email_thread: thread, contact: contact,
+               from_address: "sofia@brightloop.example", body: "Thank you.", received_at: 1.day.ago)
+
+        get person_page_path(person)
         expect(response.body).to include(">You<")
-        expect(response.body).to include("Reply to")
+        expect(response.body).to include("to Sofia")
+        expect(response.body).to include("to you")
+      end
+
+      it "shows the Reply row when can_send, and no old reply-to dock text" do
+        person, _contact, _thread = make_person(name: "Sofia Martins", email: "sofia@brightloop.example", owe: true)
+
+        get person_page_path(person)
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("Reply")
+        expect(response.body).not_to include("Reply to")
+      end
+
+      it "shows the Scout draft card when a real AgentMessage draft exists on the newest thread" do
+        person, _contact, thread = make_person(name: "Sofia Martins", email: "sofia@brightloop.example", owe: true)
+        agent_thread = create(:agent_thread, user: user, workspace: workspace,
+                              contextable: thread, purpose: :email_chat)
+        create(:agent_message, agent_thread: agent_thread, user: user,
+               author_type: :ai, draft: true, outdated: false,
+               ai_suggested_actions: [], content: "Friday works for me.")
+
+        get person_page_path(person)
+        expect(response.body).to include("Friday works for me.")
+        expect(response.body).to include("Draft by Scout")
+        expect(response.body).to include("Open draft")
+      end
+
+      it "does NOT show a draft card when only ai_action_prompt is set (no AgentMessage draft)" do
+        person, _contact, thread = make_person(name: "Sofia Martins", email: "sofia@brightloop.example", owe: true)
+        thread.email_messages.first.update!(ai_action_prompt: "Please review and confirm by Friday.")
+
+        get person_page_path(person)
+        expect(response.body).not_to include("Open draft")
+        expect(response.body).not_to include("Draft by Scout")
+      end
+
+      it "shows 8 thread blocks and the sentinel when there are 9 threads" do
+        person = create(:person, workspace: workspace, name: "Busy Person")
+        contact = create(:contact, workspace: workspace, email_account: account, person: person,
+                                   email: "busy@example.com", sender_kind: :person, sender_kind_source: "heuristic")
+        9.times do |i|
+          thread = create(:email_thread, email_account: account, subject: "Thread #{i}")
+          create(:email_message, email_account: account, email_thread: thread, contact: contact,
+                 from_address: "busy@example.com", received_at: i.days.ago)
+        end
+        contact.update_columns(email_count: 9)
+
+        get person_page_path(person)
+        expect(response).to have_http_status(:ok)
+        expect(response.body.scan("Open in inbox").length).to eq(8)
+        expect(response.body).to include("people_conversation_older")
+      end
+
+      it "appends the ninth thread on page 2 via turbo_stream" do
+        person = create(:person, workspace: workspace, name: "Busy Person")
+        contact = create(:contact, workspace: workspace, email_account: account, person: person,
+                                   email: "busy@example.com", sender_kind: :person, sender_kind_source: "heuristic")
+        9.times do |i|
+          thread = create(:email_thread, email_account: account, subject: "Thread #{i}")
+          create(:email_message, email_account: account, email_thread: thread, contact: contact,
+                 from_address: "busy@example.com", received_at: i.days.ago)
+        end
+        contact.update_columns(email_count: 9)
+
+        get person_page_path(person, page: 2, format: :turbo_stream),
+            headers: { "Accept" => "text/vnd.turbo-stream.html" }
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("people_conversation")
       end
 
       it "404s for a person in another workspace" do

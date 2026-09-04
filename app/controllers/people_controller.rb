@@ -1,18 +1,18 @@
 # frozen_string_literal: true
 
 # The People place (Rethink Stage 2): the workspace's persons and organizations
-# ordered by who needs you, and a person opened as ONE conversation across all
-# their threads — Scout's summary pinned on top, the reply box docked at the
-# bottom. Left pane = the counterpart list (People | Streams segmented control +
-# search + Need-you / Recent sections); right pane = the selected person, loaded
-# into the "people_detail" turbo frame (mirrors the email_detail pattern).
+# ordered by who needs you, and a person opened as their email threads newest-first
+# (subject headings, folded older messages, inline reply through the Compose Dock).
+# Left pane = the counterpart list (People | Streams segmented control + search +
+# Need-you / Recent sections); right pane = the selected person, loaded into the
+# "people_detail" turbo frame (mirrors the email_detail pattern).
 #
 # Gated on Features.bold_layout? (PeopleLayout). Nothing here changes the send
 # path or the mail model — it's a new reading of email threads + people + orgs.
 class PeopleController < ApplicationController
   include PeopleLayout
 
-  CONVERSATION_PER_PAGE = 30
+  THREADS_PER_PAGE = 8
 
   def index
     build_people_list
@@ -33,7 +33,7 @@ class PeopleController < ApplicationController
     build_conversation
 
     respond_to do |format|
-      format.turbo_stream # "Earlier" — prepend the previous (older) page
+      format.turbo_stream # older threads: append next page + update sentinel
       format.html do
         if turbo_frame_request_id == "people_detail"
           render :show_detail, layout: false
@@ -44,6 +44,11 @@ class PeopleController < ApplicationController
         end
       end
     end
+  rescue Pagy::OverflowError
+    respond_to do |format|
+      format.turbo_stream { @conversation_threads = []; @conversation_pagy = nil; render :show }
+      format.html { redirect_to person_page_path(@person) }
+    end
   rescue ActiveRecord::RecordNotFound
     # A person from another workspace (or a stale id) is invisible, not forbidden.
     head :not_found
@@ -51,21 +56,47 @@ class PeopleController < ApplicationController
 
   private
 
-  # The whole relationship in one scroll: every message across the person's
-  # threads (their inbound + your outbound in those threads), newest-first for
-  # pagination, then reversed so the view reads oldest→newest with the newest at
-  # the bottom next to the reply box. "Earlier" loads the older page on top.
+  # Each person's threads ordered by their latest accessible message (newest-first),
+  # paginated. Renders as ThreadBlock components: subject heading, older messages
+  # folded, the newest open, and an inline reply row under the newest thread.
   def build_conversation
     contact_ids = @person.contacts.ids
     thread_ids = conversation_thread_ids(contact_ids)
 
-    base = EmailMessage.where(email_thread_id: thread_ids)
-                       .accessible_to(current_user)
-                       .includes(:email_account, :contact, :email_thread, files_attachments: :blob)
-                       .order(received_at: :desc)
-    @conversation_pagy, page = pagy_countless(base, limit: CONVERSATION_PER_PAGE)
-    @conversation_messages = page.to_a.reverse
-    @newest_message = @conversation_messages.last
+    # Order threads by the newest accessible message in each.
+    latest_per_thread = EmailMessage.where(email_thread_id: thread_ids)
+                                    .accessible_to(current_user)
+                                    .group(:email_thread_id)
+                                    .maximum(:received_at)
+    ordered_ids = latest_per_thread.sort_by { |_id, at| at || Time.at(0) }.map(&:first).reverse
+
+    @conversation_pagy, page_ids = pagy_array(ordered_ids, limit: THREADS_PER_PAGE)
+
+    threads_by_id = EmailThread.where(id: page_ids).index_by(&:id)
+    messages_by_thread = EmailMessage.where(email_thread_id: page_ids)
+                                     .accessible_to(current_user)
+                                     .includes(:contact, :email_account, files_attachments: :blob)
+                                     .order(:received_at, :id)
+                                     .group_by(&:email_thread_id)
+
+    @conversation_threads = page_ids.filter_map do |tid|
+      thread = threads_by_id[tid]
+      msgs = messages_by_thread[tid]
+      next unless thread && msgs&.any?
+
+      People::ConversationThread.new(thread: thread, messages: msgs)
+    end
+
+    @newest_thread = @conversation_pagy.page == 1 ? @conversation_threads.first : nil
+
+    reply_msg = @newest_thread&.reply_target
+    reply_msg ||= contact_ids.any? ? EmailMessage.where(contact_id: contact_ids)
+                                                  .accessible_to(current_user)
+                                                  .order(received_at: :desc).first : nil
+
+    @reply_target = reply_msg
+    @can_send = @reply_target ? @reply_target.email_account.sendable_by?(current_user) : false
+    @scout_draft = @newest_thread ? Emails::ScoutDraft.for(@newest_thread&.newest) : nil
 
     @standing = PeopleStanding.for_user(current_user).find_by(counterpart: @person)&.standing ||
                 People::Standing.for_person(@person, user: current_user)
@@ -73,8 +104,6 @@ class PeopleController < ApplicationController
     @email_total = @person.total_email_count
     @first_seen = contact_ids.any? ? EmailMessage.where(contact_id: contact_ids).minimum(:received_at) : nil
     @sender_tags = @person.contacts.flat_map(&:sender_tags).uniq.first(2)
-
-    build_reply_dock(contact_ids)
   end
 
   def conversation_thread_ids(contact_ids)
@@ -82,18 +111,5 @@ class PeopleController < ApplicationController
 
     EmailMessage.where(contact_id: contact_ids).where.not(email_thread_id: nil)
                 .distinct.pluck(:email_thread_id)
-  end
-
-  # The reply box docks against the person's most recent inbound message and
-  # opens the existing Compose Dock in reply mode — the send path is unchanged.
-  # When Scout has a reply ready (the message carries an action prompt), its text
-  # previews in the dock under the "Scout's draft · edit freely" chip; the user
-  # still reviews and sends from the Dock.
-  def build_reply_dock(contact_ids)
-    @reply_target = contact_ids.any? ? EmailMessage.where(contact_id: contact_ids)
-                                                   .accessible_to(current_user)
-                                                   .order(received_at: :desc).first : nil
-    @can_send = @reply_target ? @reply_target.email_account.sendable_by?(current_user) : false
-    @scout_draft = @reply_target&.ai_action_prompt.to_s.strip.presence
   end
 end
