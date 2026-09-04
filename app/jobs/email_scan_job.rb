@@ -83,17 +83,18 @@ class EmailScanJob < ApplicationJob
     end
 
     scan_log = nil
+    scan_result = nil
     begin
       broadcast_sync_status(account) # scanning just turned on — show the sync pill
 
       scan_log = account.email_scan_logs.create!(status: :running, started_at: Time.current)
-      result = full ? strategy.full_resync!(scan_log: scan_log) : strategy.sync!(scan_log: scan_log)
+      scan_result = full ? strategy.full_resync!(scan_log: scan_log) : strategy.sync!(scan_log: scan_log)
 
       scan_log.update!(
         status: :completed,
         completed_at: Time.current,
-        emails_found: result.found,
-        emails_processed: result.created
+        emails_found: scan_result.found,
+        emails_processed: scan_result.created
       )
     rescue Emails::CursorExpired
       # The delta cursor died (Gmail historyId aged out, Graph deltaToken expired)
@@ -127,6 +128,10 @@ class EmailScanJob < ApplicationJob
     ensure
       release_scan_slot(account)
       broadcast_sync_status(account) # scanning finished — clear the sync pill
+      # Rebuild the skim tray only when the scan actually ingested new mail — avoids
+      # a full deck rebuild on every start-of-scan status broadcast and on scans
+      # where nothing arrived.
+      refresh_skim_tray(account) if scan_result&.created.to_i > 0
     end
   end
 
@@ -149,7 +154,8 @@ class EmailScanJob < ApplicationJob
 
   # New email arriving is not notification-worthy (the inbox is that surface).
   # Instead we surface a live bottom-center "syncing" pill while a scan runs,
-  # rendered per-user from their own current scanning state.
+  # rendered per-user from their own current scanning state. This broadcasts at
+  # BOTH the start and end of a scan (cheap, needed for the pill to turn on/off).
   def broadcast_sync_status(account)
     account.users.find_each do |user|
       # Render the pill through a real view context, in the user's locale. A bare
@@ -168,8 +174,13 @@ class EmailScanJob < ApplicationJob
         target: Campbooks::SyncIndicator::DOM_ID,
         html: html
       )
-      # Keep the Skim tray live as a scan ingests new mail.
-      Emails::SkimTrayBroadcaster.refresh(user)
     end
+  end
+
+  # Rebuild the skim tray for every user on the account. Called only at end-of-scan
+  # when new mail was actually ingested (scan_result.created > 0), so the deck is
+  # never rebuilt on the start-of-scan broadcast or on scans where nothing arrived.
+  def refresh_skim_tray(account)
+    account.users.find_each { |user| Emails::SkimTrayBroadcaster.refresh(user) }
   end
 end
