@@ -217,12 +217,10 @@ class EmailComposeController < ApplicationController
   # The freshest non-outdated Scout draft on the thread (created by the
   # suggest-reply tools). Question prompts also live as draft messages but
   # carry ai_suggested_actions — excluded so they never ghost into the canvas.
+  # Delegates to Emails::ScoutDraft.for so the People pane and the compose
+  # controller can never disagree.
   def cached_scout_draft
-    agent_thread = @message.email_thread&.agent_thread
-    agent_thread&.agent_messages
-                &.where(draft: true, outdated: false, author_type: :ai)
-                &.where("ai_suggested_actions = '[]'::jsonb") # a hash [] compiles to an empty IN, not jsonb equality
-                &.order(created_at: :desc)&.first&.content
+    Emails::ScoutDraft.for(@message)
   end
 
   # Forwarding carries the original files along as removable chips (their

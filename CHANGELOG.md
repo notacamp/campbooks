@@ -16,12 +16,17 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- **A person's conversation reads as email threads.** Threads appear newest-first, each with its subject as a heading; older messages are folded to a one-line snippet and the newest message opens with From and To, attachments, and an inline Reply row. Scout's draft appears only when Scout actually drafted one — never from the message's action prompt.
+
 ### Fixed
 
 - **An organization page in People crashed when the organization had documents.**
   The "N documents" chip on `/people/orgs/:id` pointed at a route helper that
   does not exist, so every organization with at least one document rendered a
   500 instead of its page. The chip now links to the organization's documents.
+
 
 ## [0.33.0] - 2026-09-04
 

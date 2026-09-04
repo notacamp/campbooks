@@ -1,13 +1,20 @@
-<%# "Earlier": prepend the older page above the conversation and refresh the
-    Earlier control (hidden once the oldest message is loaded). %>
-<%= turbo_stream.prepend "people_conversation" do %>
-  <% @conversation_messages.each do |message| %>
-    <%= render Campbooks::MessageBubble.new(
-          message: message, sent: message.sent?, variant: :flow,
-          name: people_bubble_name(message), channel_chip: true,
-          full: false, attachments: true, open_thread: true) %>
+<%# Older threads page: append ThreadBlocks into the list, then update or remove
+    the lazy sentinel. Never newest_thread: true on subsequent pages. %>
+<%= turbo_stream.append "people_conversation" do %>
+  <% @conversation_threads.each do |ct| %>
+    <%= render Campbooks::People::ThreadBlock.new(
+          conversation_thread: ct,
+          person_first_name: people_first_name(@person),
+          newest_thread: false,
+          can_send: false,
+          scout_draft: nil) %>
   <% end %>
 <% end %>
-<%= turbo_stream.replace "people_conversation_earlier" do %>
-  <%= render "people/conversation_earlier" %>
+
+<% if @conversation_pagy&.next %>
+  <%= turbo_stream.replace "people_conversation_older" do %>
+    <%= render "people/conversation_older" %>
+  <% end %>
+<% else %>
+  <%= turbo_stream.remove "people_conversation_older" %>
 <% end %>
