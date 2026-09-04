@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-09-04
+
 ### Added
 
 - **Now shows replies you owe and bills you owe.** A message from someone you already
@@ -44,7 +46,6 @@ major, minor, or patch change here.
   The "N documents" chip on `/people/orgs/:id` pointed at a route helper that
   does not exist, so every organization with at least one document rendered a
   500 instead of its page. The chip now links to the organization's documents.
-
 
 ## [0.33.0] - 2026-09-04
 
