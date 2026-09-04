@@ -15,8 +15,16 @@ class AgentChatReplyJob < ApplicationJob
     Current.acting_user = thread.user
     Current.workspace = thread.workspace
 
-    # Prevent duplicate replies on retry
-    return if thread.agent_messages.where(author_type: :ai).where("created_at > ?", message.created_at).exists?
+    # Prevent duplicate replies on retry; still clear the typing indicator so the
+    # user is never left with a spinning indicator after a dedup short-circuit.
+    if thread.agent_messages.where(author_type: :ai).where("created_at > ?", message.created_at).exists?
+      begin
+        Turbo::StreamsChannel.broadcast_remove_to("agent_chat_#{thread.user.id}", target: "agent_typing")
+      rescue => e
+        Rails.logger.warn("[AgentChatReplyJob] typing cleanup broadcast failed: #{e.message}")
+      end
+      return
+    end
 
     # Stream live status into the typing indicator while Scout works its tools.
     on_status = ->(label) { broadcast_typing_status(thread, label) }

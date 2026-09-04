@@ -38,7 +38,7 @@
   </div>
 
   <%# Document Skim — the review-queue ring tray + full-screen review overlay %>
-  <%= turbo_stream_from "doc_skim_#{Current.workspace.id}" %>
+  <%= turbo_stream_from "doc_skim_user_#{current_user.id}" %>
   <%= turbo_frame_tag "doc_skim_tray", src: document_skim_tray_path, loading: :lazy, class: "block" %>
   <%= render "shared/doc_skim_overlay" %>
 

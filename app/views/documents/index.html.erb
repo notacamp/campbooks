@@ -75,7 +75,7 @@
     Skim. The tray loads lazily and renders nothing when nothing needs review;
     Documents::SkimTrayBroadcaster keeps its counts live. %>
 <div data-controller="doc-skim-overlay">
-  <%= turbo_stream_from "doc_skim_#{Current.workspace.id}" %>
+  <%= turbo_stream_from "doc_skim_user_#{current_user.id}" %>
   <%= turbo_frame_tag "doc_skim_tray", src: document_skim_tray_path, loading: :lazy, class: "block" %>
   <%= render "shared/doc_skim_overlay" %>
 </div>

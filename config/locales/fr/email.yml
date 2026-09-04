@@ -1,6 +1,9 @@
 ---
 fr:
   email_messages:
+    archived_notice:
+      default: Cette conversation a été archivée.
+      dismiss_aria: Fermer l'avis d'archivage
     board:
       index:
         heading: Tableau

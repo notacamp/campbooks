@@ -108,7 +108,7 @@ module Documents
     end
 
     def current_rings
-      Documents::SkimBuilder.new(Documents::SkimScope.for(Current.workspace)).rings
+      Documents::SkimBuilder.new(Documents::SkimScope.for(Current.workspace, Current.user)).rings
     end
 
     def refresh_tray

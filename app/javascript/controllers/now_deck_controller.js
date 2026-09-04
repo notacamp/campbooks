@@ -259,16 +259,20 @@ export default class extends Controller {
     this.stack.hidden = false
   }
 
-  // Gate a live-broadcast append (see beforeStreamRender): drop it when the card
-  // isn't for the active segment, or a card with its id is already on the deck
-  // (a re-broadcast). A non-live append (load-more) passes straight through.
+  // Gate an append targeting feed_timeline. For live-broadcast cards, drop when
+  // the card is not for the active segment. For ALL cards (live or load-more),
+  // drop when a card with the same id is already on the deck — this prevents a
+  // card that arrived live from being re-appended by the next pagination page
+  // (which would cause a reorder/re-animation even though Turbo's id-dedup would
+  // ultimately prevent a literal duplicate).
   gateLiveAppend(event, stream) {
     if (stream.getAttribute("target") !== "feed_timeline") return
     const template = stream.querySelector("template")
     const card = template && template.content.firstElementChild
-    if (!card || card.dataset.feedLive !== "true") return
+    if (!card) return
+    const isLive = card.dataset.feedLive === "true"
 
-    if (!this.acceptsLive(card) || this.hasCard(card.id)) {
+    if ((isLive && !this.acceptsLive(card)) || this.hasCard(card.id)) {
       event.detail.render = () => {}
     }
   }
