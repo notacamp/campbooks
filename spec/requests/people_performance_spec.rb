@@ -74,7 +74,9 @@ RSpec.describe "People page performance", type: :request do
 
     # 12 People-specific queries (session + user/workspace + contacts check + standings x4 +
     # accounts + tags + inbox rules + feed items) plus up to 10 global topbar queries.
-    count = count_queries { get people_path }
+    # The frame request is the list path proper: the full HTML page also opens the top
+    # row's conversation (a bounded extra, guarded below).
+    count = count_queries { get people_path, headers: { "Turbo-Frame" => "people_results" } }
     expect(response).to have_http_status(:ok)
     expect(count).to be <= 22,
       "expected <= 22 queries, got #{count}"
@@ -84,7 +86,7 @@ RSpec.describe "People page performance", type: :request do
     3.times { |i| seed_person(i) }
     refresh_standings!
 
-    sqls = sql_log { get people_path }
+    sqls = sql_log { get people_path, headers: { "Turbo-Frame" => "people_results" } }
     # Exclude known global layout queries that touch email_messages only as a subquery
     # (topbar unread count, reminders indicator) — those are fired on every bold page.
     people_sqls = sqls.reject { |sql| GLOBAL_LAYOUT_SQL_PATTERNS.any? { |pat| sql.include?(pat) } }
@@ -93,6 +95,16 @@ RSpec.describe "People page performance", type: :request do
     }
     expect(bad).to be_empty,
       "expected no People-list email_messages/email_threads queries, got:\n#{bad.join("\n")}"
+  end
+
+  it "keeps the full page, which opens the top row's conversation, bounded" do
+    3.times { |i| seed_person(i) }
+    refresh_standings!
+
+    count = count_queries { get people_path }
+    expect(response).to have_http_status(:ok)
+    expect(response.body).to include("Open in inbox") # the auto-opened conversation
+    expect(count).to be <= 40, "expected <= 40 queries for the page with the top row open, got #{count}"
   end
 
   it "query count is flat when the directory grows (scaling assertion)" do
