@@ -112,22 +112,27 @@ module People
 
       base = EmailMessage.where(contact_id: contact_ids).accessible_to(@user)
 
-      # Received / first / last come from the person's own messages (contact-linked).
-      received_count, first_at, last_at =
-        base.pick(Arel.sql("count(*), min(received_at), max(received_at)"))
-
-      # "Sent" counts the way EmailMessage#sent? does — lower(from_address) LIKE
-      # '%<account address>%' (from_address may be "Name <addr>") — but across the
-      # person's THREADS, because your own replies carry no contact and would
-      # otherwise never be counted. The same thread-wide pass gives each thread's
-      # real message count and latest date.
-      thread_ids = base.where.not(email_thread_id: nil).distinct.pluck(:email_thread_id)
-      sent_case, bind_values = if account_emails.any?
+      # Sent/received tell apart the way EmailMessage#sent? does — lower(from_address)
+      # LIKE '%<account address>%' (from_address may be "Name <addr>").
+      sent_case, received_case, bind_values = if account_emails.any?
         like_clauses = account_emails.map { "lower(from_address) LIKE ?" }.join(" OR ")
-        [ "count(CASE WHEN (#{like_clauses}) THEN 1 END)", account_emails.map { |e| "%#{e.downcase}%" } ]
+        [ "count(CASE WHEN (#{like_clauses}) THEN 1 END)",
+          "count(CASE WHEN NOT (#{like_clauses}) THEN 1 END)",
+          account_emails.map { |e| "%#{e.downcase}%" } ]
       else
-        [ "0", [] ]
+        [ "0", "count(*)", [] ]
       end
+
+      # Received / first / last come from the person's own messages (contact-linked),
+      # minus anything you wrote that happens to carry their contact.
+      received_count, first_at, last_at = base.pick(Arel.sql(ActiveRecord::Base.sanitize_sql_array([
+        "#{received_case}, min(received_at), max(received_at)", *bind_values
+      ])))
+
+      # "Sent" is counted across the person's THREADS, because your own replies
+      # carry no contact and would otherwise never be counted. The same thread-wide
+      # pass gives each thread's real message count and latest date.
+      thread_ids = base.where.not(email_thread_id: nil).distinct.pluck(:email_thread_id)
       stats_sql = ActiveRecord::Base.sanitize_sql_array([
         "email_thread_id, count(*) AS msg_count, max(received_at) AS latest_at, #{sent_case} AS sent_total",
         *bind_values
