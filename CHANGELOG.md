@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.36.1] - 2026-09-04
+
 ### Fixed
 
 - The details rail beside a People conversation scrolls on its own and can be collapsed
