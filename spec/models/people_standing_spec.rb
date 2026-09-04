@@ -100,7 +100,6 @@ RSpec.describe PeopleStanding do
 
   describe "#to_counterpart" do
     it "builds a People::Counterpart with no additional queries" do
-      allow(Features).to receive(:bold_layout?).and_return(true)
       person = create(:person, workspace: workspace, name: "Ines")
       row = PeopleStanding.create!(
         workspace: workspace, user: user, counterpart: person,

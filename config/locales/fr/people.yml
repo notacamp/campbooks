@@ -18,14 +18,14 @@ fr:
           other: "%{count}j"
         actions:
           reply_hint: "Répondre (r)"
-          done_hint: "Fait (e)"
+          done_hint: "Terminé (d)"
           snooze_hint: "Reporter (s)"
           star_hint: Mettre en vedette
           unstar_hint: Retirer des favoris
           more_hint: "Plus (.)"
+          details: Détails
           archive: Archiver la conversation
           block: Bloquer l'expéditeur
-          open_profile: Ouvrir le profil classique
       search_bar:
         placeholder: Rechercher une personne ou une entreprise…
         clear: Effacer
@@ -33,21 +33,83 @@ fr:
         messages:
           one: "%{count} message"
           other: "%{count} messages"
-        open_in_inbox: Ouvrir dans la boîte
         no_subject: "(sans objet)"
         draft_by_scout: "Brouillon de Scout · modifiez librement"
         open_draft: Ouvrir le brouillon
-        reply: Répondre
-        reply_all: Répondre à tous
-        forward: Transférer
       thread_message:
         to_you: pour vous
         to_name: "pour %{name}"
+        reply: Répondre
+        reply_all: Répondre à tous
+        forward: Transférer
+        reply_hint: "Répondre (r)"
+        reply_all_hint: "Répondre à tous (a)"
+        forward_hint: "Transférer (f)"
+      details:
+        close: Fermer
+        title: Détails
+        back: Retour
+        save: Enregistrer
+        rename_label: Nom de la personne
+        person_singular: personne
+        persons_plural: personnes
+        since: "depuis %{date}"
+        addresses:
+          one: "%{count} adresse"
+          other: "%{count} adresses"
+        no_relationship: "Relation…"
+        starred: "Favori"
+        blocked: "Bloqué"
+        allowed: "Autorisé"
+        primary_badge: principal
+        copy_email: Copier l'adresse e-mail
+        kind_person: Personne
+        kind_service: Service
+        make_person: Marquer comme personne
+        make_service: Marquer comme service
+        scout_not_read: "Scout n'a pas encore lu cette personne."
+        read_on: "Lu le %{date}"
+        refresh: Actualiser
+        refresh_hint: Demander à Scout de relire cette personne
+        all_in_paper: Tout dans Paper
+        open_time: Ouvrir le Temps
+        no_event_title: "(sans titre)"
+        unknown_kind: Document
+        thread_message_one: message
+        thread_messages_other: messages
+        sections:
+          scout_read: "Lecture de Scout"
+          numbers: Chiffres
+          threads: Conversations
+          documents: Documents
+          events: Événements
+        patterns:
+          topics: Sujets
+          tone: Ton
+          urgency: Urgence
+          primary_role: Rôle
+        numbers:
+          received: Reçus
+          sent: Envoyés
+          threads: Conversations
+          documents: Documents
+          first_contact: Premier contact
+          last_contact: Dernier contact
+        threads_more: "et %{count} de plus"
+        manage:
+          star: Mettre en favori
+          unstar: Retirer des favoris
+          allow: Toujours autoriser
+          block: Bloquer
+          block_confirm: Bloquer cette personne ? Ses e-mails seront automatiquement archivés.
+          unblock: Débloquer
+          open_org: "Ouvrir %{org}"
+          same_person: Même personne ?
+          merge: "Fusionner avec %{name}"
   people:
     index:
       tab_people: Personnes
       tab_streams: Streams
-      classic_inbox: Boîte classique
       latest: Les plus récents
       show_more:
         one: "Afficher 1 de plus"
@@ -117,8 +179,8 @@ fr:
         other: "%{count} e-mails depuis %{since}"
       empty: Aucun message pour l'instant.
       reply: Répondre
+      newer_threads: Conversations plus récentes
       older: Conversations plus anciennes
-      open_profile: Ouvrir le profil classique
       star: Ajouter aux favoris
       unstar: Retirer des favoris
       block: Bloquer
@@ -137,7 +199,6 @@ fr:
       placeholder_body: Un stream, c'est le courrier d'un service — newsletters, reçus, notifications. Ouvrez-en un pour le parcourir, ou laissez-le.
       archive_all: Tout archiver
       archive_all_confirm: Archiver tous les fils de ce stream ?
-      open_classic: Ouvrir en classique
       no_threads: Rien ici pour le moment.
       no_subject: (sans objet)
     stream_kinds:
@@ -152,10 +213,21 @@ fr:
       documents:
         one: "%{count} document"
         other: "%{count} documents"
-      open_classic: Ouvrir la page classique de l'organisation
+      open_page: Page de l'organisation
       no_standing: Rien ne requiert votre attention pour le moment.
       people_heading: "Personnes chez %{org} · %{count}"
       no_people: Personne pour l'instant.
       streams_heading: "Streams de %{org} · %{count}"
       no_streams: Aucun service pour l'instant.
       open_stream: Ouvrir le stream
+    details:
+      title: Détails
+      toasts:
+        starred: Ajouté aux favoris
+        unstarred: Retiré des favoris
+        allowed: Toujours autorisé
+        blocked: Bloqué
+        unblocked: Débloqué
+        analysis_queued: Scout relit cette personne
+        merged: "Fusionné avec %{name}"
+        merge_dismissed: Ignoré

@@ -2,15 +2,19 @@
     teach the sender type. Star/block/teach act on the person's primary contact
     via the existing endpoints (full navigation so the state refreshes). %>
 <% contact = @primary_contact %>
-<details class="relative flex-shrink-0">
+<details class="relative flex-shrink-0" data-controller="dropdown-close">
   <summary class="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary">
     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/></svg>
     <span class="sr-only"><%= t("people.conversation.menu") %></span>
   </summary>
   <div class="absolute right-0 top-full z-30 mt-1 min-w-[210px] overflow-hidden rounded-xl border border-border bg-card py-1 shadow-lg">
     <% if contact %>
-      <%= link_to t("people.conversation.open_profile"), contact_path(contact), data: { turbo_frame: "_top" },
-            class: "block px-3.5 py-2 text-[13px] text-foreground no-underline hover:bg-secondary" %>
+      <%# Details — opens the rail/sheet. Below xl it toggles the sheet; at xl it's always visible. %>
+      <button type="button"
+              class="block w-full px-3.5 py-2 text-left text-[13px] text-foreground hover:bg-secondary xl:hidden"
+              data-action="click->people-details#toggle">
+        <%= t("people.details.title") %>
+      </button>
       <%= button_to (contact.starred? ? t("people.conversation.unstar") : t("people.conversation.star")),
             set_state_contact_path(contact, state: contact.starred? ? :unstar : :star),
             form: { data: { turbo: false } },

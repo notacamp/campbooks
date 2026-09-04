@@ -4,7 +4,7 @@ en:
     index:
       title: "Money"
       subtitle: "What you're owed, what you owe, and what the bank says."
-      classic: "Classic accounting"
+      accounting: "Accounting"
       export: "Export %{quarter}"
       add: "Add"
       add_title: "Add documents"
@@ -111,6 +111,15 @@ en:
           older_title: "%{count} overdue by more than three weeks · %{amount}. Open the ledger below."
           later_title: "%{count} due beyond the next month · %{amount}. Open the ledger below."
       ledger:
+        sort:
+          label: "Sort"
+          by: "Sort by %{column}"
+          date_desc: "Newest first"
+          date_asc: "Oldest first"
+          amount_desc: "Largest amount first"
+          amount_asc: "Smallest amount first"
+          counterpart_asc: "Counterpart A–Z"
+          counterpart_desc: "Counterpart Z–A"
         col:
           counterpart: "Counterpart"
           what: "What"

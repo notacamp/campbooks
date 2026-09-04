@@ -16,7 +16,13 @@ module Campbooks
         custom_class
       )
 
-      div(role: "status", **@attrs) do
+      # The status wrapper is positioned so the screen-reader-only label (which
+      # Tailwind's sr-only makes absolutely positioned) stays inside it. Without a
+      # positioned ancestor the label anchors to the page at the spinner's in-flow
+      # position — inside a scroll pane (the People list's infinite-scroll sentinel)
+      # that lands far below the viewport and stretches the document, so wheeling
+      # over the pane border scrolled the whole page into blank space.
+      div(role: "status", class: "relative", **@attrs) do
         div(class: merged)
         span(class: "sr-only") { t("shared.actions.loading") }
       end

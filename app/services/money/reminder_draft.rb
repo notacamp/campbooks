@@ -68,7 +68,7 @@ class Money
     def formatted_due
       return "" if @obligation.due_on.blank?
 
-      I18n.l(@obligation.due_on, format: :day_month)
+      I18n.l(@obligation.due_on, format: :date)
     end
   end
 end

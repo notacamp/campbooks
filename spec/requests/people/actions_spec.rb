@@ -56,7 +56,6 @@ RSpec.describe "People::Actions", type: :request do
   end
 
   before do
-    allow(Features).to receive(:bold_layout?).and_return(true)
     grant_access
     sign_in(user)
   end
@@ -104,7 +103,9 @@ RSpec.describe "People::Actions", type: :request do
 
       expect(response).to have_http_status(:ok)
       # Re-renders the counterpart list.
-      expect(response.body).to include("people_results")
+      # `update` keeps the people_results frame in place so the next action, the
+      # search and the pagination still have their target.
+      expect(response.body).to include('<turbo-stream action="update" target="people_results"')
       # Undo toast pointing to undo_done.
       expect(response.body).to include("undo_done")
     end
@@ -171,7 +172,9 @@ RSpec.describe "People::Actions", type: :request do
            headers: { "Accept" => "text/vnd.turbo-stream.html" }
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("people_results")
+      # `update` keeps the people_results frame in place so the next action, the
+      # search and the pagination still have their target.
+      expect(response.body).to include('<turbo-stream action="update" target="people_results"')
     end
   end
 
@@ -203,7 +206,9 @@ RSpec.describe "People::Actions", type: :request do
       }.to change { contact.reload.starred_at }.from(nil)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("people_results")
+      # `update` keeps the people_results frame in place so the next action, the
+      # search and the pagination still have their target.
+      expect(response.body).to include('<turbo-stream action="update" target="people_results"')
     end
   end
 
@@ -236,7 +241,9 @@ RSpec.describe "People::Actions", type: :request do
            headers: { "Accept" => "text/vnd.turbo-stream.html" }
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include("people_results")
+      # `update` keeps the people_results frame in place so the next action, the
+      # search and the pagination still have their target.
+      expect(response.body).to include('<turbo-stream action="update" target="people_results"')
     end
   end
 

@@ -2,7 +2,6 @@
 es:
   now:
     index:
-      classic_feed: Vista clásica
       need_you_chip:
         zero: nada requiere tu atención
         one: "%{count} requiere tu atención"

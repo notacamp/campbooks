@@ -12,7 +12,6 @@ RSpec.describe "People page performance", type: :request do
   let(:account) { create(:email_account, workspace: workspace) }
 
   before do
-    allow(Features).to receive(:bold_layout?).and_return(true)
     create(:email_account_user, user: user, email_account: account, can_read: true, can_send: true)
     sign_in(user)
   end
@@ -75,7 +74,8 @@ RSpec.describe "People page performance", type: :request do
     # 12 People-specific queries (session + user/workspace + contacts check + standings x4 +
     # accounts + tags + inbox rules + feed items) plus up to 10 global topbar queries.
     # The frame request is the list path proper: the full HTML page also opens the top
-    # row's conversation (a bounded extra, guarded below).
+    # row's conversation (a bounded extra, guarded below). The sendable_account_ids pluck
+    # only fires on the full conversation page (show action), not the list frame.
     count = count_queries { get people_path, headers: { "Turbo-Frame" => "people_results" } }
     expect(response).to have_http_status(:ok)
     expect(count).to be <= 22,
@@ -104,10 +104,12 @@ RSpec.describe "People page performance", type: :request do
 
     count = count_queries { get people_path }
     expect(response).to have_http_status(:ok)
-    expect(response.body).to include("Open in inbox") # the auto-opened conversation
+    # The auto-opened conversation is present (no "Open in inbox" — People is the inbox)
+    expect(response.body).not_to include("Open in inbox")
     # The list (above) + one thread's messages, its heads, the nothing-to-mark-read
-    # check, Scout's draft lookup and the conversation header — flat in the history.
-    expect(count).to be <= 45, "expected <= 45 queries for the page with the top row open, got #{count}"
+    # check, Scout's draft lookup, the sendable_account_ids pluck (+1) and the
+    # conversation header — flat in the history.
+    expect(count).to be <= 46, "expected <= 46 queries for the page with the top row open, got #{count}"
   end
 
   it "keeps the first open of unread mail, which marks it read and refreshes the row, bounded" do
@@ -118,8 +120,9 @@ RSpec.describe "People page performance", type: :request do
     expect(response).to have_http_status(:ok)
     # Marking read updates the thread, broadcasts its inbox row, recomputes this one
     # person's standing and swaps it into the list: a fixed extra, once per unread open.
-    expect(count).to be <= 75, "expected <= 75 queries for the first open of unread mail, got #{count}"
-    expect(count_queries { get people_path }).to be <= 45 # and the page is back in steady state
+    # The sendable_account_ids pluck adds one query (+1 vs. prior budget).
+    expect(count).to be <= 76, "expected <= 76 queries for the first open of unread mail, got #{count}"
+    expect(count_queries { get people_path }).to be <= 46 # and the page is back in steady state
   end
 
   it "query count is flat when the directory grows (scaling assertion)" do

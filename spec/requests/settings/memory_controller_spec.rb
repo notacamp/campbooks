@@ -19,20 +19,10 @@ RSpec.describe "Settings::MemoryController", type: :request do
   # ---------------------------------------------------------------------------
   # Feature gate
   # ---------------------------------------------------------------------------
-  describe "GET settings_memory_path — gate" do
-    it "returns 404 when the bold-layout flag is off" do
-      allow(Features).to receive(:bold_layout?).and_return(false)
-      get settings_memory_path
-      expect(response).to have_http_status(:not_found)
-    end
-  end
-
   # ---------------------------------------------------------------------------
-  # Show — flag on
+  # Show
   # ---------------------------------------------------------------------------
-  describe "GET settings_memory_path — flag on" do
-    before { allow(Features).to receive(:bold_layout?).and_return(true) }
-
+  describe "GET settings_memory_path" do
     it "returns 200" do
       get settings_memory_path
       expect(response).to have_http_status(:ok)
@@ -79,11 +69,9 @@ RSpec.describe "Settings::MemoryController", type: :request do
   end
 
   # ---------------------------------------------------------------------------
-  # Teach — flag on
+  # Teach
   # ---------------------------------------------------------------------------
-  describe "POST settings_memory_teach_path — flag on" do
-    before { allow(Features).to receive(:bold_layout?).and_return(true) }
-
+  describe "POST settings_memory_teach_path" do
     it "creates an InboxGroupRule for a stream sentence, returns turbo-stream" do
       expect do
         post settings_memory_teach_path,
@@ -146,9 +134,7 @@ RSpec.describe "Settings::MemoryController", type: :request do
   # ---------------------------------------------------------------------------
   # Confirm — skim entry
   # ---------------------------------------------------------------------------
-  describe "POST settings_memory_entry_confirm_path — flag on" do
-    before { allow(Features).to receive(:bold_layout?).and_return(true) }
-
+  describe "POST settings_memory_entry_confirm_path" do
     it "records another LearningDecision when confirming a skim habit" do
       # Seed 12 skim decisions: 9 archive + 3 keep → consensus on archive (75% > 60%)
       12.times do |i|
@@ -177,9 +163,7 @@ RSpec.describe "Settings::MemoryController", type: :request do
   # ---------------------------------------------------------------------------
   # Destroy — email rule
   # ---------------------------------------------------------------------------
-  describe "DELETE settings_memory_entry_path — flag on" do
-    before { allow(Features).to receive(:bold_layout?).and_return(true) }
-
+  describe "DELETE settings_memory_entry_path" do
     it "destroys the email rule and returns a turbo-stream remove action" do
       folder = MailFolder.create!(workspace: ws, name: "Utilities", position: 0)
       rule = ws.email_rules.create!(

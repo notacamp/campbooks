@@ -3,12 +3,11 @@
 # Keep / Move / dismiss a Scout focus block from its Time-agenda row. Keeping turns
 # the block into a real calendar event (Time::FocusKeeper); moving shifts it to a
 # chosen free slot; dismissing drops it. Each re-renders the agenda in place (so a
-# kept block yields to its event and a moved one relocates) with a toast. Gated on
-# Features.bold_layout?; personal records, so 404 (not 403) for another user's block.
+# kept block yields to its event and a moved one relocates) with a toast. Personal
+# records, so 404 (not 403) for another user's block.
 class FocusBlocksController < ApplicationController
   include TimeAgendaLoading
 
-  before_action :require_bold_layout_enabled
   before_action :set_focus_block
 
   def keep

@@ -112,7 +112,7 @@ module Campbooks
       # account-wide stop-syncing action. Native <details>; the page controller
       # closes any open one on outside click.
       def calendar_menu(account, cal)
-        details(class: "relative flex-shrink-0", data: { calendar_sidebar_target: "menu" }) do
+        details(class: "relative flex-shrink-0", data: { controller: "dropdown-close", calendar_sidebar_target: "menu" }) do
           summary(class: "flex h-6 w-6 cursor-pointer list-none items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground [&::-webkit-details-marker]:hidden",
                   title: t(".calendar_options"), aria_label: t(".calendar_options")) do
             raw safe(ELLIPSIS_SVG)

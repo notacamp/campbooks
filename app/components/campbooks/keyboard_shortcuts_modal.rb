@@ -18,6 +18,16 @@ module Campbooks
         { key: "→ / ⏎",    label: t(".shortcuts.feed_primary"),  context: t(".contexts.feed") },
         { key: "←",         label: t(".shortcuts.feed_dismiss"),  context: t(".contexts.feed") },
         { key: "e r c",     label: t(".shortcuts.feed_actions"),  context: t(".contexts.feed") },
+        { key: "↑ ↓",     label: t(".shortcuts.people_move"),      context: t(".contexts.people") },
+        { key: "⏎",       label: t(".shortcuts.people_open"),      context: t(".contexts.people") },
+        { key: "r",       label: t(".shortcuts.people_reply"),     context: t(".contexts.people") },
+        { key: "a",       label: t(".shortcuts.people_reply_all"), context: t(".contexts.people") },
+        { key: "f",       label: t(".shortcuts.people_forward"),   context: t(".contexts.people") },
+        { key: "e",       label: t(".shortcuts.people_archive"),   context: t(".contexts.people") },
+        { key: "d",       label: t(".shortcuts.people_done"),      context: t(".contexts.people") },
+        { key: "s",       label: t(".shortcuts.people_snooze"),    context: t(".contexts.people") },
+        { key: ".",       label: t(".shortcuts.people_more"),      context: t(".contexts.people") },
+        { key: "i",       label: t(".shortcuts.people_details"),   context: t(".contexts.people") },
         { key: "e",       label: t(".shortcuts.archive"),          context: t(".contexts.email") },
         { key: "#",       label: t(".shortcuts.delete"),           context: t(".contexts.email") },
         { key: "r",       label: t(".shortcuts.reply"),            context: t(".contexts.email") },
@@ -95,14 +105,10 @@ module Campbooks
 
     private
 
-    # The `g <key>` navigation chords, matching whichever primary nav is actually
-    # rendered: the bold five (Now/People/Paper/Money/Time + Scout) when the bold
-    # layout is active for this user, otherwise the classic destinations. Money
-    # rides the same accounting gate as its nav item, so no phantom chord.
+    # The `g <key>` navigation chords for the five places (Now/People/Paper/Money/
+    # Time + Scout overlay). Money rides the same accounting gate as its nav item.
     def nav_shortcuts
       ctx = t(".contexts.navigation")
-      return classic_nav_shortcuts(ctx) unless helpers.bold_layout?
-
       [
         { key: "g n", label: t(".shortcuts.nav_now"),    context: ctx },
         { key: "g p", label: t(".shortcuts.nav_people"), context: ctx },
@@ -110,19 +116,6 @@ module Campbooks
         *(Features.accounting? ? [ { key: "g m", label: t(".shortcuts.nav_money"), context: ctx } ] : []),
         { key: "g t", label: t(".shortcuts.nav_time"),   context: ctx },
         { key: "g s", label: t(".shortcuts.nav_scout"),  context: ctx }
-      ]
-    end
-
-    def classic_nav_shortcuts(ctx)
-      [
-        { key: "g h", label: t(".shortcuts.nav_home"),          context: ctx },
-        { key: "g m", label: t(".shortcuts.nav_mail"),          context: ctx },
-        { key: "g c", label: t(".shortcuts.nav_calendar"),      context: ctx },
-        { key: "g s", label: t(".shortcuts.nav_scout"),         context: ctx },
-        { key: "g f", label: t(".shortcuts.nav_files"),         context: ctx },
-        { key: "g p", label: t(".shortcuts.nav_contacts"),      context: ctx },
-        { key: "g o", label: t(".shortcuts.nav_organizations"), context: ctx },
-        { key: "g a", label: t(".shortcuts.nav_activity"),      context: ctx }
       ]
     end
   end

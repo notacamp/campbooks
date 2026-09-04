@@ -159,8 +159,3 @@
       Shared with the Now deck's connect/syncing/disconnected states. %>
   <%= render Campbooks::InboxEmptyState.new(state: @inbox_state) %>
 <% end %>
-
-<%# Scout composer — glass-docked; opens the full Scout chat (inline compose is a
-    follow-up). Desktop only here (mobile reaches Scout via the bottom-nav tab, so
-    the docked bar would collide with it). Shared with the Now page (Campbooks::ScoutBar). %>
-<%= render Campbooks::ScoutBar.new(placeholder: t(".ask_scout"), coach_anchor: true) %>

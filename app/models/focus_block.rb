@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-# A block of focus time held for a deadline the AI found in mail — the bold Time
-# agenda's one novel record (Features.bold_layout?). Time::FocusProposer places a
+# A block of focus time held for a deadline the AI found in mail — the Time
+# agenda's one novel record. Time::FocusProposer places a
 # `proposed` block in the earliest free slot before the deadline; from its agenda
 # row the user Keeps it (→ a real CalendarEvent on a writable calendar, referenced
 # by calendar_event_id, so the block's own row stops rendering and the event takes

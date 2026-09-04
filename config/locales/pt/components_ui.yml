@@ -132,6 +132,7 @@ pt:
       title: Definições da caixa de entrada
     keyboard_shortcuts_modal:
       contexts:
+        people: Pessoas
         calendar: Calendário
         email: Email
         feed: Feed
@@ -141,6 +142,16 @@ pt:
         selection: Seleção
       footer_hint: Prima ? para abrir este diálogo em qualquer momento.
       shortcuts:
+        people_move: "Percorrer as pessoas (abre após uma pausa)"
+        people_open: "Abrir a pessoa selecionada"
+        people_reply: "Responder"
+        people_reply_all: "Responder a todos"
+        people_forward: "Reencaminhar"
+        people_archive: "Arquivar a conversa"
+        people_done: "Concluído"
+        people_snooze: "Adiar até amanhã"
+        people_more: "Mais ações"
+        people_details: "Mostrar ou ocultar detalhes"
         archive: Arquivar
         cal_new: Novo evento
         cal_next: Período seguinte

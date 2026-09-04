@@ -55,10 +55,12 @@ module Campbooks
       # The list-row wraps the <a> and the action cluster in a group div so the
       # cluster can be positioned absolutely without the <a> needing to be relative.
       def list_row
+        # aria-selected is the keyboard selection (people_shortcuts_controller); the
+        # open person's row is lit through `selected` on the link below.
         div(
           id: row_dom_id,
           data: { people_row: true },
-          class: "group relative"
+          class: "group relative rounded-xl aria-selected:bg-secondary aria-selected:ring-1 aria-selected:ring-border"
         ) do
           a(href: href,
             data: { turbo_frame: "people_detail", turbo_action: "advance", action: "click->email-mobile#showDetail" },
@@ -230,7 +232,7 @@ module Campbooks
       end
 
       def more_menu
-        details(class: "relative") do
+        details(class: "relative", data: { controller: "dropdown-close" }) do
           summary(class: class_names(ACTION_BTN, "list-none cursor-pointer"),
                   title: t(".actions.more_hint"),
                   data: { people_more: true }) do
@@ -244,12 +246,18 @@ module Campbooks
                    data: { turbo_stream: true }) do
                 input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
                 button(type: "submit",
-                       class: "w-full px-4 py-2 text-left text-[13px] hover:bg-secondary") do
+                       class: "w-full px-4 py-2 text-left text-[13px] hover:bg-secondary",
+                       data: { people_archive: true }) do
                   plain(t(".actions.archive"))
                 end
               end
             end
             if (contact_id = data["contact_id"])
+              # Details — navigate to this person's page with ?details=1 so the sheet opens.
+              a(href: helpers.person_page_path(@counterpart.id, details: 1), data: { turbo_frame: "_top" },
+                class: "block px-4 py-2 text-[13px] no-underline hover:bg-secondary") do
+                plain(t(".actions.details"))
+              end
               # Block sender (POST set_state, like the conversation kebab)
               form(action: helpers.set_state_contact_path(contact_id, state: :block),
                    method: "post", class: "block w-full", data: { turbo: false }) do
@@ -257,11 +265,6 @@ module Campbooks
                 button(type: "submit", class: "w-full px-4 py-2 text-left text-[13px] hover:bg-secondary") do
                   plain(t(".actions.block"))
                 end
-              end
-              # Open classic profile
-              a(href: helpers.contact_path(contact_id), data: { turbo_frame: "_top" },
-                class: "block px-4 py-2 text-[13px] no-underline hover:bg-secondary") do
-                plain(t(".actions.open_profile"))
               end
             end
           end

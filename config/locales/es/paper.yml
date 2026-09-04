@@ -4,7 +4,7 @@ es:
     index:
       title: "Papeles"
       subtitle: "Cada documento, por lo que dice."
-      classic_files: "Archivos clásicos"
+      files: "Archivos"
       export: "Exportar"
       export_confirm: "¿Exportar los documentos que coinciden con estos filtros?"
       add: "Añadir"

@@ -14,16 +14,11 @@ RSpec.describe "Money", type: :request do
     create(:document, :approved, workspace:, document_type: :expense_invoice, currency: "EUR", **attrs)
   end
 
-  def with_flags(bold: "1", accounting: "1", &)
-    with_env("ENABLE_BOLD_LAYOUT" => bold, "ENABLE_ACCOUNTING" => accounting, &)
+  def with_flags(accounting: "1", &)
+    with_env("ENABLE_ACCOUNTING" => accounting, &)
   end
 
   describe "gating" do
-    it "404s when the bold layout flag is off" do
-      with_flags(bold: nil) { sign_in(user); get money_path }
-      expect(response).to have_http_status(:not_found)
-    end
-
     it "404s when accounting is off" do
       with_flags(accounting: nil) { sign_in(user); get money_path }
       expect(response).to have_http_status(:not_found)
@@ -115,6 +110,38 @@ RSpec.describe "Money", type: :request do
       other = create(:document, :approved, document_type: :expense_invoice, amount_cents: 1_000, due_date: Date.current - 1)
       post money_obligation_settle_path("doc:#{other.id}"), as: :turbo_stream
       expect(response).to have_http_status(:not_found)
+    end
+  end
+
+  describe "ledger sorting" do
+    before { sign_in(user) }
+
+    it "sorts by the column asked for, marks it with aria-sort, and remembers it for the session" do
+      with_flags do
+        expense(vendor_name: "Bravo", amount_cents: 5_000, due_date: Date.current - 3)
+        expense(vendor_name: "Alpha", amount_cents: 9_000, due_date: Date.current - 2)
+
+        get money_path(sort: "amount", dir: "asc")
+        expect(response).to have_http_status(:ok)
+        href = response.body[/aria-sort="ascending"[^>]*>\s*<a[^>]*href="([^"]+)"/, 1]
+        expect(href).to include("sort=amount").and include("dir=desc") # clicking the active column flips it
+        expect(table_order).to eq(%w[Bravo Alpha])
+
+        get money_path
+        expect(response.body).to include('aria-sort="ascending"')
+        expect(table_order).to eq(%w[Bravo Alpha])
+
+        get money_path(order: "counterpart_desc")
+        expect(response.body).to include('aria-sort="descending"')
+        expect(table_order).to eq(%w[Bravo Alpha])
+      end
+    end
+
+    # The counterparts in the ledger table's row order (the timeline above it lists
+    # the same names in date order, so the whole page is the wrong thing to scan).
+    def table_order
+      table = response.body[%r{<table.*?</table>}m]
+      table.scan(/<td class="px-3 py-3 font-semibold text-foreground">([^<]+)</).flatten
     end
   end
 end

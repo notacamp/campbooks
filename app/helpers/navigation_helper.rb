@@ -12,52 +12,22 @@ module NavigationHelper
   # Campbooks::NavRail and Campbooks::BottomNav read this map to render their
   # key-badge chips and aria-keyshortcuts attributes.
   NAV_SHORTCUT_KEYS = {
-    home:          "h",
-    mail:          "m",
-    calendar:      "c",
-    scout:         "s",
-    files:         "f",
-    tasks:         "t",
-    digests:       "d",
-    workflows:     "w",
-    contacts:      "p",
-    organizations: "o",
-    activity:      "a",
-    # Bold-layout chords. The nav-shortcuts controller resolves `g <key>` against
-    # the RENDERED nav links (data-nav-shortcut-key in the DOM, preferring the
-    # visible one), and only one layout's items are ever rendered at a time — so
-    # these deliberately reuse letters the classic-only items also claim (p/d/m/t)
-    # with no collision.
-    now:           "n",
-    people:        "p",
-    paper:         "d",
-    money:         "m",
-    time:          "t"
+    now:    "n",
+    people: "p",
+    paper:  "d",
+    money:  "m",
+    time:   "t"
   }.freeze
 
   # Inline SVG bodies for the primary nav icons (rendered raw, mirroring the
   # Campbooks::Logo component's approach). Scout is a filled spark; the rest are
   # stroked line icons sharing one visual weight.
   NAV_ICON_PATHS = {
-    home: '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
-    mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
-    documents: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/>',
-    files: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
-    workflows: '<circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="12" r="2.4"/><path d="M8 7.4 16 11M8 16.6 16 13"/>',
-    calendar: '<rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 3v4M16 3v4"/>',
-    organizations: '<path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11m16-11v11M8 14v.01M12 14v.01M16 14v.01M8 18v.01M12 18v.01M16 18v.01"/>',
-    contacts: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
-    activity: '<path d="M3 12h4l2 6 4-13 2 7h6"/>',
-    tasks:      '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/><path d="m9 14 2 2 4-4"/>',
-    digests:    '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/>',
-    accounting: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M7 15h1m4 0h1m-7-2h1m4 0h1"/>',
-    # Bold-layout nav (Now/People/Paper/Money/Time) — stroked to match the rest,
-    # icon shapes lifted from the approved mock.
-    now: '<path d="m12 3 9 4.5-9 4.5-9-4.5z"/><path d="m3 12 9 4.5 9-4.5"/><path d="m3 16.5 9 4.5 9-4.5"/>',
+    now:    '<path d="m12 3 9 4.5-9 4.5-9-4.5z"/><path d="m3 12 9 4.5 9-4.5"/><path d="m3 16.5 9 4.5 9-4.5"/>',
     people: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
-    paper: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
-    money: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
-    time: '<rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 3v4M16 3v4"/>'
+    paper:  '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+    money:  '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
+    time:   '<rect x="3" y="4.5" width="18" height="16.5" rx="2"/><path d="M3 9.5h18M8 3v4M16 3v4"/>'
   }.freeze
   # Four-point spark, centered in the 24×24 box (tips at 12,5 · 19.5,12 · 12,19 ·
   # 4.5,12 → center 12,12) so it sits dead-center inside the Ember tile.
@@ -79,42 +49,14 @@ module NavigationHelper
   # Single source of truth for the top-level destinations, consumed by BOTH
   # Campbooks::NavRail (desktop left rail) and Campbooks::BottomNav (mobile tab
   # bar) so the two never drift on items, order, active state, or icons. Each
-  # item: { key:, label:, path:, ember:, active: }. Scout is the one Ember item
-  # (the Meaning Rule — Ember means Scout / live / win); the active section is
-  # rendered in near-black ink, never Ember. Admin/Settings are intentionally
-  # absent here: they live in the avatar menu, not the primary nav.
+  # item: { key:, label:, path:, ember:, active: }. Admin/Settings are
+  # intentionally absent here: they live in the avatar menu, not the primary nav.
+  # Five places reframe the app around decisions rather than folders: Now (the
+  # decision deck), People (mail + contacts + organizations), Paper (files +
+  # documents), Money (accounting), Time (calendar + reminders + tasks). There is
+  # no Scout tile — Scout is reached from the docked bar, ⌘K, the rail search,
+  # and the `g s` chord. Money rides the same accounting gate as before.
   def primary_nav_items
-    return bold_nav_items if bold_layout?
-
-    [
-      nav_item(:home, t("shared.nav.home"), root_path, exact: true, also_active_for: [ home_path ], badge: nav_attention.dot?(:home)),
-      nav_item(:mail, t("shared.nav.mail"), email_messages_path(show_list: 1), badge: nav_attention.dot?(:mail)),
-      nav_item(:calendar, t("shared.nav.calendar"), calendar_path, badge: nav_attention.dot?(:calendar)),
-      nav_item(:scout, t("shared.nav.scout"), scout_path, ember: true, badge: nav_attention.dot?(:scout)),
-      nav_item(:files, t("shared.nav.files"), files_path, badge: nav_attention.dot?(:files)),
-      # Tasks is gated off by default until it's production-ready (Features.tasks?).
-      (nav_item(:tasks, t("shared.nav.tasks"), tasks_path) if Features.tasks?),
-      # Digests is gated off by default until it's production-ready (Features.digests?).
-      (nav_item(:digests, t("shared.nav.digests"), digests_path) if Features.digests?),
-      # Accounting is gated off by default until it's production-ready (Features.accounting?).
-      (nav_item(:accounting, t("shared.nav.accounting"), accounting_path) if Features.accounting?),
-      # Workflows is gated off by default until it's production-ready (Features.workflows?).
-      (nav_item(:workflows, t("shared.nav.workflows"), workflows_path) if Features.workflows?),
-      (nav_item(:contacts, t("shared.nav.contacts"), contacts_path) if workspace_module_visible?(:contacts)),
-      (nav_item(:organizations, t("shared.nav.organizations"), organizations_path) if current_entitlements.feature?(:organizations) && workspace_module_visible?(:organizations)),
-      (nav_item(:activity, t("shared.nav.activity"), activity_path) if workspace_module_visible?(:activity))
-    ].compact
-  end
-
-  # The rethought "bold" navigation (opt-in, gated on Features.bold_layout? + the
-  # user's layout_mode — see ApplicationController#bold_layout?). Five places that
-  # reframe the app around decisions rather than folders: Now (the decision deck),
-  # People (mail + contacts + organizations), Paper (files + documents), Money
-  # (accounting) and Time (calendar + reminders + tasks). There is no Ember/Scout
-  # tile — Scout is reached from the Now page's docked bar, Cmd+K, the rail's
-  # search, and the `g s` chord (the overlay PR makes the bar global). Money rides
-  # the exact same gate as the classic :accounting item.
-  def bold_nav_items
     [
       nav_item(:now, t("shared.nav.now"), now_path, exact: false, badge: nav_attention.dot?(:home)),
       nav_item(:people, t("shared.nav.people"), people_path,
@@ -182,75 +124,37 @@ module NavigationHelper
   # [path, active_keys, label, icon_path]. A sidebar link is active when
   # current_section is in its active_keys list (the user menu ignores active_keys
   # since it renders outside the settings controllers).
+  # Five places: Scout's memory, Connections, Workspace & people, Account, Plan.
   def settings_nav_groups
-    return bold_settings_nav_groups if bold_layout?
-
-    [
-      [ t("navigation.settings.groups.workspace"), [
-        [ settings_root_path, %w[general], t("navigation.settings.items.general"), "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" ],
-        [ settings_setup_template_path, %w[setup_template], t("navigation.settings.items.setup"), "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" ],
-        [ settings_plan_path, %w[plan], t("navigation.settings.items.plan"), "M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 18.75z" ],
-        [ settings_members_path, %w[members], t("navigation.settings.items.members"), "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" ],
-        [ settings_integrations_root_path, %w[integrations notion google_drive zoho_drive calendars], t("navigation.settings.items.integrations"), "M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" ],
-        # API Access (OAuth developer clients) is developer-only — hide it in the
-        # native app shell, where managing client secrets / curl snippets is pointless.
-        (hotwire_native_app? ? nil : [ settings_api_clients_path, %w[api_clients], t("navigation.settings.items.api_access"), "M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" ]),
-        [ settings_data_privacy_path, %w[data_privacy], t("navigation.settings.items.data_privacy"), "M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" ],
-        [ settings_system_health_path, %w[system_health], t("navigation.settings.items.system_health"), "M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" ]
-      ].compact ],
-      inbox_settings_nav_group,
-      [ t("navigation.settings.groups.ai_and_automation"), [
-        [ settings_pipelines_path, %w[pipelines], t("navigation.settings.items.pipelines"), "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" ],
-        # Document + email templates are readiness-gated (Features.*): their
-        # controllers `head :not_found` when the flag is off, so only advertise the
-        # link when the feature is actually reachable — otherwise it dead-ends on a
-        # blank 404 page.
-        (document_templates_enabled? ? [ settings_document_templates_path, %w[document_templates], t("navigation.settings.items.document_templates"), "M4.5 3.75h15a2.25 2.25 0 012.25 2.25v10.5A2.25 2.25 0 0119.5 18.75h-15a2.25 2.25 0 01-2.25-2.25V6A2.25 2.25 0 014.5 3.75z" ] : nil),
-        (email_templates_enabled? ? [ settings_email_templates_path, %w[email_templates], t("navigation.settings.items.email_templates"), "M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" ] : nil),
-        [ settings_ai_path, %w[ai], t("navigation.settings.items.ai_providers_and_services"), "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.456-2.456L14.25 6l1.035-.259a3.375 3.375 0 002.456-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" ],
-        [ settings_ai_prompts_path, %w[ai_prompts], t("ai_prompts.nav_label"), "M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" ]
-      ].compact ],
-      [ t("navigation.settings.groups.your_account"), [
-        [ settings_account_path, %w[account], t("navigation.settings.items.account"), "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" ],
-        [ settings_security_path, %w[security totp passkeys recovery_codes email_otp audit_log], t("navigation.settings.items.security"), "M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" ],
-        [ settings_notifications_path, %w[notifications], t("navigation.settings.items.notifications"), "M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" ]
-      ] ]
-    ]
-  end
-
-  # Bold-layout settings nav: the twenty-odd pages collapse to FIVE places, since
-  # nine of them are now Scout's behaviour expressed as sentences on the Scout's
-  # memory page (the old inbox/AI pages stay routable — reached from each
-  # sentence's edit link — so their controllers are folded into "Scout's memory"'s
-  # active keys). One flat group (no heading), matching the mock. Each item is
-  # [path, active_keys, label, icon_path].
-  def bold_settings_nav_groups
     behaviour_sections = InboxSettings::Sections::ALL
       .map { |section| "inbox_#{section[:key]}" }
       .reject { |key| key == "inbox_accounts" }
 
-    [
-      [ nil, [
-        [ settings_memory_path,
-          %w[memory ai ai_prompts pipelines document_templates email_templates] + behaviour_sections,
-          t("navigation.settings.bold.memory"),
-          "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.456-2.456L14.25 6l1.035-.259a3.375 3.375 0 002.456-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" ],
-        [ settings_integrations_root_path,
-          %w[integrations notion google_drive zoho_drive calendars inbox_accounts api_clients],
-          t("navigation.settings.bold.connections"),
-          "M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" ],
-        [ settings_root_path,
-          %w[general setup_template members data_privacy system_health],
-          t("navigation.settings.bold.workspace_people"),
-          "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" ],
-        [ settings_account_path,
-          %w[account security totp passkeys recovery_codes email_otp audit_log notifications],
-          t("navigation.settings.bold.account"),
-          "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" ],
-        [ settings_plan_path, %w[plan], t("navigation.settings.bold.plan"),
-          "M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 18.75z" ]
-      ] ]
-    ]
+    items = [
+      [ settings_memory_path,
+        %w[memory ai ai_prompts pipelines document_templates email_templates] + behaviour_sections,
+        t("navigation.settings.memory"),
+        "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.456-2.456L14.25 6l1.035-.259a3.375 3.375 0 002.456-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" ],
+      [ settings_integrations_root_path,
+        %w[integrations notion google_drive zoho_drive calendars inbox_accounts api_clients],
+        t("navigation.settings.connections"),
+        "M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" ],
+      [ settings_root_path,
+        %w[general setup_template members data_privacy system_health],
+        t("navigation.settings.workspace_people"),
+        "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" ],
+      [ settings_account_path,
+        %w[account security totp passkeys recovery_codes email_otp audit_log notifications],
+        t("navigation.settings.account"),
+        "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" ],
+      [ settings_plan_path, %w[plan], t("navigation.settings.plan"),
+        "M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 18.75z" ],
+      # API Access (OAuth developer clients) is developer-only — hide it in the
+      # native app shell, where managing client secrets / curl snippets is pointless.
+      (hotwire_native_app? ? nil : [ settings_api_clients_path, %w[api_clients], t("navigation.settings.items.api_access"), "M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" ])
+    ].compact
+
+    [ [ nil, items ] ]
   end
 
   # The "Inbox" settings group: one sidebar item per inbox-settings panel, sourced

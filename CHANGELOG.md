@@ -20,6 +20,69 @@ major, minor, or patch change here.
 
 - Quieter draft-save feedback: the composer's autosave status settles to a calm "Saved" instead of a flashing label, and the parked-draft pill is now a compact, on-system capsule that reveals the draft on hover.
 
+## [0.36.2] - 2026-09-04
+
+### Changed
+
+- Money shows the year on its dates — due, paid and renewal dates in the ledger, the
+  timeline labels, Scout's summary and the reminder draft — so last year's bills read
+  unambiguously.
+- The Money ledger lists newest first by default, and its Counterpart, Amount and Due
+  headers sort the table (click again to flip the direction); phones get a sort select.
+  The choice is remembered for the session, so row actions keep the order.
+
+### Fixed
+
+- People: after the first action on a row (archive, done, snooze) the list stopped
+  updating — the action was applied but every later one had nothing to render into.
+  The list keeps its frame now, the keyboard selection survives the re-render, and
+  archiving from the keyboard moves the conversation on to the person's next thread.
+
+## [0.36.1] - 2026-09-04
+
+### Fixed
+
+- The details rail beside a People conversation scrolls on its own and can be collapsed
+  (the close control in its header; the ⓘ button or the `i` key bring it back), and the
+  choice is remembered on that browser.
+- Keys on People: the `g` navigation chords (`g n`, `g p`, `g d`, `g m`, `g t`, `g s`) now work
+  there too, the list's arrow keys stay out of the way while the Scout overlay is open,
+  Enter on a focused button no longer also opens the selected row, and the `?` cheat
+  sheet lists the People keys. `e` now archives the selected person's newest thread
+  (Done moved to `d`), and the arrow keys start from the person that is open, with the
+  selected row highlighted.
+- People rows outside the lanes now carry their newest message too, so Reply and Archive
+  work from the list (hover, `r`, `e`) for everyone, not only for people who need you.
+
+## [0.36.0] - 2026-09-04
+
+### Added
+
+- **A person's details in People.** Their addresses, organization, relationship, Scout's read, the numbers, every thread, documents and events with them, and star / allow / block / merge — from the person's name, the row menu or the i key.
+
+### Changed
+
+- **Conversations read newest to oldest.** In People, each thread opens on its latest
+  message with the older ones folded beneath it, and every open message carries its own
+  Reply, Reply all and Forward.
+
+### Removed
+
+- **Classic layout removed.** The `ENABLE_BOLD_LAYOUT` feature flag and the per-user
+  Classic/Bold layout picker have been deleted. The Now/People/Paper/Money/Time
+  navigation and the Scout overlay are now the sole layout — there is no classic mode.
+  Self-hosters: remove `ENABLE_BOLD_LAYOUT` from your environment; it has no effect
+  and will not exist in future releases.
+- The "Open in inbox" link on People threads — People is the inbox.
+
+### Fixed
+
+- Menus in People (a row's More menu, the conversation menu) close when you click
+  anywhere else, and on Escape.
+- The People page no longer scrolls into blank space when the wheel lands between
+  the list and the conversation: the list's infinite-scroll spinner was stretching the
+  page below the viewport.
+
 ## [0.35.0] - 2026-09-04
 
 ### Added

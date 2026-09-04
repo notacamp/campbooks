@@ -2,7 +2,6 @@
 fr:
   now:
     index:
-      classic_feed: Vue classique
       need_you_chip:
         zero: rien ne requiert votre attention
         one: "%{count} requiert votre attention"

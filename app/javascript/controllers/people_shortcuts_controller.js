@@ -1,14 +1,18 @@
 import { Controller } from "@hotwired/stimulus"
 import { skimOverlayOpen } from "controllers/skim_utils"
 
-// Keyboard shortcuts for the People list pane.
+// Keyboard shortcuts for the People list pane and open conversation.
 //
 // ↑ / ↓  — move aria-selected between [data-people-row] rows (all lanes + Recent,
 //           DOM order), scroll into view, open after 150 ms debounce.
 // Enter  — open the selected row immediately.
-// r      — click the selected row's Reply form button.
-// e      — click the selected row's Done form button.
+// r      — click the selected row's Reply form button; falls back to the first
+//           [data-people-reply] inside #people_detail when no row is selected.
+// a      — click the first [data-people-reply-all] inside #people_detail.
+// e      — archive the selected row's newest thread (the More menu's Archive form).
+// d      — click the selected row's Done form button (rows in a lane).
 // s      — click the selected row's Snooze form button.
+// f      — click the first [data-people-forward] inside #people_detail.
 // .      — open the selected row's More <details>.
 // Escape — clear the selection.
 //
@@ -28,11 +32,19 @@ export default class extends Controller {
     this._bound = this._keydown.bind(this)
     window.addEventListener("keydown", this._bound)
     this._debounceTimer = null
+
+    // Every row action (archive, done, snooze…) re-renders the list, and live
+    // broadcasts replace single rows; both drop the aria-selected attribute.
+    // Watch the list and put the selection back where it was.
+    this._observer = new MutationObserver(() => this._scheduleRestore())
+    this._observer.observe(this.hasListTarget ? this.listTarget : this.element, { childList: true, subtree: true })
   }
 
   disconnect () {
     window.removeEventListener("keydown", this._bound)
     clearTimeout(this._debounceTimer)
+    this._observer?.disconnect()
+    cancelAnimationFrame(this._restoreFrame)
   }
 
   // ── Private ─────────────────────────────────────────────────────────────────
@@ -53,17 +65,31 @@ export default class extends Controller {
         event.preventDefault()
         this._openSelected()
         break
-      case "r":
-        this._clickAction("[data-people-reply]")
+      case "r": {
+        const replied = this._clickAction("[data-people-reply]")
+        if (!replied) this._clickDetail("[data-people-reply]")
+        break
+      }
+      case "a":
+        this._clickDetail("[data-people-reply-all]")
         break
       case "e":
+        this._clickAction("[data-people-archive]")
+        break
+      case "d":
         this._clickAction("[data-people-done]")
         break
       case "s":
         this._clickAction("[data-people-snooze]")
         break
+      case "f":
+        this._clickDetail("[data-people-forward]")
+        break
       case ".":
         this._clickAction("[data-people-more]")
+        break
+      case "i":
+        this._toggleDetails()
         break
       case "Escape":
         this._clearSelection()
@@ -72,16 +98,19 @@ export default class extends Controller {
   }
 
   _shouldIgnore (event) {
-    // Respect command palette.
-    const palette = document.querySelector(".command-palette-dialog[open]")
-    if (palette) return true
+    // Respect any open dialog — the Scout overlay (⌘K) above all: its arrow keys
+    // move through ITS results, not the People list behind it.
+    if (document.querySelector("dialog[open]")) return true
 
-    // Respect Scout/skim overlay.
+    // Respect the skim overlay (a role="dialog" panel, not a native <dialog>).
     if (skimOverlayOpen()) return true
 
     // Don't intercept typing in editable fields.
     const el = document.activeElement
     if (el && (el.matches(EDITABLE_SELECTOR) || el.closest(EDITABLE_SELECTOR))) return true
+
+    // Enter on a focused control activates that control, not the selected row.
+    if (event.key === "Enter" && el && el.matches("button, a, summary, select, [role=button]")) return true
 
     // Only handle unmodified keys.
     if (event.metaKey || event.ctrlKey || event.altKey) return true
@@ -98,11 +127,19 @@ export default class extends Controller {
     return this._rows().find(r => r.getAttribute("aria-selected") === "true") || null
   }
 
+  // The row of the person whose conversation is open — where the arrow keys start
+  // from when nothing has been selected yet (or after the list re-rendered).
+  _openPersonRow () {
+    const id = document.querySelector("[data-people-details-person-id-value]")?.dataset.peopleDetailsPersonIdValue
+    if (!id) return null
+    return this._rows().find(r => r.querySelector(`a[href*='/people/${id}']`)) || null
+  }
+
   _moveSelection (delta) {
     const rows = this._rows()
     if (rows.length === 0) return
 
-    const current = this._selectedRow()
+    const current = this._selectedRow() || this._openPersonRow()
     const idx = current ? rows.indexOf(current) : -1
     const next = rows[Math.max(0, Math.min(rows.length - 1, idx + delta))]
     if (!next || next === current) return
@@ -118,10 +155,39 @@ export default class extends Controller {
   _select (row) {
     this._rows().forEach(r => r.removeAttribute("aria-selected"))
     row.setAttribute("aria-selected", "true")
+    this._lastSelectedId = row.id
+    this._lastSelectedIndex = this._rows().indexOf(row)
   }
 
   _clearSelection () {
     this._rows().forEach(r => r.removeAttribute("aria-selected"))
+    this._lastSelectedId = null
+    this._lastSelectedIndex = null
+  }
+
+  _scheduleRestore () {
+    cancelAnimationFrame(this._restoreFrame)
+    this._restoreFrame = requestAnimationFrame(() => this._restoreSelection())
+  }
+
+  // After a re-render: the same row when it is still there, else the row that took
+  // its place (an archived person with no other thread drops out of the list). When
+  // the row was just archived, open it again so the conversation moves off the
+  // archived thread.
+  _restoreSelection () {
+    if (this._selectedRow() || this._lastSelectedId == null) return
+    const rows = this._rows()
+    if (rows.length === 0) return
+
+    const row = document.getElementById(this._lastSelectedId) ||
+                rows[Math.min(this._lastSelectedIndex ?? 0, rows.length - 1)]
+    if (!row) return
+
+    this._select(row)
+    if (this._reopenAfterUpdate) {
+      this._reopenAfterUpdate = false
+      this._openRow(row)
+    }
   }
 
   _openSelected () {
@@ -135,10 +201,40 @@ export default class extends Controller {
   }
 
   // Click the first matching action button inside the selected row.
+  // Returns true when a button was found and clicked.
   _clickAction (selector) {
     const row = this._selectedRow()
-    if (!row) return
+    if (!row) return false
     const btn = row.querySelector(selector)
+    if (!btn) return false
+    // Archiving changes what the row stands for: once the list re-renders, open
+    // the row again so the pane shows the person's next thread (or the next person).
+    this._reopenAfterUpdate = selector === "[data-people-archive]"
+    btn.click()
+    return true
+  }
+
+  // Click the first matching button inside #people_detail (the open conversation).
+  _clickDetail (selector) {
+    const detail = document.getElementById("people_detail")
+    if (!detail) return
+    const btn = detail.querySelector(selector)
     if (btn) btn.click()
+  }
+
+  // Toggle the Details sheet (below xl) or collapse/expand the rail (xl+).
+  _toggleDetails () {
+    const detailPane = document.getElementById("people_details_pane")
+    if (!detailPane) return
+    // Find the people-details Stimulus controller on the conversation pane parent.
+    const wrapper = detailPane.closest("[data-controller~='people-details']")
+    if (wrapper) {
+      const app = this.application.getControllerForElementAndIdentifier(wrapper, "people-details")
+      if (app && typeof app.toggle === "function") app.toggle()
+    } else {
+      // Fallback: toggle class directly.
+      detailPane.classList.toggle("translate-x-0")
+      detailPane.classList.toggle("translate-x-full")
+    }
   }
 }

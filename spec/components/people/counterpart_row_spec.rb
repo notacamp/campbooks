@@ -103,6 +103,17 @@ RSpec.describe Campbooks::People::CounterpartRow, type: :component do
     expect(html).not_to include("data-people-done")
   end
 
+  it "the More menu carries data-controller=dropdown-close" do
+    person = create(:person, name: "Sofia Martins")
+    counterpart = People::Counterpart.new(kind: :person, record: person, name: "Sofia Martins",
+                                          subtitle: nil, avatar_email: "sofia@x.example",
+                                          avatar_initial: nil, last_activity: Time.current,
+                                          standing: standing,
+                                          data: {})
+    html = render(described_class.new(counterpart: counterpart))
+    expect(html).to include('data-controller="dropdown-close"')
+  end
+
   it "does not render the action cluster for organization rows" do
     org = create(:organization, name: "ACME")
     counterpart = People::Counterpart.new(kind: :organization, record: org, name: "ACME",
@@ -141,8 +152,10 @@ RSpec.describe Campbooks::People::CounterpartRow, type: :component do
       expect(latest).to include("id=\"people_row_latest_#{person.id}\"")
       expect(latest).not_to include("id=\"people_row_#{person.id}\"")
       expect(latest).to include("Can you send the deck by Friday?")
-      expect(lane).to include("2d")        # the lane shape shows how long they have waited
-      expect(latest).not_to include("2d")  # the inbox shape shows when the message arrived
+      # Match the wait chip as element text ("…>2d<…"), not as a substring: the row's
+      # UUID id can contain "2d" and made this assertion flaky.
+      expect(lane).to match(%r{>\s*2d\s*<})        # the lane shape shows how long they have waited
+      expect(latest).not_to match(%r{>\s*2d\s*<})  # the inbox shape shows when the message arrived
     end
   end
 end

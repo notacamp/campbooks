@@ -1,5 +1,5 @@
-<%# One stream thread: subject, sender · date, one-line snippet. Opens the classic
-    thread in a top-level Turbo visit (never inside the People frame). %>
+<%# One stream thread: subject, sender · date, one-line snippet. Opens the thread
+    in a top-level Turbo visit (never inside the People frame). %>
 <% latest = thread.latest_message %>
 <% if latest %>
   <%= link_to email_message_path(latest), data: { turbo_frame: "_top" },

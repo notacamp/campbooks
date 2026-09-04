@@ -80,17 +80,20 @@ RSpec.describe "Onboarding welcome flow", type: :request do
     end
   end
 
+  # Home feed is served to the native app shell; web users are redirected to /now.
+  NATIVE_UA_ONBOARDING = "Campbooks/1.0 Hotwire Native iOS".freeze
+
   describe "home first-sync stage" do
     it "takes over home while the first scan runs and steps aside after it completes" do
       account = create(:email_account, workspace: user.workspace)
       account.email_account_users.create!(user: user, owner: true, can_read: true, can_send: true, can_manage: true)
       log = EmailScanLog.create!(email_account: account, status: :running, started_at: Time.current)
 
-      get root_path
+      get root_path, headers: { "HTTP_USER_AGENT" => NATIVE_UA_ONBOARDING }
       expect(response.body).to include("data-controller=\"first-sync\"")
 
       log.update!(status: :completed, completed_at: Time.current)
-      get root_path
+      get root_path, headers: { "HTTP_USER_AGENT" => NATIVE_UA_ONBOARDING }
       expect(response.body).not_to include("data-controller=\"first-sync\"")
     end
 
@@ -99,7 +102,7 @@ RSpec.describe "Onboarding welcome flow", type: :request do
       account.email_account_users.create!(user: user, owner: true, can_read: true, can_send: true, can_manage: true)
       EmailScanLog.create!(email_account: account, status: :running, started_at: Time.current)
 
-      get root_path
+      get root_path, headers: { "HTTP_USER_AGENT" => NATIVE_UA_ONBOARDING }
       expect(response.body).to include(skip_first_sync_onboarding_path)
       # The form carries the Stimulus escape target
       expect(response.body).to include("first-sync-target=\"escape\"")
@@ -110,7 +113,7 @@ RSpec.describe "Onboarding welcome flow", type: :request do
       account.email_account_users.create!(user: user, owner: true, can_read: true, can_send: true, can_manage: true)
       EmailScanLog.create!(email_account: account, status: :running, started_at: Time.current)
 
-      get root_path
+      get root_path, headers: { "HTTP_USER_AGENT" => NATIVE_UA_ONBOARDING }
       expect(response.body).to include("first-sync-persona")
       expect(response.body).to include(apply_persona_onboarding_path)
     end

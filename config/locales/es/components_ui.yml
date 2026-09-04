@@ -132,6 +132,7 @@ es:
       title: Configuración de la bandeja de entrada
     keyboard_shortcuts_modal:
       contexts:
+        people: Personas
         calendar: Calendario
         email: Correo
         feed: Feed
@@ -141,6 +142,16 @@ es:
         selection: Selección
       footer_hint: Pulse ? para abrir este diálogo en cualquier momento.
       shortcuts:
+        people_move: "Recorrer las personas (abre tras una pausa)"
+        people_open: "Abrir la persona seleccionada"
+        people_reply: "Responder"
+        people_reply_all: "Responder a todos"
+        people_forward: "Reenviar"
+        people_archive: "Archivar la conversación"
+        people_done: "Hecho"
+        people_snooze: "Posponer hasta mañana"
+        people_more: "Más acciones"
+        people_details: "Mostrar u ocultar detalles"
         archive: Archivar
         cal_new: Nuevo evento
         cal_next: Período siguiente

@@ -30,9 +30,8 @@ class NavRailComponentPreview < ViewComponent::Preview
     render(Campbooks::NavRail.new(items: sample_items(active: :home, badges: %i[mail scout])))
   end
 
-  # The rethought "bold" navigation (Features.bold_layout? + a bold-mode user):
-  # Now / People / Paper / Money / Time, with no Ember/Scout tile — Scout is
-  # reached from the Now page's docked bar and Cmd+K instead.
+  # The five-place navigation: Now / People / Paper / Money / Time, with no
+  # Ember/Scout tile — Scout is reached from the docked bar and Cmd+K instead.
   def bold
     render(Campbooks::NavRail.new(items: bold_sample_items(active: :now)))
   end

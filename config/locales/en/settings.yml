@@ -35,9 +35,6 @@ en:
       language:
         failed: Could not update your language. Please try again.
         updated: Language updated.
-      layout_preference:
-        failed: Could not update your layout. Please try again.
-        updated: Layout updated.
       show:
         change_password: Change Password
         compose_desk: Full page — writing gets the whole screen
@@ -57,18 +54,10 @@ en:
         delete_account_button: Delete account
         language_subtitle: Choose the language for your Campbooks interface.
         language_title: Language
-        layout_bold_desc: Now, People, Paper, Money and Time. The rethought Campbooks;
-          some places still open the classic screens for now.
-        layout_bold_title: Bold
-        layout_classic_desc: Home, Mail, Calendar, Scout and Files.
-        layout_classic_title: Classic
-        layout_intro: Pick how Campbooks is laid out. Bold is in preview.
-        layout_title: Layout
         new_password: New Password
         privacy_policy: Privacy Policy
         save_compose: Save
         save_language: Save
-        save_layout: Save
         subtitle: Manage your password and account preferences.
         terms_of_service: Terms of Service
         title: Account Settings

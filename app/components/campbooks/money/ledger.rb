@@ -13,6 +13,10 @@ module Campbooks
       MINUS = "−"
 
       COLUMNS = %i[counterpart what amount due status source].freeze
+      # Column → the ledger sort it drives (Money::Ledger::SORTS).
+      SORTABLE = { counterpart: :counterpart, amount: :amount, due: :date }.freeze
+      # The phone's sort select, in display order.
+      ORDERS = %w[date_desc date_asc amount_desc amount_asc counterpart_asc counterpart_desc].freeze
 
       def initialize(ledger:, **attrs)
         @ledger = ledger
@@ -34,9 +38,7 @@ module Campbooks
           table(class: "w-full border-collapse text-[13.5px]") do
             thead do
               tr do
-                COLUMNS.each do |col|
-                  th(class: class_names(header_class, ("text-right" if col == :amount))) { t(".col.#{col}") }
-                end
+                COLUMNS.each { |col| header_cell(col) }
                 th(class: header_class) { span(class: "sr-only") { t(".col.actions") } }
               end
             end
@@ -68,9 +70,48 @@ module Campbooks
         end
       end
 
+      # A sortable column header is a link that sets the sort (clicking the active
+      # column flips its direction); the active one carries aria-sort and an arrow.
+      def header_cell(col)
+        sort_key = SORTABLE[col]
+        right = ("text-right" if col == :amount)
+        return th(class: class_names(header_class, right)) { t(".col.#{col}") } unless sort_key
+
+        active = @ledger.sort == sort_key
+        dir = active ? @ledger.dir : nil
+        next_dir = active ? (dir == :asc ? :desc : :asc) : ::Money::Ledger.default_dir(sort_key)
+        th(class: class_names(header_class, right), aria_sort: (dir == :asc ? "ascending" : "descending" if active)) do
+          a(href: helpers.money_path(sort: sort_key, dir: next_dir, range: helpers.params[:range].presence),
+            class: class_names("inline-flex items-center gap-1 no-underline hover:text-foreground", ("text-foreground" if active)),
+            title: t(".sort.by", column: t(".col.#{col}"))) do
+            plain t(".col.#{col}")
+            if active
+              span(aria_hidden: "true") { dir == :asc ? "↑" : "↓" }
+            end
+          end
+        end
+      end
+
+      # Phones have no column headers: a small sort select above the cards.
+      def mobile_sort_control
+        form(action: helpers.money_path, method: :get, class: "flex items-center justify-end gap-2",
+             data: { controller: "auto-submit" }) do
+          input(type: "hidden", name: "range", value: helpers.params[:range]) if helpers.params[:range].present?
+          label(for: "money_order", class: "text-[11.5px] text-muted-foreground") { t(".sort.label") }
+          select(id: "money_order", name: "order",
+                 class: "rounded-md border border-border bg-card px-2 py-1 text-[12.5px] text-foreground",
+                 data: { action: "change->auto-submit#submit" }) do
+            ORDERS.each do |order|
+              option(value: order, selected: (order == "#{@ledger.sort}_#{@ledger.dir}")) { t(".sort.#{order}") }
+            end
+          end
+        end
+      end
+
       # ── Mobile ─────────────────────────────────────────────────────────────
       def mobile_cards
         div(class: "space-y-4 sm:hidden") do
+          mobile_sort_control
           @ledger.sections.each do |(key, list)|
             div(class: "text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground") { "#{t(".section.#{key}")} · #{list.size}" }
             div(class: "space-y-2.5") { list.each { |o| mobile_card(o) } }
@@ -106,7 +147,7 @@ module Campbooks
             span(class: "text-muted-foreground/70") { "· #{t('money.status.estimated')}" }
           end
           if obligation.recurring? && obligation.next_renewal_on
-            div(class: "text-[11.5px] text-muted-foreground/70") { t(".next_renews", date: l(obligation.next_renewal_on, format: :day_month)) }
+            div(class: "text-[11.5px] text-muted-foreground/70") { t(".next_renews", date: l(obligation.next_renewal_on, format: :date)) }
           end
         end
       end
@@ -123,14 +164,14 @@ module Campbooks
       def due_text(obligation)
         return "" unless obligation.due_on
 
-        l(obligation.due_on, format: :day_month)
+        l(obligation.due_on, format: :date)
       end
 
       # ── Status chip (icon + label, always) ───────────────────────────────────
       def status_chip(obligation)
         case obligation.status
         when :late    then chip(:warning, :warning, t("money.status.late", count: obligation.days_late(Date.current)))
-        when :settled then chip(:success, :check, t("money.status.paid", date: l(obligation.settled_on, format: :day_month)))
+        when :settled then chip(:success, :check, t("money.status.paid", date: l(obligation.settled_on, format: :date)))
         when :decide  then chip(:ember, :spark, t("money.status.decide"))
         else               chip(:muted, :clock, due_chip_label(obligation))
         end

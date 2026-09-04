@@ -4,7 +4,7 @@ require "rails_helper"
 # afterwards (the suite defaults them ON in config/environments/test.rb).
 RSpec.describe Features do
   around do |example|
-    keys = %w[ENABLE_WORKFLOWS ENABLE_EMAIL_BOARD ENABLE_MICROSOFT ENABLE_MICROSOFT_MAILBOX ENABLE_BOLD_LAYOUT]
+    keys = %w[ENABLE_WORKFLOWS ENABLE_EMAIL_BOARD ENABLE_MICROSOFT ENABLE_MICROSOFT_MAILBOX]
     saved = keys.index_with { |k| ENV[k] }
     begin
       example.run
@@ -33,19 +33,6 @@ RSpec.describe Features do
 
       ENV.delete("ENABLE_EMAIL_BOARD")
       expect(Features.email_board?).to be(false)
-    end
-  end
-
-  describe ".bold_layout?" do
-    it "is true only when ENABLE_BOLD_LAYOUT == '1'" do
-      ENV["ENABLE_BOLD_LAYOUT"] = "1"
-      expect(Features.bold_layout?).to be(true)
-
-      ENV["ENABLE_BOLD_LAYOUT"] = "0"
-      expect(Features.bold_layout?).to be(false)
-
-      ENV.delete("ENABLE_BOLD_LAYOUT")
-      expect(Features.bold_layout?).to be(false)
     end
   end
 

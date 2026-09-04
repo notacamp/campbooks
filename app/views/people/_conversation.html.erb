@@ -1,7 +1,13 @@
-<%# One person's email threads newest-first: subject headings, older messages folded,
-    the newest open with From/To and attachments, and an inline reply row under the
-    newest thread. Scout's standing and action chips are pinned above. %>
-<div class="flex h-full w-full min-w-0 flex-col">
+<%# One person's email threads newest-first: each thread opens on its newest message
+    with older ones folded beneath (newest-first), and every open message carries
+    its own Reply, Reply all and Forward. Scout's standing and action chips pinned above.
+    The Details rail (aside#people_details_pane) sits to the right at xl+. %>
+<div class="relative flex h-full w-full min-w-0"
+     data-controller="people-details"
+     data-people-details-person-id-value="<%= @person.id %>"
+     data-people-details-open-value="<%= params[:details].present? %>">
+  <%# Main conversation column — narrows at xl to make room for the rail. %>
+  <div class="flex h-full min-w-0 flex-1 flex-col">
   <%# Mobile: back to the list. %>
   <div class="flex items-center px-3 py-2 lg:hidden">
     <button type="button" data-action="click->email-mobile#showList"
@@ -56,11 +62,21 @@
         </svg>
       <% end %>
     <% end %>
+    <%# Details ⓘ button — toggles the sheet below xl, collapses/expands the rail at xl+. %>
+    <button type="button"
+            class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary"
+            title="<%= t("people.details.title") %>"
+            data-action="click->people-details#toggle"
+            data-people-details-target="detailsBtn">
+      <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    </button>
     <%= render "people/conversation_menu" %>
   </div>
 
-  <%# Scrollable threads column — newest at the top. %>
-  <div class="flex-1 overflow-y-auto">
+  <%# Scrollable threads column — newest at the top. Positioned so absolutely
+      placed descendants (the sentinel spinner's sr-only label) scroll with it
+      instead of anchoring to the page. %>
+  <div class="relative flex-1 overflow-y-auto">
     <div class="w-full px-6 pb-6 pt-5">
 
       <%# Scout's standing pinned above the threads. %>
@@ -77,16 +93,31 @@
       <%# Slot for Scout's draft-questions form (EmailToolsController streams into here). %>
       <div id="thread_compose_target"></div>
 
-      <%# Thread blocks, newest-first. %>
+      <%# "Newer threads" link — shown when the permalink redirect landed on page 2+. %>
+      <% if @conversation_pagy&.page.to_i > 1 %>
+        <div class="mb-3">
+          <%= link_to t("people.conversation.newer_threads"), person_page_path(@person),
+                data: { turbo_frame: "people_detail" },
+                class: "text-sm text-muted-foreground hover:text-foreground" %>
+        </div>
+      <% end %>
+
+      <%# Thread blocks, newest-first. Each wrapper carries an id for the detail
+          rail's jump-to-thread link; the focused thread also gets the
+          scroll-into-view controller so it scrolls into view on load. %>
       <div id="people_conversation">
         <% @conversation_threads.each_with_index do |ct, i| %>
-          <%= render Campbooks::People::ThreadBlock.new(
-                conversation_thread: ct,
-                person_first_name: people_first_name(@person),
-                person_id: @person.id,
-                newest_thread: (i == 0 && @conversation_pagy&.page == 1),
-                can_send: @can_send,
-                scout_draft: (i == 0 && @conversation_pagy&.page == 1 ? @scout_draft : nil)) %>
+          <% is_newest = (i == 0 && @conversation_pagy&.page == 1) %>
+          <% is_focused = @focused_thread_id.present? && ct.thread.id == @focused_thread_id %>
+          <div id="people_thread_block_<%= ct.thread.id %>"<% if is_focused %> data-controller="scroll-into-view"<% end %>>
+            <%= render Campbooks::People::ThreadBlock.new(
+                  conversation_thread: ct,
+                  person_first_name: people_first_name(@person),
+                  person_id: @person.id,
+                  newest_thread: is_newest,
+                  can_send: @sendable_account_ids.include?(ct.thread.email_account_id),
+                  scout_draft: (is_newest ? @scout_draft : nil)) %>
+          </div>
         <% end %>
       </div>
 
@@ -97,4 +128,23 @@
       <%= render "people/conversation_older" if @conversation_pagy&.next %>
     </div>
   </div>
+  </div><%# /main conversation column %>
+
+  <%# Details rail / sheet. Static at xl+ (collapsible: the people-details controller
+      sets the hidden attribute and remembers the choice); a sheet (translate-x-full →
+      translate-x-0) below xl. It scrolls on its own, whatever the mode. %>
+  <aside id="people_details_pane"
+         class="absolute inset-y-0 right-0 z-20 flex w-full flex-col overflow-y-auto lg:w-[400px] xl:w-[300px] translate-x-full
+                border-l border-border bg-card transition-transform duration-200
+                xl:static xl:translate-x-0 xl:flex-none"
+         data-people-details-target="pane">
+    <%= turbo_frame_tag "people_details",
+          src: people_details_path(@person),
+          loading: :lazy do %>
+      <%# Loading placeholder %>
+      <div class="flex h-full items-center justify-center">
+        <%= render Campbooks::Spinner.new %>
+      </div>
+    <% end %>
+  </aside>
 </div>

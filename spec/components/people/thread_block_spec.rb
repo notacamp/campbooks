@@ -44,44 +44,51 @@ RSpec.describe Campbooks::People::ThreadBlock, type: :component do
     expect(html).to match(/<h3[^>]*>/)
   end
 
-  it "renders the newest message open with older messages not open" do
+  it "renders the newest message first and open, older messages folded beneath newest-first" do
     older = create(:email_message, email_account: account, email_thread: thread, contact: contact,
                    from_address: "sofia@brightloop.example", subject: "Q3 deck review",
                    body: "First message.", received_at: 3.days.ago)
     html = render_block(conversation_thread: ct([ older, inbound ]))
     # newest is open
     expect(html).to match(/<details[^>]*open/)
-    # snippet from older visible but older not open
-    expect(html).to include("First message")
-    expect(html).to include("Please review the deck")
+    # newest body comes before older snippet
+    expect(html.index("Please review the deck")).to be < html.index("First message")
+    # first <details has open attribute
+    expect(html).to match(/<details[^>]*open/)
   end
 
-  it "renders an 'Open in inbox' link pointing to the newest message" do
+  it "does not link to the classic message page" do
     html = render_block(conversation_thread: ct([ inbound ]))
-    expect(html).to include("/email_messages/#{inbound.id}")
-    expect(html).to include('data-turbo-frame="_top"')
-    expect(html).to include("Open in inbox")
+    expect(html).not_to include("/email_messages/")
+    expect(html).not_to include("Open in inbox")
   end
 
-  it "shows the ghost reply row when newest_thread and can_send (no scout draft)" do
+  it "renders action buttons on the newest message when can_send is true (no scout draft)" do
     html = render_block(conversation_thread: ct([ inbound ]), newest_thread: true, can_send: true)
-    expect(html).to include("Reply all")
-    expect(html).to include("Forward")
+    expect(html).to include("mode=reply_all")
+    expect(html).to include("mode=forward")
     expect(html).not_to include("Draft by Scout")
   end
 
-  it "shows the Scout draft card instead of ghost row when a draft is present" do
+  it "renders no action buttons on the newest message when can_send is false" do
+    html = render_block(conversation_thread: ct([ inbound ]), newest_thread: true, can_send: false)
+    expect(html).not_to include("mode=reply_all")
+    expect(html).not_to include("mode=forward")
+  end
+
+  it "shows the Scout draft card after the newest body when a draft is present" do
     html = render_block(conversation_thread: ct([ inbound ]), newest_thread: true, can_send: true,
                         scout_draft: "Friday works for me.")
     expect(html).to include("Friday works for me.")
     expect(html).to include("Draft by Scout")
     expect(html).to include("Open draft")
-    expect(html).not_to include("Reply all")
+    # draft appears after newest body, before any older snippet
+    expect(html.index("Friday works for me.")).to be > html.index("Please review the deck")
   end
 
-  it "shows no reply area when not newest_thread" do
-    html = render_block(conversation_thread: ct([ inbound ]), newest_thread: false, can_send: true)
-    expect(html).not_to include("Reply all")
+  it "shows no draft card when not newest_thread" do
+    html = render_block(conversation_thread: ct([ inbound ]), newest_thread: false, can_send: true,
+                        scout_draft: "Friday works for me.")
     expect(html).not_to include("Draft by Scout")
   end
 
@@ -112,7 +119,7 @@ RSpec.describe Campbooks::People::ThreadBlock, type: :component do
 
       expect(html).to include("Q3 deck review")
       expect(html).to include("3 messages")
-      expect(html).to include("/email_messages/#{inbound.id}")
+      expect(html).not_to include("/email_messages/")
       expect(html).to match(/<turbo-frame[^>]*id="people_thread_#{thread.id}"[^>]*loading="lazy"/)
       expect(html).to include("/people/person-1/threads/#{thread.id}")
       expect(html).not_to include("Please review the deck")
@@ -141,7 +148,7 @@ RSpec.describe Campbooks::People::ThreadBlock, type: :component do
     it "renders only the message list with frame_only" do
       html = render_block(conversation_thread: ct([ inbound ]), person_id: "person-1", frame_only: true)
       expect(html).not_to match(/<h3[^>]*>/)
-      expect(html).not_to include("Open in inbox")
+      expect(html).not_to include("/email_messages/")
       expect(html).to include("Please review the deck")
     end
   end
