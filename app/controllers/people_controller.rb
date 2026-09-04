@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 
 # The People place (Rethink Stage 2): the workspace's persons and organizations
-# ordered by who needs you, and a person opened as their email threads newest-first
-# (subject headings, folded older messages, inline reply through the Compose Dock).
+# ordered by who needs you, and a person opened as their email threads newest-first,
+# each thread opening on its newest message with older ones folded beneath, every
+# open message carrying Reply / Reply all / Forward through the Compose Dock.
 # Left pane = the counterpart list (People | Streams segmented control + search +
 # Need-you / Recent sections); right pane = the selected person, loaded into the
 # "people_detail" turbo frame (mirrors the email_detail pattern).
@@ -69,14 +70,18 @@ class PeopleController < ApplicationController
   private
 
   # Each person's threads ordered by their latest accessible message (newest-first),
-  # paginated. Renders as ThreadBlock components: subject heading, older messages
-  # folded, the newest open, and an inline reply row under the newest thread.
+  # paginated. Renders as ThreadBlock components: subject heading, newest message
+  # open first, older messages folded beneath newest-first, per-message compose
+  # actions when can_send is true.
   #
   # Only the newest thread on the first page arrives with its messages. Every
   # other thread is a heading over a lazy frame (People::ThreadsController), and
   # inside the loaded thread the folded messages fetch their bodies on expand
   # (People::MessagesController) — so opening a person costs one thread's
   # messages however long the history is.
+  #
+  # @sendable_account_ids is computed once per request (a single pluck) and used
+  # to determine can_send per thread without N+1.
   def build_conversation
     contact_ids = @person.contacts.ids
     thread_ids = conversation_thread_ids(contact_ids)
@@ -120,7 +125,9 @@ class PeopleController < ApplicationController
                                                   .order(received_at: :desc).first : nil
 
     @reply_target = reply_msg
-    @can_send = @reply_target ? @reply_target.email_account.sendable_by?(current_user) : false
+    @sendable_account_ids = EmailAccountUser.where(user_id: current_user.id, can_send: true)
+                                            .pluck(:email_account_id).to_set
+    @can_send = @reply_target ? @sendable_account_ids.include?(@reply_target.email_account_id) : false
     @scout_draft = @newest_thread ? Emails::ScoutDraft.for(@newest_thread&.newest) : nil
 
     @standing = PeopleStanding.for_user(current_user).find_by(counterpart: @person)&.standing ||

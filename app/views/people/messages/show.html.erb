@@ -4,5 +4,6 @@
   <%= render Campbooks::People::ThreadMessage.new(
         message: @message,
         person_first_name: people_first_name(@person),
-        content_only: true) %>
+        content_only: true,
+        can_send: @can_send) %>
 <% end %>

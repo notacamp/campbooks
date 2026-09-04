@@ -20,6 +20,21 @@ major, minor, or patch change here.
 
 - **A person's details in People.** Their addresses, organization, relationship, Scout's read, the numbers, every thread, documents and events with them, and star / allow / block / merge — from the person's name, the row menu or the i key.
 
+### Changed
+
+- **Conversations read newest to oldest.** In People, each thread opens on its latest
+  message with the older ones folded beneath it, and every open message carries its own
+  Reply, Reply all and Forward.
+
+### Removed
+
+- The "Open in inbox" link on People threads — People is the inbox.
+
+### Fixed
+
+- Menus in People (a row's More menu, the conversation menu) close when you click
+  anywhere else, and on Escape.
+
 ## [0.35.0] - 2026-09-04
 
 ### Added

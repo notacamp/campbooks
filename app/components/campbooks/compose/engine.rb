@@ -372,7 +372,7 @@ module Campbooks
       def schedule_control
         default_at = (Time.current + 1.hour).change(min: (Time.current.min / 30) * 30)
 
-        details(class: "relative") do
+        details(class: "relative", data: { controller: "dropdown-close" }) do
           summary(class: "list-none inline-flex items-center gap-1.5 px-3.5 py-2 text-[13px] font-medium text-gray-600 border border-gray-200 rounded-[0.7rem] cursor-pointer select-none hover:bg-gray-50 transition-colors") do
             plain t(".schedule")
           end

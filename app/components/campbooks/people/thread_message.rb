@@ -4,7 +4,7 @@ module Campbooks
   module People
     # One message row inside a ThreadBlock. Uses a native <details> element so no
     # JavaScript is needed: the newest message gets the `open` attribute, older
-    # ones start folded.
+    # ones start folded beneath it.
     #
     # The summary (always-visible) line carries:
     #   - a small avatar
@@ -14,6 +14,8 @@ module Campbooks
     #     a paperclip glyph when attachments are present, and the received-at time
     #
     # The content (shown when open) is the sanitized body plus an attachments row.
+    # When `can_send` is true an actions row (Reply / Reply all / Forward) appears
+    # after the body so every open message has its own compose buttons.
     # With `lazy_src` the content is a lazy turbo-frame instead, so a folded
     # message costs nothing until it is expanded: the frame loads the body from
     # People::MessagesController, which renders this component `content_only`.
@@ -26,19 +28,25 @@ module Campbooks
     # @param full_body [Boolean] render the full body (newest of newest thread only)
     # @param lazy_src [String, nil] URL that serves the body (folded messages)
     # @param content_only [Boolean] render just the body + attachments (the frame's content)
+    # @param can_send [Boolean] when true, render Reply / Reply all / Forward buttons
     class ThreadMessage < Campbooks::Base
       register_element :turbo_frame
 
       CLIP_ICON = '<svg class="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>'
+      REPLY_ICON = '<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>'
+      REPLY_ALL_ICON = '<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 10H3l6-6m-6 6l6 6M17 10h-7m7 0c2.761 0 5 2.239 5 5v3"/></svg>'
+      FORWARD_ICON = '<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10H11a8 8 0 00-8 8v2m18-10l-6-6m6 6l-6 6"/></svg>'
       PREVIEW_THRESHOLD = 600
 
-      def initialize(message:, person_first_name:, open: false, full_body: false, lazy_src: nil, content_only: false)
+      def initialize(message:, person_first_name:, open: false, full_body: false, lazy_src: nil,
+                     content_only: false, can_send: false)
         @message = message
         @person_first_name = person_first_name
         @open = open
         @full_body = full_body
         @lazy_src = lazy_src
         @content_only = content_only
+        @can_send = can_send
       end
 
       def view_template
@@ -88,6 +96,29 @@ module Campbooks
       def message_content
         div(class: @content_only ? "overflow-x-auto" : "mt-2 overflow-x-auto") { message_body }
         attachments_row if has_attachments?
+        actions_row if @can_send
+      end
+
+      def actions_row
+        div(class: "mt-2.5 flex flex-wrap items-center gap-1.5") do
+          compose_form_button(:reply,     REPLY_ICON,     t(".reply"),     "people_reply")
+          compose_form_button(:reply_all, REPLY_ALL_ICON, t(".reply_all"), "people_reply_all")
+          compose_form_button(:forward,   FORWARD_ICON,   t(".forward"),   "people_forward")
+        end
+      end
+
+      def compose_form_button(mode, icon_svg, label, data_key)
+        short_key = data_key.delete_prefix("people_")
+        hint_key = ".#{short_key}_hint"
+        # Use a symbol so Phlex dasherizes the data attribute (people_reply → data-people-reply)
+        form(action: helpers.compose_email_message_path(@message, mode: mode), method: "post", class: "inline-flex") do
+          input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
+          button(type: "submit", data: { data_key.to_sym => true },
+                 title: t(hint_key, default: label),
+                 class: "inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[12px] font-medium text-foreground hover:bg-secondary") do
+            raw(safe(icon_svg)); whitespace; plain(label)
+          end
+        end
       end
 
       def avatar_email

@@ -34,16 +34,18 @@ es:
         messages:
           one: "%{count} mensaje"
           other: "%{count} mensajes"
-        open_in_inbox: Abrir en bandeja
         no_subject: "(sin asunto)"
         draft_by_scout: "Borrador de Scout · edítalo libremente"
         open_draft: Abrir borrador
-        reply: Responder
-        reply_all: Responder a todos
-        forward: Reenviar
       thread_message:
         to_you: para ti
         to_name: "para %{name}"
+        reply: Responder
+        reply_all: Responder a todos
+        forward: Reenviar
+        reply_hint: "Responder (r)"
+        reply_all_hint: "Responder a todos (a)"
+        forward_hint: "Reenviar (f)"
       details:
         title: Detalles
         back: Volver
