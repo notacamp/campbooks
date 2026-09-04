@@ -1,0 +1,9 @@
+<%# Lazy sentinel that streams the next page of older threads into the list.
+    Rendered after the last ThreadBlock when there are more pages. %>
+<%= turbo_frame_tag "people_conversation_older",
+      src: person_page_path(@person, page: @conversation_pagy.next, format: :turbo_stream),
+      loading: :lazy do %>
+  <div class="flex items-center justify-center py-6" aria-label="<%= t('people.conversation.older') %>">
+    <%= render(Campbooks::Spinner.new(size: :sm)) %>
+  </div>
+<% end %>

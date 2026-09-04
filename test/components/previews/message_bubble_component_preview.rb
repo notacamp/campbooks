@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # Previews for Campbooks::MessageBubble — the shared message body used by the email
-# reading pane (:chat) and the People conversation (:flow).
+# reading pane (:chat).
 class MessageBubbleComponentPreview < ViewComponent::Preview
   def chat_received
     render Campbooks::MessageBubble.new(message: received, sent: false, variant: :chat)
@@ -9,18 +9,6 @@ class MessageBubbleComponentPreview < ViewComponent::Preview
 
   def chat_sent
     render Campbooks::MessageBubble.new(message: sent, sent: true, variant: :chat)
-  end
-
-  # People conversation: a received message with a channel chip + Open-thread link.
-  def flow_received
-    render Campbooks::MessageBubble.new(message: received, sent: false, variant: :flow,
-                                        name: "Sofia", channel_chip: true, open_thread: false, full: true)
-  end
-
-  # People conversation: your own message ("You"), muted body.
-  def flow_sent
-    render Campbooks::MessageBubble.new(message: sent, sent: true, variant: :flow,
-                                        name: "You", channel_chip: true, full: true)
   end
 
   private

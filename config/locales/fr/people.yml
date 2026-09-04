@@ -14,6 +14,19 @@ fr:
       search_bar:
         placeholder: Rechercher une personne ou une entreprise…
         clear: Effacer
+      thread_block:
+        messages:
+          one: "%{count} message"
+          other: "%{count} messages"
+        open_in_inbox: Ouvrir dans la boîte
+        draft_by_scout: "Brouillon de Scout · modifiez librement"
+        open_draft: Ouvrir le brouillon
+        reply: Répondre
+        reply_all: Répondre à tous
+        forward: Transférer
+      thread_message:
+        to_you: pour vous
+        to_name: "pour %{name}"
   people:
     index:
       tab_people: Personnes
@@ -57,11 +70,8 @@ fr:
         one: "%{count} e-mail depuis %{since}"
         other: "%{count} e-mails depuis %{since}"
       empty: Aucun message pour l'instant.
-      earlier: Plus anciens
-      reply_to: "Répondre à %{name}"
       reply: Répondre
-      send: Envoyer
-      scout_draft_chip: Brouillon de Scout · modifiez librement
+      older: Conversations plus anciennes
       open_profile: Ouvrir le profil classique
       star: Ajouter aux favoris
       unstar: Retirer des favoris

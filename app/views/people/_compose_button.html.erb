@@ -1,0 +1,12 @@
+<%# Opens the existing Compose Dock in the given mode against `message`.
+    `mode`: :reply | :reply_all | :forward
+    `label`: button text (required)
+    `variant`: :primary | :ghost %>
+<% button_class = variant&.to_sym == :primary ?
+      "inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90" :
+      "inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-[12px] font-medium text-foreground hover:bg-secondary" %>
+<%= form_with url: compose_email_message_path(message, mode: mode), method: :post, class: "inline-flex" do |f| %>
+  <button type="submit" class="<%= button_class %>">
+    <%= label %>
+  </button>
+<% end %>

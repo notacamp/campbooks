@@ -14,6 +14,19 @@ en:
       search_bar:
         placeholder: Find a person or company…
         clear: Clear
+      thread_block:
+        messages:
+          one: "%{count} message"
+          other: "%{count} messages"
+        open_in_inbox: Open in inbox
+        draft_by_scout: "Draft by Scout · edit freely"
+        open_draft: Open draft
+        reply: Reply
+        reply_all: Reply all
+        forward: Forward
+      thread_message:
+        to_you: to you
+        to_name: "to %{name}"
   people:
     index:
       tab_people: People
@@ -57,11 +70,8 @@ en:
         one: "%{count} email since %{since}"
         other: "%{count} emails since %{since}"
       empty: No messages yet.
-      earlier: Earlier
-      reply_to: "Reply to %{name}"
       reply: Reply
-      send: Send
-      scout_draft_chip: Scout's draft · edit freely
+      older: Older conversations
       open_profile: Open classic profile
       star: Star
       unstar: Unstar

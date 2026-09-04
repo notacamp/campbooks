@@ -14,6 +14,19 @@ pt:
       search_bar:
         placeholder: Encontrar uma pessoa ou empresa…
         clear: Limpar
+      thread_block:
+        messages:
+          one: "%{count} mensagem"
+          other: "%{count} mensagens"
+        open_in_inbox: Abrir na caixa
+        draft_by_scout: "Rascunho do Scout · edite à vontade"
+        open_draft: Abrir rascunho
+        reply: Responder
+        reply_all: Responder a todos
+        forward: Reencaminhar
+      thread_message:
+        to_you: para si
+        to_name: "para %{name}"
   people:
     index:
       tab_people: Pessoas
@@ -57,11 +70,8 @@ pt:
         one: "%{count} email desde %{since}"
         other: "%{count} emails desde %{since}"
       empty: Ainda sem mensagens.
-      earlier: Anteriores
-      reply_to: "Responder a %{name}"
       reply: Responder
-      send: Enviar
-      scout_draft_chip: Rascunho do Scout · edite à vontade
+      older: Conversas anteriores
       open_profile: Abrir perfil clássico
       star: Marcar como favorito
       unstar: Remover dos favoritos
