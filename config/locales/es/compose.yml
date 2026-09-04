@@ -23,7 +23,6 @@ es:
         cc_button: Cc
         collapse_envelope: Contraer los campos de destinatarios
         discard: Descartar
-        draft_saved: Borrador guardado
         edit_recipients: Editar destinatarios y asunto
         expand_quote_title: Mostrar el mensaje citado y editarlo
         label_bcc: Cco
@@ -42,6 +41,7 @@ es:
         quoted_from_undated: "%{who} escribió"
         quoted_generic: Mensaje citado
         recipients_more: "%{name} +%{count}"
+        saved: Guardado
         saving: Guardando…
         schedule: Programar
         schedule_at_label: Enviar el
@@ -57,7 +57,6 @@ es:
         rewrite_failed: No se pudo reescribir el borrador
         rewrite_shorter: Más corto
         rewrite_warmer: Más cálido
-        saved_just_now: Guardado ahora mismo
         scout_draft_chip: Borrador de Scout · edita con libertad
         scout_draft_source: a partir de tu nota y la conversación
         undo_rewrite: Deshacer reescritura
@@ -66,7 +65,6 @@ es:
         placeholder: Dile a Scout qué decir, o empieza a escribir…
       pill:
         dismiss_title: Ocultar
-        draft_saved: Borrador guardado
         resume_aria: Retomar el borrador
         untitled: Borrador
       context_rail:

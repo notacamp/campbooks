@@ -2,11 +2,13 @@
 
 module Campbooks
   module Compose
-    # The parked-draft pill: a small bottom-right capsule that survives
-    # navigation (rendered by the layout whenever an unsent draft exists) and
-    # re-opens the draft in the Dock on click. Sits above the mobile bottom nav.
-    # The × dismisses the pill without deleting the draft (server-side
-    # dismissed_at + Undo toast); editing the draft again revives it.
+    # The parked-draft affordance: a small frosted capsule (bottom-right, above
+    # the mobile bottom nav) that survives navigation and reopens the draft in
+    # the Dock on click. It rests quiet — a muted glyph — and reveals the draft's
+    # destination on hover/focus; the × sets it aside (server-side dismissed_at +
+    # Undo toast) without deleting the draft, and editing the draft again revives
+    # it. Shares the frosted card/border/blur language of the sync pill and action
+    # toasts, and never uses Ember: a saved draft isn't Scout, live, or a win.
     class Pill < Campbooks::Base
       def initialize(draft:)
         @draft = draft
@@ -14,9 +16,9 @@ module Campbooks
 
       def view_template
         div(id: "compose_draft_pill",
-            class: "fixed bottom-20 lg:bottom-5 right-4 z-[60] flex items-center max-w-[250px] " \
-                   "bg-card border border-gray-200 rounded-full pl-2.5 pr-1.5 py-1.5 shadow-lg " \
-                   "hover:shadow-xl hover:-translate-y-0.5 transition-all motion-reduce:transition-none",
+            class: "group fixed bottom-20 right-4 z-[60] inline-flex items-center gap-1 rounded-full " \
+                   "border border-border bg-card/95 py-1.5 pl-1.5 pr-2 shadow-lg backdrop-blur " \
+                   "transition-shadow hover:shadow-xl lg:bottom-5",
             data: { compose_dock_target: "pill" }) do
           resume_link
           dismiss_button
@@ -27,32 +29,52 @@ module Campbooks
 
       def resume_link
         a(href: helpers.draft_email_path(@draft),
-          class: "flex items-center gap-2 min-w-0 py-0.5",
+          class: "flex min-w-0 items-center gap-2 rounded-full focus:outline-none " \
+                 "focus-visible:ring-2 focus-visible:ring-accent-400",
           data: { turbo_stream: "true" },
           aria_label: t(".resume_aria")) do
-          span(class: "w-5 h-5 rounded-full bg-accent-600 text-white flex items-center justify-center flex-shrink-0") do
-            svg(class: "w-2.5 h-2.5", fill: "none", stroke: "currentColor", stroke_width: "2.2",
-                stroke_linecap: "round", stroke_linejoin: "round", viewBox: "0 0 24 24") do
-              raw(safe('<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/>'))
-            end
-          end
-          span(class: "min-w-0") do
-            span(class: "block text-xs font-medium text-gray-800 truncate") { title_text }
-            span(class: "block text-[10px] text-gray-400") { t(".draft_saved") }
+          glyph
+          detail
+        end
+      end
+
+      # Quiet pencil in a muted circle — the resting state. Muted, not Ember.
+      def glyph
+        span(class: "flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full " \
+                    "bg-muted text-muted-foreground") do
+          svg(class: "h-3.5 w-3.5", fill: "none", stroke: "currentColor", stroke_width: "2.2",
+              stroke_linecap: "round", stroke_linejoin: "round", viewBox: "0 0 24 24") do
+            raw(safe('<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/>'))
           end
         end
       end
 
-      # Mirrors ActionToast#undo_button: a tiny inline form so the × can POST
-      # (with CSRF) as a Turbo Stream from any page the pill renders on.
+      # The draft's destination, collapsed to zero width at rest and revealed on
+      # hover/focus (grid 0fr→1fr + fade). overflow-hidden clips it while closed.
+      def detail
+        span(class: "grid grid-cols-[0fr] opacity-0 transition-all duration-200 ease-out " \
+                    "group-hover:grid-cols-[1fr] group-hover:opacity-100 " \
+                    "group-focus-within:grid-cols-[1fr] group-focus-within:opacity-100 " \
+                    "motion-reduce:transition-none") do
+          span(class: "overflow-hidden") do
+            span(class: "block max-w-[168px] truncate whitespace-nowrap pl-0.5 pr-1 " \
+                        "text-xs font-medium text-foreground") { title_text }
+          end
+        end
+      end
+
+      # Mirrors ActionToast#undo_button: a tiny inline form so the x can POST (with
+      # CSRF) as a Turbo Stream from any page the pill renders on. Stays reachable
+      # at rest (no hover) so it works on touch.
       def dismiss_button
         form(action: helpers.dismiss_draft_email_path(@draft), method: :post, class: "contents") do
           input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
           button(type: "submit",
-                 class: "w-6 h-6 ml-1 rounded-full flex items-center justify-center flex-shrink-0 " \
-                        "text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer",
+                 class: "flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full " \
+                        "text-muted-foreground transition-colors hover:bg-muted hover:text-foreground " \
+                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-400",
                  title: t(".dismiss_title"), aria_label: t(".dismiss_title")) do
-            svg(class: "w-3 h-3", fill: "none", stroke: "currentColor", stroke_width: "2.2",
+            svg(class: "h-3 w-3", fill: "none", stroke: "currentColor", stroke_width: "2.4",
                 stroke_linecap: "round", viewBox: "0 0 24 24") do
               raw(safe('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>'))
             end
