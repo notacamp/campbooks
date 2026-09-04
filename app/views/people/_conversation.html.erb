@@ -64,7 +64,7 @@
     <div class="mx-auto w-full max-w-[720px] px-5 pb-6 pt-5">
 
       <%# Scout's standing pinned above the threads. %>
-      <%= render Campbooks::ScoutNote.new(message: @standing.text.presence || t("people.conversation.no_standing"),
+      <%= render Campbooks::ScoutNote.new(message: @standing.text.presence || people_standing_note(@standing, @person) || t("people.conversation.no_standing"),
             time: t("people.conversation.where_things_stand"), class: "mb-3") %>
 
       <% if @can_send && @reply_target %>

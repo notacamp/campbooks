@@ -94,6 +94,15 @@ es:
     standing:
       money_subject: "%{amount} · vence el %{date}"
     conversation:
+      standing_reply:
+        one: "%{name} escribió hace %{count} día sobre “%{subject}” y espera tu respuesta."
+        other: "%{name} escribió hace %{count} días sobre “%{subject}” y espera tu respuesta."
+      standing_nudge:
+        one: "Escribiste a %{name} hace %{count} día sobre “%{subject}”; aún sin respuesta."
+        other: "Escribiste a %{name} hace %{count} días sobre “%{subject}”; aún sin respuesta."
+      standing_decide:
+        one: "Scout marcó “%{subject}” para ti hace %{count} día."
+        other: "Scout marcó “%{subject}” para ti hace %{count} días."
       you: Tú
       back: Personas
       menu: Más

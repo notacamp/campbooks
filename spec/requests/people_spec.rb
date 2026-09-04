@@ -315,6 +315,21 @@ RSpec.describe "People", type: :request do
         expect(response.body).to include("people_conversation")
       end
 
+      it "explains a reply you owe in Scout's note when Scout has no read of its own" do
+        person, contact, thread = make_person(name: "Ines Almeida", email: "ines@almeidasa.example", replied: true)
+        thread.update!(subject: "Contract clause 7.2")
+        thread.email_messages.update_all(received_at: 8.days.ago)
+        thread.update_columns(last_inbound_at: 8.days.ago, last_outbound_at: 12.days.ago)
+        contact.update_columns(sender_kind_source: "heuristic")
+        Feed::Generator.for_user(user)
+        refresh_standings!
+
+        get person_page_path(person)
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("waiting on your reply")
+        expect(response.body).not_to include("Nothing needs you here right now")
+      end
+
       it "404s for a person in another workspace" do
         other_person = create(:person, workspace: create(:workspace))
         get person_page_path(other_person)

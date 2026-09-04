@@ -54,12 +54,12 @@ module Campbooks
         div(
           id: row_dom_id,
           data: { people_row: true },
-          class: "relative"
+          class: "group relative"
         ) do
           a(href: href,
             data: { turbo_frame: "people_detail", turbo_action: "advance", action: "click->email-mobile#showDetail" },
             class: class_names(
-              "group flex items-start gap-2.5 rounded-xl px-3 py-[7px] no-underline transition-colors",
+              "flex items-start gap-2.5 rounded-xl px-3 py-[7px] no-underline transition-colors",
               @selected ? "bg-secondary" : "hover:bg-secondary/60"
             )) do
             avatar_with_dot
@@ -155,10 +155,7 @@ module Campbooks
       end
 
       def action_cluster
-        div(
-          class: "absolute inset-y-0 right-0 hidden items-center gap-0.5 pr-2 group-hover:flex group-focus-within:flex",
-          aria_hidden: "true"
-        ) do
+        div(class: "absolute inset-y-0 right-0 hidden items-center gap-0.5 pr-2 group-hover:flex group-focus-within:flex") do
           div(class: "flex items-center gap-0.5 rounded-xl bg-card/90 px-1 py-1 shadow-sm backdrop-blur") do
             reply_button   if can_reply?
             done_button    if can_done?

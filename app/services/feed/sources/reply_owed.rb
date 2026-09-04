@@ -48,7 +48,7 @@ module Feed
         return nil if copied_only?(m)
         thread = m.email_thread
         return nil unless thread && m.received_at && thread.last_inbound_at
-        return nil if m.received_at < thread.last_inbound_at # an older message they followed up on; the newest one is the ask
+        return nil if m.received_at < thread.last_inbound_at - 1.second # an older message they followed up on; the newest one is the ask
         return nil unless established_relationship?(m, contact)
 
         age = age_days(m.received_at)

@@ -94,6 +94,15 @@ en:
     standing:
       money_subject: "%{amount} · due %{date}"
     conversation:
+      standing_reply:
+        one: "%{name} wrote %{count} day ago about “%{subject}” and is waiting on your reply."
+        other: "%{name} wrote %{count} days ago about “%{subject}” and is waiting on your reply."
+      standing_nudge:
+        one: "You wrote to %{name} %{count} day ago about “%{subject}”; no reply yet."
+        other: "You wrote to %{name} %{count} days ago about “%{subject}”; no reply yet."
+      standing_decide:
+        one: "Scout flagged “%{subject}” for you %{count} day ago."
+        other: "Scout flagged “%{subject}” for you %{count} days ago."
       you: You
       back: People
       menu: More
