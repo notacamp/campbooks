@@ -19,6 +19,8 @@ module Feed
       generator.call
       # Slide any brand-new cards into an open Now page's deck (no-op when none).
       Feed::LiveDeck.broadcast(user, generator.inserted_items)
+      # Refresh People standings on the same cadence as the feed.
+      People::StandingsRefreshJob.enqueue_for(user.id)
     end
 
     # Enqueue a refresh for one user, at most once per DEBOUNCE window. The
