@@ -32,11 +32,19 @@ export default class extends Controller {
     this._bound = this._keydown.bind(this)
     window.addEventListener("keydown", this._bound)
     this._debounceTimer = null
+
+    // Every row action (archive, done, snooze…) re-renders the list, and live
+    // broadcasts replace single rows; both drop the aria-selected attribute.
+    // Watch the list and put the selection back where it was.
+    this._observer = new MutationObserver(() => this._scheduleRestore())
+    this._observer.observe(this.hasListTarget ? this.listTarget : this.element, { childList: true, subtree: true })
   }
 
   disconnect () {
     window.removeEventListener("keydown", this._bound)
     clearTimeout(this._debounceTimer)
+    this._observer?.disconnect()
+    cancelAnimationFrame(this._restoreFrame)
   }
 
   // ── Private ─────────────────────────────────────────────────────────────────
@@ -147,10 +155,39 @@ export default class extends Controller {
   _select (row) {
     this._rows().forEach(r => r.removeAttribute("aria-selected"))
     row.setAttribute("aria-selected", "true")
+    this._lastSelectedId = row.id
+    this._lastSelectedIndex = this._rows().indexOf(row)
   }
 
   _clearSelection () {
     this._rows().forEach(r => r.removeAttribute("aria-selected"))
+    this._lastSelectedId = null
+    this._lastSelectedIndex = null
+  }
+
+  _scheduleRestore () {
+    cancelAnimationFrame(this._restoreFrame)
+    this._restoreFrame = requestAnimationFrame(() => this._restoreSelection())
+  }
+
+  // After a re-render: the same row when it is still there, else the row that took
+  // its place (an archived person with no other thread drops out of the list). When
+  // the row was just archived, open it again so the conversation moves off the
+  // archived thread.
+  _restoreSelection () {
+    if (this._selectedRow() || this._lastSelectedId == null) return
+    const rows = this._rows()
+    if (rows.length === 0) return
+
+    const row = document.getElementById(this._lastSelectedId) ||
+                rows[Math.min(this._lastSelectedIndex ?? 0, rows.length - 1)]
+    if (!row) return
+
+    this._select(row)
+    if (this._reopenAfterUpdate) {
+      this._reopenAfterUpdate = false
+      this._openRow(row)
+    }
   }
 
   _openSelected () {
@@ -169,8 +206,12 @@ export default class extends Controller {
     const row = this._selectedRow()
     if (!row) return false
     const btn = row.querySelector(selector)
-    if (btn) { btn.click(); return true }
-    return false
+    if (!btn) return false
+    // Archiving changes what the row stands for: once the list re-renders, open
+    // the row again so the pane shows the person's next thread (or the next person).
+    this._reopenAfterUpdate = selector === "[data-people-archive]"
+    btn.click()
+    return true
   }
 
   // Click the first matching button inside #people_detail (the open conversation).

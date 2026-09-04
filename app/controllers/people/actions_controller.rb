@@ -28,8 +28,12 @@ module People
         build_people_list
         respond_to do |format|
           format.turbo_stream do
+            # `update`, not `replace`: the partial has no element with the frame's
+            # id, so replacing the people_results frame removed it and every later
+            # action (and the search + pagination that target it) had no target —
+            # the server acted, the list never changed.
             render turbo_stream: [
-              turbo_stream.replace("people_results",
+              turbo_stream.update("people_results",
                 partial: "people/counterpart_list"),
               result[:toast]
             ].compact
