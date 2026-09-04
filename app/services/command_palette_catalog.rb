@@ -82,7 +82,7 @@ class CommandPaletteCatalog
   end
 
   # Static calendar destinations (view switches + today). Page-relative previous/next
-  # are added client-side in command_palette_controller (they depend on the view+date
+  # are added client-side in scout_overlay_controller (they depend on the view+date
   # currently rendered).
   def calendar_commands
     cat = I18n.t("command_palette.categories.calendar")

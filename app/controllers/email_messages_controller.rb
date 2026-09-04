@@ -137,6 +137,16 @@ class EmailMessagesController < ApplicationController
     @comments = @agent_thread&.agent_messages&.chronological || []
     @can_send = @message.email_account.sendable_by?(Current.user)
 
+    # Redirect to the sender's person page when the message belongs to a known person.
+    # Turbo-frame requests (the reading pane or thread-row clicks) bypass this so they
+    # keep the email detail view intact.
+    unless turbo_frame_request?
+      person = @message.contact&.person
+      if person && Current.workspace.people.exists?(person.id)
+        return redirect_to person_page_path(person, thread: @message.email_thread_id)
+      end
+    end
+
     # Redirect to folder context if email is not in any account's inbox
     if params[:folder_id].blank? && params[:folder_name].blank? && @message.provider_folder_id.present?
       inbox_ids = inbox_folder_ids

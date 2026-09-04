@@ -118,6 +118,7 @@ fr:
         other: "%{count} e-mails depuis %{since}"
       empty: Aucun message pour l'instant.
       reply: Répondre
+      newer_threads: Conversations plus récentes
       older: Conversations plus anciennes
       open_profile: Ouvrir le profil classique
       star: Ajouter aux favoris

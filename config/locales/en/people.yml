@@ -118,6 +118,7 @@ en:
         other: "%{count} emails since %{since}"
       empty: No messages yet.
       reply: Reply
+      newer_threads: Newer threads
       older: Older conversations
       open_profile: Profile
       star: Star

@@ -118,6 +118,7 @@ pt:
         other: "%{count} emails desde %{since}"
       empty: Ainda sem mensagens.
       reply: Responder
+      newer_threads: Conversas mais recentes
       older: Conversas anteriores
       open_profile: Abrir perfil clássico
       star: Marcar como favorito

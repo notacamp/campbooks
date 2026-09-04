@@ -313,7 +313,6 @@ Rails.application.routes.draw do
   post "scout/tool", to: "agent_tools#create", as: :scout_tool
   # The Scout overlay body (idle suggestions/recent threads, or a thread's
   # conversation), loaded lazily into the layout's overlay frame on first open.
-  # Bold-layout only (require_bold_layout_enabled → 404 otherwise).
   get "scout/overlay", to: "scout_overlay#show", as: :scout_overlay
 
   resources :imap_accounts, only: [ :new, :create, :edit, :update ]

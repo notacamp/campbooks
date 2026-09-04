@@ -93,7 +93,16 @@ class PeopleController < ApplicationController
                                     .maximum(:received_at)
     ordered_ids = latest_per_thread.sort_by { |_id, at| at || Time.at(0) }.map(&:first).reverse
 
-    @conversation_pagy, page_ids = pagy_array(ordered_ids, limit: THREADS_PER_PAGE)
+    # When a specific thread is requested (permalink redirect from /email_messages/:id),
+    # land on the page that contains it. params[:page] takes precedence if both are set.
+    focused_id = params[:thread].presence
+    if focused_id && ordered_ids.include?(focused_id) && params[:page].blank?
+      @focused_thread_id = focused_id
+      target_page = (ordered_ids.index(focused_id) / THREADS_PER_PAGE) + 1
+    end
+
+    @conversation_pagy, page_ids = pagy_array(ordered_ids, limit: THREADS_PER_PAGE,
+                                               page: target_page || params[:page])
 
     threads_by_id = EmailThread.where(id: page_ids).index_by(&:id)
     # What each heading needs — count, newest message id + time — without bodies.
@@ -101,7 +110,8 @@ class PeopleController < ApplicationController
                                   .accessible_to(current_user)
                                   .pluck(:email_thread_id, :id, :received_at)
                                   .group_by(&:first)
-    eager_id = @conversation_pagy.page == 1 ? page_ids.first : nil
+    # Eager-load the focused thread when given; otherwise the newest thread on page 1.
+    eager_id = @focused_thread_id || (@conversation_pagy.page == 1 ? page_ids.first : nil)
     eager_messages = eager_id ? conversation_messages(eager_id) : nil
 
     @conversation_threads = page_ids.filter_map do |tid|
