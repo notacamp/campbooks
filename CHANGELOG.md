@@ -25,6 +25,13 @@ major, minor, or patch change here.
   headers sort the table (click again to flip the direction); phones get a sort select.
   The choice is remembered for the session, so row actions keep the order.
 
+### Fixed
+
+- People: after the first action on a row (archive, done, snooze) the list stopped
+  updating — the action was applied but every later one had nothing to render into.
+  The list keeps its frame now, the keyboard selection survives the re-render, and
+  archiving from the keyboard moves the conversation on to the person's next thread.
+
 ## [0.36.1] - 2026-09-04
 
 ### Fixed
