@@ -263,9 +263,22 @@ module Reconciliations
       card_html    = render_card_html(@transaction)
       summary_html = render_summary_bar_html
 
-      toast_message = undo_url.present? ?
-        "#{notify} &mdash; <a class='font-medium underline' data-turbo-method='post' href='#{undo_url}'>#{t("shared.actions.undo")}</a>".html_safe :
-        notify
+      # Build the toast with safe_join so `notify` (which can contain a
+      # user-supplied filename) is HTML-escaped; only the trusted undo link is
+      # marked safe. Interpolating notify into an html_safe string was a
+      # reflected-XSS vector (CodeQL rb/reflected-xss).
+      toast_message =
+        if undo_url.present?
+          helpers.safe_join([
+            notify,
+            " — ",
+            helpers.link_to(t("shared.actions.undo"), undo_url,
+                            class: "font-medium underline",
+                            data:  { turbo_method: :post })
+          ])
+        else
+          notify
+        end
 
       render turbo_stream: [
         turbo_stream.replace(dom_id(@transaction),        html: row_html),
