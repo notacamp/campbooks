@@ -99,12 +99,27 @@ RSpec.describe "People page performance", type: :request do
 
   it "keeps the full page, which opens the top row's conversation, bounded" do
     3.times { |i| seed_person(i) }
+    EmailMessage.update_all(read: true, viewed_at: Time.current) # steady state: nothing left to mark read
     refresh_standings!
 
     count = count_queries { get people_path }
     expect(response).to have_http_status(:ok)
     expect(response.body).to include("Open in inbox") # the auto-opened conversation
-    expect(count).to be <= 40, "expected <= 40 queries for the page with the top row open, got #{count}"
+    # The list (above) + one thread's messages, its heads, the nothing-to-mark-read
+    # check, Scout's draft lookup and the conversation header — flat in the history.
+    expect(count).to be <= 45, "expected <= 45 queries for the page with the top row open, got #{count}"
+  end
+
+  it "keeps the first open of unread mail, which marks it read and refreshes the row, bounded" do
+    3.times { |i| seed_person(i) }
+    refresh_standings!
+
+    count = count_queries { get people_path }
+    expect(response).to have_http_status(:ok)
+    # Marking read updates the thread, broadcasts its inbox row, recomputes this one
+    # person's standing and swaps it into the list: a fixed extra, once per unread open.
+    expect(count).to be <= 75, "expected <= 75 queries for the first open of unread mail, got #{count}"
+    expect(count_queries { get people_path }).to be <= 45 # and the page is back in steady state
   end
 
   it "query count is flat when the directory grows (scaling assertion)" do

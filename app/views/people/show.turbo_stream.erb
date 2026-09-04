@@ -5,6 +5,7 @@
     <%= render Campbooks::People::ThreadBlock.new(
           conversation_thread: ct,
           person_first_name: people_first_name(@person),
+          person_id: @person.id,
           newest_thread: false,
           can_send: false,
           scout_draft: nil) %>

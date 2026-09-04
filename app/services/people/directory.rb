@@ -62,7 +62,12 @@ module People
       contacts = person.contacts.to_a
       return nil if contacts.none? { |c| c.kind_person? && c.email_count.to_i > 0 }
       return nil unless listable_person?(person)
-      person_counterpart(person, attention)
+
+      # The same data flags the full directory computes (new / unread / snippet /
+      # can_reply …), so a single-row refresh never strips the row of its chips.
+      rows = [ person_counterpart(person, attention) ]
+      add_person_flags!(rows, attention)
+      rows.first
     end
 
     # ── Exposed for People::Standings.refresh! ────────────────────────────────
@@ -232,17 +237,42 @@ module People
         msg_id         = cp.standing.email_message_id
         acct_id        = msg_account_map[msg_id]
 
+        latest_inbound = people_standing.latest_inbound_for(person)
+
         data = cp.data.dup
         data["new"]            = new_sender?(contacts, people_standing.threads_for(person))
-        data["unread"]         = unread_thread_set.include?(cp.standing.thread_id)
+        # Unread when the standing thread has unread inbound mail, or — the inbox
+        # reading — when the newest thing they sent has not been read yet.
+        data["unread"]         = unread_thread_set.include?(cp.standing.thread_id) ||
+                                 (latest_inbound.present? && !latest_inbound.read)
         data["has_attachment"] = item&.message&.has_attachment? || false
         data["starred"]        = contacts.any?(&:starred?)
         data["contact_id"]     = contacts.max_by { |c| c.email_count.to_i }&.id
+        data["snippet"]        = snippet_for(latest_inbound)
         data["can_reply"]      = msg_id.present? && acct_id && sendable_account_ids.include?(acct_id)
         data["can_done"]       = item.present? && DONE_KINDS.include?(item.feed_item.kind)
 
         cp.with(data: data)
       end
+    end
+
+    # One line of the newest message from them, for rows without a Scout read:
+    # the provider snippet when present, else the body as plain text.
+    def snippet_for(message)
+      return nil unless message
+
+      text = message.summary.presence || html_to_text(message.body)
+      text&.squish&.truncate(120).presence
+    end
+
+    def html_to_text(html)
+      return nil if html.blank?
+
+      fragment = Loofah.fragment(html.to_s)
+      fragment.xpath(".//style|.//script|.//head|.//title").each(&:remove)
+      fragment.to_text(encode_special_chars: false)
+    rescue StandardError
+      ActionController::Base.helpers.strip_tags(html.to_s)
     end
 
     # True for a person with at most 1 message and no outbound from you.

@@ -85,15 +85,16 @@ RSpec.describe "People", type: :request do
         expect(response.body).to include(signed)
       end
 
-      it "lists persons and the Recent section (lanes appear only when feed items exist)" do
+      it "lists persons and the Latest section (lanes appear only when feed items exist)" do
         make_person(name: "Sofia Martins", email: "sofia@brightloop.example", org_name: "Brightloop")
         make_person(name: "Ana Reis", email: "ana@accounting.example", org_name: "Accounting")
         refresh_standings!
 
         get people_path
         expect(response).to have_http_status(:ok)
-        # Without live feed items all persons fall to Recent (no attention standings).
-        expect(response.body).to include("Recent")
+        # Without live feed items all persons fall to Latest (no attention standings).
+        expect(response.body).to include("Latest")
+        expect(response.body).to include('id="people_latest_list"')
         expect(response.body).to include("Sofia Martins").and include("Ana Reis")
       end
 
@@ -208,12 +209,94 @@ RSpec.describe "People", type: :request do
         expect(response.body).to include(people_streams_path)
       end
 
-      it "Recent paginates 30 per page via the turbo_stream format" do
+      it "Latest paginates 30 per page via the turbo_stream format" do
         31.times { |i| make_person(name: "Person #{i}", email: "person#{i}@x.example") }
         refresh_standings!
 
-        get people_path(q: nil), headers: { "Accept" => "text/vnd.turbo-stream.html" }
+        get people_path
+        expect(response.body).to include("people_latest_pagination")
+        expect(response.body.scan("people_row_latest_").length).to eq(30)
+
+        get people_path(page: 2), headers: { "Accept" => "text/vnd.turbo-stream.html" }
         expect(response).to have_http_status(:ok)
+        expect(response.body).to include('action="append" target="people_latest_list"')
+        expect(response.body.scan("people_row_latest_").length).to eq(1)
+        expect(response.body).to include('action="remove" target="people_latest_pagination"')
+      end
+
+      it "orders Latest newest-first and keeps lane people in it too" do
+        older, = make_person(name: "Older Olga", email: "olga@x.example", inbound_at: 5.days.ago)
+        newest, = make_person(name: "Newest Nuno", email: "nuno@x.example", inbound_at: 1.hour.ago)
+        owed, _contact, thread = make_person(name: "Ines Almeida", email: "ines@almeidasa.example", replied: true,
+                                             inbound_at: 8.days.ago)
+        thread.update_columns(last_inbound_at: 8.days.ago, last_outbound_at: 12.days.ago)
+        Feed::Generator.for_user(user)
+        refresh_standings!
+
+        get people_path
+        body = response.body
+        expect(body).to include("people_row_#{owed.id}")                 # in the Reply lane
+        expect(body).to include("people_row_latest_#{owed.id}")          # and in Latest
+        expect(body.index("people_row_latest_#{newest.id}")).to be < body.index("people_row_latest_#{older.id}")
+        expect(body.index("people_row_latest_#{older.id}")).to be < body.index("people_row_latest_#{owed.id}")
+      end
+
+      it "shows the newest message's first line on a Latest row" do
+        _person, contact, thread = make_person(name: "Sofia Martins", email: "sofia@brightloop.example")
+        create(:email_message, email_account: account, email_thread: thread, contact: contact,
+               from_address: "sofia@brightloop.example", body: "<p>Can you send the deck by Friday?</p>",
+               received_at: 1.hour.ago)
+        refresh_standings!
+
+        get people_path
+        expect(response.body).to include("Can you send the deck by Friday?")
+      end
+
+      it "folds a lane beyond five rows behind Show N more" do
+        6.times { |i| make_person(name: "Owed Person #{i}", email: "owed#{i}@x.example") }
+        # Already read, so auto-opening the top row recomputes nothing under the fake lane.
+        EmailMessage.update_all(read: true, viewed_at: Time.current)
+        refresh_standings!
+        PeopleStanding.for_user(user).update_all(needs_you: true, verb: "reply", standing_kind: "reply_owed",
+                                                 subject: "Deck", wait_days: 3, score: 5)
+
+        get people_path
+        expect(response.body).to include("Show 1 more")
+        6.times { |i| expect(response.body).to include("Owed Person #{i}") }
+      end
+
+      it "opens on the latest received message, not the top lane row" do
+        make_person(name: "Older Olga", email: "olga@x.example", inbound_at: 5.days.ago)
+        make_person(name: "Newest Nuno", email: "nuno@x.example", inbound_at: 1.hour.ago)
+        refresh_standings!
+
+        get people_path
+        # The pane's thread heading is Nuno's; Olga's subject only appears on her row.
+        expect(response.body).to match(/<h3[^>]*>\s*Re: Newest Nuno/)
+        expect(response.body).not_to match(/<h3[^>]*>\s*Re: Older Olga/)
+      end
+
+      it "marks the auto-opened person's newest thread read on the device and at the provider" do
+        _person, _contact, thread = make_person(name: "Sofia Martins", email: "sofia@brightloop.example")
+        message = thread.email_messages.first
+        message.update_columns(read: false, viewed_at: nil)
+        refresh_standings!
+
+        expect { get people_path }.to have_enqueued_job(MarkReadJob).with(account.id, [ message.provider_message_id ])
+        expect(message.reload).to have_attributes(read: true)
+        expect(message.viewed_at).to be_present
+      end
+
+      it "renders the auto-opened person's rows without the unread dot" do
+        person, _contact, thread = make_person(name: "Sofia Martins", email: "sofia@brightloop.example")
+        thread.email_messages.update_all(read: false, viewed_at: nil)
+        refresh_standings!
+        expect(PeopleStanding.for_user(user).find_by(counterpart: person).data["unread"]).to be true
+
+        get people_path
+        row = Nokogiri::HTML(response.body).at_css("#people_row_latest_#{person.id}")
+        expect(row).to be_present
+        expect(row.to_html).not_to include("bottom-0 right-0") # the unread dot
       end
     end
 
@@ -333,6 +416,112 @@ RSpec.describe "People", type: :request do
       it "404s for a person in another workspace" do
         other_person = create(:person, workspace: create(:workspace))
         get person_page_path(other_person)
+        expect(response).to have_http_status(:not_found)
+      end
+
+      it "marks the newest thread read when a person is opened" do
+        person, _contact, thread = make_person(name: "Sofia Martins", email: "sofia@brightloop.example")
+        message = thread.email_messages.first
+        message.update_columns(read: false, viewed_at: nil)
+
+        expect { get person_page_path(person) }
+          .to have_enqueued_job(MarkReadJob).with(account.id, [ message.provider_message_id ])
+        expect(message.reload).to have_attributes(read: true)
+      end
+
+      it "loads only the newest thread's messages; older threads are lazy frames" do
+        person, contact, newest_thread = make_person(name: "Sofia Martins", email: "sofia@brightloop.example",
+                                                     inbound_at: 1.hour.ago)
+        newest_thread.email_messages.update_all(body: "Newest body NEWMARK")
+        older = create(:email_thread, email_account: account, subject: "Older thread")
+        create(:email_message, email_account: account, email_thread: older, contact: contact, subject: "Older thread",
+               from_address: "sofia@brightloop.example", body: "Older body OLDMARK", received_at: 3.days.ago)
+
+        get person_page_path(person)
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("NEWMARK")
+        expect(response.body).not_to include("OLDMARK")
+        expect(response.body).to match(/<h3[^>]*>\s*Older thread/) # its heading is there
+        expect(response.body).to match(/<turbo-frame[^>]*id="people_thread_#{older.id}"[^>]*loading="lazy"/)
+        expect(response.body).to include(people_thread_path(person, older))
+      end
+
+      it "gives folded messages of the newest thread a lazy body frame" do
+        person, contact, thread = make_person(name: "Sofia Martins", email: "sofia@brightloop.example",
+                                              inbound_at: 1.hour.ago)
+        earlier = create(:email_message, email_account: account, email_thread: thread, contact: contact,
+                         from_address: "sofia@brightloop.example",
+                         body: "Earlier message. #{'x' * 200} TAILMARKER", received_at: 3.days.ago)
+
+        get person_page_path(person)
+        expect(response.body).to match(/<turbo-frame[^>]*id="people_message_#{earlier.id}"[^>]*loading="lazy"/)
+        expect(response.body).to include(people_message_path(person, earlier))
+        expect(response.body).not_to include("TAILMARKER")
+      end
+    end
+
+    describe "GET /people/:id/threads/:thread_id" do
+      it "renders the thread's messages into its frame and marks them read" do
+        person, contact, _newest = make_person(name: "Sofia Martins", email: "sofia@brightloop.example")
+        older = create(:email_thread, email_account: account, subject: "Older thread")
+        message = create(:email_message, email_account: account, email_thread: older, contact: contact,
+                         from_address: "sofia@brightloop.example", body: "Older body OLDMARK", received_at: 3.days.ago)
+        message.update_columns(read: false, viewed_at: nil)
+
+        expect { get people_thread_path(person, older), headers: { "Turbo-Frame" => "people_thread_#{older.id}" } }
+          .to have_enqueued_job(MarkReadJob).with(account.id, [ message.provider_message_id ])
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("<turbo-frame id=\"people_thread_#{older.id}\"")
+        expect(response.body).to include("OLDMARK")
+        expect(response.body).not_to include("<h3") # the heading stays on the page
+        expect(message.reload).to have_attributes(read: true)
+      end
+
+      it "404s for a thread that is not part of the person's conversation" do
+        person, = make_person(name: "Sofia Martins", email: "sofia@brightloop.example")
+        _other, _c, foreign_thread = make_person(name: "Rui Santos", email: "rui@cloudhost.example")
+
+        get people_thread_path(person, foreign_thread)
+        expect(response).to have_http_status(:not_found)
+      end
+
+      it "404s for a thread the user cannot read" do
+        person, _contact, thread = make_person(name: "Sofia Martins", email: "sofia@brightloop.example")
+        EmailAccountUser.where(user: user, email_account: account).update_all(can_read: false)
+
+        get people_thread_path(person, thread)
+        expect(response).to have_http_status(:not_found)
+      end
+    end
+
+    describe "GET /people/:id/messages/:message_id" do
+      it "renders the message body into its frame" do
+        person, contact, thread = make_person(name: "Sofia Martins", email: "sofia@brightloop.example")
+        earlier = create(:email_message, email_account: account, email_thread: thread, contact: contact,
+                         from_address: "sofia@brightloop.example", body: "Earlier body EARLYMARK", received_at: 3.days.ago)
+
+        get people_message_path(person, earlier)
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("<turbo-frame id=\"people_message_#{earlier.id}\"")
+        expect(response.body).to include("EARLYMARK")
+        expect(response.body).not_to include("<details")
+      end
+
+      it "renders your own reply in a shared thread" do
+        person, _contact, thread = make_person(name: "Sofia Martins", email: "sofia@brightloop.example")
+        mine = create(:email_message, email_account: account, email_thread: thread, contact: nil,
+                      from_address: account.email_address, body: "My reply MINEMARK", received_at: 1.day.ago)
+
+        get people_message_path(person, mine)
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("MINEMARK")
+      end
+
+      it "404s for a message from someone else's conversation" do
+        person, = make_person(name: "Sofia Martins", email: "sofia@brightloop.example")
+        _other, _c, foreign_thread = make_person(name: "Rui Santos", email: "rui@cloudhost.example")
+
+        get people_message_path(person, foreign_thread.email_messages.first)
         expect(response).to have_http_status(:not_found)
       end
     end

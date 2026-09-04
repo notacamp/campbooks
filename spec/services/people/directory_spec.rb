@@ -208,6 +208,22 @@ RSpec.describe People::Directory do
       expect(cp.data["unread"]).to be true
     end
 
+    it "marks data['unread'] true when the newest message from them is unread, even without an attention item" do
+      _person, contact, thread = make_person(name: "Fresh Sender", email: "fresh@x.example")
+      EmailMessage.find_by!(email_thread: thread, contact: contact).update_columns(read: false)
+
+      cp = directory.counterparts.find { |c| c.name == "Fresh Sender" }
+      expect(cp.data["unread"]).to be true
+    end
+
+    it "marks data['unread'] false once the newest message from them is read" do
+      _person, contact, thread = make_person(name: "Seen Sender", email: "seen@x.example")
+      EmailMessage.find_by!(email_thread: thread, contact: contact).update_columns(read: true)
+
+      cp = directory.counterparts.find { |c| c.name == "Seen Sender" }
+      expect(cp.data["unread"]).to be false
+    end
+
     # ── data["has_attachment"] flag ───────────────────────────────────────────
 
     it "marks data['has_attachment'] true when the attention item's message has an attachment" do

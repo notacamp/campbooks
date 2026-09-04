@@ -7,13 +7,15 @@ RSpec.describe Campbooks::People::ThreadMessage, type: :component do
   let(:thread) { create(:email_thread, email_account: account, subject: "Q3 deck") }
   let(:contact) { create(:contact, email: "sofia@brightloop.example", name: "Sofia Martins", email_account: account) }
 
-  def render_msg(message, open: false, full_body: false)
+  def render_msg(message, open: false, full_body: false, lazy_src: nil, content_only: false)
     ApplicationController.render(
       described_class.new(
         message: message,
         person_first_name: "Sofia",
         open: open,
-        full_body: full_body
+        full_body: full_body,
+        lazy_src: lazy_src,
+        content_only: content_only
       ),
       layout: false
     )
@@ -61,7 +63,6 @@ RSpec.describe Campbooks::People::ThreadMessage, type: :component do
   it "renders an attachments row when files are present" do
     msg = create(:email_message, email_account: account, email_thread: thread, contact: contact,
                  from_address: "sofia@brightloop.example", body: "See attached.")
-    pdf = Rack::Test::UploadedFile.new(StringIO.new("fake pdf"), "application/pdf", original_filename: "report.pdf")
     msg.files.attach(io: StringIO.new("fake pdf"), filename: "report.pdf", content_type: "application/pdf")
 
     html = render_msg(msg, open: true)
@@ -73,5 +74,26 @@ RSpec.describe Campbooks::People::ThreadMessage, type: :component do
                  from_address: "sofia@brightloop.example", body: nil, summary: nil)
     html = render_msg(msg, open: true)
     expect(html).to include("No content")
+  end
+
+  describe "lazy body" do
+    let(:msg) do
+      create(:email_message, email_account: account, email_thread: thread, contact: contact,
+             from_address: "sofia@brightloop.example", body: "Earlier note. #{'y' * 200} TAILMARKER")
+    end
+
+    it "renders the summary line over a lazy frame instead of the body when lazy_src is set" do
+      html = render_msg(msg, lazy_src: "/people/p1/messages/#{msg.id}")
+      expect(html).to match(/<turbo-frame[^>]*id="people_message_#{msg.id}"[^>]*src="\/people\/p1\/messages\/#{msg.id}"[^>]*loading="lazy"/)
+      expect(html).to include("Earlier note.")
+      expect(html).not_to include("TAILMARKER")
+    end
+
+    it "renders just the body (no <details>) with content_only" do
+      html = render_msg(msg, content_only: true)
+      expect(html).not_to include("<details")
+      expect(html).not_to include("<turbo-frame")
+      expect(html).to include("TAILMARKER")
+    end
   end
 end

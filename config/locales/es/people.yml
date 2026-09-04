@@ -48,7 +48,11 @@ es:
       tab_people: Personas
       tab_streams: Streams
       classic_inbox: Bandeja clásica
-      recent: Recientes
+      latest: Más recientes
+      show_more:
+        one: "Mostrar 1 más"
+        other: "Mostrar %{count} más"
+      show_less: Mostrar menos
       organization: Organización
       people_count:
         one: "%{count} persona"

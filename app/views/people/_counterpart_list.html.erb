@@ -1,6 +1,9 @@
-<%# The counterpart list: verb lanes (Reply, Decide, Pay, Chase, Nudge) first —
-    each only when non-empty — then Recent (paginated), then the Streams foot row. %>
-<% if @lanes.blank? && @recent.blank? %>
+<%# The counterpart list: verb lanes first (each capped at LANE_CAP rows, the rest
+    folded behind "Show N more"), then Latest — everyone by newest activity, the
+    inbox proper, paginated with an infinite-scroll sentinel — then the Streams
+    foot row. A person who needs you appears in a lane AND in Latest, so the
+    newest sender is always at the top of Latest. %>
+<% if @lanes.blank? && @latest.blank? %>
   <div class="px-6 py-10 text-center">
     <p class="text-sm text-muted-foreground">
       <%= @query.present? ? t("people.index.no_matches") : t("people.index.empty") %>
@@ -12,25 +15,38 @@
 <% else %>
   <%# Verb lanes (Reply, Decide, Pay, Chase, Nudge) %>
   <% @lanes.each do |lane| %>
+    <% shown = lane[:counterparts].first(PeopleLayout::LANE_CAP) %>
+    <% folded = lane[:counterparts].drop(PeopleLayout::LANE_CAP) %>
     <div class="flex items-center gap-1.5 px-4 pb-1.5 pt-3.5">
       <span class="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"><%= lane[:label] %></span>
       <span class="flex h-[15px] min-w-[15px] items-center justify-center rounded-full bg-muted px-1 text-[9px] font-bold text-muted-foreground"><%= lane[:counterparts].size %></span>
     </div>
     <div class="space-y-0.5 px-1.5 pb-1">
-      <%= render partial: "people/counterpart_row", collection: lane[:counterparts], as: :counterpart %>
+      <%= render partial: "people/counterpart_row", collection: shown, as: :counterpart %>
+      <% if folded.any? %>
+        <details class="group/lane">
+          <summary class="cursor-pointer list-none px-3 py-1.5 text-[12px] font-medium text-muted-foreground hover:text-foreground">
+            <span class="group-open/lane:hidden"><%= t("people.index.show_more", count: folded.size) %></span>
+            <span class="hidden group-open/lane:inline"><%= t("people.index.show_less") %></span>
+          </summary>
+          <div class="space-y-0.5">
+            <%= render partial: "people/counterpart_row", collection: folded, as: :counterpart %>
+          </div>
+        </details>
+      <% end %>
     </div>
   <% end %>
 
-  <%# Recent section (paginated) %>
-  <% if @recent.any? %>
+  <%# Latest: everyone, newest first (paginated) %>
+  <% if @latest.any? %>
     <div class="flex items-center gap-1.5 px-4 pb-1.5 pt-3.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-      <%= t("people.index.recent") %>
+      <%= t("people.index.latest") %>
     </div>
-    <div id="people_recent_list" class="space-y-0.5 px-1.5 pb-2">
-      <%= render partial: "people/counterpart_row", collection: @recent, as: :counterpart %>
+    <div id="people_latest_list" class="space-y-0.5 px-1.5 pb-2">
+      <%= render partial: "people/counterpart_row", collection: @latest, as: :counterpart, locals: { variant: :latest } %>
     </div>
-    <% if @recent_pagy&.next %>
-      <%= render "people/recent_pagination", pagy: @recent_pagy, query: @query %>
+    <% if @latest_pagy&.next %>
+      <%= render "people/latest_pagination", pagy: @latest_pagy, query: @query %>
     <% end %>
   <% end %>
 

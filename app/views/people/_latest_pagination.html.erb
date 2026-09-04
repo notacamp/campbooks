@@ -1,7 +1,7 @@
-<%# Infinite-scroll sentinel for the Recent list. Lazily streams the next page
+<%# Infinite-scroll sentinel for the Latest list. Lazily streams the next page
     (carrying the current query) when it scrolls into view. `pagy` + `query`
     required. %>
-<%= turbo_frame_tag "people_recent_pagination",
+<%= turbo_frame_tag "people_latest_pagination",
       src: people_path(q: query.presence, page: pagy.next, format: :turbo_stream),
       loading: :lazy do %>
   <div class="flex items-center justify-center py-6">

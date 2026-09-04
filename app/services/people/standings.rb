@@ -202,11 +202,9 @@ module People
 
         # Remove gone rows.
         gone_ids.each do |cid|
-          # We only know the id — remove by DOM id pattern is best-effort.
-          Turbo::StreamsChannel.broadcast_remove_to(
-            "people_#{user.id}",
-            target: "people_row_#{cid}"
-          )
+          %W[people_row_#{cid} people_row_latest_#{cid}].each do |target|
+            Turbo::StreamsChannel.broadcast_remove_to("people_#{user.id}", target: target)
+          end
         end
 
         # New rows: show the pill.
@@ -237,25 +235,23 @@ module People
       def broadcast_replace_row!(user, standing_row)
         I18n.with_locale(user.locale || I18n.default_locale) do
           cp = standing_row.to_counterpart
-          html = ApplicationController.render(
-            Campbooks::People::CounterpartRow.new(counterpart: cp),
-            layout: false
-          )
-          Turbo::StreamsChannel.broadcast_replace_to(
-            "people_#{user.id}",
-            target: "people_row_#{standing_row.counterpart_id}",
-            html: html
-          )
+          # The same person can sit in a lane and in Latest; replace both rows.
+          { lane: "people_row_#{standing_row.counterpart_id}", latest: "people_row_latest_#{standing_row.counterpart_id}" }.each do |variant, target|
+            html = ApplicationController.render(
+              Campbooks::People::CounterpartRow.new(counterpart: cp, variant: variant),
+              layout: false
+            )
+            Turbo::StreamsChannel.broadcast_replace_to("people_#{user.id}", target: target, html: html)
+          end
         end
       rescue => e
         Rails.logger.warn("[People::Standings] broadcast_replace_row! failed: #{e.class}: #{e.message}")
       end
 
       def broadcast_remove!(user, counterpart)
-        Turbo::StreamsChannel.broadcast_remove_to(
-          "people_#{user.id}",
-          target: "people_row_#{counterpart.id}"
-        )
+        %W[people_row_#{counterpart.id} people_row_latest_#{counterpart.id}].each do |target|
+          Turbo::StreamsChannel.broadcast_remove_to("people_#{user.id}", target: target)
+        end
       rescue => e
         Rails.logger.warn("[People::Standings] broadcast_remove! failed: #{e.class}: #{e.message}")
       end

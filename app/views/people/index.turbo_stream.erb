@@ -1,13 +1,13 @@
-<%# Next page of the Recent list: append the rows, then advance (or retire) the
+<%# Next page of the Latest list: append the rows, then advance (or retire) the
     lazy sentinel. Mirrors organizations/index.turbo_stream. %>
-<%= turbo_stream.append "people_recent_list" do %>
-  <%= render partial: "people/counterpart_row", collection: @recent, as: :counterpart %>
+<%= turbo_stream.append "people_latest_list" do %>
+  <%= render partial: "people/counterpart_row", collection: @latest, as: :counterpart, locals: { variant: :latest } %>
 <% end %>
 
-<% if @recent_pagy&.next %>
-  <%= turbo_stream.replace "people_recent_pagination" do %>
-    <%= render "people/recent_pagination", pagy: @recent_pagy, query: @query %>
+<% if @latest_pagy&.next %>
+  <%= turbo_stream.replace "people_latest_pagination" do %>
+    <%= render "people/latest_pagination", pagy: @latest_pagy, query: @query %>
   <% end %>
 <% else %>
-  <%= turbo_stream.remove "people_recent_pagination" %>
+  <%= turbo_stream.remove "people_latest_pagination" %>
 <% end %>
