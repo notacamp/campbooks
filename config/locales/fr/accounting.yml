@@ -82,6 +82,11 @@ fr:
       col_counterparty: Contrepartie
       col_amount: Montant
       col_match: Association
+      grouped_ledger_title: Relevé
+      group_count:
+        one: "%{count} groupe"
+        other: "%{count} groupes"
+      workbench_title: Atelier de rapprochement
     confirm_all_suggestions:
       confirmed:
         one: "1 association confirmée"
@@ -220,6 +225,43 @@ fr:
         request_invoice_to_placeholder: "fournisseur@exemple.com"
         request_invoice_subject: Objet
         request_invoice_open_composer: Réviser dans le compositeur
+      grouped_ledger:
+        empty: Aucune transaction à afficher.
+      reconciliation_group:
+        state:
+          matched: Associé
+          review: Vérifier cette association
+          partial: Paiement partiel
+          partial_label: partiel
+          excluded: Mis de côté
+          credit: Revenu associé
+          unmatched: Sans facture
+        revenue_label: revenu
+        review_label: vérifier
+        excluded_label: Mis de côté
+        unmatched_chip: "Sans facture · Résoudre"
+        unknown_party: Inconnu
+        nif_missing: Numéro TVA manquant sur ce document
+        nif_mismatch: Le numéro TVA ne correspond pas à celui de l'entreprise
+        footer:
+          balances: équilibré
+          "of": sur
+          outstanding: en attente
+          installments: Deux paiements soldent une facture.
+          split: Un virement solde plusieurs factures.
+          partial_deposit: Acompte payé.
+          multi_txn:
+            one: Un paiement
+            other: "%{count} paiements soldent une facture."
+          multi_doc:
+            one: Une facture
+            other: "Un virement solde %{count} factures."
+      reconciliations_rail:
+        title: Relevés bancaires
+        view_all: Voir tout
+        untitled: Relevé sans nom
+        progress: "%{resolved} sur %{total}"
+        open: Ouvrir →
     money:
       summary:
         late_receivable_html: "La facture de %{name} est %{overdue}, j'ai donc rédigé un rappel."

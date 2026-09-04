@@ -75,6 +75,9 @@ class ReconciliationsController < ApplicationController
       limit: 50
     )
 
+    @groups      = Reconciliations::Groups.new(@reconciliation).call
+    @company_nif = Current.workspace&.company_nif.presence
+
     respond_to do |format|
       format.html
       format.turbo_stream

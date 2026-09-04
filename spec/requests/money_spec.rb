@@ -144,4 +144,34 @@ RSpec.describe "Money", type: :request do
       table.scan(/<td class="px-3 py-3 font-semibold text-foreground">([^<]+)</).flatten
     end
   end
+
+  describe "bank statements rail" do
+    around { |ex| with_flags { ex.run } }
+    before { sign_in(user) }
+
+    it "renders a Bank statements section when reconciliations exist" do
+      stmt = create(:document, :bank_statement, workspace:)
+      recon = create(:reconciliation, workspace:, statement_document: stmt, status: :ready,
+                     bank_name: "Test Bank", period_start: Date.new(2024, 1, 1),
+                     period_end: Date.new(2024, 1, 31))
+
+      get money_path
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(I18n.t("components.accounting.reconciliations_rail.title"))
+      expect(response.body).to include("Test Bank")
+    end
+
+    it "omits the section when no reconciliations exist" do
+      get money_path
+      expect(response.body).not_to include(I18n.t("components.accounting.reconciliations_rail.title"))
+    end
+
+    it "links each card to the reconciliation workbench" do
+      stmt = create(:document, :bank_statement, workspace:)
+      recon = create(:reconciliation, workspace:, statement_document: stmt, status: :ready)
+
+      get money_path
+      expect(response.body).to include(reconciliation_path(recon))
+    end
+  end
 end

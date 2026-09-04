@@ -82,6 +82,11 @@ en:
       col_counterparty: Counterparty
       col_amount: Amount
       col_match: Match
+      grouped_ledger_title: Statement
+      group_count:
+        one: "%{count} group"
+        other: "%{count} groups"
+      workbench_title: Transaction workbench
     confirm_all_suggestions:
       confirmed:
         one: "1 match confirmed"
@@ -220,3 +225,40 @@ en:
         request_invoice_to_placeholder: "supplier@example.com"
         request_invoice_subject: Subject
         request_invoice_open_composer: Review in composer
+      grouped_ledger:
+        empty: No transactions to display.
+      reconciliation_group:
+        state:
+          matched: Matched
+          review: Review this match
+          partial: Partly paid
+          partial_label: partial
+          excluded: Set aside
+          credit: Revenue matched
+          unmatched: No invoice
+        revenue_label: revenue
+        review_label: review
+        excluded_label: Set aside
+        unmatched_chip: "No invoice · Resolve"
+        unknown_party: Unknown
+        nif_missing: NIF missing on this document
+        nif_mismatch: NIF does not match your company's
+        footer:
+          balances: balances
+          "of": of
+          outstanding: outstanding
+          installments: Two payments settle one invoice.
+          split: One payment clears several invoices.
+          partial_deposit: Deposit paid.
+          multi_txn:
+            one: One payment
+            other: "%{count} payments settle one invoice."
+          multi_doc:
+            one: One invoice
+            other: "One payment clears %{count} invoices."
+      reconciliations_rail:
+        title: Bank statements
+        view_all: View all
+        untitled: Unnamed statement
+        progress: "%{resolved} of %{total}"
+        open: Open →

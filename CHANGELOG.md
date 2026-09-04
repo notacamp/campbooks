@@ -25,6 +25,19 @@ major, minor, or patch change here.
   invoice outstanding). The `settlement_state` computed field on a document reports
   `:settled`, `:partial`, or `:unsettled` based on how much of the invoice amount is
   accounted for across all confirmed matches.
+- Bank reconciliation show page now displays a **grouped paired ledger** — transactions
+  and their matched invoices are presented side-by-side in a three-column grid (bank
+  left · connector node · invoice right), with distinct visual states for each group:
+  matched (green ✓), under review (~, amber with confidence %), partial payment (½),
+  credit/revenue (+), excluded (—, muted), and unmatched (!, ember). Multi-transaction
+  or multi-invoice groups are presented in an inset card with a balance footer. NIF
+  validation flags are shown inline when the workspace has a company NIF configured.
+  The flat transaction workbench table remains below the ledger in a collapsed
+  `<details>` block for manual match actions.
+- Money page (`/money`) now shows a **Bank Statements rail** at the bottom — up to six
+  recent reconciliations with bank name, period, progress bar (resolved/total
+  transactions), currency, and a direct link to the workbench. Loaded with N+1-safe
+  batch counts.
 
 ### Changed
 

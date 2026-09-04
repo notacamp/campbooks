@@ -102,6 +102,21 @@ class MoneyController < ApplicationController
     @ledger = Money::Ledger.for(Current.workspace, current_user, today: @today, horizon: @horizon, sort: sort, dir: dir)
     @summary = Money::Summary.for(Current.workspace, current_user, today: @today, ledger: @ledger)
     @quarter_label = quarter_label
+    # Surface recent bank statement reconciliations so Money is the entry point
+    # for statement work. Limit to 6 most recent ready/matching ones.
+    @recent_reconciliations = Current.workspace.reconciliations.recent
+                                     .includes(:statement_document)
+                                     .limit(6)
+    # Pre-populate memoised counts to avoid N+1 on progress bars.
+    rids = @recent_reconciliations.map(&:id)
+    tx_totals   = BankTransaction.where(reconciliation_id: rids).group(:reconciliation_id).count
+    tx_resolved = BankTransaction.where(reconciliation_id: rids,
+                                        status: %i[matched excluded requested])
+                                 .group(:reconciliation_id).count
+    @recent_reconciliations.each do |r|
+      r.instance_variable_set(:@total_transactions, tx_totals.fetch(r.id, 0))
+      r.instance_variable_set(:@resolved_count,     tx_resolved.fetch(r.id, 0))
+    end
   end
 
   # The ledger's order: ?sort=&dir= (the column links), ?order=date_desc (the

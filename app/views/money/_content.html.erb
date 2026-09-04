@@ -11,4 +11,11 @@
             class: "mt-4 inline-block text-sm font-medium text-foreground underline underline-offset-4" %>
     </div>
   <% end %>
+
+  <%# ── Bank statements section ─────────────────────────────────────────────
+      Lists recent reconciliations so Money is the entry point for bank
+      statement work (the standalone /accounting nav will be retired later). %>
+  <% if @recent_reconciliations&.any? %>
+    <%= render Campbooks::Accounting::ReconciliationsRail.new(reconciliations: @recent_reconciliations) %>
+  <% end %>
 </div>
