@@ -48,7 +48,6 @@ es:
       tab_people: Personas
       tab_streams: Streams
       classic_inbox: Bandeja clásica
-      need_you: Te necesitan
       recent: Recientes
       organization: Organización
       people_count:
@@ -78,7 +77,6 @@ es:
         zero: Streams
         one: "Streams · %{count}"
         other: "Streams · %{count}"
-      new: Nuevo
     actions:
       done: "%{name} marcado como hecho"
       restored: Restaurado
@@ -95,7 +93,6 @@ es:
       snooze_title: Posponer
     standing:
       money_subject: "%{amount} · vence el %{date}"
-      no_standing: Nada requiere tu atención ahora mismo.
     conversation:
       you: Tú
       back: Personas

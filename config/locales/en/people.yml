@@ -48,7 +48,6 @@ en:
       tab_people: People
       tab_streams: Streams
       classic_inbox: Classic inbox
-      need_you: Need you
       recent: Recent
       organization: Organization
       people_count:
@@ -78,7 +77,6 @@ en:
         zero: Streams
         one: "Streams · %{count}"
         other: "Streams · %{count}"
-      new: New
     actions:
       done: "Marked %{name} done"
       restored: Restored
@@ -95,7 +93,6 @@ en:
       snooze_title: Snooze
     standing:
       money_subject: "%{amount} · due %{date}"
-      no_standing: Nothing needs you here right now.
     conversation:
       you: You
       back: People

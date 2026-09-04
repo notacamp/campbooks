@@ -48,7 +48,6 @@ pt:
       tab_people: Pessoas
       tab_streams: Streams
       classic_inbox: Caixa clássica
-      need_you: Precisam de si
       recent: Recentes
       organization: Organização
       people_count:
@@ -78,7 +77,6 @@ pt:
         zero: Streams
         one: "Streams · %{count}"
         other: "Streams · %{count}"
-      new: Novo
     actions:
       done: "%{name} marcado como feito"
       restored: Restaurado
@@ -95,7 +93,6 @@ pt:
       snooze_title: Adiar
     standing:
       money_subject: "%{amount} · vence %{date}"
-      no_standing: Nada precisa de si por agora.
     conversation:
       you: Você
       back: Pessoas

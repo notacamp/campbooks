@@ -48,7 +48,6 @@ fr:
       tab_people: Personnes
       tab_streams: Streams
       classic_inbox: Boîte classique
-      need_you: Besoin de vous
       recent: Récents
       organization: Organisation
       people_count:
@@ -78,7 +77,6 @@ fr:
         zero: Streams
         one: "Streams · %{count}"
         other: "Streams · %{count}"
-      new: Nouveau
     actions:
       done: "%{name} marqué comme fait"
       restored: Restauré
@@ -95,7 +93,6 @@ fr:
       snooze_title: Reporter
     standing:
       money_subject: "%{amount} · dû le %{date}"
-      no_standing: Rien ne requiert votre attention pour le moment.
     conversation:
       you: Vous
       back: Personnes
