@@ -76,6 +76,9 @@ export default class extends Controller {
       case ".":
         this._clickAction("[data-people-more]")
         break
+      case "i":
+        this._toggleDetails()
+        break
       case "Escape":
         this._clearSelection()
         break
@@ -161,5 +164,22 @@ export default class extends Controller {
     if (!detail) return
     const btn = detail.querySelector(selector)
     if (btn) btn.click()
+  }
+
+  // Toggle the Details sheet — no-op at xl+ where the rail is always visible.
+  _toggleDetails () {
+    if (window.matchMedia("(min-width: 1280px)").matches) return
+    const detailPane = document.getElementById("people_details_pane")
+    if (!detailPane) return
+    // Find the people-details Stimulus controller on the conversation pane parent.
+    const wrapper = detailPane.closest("[data-controller~='people-details']")
+    if (wrapper) {
+      const app = this.application.getControllerForElementAndIdentifier(wrapper, "people-details")
+      if (app && typeof app.toggle === "function") app.toggle()
+    } else {
+      // Fallback: toggle class directly.
+      detailPane.classList.toggle("translate-x-0")
+      detailPane.classList.toggle("translate-x-full")
+    }
   }
 }

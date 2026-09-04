@@ -23,9 +23,9 @@ fr:
           star_hint: Mettre en vedette
           unstar_hint: Retirer des favoris
           more_hint: "Plus (.)"
+          details: Détails
           archive: Archiver la conversation
           block: Bloquer l'expéditeur
-          open_profile: Ouvrir le profil classique
       search_bar:
         placeholder: Rechercher une personne ou une entreprise…
         clear: Effacer
@@ -45,6 +45,66 @@ fr:
         reply_hint: "Répondre (r)"
         reply_all_hint: "Répondre à tous (a)"
         forward_hint: "Transférer (f)"
+      details:
+        title: Détails
+        back: Retour
+        save: Enregistrer
+        rename_label: Nom de la personne
+        person_singular: personne
+        persons_plural: personnes
+        since: "depuis %{date}"
+        addresses:
+          one: "%{count} adresse"
+          other: "%{count} adresses"
+        no_relationship: "Relation…"
+        starred: "Favori"
+        blocked: "Bloqué"
+        allowed: "Autorisé"
+        primary_badge: principal
+        copy_email: Copier l'adresse e-mail
+        kind_person: Personne
+        kind_service: Service
+        make_person: Marquer comme personne
+        make_service: Marquer comme service
+        scout_not_read: "Scout n'a pas encore lu cette personne."
+        read_on: "Lu le %{date}"
+        refresh: Actualiser
+        refresh_hint: Demander à Scout de relire cette personne
+        all_in_paper: Tout dans Paper
+        open_time: Ouvrir le Temps
+        no_event_title: "(sans titre)"
+        unknown_kind: Document
+        thread_message_one: message
+        thread_messages_other: messages
+        sections:
+          scout_read: "Lecture de Scout"
+          numbers: Chiffres
+          threads: Conversations
+          documents: Documents
+          events: Événements
+        patterns:
+          topics: Sujets
+          tone: Ton
+          urgency: Urgence
+          primary_role: Rôle
+        numbers:
+          received: Reçus
+          sent: Envoyés
+          threads: Conversations
+          documents: Documents
+          first_contact: Premier contact
+          last_contact: Dernier contact
+        threads_more: "et %{count} de plus"
+        manage:
+          star: Mettre en favori
+          unstar: Retirer des favoris
+          allow: Toujours autoriser
+          block: Bloquer
+          block_confirm: Bloquer cette personne ? Ses e-mails seront automatiquement archivés.
+          unblock: Débloquer
+          open_org: "Ouvrir %{org}"
+          same_person: Même personne ?
+          merge: "Fusionner avec %{name}"
   people:
     index:
       tab_people: Personnes
@@ -120,7 +180,6 @@ fr:
       empty: Aucun message pour l'instant.
       reply: Répondre
       older: Conversations plus anciennes
-      open_profile: Ouvrir le profil classique
       star: Ajouter aux favoris
       unstar: Retirer des favoris
       block: Bloquer
@@ -161,3 +220,14 @@ fr:
       streams_heading: "Streams de %{org} · %{count}"
       no_streams: Aucun service pour l'instant.
       open_stream: Ouvrir le stream
+    details:
+      title: Détails
+      toasts:
+        starred: Ajouté aux favoris
+        unstarred: Retiré des favoris
+        allowed: Toujours autorisé
+        blocked: Bloqué
+        unblocked: Débloqué
+        analysis_queued: Scout relit cette personne
+        merged: "Fusionné avec %{name}"
+        merge_dismissed: Ignoré
