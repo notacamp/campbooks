@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "pagy/extras/array" # PeopleController#build_conversation paginates thread ids
 require "pagy/extras/countless"
 
 # Shared chrome for the People place: the bold-layout gate, the "email" three-pane
