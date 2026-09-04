@@ -183,9 +183,9 @@ module Campbooks
       def label_detail(o)
         case o.status
         when :late    then t("money.status.late", count: o.days_late(@today))
-        when :settled then t("money.status.paid", date: l(o.settled_on, format: :day_month))
-        when :decide  then t(".renews", date: l(o.due_on, format: :day_month))
-        else               t(".due", date: l(o.due_on, format: :day_month))
+        when :settled then t("money.status.paid", date: l(o.settled_on, format: :date))
+        when :decide  then t(".renews", date: l(o.due_on, format: :date))
+        else               t(".due", date: l(o.due_on, format: :date))
         end
       end
 

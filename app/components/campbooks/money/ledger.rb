@@ -106,7 +106,7 @@ module Campbooks
             span(class: "text-muted-foreground/70") { "· #{t('money.status.estimated')}" }
           end
           if obligation.recurring? && obligation.next_renewal_on
-            div(class: "text-[11.5px] text-muted-foreground/70") { t(".next_renews", date: l(obligation.next_renewal_on, format: :day_month)) }
+            div(class: "text-[11.5px] text-muted-foreground/70") { t(".next_renews", date: l(obligation.next_renewal_on, format: :date)) }
           end
         end
       end
@@ -123,14 +123,14 @@ module Campbooks
       def due_text(obligation)
         return "" unless obligation.due_on
 
-        l(obligation.due_on, format: :day_month)
+        l(obligation.due_on, format: :date)
       end
 
       # ── Status chip (icon + label, always) ───────────────────────────────────
       def status_chip(obligation)
         case obligation.status
         when :late    then chip(:warning, :warning, t("money.status.late", count: obligation.days_late(Date.current)))
-        when :settled then chip(:success, :check, t("money.status.paid", date: l(obligation.settled_on, format: :day_month)))
+        when :settled then chip(:success, :check, t("money.status.paid", date: l(obligation.settled_on, format: :date)))
         when :decide  then chip(:ember, :spark, t("money.status.decide"))
         else               chip(:muted, :clock, due_chip_label(obligation))
         end

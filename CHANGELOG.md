@@ -16,6 +16,12 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- Money shows the year on its dates — due, paid and renewal dates in the ledger, the
+  timeline labels, Scout's summary and the reminder draft — so last year's bills read
+  unambiguously.
+
 ## [0.36.1] - 2026-09-04
 
 ### Fixed
