@@ -195,15 +195,23 @@ class PeopleController < ApplicationController
     @lanes.each { |lane| lane[:counterparts] = lane[:counterparts].map(&swap) }
   end
 
-  # Opening a person reads their newest thread: mark it read the way the inbox
-  # does (local, provider, live inbox), then refresh this person's row so the
-  # unread dot clears in the list. Only the first page carries the newest thread.
+  # Opening a person reads their newest thread — or the thread a message permalink
+  # asked for (?thread=) — so mark that one read the way the inbox does (local,
+  # provider, live inbox), then refresh this person's row so the unread dot clears
+  # in the list. Only the first page carries the newest thread.
   # Returns true when anything was unread.
   def mark_newest_thread_read
-    thread = @newest_thread&.thread
+    thread = focused_conversation_thread&.thread || @newest_thread&.thread
     return false unless thread && Emails::MarkThreadRead.call(thread)
 
     People::Standings.refresh_counterpart!(current_user, @person)
     true
+  end
+
+  # The thread a ?thread= permalink asked for, when it is on the rendered page.
+  def focused_conversation_thread
+    return nil unless @focused_thread_id
+
+    @conversation_threads&.find { |ct| ct.thread.id == @focused_thread_id }
   end
 end

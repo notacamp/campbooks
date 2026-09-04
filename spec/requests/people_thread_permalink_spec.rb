@@ -65,6 +65,8 @@ RSpec.describe "People thread permalink", type: :request do
       person, threads = seed_many_threads
       # The last thread in the array is the oldest — it will be on page 2.
       old_thread = threads.last
+      EmailMessage.where(email_thread: old_thread).update_all(read: false)
+      EmailMessage.where(email_thread: threads.first).update_all(read: false)
 
       get person_page_path(person, thread: old_thread.id)
 
@@ -74,6 +76,9 @@ RSpec.describe "People thread permalink", type: :request do
       expect(response.body).to include('data-controller="scroll-into-view"')
       # The newer-threads link should appear.
       expect(response.body).to include(I18n.t("people.conversation.newer_threads"))
+      # Arriving on a permalink reads THAT thread, not the newest one.
+      expect(EmailMessage.where(email_thread: old_thread).pluck(:read)).to all(be(true))
+      expect(EmailMessage.where(email_thread: threads.first).pluck(:read)).to all(be(false))
     end
 
     it "does NOT show the newer-threads link when the thread is on page 1" do
