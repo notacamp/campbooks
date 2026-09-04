@@ -123,23 +123,17 @@ class PeopleController < ApplicationController
   # opens with content rather than a blank right pane. Sets @auto_opened = true so
   # the view passes start-on-list-value="true" (phones keep the list, not the detail).
   def auto_open_top_row
-    top = (@lanes.first&.dig(:counterparts)&.first) || @recent.first
+    candidates = (@lanes || []).flat_map { |lane| lane[:counterparts] } + Array(@recent)
+    top = candidates.find(&:person?)
     return unless top
 
-    if top.person?
-      @person = Current.workspace.people.find_by(id: top.id)
-      return unless @person
+    @person = Current.workspace.people.find_by(id: top.id)
+    return unless @person
 
-      build_conversation
-      @selected_id = top.id
-      @auto_opened = true
-    else
-      # Organization: just mark selected, no full conversation build.
-      @selected_id = top.id
-      @auto_opened = true
-    end
-  rescue ActiveRecord::RecordNotFound, StandardError
-    # Never crash the index on auto-open failure.
-    nil
+    build_conversation
+    @selected_id = top.id
+    @auto_opened = true
+  rescue ActiveRecord::RecordNotFound
+    @person = nil
   end
 end

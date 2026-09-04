@@ -146,8 +146,8 @@ RSpec.describe People::Standings do
     it "broadcasts a replace when the row changed" do
       person, = make_person(name: "Sofia", email: "sofia@x.example")
       described_class.refresh!(user)
-      # Force updated_at to age so we can detect a change.
-      PeopleStanding.for_user(user).update_all(updated_at: 10.minutes.ago)
+      # Change what the row renders (its name) so the fingerprint differs.
+      person.update!(name: "Sofia Renamed")
 
       # have_broadcasted_to requires ActionCable::TestHelper; use a message expectation instead.
       expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to).with(
@@ -167,11 +167,22 @@ RSpec.describe People::Standings do
       _person_b, = make_person(name: "B", email: "b@x.example")
       described_class.refresh!(user)
 
-      # Force both rows to look old so the next refresh detects changes.
-      PeopleStanding.for_user(user).update_all(updated_at: 1.hour.ago)
+      # Only rows whose rendered content changed broadcast: rename A, leave B alone.
+      person_a.update!(name: "A Renamed")
 
       # have_broadcasted_to requires ActionCable::TestHelper; use a message expectation instead.
-      expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to).at_least(:once)
+      expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to).with(
+        "people_#{user.id}", hash_including(target: "people_row_#{person_a.id}")
+      ).once
+      described_class.refresh!(user)
+    end
+
+    it "broadcasts nothing when a re-run changes no row" do
+      make_person(name: "A", email: "a@x.example")
+      described_class.refresh!(user)
+
+      expect(Turbo::StreamsChannel).not_to receive(:broadcast_replace_to)
+      expect(Turbo::StreamsChannel).not_to receive(:broadcast_remove_to)
       described_class.refresh!(user)
     end
   end

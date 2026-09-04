@@ -237,6 +237,7 @@ module People
         data["unread"]         = unread_thread_set.include?(cp.standing.thread_id)
         data["has_attachment"] = item&.message&.has_attachment? || false
         data["starred"]        = contacts.any?(&:starred?)
+        data["contact_id"]     = contacts.max_by { |c| c.email_count.to_i }&.id
         data["can_reply"]      = msg_id.present? && acct_id && sendable_account_ids.include?(acct_id)
         data["can_done"]       = item.present? && DONE_KINDS.include?(item.feed_item.kind)
 

@@ -18,8 +18,8 @@ module People
         workspace = user.workspace
         return 0 unless workspace
 
-        # Snapshot updated_at before the upsert so we know what changed.
-        before = PeopleStanding.for_user(user).pluck(:counterpart_id, :updated_at).to_h
+        # Snapshot the rendered state before the upsert so only real changes broadcast.
+        before = fingerprints(user)
 
         directory  = People::Directory.new(user, workspace: workspace, now: now)
         counterparts = directory.counterparts
@@ -79,7 +79,7 @@ module People
         end
 
         existing_row = PeopleStanding.for_user(user).find_by(counterpart: counterpart)
-        before_updated = existing_row&.updated_at
+        before_print = existing_row && fingerprint(existing_row)
 
         if cp.nil?
           # No longer eligible — delete the row.
@@ -110,9 +110,7 @@ module People
         return unless reloaded
 
         # Broadcast if something actually changed.
-        if before_updated.nil? || reloaded.updated_at > before_updated
-          broadcast_replace_row!(user, reloaded)
-        end
+        broadcast_replace_row!(user, reloaded) if before_print.nil? || fingerprint(reloaded) != before_print
       rescue => e
         Rails.logger.warn("[People::Standings] refresh_counterpart! failed: #{e.class}: #{e.message}")
       end
@@ -186,16 +184,21 @@ module People
       # a pill for rows that are new (not previously in `before`). Rows that
       # disappeared are broadcast as removes.
       def broadcast_changes!(user, before)
-        after = PeopleStanding.for_user(user).to_a
-        after_set = after.map { |r| r.counterpart_id }.to_set
+        after_rows = PeopleStanding.for_user(user).to_a
+        after = after_rows.to_h { |r| [ r.counterpart_id, fingerprint(r) ] }
+        after_set = after.keys.to_set
         before_set = before.keys.to_set
 
         new_ids   = after_set - before_set
         gone_ids  = before_set - after_set
-        changed   = after.select { |r| before[r.counterpart_id] && r.updated_at > before[r.counterpart_id] }
+        changed   = after_rows.select { |r| before.key?(r.counterpart_id) && before[r.counterpart_id] != after[r.counterpart_id] }
 
-        # Replace changed rows in place.
-        changed.each { |row| broadcast_replace_row!(user, row) }
+        # Replace changed rows in place; past a handful, one pill beats a storm of replaces.
+        if changed.size > MAX_ROW_BROADCASTS
+          new_ids |= changed.map(&:counterpart_id)
+        else
+          changed.each { |row| broadcast_replace_row!(user, row) }
+        end
 
         # Remove gone rows.
         gone_ids.each do |cid|
@@ -217,6 +220,18 @@ module People
         end
       rescue => e
         Rails.logger.warn("[People::Standings] broadcast_changes! failed: #{e.class}: #{e.message}")
+      end
+
+      MAX_ROW_BROADCASTS = 25
+
+      def fingerprints(user)
+        PeopleStanding.for_user(user).to_h { |r| [ r.counterpart_id, fingerprint(r) ] }
+      end
+
+      # What the row renders: any difference here is worth a replace, nothing else is.
+      def fingerprint(row)
+        [ row.needs_you, row.verb, row.subject, row.wait_days, row.text, row.score.round(2),
+          row.name, row.subtitle, row.avatar_email, row.data ]
       end
 
       def broadcast_replace_row!(user, standing_row)

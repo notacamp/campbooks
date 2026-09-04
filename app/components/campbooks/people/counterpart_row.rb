@@ -172,11 +172,11 @@ module Campbooks
       def reply_button
         if (msg_id = standing.email_message_id)
           form(action: helpers.compose_email_message_path(msg_id, mode: :reply),
-               method: :get, class: "contents") do
+               method: "post", class: "contents") do
             input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
             button(type: "submit", class: ACTION_BTN,
                    title: t(".actions.reply_hint"),
-                   data: { turbo: false, people_reply: true }) do
+                   data: { people_reply: true }) do
               action_icon(ICON_REPLY)
             end
           end
@@ -244,18 +244,20 @@ module Campbooks
                 end
               end
             end
-            # Block sender
-            if (busiest = busiest_contact_email)
-              a(href: helpers.set_state_contact_path(busiest, state: :block),
-                data: { turbo_method: :patch },
-                class: "block px-4 py-2 text-[13px] no-underline hover:bg-secondary") do
-                plain(t(".actions.block"))
+            if (contact_id = data["contact_id"])
+              # Block sender (POST set_state, like the conversation kebab)
+              form(action: helpers.set_state_contact_path(contact_id, state: :block),
+                   method: "post", class: "block w-full", data: { turbo: false }) do
+                input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
+                button(type: "submit", class: "w-full px-4 py-2 text-left text-[13px] hover:bg-secondary") do
+                  plain(t(".actions.block"))
+                end
               end
-            end
-            # Open classic profile
-            a(href: href, target: "_top",
-              class: "block px-4 py-2 text-[13px] no-underline hover:bg-secondary") do
-              plain(t(".actions.open_profile"))
+              # Open classic profile
+              a(href: helpers.contact_path(contact_id), data: { turbo_frame: "_top" },
+                class: "block px-4 py-2 text-[13px] no-underline hover:bg-secondary") do
+                plain(t(".actions.open_profile"))
+              end
             end
           end
         end
@@ -266,13 +268,6 @@ module Campbooks
             stroke_width: "2", viewBox: "0 0 24 24", aria_hidden: "true") do
           raw(safe(inner_path))
         end
-      end
-
-      def busiest_contact_email
-        return nil unless @counterpart.record.respond_to?(:contacts)
-
-        contact = @counterpart.record.contacts.max_by { |c| c.email_count.to_i }
-        contact&.id
       end
 
       # ── Helpers ─────────────────────────────────────────────────────────────

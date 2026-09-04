@@ -119,7 +119,7 @@ module People
 
       snooze_until = resolve_snooze_until
       result = EmailActions.run("snooze", email_message: @message,
-                                args: { until: snooze_until.iso8601 }, user: current_user)
+                                args: { "snoozed_until" => snooze_until.iso8601 }, user: current_user)
       return failure(result[:message]) unless result[:success]
 
       {
@@ -148,7 +148,6 @@ module People
       return failure(t("people.actions.not_found")) unless contact
 
       contact.star!
-      contact.track_event("contact.starred") rescue nil
       name = people_first_name_for(@row)
       {
         success: true,
@@ -164,7 +163,6 @@ module People
       return failure(t("people.actions.not_found")) unless contact
 
       contact.unstar!
-      contact.track_event("contact.unstarred") rescue nil
       name = people_first_name_for(@row)
       {
         success: true,
