@@ -104,6 +104,30 @@ module Reconciliations
       Rails.logger.error("[Reconciliations::Matcher] txn #{txn.id} failed: #{e.class}: #{e.message}")
     end
 
+    # ── Scoring helpers ──────────────────────────────────────────────────────────
+    # The scoring implementation now lives in Reconciliations::Candidates (shared
+    # with the hunt panel). These thin delegators keep Matcher's scoring contract
+    # stable for callers and unit tests after the extraction.
+    def scorer_for(txn)
+      Reconciliations::Candidates.new(bank_transaction: txn, workspace: @workspace)
+    end
+
+    def amount_score(txn, doc)
+      scorer_for(txn).send(:amount_score, doc)
+    end
+
+    def date_score(txn, doc)
+      scorer_for(txn).send(:date_score, doc)
+    end
+
+    def name_score(txn, doc)
+      scorer_for(txn).send(:name_score, doc)
+    end
+
+    def normalize_currency(raw)
+      scorer_for(nil).send(:normalize_currency, raw)
+    end
+
     # ── Currency map (kept here as the source-of-truth; Candidates references it) ──
 
     CURRENCY_MAP = {
