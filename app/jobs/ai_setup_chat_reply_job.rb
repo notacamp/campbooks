@@ -17,8 +17,16 @@ class AiSetupChatReplyJob < ApplicationJob
     Current.acting_user = thread.user
     Current.workspace = thread.workspace
 
-    # Prevent a duplicate reply if the job is retried after it already answered.
-    return if thread.agent_messages.where(author_type: :ai).where("created_at > ?", message.created_at).exists?
+    # Prevent a duplicate reply if the job is retried after it already answered;
+    # still clear the typing indicator so the user is never left spinning.
+    if thread.agent_messages.where(author_type: :ai).where("created_at > ?", message.created_at).exists?
+      begin
+        Turbo::StreamsChannel.broadcast_remove_to(stream_name(thread), target: "setup_chat_typing_#{thread.id}")
+      rescue => e
+        Rails.logger.warn("[AiSetupChatReplyJob] typing cleanup broadcast failed: #{e.message}")
+      end
+      return
+    end
 
     history = thread.agent_messages.chronological.map do |m|
       { role: m.from_user? ? "user" : "assistant", content: m.content }

@@ -1,6 +1,9 @@
 ---
 pt:
   email_messages:
+    archived_notice:
+      default: Esta conversa foi arquivada.
+      dismiss_aria: Dispensar aviso de arquivamento
     board:
       index:
         heading: Quadro

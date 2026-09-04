@@ -1,0 +1,19 @@
+<%# Prepended into #email_content when Scout auto-archives a conversation.
+    Uses prepend (not replace) so an open reply/compose form is never clobbered. %>
+<div id="email_archived_notice"
+     class="flex items-center justify-between gap-3 px-4 py-2.5 bg-amber-50 dark:bg-amber-500/10 border-b border-amber-200 dark:border-amber-500/25 text-[13px] text-amber-800 dark:text-amber-200 flex-shrink-0">
+  <span class="flex items-center gap-2">
+    <svg class="w-4 h-4 flex-shrink-0 text-amber-500 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 11a2 2 0 002 2h8a2 2 0 002-2L19 8"/>
+    </svg>
+    <%= local_assigns[:message].presence || t("email_messages.archived_notice.default") %>
+  </span>
+  <button type="button"
+          onclick="document.getElementById('email_archived_notice').remove()"
+          aria-label="<%= t("email_messages.archived_notice.dismiss_aria") %>"
+          class="flex-shrink-0 p-0.5 rounded text-amber-600 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-100 hover:bg-amber-100 dark:hover:bg-amber-500/20 cursor-pointer">
+    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+    </svg>
+  </button>
+</div>

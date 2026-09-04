@@ -7,8 +7,8 @@
     people#index, people#show (full load) and people/organizations#show (full load);
     @person / @organization drive what the detail renders. %>
 <%# Live row updates from Scout's background refresh. %>
-<%= turbo_stream_from "people_#{current_user.id}" %>
-<div class="block h-full overflow-hidden">
+<div class="block h-full overflow-hidden" data-controller="live-reconcile">
+  <%= turbo_stream_from "people_#{current_user.id}" %>
   <div class="flex h-full"
        data-controller="email-mobile people-shortcuts"
        data-email-mobile-breakpoint-value="1024"

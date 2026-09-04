@@ -13,7 +13,10 @@ class ComposeChatReplyJob < ApplicationJob
     Current.acting_user = thread.user
     Current.workspace = thread.workspace
 
-    return if thread.agent_messages.where(author_type: :ai).where("created_at > ?", message.created_at).exists?
+    if thread.agent_messages.where(author_type: :ai).where("created_at > ?", message.created_at).exists?
+      broadcast_update(thread, [])
+      return
+    end
 
     result = Ai::ComposeChatService.new(thread).reply_to(message)
 
@@ -23,6 +26,7 @@ class ComposeChatReplyJob < ApplicationJob
           content: I18n.t("jobs.compose_chat_reply.error"),
           author_type: :ai,
           ai_suggested_actions: [],
+          reply_status: :replied,
           user: thread.user
         )
       end
@@ -32,6 +36,7 @@ class ComposeChatReplyJob < ApplicationJob
         author_type: :ai,
         ai_suggested_actions: result[:suggested_actions] || [],
         ai_auto_actions: result[:auto_actions] || [],
+        reply_status: :replied,
         user: thread.user
       )
     end
@@ -42,8 +47,10 @@ class ComposeChatReplyJob < ApplicationJob
   rescue ActiveRecord::RecordNotFound
     Rails.logger.warn("[ComposeChatReplyJob] Message #{agent_message_id} not found, skipping")
   rescue => e
-    Rails.logger.error("[ComposeChatReplyJob] Error: #{e.message}")
-    raise
+    Rails.logger.error("[ComposeChatReplyJob] Error (attempt #{executions}): #{e.message}")
+    raise if executions < 2
+    message.failed! if message&.persisted? && !message.failed?
+    broadcast_update(thread, []) if thread
   end
 
   private

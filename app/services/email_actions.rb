@@ -103,7 +103,7 @@ class EmailActions
   # share the mailbox — with no per-surface wiring. See Emails::InboxBroadcaster.
   INBOX_REMOVE_TOOLS  = %w[archive trash snooze block_sender].freeze
   INBOX_UPSERT_TOOLS  = %w[unarchive unsnooze].freeze
-  INBOX_REPLACE_TOOLS = %w[pin unpin add_tag remove_tag].freeze
+  INBOX_REPLACE_TOOLS = %w[pin unpin add_tag remove_tag star_sender unstar_sender].freeze
 
   def self.broadcast_inbox_change(tool, email_message, result)
     return unless result[:success] && email_message

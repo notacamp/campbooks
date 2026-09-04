@@ -78,4 +78,17 @@ RSpec.describe AgentChatReplyJob, type: :job do
     described_class.perform_now(message.id)
     expect(thread.reload.title).to eq(message.content.truncate(60))
   end
+
+  it "clears the typing indicator and creates no second reply when an AI reply already exists (retry dedup)" do
+    # Simulate a retry: an AI reply was already persisted on the first attempt.
+    create(:agent_message, agent_thread: thread, user: user, author_type: :ai,
+                           content: "Already answered.", created_at: 1.second.after(message.created_at))
+
+    expect {
+      described_class.perform_now(message.id)
+    }.not_to change { thread.agent_messages.where(author_type: :ai).count }
+
+    expect(Turbo::StreamsChannel).to have_received(:broadcast_remove_to)
+      .with("agent_chat_#{user.id}", target: "agent_typing")
+  end
 end

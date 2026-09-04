@@ -15,6 +15,7 @@ export default class extends Controller {
   static values = { url: String }
 
   connect() {
+    this._loading = false
     this._onFrameLoad = () => this._stopIfFinished()
     this.element.addEventListener("turbo:frame-load", this._onFrameLoad)
     this._timer = setInterval(() => this._poll(), 2500)
@@ -25,7 +26,9 @@ export default class extends Controller {
   }
 
   _poll() {
+    if (this._loading) return
     const frame = this.element
+    this._loading = true
     if (frame.getAttribute("src")) {
       if (typeof frame.reload === "function") frame.reload()
     } else {
@@ -34,6 +37,7 @@ export default class extends Controller {
   }
 
   _stopIfFinished() {
+    this._loading = false
     if (!this.element.querySelector("[data-rule-run-progress]")) this._stop()
   }
 

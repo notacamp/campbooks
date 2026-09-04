@@ -16,6 +16,7 @@ module Tasks
       return if claimed.zero?
 
       thread = message.agent_thread
+      task = nil
       task = thread&.contextable
       return unless task.is_a?(Task)
 
@@ -23,7 +24,15 @@ module Tasks
       Current.acting_user = thread.user
       Current.workspace = thread.workspace
 
-      return if thread.agent_messages.where(author_type: :ai).where("created_at > ?", message.created_at).exists?
+      # Prevent duplicate replies on retry; still clear the typing indicator.
+      if thread.agent_messages.where(author_type: :ai).where("created_at > ?", message.created_at).exists?
+        begin
+          Turbo::StreamsChannel.broadcast_remove_to(task, target: "scout_typing")
+        rescue => e
+          Rails.logger.warn("[Tasks::ChatReplyJob] typing cleanup broadcast failed: #{e.message}")
+        end
+        return
+      end
 
       result = Ai::ChatService.reply_to(message)
       if result.blank? || result[:reply].blank?
@@ -55,9 +64,14 @@ module Tasks
     rescue ActiveRecord::RecordNotFound
       Rails.logger.warn("[Tasks::ChatReplyJob] message #{agent_message_id} not found, skipping")
     rescue => e
-      Rails.logger.error("[Tasks::ChatReplyJob] Error: #{e.message}")
-      AgentMessage.where(id: agent_message_id).update_all(reply_status: :pending)
-      raise
+      Rails.logger.error("[Tasks::ChatReplyJob] Error (attempt #{executions}): #{e.message}")
+      if executions < 2
+        AgentMessage.where(id: agent_message_id).update_all(reply_status: :pending)
+        raise
+      else
+        AgentMessage.where(id: agent_message_id).update_all(reply_status: :failed)
+        broadcast_failure(task) if task
+      end
     end
 
     private

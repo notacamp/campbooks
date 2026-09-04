@@ -60,6 +60,20 @@ major, minor, or patch change here.
   updating — the action was applied but every later one had nothing to render into.
   The list keeps its frame now, the keyboard selection survives the re-render, and
   archiving from the keyboard moves the conversation on to the person's next thread.
+- Scout's chat surfaces (the Scout page, the command-palette overlay, compose, and task
+  discussions) and the AI setup assistant no longer leave a typing indicator spinning, or a
+  reply stuck out of sight, when a reply is retried or arrives during a brief connection drop:
+  the indicator clears, failures show a retry card, and the reply lands.
+- Live views (People, Scout chat, task discussions, the setup dialog) now catch up after a
+  dropped connection. When the socket reconnects they refresh, so what you see cannot quietly
+  fall out of step with the server.
+- The document review tray counts only what you can open: a document filed in a restricted
+  folder you do not have access to is no longer counted in your "needs review" tray.
+- Starring or unstarring a sender now updates that conversation's row in your other open tabs.
+- Grouped notifications no longer double up (a duplicate toast and an inflated bell count) when
+  two events land at the same instant.
+- When Scout archives a conversation you have open, it shows a dismissible "archived" notice
+  instead of replacing the whole reading pane, so a reply you were drafting is not lost.
 
 ## [0.36.1] - 2026-09-04
 

@@ -205,7 +205,7 @@
     </aside>
   </div>
 
-  <section class="mt-10" data-controller="chat-input">
+  <section class="mt-10" data-controller="chat-input live-reconcile">
     <%= turbo_stream_from @task %>
     <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><%= t(".discussion") %></h2>
     <% comments = @task.agent_messages.chronological.to_a %>
