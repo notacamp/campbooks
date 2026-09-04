@@ -1,14 +1,17 @@
 import { Controller } from "@hotwired/stimulus"
 import { skimOverlayOpen } from "controllers/skim_utils"
 
-// Keyboard shortcuts for the People list pane.
+// Keyboard shortcuts for the People list pane and open conversation.
 //
 // ↑ / ↓  — move aria-selected between [data-people-row] rows (all lanes + Recent,
 //           DOM order), scroll into view, open after 150 ms debounce.
 // Enter  — open the selected row immediately.
-// r      — click the selected row's Reply form button.
+// r      — click the selected row's Reply form button; falls back to the first
+//           [data-people-reply] inside #people_detail when no row is selected.
+// a      — click the first [data-people-reply-all] inside #people_detail.
 // e      — click the selected row's Done form button.
 // s      — click the selected row's Snooze form button.
+// f      — click the first [data-people-forward] inside #people_detail.
 // .      — open the selected row's More <details>.
 // Escape — clear the selection.
 //
@@ -53,14 +56,22 @@ export default class extends Controller {
         event.preventDefault()
         this._openSelected()
         break
-      case "r":
-        this._clickAction("[data-people-reply]")
+      case "r": {
+        const replied = this._clickAction("[data-people-reply]")
+        if (!replied) this._clickDetail("[data-people-reply]")
+        break
+      }
+      case "a":
+        this._clickDetail("[data-people-reply-all]")
         break
       case "e":
         this._clickAction("[data-people-done]")
         break
       case "s":
         this._clickAction("[data-people-snooze]")
+        break
+      case "f":
+        this._clickDetail("[data-people-forward]")
         break
       case ".":
         this._clickAction("[data-people-more]")
@@ -135,10 +146,20 @@ export default class extends Controller {
   }
 
   // Click the first matching action button inside the selected row.
+  // Returns true when a button was found and clicked.
   _clickAction (selector) {
     const row = this._selectedRow()
-    if (!row) return
+    if (!row) return false
     const btn = row.querySelector(selector)
+    if (btn) { btn.click(); return true }
+    return false
+  }
+
+  // Click the first matching button inside #people_detail (the open conversation).
+  _clickDetail (selector) {
+    const detail = document.getElementById("people_detail")
+    if (!detail) return
+    const btn = detail.querySelector(selector)
     if (btn) btn.click()
   }
 }

@@ -16,6 +16,12 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Conversations read newest to oldest.** In People, each thread opens on its latest
+  message with the older ones folded beneath it, and every open message carries its own
+  Reply, Reply all and Forward.
+
 ### Removed
 
 - **Classic layout removed.** The `ENABLE_BOLD_LAYOUT` feature flag and the per-user
@@ -23,6 +29,12 @@ major, minor, or patch change here.
   navigation and the Scout overlay are now the sole layout — there is no classic mode.
   Self-hosters: remove `ENABLE_BOLD_LAYOUT` from your environment; it has no effect
   and will not exist in future releases.
+- The "Open in inbox" link on People threads — People is the inbox.
+
+### Fixed
+
+- Menus in People (a row's More menu, the conversation menu) close when you click
+  anywhere else, and on Escape.
 
 ## [0.35.0] - 2026-09-04
 

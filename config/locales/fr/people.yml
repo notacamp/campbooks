@@ -33,16 +33,18 @@ fr:
         messages:
           one: "%{count} message"
           other: "%{count} messages"
-        open_in_inbox: Ouvrir dans la boîte
         no_subject: "(sans objet)"
         draft_by_scout: "Brouillon de Scout · modifiez librement"
         open_draft: Ouvrir le brouillon
-        reply: Répondre
-        reply_all: Répondre à tous
-        forward: Transférer
       thread_message:
         to_you: pour vous
         to_name: "pour %{name}"
+        reply: Répondre
+        reply_all: Répondre à tous
+        forward: Transférer
+        reply_hint: "Répondre (r)"
+        reply_all_hint: "Répondre à tous (a)"
+        forward_hint: "Transférer (f)"
   people:
     index:
       tab_people: Personnes

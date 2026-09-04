@@ -33,16 +33,18 @@ en:
         messages:
           one: "%{count} message"
           other: "%{count} messages"
-        open_in_inbox: Open in inbox
         no_subject: "(no subject)"
         draft_by_scout: "Draft by Scout · edit freely"
         open_draft: Open draft
-        reply: Reply
-        reply_all: Reply all
-        forward: Forward
       thread_message:
         to_you: to you
         to_name: "to %{name}"
+        reply: Reply
+        reply_all: Reply all
+        forward: Forward
+        reply_hint: "Reply (r)"
+        reply_all_hint: "Reply all (a)"
+        forward_hint: "Forward (f)"
   people:
     index:
       tab_people: People

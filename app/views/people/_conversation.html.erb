@@ -1,6 +1,6 @@
-<%# One person's email threads newest-first: subject headings, older messages folded,
-    the newest open with From/To and attachments, and an inline reply row under the
-    newest thread. Scout's standing and action chips are pinned above. %>
+<%# One person's email threads newest-first: each thread opens on its newest message
+    with older ones folded beneath (newest-first), and every open message carries
+    its own Reply, Reply all and Forward. Scout's standing and action chips pinned above. %>
 <div class="flex h-full w-full min-w-0 flex-col">
   <%# Mobile: back to the list. %>
   <div class="flex items-center px-3 py-2 lg:hidden">
@@ -80,13 +80,14 @@
       <%# Thread blocks, newest-first. %>
       <div id="people_conversation">
         <% @conversation_threads.each_with_index do |ct, i| %>
+          <% is_newest = (i == 0 && @conversation_pagy&.page == 1) %>
           <%= render Campbooks::People::ThreadBlock.new(
                 conversation_thread: ct,
                 person_first_name: people_first_name(@person),
                 person_id: @person.id,
-                newest_thread: (i == 0 && @conversation_pagy&.page == 1),
-                can_send: @can_send,
-                scout_draft: (i == 0 && @conversation_pagy&.page == 1 ? @scout_draft : nil)) %>
+                newest_thread: is_newest,
+                can_send: @sendable_account_ids.include?(ct.thread.email_account_id),
+                scout_draft: (is_newest ? @scout_draft : nil)) %>
         <% end %>
       </div>
 

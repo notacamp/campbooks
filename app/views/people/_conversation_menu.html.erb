@@ -2,7 +2,7 @@
     teach the sender type. Star/block/teach act on the person's primary contact
     via the existing endpoints (full navigation so the state refreshes). %>
 <% contact = @primary_contact %>
-<details class="relative flex-shrink-0">
+<details class="relative flex-shrink-0" data-controller="dropdown-close">
   <summary class="inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary">
     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01"/></svg>
     <span class="sr-only"><%= t("people.conversation.menu") %></span>
