@@ -36,7 +36,6 @@
 
   <%# Streams foot line %>
   <%= link_to people_streams_path,
-        data: { turbo_frame: "people_detail" },
         class: "flex items-center gap-2 border-t border-dashed border-border mx-3 px-3 py-3 text-[12.5px] text-muted-foreground no-underline hover:text-foreground" do %>
     <%= t("people.index.streams_foot", count: streams_count) %>
   <% end %>

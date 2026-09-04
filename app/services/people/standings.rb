@@ -79,7 +79,7 @@ module People
           subject:           standing.subject,
           wait_days:         standing.wait_days.to_i,
           feed_item_id:      standing.feed_item_id,
-          email_message_id:  nil, # reserved for PR 3 row actions
+          email_message_id:  standing.email_message_id,
           score:             cp.score&.value || 0.0,
           strength:          cp.score&.strength || 0.0,
           last_activity_at:  cp.last_activity,

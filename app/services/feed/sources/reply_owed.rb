@@ -28,7 +28,7 @@ module Feed
       end
 
       def still_valid?(item, m)
-        return false if m.nil? || m.subject.blank?
+        return false if m.nil?
         return false if m.skimmed_at.present?
         return false if m.ai_todo_dismissed?
 

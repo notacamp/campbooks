@@ -61,7 +61,7 @@ module Campbooks
             div(class: "min-w-0 flex-1 flex items-baseline gap-1 truncate") do
               span(class: "flex-shrink-0 text-[13.5px] font-semibold text-foreground") { @counterpart.name }
               if new_sender?
-                span(class: "flex-shrink-0 rounded bg-ember-solid/15 px-1 py-px text-[9.5px] font-semibold uppercase tracking-wide text-ember-solid") { t(".new") }
+                span(class: "flex-shrink-0 rounded bg-ember/15 px-1 py-px text-[9.5px] font-semibold uppercase tracking-wide text-ember") { t(".new") }
               end
               if (subj = standing.subject).present?
                 span(class: "flex-shrink-0 text-muted-foreground/50 text-[12px]") { "·" }
@@ -85,7 +85,7 @@ module Campbooks
               span(class: "text-muted-foreground/60") { raw(safe(PAPERCLIP)) }
             end
             span(class: class_names("text-[11.5px] font-semibold tabular-nums",
-                                    urgent ? "text-ember-solid" : "text-muted-foreground")) do
+                                    urgent ? "text-ember" : "text-muted-foreground")) do
               t(".wait_days", count: wait)
             end
           end

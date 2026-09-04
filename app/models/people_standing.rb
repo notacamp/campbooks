@@ -43,7 +43,8 @@ class PeopleStanding < ApplicationRecord
       verb: verb&.to_sym,
       subject: subject,
       wait_days: wait_days,
-      feed_item_id: feed_item_id
+      feed_item_id: feed_item_id,
+      email_message_id: email_message_id
     )
   end
 

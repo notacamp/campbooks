@@ -41,11 +41,12 @@ module People
 
       # Orgs: a row ONLY when there is a money attention item for this org.
       # No Recent org rows.
+      person_rows_by_id = person_rows.index_by(&:id)
       org_rows = orgs.filter_map do |org|
         org_item = attention.for(org)
         next unless org_item
 
-        org_counterpart(org, person_rows.index_by(&:id), org_item)
+        org_counterpart(org, person_rows_by_id, org_item)
       end
 
       person_rows + org_rows
@@ -172,9 +173,9 @@ module People
       lead           = org_lead(org, person_rows_by_id)
       item_score     = org_attention_item&.feed_item&.score.to_f
 
-      facts = if lead
-                lead.facts
-      elsif standing.needs_you
+      facts = if lead&.facts
+                lead.facts.with(standing: standing, item_score: item_score)
+      else
                 People::Priority.facts_for(standing: standing, threads: [], contacts: [],
                                            relationship_type: nil, last_activity: last_activity,
                                            item_score: item_score)
@@ -190,7 +191,7 @@ module People
         last_activity: last_activity,
         standing: standing,
         facts: facts,
-        score: lead&.score || standing_only_score(standing, last_activity),
+        score: People::Priority.score(facts, now: @now),
         data: { "people_count" => people_count, "services_count" => services_count }
       )
     end
@@ -211,9 +212,9 @@ module People
       standing_thread_ids = rows.filter_map { |cp| cp.standing.thread_id }
       unread_thread_set   = unread_thread_ids(standing_thread_ids)
 
-      rows.each do |cp|
+      rows.map! do |cp|
         person = cp.record
-        next unless person
+        next cp unless person
 
         contacts = person.contacts.to_a
         item = attention.for(person)
@@ -223,8 +224,7 @@ module People
         data["unread"]         = unread_thread_set.include?(cp.standing.thread_id)
         data["has_attachment"] = item&.message&.has_attachment? || false
 
-        # Rebuild with the enriched data field.
-        rows[rows.index(cp)] = cp.with(data: data)
+        cp.with(data: data)
       end
     end
 

@@ -16,9 +16,9 @@ module People
   # sentence templates are gone - verbs and subjects now come from the feed.
   class Standing
     Result = Data.define(:text, :needs_you, :thread_id, :overdue_days, :kind,
-                         :verb, :subject, :wait_days, :feed_item_id) do
+                         :verb, :subject, :wait_days, :feed_item_id, :email_message_id) do
       def initialize(text:, needs_you: false, thread_id: nil, overdue_days: 0, kind: :none,
-                     verb: nil, subject: nil, wait_days: 0, feed_item_id: nil)
+                     verb: nil, subject: nil, wait_days: 0, feed_item_id: nil, email_message_id: nil)
         super
       end
       def self.none = new(text: nil)
@@ -119,7 +119,8 @@ module People
         verb: item.verb,
         subject: item.subject,
         wait_days: item.wait_days,
-        feed_item_id: fi.id
+        feed_item_id: fi.id,
+        email_message_id: item.message&.id
       )
     end
 

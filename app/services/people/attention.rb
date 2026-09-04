@@ -214,20 +214,11 @@ module People
         next unless type == "Person"
         next unless item.thread_id.present?
 
-        # Recover the Person from the loaded subjects.
-        fi = item.feed_item
-        subj = load_single_subject(fi)
-        person = subj&.contact&.person
+        person = item.message&.contact&.person
         by_thread[item.thread_id] << [ person, item ] if person
       end
       # Sort each group by descending score.
       by_thread.transform_values { |pairs| pairs.sort_by { |_, i| -i.feed_item.score }.map(&:first) }
-    end
-
-    def load_single_subject(fi)
-      return nil unless fi.subject_type == "EmailMessage"
-
-      EmailMessage.where(id: fi.subject_id).includes(contact: :person).first
     end
   end
 end
