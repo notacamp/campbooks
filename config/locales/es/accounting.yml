@@ -82,6 +82,11 @@ es:
       col_counterparty: Contraparte
       col_amount: Importe
       col_match: Asociación
+      grouped_ledger_title: Extracto
+      group_count:
+        one: "%{count} grupo"
+        other: "%{count} grupos"
+      workbench_title: Área de trabajo
     confirm_all_suggestions:
       confirmed:
         one: "1 asociación confirmada"
@@ -220,6 +225,43 @@ es:
         request_invoice_to_placeholder: "proveedor@ejemplo.com"
         request_invoice_subject: Asunto
         request_invoice_open_composer: Revisar en el compositor
+      grouped_ledger:
+        empty: No hay transacciones que mostrar.
+      reconciliation_group:
+        state:
+          matched: Asociado
+          review: Revisar esta asociación
+          partial: Pago parcial
+          partial_label: parcial
+          excluded: Apartado
+          credit: Ingreso asociado
+          unmatched: Sin factura
+        revenue_label: ingreso
+        review_label: revisar
+        excluded_label: Apartado
+        unmatched_chip: "Sin factura · Resolver"
+        unknown_party: Desconocido
+        nif_missing: NIF faltante en este documento
+        nif_mismatch: El NIF no coincide con el de la empresa
+        footer:
+          balances: equilibrado
+          "of": de
+          outstanding: pendiente
+          installments: Dos pagos liquidan una factura.
+          split: Un pago liquida varias facturas.
+          partial_deposit: Señal pagada.
+          multi_txn:
+            one: Un pago
+            other: "%{count} pagos liquidan una factura."
+          multi_doc:
+            one: Una factura
+            other: "Un pago liquida %{count} facturas."
+      reconciliations_rail:
+        title: Extractos bancarios
+        view_all: Ver todos
+        untitled: Extracto sin nombre
+        progress: "%{resolved} de %{total}"
+        open: Abrir →
     money:
       summary:
         late_receivable_html: "La factura de %{name} está %{overdue}, así que he redactado un recordatorio."
