@@ -61,6 +61,7 @@ module People
     def prime(people: [], organizations: [])
       @primed = true
       @threads_by_person ||= {}
+      @latest_by_thread ||= {}
       @latest_inbound_by_person ||= {}
       @primed_person_ids ||= Set.new
       @org_sample ||= {}
@@ -133,6 +134,15 @@ module People
     def threads_for(person) = person_threads(person)
     def latest_inbound_for(person) = latest_inbound_message(person)
 
+    # Returns the pre-loaded latest message for a primed thread, else falls back
+    # to the live query on the thread. Public so People::Directory can use the
+    # same primed data when it calls listable_person?.
+    def latest_message_for(thread)
+      return @latest_by_thread[thread.id] if @latest_by_thread&.key?(thread.id)
+
+      thread.latest_message
+    end
+
     def sampled_people_for(organization)
       return @org_sample[organization.id] if @primed && @org_sample&.key?(organization.id)
 
@@ -184,7 +194,7 @@ module People
     # you were merely copied on. Without this every unanswered promotion reads as
     # "waiting on your reply", and the oldest of them tops the People list.
     def reply_owed?(thread)
-      message = thread.latest_message
+      message = latest_message_for(thread)
       return true if message.nil?
 
       !Contacts::SenderKind.broadcast?(message, provider_hints: false) && !copied_only?(message)
@@ -312,7 +322,10 @@ module People
     end
 
     # Mirrors person_threads for the whole batch: the inbox threads (on readable
-    # accounts) each person's contacts touch, messages preloaded — grouped by person.
+    # accounts) each person's contacts touch, grouped by person. Messages are NOT
+    # bulk-loaded via includes — instead we load ONE message per thread (the newest)
+    # with a DISTINCT ON query into @latest_by_thread, so reply_owed? can read the
+    # sender/headers without per-thread queries.
     def prime_threads(contact_ids, contact_to_person)
       return if readable_account_ids.empty?
 
@@ -329,11 +342,33 @@ module People
       end
 
       threads = EmailThread.where(id: all_thread_ids.uniq, email_account_id: readable_account_ids)
-                           .includes(:email_messages)
                            .index_by(&:id)
       thread_ids_by_person.each do |person_id, thread_ids|
         @threads_by_person[person_id] = thread_ids.uniq.filter_map { |id| threads[id] }
       end
+
+      # Load the newest message per thread (columns the reply-owed and broadcast checks
+      # need; body excluded — nothing in this path reads it).
+      prime_latest_by_thread(threads.keys)
+    end
+
+    # One message per thread: the newest, selected with DISTINCT ON so the database
+    # does a single indexed scan instead of N ordered-limit queries. The column list
+    # covers every field the standing and broadcast checks read from a message;
+    # body and other large/unused columns are excluded.
+    def prime_latest_by_thread(thread_ids)
+      return if thread_ids.empty?
+
+      cols = %w[
+        id email_thread_id contact_id received_at from_address to_address cc_address
+        subject category header_list_unsubscribe header_precedence header_auto_submitted
+        ai_action_prompt ai_priority email_account_id provider_folder_id
+      ].join(", ")
+
+      messages = EmailMessage.select("DISTINCT ON (email_thread_id) #{cols}")
+                             .where(email_thread_id: thread_ids)
+                             .order("email_thread_id, received_at DESC NULLS LAST, id DESC")
+      messages.each { |msg| @latest_by_thread[msg.email_thread_id] = msg }
     end
 
     # Mirrors latest_inbound_message for the whole batch: the newest accessible
