@@ -129,6 +129,17 @@ RSpec.describe "People", type: :request do
         expect(response.body).to include("People at").and include("Streams from")
         expect(response.body).to include("Rui Santos").and include("Billing")
       end
+
+      it "links to the organization's documents when it has any" do
+        org = create(:organization, workspace: workspace, name: "Cloudhost", domain: "cloudhost.example")
+        person, contact, = make_person(name: "Rui Santos", email: "rui@cloudhost.example")
+        create(:organization_membership, person: person, organization: org)
+        EmailMessage.find_by!(contact: contact).documents << create(:document, workspace: workspace)
+
+        get people_organization_path(org)
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include(documents_organization_path(org))
+      end
     end
 
     describe "streams" do

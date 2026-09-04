@@ -16,6 +16,13 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- **An organization page in People crashed when the organization had documents.**
+  The "N documents" chip on `/people/orgs/:id` pointed at a route helper that
+  does not exist, so every organization with at least one document rendered a
+  500 instead of its page. The chip now links to the organization's documents.
+
 ## [0.33.0] - 2026-09-04
 
 ### Changed

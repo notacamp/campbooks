@@ -24,7 +24,7 @@
     </div>
     <span class="flex-1"></span>
     <% if @doc_count.to_i.positive? %>
-      <%= link_to organization_documents_path(@organization), data: { turbo_frame: "_top" },
+      <%= link_to documents_organization_path(@organization), data: { turbo_frame: "_top" },
             class: "inline-flex h-[26px] flex-shrink-0 items-center rounded-md bg-secondary px-2.5 text-[12px] font-medium text-muted-foreground no-underline hover:text-foreground" do %>
         <%= t("people.org.documents", count: @doc_count) %>
       <% end %>
