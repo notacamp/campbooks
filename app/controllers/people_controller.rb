@@ -18,7 +18,13 @@ class PeopleController < ApplicationController
     build_people_list
 
     respond_to do |format|
-      format.html
+      format.html do
+        # Auto-open the top row on the full-page HTML response when no row is already
+        # selected and this is not a Turbo Frame request (phones keep the list via the
+        # start-on-list-value attribute).
+        auto_open_top_row unless @selected_id.present? || turbo_frame_request?
+        render :index
+      end
       format.turbo_stream # the Recent list's lazy infinite-scroll sentinel
     end
   rescue Pagy::OverflowError
@@ -111,5 +117,23 @@ class PeopleController < ApplicationController
 
     EmailMessage.where(contact_id: contact_ids).where.not(email_thread_id: nil)
                 .distinct.pluck(:email_thread_id)
+  end
+
+  # Pre-render the detail pane for the first row in the list so the HTML response
+  # opens with content rather than a blank right pane. Sets @auto_opened = true so
+  # the view passes start-on-list-value="true" (phones keep the list, not the detail).
+  def auto_open_top_row
+    candidates = (@lanes || []).flat_map { |lane| lane[:counterparts] } + Array(@recent)
+    top = candidates.find(&:person?)
+    return unless top
+
+    @person = Current.workspace.people.find_by(id: top.id)
+    return unless @person
+
+    build_conversation
+    @selected_id = top.id
+    @auto_opened = true
+  rescue ActiveRecord::RecordNotFound
+    @person = nil
   end
 end

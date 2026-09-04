@@ -27,6 +27,35 @@
       <%= render "people/compose_button", message: @reply_target, mode: :reply,
             label: t("people.conversation.reply"), variant: :ghost %>
     <% end %>
+    <%# Done / Snooze / Star header actions (only when the person has a standing row). %>
+    <% if (row = PeopleStanding.for_user(current_user).find_by(counterpart: @person)) %>
+      <% if row.feed_item_id && row.needs_you %>
+        <%= button_to people_action_path(@person.id, :done),
+              class: "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors",
+              title: t("people.actions.done", name: @person.display_name.split.first),
+              data: { turbo_stream: true } do %>
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        <% end %>
+      <% end %>
+      <% if row.email_message_id %>
+        <%= button_to people_action_path(@person.id, :snooze),
+              params: { until: "tomorrow" },
+              class: "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors",
+              title: t("people.actions.snooze_title"),
+              data: { turbo_stream: true } do %>
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <% end %>
+      <% end %>
+      <% star_action = (row.data || {})["starred"] ? :unstar : :star %>
+      <%= button_to people_action_path(@person.id, star_action),
+            class: "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border transition-colors #{ (row.data || {})["starred"] ? "text-amber-500 hover:text-amber-600" : "text-muted-foreground hover:bg-secondary hover:text-foreground" }",
+            title: (row.data || {})["starred"] ? t("people.conversation.unstar") : t("people.conversation.star"),
+            data: { turbo_stream: true } do %>
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+        </svg>
+      <% end %>
+    <% end %>
     <%= render "people/conversation_menu" %>
   </div>
 
@@ -35,7 +64,7 @@
     <div class="mx-auto w-full max-w-[720px] px-5 pb-6 pt-5">
 
       <%# Scout's standing pinned above the threads. %>
-      <%= render Campbooks::ScoutNote.new(message: @standing.text.presence || t("people.conversation.no_standing"),
+      <%= render Campbooks::ScoutNote.new(message: @standing.text.presence || people_standing_note(@standing, @person) || t("people.conversation.no_standing"),
             time: t("people.conversation.where_things_stand"), class: "mb-3") %>
 
       <% if @can_send && @reply_target %>

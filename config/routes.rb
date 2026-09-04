@@ -124,11 +124,13 @@ Rails.application.routes.draw do
   # Streams hold the services (inbox groups). Gated on Features.bold_layout?
   # (require_bold_layout_enabled in each controller). Streams + the org page must
   # resolve BEFORE the /people/:id person catch-all.
-  get "people",                to: "people#index",               as: :people
-  get "people/streams",        to: "people/streams#index",       as: :people_streams
-  get "people/streams/:name",  to: "people/streams#show",        as: :people_stream, constraints: { name: %r{[^/]+} }, format: false
-  get "people/orgs/:id",       to: "people/organizations#show",  as: :people_organization
-  get "people/:id",            to: "people#show",                as: :person_page
+  get  "people",                to: "people#index",               as: :people
+  get  "people/streams",        to: "people/streams#index",       as: :people_streams
+  get  "people/streams/:name",  to: "people/streams#show",        as: :people_stream, constraints: { name: %r{[^/]+} }, format: false
+  get  "people/orgs/:id",       to: "people/organizations#show",  as: :people_organization
+  post "people/:id/actions/:kind", to: "people/actions#create",  as: :people_action,
+       constraints: { kind: /done|undo_done|snooze|unsnooze|star|unstar|archive|unarchive/ }
+  get  "people/:id",            to: "people#show",                as: :person_page
 
   # Workspace activity feed — a retrospective timeline of domain Events (distinct
   # from the prospective home feed). Read-only; turbo_stream serves pagination.

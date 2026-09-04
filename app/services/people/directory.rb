@@ -52,10 +52,16 @@ module People
       person_rows + org_rows
     end
 
-    # Build a single counterpart for one person.
+    # Build a single counterpart for one person, or nil when the person is no
+    # longer eligible (email_count dropped to zero, blocked, etc.).
     def counterpart_for(person)
       attention = People::Attention.new(@user, now: @now)
       people_standing.prime(people: [ person ])
+      # Re-check the same eligibility criteria used in eligible_persons so that
+      # refresh_counterpart! can delete a row when the person becomes ineligible.
+      contacts = person.contacts.to_a
+      return nil if contacts.none? { |c| c.kind_person? && c.email_count.to_i > 0 }
+      return nil unless listable_person?(person)
       person_counterpart(person, attention)
     end
 
@@ -196,7 +202,9 @@ module People
       parts.join(" · ")
     end
 
-    # ── Person data flags (new / unread / has_attachment) ────────────────────
+    # ── Person data flags (new / unread / has_attachment / starred / can_reply / can_done) ──
+
+    DONE_KINDS = %w[reply_reminder reply_owed email_action follow_up].freeze
 
     def add_person_flags!(rows, attention)
       return if rows.empty?
@@ -205,6 +213,14 @@ module People
       standing_thread_ids = rows.filter_map { |cp| cp.standing.thread_id }
       unread_thread_set   = unread_thread_ids(standing_thread_ids)
 
+      # Batch sendable account check: one EmailAccountUser lookup per account.
+      sendable_account_ids = sendable_account_id_set
+
+      # Batch email_account_id lookup for standing messages.
+      standing_msg_ids = rows.filter_map { |cp| cp.standing.email_message_id }
+      msg_account_map  = standing_msg_ids.any? ?
+        EmailMessage.where(id: standing_msg_ids).pluck(:id, :email_account_id).to_h : {}
+
       rows.map! do |cp|
         person = cp.record
         next cp unless person
@@ -212,10 +228,18 @@ module People
         contacts = person.contacts.to_a
         item = attention.for(person)
 
+        # can_reply: standing message exists and account is sendable.
+        msg_id         = cp.standing.email_message_id
+        acct_id        = msg_account_map[msg_id]
+
         data = cp.data.dup
         data["new"]            = new_sender?(contacts, people_standing.threads_for(person))
         data["unread"]         = unread_thread_set.include?(cp.standing.thread_id)
         data["has_attachment"] = item&.message&.has_attachment? || false
+        data["starred"]        = contacts.any?(&:starred?)
+        data["contact_id"]     = contacts.max_by { |c| c.email_count.to_i }&.id
+        data["can_reply"]      = msg_id.present? && acct_id && sendable_account_ids.include?(acct_id)
+        data["can_done"]       = item.present? && DONE_KINDS.include?(item.feed_item.kind)
 
         cp.with(data: data)
       end
@@ -325,6 +349,17 @@ module People
 
     def prime_standing(people: [], organizations: [])
       people_standing.prime(people: people, organizations: organizations)
+    end
+
+    # ── Sendable account set (batched, cached) ────────────────────────────────
+    # Returns the set of email_account_ids the current user can SEND from —
+    # used to compute data["can_reply"] for each row in one bulk query.
+
+    def sendable_account_id_set
+      @sendable_account_id_set ||=
+        EmailAccountUser.where(user_id: @user.id, can_send: true, email_account_id: readable_account_ids)
+                        .pluck(:email_account_id)
+                        .to_set
     end
 
     # ── Shared inbox scoping ──────────────────────────────────────────────────

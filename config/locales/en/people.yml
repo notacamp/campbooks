@@ -16,6 +16,16 @@ en:
           zero: "0d"
           one: "1d"
           other: "%{count}d"
+        actions:
+          reply_hint: "Reply (r)"
+          done_hint: "Done (e)"
+          snooze_hint: "Snooze (s)"
+          star_hint: "Star"
+          unstar_hint: "Unstar"
+          more_hint: "More (.)"
+          archive: Archive thread
+          block: Block sender
+          open_profile: Open classic profile
       search_bar:
         placeholder: Find a person or company…
         clear: Clear
@@ -38,7 +48,6 @@ en:
       tab_people: People
       tab_streams: Streams
       classic_inbox: Classic inbox
-      need_you: Need you
       recent: Recent
       organization: Organization
       people_count:
@@ -61,15 +70,39 @@ en:
         pay: Pay
         chase: Chase
         nudge: Nudge
+      new_rows:
+        one: "1 new · refresh"
+        other: "%{count} new · refresh"
       streams_foot:
         zero: Streams
         one: "Streams · %{count}"
         other: "Streams · %{count}"
-      new: New
+    actions:
+      done: "Marked %{name} done"
+      restored: Restored
+      snoozed: "Snoozed until %{until}"
+      unsnoozed: Unsnoozed
+      starred: "Starred %{name}"
+      unstarred: "Unstarred %{name}"
+      archived: "Archived %{name}'s thread"
+      unarchived: Moved to inbox
+      undo: Undo
+      unsupported: Action not supported
+      not_found: Not found
+      needs_message: No message for this action
+      snooze_title: Snooze
     standing:
       money_subject: "%{amount} · due %{date}"
-      no_standing: Nothing needs you here right now.
     conversation:
+      standing_reply:
+        one: "%{name} wrote %{count} day ago about “%{subject}” and is waiting on your reply."
+        other: "%{name} wrote %{count} days ago about “%{subject}” and is waiting on your reply."
+      standing_nudge:
+        one: "You wrote to %{name} %{count} day ago about “%{subject}”; no reply yet."
+        other: "You wrote to %{name} %{count} days ago about “%{subject}”; no reply yet."
+      standing_decide:
+        one: "Scout flagged “%{subject}” for you %{count} day ago."
+        other: "Scout flagged “%{subject}” for you %{count} days ago."
       you: You
       back: People
       menu: More

@@ -21,6 +21,7 @@ major, minor, or patch change here.
 - **Now shows replies you owe and bills you owe.** A message from someone you already
   correspond with, unanswered for three days, becomes a card even when Scout has not
   read the mail; a past-due expense invoice becomes a "You owe …" card with Mark paid.
+- **Act on People rows.** Reply, Done, Snooze, Star and Archive on every person row, with Undo; the ↑ ↓ ↵ r e s keys; the page opens on the top row; rows update live as Scout refreshes.
 
 ### Changed
 

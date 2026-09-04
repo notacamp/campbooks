@@ -51,6 +51,40 @@ RSpec.describe "People", type: :request do
     end
 
     describe "GET /people" do
+      it "opens the top row's detail on the HTML index" do
+        person, = make_person(name: "Auto Sofia", email: "auto@brightloop.example")
+        refresh_standings!
+
+        get people_path
+        expect(response).to have_http_status(:ok)
+        # The detail pane content (conversation heading or Scout note) should be present.
+        expect(response.body).to include("Auto Sofia")
+        # start-on-list-value should be true (phones keep the list).
+        expect(response.body).to match(/start-on-list-value="true"/)
+      end
+
+      it "does not auto-open on a turbo frame request" do
+        make_person(name: "Sofia Martins", email: "sofia@brightloop.example")
+        refresh_standings!
+
+        get people_path, headers: { "Turbo-Frame" => "people_results" }
+        expect(response).to have_http_status(:ok)
+        # Frame response should not contain the full conversation pane.
+        expect(response.body).not_to match(/where.things.stand/)
+      end
+
+      it "renders the people_new_pill container" do
+        get people_path
+        expect(response.body).to include('id="people_new_pill"')
+      end
+
+      it "includes the people_<id> stream tag" do
+        get people_path
+        # turbo_stream_from signs the stream name; verify via the signed form.
+        signed = Turbo::StreamsChannel.signed_stream_name("people_#{user.id}")
+        expect(response.body).to include(signed)
+      end
+
       it "lists persons and the Recent section (lanes appear only when feed items exist)" do
         make_person(name: "Sofia Martins", email: "sofia@brightloop.example", org_name: "Brightloop")
         make_person(name: "Ana Reis", email: "ana@accounting.example", org_name: "Accounting")
@@ -279,6 +313,21 @@ RSpec.describe "People", type: :request do
             headers: { "Accept" => "text/vnd.turbo-stream.html" }
         expect(response).to have_http_status(:ok)
         expect(response.body).to include("people_conversation")
+      end
+
+      it "explains a reply you owe in Scout's note when Scout has no read of its own" do
+        person, contact, thread = make_person(name: "Ines Almeida", email: "ines@almeidasa.example", replied: true)
+        thread.update!(subject: "Contract clause 7.2")
+        thread.email_messages.update_all(received_at: 8.days.ago)
+        thread.update_columns(last_inbound_at: 8.days.ago, last_outbound_at: 12.days.ago)
+        contact.update_columns(sender_kind_source: "heuristic")
+        Feed::Generator.for_user(user)
+        refresh_standings!
+
+        get person_page_path(person)
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("waiting on your reply")
+        expect(response.body).not_to include("Nothing needs you here right now")
       end
 
       it "404s for a person in another workspace" do

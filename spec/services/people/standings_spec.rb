@@ -113,6 +113,80 @@ RSpec.describe People::Standings do
     end
   end
 
+  describe ".refresh_counterpart!" do
+    it "updates a single row when the person is still eligible" do
+      person, contact, = make_person(name: "Sofia", email: "sofia@x.example")
+      described_class.refresh!(user)
+
+      row_before = PeopleStanding.for_user(user).find_by!(counterpart: person)
+
+      # Change the contact name so the row name changes on re-compute.
+      person.update!(name: "Sofia Updated")
+      contact.update_columns(name: "Sofia Updated")
+
+      described_class.refresh_counterpart!(user, person)
+
+      row_after = PeopleStanding.for_user(user).find_by!(counterpart: person)
+      expect(row_after.name).to eq("Sofia Updated")
+    end
+
+    it "deletes the row when the person is no longer eligible" do
+      person, = make_person(name: "Sofia", email: "sofia@x.example")
+      described_class.refresh!(user)
+      expect(PeopleStanding.for_user(user).find_by(counterpart: person)).to be_present
+
+      # Make person ineligible.
+      person.contacts.update_all(email_count: 0)
+
+      described_class.refresh_counterpart!(user, person)
+
+      expect(PeopleStanding.for_user(user).find_by(counterpart: person)).to be_nil
+    end
+
+    it "broadcasts a replace when the row changed" do
+      person, = make_person(name: "Sofia", email: "sofia@x.example")
+      described_class.refresh!(user)
+      # Change what the row renders (its name) so the fingerprint differs.
+      person.update!(name: "Sofia Renamed")
+
+      # have_broadcasted_to requires ActionCable::TestHelper; use a message expectation instead.
+      expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to).with(
+        "people_#{user.id}", hash_including(target: a_string_starting_with("people_row_"))
+      ).at_least(:once)
+      described_class.refresh_counterpart!(user, person)
+    end
+
+    it "does not raise when the person is nil" do
+      expect { described_class.refresh_counterpart!(user, nil) }.not_to raise_error
+    end
+  end
+
+  describe ".refresh! broadcasts" do
+    it "broadcasts changed rows after a re-run that sees differences" do
+      person_a, = make_person(name: "A", email: "a@x.example")
+      _person_b, = make_person(name: "B", email: "b@x.example")
+      described_class.refresh!(user)
+
+      # Only rows whose rendered content changed broadcast: rename A, leave B alone.
+      person_a.update!(name: "A Renamed")
+
+      # have_broadcasted_to requires ActionCable::TestHelper; use a message expectation instead.
+      expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to).with(
+        "people_#{user.id}", hash_including(target: "people_row_#{person_a.id}")
+      ).once
+      described_class.refresh!(user)
+    end
+
+    it "broadcasts nothing when a re-run changes no row" do
+      make_person(name: "A", email: "a@x.example")
+      described_class.refresh!(user)
+
+      expect(Turbo::StreamsChannel).not_to receive(:broadcast_replace_to)
+      expect(Turbo::StreamsChannel).not_to receive(:broadcast_remove_to)
+      described_class.refresh!(user)
+    end
+  end
+
   describe ".stale?" do
     it "returns true when there are no rows" do
       expect(described_class.stale?(user)).to be true
