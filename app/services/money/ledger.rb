@@ -18,18 +18,30 @@ class Money
     # The timeline axis reaches this far left of today (overdue region).
     TIMELINE_BACK = 21.days
 
-    def self.for(workspace, user, today: Date.current, horizon: DEFAULT_HORIZON, lookback: DEFAULT_LOOKBACK)
-      new(workspace, user, today: today, horizon: horizon, lookback: lookback)
+    # How the ledger's sections are ordered: by date (newest first by default),
+    # by amount (largest first) or by counterpart (A–Z). `sections` applies it;
+    # `obligations` stays in ascending date order for the timeline and the export.
+    SORTS = %i[date amount counterpart].freeze
+    DIRS  = %i[desc asc].freeze
+    DEFAULT_DIRS = { date: :desc, amount: :desc, counterpart: :asc }.freeze
+
+    def self.for(workspace, user, today: Date.current, horizon: DEFAULT_HORIZON, lookback: DEFAULT_LOOKBACK,
+                 sort: :date, dir: nil)
+      new(workspace, user, today: today, horizon: horizon, lookback: lookback, sort: sort, dir: dir)
     end
 
-    attr_reader :today, :horizon, :lookback
+    def self.default_dir(sort) = DEFAULT_DIRS.fetch(sort.to_s.to_sym, :desc)
 
-    def initialize(workspace, user, today:, horizon:, lookback:)
+    attr_reader :today, :horizon, :lookback, :sort, :dir
+
+    def initialize(workspace, user, today:, horizon:, lookback:, sort: :date, dir: nil)
       @workspace = workspace
       @user = user
       @today = today
       @horizon = horizon
       @lookback = lookback
+      @sort = SORTS.include?(sort.to_s.to_sym) ? sort.to_s.to_sym : :date
+      @dir = DIRS.include?(dir.to_s.to_sym) ? dir.to_s.to_sym : self.class.default_dir(@sort)
     end
 
     def obligations
@@ -48,9 +60,16 @@ class Money
       obligations.select(&:settled?).sort_by { |o| o.settled_on || o.due_on }.reverse
     end
 
-    # Ordered, labelled sections for the ledger table. Empty sections are dropped.
+    # Ordered, labelled sections for the ledger table, each in the chosen order
+    # (newest first by default). Empty sections are dropped.
     def sections
-      [ [ :late, late ], [ :due, due ], [ :settled, settled ] ].reject { |(_key, list)| list.empty? }
+      [ [ :late, sorted(late) ], [ :due, sorted(due) ], [ :settled, sorted(settled) ] ]
+        .reject { |(_key, list)| list.empty? }
+    end
+
+    def sorted(list)
+      ordered = list.sort_by { |o| [ sort_key(o), o.counterpart.to_s.downcase, o.id ] }
+      @dir == :desc ? ordered.reverse : ordered
     end
 
     def any?
@@ -84,6 +103,15 @@ class Money
     def open_obligations = obligations.select { |o| open?(o) }
 
     private
+
+    # The date that matters for the row: when it was settled, else when it is due.
+    def sort_key(obligation)
+      case @sort
+      when :amount      then obligation.amount_cents.to_i
+      when :counterpart then obligation.counterpart.to_s.downcase
+      else (obligation.settled? ? (obligation.settled_on || obligation.due_on) : obligation.due_on) || Date.new(1970, 1, 1)
+      end
+    end
 
     def open_sum(direction)
       open_obligations.select { |o| o.direction == direction }

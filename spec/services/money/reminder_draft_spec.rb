@@ -20,7 +20,7 @@ RSpec.describe Money::ReminderDraft do
       expect(draft.body).to include("Brightloop")
       expect(draft.body).to include("invoice #0231")
       expect(draft.body).to include("€1,200.00")
-      expect(draft.body).to include("Aug 22")
+      expect(draft.body).to include("Aug 22, 2026") # Money dates carry the year
       expect(draft.body).to include("12 days ago")
       expect(draft.body.scan(/[.?]/).size).to be >= 4
     end

@@ -56,7 +56,7 @@ module Campbooks
 
       def renewal_clause
         o = @summary.renewals.min_by(&:due_on)
-        t(".renewal_html", amount: bold(fmt(o.amount)), date: l(o.due_on, format: :day_month))
+        t(".renewal_html", amount: bold(fmt(o.amount)), date: l(o.due_on, format: :date))
       end
 
       def overdue_phrase(obligation)

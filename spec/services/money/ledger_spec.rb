@@ -110,6 +110,46 @@ RSpec.describe Money::Ledger do
 
       expect(ledger.sections.map(&:first)).to eq(%i[late due settled])
     end
+
+    it "puts the newest first within a section by default" do
+      expense(vendor_name: "Older", amount_cents: 1_000, due_date: today - 20)
+      expense(vendor_name: "Newer", amount_cents: 1_000, due_date: today - 2)
+      revenue(client_name: "Soon", invoice_number: "1", amount_cents: 1_000, due_date: today + 2)
+      revenue(client_name: "Later", invoice_number: "2", amount_cents: 1_000, due_date: today + 20)
+
+      late = ledger.sections.to_h[:late].map(&:counterpart)
+      due  = ledger.sections.to_h[:due].map(&:counterpart)
+      expect(late).to eq(%w[Newer Older])
+      expect(due).to eq(%w[Later Soon])
+      expect(ledger.sort).to eq(:date)
+      expect(ledger.dir).to eq(:desc)
+    end
+
+    it "sorts by amount and by counterpart in either direction" do
+      expense(vendor_name: "Bravo", amount_cents: 5_000, due_date: today - 3)
+      expense(vendor_name: "Alpha", amount_cents: 9_000, due_date: today - 2)
+      expense(vendor_name: "Charlie", amount_cents: 1_000, due_date: today - 1)
+
+      by_amount = described_class.for(workspace, user, today: today, sort: :amount)
+      expect(by_amount.sections.to_h[:late].map(&:counterpart)).to eq(%w[Alpha Bravo Charlie])
+      expect(by_amount.dir).to eq(:desc)
+
+      by_amount_asc = described_class.for(workspace, user, today: today, sort: :amount, dir: :asc)
+      expect(by_amount_asc.sections.to_h[:late].map(&:counterpart)).to eq(%w[Charlie Bravo Alpha])
+
+      by_name = described_class.for(workspace, user, today: today, sort: :counterpart)
+      expect(by_name.sections.to_h[:late].map(&:counterpart)).to eq(%w[Alpha Bravo Charlie])
+      expect(by_name.dir).to eq(:asc)
+
+      by_name_desc = described_class.for(workspace, user, today: today, sort: "counterpart", dir: "desc")
+      expect(by_name_desc.sections.to_h[:late].map(&:counterpart)).to eq(%w[Charlie Bravo Alpha])
+    end
+
+    it "falls back to date, newest first, for an unknown sort" do
+      unknown = described_class.for(workspace, user, today: today, sort: :bogus, dir: :sideways)
+      expect(unknown.sort).to eq(:date)
+      expect(unknown.dir).to eq(:desc)
+    end
   end
 
   describe "recurrence" do
