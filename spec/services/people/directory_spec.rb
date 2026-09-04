@@ -267,8 +267,9 @@ RSpec.describe People::Directory do
     end
 
     it "sets can_reply=true when the account is sendable" do
-      # grant_access sets can_send:true by default from before block.
-      create(:email_account_user, user: user, email_account: account, can_send: true)
+      # before block creates email_account_user with can_read; update it to have can_send too.
+      EmailAccountUser.find_by(user: user, email_account: account)
+                      .update_columns(can_send: true)
       make_person(name: "Ana", email: "ana@x.example", owe: true)
       cp = directory.counterparts.find { |c| c.name == "Ana" }
       # can_reply depends on email_message_id existing; if standing has one, check it.
@@ -280,15 +281,19 @@ RSpec.describe People::Directory do
     it "sets can_done=true when the row has an eligible feed item kind" do
       person, contact, thread = make_person(name: "Sofia", email: "sofia@x.example", owe: true)
       msg = thread.email_messages.first
-      item = create(:feed_item, user: user, workspace: workspace,
-                                subject: msg, kind: "reply_reminder", score: 0.5,
-                                data: { "thread_id" => thread.id })
+      # No :feed_item factory exists — use FeedItem.create! directly.
+      item = FeedItem.create!(user: user, workspace: workspace,
+                              subject: msg, kind: "reply_reminder", score: 0.5,
+                              dedupe_key: "reply_reminder:#{msg.id}",
+                              sort_at: Time.current,
+                              data: { "thread_id" => thread.id })
 
       attn_item = instance_double("People::Attention::Item",
                                   feed_item: item,
                                   message: msg, text: "Reply needed",
+                                  subject: "Thread Sofia",
                                   thread_id: thread.id, verb: :reply,
-                                  wait_days: 2, kind: :attention)
+                                  wait_days: 2, attention: true)
       attn = instance_double("People::Attention")
       allow(attn).to receive(:for).and_return(attn_item)
       allow(People::Attention).to receive(:new).and_return(attn)

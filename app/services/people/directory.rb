@@ -52,10 +52,16 @@ module People
       person_rows + org_rows
     end
 
-    # Build a single counterpart for one person.
+    # Build a single counterpart for one person, or nil when the person is no
+    # longer eligible (email_count dropped to zero, blocked, etc.).
     def counterpart_for(person)
       attention = People::Attention.new(@user, now: @now)
       people_standing.prime(people: [ person ])
+      # Re-check the same eligibility criteria used in eligible_persons so that
+      # refresh_counterpart! can delete a row when the person becomes ineligible.
+      contacts = person.contacts.to_a
+      return nil if contacts.none? { |c| c.kind_person? && c.email_count.to_i > 0 }
+      return nil unless listable_person?(person)
       person_counterpart(person, attention)
     end
 
@@ -232,7 +238,7 @@ module People
         data["has_attachment"] = item&.message&.has_attachment? || false
         data["starred"]        = contacts.any?(&:starred?)
         data["can_reply"]      = msg_id.present? && acct_id && sendable_account_ids.include?(acct_id)
-        data["can_done"]       = item.present? && DONE_KINDS.include?(item.kind)
+        data["can_done"]       = item.present? && DONE_KINDS.include?(item.feed_item.kind)
 
         cp.with(data: data)
       end

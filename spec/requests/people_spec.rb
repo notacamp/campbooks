@@ -80,7 +80,9 @@ RSpec.describe "People", type: :request do
 
       it "includes the people_<id> stream tag" do
         get people_path
-        expect(response.body).to include("people_#{user.id}")
+        # turbo_stream_from signs the stream name; verify via the signed form.
+        signed = Turbo::StreamsChannel.signed_stream_name("people_#{user.id}")
+        expect(response.body).to include(signed)
       end
 
       it "lists persons and the Recent section (lanes appear only when feed items exist)" do

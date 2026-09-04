@@ -27,14 +27,18 @@ module People
         ApplicationRecord.transaction do
           if counterparts.any?
             rows = counterparts.map { |cp| build_row(cp, user: user, workspace: workspace, now: now, directory: directory) }
+            # record_timestamps: false prevents Rails from injecting a second
+            # `updated_at = CURRENT_TIMESTAMP` that would conflict with our
+            # explicit updated_at in update_only (and bypass travel_to in tests).
             PeopleStanding.upsert_all(
               rows,
               unique_by: :index_people_standings_on_user_counterpart,
+              record_timestamps: false,
               update_only: %i[
                 needs_you standing_kind text email_thread_id overdue_days
                 score strength last_activity_at name subtitle avatar_email
                 avatar_initial data verb subject wait_days feed_item_id
-                email_message_id refreshed_at
+                email_message_id refreshed_at updated_at
               ]
             )
           end
@@ -87,14 +91,18 @@ module People
         end
 
         row_data = build_row(cp, user: user, workspace: workspace, now: now, directory: directory)
+        # record_timestamps: false lets us control updated_at explicitly via update_only,
+        # preventing Rails from injecting a second `updated_at = CURRENT_TIMESTAMP` that
+        # would (a) collide with our update_only entry and (b) bypass travel_to in tests.
         PeopleStanding.upsert(
           row_data,
           unique_by: :index_people_standings_on_user_counterpart,
+          record_timestamps: false,
           update_only: %i[
             needs_you standing_kind text email_thread_id overdue_days
             score strength last_activity_at name subtitle avatar_email
             avatar_initial data verb subject wait_days feed_item_id
-            email_message_id refreshed_at
+            email_message_id refreshed_at updated_at
           ]
         )
 

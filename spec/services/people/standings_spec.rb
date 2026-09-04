@@ -149,9 +149,11 @@ RSpec.describe People::Standings do
       # Force updated_at to age so we can detect a change.
       PeopleStanding.for_user(user).update_all(updated_at: 10.minutes.ago)
 
-      expect {
-        described_class.refresh_counterpart!(user, person)
-      }.to have_broadcasted_to("people_#{user.id}").at_least(:once)
+      # have_broadcasted_to requires ActionCable::TestHelper; use a message expectation instead.
+      expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to).with(
+        "people_#{user.id}", hash_including(target: a_string_starting_with("people_row_"))
+      ).at_least(:once)
+      described_class.refresh_counterpart!(user, person)
     end
 
     it "does not raise when the person is nil" do
@@ -160,17 +162,17 @@ RSpec.describe People::Standings do
   end
 
   describe ".refresh! broadcasts" do
-    it "broadcasts only changed rows, not unchanged ones" do
+    it "broadcasts changed rows after a re-run that sees differences" do
       person_a, = make_person(name: "A", email: "a@x.example")
-      person_b, = make_person(name: "B", email: "b@x.example")
+      _person_b, = make_person(name: "B", email: "b@x.example")
       described_class.refresh!(user)
 
-      # Force both rows to look old so a re-run sees differences.
+      # Force both rows to look old so the next refresh detects changes.
       PeopleStanding.for_user(user).update_all(updated_at: 1.hour.ago)
 
-      expect {
-        described_class.refresh!(user)
-      }.to have_broadcasted_to("people_#{user.id}").at_least(:once)
+      # have_broadcasted_to requires ActionCable::TestHelper; use a message expectation instead.
+      expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to).at_least(:once)
+      described_class.refresh!(user)
     end
   end
 
