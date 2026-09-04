@@ -33,16 +33,18 @@ pt:
         messages:
           one: "%{count} mensagem"
           other: "%{count} mensagens"
-        open_in_inbox: Abrir na caixa
         no_subject: "(sem assunto)"
         draft_by_scout: "Rascunho do Scout · edite à vontade"
         open_draft: Abrir rascunho
-        reply: Responder
-        reply_all: Responder a todos
-        forward: Reencaminhar
       thread_message:
         to_you: para si
         to_name: "para %{name}"
+        reply: Responder
+        reply_all: Responder a todos
+        forward: Reencaminhar
+        reply_hint: "Responder (r)"
+        reply_all_hint: "Responder a todos (a)"
+        forward_hint: "Reencaminhar (f)"
   people:
     index:
       tab_people: Pessoas

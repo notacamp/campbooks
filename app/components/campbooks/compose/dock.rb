@@ -90,7 +90,7 @@ module Campbooks
       # Forward) that recomputes recipients server-side while carrying the body.
       def mode_control
         if @message && SWITCHABLE_MODES.include?(@mode)
-          details(class: "relative flex-shrink-0") do
+          details(class: "relative flex-shrink-0", data: { controller: "dropdown-close" }) do
             summary(class: "list-none flex items-center gap-2 cursor-pointer select-none group",
                     aria_label: t(".switch_mode")) do
               mode_glyph_tile

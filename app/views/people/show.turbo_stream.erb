@@ -7,7 +7,7 @@
           person_first_name: people_first_name(@person),
           person_id: @person.id,
           newest_thread: false,
-          can_send: false,
+          can_send: @sendable_account_ids.include?(ct.thread.email_account_id),
           scout_draft: nil) %>
   <% end %>
 <% end %>

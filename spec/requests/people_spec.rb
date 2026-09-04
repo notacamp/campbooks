@@ -307,16 +307,19 @@ RSpec.describe "People", type: :request do
         create(:email_message, email_account: account, email_thread: thread, contact: contact,
                from_address: "sofia@brightloop.example", subject: "Q3 kickoff deck",
                body: "Earlier message.", received_at: 5.days.ago)
-        newest = create(:email_message, email_account: account, email_thread: thread, contact: contact,
-                        from_address: "sofia@brightloop.example", subject: "Q3 kickoff deck",
-                        body: "Latest message from Sofia.", received_at: 1.day.ago)
+        create(:email_message, email_account: account, email_thread: thread, contact: contact,
+               from_address: "sofia@brightloop.example", subject: "Q3 kickoff deck",
+               body: "Latest message from Sofia.", received_at: 1.day.ago)
 
         get person_page_path(person)
         expect(response).to have_http_status(:ok)
         expect(response.body).to include("Q3 kickoff deck")
         expect(response.body).to match(/<details[^>]*open/)
-        expect(response.body).to include("Open in inbox")
-        expect(response.body).to include("/email_messages/#{newest.id}")
+        # No "Open in inbox" — People is the inbox
+        expect(response.body).not_to include("Open in inbox")
+        # Per-message Reply all and Forward forms are present for the newest message
+        expect(response.body).to include("compose?mode=reply_all")
+        expect(response.body).to include("compose?mode=forward")
       end
 
       it "shows You and to <first name> for outbound, and to you for inbound" do
@@ -369,7 +372,7 @@ RSpec.describe "People", type: :request do
         contact = create(:contact, workspace: workspace, email_account: account, person: person,
                                    email: "busy@example.com", sender_kind: :person, sender_kind_source: "heuristic")
         9.times do |i|
-          thread = create(:email_thread, email_account: account, subject: "Thread #{i}")
+          thread = create(:email_thread, email_account: account, subject: "Subject#{i}Distinct")
           create(:email_message, email_account: account, email_thread: thread, contact: contact,
                  from_address: "busy@example.com", received_at: i.days.ago)
         end
@@ -377,7 +380,12 @@ RSpec.describe "People", type: :request do
 
         get person_page_path(person)
         expect(response).to have_http_status(:ok)
-        expect(response.body.scan("Open in inbox").length).to eq(8)
+        # 8 thread blocks on page 1 (no "Open in inbox" — People is the inbox).
+        # We count the outer ThreadBlock div (rounded-xl + bg-card wrapper, one per block).
+        # The scan for "Subject" is intentionally avoided: display_subject returns the
+        # email_message subject (a Faker sentence from the factory), not the thread subject.
+        expect(response.body).not_to include("Open in inbox")
+        expect(response.body.scan("rounded-xl border border-border bg-card").length).to be >= 8
         expect(response.body).to include("people_conversation_older")
       end
 
@@ -386,7 +394,7 @@ RSpec.describe "People", type: :request do
         contact = create(:contact, workspace: workspace, email_account: account, person: person,
                                    email: "busy@example.com", sender_kind: :person, sender_kind_source: "heuristic")
         9.times do |i|
-          thread = create(:email_thread, email_account: account, subject: "Thread #{i}")
+          thread = create(:email_thread, email_account: account, subject: "Subject#{i}Distinct")
           create(:email_message, email_account: account, email_thread: thread, contact: contact,
                  from_address: "busy@example.com", received_at: i.days.ago)
         end
@@ -477,6 +485,33 @@ RSpec.describe "People", type: :request do
         expect(message.reload).to have_attributes(read: true)
       end
 
+      it "includes action forms when the user can send on the thread's account" do
+        person, contact, _newest = make_person(name: "Sofia Martins", email: "sofia@brightloop.example")
+        older = create(:email_thread, email_account: account, subject: "Older thread")
+        create(:email_message, email_account: account, email_thread: older, contact: contact,
+               from_address: "sofia@brightloop.example", body: "Older body", received_at: 3.days.ago)
+
+        get people_thread_path(person, older), headers: { "Turbo-Frame" => "people_thread_#{older.id}" }
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include("mode=reply")
+        expect(response.body).to include("mode=reply_all")
+        expect(response.body).to include("mode=forward")
+      end
+
+      it "includes no action forms when the user cannot send on the thread's account" do
+        # Revoke can_send
+        EmailAccountUser.where(user: user, email_account: account).update_all(can_send: false)
+        person, contact, _newest = make_person(name: "Sofia Martins", email: "sofia@brightloop.example")
+        older = create(:email_thread, email_account: account, subject: "Older thread")
+        create(:email_message, email_account: account, email_thread: older, contact: contact,
+               from_address: "sofia@brightloop.example", body: "Older body", received_at: 3.days.ago)
+
+        get people_thread_path(person, older), headers: { "Turbo-Frame" => "people_thread_#{older.id}" }
+        expect(response).to have_http_status(:ok)
+        expect(response.body).not_to include("mode=reply_all")
+        expect(response.body).not_to include("mode=forward")
+      end
+
       it "404s for a thread that is not part of the person's conversation" do
         person, = make_person(name: "Sofia Martins", email: "sofia@brightloop.example")
         _other, _c, foreign_thread = make_person(name: "Rui Santos", email: "rui@cloudhost.example")
@@ -523,6 +558,15 @@ RSpec.describe "People", type: :request do
 
         get people_message_path(person, foreign_thread.email_messages.first)
         expect(response).to have_http_status(:not_found)
+      end
+    end
+
+    describe "kebab and menus" do
+      it "the conversation kebab carries data-controller=dropdown-close" do
+        person, = make_person(name: "Sofia Martins", email: "sofia@brightloop.example")
+        get person_page_path(person)
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include('data-controller="dropdown-close"')
       end
     end
 

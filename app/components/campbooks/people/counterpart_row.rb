@@ -230,7 +230,7 @@ module Campbooks
       end
 
       def more_menu
-        details(class: "relative") do
+        details(class: "relative", data: { controller: "dropdown-close" }) do
           summary(class: class_names(ACTION_BTN, "list-none cursor-pointer"),
                   title: t(".actions.more_hint"),
                   data: { people_more: true }) do

@@ -138,7 +138,7 @@ module Campbooks
       def move_popover
         return if @move_slots.empty?
 
-        details(class: "relative") do
+        details(class: "relative", data: { controller: "dropdown-close" }) do
           summary(class: "inline-flex h-[26px] cursor-pointer list-none items-center rounded border border-input " \
                          "bg-background px-2 text-xs font-medium text-foreground shadow-sm hover:bg-accent " \
                          "[&::-webkit-details-marker]:hidden") { t(".move") }
@@ -160,7 +160,7 @@ module Campbooks
       end
 
       def kebab
-        details(class: "relative") do
+        details(class: "relative", data: { controller: "dropdown-close" }) do
           summary(class: "inline-flex h-[26px] w-[26px] cursor-pointer list-none items-center justify-center rounded " \
                          "text-muted-foreground hover:bg-muted [&::-webkit-details-marker]:hidden") do
             raw(safe(kebab_icon))

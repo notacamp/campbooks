@@ -18,6 +18,7 @@ module People
                              .find(params[:message_id])
       return head :not_found unless on_conversation?(@message)
 
+      @can_send = @message.email_account.sendable_by?(current_user)
       render :show, layout: false
     rescue ActiveRecord::RecordNotFound
       head :not_found
