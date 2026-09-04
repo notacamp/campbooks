@@ -48,7 +48,7 @@ module Campbooks
       # ── Layout ─────────────────────────────────────────────────────────────
 
       def row_grid
-        div(class: "grid grid-cols-[minmax(0,1fr)_80px_minmax(0,1fr)] gap-x-3 items-center sm:gap-x-4") do
+        div(class: "grid grid-cols-1 gap-y-3 sm:grid-cols-[minmax(0,1fr)_80px_minmax(0,1fr)] sm:gap-x-4 sm:gap-y-0 sm:items-center") do
           yield
         end
       end
@@ -88,7 +88,7 @@ module Campbooks
       # ── Middle node ────────────────────────────────────────────────────────
 
       def middle_node
-        div(class: "flex flex-col items-center justify-center gap-1") do
+        div(class: "flex flex-row items-center justify-start gap-2 sm:flex-col sm:justify-center sm:gap-1") do
           node_glyph
           ratio_label if show_ratio_label?
         end
@@ -118,7 +118,7 @@ module Campbooks
         when :credit
           [ check_svg, t(".state.credit"), "bg-success/15 text-success" ]
         else # :unmatched / :needs_you
-          [ "!", t(".state.unmatched"), "bg-ember-solid/15 text-ember-solid" ]
+          [ "!", t(".state.unmatched"), "bg-ember/15 text-ember" ]
         end
       end
 
@@ -193,7 +193,7 @@ module Campbooks
 
       def unmatched_chip
         button(
-          class: "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[12.5px] font-semibold bg-ember-solid/10 text-ember-solid cursor-pointer hover:bg-ember-solid/15 transition-colors"
+          class: "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[12.5px] font-semibold bg-ember/10 text-ember cursor-pointer hover:bg-ember/15 transition-colors"
         ) do
           plain t(".unmatched_chip")
         end

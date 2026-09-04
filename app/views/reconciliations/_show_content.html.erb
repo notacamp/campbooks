@@ -74,7 +74,7 @@
             <%= t("reconciliations.show.grouped_ledger_title") %>
           </h2>
           <span class="text-[11.5px] text-muted-foreground">
-            <%= groups.size %> <%= t("reconciliations.show.group_count", count: groups.size) %>
+            <%= t("reconciliations.show.group_count", count: groups.size) %>
           </span>
         </div>
         <%= render Campbooks::Accounting::GroupedLedger.new(
