@@ -6,13 +6,16 @@
     the detail, and the detail's header carries a back button. This same view backs
     people#index, people#show (full load) and people/organizations#show (full load);
     @person / @organization drive what the detail renders. %>
+<%# Live row updates from Scout's background refresh. %>
+<%= turbo_stream_from "people_#{current_user.id}" %>
 <div class="block h-full overflow-hidden">
   <div class="flex h-full"
-       data-controller="email-mobile"
+       data-controller="email-mobile people-shortcuts"
        data-email-mobile-breakpoint-value="1024"
-       data-email-mobile-start-on-list-value="<%= @selected_id.blank? %>">
+       data-email-mobile-start-on-list-value="<%= @selected_id.blank? || @auto_opened %>">
     <%# ── Left pane: the counterpart list ─────────────────────────────────── %>
     <div data-email-mobile-target="list" data-inbox-pane="list"
+         data-people-shortcuts-target="list"
          class="hidden w-full flex-col overflow-y-auto border-r border-border bg-card lg:flex lg:w-[400px] lg:shrink-0">
       <%= render "people/segmented_header" %>
       <%# The search form sits OUTSIDE the results frame so it keeps focus while the
@@ -20,6 +23,8 @@
       <div class="px-3.5 pb-2">
         <%= render Campbooks::People::SearchBar.new(q: @query) %>
       </div>
+      <%# New-rows pill — broadcast target; empty by default. %>
+      <div id="people_new_pill"></div>
       <%= turbo_frame_tag "people_results", class: "block flex-1" do %>
         <%= render "people/counterpart_list" %>
       <% end %>
