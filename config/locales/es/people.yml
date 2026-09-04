@@ -19,6 +19,7 @@ es:
           one: "%{count} mensaje"
           other: "%{count} mensajes"
         open_in_inbox: Abrir en bandeja
+        no_subject: "(sin asunto)"
         draft_by_scout: "Borrador de Scout · edítalo libremente"
         open_draft: Abrir borrador
         reply: Responder

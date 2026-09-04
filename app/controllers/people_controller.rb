@@ -70,7 +70,7 @@ class PeopleController < ApplicationController
                                     .accessible_to(current_user)
                                     .group(:email_thread_id)
                                     .maximum(:received_at)
-    ordered_ids = latest_per_thread.sort_by { |_id, at| at }.map(&:first).reverse
+    ordered_ids = latest_per_thread.sort_by { |_id, at| at || Time.at(0) }.map(&:first).reverse
 
     @conversation_pagy, page_ids = pagy_array(ordered_ids, limit: THREADS_PER_PAGE)
 

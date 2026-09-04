@@ -19,6 +19,7 @@ en:
           one: "%{count} message"
           other: "%{count} messages"
         open_in_inbox: Open in inbox
+        no_subject: "(no subject)"
         draft_by_scout: "Draft by Scout · edit freely"
         open_draft: Open draft
         reply: Reply

@@ -43,7 +43,7 @@ module Campbooks
         div(class: "flex min-w-0 items-start gap-2 border-b border-border px-4 py-3") do
           div(class: "min-w-0 flex-1") do
             h3(class: "text-[15px] font-semibold tracking-[-0.01em] text-foreground") do
-              plain(@ct.subject.presence || t("people.conversation.no_standing"))
+              plain(@ct.subject.presence || t(".no_subject"))
             end
             if @ct.latest_at
               span(class: "text-[12px] text-muted-foreground") do
@@ -55,7 +55,7 @@ module Campbooks
           if @ct.newest
             a(href: helpers.email_message_path(@ct.newest),
               data: { turbo_frame: "_top" },
-              class: "inline-flex flex-shrink-0 items-center rounded-lg border border-border px-2.5 py-1 text-[12px] font-medium text-muted-foreground no-underline hover:bg-secondary") do
+              class: "flex-shrink-0 self-center text-[12px] text-muted-foreground no-underline underline-offset-2 hover:text-foreground hover:underline") do
               plain(t(".open_in_inbox"))
             end
           end
