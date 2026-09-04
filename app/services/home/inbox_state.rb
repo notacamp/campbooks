@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
 module Home
-  # The zero-state of a user's inbox, shared by the classic Home empty branch and
-  # the Now deck's cleared/connect states so the two never diverge. One of:
+  # The zero-state of a user's inbox, shared by the Home and Now deck's cleared/
+  # connect states so the two never diverge. One of:
   #   :syncing      — a live inbox whose first scan is still running
   #   :caught_up    — a live inbox; the queue is genuinely clear
   #   :disconnected — connected before, but every inbox is now inactive

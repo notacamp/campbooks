@@ -73,12 +73,6 @@ class User < ApplicationRecord
   enum :role, { member: 0, admin: 1 }
   # Where a brand-new email opens: the Desk (full page) or the Dock (sheet).
   enum :compose_default, { desk: 0, dock: 1 }, prefix: :composes_in
-  # Home/navigation layout: the classic five (Home/Mail/Calendar/Scout/Files) or
-  # the rethought bold five (Now/People/Paper/Money/Time + the Now page). Only
-  # honoured on a build with Features.bold_layout? on — see
-  # ApplicationController#bold_layout?. Prefix gives layout_classic? / layout_bold?.
-  enum :layout_mode, { classic: 0, bold: 1 }, prefix: :layout
-
   normalizes :email_address, with: ->(e) { e.strip.downcase }
 
   validates :email_address, presence: true, uniqueness: true

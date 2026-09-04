@@ -75,21 +75,19 @@ Rails.application.routes.draw do
   root "home#index"
   get "home", to: "home#index", as: :home
 
-  # The rethought "bold" home: Scout's ledger, the segment rings, the decision
-  # deck over the same home feed, and Scout's log. Gated on Features.bold_layout?
-  # (the page works for classic-mode users too when the flag is on). #undo_log
-  # reverses one Scout action from the log (archive → unarchive, tag → remove).
+  # The Now home: Scout's ledger, the segment rings, the decision deck and Scout's
+  # log. #undo_log reverses one Scout action from the log (archive → unarchive,
+  # tag → remove).
   get "now", to: "now#index", as: :now
   post "now/log/:id/undo", to: "now#undo_log", as: :now_log_undo
 
-  # Paper — the rethought "bold" document surface (every document as what it says, not
-  # a filename). Gated on Features.bold_layout? in PaperController. Params: q, type
+  # Paper — every document as what it says, not a filename. Params: q, type
   # (bucket), status, page.
   get "paper", to: "paper#index", as: :paper
-  # Money — the bold-layout obligations surface: what you're owed, what you owe,
-  # and what the bank settled, on one 30-day timeline. Built on the accounting
-  # substrate; gated by Features.bold_layout? AND the accounting gate/entitlement.
-  # An obligation id is "doc:<uuid>" or "rem:<uuid>", so :id carries a colon.
+  # Money — obligations surface: what you're owed, what you owe, and what the bank
+  # settled, on one 30-day timeline. Built on the accounting substrate; gated by
+  # the accounting gate/entitlement. An obligation id is "doc:<uuid>" or
+  # "rem:<uuid>", so :id carries a colon.
   get "money", to: "money#index", as: :money
   get "money/export", to: "money#export", as: :money_export
   scope "money/obligations/:id", constraints: { id: %r{[a-z]+:[^/]+} } do
@@ -100,9 +98,8 @@ Rails.application.routes.draw do
     post   "decide", to: "money#decide",   as: :money_obligation_decide
   end
 
-  # The bold Time surface: one agenda interleaving calendar events, deadlines Scout
-  # found in mail, tasks and Scout's proposed focus blocks (agenda|week|month).
-  # Gated on Features.bold_layout? (TimeController). The classic /calendar stays.
+  # The Time surface: one agenda interleaving calendar events, deadlines Scout found
+  # in mail, tasks and Scout's proposed focus blocks (agenda|week|month).
   get "time", to: "time#index", as: :time
 
   # Scout's focus blocks — Keep (→ a real calendar event), Move (to another free
@@ -119,11 +116,10 @@ Rails.application.routes.draw do
   # controller PATCHes it once when User#time_zone is still nil) — drives the Time
   # surface's day bucketing + focus slot finding. Top-level so any page can call it.
   patch "account/time_zone", to: "settings/account#time_zone", as: :account_time_zone
-  # The People place (Rethink Stage 2) — persons + organizations ordered by who
-  # needs you; a person opens as one conversation across all their threads;
-  # Streams hold the services (inbox groups). Gated on Features.bold_layout?
-  # (require_bold_layout_enabled in each controller). Streams + the org page must
-  # resolve BEFORE the /people/:id person catch-all.
+  # The People place — persons + organizations ordered by who needs you; a person
+  # opens as one conversation across all their threads; Streams hold the services
+  # (inbox groups). Streams + the org page must resolve BEFORE the /people/:id
+  # person catch-all.
   get  "people",                to: "people#index",               as: :people
   get  "people/streams",        to: "people/streams#index",       as: :people_streams
   get  "people/streams/:name",  to: "people/streams#show",        as: :people_stream, constraints: { name: %r{[^/]+} }, format: false
@@ -326,7 +322,6 @@ Rails.application.routes.draw do
   post "scout/tool", to: "agent_tools#create", as: :scout_tool
   # The Scout overlay body (idle suggestions/recent threads, or a thread's
   # conversation), loaded lazily into the layout's overlay frame on first open.
-  # Bold-layout only (require_bold_layout_enabled → 404 otherwise).
   get "scout/overlay", to: "scout_overlay#show", as: :scout_overlay
 
   resources :imap_accounts, only: [ :new, :create, :edit, :update ]
@@ -398,10 +393,9 @@ Rails.application.routes.draw do
     # redirects to the first panel; unknown sections 404 in the controller.
     get "inbox", to: redirect("/settings/inbox/tags"), as: :inbox
     get "inbox/:section", to: "inbox#show", as: :inbox_section
-    # Scout's memory — the bold-layout collapse of the inbox/AI settings into
-    # editable sentences (gated on Features.bold_layout? in the controller). The
-    # underlying forms still live at their existing settings paths, reached from
-    # each sentence's edit link. Entry ids are stable strings ("rule:<uuid>",
+    # Scout's memory — inbox/AI settings as editable sentences. The underlying forms
+    # still live at their existing settings paths, reached from each sentence's edit
+    # link. Entry ids are stable strings ("rule:<uuid>",
     # "skim:<tier>:<label>:<token>") — colon-separated, base64url'd, never dotted.
     get "memory", to: "memory#show", as: :memory
     post "memory/teach", to: "memory#teach", as: :memory_teach
@@ -420,7 +414,6 @@ Rails.application.routes.draw do
     resource :account, only: [ :show, :update, :destroy ], controller: "account" do
       patch :language
       patch :compose_preference
-      patch :layout_preference
       patch :writing_style
       post :analyze_writing_style
       get :delete

@@ -11,7 +11,6 @@ RSpec.describe People::Standings do
 
   before do
     create(:email_account_user, user: user, email_account: account, can_read: true)
-    allow(Features).to receive(:bold_layout?).and_return(true)
   end
 
   def make_person(name:, email:, inbound_at: 2.days.ago, owe: false, source: "heuristic", emails: 1)

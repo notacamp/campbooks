@@ -8,8 +8,8 @@
 # Need-you / Recent sections); right pane = the selected person, loaded into the
 # "people_detail" turbo frame (mirrors the email_detail pattern).
 #
-# Gated on Features.bold_layout? (PeopleLayout). Nothing here changes the send
-# path or the mail model — it's a new reading of email threads + people + orgs.
+# Nothing here changes the send path or the mail model — it's a reading of email
+# threads + people + orgs.
 class PeopleController < ApplicationController
   include PeopleLayout
 
@@ -93,7 +93,16 @@ class PeopleController < ApplicationController
                                     .maximum(:received_at)
     ordered_ids = latest_per_thread.sort_by { |_id, at| at || Time.at(0) }.map(&:first).reverse
 
-    @conversation_pagy, page_ids = pagy_array(ordered_ids, limit: THREADS_PER_PAGE)
+    # When a specific thread is requested (permalink redirect from /email_messages/:id),
+    # land on the page that contains it. params[:page] takes precedence if both are set.
+    focused_id = params[:thread].presence
+    if focused_id && ordered_ids.include?(focused_id) && params[:page].blank?
+      @focused_thread_id = focused_id
+      target_page = (ordered_ids.index(focused_id) / THREADS_PER_PAGE) + 1
+    end
+
+    @conversation_pagy, page_ids = pagy_array(ordered_ids, limit: THREADS_PER_PAGE,
+                                               page: target_page || params[:page])
 
     threads_by_id = EmailThread.where(id: page_ids).index_by(&:id)
     # What each heading needs — count, newest message id + time — without bodies.
@@ -101,7 +110,8 @@ class PeopleController < ApplicationController
                                   .accessible_to(current_user)
                                   .pluck(:email_thread_id, :id, :received_at)
                                   .group_by(&:first)
-    eager_id = @conversation_pagy.page == 1 ? page_ids.first : nil
+    # Eager-load the focused thread when given; otherwise the newest thread on page 1.
+    eager_id = @focused_thread_id || (@conversation_pagy.page == 1 ? page_ids.first : nil)
     eager_messages = eager_id ? conversation_messages(eager_id) : nil
 
     @conversation_threads = page_ids.filter_map do |tid|
@@ -185,15 +195,23 @@ class PeopleController < ApplicationController
     @lanes.each { |lane| lane[:counterparts] = lane[:counterparts].map(&swap) }
   end
 
-  # Opening a person reads their newest thread: mark it read the way the inbox
-  # does (local, provider, live inbox), then refresh this person's row so the
-  # unread dot clears in the list. Only the first page carries the newest thread.
+  # Opening a person reads their newest thread — or the thread a message permalink
+  # asked for (?thread=) — so mark that one read the way the inbox does (local,
+  # provider, live inbox), then refresh this person's row so the unread dot clears
+  # in the list. Only the first page carries the newest thread.
   # Returns true when anything was unread.
   def mark_newest_thread_read
-    thread = @newest_thread&.thread
+    thread = focused_conversation_thread&.thread || @newest_thread&.thread
     return false unless thread && Emails::MarkThreadRead.call(thread)
 
     People::Standings.refresh_counterpart!(current_user, @person)
     true
+  end
+
+  # The thread a ?thread= permalink asked for, when it is on the rendered page.
+  def focused_conversation_thread
+    return nil unless @focused_thread_id
+
+    @conversation_threads&.find { |ct| ct.thread.id == @focused_thread_id }
   end
 end

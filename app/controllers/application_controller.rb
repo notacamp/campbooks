@@ -18,7 +18,7 @@ class ApplicationController < ActionController::Base
   helper_method :current_user, :self_hosted?, :signup_mode, :public_signup_allowed?, :beta_code_required?,
                 :workflows_enabled?, :email_board_enabled?, :microsoft_enabled?, :imap_enabled?,
                 :document_templates_enabled?, :email_templates_enabled?, :tasks_enabled?, :accounting_enabled?,
-                :ai_provider_available?, :show_beta_banner?, :current_entitlements, :bold_layout?,
+                :ai_provider_available?, :show_beta_banner?, :current_entitlements,
                 :layout_scout_bar?, :layout_scout_launcher?
 
   private
@@ -102,17 +102,6 @@ class ApplicationController < ActionController::Base
     Features.accounting?
   end
 
-  # Whether to render the rethought "bold" layout for THIS request: the flag is on
-  # AND the signed-in user chose it (Settings › Account). Drives the five-place
-  # nav (NavigationHelper#primary_nav_items) and the root → /now redirect. The
-  # /now page itself is gated on the flag alone (require_bold_layout_enabled), so a
-  # classic-mode user can still open it on a flag-on build. Memoized per request.
-  def bold_layout?
-    return @_bold_layout if defined?(@_bold_layout)
-
-    @_bold_layout = Features.bold_layout? && current_user&.layout_bold? || false
-  end
-
   # 404 a request for a feature gated off by a readiness flag (Features.*). Used
   # as a before_action by the controllers behind one. A 404 (rather than a
   # redirect) keeps a disabled feature from advertising its own existence.
@@ -144,26 +133,17 @@ class ApplicationController < ActionController::Base
     head :not_found unless Features.accounting?
   end
 
-  # Gates the Now page on the readiness flag alone (NOT the per-user preference):
-  # a classic-mode user can open /now on a flag-on build, they just don't get the
-  # bold nav. 404 (not redirect) keeps a disabled feature from advertising itself.
-  def require_bold_layout_enabled
-    head :not_found unless Features.bold_layout?
-  end
-
   # Whether the application layout should render the docked Scout bar for this
-  # request. The bar opens the global Scout overlay (bold layout only). Suppressed
-  # on a page that renders its own bar (Home sets @renders_own_scout_bar so its
-  # classic bar stays untouched).
+  # request. Suppressed on a page that renders its own bar (@renders_own_scout_bar).
   def layout_scout_bar?
-    bold_layout? && !@renders_own_scout_bar
+    !@renders_own_scout_bar
   end
 
   # Whether the email layout should render the compact Scout launcher (the
-  # floating spark that opens the overlay). Bold layout only, and never on the
-  # Scout page itself, which sets @hide_scout_launcher.
+  # floating spark that opens the overlay). Never on the Scout page itself,
+  # which sets @hide_scout_launcher.
   def layout_scout_launcher?
-    bold_layout? && !@hide_scout_launcher
+    !@hide_scout_launcher
   end
 
   # ── Signup gating (see config/initializers/registration.rb) ──

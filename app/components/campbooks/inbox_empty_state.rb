@@ -2,11 +2,11 @@
 
 module Campbooks
   # The inbox zero-state, centred: Scout's avatar over a short line and, where it
-  # helps, a call to action. Shared by the classic Home empty branch and the Now
-  # deck's connect/syncing/disconnected states so the two never diverge (Home::
-  # InboxState decides which one). Copy stays under home.index.* (the Home page
-  # owns these strings and its request spec asserts them), read here by absolute
-  # key. The Now deck renders its own "Stack cleared." for the caught-up case.
+  # helps, a call to action. Shared by the Home and Now deck's connect/syncing/
+  # disconnected states (Home::InboxState decides which one). Copy stays under
+  # home.index.* (the Home page owns these strings and its request spec asserts
+  # them), read here by absolute key. The Now deck renders its own "Stack cleared."
+  # for the caught-up case.
   #
   # @param state [Symbol] :syncing | :caught_up | :disconnected | :none
   # @param wrapper_class [String] outer spacing (Home uses mt-16; the deck less)

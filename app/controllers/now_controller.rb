@@ -2,21 +2,15 @@
 
 require "pagy/extras/countless"
 
-# The rethought "bold" home (the "Now" surface): the same materialized home feed,
-# reframed as a queue of decisions you clear. Scout's ledger up top, the segment
-# rings, the decision deck (a stack of the existing Feed::Card renders), setup
-# cards, the cleared moment, and Scout's log over workspace Events — with the
-# docked Scout bar (Campbooks::ScoutBar).
+# The Now surface (the first place): the home feed reframed as a queue of decisions
+# you clear. Scout's ledger up top, the segment rings, the decision deck (a stack of
+# Feed::Card renders), setup cards, the cleared moment, and Scout's log over workspace
+# Events — with the docked Scout bar (Campbooks::ScoutBar).
 #
-# It reuses HomeController's collaborators (Feed::Reader, Home::InboxState,
-# Feed::RefreshJob) rather than duplicating the pipeline. Gated on the readiness
-# FLAG alone (require_bold_layout_enabled), NOT the per-user preference — a
-# classic-mode user can open /now on a flag-on build. The Scout overlay is a
-# follow-up PR; this page's bar is just a link to /scout.
+# Reuses HomeController's collaborators (Feed::Reader, Home::InboxState, Feed::RefreshJob)
+# rather than duplicating the pipeline.
 class NowController < ApplicationController
   include Pagy::Backend
-
-  before_action :require_bold_layout_enabled
 
   # Deliberately generous: the deck clears one card at a time, so a page holds a
   # good run before the controller lazily fetches more.

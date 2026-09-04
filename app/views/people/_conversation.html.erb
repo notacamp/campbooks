@@ -93,17 +93,31 @@
       <%# Slot for Scout's draft-questions form (EmailToolsController streams into here). %>
       <div id="thread_compose_target"></div>
 
-      <%# Thread blocks, newest-first. %>
+      <%# "Newer threads" link — shown when the permalink redirect landed on page 2+. %>
+      <% if @conversation_pagy&.page.to_i > 1 %>
+        <div class="mb-3">
+          <%= link_to t("people.conversation.newer_threads"), person_page_path(@person),
+                data: { turbo_frame: "people_detail" },
+                class: "text-sm text-muted-foreground hover:text-foreground" %>
+        </div>
+      <% end %>
+
+      <%# Thread blocks, newest-first. Each wrapper carries an id for the detail
+          rail's jump-to-thread link; the focused thread also gets the
+          scroll-into-view controller so it scrolls into view on load. %>
       <div id="people_conversation">
         <% @conversation_threads.each_with_index do |ct, i| %>
           <% is_newest = (i == 0 && @conversation_pagy&.page == 1) %>
-          <%= render Campbooks::People::ThreadBlock.new(
-                conversation_thread: ct,
-                person_first_name: people_first_name(@person),
-                person_id: @person.id,
-                newest_thread: is_newest,
-                can_send: @sendable_account_ids.include?(ct.thread.email_account_id),
-                scout_draft: (is_newest ? @scout_draft : nil)) %>
+          <% is_focused = @focused_thread_id.present? && ct.thread.id == @focused_thread_id %>
+          <div id="people_thread_block_<%= ct.thread.id %>"<% if is_focused %> data-controller="scroll-into-view"<% end %>>
+            <%= render Campbooks::People::ThreadBlock.new(
+                  conversation_thread: ct,
+                  person_first_name: people_first_name(@person),
+                  person_id: @person.id,
+                  newest_thread: is_newest,
+                  can_send: @sendable_account_ids.include?(ct.thread.email_account_id),
+                  scout_draft: (is_newest ? @scout_draft : nil)) %>
+          </div>
         <% end %>
       </div>
 

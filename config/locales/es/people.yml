@@ -109,7 +109,6 @@ es:
     index:
       tab_people: Personas
       tab_streams: Streams
-      classic_inbox: Bandeja clásica
       latest: Más recientes
       show_more:
         one: "Mostrar 1 más"
@@ -179,6 +178,7 @@ es:
         other: "%{count} correos desde %{since}"
       empty: Aún no hay mensajes.
       reply: Responder
+      newer_threads: Conversaciones más recientes
       older: Conversaciones anteriores
       star: Marcar como favorito
       unstar: Quitar de favoritos
@@ -198,7 +198,6 @@ es:
       placeholder_body: "Un stream es el correo de un servicio: newsletters, recibos, notificaciones. Abre uno para revisarlo o déjalo pasar."
       archive_all: Archivar todo
       archive_all_confirm: ¿Archivar todas las conversaciones de este stream?
-      open_classic: Abrir en clásico
       no_threads: Nada por aquí ahora mismo.
       no_subject: (sin asunto)
     stream_kinds:
@@ -213,7 +212,7 @@ es:
       documents:
         one: "%{count} documento"
         other: "%{count} documentos"
-      open_classic: Abrir página clásica de la organización
+      open_page: Página de la organización
       no_standing: Nada requiere tu atención ahora mismo.
       people_heading: "Personas en %{org} · %{count}"
       no_people: Aún no hay personas.

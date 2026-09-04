@@ -7,7 +7,7 @@
     <p class="mt-1 text-muted-foreground"><%= t("money.index.subtitle") %></p>
   </div>
   <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
-    <%= link_to t("money.index.classic"), accounting_path,
+    <%= link_to t("money.index.accounting"), accounting_path,
           class: "rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground" %>
     <%= render(Campbooks::Button.new(variant: :outline, size: :sm, href: money_export_path, data: { turbo: false })) do %>
       <%= t("money.index.export", quarter: @quarter_label) %>

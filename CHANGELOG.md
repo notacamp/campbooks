@@ -28,6 +28,11 @@ major, minor, or patch change here.
 
 ### Removed
 
+- **Classic layout removed.** The `ENABLE_BOLD_LAYOUT` feature flag and the per-user
+  Classic/Bold layout picker have been deleted. The Now/People/Paper/Money/Time
+  navigation and the Scout overlay are now the sole layout — there is no classic mode.
+  Self-hosters: remove `ENABLE_BOLD_LAYOUT` from your environment; it has no effect
+  and will not exist in future releases.
 - The "Open in inbox" link on People threads — People is the inbox.
 
 ### Fixed

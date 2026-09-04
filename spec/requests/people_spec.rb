@@ -33,24 +33,12 @@ RSpec.describe "People", type: :request do
     People::Standings.refresh!(user)
   end
 
-  describe "the bold-layout gate" do
-    it "404s when the flag is off" do
-      allow(Features).to receive(:bold_layout?).and_return(false)
-      grant_access
-      sign_in(user)
-      get people_path
-      expect(response).to have_http_status(:not_found)
-    end
+  before do
+    grant_access
+    sign_in(user)
   end
 
-  context "with the flag on" do
-    before do
-      allow(Features).to receive(:bold_layout?).and_return(true)
-      grant_access
-      sign_in(user)
-    end
-
-    describe "GET /people" do
+  describe "GET /people" do
       it "opens the top row's detail on the HTML index" do
         person, = make_person(name: "Auto Sofia", email: "auto@brightloop.example")
         refresh_standings!
@@ -645,5 +633,4 @@ RSpec.describe "People", type: :request do
         expect(response).to have_http_status(:unprocessable_content)
       end
     end
-  end
 end

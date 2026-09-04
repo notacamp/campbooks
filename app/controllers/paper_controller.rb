@@ -1,17 +1,13 @@
 # frozen_string_literal: true
 
-# Paper — the rethought document surface (Rethink stage 3). A file browser shows what a
+# Paper — the document surface (the fourth place). A file browser shows what a
 # file is CALLED; Paper shows what it SAYS: every document is a row of facts (kind, amount,
 # the date that matters, a meaning-bearing status). Reuses the Files search stack
 # (Documents::Search + Files::Searchable) and renders the same permission-scoped documents
-# through the Paper table. Gated on Features.bold_layout? (the flag, not the per-user
-# preference — a classic-mode user can open /paper on a flag-on build); "Classic files"
-# links back to /files.
+# through the Paper table.
 class PaperController < ApplicationController
   include Pagy::Backend
   include Files::Searchable
-
-  before_action :require_bold_layout_enabled
 
   PAGE_SIZE = 30
 

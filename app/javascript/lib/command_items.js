@@ -3,8 +3,8 @@
 // The item model (catalog / composite / current-email / calendar commands +
 // server search results), the client-side filtering, the keyboard navigation,
 // the debounced search, and the composite-capture state machine all live here so
-// the classic palette (command_palette_controller.js) and the Scout overlay
-// (scout_overlay_controller.js) never fork. Each controller is a thin "host"
+// the scout_overlay_controller.js never forks its own filtering / state logic.
+// The overlay controller is a thin "host"
 // that owns only its own DOM: how a row is drawn, the breadcrumb, and the input.
 //
 // The engine holds the state (selection, results, capture) and calls back into

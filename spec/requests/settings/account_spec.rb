@@ -115,26 +115,4 @@ RSpec.describe "Settings::Account", type: :request do
       expect(response).to redirect_to(new_session_path)
     end
   end
-
-  describe "Layout preference (bold vs classic)" do
-    it "updates the layout_mode enum via PATCH layout_preference" do
-      sign_in(user)
-      expect {
-        patch layout_preference_settings_account_path, params: { layout_mode: "bold" }
-      }.to change { user.reload.layout_mode }.from("classic").to("bold")
-      expect(response).to redirect_to(settings_account_path)
-    end
-
-    it "shows the Layout section only when the bold-layout flag is on" do
-      sign_in(user)
-
-      allow(Features).to receive(:bold_layout?).and_return(false)
-      get settings_account_path
-      expect(response.body).not_to include(I18n.t("settings.account.show.layout_title"))
-
-      allow(Features).to receive(:bold_layout?).and_return(true)
-      get settings_account_path
-      expect(response.body).to include(I18n.t("settings.account.show.layout_title"))
-    end
-  end
 end

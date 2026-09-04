@@ -64,17 +64,6 @@ class Settings::AccountController < Settings::BaseController
     end
   end
 
-  # Bold vs Classic layout (the rethought Now/People/Paper/Money/Time nav + Now
-  # page vs today's Home/Mail/Calendar/Scout/Files) — a no-password preference,
-  # like #compose_preference. The section is only shown when Features.bold_layout?.
-  def layout_preference
-    if current_user.update(params.permit(:layout_mode))
-      redirect_to settings_account_path, success: t(".updated")
-    else
-      redirect_to settings_account_path, alert: t(".failed")
-    end
-  end
-
   # One-shot capture of the device time zone, PATCHed by the local-greeting Stimulus
   # controller when User#time_zone is still blank. Only sets it when currently blank
   # (never overwrites a chosen zone) and only for a zone Rails can resolve; always

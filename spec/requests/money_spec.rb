@@ -14,16 +14,11 @@ RSpec.describe "Money", type: :request do
     create(:document, :approved, workspace:, document_type: :expense_invoice, currency: "EUR", **attrs)
   end
 
-  def with_flags(bold: "1", accounting: "1", &)
-    with_env("ENABLE_BOLD_LAYOUT" => bold, "ENABLE_ACCOUNTING" => accounting, &)
+  def with_flags(accounting: "1", &)
+    with_env("ENABLE_ACCOUNTING" => accounting, &)
   end
 
   describe "gating" do
-    it "404s when the bold layout flag is off" do
-      with_flags(bold: nil) { sign_in(user); get money_path }
-      expect(response).to have_http_status(:not_found)
-    end
-
     it "404s when accounting is off" do
       with_flags(accounting: nil) { sign_in(user); get money_path }
       expect(response).to have_http_status(:not_found)

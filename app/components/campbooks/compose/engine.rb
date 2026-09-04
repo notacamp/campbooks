@@ -23,20 +23,19 @@ module Campbooks
       #   HTML5 `form` attribute.
       # show_attachments: set to false when the context rail already renders the
       #   ComposeAttachments card (avoids duplicate upload UI on the Desk).
-      # bold: the rethought "compose from intent" layout (bold layout only) — a top
-      #   bar, the IntentInput, a chip envelope (subject-as-chip, inferred suffixes),
-      #   a From·Signature meta line, and a bordered editor card with a tone-rewrite
-      #   footer. Classic renders exactly as before.
+      # desk: the "compose from intent" layout — a top bar, the IntentInput, a chip
+      #   envelope (subject-as-chip, inferred suffixes), a From·Signature meta line,
+      #   and a bordered editor card with a tone-rewrite footer.
       # persistent_status: keep the autosave status visible with a check ("Saved
       #   just now") instead of the fading "Draft saved".
-      # intent/heading/back_url: bold top-bar + IntentInput inputs.
+      # intent/heading/back_url: desk top-bar + IntentInput inputs.
       # to_inferred/subject_inferred: mark the prefilled chips "· inferred".
       def initialize(shell:, mode:, action_url:, message: nil, draft: nil,
                      to: "", cc: "", bcc: "", subject: "", body: "", quoted_body: "",
                      signatures: [], signature_id: nil, account: nil, accounts: [],
                      attachment_entries: [], scout_draft: nil,
                      form_id: nil, show_attachments: true,
-                     bold: false, persistent_status: false, intent: "",
+                     desk: false, persistent_status: false, intent: "",
                      heading: nil, back_url: nil, to_inferred: false, subject_inferred: false)
         @shell = shell
         @mode = mode.to_sym
@@ -57,7 +56,7 @@ module Campbooks
         @scout_draft = scout_draft
         @form_id = form_id
         @show_attachments = show_attachments
-        @bold = bold
+        @desk = desk
         @persistent_status = persistent_status
         @intent = intent.to_s
         @heading = heading
@@ -72,7 +71,7 @@ module Campbooks
                  "keydown->compose-engine#keydown turbo:submit-end->compose-engine#restoreButton"
         # Bold: Scout's intent draft lands in the editor → mark it (a chip that
         # clears on the first edit) and restore the intent's Draft button.
-        action += " compose-chat:body-set@window->compose-engine#markScoutDraft" if bold?
+        action += " compose-chat:body-set@window->compose-engine#markScoutDraft" if desk?
 
         form_data = {
           controller: "compose-engine compose-autosave",
@@ -87,9 +86,9 @@ module Campbooks
           compose_autosave_mode_value: @mode.to_s,
           compose_autosave_in_reply_to_id_value: @message&.id.to_s,
           compose_autosave_saving_text_value: t(".saving"),
-          compose_autosave_saved_text_value: bold? ? t(".saved_just_now") : t(".draft_saved")
+          compose_autosave_saved_text_value: desk? ? t(".saved_just_now") : t(".draft_saved")
         }
-        if bold?
+        if desk?
           form_data[:scout_draft] = "false"
           form_data[:compose_autosave_persistent_status_value] = "true"
           form_data[:compose_engine_rewrite_url_value] = helpers.rewrite_draft_email_messages_path
@@ -99,7 +98,7 @@ module Campbooks
         end
 
         form_attrs = { action: @action_url, method: "post",
-                       class: bold? ? "flex flex-col" : "flex flex-col min-h-0 flex-1", data: form_data }
+                       class: desk? ? "flex flex-col" : "flex flex-col min-h-0 flex-1", data: form_data }
         form_attrs[:id] = @form_id if @form_id.present?
 
         form(**form_attrs) do
@@ -110,7 +109,7 @@ module Campbooks
             input(type: "hidden", name: "email_account_id", value: (@account || @accounts.first).id)
           end
 
-          if bold?
+          if desk?
             bold_body
           else
             envelope
@@ -129,7 +128,7 @@ module Campbooks
       private
 
       def dock? = @shell == :dock
-      def bold? = @bold
+      def desk? = @desk
 
       # A fixed sending identity (reply flows resolve the account server-side
       # from the source message; new-message with one account pins it here).

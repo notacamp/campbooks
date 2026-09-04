@@ -13,10 +13,8 @@
 
   <div class="flex-1"></div>
 
-  <%# Only one of these controllers is mounted at a time (command-palette in
-      classic, scout-overlay in bold), so both actions open whichever exists. %>
   <button type="button"
-          data-action="click->command-palette#open click->scout-overlay#open"
+          data-action="click->scout-overlay#open"
           class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer"
           aria-label="<%= t('.search_and_commands') %>">
     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

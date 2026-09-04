@@ -2,7 +2,6 @@
 en:
   now:
     index:
-      classic_feed: Classic feed
       need_you_chip:
         zero: nothing needs you
         one: "%{count} needs you"

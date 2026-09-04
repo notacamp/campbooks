@@ -12,7 +12,6 @@ RSpec.describe "People page performance", type: :request do
   let(:account) { create(:email_account, workspace: workspace) }
 
   before do
-    allow(Features).to receive(:bold_layout?).and_return(true)
     create(:email_account_user, user: user, email_account: account, can_read: true, can_send: true)
     sign_in(user)
   end

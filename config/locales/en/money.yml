@@ -4,7 +4,7 @@ en:
     index:
       title: "Money"
       subtitle: "What you're owed, what you owe, and what the bank says."
-      classic: "Classic accounting"
+      accounting: "Accounting"
       export: "Export %{quarter}"
       add: "Add"
       add_title: "Add documents"

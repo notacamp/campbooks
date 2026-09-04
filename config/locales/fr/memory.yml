@@ -108,9 +108,8 @@ fr:
         button: Apprendre
   navigation:
     settings:
-      bold:
-        memory: Mémoire de Scout
-        connections: Connexions
-        workspace_people: Espace et personnes
-        account: Compte
-        plan: Forfait
+      memory: Mémoire de Scout
+      connections: Connexions
+      workspace_people: Espace et personnes
+      account: Compte
+      plan: Forfait

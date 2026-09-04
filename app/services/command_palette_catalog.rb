@@ -29,15 +29,12 @@ class CommandPaletteCatalog
 
   def navigate
     [
-      # Now (the rethought decision deck) is reachable from Cmd+K even for classic
-      # users whenever the flag is on, so they can try it without switching layout.
-      *(Features.bold_layout? ? [ cmd("now", I18n.t("command_palette.commands.now"), I18n.t("command_palette.categories.navigate"), "grid", now_path) ] : []),
-      *(Features.bold_layout? ? [ cmd("paper", I18n.t("command_palette.commands.paper"), I18n.t("command_palette.categories.navigate"), "file", paper_path) ] : []),
+      cmd("now", I18n.t("command_palette.commands.now"), I18n.t("command_palette.categories.navigate"), "grid", now_path),
+      cmd("people", I18n.t("command_palette.commands.people"), I18n.t("command_palette.categories.navigate"), "users", people_path),
+      cmd("paper", I18n.t("command_palette.commands.paper"), I18n.t("command_palette.categories.navigate"), "file", paper_path),
       # Money (the obligations surface) lives wherever the accounting module does.
-      *(Features.bold_layout? && Features.accounting? ? [ cmd("money", I18n.t("command_palette.commands.money"), I18n.t("command_palette.categories.navigate"), "credit-card", money_path) ] : []),
-      # People (the rethought conversations place) — bold layout only.
-      *(Features.bold_layout? ? [ cmd("people", I18n.t("command_palette.commands.people"), I18n.t("command_palette.categories.navigate"), "users", people_path) ] : []),
-      cmd("inbox", I18n.t("command_palette.commands.inbox"), I18n.t("command_palette.categories.navigate"), "mail", root_path),
+      *(Features.accounting? ? [ cmd("money", I18n.t("command_palette.commands.money"), I18n.t("command_palette.categories.navigate"), "credit-card", money_path) ] : []),
+      cmd("time", I18n.t("command_palette.commands.time"), I18n.t("command_palette.categories.navigate"), "calendar", time_path),
       cmd("scout", I18n.t("command_palette.commands.scout_ai_chat"), I18n.t("command_palette.categories.navigate"), "sparkles", scout_path),
       cmd("files", I18n.t("command_palette.commands.files"), I18n.t("command_palette.categories.navigate"), "folder", files_path),
       # Workflows is gated off by default until it's production-ready (Features.workflows?).
@@ -47,9 +44,6 @@ class CommandPaletteCatalog
       cmd("email-scans", I18n.t("command_palette.commands.email_scans"), I18n.t("command_palette.categories.navigate"), "search", email_messages_path(inbox_settings: "accounts")),
       cmd("notifications", I18n.t("command_palette.commands.notifications"), I18n.t("command_palette.categories.navigate"), "bell", notifications_path),
       cmd("calendar", I18n.t("command_palette.commands.calendar"), I18n.t("command_palette.categories.navigate"), "calendar", calendar_path),
-      # Time (the bold agenda) is reachable from Cmd+K even for a classic user on a
-      # flag-on build, like Now above.
-      *(Features.bold_layout? ? [ cmd("time", I18n.t("command_palette.commands.time"), I18n.t("command_palette.categories.navigate"), "calendar", time_path) ] : []),
       cmd("contacts", I18n.t("command_palette.commands.settings_contacts"), I18n.t("command_palette.categories.navigate"), "users", contacts_path)
     ]
   end
@@ -88,7 +82,7 @@ class CommandPaletteCatalog
   end
 
   # Static calendar destinations (view switches + today). Page-relative previous/next
-  # are added client-side in command_palette_controller (they depend on the view+date
+  # are added client-side in scout_overlay_controller (they depend on the view+date
   # currently rendered).
   def calendar_commands
     cat = I18n.t("command_palette.categories.calendar")

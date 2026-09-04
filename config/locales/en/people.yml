@@ -109,7 +109,6 @@ en:
     index:
       tab_people: People
       tab_streams: Streams
-      classic_inbox: Classic inbox
       latest: Latest
       show_more:
         one: "Show 1 more"
@@ -179,6 +178,7 @@ en:
         other: "%{count} emails since %{since}"
       empty: No messages yet.
       reply: Reply
+      newer_threads: Newer threads
       older: Older conversations
       star: Star
       unstar: Unstar
@@ -198,7 +198,6 @@ en:
       placeholder_body: A stream is a service's mail — newsletters, receipts, notifications. Open one to skim it, or leave it be.
       archive_all: Archive all
       archive_all_confirm: Archive every thread in this stream?
-      open_classic: Open in classic
       no_threads: Nothing here right now.
       no_subject: (no subject)
     stream_kinds:
@@ -213,7 +212,7 @@ en:
       documents:
         one: "%{count} document"
         other: "%{count} documents"
-      open_classic: Open classic organization page
+      open_page: Organization page
       no_standing: Nothing needs you here right now.
       people_heading: "People at %{org} · %{count}"
       no_people: No people yet.

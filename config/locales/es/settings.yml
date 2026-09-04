@@ -36,7 +36,6 @@ es:
       language:
         failed: No se pudo actualizar el idioma. Inténtelo de nuevo.
         updated: Idioma actualizado.
-      layout_preference:
         failed: No se pudo actualizar tu diseño. Inténtalo de nuevo.
         updated: Diseño actualizado.
       show:
@@ -60,16 +59,8 @@ es:
         language_title: Idioma
         new_password: Nueva contraseña
         privacy_policy: Política de Privacidad
-        layout_bold_desc: "Ahora, Personas, Papeles, Dinero y Tiempo. El Campbooks repensado;\
-          \ algunos apartados todavía abren las pantallas clásicas por ahora."
-        layout_bold_title: Negrita
-        layout_classic_desc: "Inicio, Correo, Calendario, Scout y Archivos."
-        layout_classic_title: "Clásico"
-        layout_intro: "Elige cómo está organizado Campbooks. El diseño Negrita está en vista previa."
-        layout_title: "Diseño"
         save_compose: Guardar
         save_language: Guardar
-        save_layout: Guardar
         subtitle: Gestione su contraseña y las preferencias de su cuenta.
         terms_of_service: Términos del Servicio
         title: Configuración de cuenta

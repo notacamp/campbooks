@@ -2,7 +2,6 @@
 pt:
   now:
     index:
-      classic_feed: Vista clássica
       need_you_chip:
         zero: nada precisa de si
         one: "%{count} precisa de si"

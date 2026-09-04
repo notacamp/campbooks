@@ -1,18 +1,14 @@
 # frozen_string_literal: true
 
-# The bold Time surface (the Rethink's fifth place): one agenda that interleaves
-# calendar events, deadlines Scout found in mail (pending reminders), due-dated
-# tasks, and Scout's proposed focus blocks — plus the classic Week/Month grids as
-# toggles. Reuses the calendar's loading (Calendars::PageData) and adds tasks +
-# focus blocks; reminders are ROWS here, not a tab. Gated on the readiness FLAG
-# (Features.bold_layout?) — it works for a classic-mode user on a flag-on build,
-# just like /now. The classic /calendar is untouched.
+# The Time surface (the fifth place): one agenda that interleaves calendar events,
+# deadlines Scout found in mail (pending reminders), due-dated tasks, and Scout's
+# proposed focus blocks — plus Week/Month grids as toggles. Reuses the calendar's
+# loading (Calendars::PageData) and adds tasks + focus blocks; reminders are ROWS
+# here, not a tab.
 class TimeController < ApplicationController
   include TimeAgendaLoading # load_time_agenda / agenda_move_slots / AGENDA_DAYS
 
   VIEWS = %w[agenda week month].freeze
-
-  before_action :require_bold_layout_enabled
 
   def index
     @view = VIEWS.include?(params[:view]) ? params[:view] : "agenda"

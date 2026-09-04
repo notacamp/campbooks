@@ -56,7 +56,6 @@ RSpec.describe "People::Actions", type: :request do
   end
 
   before do
-    allow(Features).to receive(:bold_layout?).and_return(true)
     grant_access
     sign_in(user)
   end
