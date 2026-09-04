@@ -24,7 +24,11 @@ major, minor, or patch change here.
 - Keys on People: the `g` navigation chords (`g n`, `g p`, `g d`, `g m`, `g t`, `g s`) now work
   there too, the list's arrow keys stay out of the way while the Scout overlay is open,
   Enter on a focused button no longer also opens the selected row, and the `?` cheat
-  sheet lists the People keys.
+  sheet lists the People keys. `e` now archives the selected person's newest thread
+  (Done moved to `d`), and the arrow keys start from the person that is open, with the
+  selected row highlighted.
+- People rows outside the lanes now carry their newest message too, so Reply and Archive
+  work from the list (hover, `r`, `e`) for everyone, not only for people who need you.
 
 ## [0.36.0] - 2026-09-04
 

@@ -147,6 +147,7 @@ en:
         people_reply: "Reply"
         people_reply_all: "Reply all"
         people_forward: "Forward"
+        people_archive: "Archive the thread"
         people_done: "Done"
         people_snooze: "Snooze until tomorrow"
         people_more: "More actions"

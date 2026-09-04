@@ -147,6 +147,7 @@ es:
         people_reply: "Responder"
         people_reply_all: "Responder a todos"
         people_forward: "Reenviar"
+        people_archive: "Archivar la conversación"
         people_done: "Hecho"
         people_snooze: "Posponer hasta mañana"
         people_more: "Más acciones"

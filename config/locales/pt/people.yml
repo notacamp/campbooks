@@ -18,7 +18,7 @@ pt:
           other: "%{count}d"
         actions:
           reply_hint: "Responder (r)"
-          done_hint: "Feito (e)"
+          done_hint: "Concluído (d)"
           snooze_hint: "Adiar (s)"
           star_hint: Destacar
           unstar_hint: Remover destaque

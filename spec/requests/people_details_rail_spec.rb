@@ -38,6 +38,20 @@ RSpec.describe "People details rail", type: :request do
     expect(button).not_to include("xl:hidden")
   end
 
+  it "lights the keyboard-selected row and exposes the archive hook the e key uses" do
+    thread = create(:email_thread, email_account: account, subject: "Q3 deck")
+    create(:email_message, email_account: account, email_thread: thread, contact: contact,
+           from_address: "sofia@brightloop.example", body: "Hi", received_at: 1.day.ago)
+    People::Standings.refresh!(user)
+
+    get people_path
+
+    expect(response).to have_http_status(:ok)
+    row = response.body[/<div id="people_row_latest_#{person.id}"[^<]*?>/]
+    expect(row).to include("aria-selected:bg-secondary")
+    expect(response.body).to include("data-people-archive")
+  end
+
   it "gives the rail header a close control that works at desktop width too" do
     get people_details_path(person)
 

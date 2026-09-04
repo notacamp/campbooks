@@ -18,7 +18,7 @@ es:
           other: "%{count}d"
         actions:
           reply_hint: "Responder (r)"
-          done_hint: "Hecho (e)"
+          done_hint: "Hecho (d)"
           snooze_hint: "Posponer (s)"
           star_hint: Destacar
           unstar_hint: Quitar destaque

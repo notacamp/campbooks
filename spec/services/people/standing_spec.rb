@@ -115,6 +115,16 @@ RSpec.describe People::Standing do
     expect(st.kind).to eq(:last_exchange)
   end
 
+  it "carries the newest inbound message without an attention item, so the row can reply and archive" do
+    p = person_with(name: "Quiet", context_summary: nil, last_inbound: 3.days.ago)
+    newest = EmailMessage.where(contact_id: p.contacts.ids).order(received_at: :desc).first
+    expect(newest).to be_present
+
+    st = described_class.for_person(p, user: user)
+    expect(st.kind).to eq(:last_exchange)
+    expect(st.email_message_id).to eq(newest.id)
+  end
+
   it "Result.none has kind :none and needs_you false" do
     expect(described_class::Result.none.kind).to eq(:none)
     expect(described_class::Result.none.needs_you).to be false

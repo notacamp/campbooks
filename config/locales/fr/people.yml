@@ -18,7 +18,7 @@ fr:
           other: "%{count}j"
         actions:
           reply_hint: "Répondre (r)"
-          done_hint: "Fait (e)"
+          done_hint: "Terminé (d)"
           snooze_hint: "Reporter (s)"
           star_hint: Mettre en vedette
           unstar_hint: Retirer des favoris
