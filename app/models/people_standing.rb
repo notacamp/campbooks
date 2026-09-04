@@ -23,6 +23,8 @@ class PeopleStanding < ApplicationRecord
   # Primary sort: score descending, then persons before their org on ties (Person > Organization
   # lexicographically), then livelier row, then id for stable pagination.
   scope :ranked,    -> { order(score: :desc, counterpart_type: :desc, last_activity_at: :desc, id: :asc) }
+  # The inbox order: newest activity first, rows without activity last, stable by id.
+  scope :latest,    -> { order(Arel.sql("last_activity_at DESC NULLS LAST"), id: :asc) }
   scope :search, lambda { |query|
     like = "%#{sanitize_sql_like(query.to_s.strip)}%"
     where("name ILIKE :like OR subtitle ILIKE :like OR avatar_email ILIKE :like", like: like)

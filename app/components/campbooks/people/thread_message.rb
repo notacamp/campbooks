@@ -14,6 +14,9 @@ module Campbooks
     #     a paperclip glyph when attachments are present, and the received-at time
     #
     # The content (shown when open) is the sanitized body plus an attachments row.
+    # With `lazy_src` the content is a lazy turbo-frame instead, so a folded
+    # message costs nothing until it is expanded: the frame loads the body from
+    # People::MessagesController, which renders this component `content_only`.
     # We use Tailwind's `group` on <details> so child elements can react to
     # open/closed state via `group-open:*` utilities.
     #
@@ -21,18 +24,26 @@ module Campbooks
     # @param person_first_name [String] e.g. "Sofia"
     # @param open [Boolean] whether this <details> starts open
     # @param full_body [Boolean] render the full body (newest of newest thread only)
+    # @param lazy_src [String, nil] URL that serves the body (folded messages)
+    # @param content_only [Boolean] render just the body + attachments (the frame's content)
     class ThreadMessage < Campbooks::Base
+      register_element :turbo_frame
+
       CLIP_ICON = '<svg class="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>'
       PREVIEW_THRESHOLD = 600
 
-      def initialize(message:, person_first_name:, open: false, full_body: false)
+      def initialize(message:, person_first_name:, open: false, full_body: false, lazy_src: nil, content_only: false)
         @message = message
         @person_first_name = person_first_name
         @open = open
         @full_body = full_body
+        @lazy_src = lazy_src
+        @content_only = content_only
       end
 
       def view_template
+        return message_content if @content_only
+
         details(class: "group px-4 py-3", open: @open || nil) do
           summary(class: "flex min-w-0 cursor-pointer list-none items-center gap-2") do
             render(ContactAvatar.new(
@@ -56,12 +67,28 @@ module Campbooks
               plain(@message.received_at ? l(@message.received_at, format: :at_short) : "")
             end
           end
-          div(class: "mt-2 overflow-x-auto") { message_body }
-          attachments_row if has_attachments?
+          if @lazy_src
+            lazy_content
+          else
+            message_content
+          end
         end
       end
 
       private
+
+      # A closed <details> keeps its frame out of view, so Turbo only fetches the
+      # body once the row is expanded.
+      def lazy_content
+        turbo_frame(id: "people_message_#{@message.id}", src: @lazy_src, loading: "lazy", class: "mt-2 block") do
+          div(class: "flex items-center py-1") { render(Campbooks::Spinner.new(size: :sm)) }
+        end
+      end
+
+      def message_content
+        div(class: @content_only ? "overflow-x-auto" : "mt-2 overflow-x-auto") { message_body }
+        attachments_row if has_attachments?
+      end
 
       def avatar_email
         @message.sent? ? (@message.email_account&.email_address || "?") : (@message.from_address || "?")

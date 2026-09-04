@@ -48,7 +48,11 @@ pt:
       tab_people: Pessoas
       tab_streams: Streams
       classic_inbox: Caixa clássica
-      recent: Recentes
+      latest: Mais recentes
+      show_more:
+        one: "Mostrar mais 1"
+        other: "Mostrar mais %{count}"
+      show_less: Mostrar menos
       organization: Organização
       people_count:
         one: "%{count} pessoa"

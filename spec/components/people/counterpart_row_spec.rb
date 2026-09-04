@@ -125,4 +125,24 @@ RSpec.describe Campbooks::People::CounterpartRow, type: :component do
     html = render(described_class.new(counterpart: counterpart))
     expect(html).to include("text-amber-500")
   end
+
+  describe "the latest variant (the inbox list)" do
+    it "carries its own id, shows the date instead of the wait, and the message's first line" do
+      person = create(:person, name: "Sofia Martins")
+      counterpart = People::Counterpart.new(kind: :person, record: person, name: "Sofia Martins",
+                                            subtitle: "Brightloop", avatar_email: "sofia@brightloop.example",
+                                            avatar_initial: nil, last_activity: Time.current,
+                                            standing: standing(needs_you: true, verb: :reply,
+                                                               subject: "Q3 deck", wait_days: 2),
+                                            data: { "snippet" => "Can you send the deck by Friday?" })
+      lane = render(described_class.new(counterpart: counterpart))
+      latest = render(described_class.new(counterpart: counterpart, variant: :latest))
+
+      expect(latest).to include("id=\"people_row_latest_#{person.id}\"")
+      expect(latest).not_to include("id=\"people_row_#{person.id}\"")
+      expect(latest).to include("Can you send the deck by Friday?")
+      expect(lane).to include("2d")        # the lane shape shows how long they have waited
+      expect(latest).not_to include("2d")  # the inbox shape shows when the message arrived
+    end
+  end
 end

@@ -1,1 +1,2 @@
-<%= render Campbooks::People::CounterpartRow.new(counterpart: counterpart, selected: (@selected_id == counterpart.id)) %>
+<%= render Campbooks::People::CounterpartRow.new(counterpart: counterpart, selected: (@selected_id == counterpart.id),
+      variant: local_assigns.fetch(:variant, :lane)) %>

@@ -16,6 +16,23 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **People is the inbox.** Under the verb lanes, People now lists everyone by their
+  latest message, newest first — the whole mailbox, scrolling as far back as it goes —
+  with a one-line preview on each row. The page opens on the latest received message,
+  and opening a conversation marks it read the way the inbox does: on the device, at
+  the provider, and live in every open inbox. Each lane shows five rows and folds the
+  rest behind "Show N more".
+
+### Changed
+
+- **Opening a person is fast however long the history.** Only the newest thread arrives
+  with the page; older threads load as they scroll into view, and a folded message
+  fetches its body when you expand it.
+- The conversation pane now stretches to the width of its column, and Scout's action
+  chips no longer sit flush on the first thread.
+
 ## [0.34.0] - 2026-09-04
 
 ### Added

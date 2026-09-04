@@ -48,7 +48,11 @@ en:
       tab_people: People
       tab_streams: Streams
       classic_inbox: Classic inbox
-      recent: Recent
+      latest: Latest
+      show_more:
+        one: "Show 1 more"
+        other: "Show %{count} more"
+      show_less: Show less
       organization: Organization
       people_count:
         one: "%{count} person"

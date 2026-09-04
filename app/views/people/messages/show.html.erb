@@ -1,0 +1,8 @@
+<%# The body of one folded conversation message, streamed into the frame its
+    ThreadMessage row rendered under the summary line. %>
+<%= turbo_frame_tag "people_message_#{@message.id}" do %>
+  <%= render Campbooks::People::ThreadMessage.new(
+        message: @message,
+        person_first_name: people_first_name(@person),
+        content_only: true) %>
+<% end %>

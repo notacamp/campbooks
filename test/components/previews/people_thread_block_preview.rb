@@ -44,6 +44,22 @@ class PeopleThreadBlockPreview < Lookbook::Preview
     )
   end
 
+  # An older thread as the person page first renders it: the heading over the
+  # lazy frame that People::ThreadsController fills in when it scrolls into view.
+  def older_thread_lazy
+    _account, _person, thread, messages = sample_data
+    ct = People::ConversationThread.new(thread: thread, count: messages.size,
+                                        latest_at: messages.last.received_at, newest_id: messages.last.id)
+    render Campbooks::People::ThreadBlock.new(
+      conversation_thread: ct,
+      person_first_name: "Sofia",
+      person_id: SecureRandom.uuid,
+      newest_thread: false,
+      can_send: false,
+      scout_draft: nil
+    )
+  end
+
   # A thread with a single message that has an attachment.
   def thread_with_attachment
     account = EmailAccount.first || FactoryBot.create(:email_account)

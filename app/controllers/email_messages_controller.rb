@@ -400,19 +400,10 @@ class EmailMessagesController < ApplicationController
   # viewed_at clause also catches messages that synced in already-read but were
   # never opened here, so the nav dot still clears. Shared by the full-page `show`
   # and the bottom-right `drawer_content` so opening either surface marks read.
+  # Shared with the People conversation (Emails::MarkThreadRead): local update,
+  # provider sync through MarkReadJob, and the live inbox broadcast.
   def mark_thread_read
-    return unless @thread
-
-    messages = @thread.email_messages
-    unread_ids = messages.where(read: false).pluck(:provider_message_id)
-    messages.where(read: false).or(messages.where(viewed_at: nil))
-            .update_all(read: true, viewed_at: Time.current, updated_at: Time.current)
-    return if unread_ids.empty?
-
-    MarkReadJob.perform_later(@message.email_account_id, unread_ids) if @message.email_account_id
-    # Live inbox: clear the unread dot on this thread's row in every other open
-    # inbox (other tabs/devices, teammates sharing the mailbox).
-    Emails::InboxBroadcaster.replace(@thread)
+    Emails::MarkThreadRead.call(@thread, account_id: @message&.email_account_id)
   end
 
   def readable_accounts

@@ -61,15 +61,17 @@
 
   <%# Scrollable threads column — newest at the top. %>
   <div class="flex-1 overflow-y-auto">
-    <div class="mx-auto w-full max-w-[720px] px-5 pb-6 pt-5">
+    <div class="w-full px-6 pb-6 pt-5">
 
       <%# Scout's standing pinned above the threads. %>
       <%= render Campbooks::ScoutNote.new(message: @standing.text.presence || people_standing_note(@standing, @person) || t("people.conversation.no_standing"),
             time: t("people.conversation.where_things_stand"), class: "mb-3") %>
 
       <% if @can_send && @reply_target %>
-        <%= render Campbooks::EmailScoutActions.new(message: @reply_target, surface: :detail,
-              can_send: @can_send, show_note: false) %>
+        <div class="mb-3">
+          <%= render Campbooks::EmailScoutActions.new(message: @reply_target, surface: :detail,
+                can_send: @can_send, show_note: false) %>
+        </div>
       <% end %>
 
       <%# Slot for Scout's draft-questions form (EmailToolsController streams into here). %>
@@ -81,6 +83,7 @@
           <%= render Campbooks::People::ThreadBlock.new(
                 conversation_thread: ct,
                 person_first_name: people_first_name(@person),
+                person_id: @person.id,
                 newest_thread: (i == 0 && @conversation_pagy&.page == 1),
                 can_send: @can_send,
                 scout_draft: (i == 0 && @conversation_pagy&.page == 1 ? @scout_draft : nil)) %>

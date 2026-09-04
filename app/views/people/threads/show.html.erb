@@ -1,0 +1,9 @@
+<%# One lazily-loaded thread of a person's conversation: the ThreadBlock's message
+    list, streamed into the frame the person page rendered under the heading. %>
+<%= turbo_frame_tag "people_thread_#{@thread.id}" do %>
+  <%= render Campbooks::People::ThreadBlock.new(
+        conversation_thread: @conversation_thread,
+        person_first_name: people_first_name(@person),
+        person_id: @person.id,
+        frame_only: true) %>
+<% end %>

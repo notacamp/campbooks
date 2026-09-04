@@ -171,8 +171,12 @@ RSpec.describe People::Standings do
       person_a.update!(name: "A Renamed")
 
       # have_broadcasted_to requires ActionCable::TestHelper; use a message expectation instead.
+      # A row lives in a lane and in Latest, so each change replaces both shapes.
       expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to).with(
         "people_#{user.id}", hash_including(target: "people_row_#{person_a.id}")
+      ).once
+      expect(Turbo::StreamsChannel).to receive(:broadcast_replace_to).with(
+        "people_#{user.id}", hash_including(target: "people_row_latest_#{person_a.id}")
       ).once
       described_class.refresh!(user)
     end

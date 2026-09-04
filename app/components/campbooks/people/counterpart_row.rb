@@ -36,10 +36,14 @@ module Campbooks
       # @param counterpart [People::Counterpart]
       # @param selected [Boolean] lit (left-pane selection)
       # @param nested [Boolean] organization-page row shape (trailing "Open" button)
-      def initialize(counterpart:, selected: false, nested: false)
+      # @param variant [Symbol] :lane (the verb lanes: wait at the right) or :latest
+      #   (the inbox list: the date at the right). The two lists can hold the same
+      #   person, so the DOM id carries the variant.
+      def initialize(counterpart:, selected: false, nested: false, variant: :lane)
         @counterpart = counterpart
         @selected = selected
         @nested = nested
+        @variant = variant
       end
 
       def view_template
@@ -104,7 +108,7 @@ module Campbooks
       end
 
       def right_meta
-        if @counterpart.needs_you?
+        if @counterpart.needs_you? && @variant == :lane
           wait = standing.wait_days.to_i
           urgent = wait >= 7
           div(class: "flex flex-shrink-0 items-center gap-0.5") do
@@ -121,13 +125,17 @@ module Campbooks
         end
       end
 
+      # Scout's read with the spark when there is one; otherwise the newest
+      # message's first line, muted — the row then reads like an inbox row.
       def standing_line
         text = standing.text
-        return if text.blank?
-
-        div(class: "mt-0.5 flex items-start gap-1 text-[12px] leading-snug text-foreground/70 line-clamp-1") do
-          span(class: "mt-[2px] flex-shrink-0", style: "color: var(--ember-solid)") { raw(safe(SPARK)) }
-          span(class: "min-w-0 line-clamp-1") { text }
+        if text.present?
+          div(class: "mt-0.5 flex items-start gap-1 text-[12px] leading-snug text-foreground/70 line-clamp-1") do
+            span(class: "mt-[2px] flex-shrink-0", style: "color: var(--ember-solid)") { raw(safe(SPARK)) }
+            span(class: "min-w-0 line-clamp-1") { text }
+          end
+        elsif (snippet = data["snippet"]).present?
+          div(class: "mt-0.5 text-[12px] leading-snug text-muted-foreground line-clamp-1") { snippet }
         end
       end
 
@@ -274,7 +282,7 @@ module Campbooks
       end
 
       def row_dom_id
-        "people_row_#{@counterpart.id}"
+        @variant == :latest ? "people_row_latest_#{@counterpart.id}" : "people_row_#{@counterpart.id}"
       end
 
       def standing    = @counterpart.standing

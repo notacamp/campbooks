@@ -14,6 +14,9 @@ module PeopleLayout
   include Pagy::Backend
 
   PEOPLE_PER_PAGE = 30
+  # Lanes show this many rows before folding the rest behind "Show N more", so the
+  # Latest list (the inbox proper) starts near the top of the pane.
+  LANE_CAP = 5
 
   included do
     before_action :require_bold_layout_enabled
@@ -36,17 +39,18 @@ module PeopleLayout
     @query = params[:q].to_s.strip
     lazy_backfill_sender_kinds          # cheap EXISTS; enqueues if unclassified contacts remain
     ensure_standings_fresh              # inline on first visit, enqueue-and-serve when stale
-    rows = PeopleStanding.for_user(current_user).ranked
+    rows = PeopleStanding.for_user(current_user)
     rows = rows.search(@query) if @query.present?
 
-    # Build lane structure: Need-you rows grouped by verb, then Recent paginated.
-    needing = rows.needing.map(&:to_counterpart)
+    # Lanes: the rows that need you, grouped by verb, best first.
+    needing = rows.needing.ranked.map(&:to_counterpart)
     @lanes  = build_lanes(needing)
-    # Keep @need_you for backward-compat (detail pane, specs).
     @need_you = needing
 
-    @recent_pagy, recent_rows = pagy_countless(rows.recent, limit: PEOPLE_PER_PAGE)
-    @recent = recent_rows.map(&:to_counterpart)
+    # Latest: everyone, newest activity first — the inbox proper. Lane people
+    # appear here too, so the newest sender is always at the top of Latest.
+    @latest_pagy, latest_rows = pagy_countless(rows.latest, limit: PEOPLE_PER_PAGE)
+    @latest = latest_rows.map(&:to_counterpart)
   end
 
   # Group Need-you counterparts into ordered verb lanes.
