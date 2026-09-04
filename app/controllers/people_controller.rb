@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "pagy/extras/countless"
-
 # The People place (Rethink Stage 2): the workspace's persons and organizations
 # ordered by who needs you, and a person opened as ONE conversation across all
 # their threads — Scout's summary pinned on top, the reply box docked at the
@@ -69,7 +67,8 @@ class PeopleController < ApplicationController
     @conversation_messages = page.to_a.reverse
     @newest_message = @conversation_messages.last
 
-    @standing = People::Standing.for_person(@person, user: current_user)
+    @standing = PeopleStanding.for_user(current_user).find_by(counterpart: @person)&.standing ||
+                People::Standing.for_person(@person, user: current_user)
     @primary_contact = @person.contacts.max_by { |c| c.email_count.to_i }
     @email_total = @person.total_email_count
     @first_seen = contact_ids.any? ? EmailMessage.where(contact_id: contact_ids).minimum(:received_at) : nil

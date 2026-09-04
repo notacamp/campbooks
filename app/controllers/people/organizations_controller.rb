@@ -33,13 +33,32 @@ module People
 
     def build_org_detail
       people = org_detail_people
-      prime_standing(people: people, organizations: [ @organization ])
-      @standing = people_standing.organization(@organization)
-      @org_people = people.map { |person| person_counterpart(person) }
-                          .sort_by { |counterpart| -(counterpart.last_activity&.to_i || 0) }
+      ids    = people.map(&:id)
+
+      # Read person rows from the standings table (fast, no email queries).
+      rows_by_person_id = PeopleStanding.for_user(current_user)
+                                        .where(counterpart_type: "Person", counterpart_id: ids)
+                                        .index_by(&:counterpart_id)
+
+      # Fall back to live computation for members not yet in the table.
+      missing_people = people.reject { |p| rows_by_person_id.key?(p.id) }
+      fallback_dir = missing_people.any? ? People::Directory.new(current_user, workspace: Current.workspace) : nil
+
+      @org_people = people.map do |person|
+        if (row = rows_by_person_id[person.id])
+          row.to_counterpart
+        else
+          fallback_dir.counterpart_for(person)
+        end
+      end.sort_by { |c| -(c.last_activity&.to_i || 0) }
+
+      # Org standing: from the table, else live.
+      @standing = PeopleStanding.for_user(current_user).find_by(counterpart: @organization)&.standing ||
+                  People::Standing.for_organization(@organization, user: current_user)
+
       @org_streams = org_stream_summaries
-      @first_year = @organization.email_messages.minimum(:received_at)&.year
-      @doc_count = @organization.documents.count
+      @first_year  = @organization.email_messages.minimum(:received_at)&.year
+      @doc_count   = @organization.documents.count
     end
 
     def org_detail_people
@@ -70,11 +89,11 @@ module People
 
     def stream_kind_icon(kind)
       case kind
-      when "billing"      then :file
+      when "billing"       then :file
       when "notifications" then :bell
-      when "newsletters"  then :mail
-      when "social"       then :users
-      else                     :file
+      when "newsletters"   then :mail
+      when "social"        then :users
+      else                      :file
       end
     end
 
