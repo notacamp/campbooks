@@ -51,6 +51,38 @@ RSpec.describe "People", type: :request do
     end
 
     describe "GET /people" do
+      it "opens the top row's detail on the HTML index" do
+        person, = make_person(name: "Auto Sofia", email: "auto@brightloop.example")
+        refresh_standings!
+
+        get people_path
+        expect(response).to have_http_status(:ok)
+        # The detail pane content (conversation heading or Scout note) should be present.
+        expect(response.body).to include("Auto Sofia")
+        # start-on-list-value should be true (phones keep the list).
+        expect(response.body).to match(/start-on-list-value="true"/)
+      end
+
+      it "does not auto-open on a turbo frame request" do
+        make_person(name: "Sofia Martins", email: "sofia@brightloop.example")
+        refresh_standings!
+
+        get people_path, headers: { "Turbo-Frame" => "people_results" }
+        expect(response).to have_http_status(:ok)
+        # Frame response should not contain the full conversation pane.
+        expect(response.body).not_to match(/where.things.stand/)
+      end
+
+      it "renders the people_new_pill container" do
+        get people_path
+        expect(response.body).to include('id="people_new_pill"')
+      end
+
+      it "includes the people_<id> stream tag" do
+        get people_path
+        expect(response.body).to include("people_#{user.id}")
+      end
+
       it "lists persons and the Recent section (lanes appear only when feed items exist)" do
         make_person(name: "Sofia Martins", email: "sofia@brightloop.example", org_name: "Brightloop")
         make_person(name: "Ana Reis", email: "ana@accounting.example", org_name: "Accounting")

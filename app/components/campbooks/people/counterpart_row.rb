@@ -176,7 +176,7 @@ module Campbooks
             input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
             button(type: "submit", class: ACTION_BTN,
                    title: t(".actions.reply_hint"),
-                   data: { turbo: false }) do
+                   data: { turbo: false, people_reply: true }) do
               action_icon(ICON_REPLY)
             end
           end
@@ -188,7 +188,8 @@ module Campbooks
              method: :post, class: "contents",
              data: { turbo_stream: true }) do
           input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
-          button(type: "submit", class: ACTION_BTN, title: t(".actions.done_hint")) do
+          button(type: "submit", class: ACTION_BTN, title: t(".actions.done_hint"),
+                 data: { people_done: true }) do
             action_icon(ICON_DONE)
           end
         end
@@ -200,7 +201,8 @@ module Campbooks
              data: { turbo_stream: true }) do
           input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
           input(type: "hidden", name: "until", value: "tomorrow")
-          button(type: "submit", class: ACTION_BTN, title: t(".actions.snooze_hint")) do
+          button(type: "submit", class: ACTION_BTN, title: t(".actions.snooze_hint"),
+                 data: { people_snooze: true }) do
             action_icon(ICON_SNOOZE)
           end
         end
@@ -225,7 +227,8 @@ module Campbooks
       def more_menu
         details(class: "relative") do
           summary(class: class_names(ACTION_BTN, "list-none cursor-pointer"),
-                  title: t(".actions.more_hint")) do
+                  title: t(".actions.more_hint"),
+                  data: { people_more: true }) do
             action_icon(ICON_MORE)
           end
           div(class: "absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-border bg-card py-1 shadow-lg") do

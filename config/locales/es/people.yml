@@ -16,6 +16,16 @@ es:
           zero: "0d"
           one: "1d"
           other: "%{count}d"
+        actions:
+          reply_hint: "Responder (r)"
+          done_hint: "Hecho (e)"
+          snooze_hint: "Posponer (s)"
+          star_hint: Destacar
+          unstar_hint: Quitar destaque
+          more_hint: "Más (.)"
+          archive: Archivar conversación
+          block: Bloquear remitente
+          open_profile: Abrir perfil clásico
       search_bar:
         placeholder: Buscar una persona o empresa…
         clear: Borrar
@@ -61,11 +71,28 @@ es:
         pay: Pagar
         chase: Cobrar
         nudge: Recordar
+      new_rows:
+        one: "1 nuevo · actualizar"
+        other: "%{count} nuevos · actualizar"
       streams_foot:
         zero: Streams
         one: "Streams · %{count}"
         other: "Streams · %{count}"
       new: Nuevo
+    actions:
+      done: "%{name} marcado como hecho"
+      restored: Restaurado
+      snoozed: "Pospuesto hasta %{until}"
+      unsnoozed: Activo de nuevo
+      starred: "%{name} destacado"
+      unstarred: "Destaque eliminado de %{name}"
+      archived: "Conversación de %{name} archivada"
+      unarchived: Movido a la bandeja de entrada
+      undo: Deshacer
+      unsupported: Acción no admitida
+      not_found: No encontrado
+      needs_message: Sin mensaje para esta acción
+      snooze_title: Posponer
     standing:
       money_subject: "%{amount} · vence el %{date}"
       no_standing: Nada requiere tu atención ahora mismo.

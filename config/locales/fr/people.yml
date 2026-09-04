@@ -16,6 +16,16 @@ fr:
           zero: "0j"
           one: "1j"
           other: "%{count}j"
+        actions:
+          reply_hint: "Répondre (r)"
+          done_hint: "Fait (e)"
+          snooze_hint: "Reporter (s)"
+          star_hint: Mettre en vedette
+          unstar_hint: Retirer des favoris
+          more_hint: "Plus (.)"
+          archive: Archiver la conversation
+          block: Bloquer l'expéditeur
+          open_profile: Ouvrir le profil classique
       search_bar:
         placeholder: Rechercher une personne ou une entreprise…
         clear: Effacer
@@ -61,11 +71,28 @@ fr:
         pay: Payer
         chase: Relancer
         nudge: Rappeler
+      new_rows:
+        one: "1 nouveau · actualiser"
+        other: "%{count} nouveaux · actualiser"
       streams_foot:
         zero: Streams
         one: "Streams · %{count}"
         other: "Streams · %{count}"
       new: Nouveau
+    actions:
+      done: "%{name} marqué comme fait"
+      restored: Restauré
+      snoozed: "Reporté jusqu'au %{until}"
+      unsnoozed: Activé de nouveau
+      starred: "%{name} mis en vedette"
+      unstarred: "Vedette retirée de %{name}"
+      archived: "Conversation de %{name} archivée"
+      unarchived: Déplacé vers la boîte de réception
+      undo: Annuler
+      unsupported: Action non prise en charge
+      not_found: Introuvable
+      needs_message: Aucun message pour cette action
+      snooze_title: Reporter
     standing:
       money_subject: "%{amount} · dû le %{date}"
       no_standing: Rien ne requiert votre attention pour le moment.

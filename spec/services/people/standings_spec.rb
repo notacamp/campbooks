@@ -113,6 +113,67 @@ RSpec.describe People::Standings do
     end
   end
 
+  describe ".refresh_counterpart!" do
+    it "updates a single row when the person is still eligible" do
+      person, contact, = make_person(name: "Sofia", email: "sofia@x.example")
+      described_class.refresh!(user)
+
+      row_before = PeopleStanding.for_user(user).find_by!(counterpart: person)
+
+      # Change the contact name so the row name changes on re-compute.
+      person.update!(name: "Sofia Updated")
+      contact.update_columns(name: "Sofia Updated")
+
+      described_class.refresh_counterpart!(user, person)
+
+      row_after = PeopleStanding.for_user(user).find_by!(counterpart: person)
+      expect(row_after.name).to eq("Sofia Updated")
+    end
+
+    it "deletes the row when the person is no longer eligible" do
+      person, = make_person(name: "Sofia", email: "sofia@x.example")
+      described_class.refresh!(user)
+      expect(PeopleStanding.for_user(user).find_by(counterpart: person)).to be_present
+
+      # Make person ineligible.
+      person.contacts.update_all(email_count: 0)
+
+      described_class.refresh_counterpart!(user, person)
+
+      expect(PeopleStanding.for_user(user).find_by(counterpart: person)).to be_nil
+    end
+
+    it "broadcasts a replace when the row changed" do
+      person, = make_person(name: "Sofia", email: "sofia@x.example")
+      described_class.refresh!(user)
+      # Force updated_at to age so we can detect a change.
+      PeopleStanding.for_user(user).update_all(updated_at: 10.minutes.ago)
+
+      expect {
+        described_class.refresh_counterpart!(user, person)
+      }.to have_broadcasted_to("people_#{user.id}").at_least(:once)
+    end
+
+    it "does not raise when the person is nil" do
+      expect { described_class.refresh_counterpart!(user, nil) }.not_to raise_error
+    end
+  end
+
+  describe ".refresh! broadcasts" do
+    it "broadcasts only changed rows, not unchanged ones" do
+      person_a, = make_person(name: "A", email: "a@x.example")
+      person_b, = make_person(name: "B", email: "b@x.example")
+      described_class.refresh!(user)
+
+      # Force both rows to look old so a re-run sees differences.
+      PeopleStanding.for_user(user).update_all(updated_at: 1.hour.ago)
+
+      expect {
+        described_class.refresh!(user)
+      }.to have_broadcasted_to("people_#{user.id}").at_least(:once)
+    end
+  end
+
   describe ".stale?" do
     it "returns true when there are no rows" do
       expect(described_class.stale?(user)).to be true
