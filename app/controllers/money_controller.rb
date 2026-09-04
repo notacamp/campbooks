@@ -98,9 +98,31 @@ class MoneyController < ApplicationController
   def build_ledger
     @today = Date.current
     @horizon = params[:range] == "90d" ? 90.days : 30.days
-    @ledger = Money::Ledger.for(Current.workspace, current_user, today: @today, horizon: @horizon)
+    sort, dir = ledger_sort
+    @ledger = Money::Ledger.for(Current.workspace, current_user, today: @today, horizon: @horizon, sort: sort, dir: dir)
     @summary = Money::Summary.for(Current.workspace, current_user, today: @today, ledger: @ledger)
     @quarter_label = quarter_label
+  end
+
+  # The ledger's order: ?sort=&dir= (the column links), ?order=date_desc (the
+  # phone's select), else what this session last chose, else newest first. The
+  # choice is kept in the session so a row action re-renders in the same order.
+  def ledger_sort
+    sort, dir = params[:order].to_s.split("_", 2) if params[:order].present?
+    sort = params[:sort] if params[:sort].present?
+    dir  = params[:dir]  if params[:dir].present?
+
+    if Money::Ledger::SORTS.include?(sort.to_s.to_sym)
+      sort = sort.to_s.to_sym
+      dir  = Money::Ledger::DIRS.include?(dir.to_s.to_sym) ? dir.to_s.to_sym : Money::Ledger.default_dir(sort)
+      session[:money_sort] = [ sort.to_s, dir.to_s ]
+      return [ sort, dir ]
+    end
+
+    remembered = Array(session[:money_sort]).map { |v| v.to_s.to_sym }
+    return remembered if remembered.size == 2 && Money::Ledger::SORTS.include?(remembered[0]) && Money::Ledger::DIRS.include?(remembered[1])
+
+    [ :date, :desc ]
   end
 
   def set_obligation

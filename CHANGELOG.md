@@ -21,6 +21,9 @@ major, minor, or patch change here.
 - Money shows the year on its dates — due, paid and renewal dates in the ledger, the
   timeline labels, Scout's summary and the reminder draft — so last year's bills read
   unambiguously.
+- The Money ledger lists newest first by default, and its Counterpart, Amount and Due
+  headers sort the table (click again to flip the direction); phones get a sort select.
+  The choice is remembered for the session, so row actions keep the order.
 
 ## [0.36.1] - 2026-09-04
 
