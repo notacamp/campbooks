@@ -13,7 +13,7 @@ class PeopleStanding < ApplicationRecord
   belongs_to :counterpart, polymorphic: true
   belongs_to :email_thread, optional: true
 
-  STANDING_KINDS = %w[you_owe nudge prompt summary last_exchange none].freeze
+  STANDING_KINDS = %w[attention summary last_exchange none].freeze
   validates :standing_kind, inclusion: { in: STANDING_KINDS }
   validates :name, presence: true
 
@@ -38,8 +38,13 @@ class PeopleStanding < ApplicationRecord
       text: text,
       needs_you: needs_you,
       thread_id: email_thread_id,
-      overdue_days: overdue_days,
-      kind: standing_kind.to_sym
+      overdue_days: wait_days,
+      kind: standing_kind.to_sym,
+      verb: verb&.to_sym,
+      subject: subject,
+      wait_days: wait_days,
+      feed_item_id: feed_item_id,
+      email_message_id: email_message_id
     )
   end
 
@@ -57,7 +62,8 @@ class PeopleStanding < ApplicationRecord
       last_activity: last_activity_at,
       standing: standing,
       facts: nil,
-      score: People::Priority::Score.new(value: score, needs_you: needs_you, strength: strength, recency: 0.0)
+      score: People::Priority::Score.new(value: score, needs_you: needs_you, strength: strength, recency: 0.0),
+      data: data || {}
     )
   end
 end

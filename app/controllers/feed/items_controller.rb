@@ -22,6 +22,7 @@ module Feed
           verdict = params[:tool].to_s == "undo_tag_filing" ? :rejected : :accepted
           record_tag_suggestion_learning(verdict)
         end
+        People::StandingsRefreshJob.enqueue_for(current_user.id)
       end
 
       respond_to do |format|
@@ -40,6 +41,7 @@ module Feed
     def dismiss
       @item.dismiss!
       record_tag_suggestion_learning(:rejected) if tag_suggestion_item?
+      People::StandingsRefreshJob.enqueue_for(current_user.id)
       respond_to do |format|
         format.turbo_stream do
           render turbo_stream: [
@@ -55,6 +57,7 @@ module Feed
     def undo
       reverse_action(@item.subject)
       @item.reactivate!
+      People::StandingsRefreshJob.enqueue_for(current_user.id)
 
       respond_to do |format|
         format.turbo_stream do

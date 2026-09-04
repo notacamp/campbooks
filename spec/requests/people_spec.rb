@@ -51,16 +51,16 @@ RSpec.describe "People", type: :request do
     end
 
     describe "GET /people" do
-      it "lists persons under Need you and Recent, by standing" do
-        make_person(name: "Sofia Martins", email: "sofia@brightloop.example", org_name: "Brightloop", owe: true)
-        make_person(name: "Ana Reis", email: "ana@accounting.example", org_name: "Accounting", owe: false)
+      it "lists persons and the Recent section (lanes appear only when feed items exist)" do
+        make_person(name: "Sofia Martins", email: "sofia@brightloop.example", org_name: "Brightloop")
+        make_person(name: "Ana Reis", email: "ana@accounting.example", org_name: "Accounting")
         refresh_standings!
 
         get people_path
         expect(response).to have_http_status(:ok)
-        expect(response.body).to include("Need you").and include("Recent")
+        # Without live feed items all persons fall to Recent (no attention standings).
+        expect(response.body).to include("Recent")
         expect(response.body).to include("Sofia Martins").and include("Ana Reis")
-        expect(response.body).to include("Waiting on your reply")
       end
 
       it "filters by ?q= through the standings table" do
@@ -126,6 +126,52 @@ RSpec.describe "People", type: :request do
         }.to have_enqueued_job(People::StandingsRefreshJob)
         expect(response).to have_http_status(:ok)
         expect(response.body).to include("Stale Person")
+      end
+
+      it "renders lanes in order when feed items exist for those verbs" do
+        # Build a person whose reply_owed feed item should produce a Reply lane.
+        allow(Emails::InboxFolders).to receive(:ids_for).and_return(%w[INBOX])
+
+        person, contact, thread = make_person(name: "Reply Person", email: "reply@x.example",
+                                              inbound_at: 6.days.ago, replied: true, emails: 5)
+        msg = EmailMessage.find_by!(contact: contact, email_thread: thread)
+        msg.update_columns(skimmed_at: nil, ai_todo_dismissed: false,
+                           provider_folder_id: "INBOX", received_at: 6.days.ago)
+        thread.update_columns(last_inbound_at: 6.days.ago, last_outbound_at: nil)
+
+        FeedItem.create!(user: user, workspace: workspace, kind: "reply_owed", subject: msg,
+                         dedupe_key: "reply_owed:#{msg.id}", sort_at: msg.received_at,
+                         score: 60.0, attention: false,
+                         data: { "age_days" => 6 })
+
+        refresh_standings!
+        get people_path
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include(I18n.t("people.index.lanes.reply"))
+        expect(response.body).to include("Reply Person")
+      end
+
+      it "shows a 'New' chip for a one-message stranger with no outbound" do
+        # One inbound, no outbound → data["new"] = true in the standing.
+        make_person(name: "Brand New", email: "new@stranger.example",
+                    inbound_at: 1.day.ago, replied: false, emails: 1)
+        refresh_standings!
+
+        get people_path
+        expect(response).to have_http_status(:ok)
+        # The "New" chip is rendered by CounterpartRow (t(".new") → "New" in en locale).
+        expect(response.body).to include("Brand New")   # person is listed
+        expect(response.body).to include(">New<")        # chip text is in HTML
+      end
+
+      it "renders the Streams foot navigation link at the bottom" do
+        make_person(name: "Someone", email: "s@x.example")
+        refresh_standings!
+
+        get people_path
+        expect(response).to have_http_status(:ok)
+        # The streams foot link always appears when there are people rows.
+        expect(response.body).to include(people_streams_path)
       end
 
       it "Recent paginates 30 per page via the turbo_stream format" do

@@ -35,8 +35,10 @@ module Feed
     HALF_LIFE_DAYS = {
       "follow_up" => 14.0,
       "reply_reminder" => 14.0,
+      "reply_owed" => 14.0,
       "task" => 14.0,
-      "starred_email" => 10.0
+      "starred_email" => 10.0,
+      "late_payable" => 7.0
     }.freeze
     DEFAULT_HALF_LIFE_DAYS = 7.0
 

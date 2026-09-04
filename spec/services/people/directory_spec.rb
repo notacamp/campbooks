@@ -42,10 +42,31 @@ RSpec.describe People::Directory do
       expect(names).to include("Sofia")
     end
 
-    it "includes an org when it has a person member with mail" do
+    it "excludes an org without a money feed item (orgs only appear for pay/chase)" do
       org = create(:organization, workspace: workspace, name: "Cloudhost")
       person, = make_person(name: "Rui", email: "rui@cloudhost.example")
       create(:organization_membership, person: person, organization: org)
+
+      names = directory.counterparts.map(&:name)
+      expect(names).not_to include("Cloudhost")
+      expect(names).to include("Rui")
+    end
+
+    it "includes an org when attention returns a money item for it" do
+      org = create(:organization, workspace: workspace, name: "Cloudhost")
+      person, = make_person(name: "Rui", email: "rui@cloudhost.example")
+      create(:organization_membership, person: person, organization: org)
+
+      org_item = instance_double(People::Attention::Item,
+                                 verb: :chase, subject: "Invoice #1", wait_days: 14, text: nil,
+                                 thread_id: nil, message: nil, attention: true,
+                                 feed_item: instance_double(FeedItem, id: SecureRandom.uuid, score: 80.0, sort_at: Time.current))
+
+      attn = instance_double(People::Attention)
+      allow(attn).to receive(:for).with(kind_of(Person)).and_return(nil)
+      allow(attn).to receive(:for).with(org).and_return(org_item)
+      allow(attn).to receive(:items_by_counterpart).and_return({})
+      allow(People::Attention).to receive(:new).and_return(attn)
 
       names = directory.counterparts.map(&:name)
       expect(names).to include("Cloudhost")
@@ -99,19 +120,134 @@ RSpec.describe People::Directory do
       expect(names).not_to include("Blocked")
     end
 
-    it "ranks an org as its lead person" do
+    # ── Group-thread folding ──────────────────────────────────────────────────
+
+    it "folds a thread-mate into the winner's row even when only the winner has a feed item" do
+      # Winner (Ana) has a feed item → she appears in Need-you.
+      # Other (Bruno) has mail on the same thread but no feed item → he would normally
+      # appear under Recent. The fold should absorb him into Ana's row.
+
+      thread = create(:email_thread, email_account: account, subject: "Contract review")
+
+      person_a = create(:person, workspace: workspace, name: "Ana Lima")
+      contact_a = create(:contact, workspace: workspace, email_account: account, person: person_a,
+                         sender_kind: :person, sender_kind_source: "heuristic",
+                         email: "ana@x.example", starred_at: Time.current, email_count: 5)
+      msg_a = create(:email_message, email_account: account, email_thread: thread, contact: contact_a,
+                     from_address: "ana@x.example", received_at: 5.days.ago,
+                     provider_folder_id: "INBOX", skimmed_at: nil, ai_todo_dismissed: false)
+      contact_a.update_columns(last_email_at: 5.days.ago)
+
+      person_b = create(:person, workspace: workspace, name: "Bruno Costa")
+      contact_b = create(:contact, workspace: workspace, email_account: account, person: person_b,
+                         sender_kind: :person, sender_kind_source: "heuristic",
+                         email: "bruno@x.example", email_count: 5)
+      create(:email_message, email_account: account, email_thread: thread, contact: contact_b,
+             from_address: "bruno@x.example", received_at: 5.days.ago,
+             provider_folder_id: "INBOX", skimmed_at: nil, ai_todo_dismissed: false)
+      contact_b.update_columns(last_email_at: 5.days.ago)
+      thread.update_columns(last_inbound_at: 5.days.ago, last_outbound_at: nil)
+
+      # Only Ana (the winner) has a feed item.
+      FeedItem.create!(user: user, workspace: workspace, kind: "reply_owed", subject: msg_a,
+                       dedupe_key: "reply_owed:#{msg_a.id}", sort_at: msg_a.received_at,
+                       score: 60.0, attention: false, data: { "age_days" => 5 })
+
+      counterparts = directory.counterparts
+      names = counterparts.map(&:name)
+
+      # The combined row is named "Ana Lima, Bruno Costa" (winner first).
+      group_row = counterparts.find { |cp| cp.name.include?("Ana Lima") && cp.name.include?("Bruno Costa") }
+      expect(group_row).not_to be_nil, "expected a combined row; got: #{names.inspect}"
+
+      # Bruno must NOT have a separate row (not under Recent either).
+      expect(names).not_to include("Bruno Costa")
+
+      # The winner's row carries both person ids.
+      expect(group_row.data["participant_ids"]).to include(person_a.id, person_b.id)
+    end
+
+    # ── data["new"] flag ─────────────────────────────────────────────────────
+
+    it "marks data['new'] true for a stranger with exactly one inbound and no outbound thread" do
+      make_person(name: "Stranger Rosario", email: "rosario@new.example", emails: 1, replied: false)
+      counterparts = directory.counterparts
+      cp = counterparts.find { |c| c.name == "Stranger Rosario" }
+      expect(cp).not_to be_nil
+      expect(cp.data["new"]).to be true
+    end
+
+    it "does not mark data['new'] for a person you have replied to" do
+      make_person(name: "Old Friend", email: "friend@known.example", emails: 5, replied: true)
+      counterparts = directory.counterparts
+      cp = counterparts.find { |c| c.name == "Old Friend" }
+      expect(cp).not_to be_nil
+      expect(cp.data["new"]).to be false
+    end
+
+    # ── data["unread"] flag ───────────────────────────────────────────────────
+
+    it "marks data['unread'] true when the standing thread has an unread inbound" do
+      person, contact, thread = make_person(name: "Unread Sender", email: "unread@x.example")
+      # Mark the message as unread.
+      msg = EmailMessage.find_by!(email_thread: thread, contact: contact)
+      msg.update_columns(read: false)
+
+      # Need an attention item so standing has a thread_id.
+      msg.update_columns(skimmed_at: nil, ai_todo_dismissed: false, provider_folder_id: "INBOX",
+                         received_at: 5.days.ago)
+      thread.update_columns(last_inbound_at: 5.days.ago, last_outbound_at: nil)
+      FeedItem.create!(user: user, workspace: workspace, kind: "reply_owed", subject: msg,
+                       dedupe_key: "reply_owed:#{msg.id}", sort_at: msg.received_at,
+                       score: 60.0, attention: false, data: { "age_days" => 5 })
+      contact.update_columns(starred_at: Time.current)
+
+      counterparts = directory.counterparts
+      cp = counterparts.find { |c| c.name == "Unread Sender" }
+      expect(cp).not_to be_nil
+      expect(cp.data["unread"]).to be true
+    end
+
+    # ── data["has_attachment"] flag ───────────────────────────────────────────
+
+    it "marks data['has_attachment'] true when the attention item's message has an attachment" do
+      person, contact, thread = make_person(name: "Attacher", email: "attach@x.example")
+      msg = EmailMessage.find_by!(email_thread: thread, contact: contact)
+      msg.update_columns(has_attachment: true, skimmed_at: nil, ai_todo_dismissed: false,
+                         provider_folder_id: "INBOX", received_at: 5.days.ago)
+      thread.update_columns(last_inbound_at: 5.days.ago, last_outbound_at: nil)
+      FeedItem.create!(user: user, workspace: workspace, kind: "reply_owed", subject: msg,
+                       dedupe_key: "reply_owed:#{msg.id}", sort_at: msg.received_at,
+                       score: 60.0, attention: false, data: { "age_days" => 5 })
+      contact.update_columns(starred_at: Time.current)
+
+      cp = directory.counterparts.find { |c| c.name == "Attacher" }
+      expect(cp).not_to be_nil
+      expect(cp.data["has_attachment"]).to be true
+    end
+
+    it "an org row has a positive priority when it has a money attention item" do
       org = create(:organization, workspace: workspace, name: "Cloudhost")
-      person, = make_person(name: "Rui Santos", email: "rui@cloudhost.example", owe: true,
+      person, = make_person(name: "Rui Santos", email: "rui@cloudhost.example",
                             inbound_at: 2.days.ago, emails: 5)
       create(:organization_membership, person: person, organization: org)
 
+      org_item = instance_double(People::Attention::Item,
+                                 verb: :chase, subject: "Invoice #1", wait_days: 14, text: nil,
+                                 thread_id: nil, message: nil, attention: true,
+                                 feed_item: instance_double(FeedItem, id: SecureRandom.uuid, score: 80.0, sort_at: Time.current))
+
+      attn = instance_double(People::Attention)
+      allow(attn).to receive(:for).with(kind_of(Person)).and_return(nil)
+      allow(attn).to receive(:for).with(org).and_return(org_item)
+      allow(attn).to receive(:items_by_counterpart).and_return({})
+      allow(People::Attention).to receive(:new).and_return(attn)
+
       counterparts = directory.counterparts
-      rui      = counterparts.find { |c| c.name == "Rui Santos" }
       cloudhost = counterparts.find { |c| c.name == "Cloudhost" }
 
-      # Org should have the same score as its lead person, so it sits right behind
+      expect(cloudhost).not_to be_nil
       expect(cloudhost.priority).to be > 0
-      expect(rui.priority).to be >= cloudhost.priority
     end
   end
 end

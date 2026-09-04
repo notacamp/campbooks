@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_04_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_04_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -1305,7 +1305,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_04_120000) do
     t.string "counterpart_type", null: false
     t.datetime "created_at", null: false
     t.jsonb "data", default: {}, null: false
+    t.uuid "email_message_id"
     t.uuid "email_thread_id"
+    t.uuid "feed_item_id"
     t.datetime "last_activity_at"
     t.string "name", null: false
     t.boolean "needs_you", default: false, null: false
@@ -1314,12 +1316,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_04_120000) do
     t.float "score", default: 0.0, null: false
     t.string "standing_kind", default: "none", null: false
     t.float "strength", default: 0.0, null: false
+    t.string "subject"
     t.string "subtitle"
     t.text "text"
     t.datetime "updated_at", null: false
     t.uuid "user_id", null: false
+    t.string "verb"
+    t.integer "wait_days", default: 0, null: false
     t.uuid "workspace_id", null: false
     t.index ["counterpart_type", "counterpart_id"], name: "index_people_standings_on_counterpart"
+    t.index ["feed_item_id"], name: "index_people_standings_on_feed_item_id"
     t.index ["user_id", "counterpart_type", "counterpart_id"], name: "index_people_standings_on_user_counterpart", unique: true
     t.index ["user_id", "needs_you", "score", "last_activity_at"], name: "index_people_standings_list", order: { score: :desc, last_activity_at: :desc }
     t.index ["workspace_id"], name: "index_people_standings_on_workspace_id"

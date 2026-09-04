@@ -11,140 +11,147 @@ RSpec.describe People::Standing do
 
   before { create(:email_account_user, user: user, email_account: account, can_read: true) }
 
-  # Builds a person + a thread. `last_inbound`/`last_outbound` set the thread's
-  # denormalized reply state; a message is created for each present timestamp.
-  def person_with(name:, context_summary: nil, ai_action_prompt: nil, last_inbound: nil, last_outbound: nil, last_email_at: nil,
-                  unsubscribe: nil, category: nil, to: nil, cc: nil)
+  def person_with(name:, context_summary: nil, last_inbound: nil, last_outbound: nil, last_email_at: nil)
     person = create(:person, workspace: workspace, name: name, context_summary: context_summary)
-    contact = create(:contact, workspace: workspace, email_account: account, person: person,
-                     email: "#{name.parameterize}@x.example", sender_kind: :person, email_count: 1,
-                     last_email_at: last_email_at || last_inbound || 1.day.ago)
-    thread = create(:email_thread, email_account: account, subject: "Q3 deck",
-                    last_inbound_at: last_inbound, last_outbound_at: last_outbound)
+    create(:contact, workspace: workspace, email_account: account, person: person,
+           email: "#{name.parameterize}@x.example", sender_kind: :person, email_count: 1,
+           last_email_at: last_email_at || last_inbound || 1.day.ago)
     if last_inbound
-      create(:email_message, email_account: account, email_thread: thread, contact: contact,
-             from_address: contact.email, received_at: last_inbound, subject: "Q3 deck",
-             ai_action_prompt: ai_action_prompt, body: "hello",
-             header_list_unsubscribe: unsubscribe, category: category, to_address: to, cc_address: cc)
-    end
-    if last_outbound
-      create(:email_message, email_account: account, email_thread: thread, from_address: account.email_address,
-             received_at: last_outbound, subject: "Re: Q3 deck", body: "on it")
+      thread = create(:email_thread, email_account: account, subject: "Hello",
+                      last_inbound_at: last_inbound, last_outbound_at: last_outbound)
+      create(:email_message, email_account: account, email_thread: thread, contact:
+             Contact.find_by(person: person),
+             from_address: "#{name.parameterize}@x.example", received_at: last_inbound,
+             subject: "Hello", body: "hi")
     end
     person
   end
 
-  it "you owe a reply → needs you, pluralized" do
-    owe2 = person_with(name: "Sofia", last_inbound: 2.days.ago, last_outbound: nil)
-    st = described_class.for_person(owe2, user: user)
+  # Builds a People::Attention double that returns `item` for any counterpart.
+  def stub_attention_with(item, counterpart: nil)
+    attn = instance_double(People::Attention)
+    if counterpart
+      allow(attn).to receive(:for).with(counterpart).and_return(item)
+      allow(attn).to receive(:for).with(anything).and_return(nil)
+    else
+      allow(attn).to receive(:for).and_return(item)
+    end
+    attn
+  end
+
+  def stub_attention_item(verb:, subject: "Q3 deck", wait_days: 2, score: 50.0)
+    fi = instance_double(FeedItem,
+                         id: SecureRandom.uuid,
+                         score: score,
+                         sort_at: Time.current,
+                         data: { "age_days" => wait_days })
+    instance_double(People::Attention::Item,
+                    feed_item: fi,
+                    verb: verb,
+                    subject: subject,
+                    wait_days: wait_days,
+                    text: nil,
+                    thread_id: nil,
+                    message: nil,
+                    attention: true)
+  end
+
+  # ── Attention path ─────────────────────────────────────────────────────────
+
+  it "with an attention item → needs_you true, kind :attention, feed_item_id and email_message_id set" do
+    p = person_with(name: "Sofia", last_inbound: 2.days.ago)
+
+    fi_id  = SecureRandom.uuid
+    msg_id = SecureRandom.uuid
+    fi     = instance_double(FeedItem, id: fi_id, score: 50.0, sort_at: Time.current,
+                             data: { "age_days" => 2 })
+    msg    = instance_double(EmailMessage, id: msg_id)
+    item   = instance_double(People::Attention::Item,
+                             feed_item: fi, verb: :reply, subject: "Q3 deck",
+                             wait_days: 2, text: nil, thread_id: nil,
+                             message: msg, attention: true)
+    attn   = stub_attention_with(item)
+
+    st = described_class.for_person(p, user: user, attention: attn)
     expect(st.needs_you).to be true
-    expect(st.text).to eq("Waiting on your reply for 2 days.")
-    expect(st.overdue_days).to eq(2)
-
-    owe1 = person_with(name: "Mara", last_inbound: 25.hours.ago, last_outbound: nil)
-    expect(described_class.for_person(owe1, user: user).text).to eq("Waiting on your reply for a day.")
+    expect(st.kind).to eq(:attention)
+    expect(st.verb).to eq(:reply)
+    expect(st.subject).to eq("Q3 deck")
+    expect(st.wait_days).to eq(2)
+    expect(st.feed_item_id).to eq(fi_id)
+    expect(st.email_message_id).to eq(msg_id)
   end
 
-  it "names the rung that produced the text" do
-    expect(described_class.for_person(person_with(name: "Sofia", last_inbound: 2.days.ago), user: user).kind).to eq(:you_owe)
-    expect(described_class.for_person(person_with(name: "Miguel", last_inbound: 12.days.ago, last_outbound: 6.days.ago), user: user).kind).to eq(:nudge)
-    expect(described_class.for_person(person_with(name: "Ana", last_inbound: 5.days.ago, last_outbound: 1.day.ago,
-                                                  ai_action_prompt: "Needs a receipt."), user: user).kind).to eq(:prompt)
-    expect(described_class.for_person(person_with(name: "Quiet", last_email_at: 3.days.ago), user: user).kind).to eq(:last_exchange)
-    expect(described_class::Result.none.kind).to eq(:none)
-  end
-
-  describe "what counts as a reply you owe" do
-    it "not a newsletter, receipt or alert — a broadcast nobody answers" do
-      newsletter = person_with(name: "Weekly Byte", last_inbound: 40.days.ago, unsubscribe: "<mailto:unsub@byte.example>")
-      st = described_class.for_person(newsletter, user: user)
-      expect(st.needs_you).to be false
-      expect(st.kind).to eq(:last_exchange)
-
-      alert = person_with(name: "Alerts", last_inbound: 3.days.ago, category: "notifications")
-      expect(described_class.for_person(alert, user: user).needs_you).to be false
-    end
-
-    it "still a person writing about an invoice (a rules-only transactional read)" do
-      vendor = person_with(name: "Ines", last_inbound: 8.days.ago, category: "updates")
-      st = described_class.for_person(vendor, user: user)
-      expect(st.needs_you).to be true
-      expect(st.kind).to eq(:you_owe)
-    end
-
-    it "not a thread you were only copied on" do
-      copied = person_with(name: "Marta", last_inbound: 4.days.ago, to: "someone@else.example", cc: account.email_address)
-      expect(described_class.for_person(copied, user: user).needs_you).to be false
-
-      direct = person_with(name: "David", last_inbound: 4.days.ago, to: account.email_address, cc: "someone@else.example")
-      expect(described_class.for_person(direct, user: user).needs_you).to be true
-    end
-
-    it "not once it has gone stale — silence was the triage" do
-      stale = person_with(name: "Old", last_inbound: 61.days.ago)
-      st = described_class.for_person(stale, user: user)
-      expect(st.needs_you).to be false
-      expect(st.text).to start_with("Last exchange")
-    end
-  end
-
-  it "they owe you (nudge due) → No reply … Nudge?" do
+  it "verb :nudge from a follow_up attention item" do
     p = person_with(name: "Miguel", last_inbound: 12.days.ago, last_outbound: 6.days.ago)
-    st = described_class.for_person(p, user: user)
+    item = stub_attention_item(verb: :nudge, subject: "Proposal", wait_days: 6)
+    st = described_class.for_person(p, user: user, attention: stub_attention_with(item))
+    expect(st.verb).to eq(:nudge)
     expect(st.needs_you).to be true
-    expect(st.text).to include("No reply to").and include("Nudge?")
   end
 
-  it "falls to the Scout action prompt when nothing is owed" do
-    p = person_with(name: "Ana", last_inbound: 5.days.ago, last_outbound: 1.day.ago,
-                    ai_action_prompt: "She needs one receipt from June.")
-    st = described_class.for_person(p, user: user)
-    expect(st.needs_you).to be false
-    expect(st.text).to eq("She needs one receipt from June.")
+  it "verb :decide from an email_action attention item" do
+    p = person_with(name: "Ana", last_inbound: 3.days.ago)
+    item = stub_attention_item(verb: :decide, subject: "Contract review", wait_days: 3)
+    st = described_class.for_person(p, user: user, attention: stub_attention_with(item))
+    expect(st.verb).to eq(:decide)
   end
 
-  it "falls to the profile summary's first sentence" do
+  # ── Fallback path (no attention item) ─────────────────────────────────────
+
+  it "falls to the profile summary's first sentence when no attention item" do
     p = person_with(name: "David", last_inbound: 5.days.ago, last_outbound: 1.day.ago,
                     context_summary: "Long-time client. Prefers phone.")
-    expect(described_class.for_person(p, user: user).text).to eq("Long-time client.")
+    st = described_class.for_person(p, user: user)
+    expect(st.needs_you).to be false
+    expect(st.kind).to eq(:summary)
+    expect(st.text).to eq("Long-time client.")
   end
 
-  it "falls back to the last exchange when there is nothing else" do
+  it "falls back to last_exchange when no attention item and no summary" do
     p = person_with(name: "Quiet", context_summary: nil, last_email_at: 3.days.ago)
     st = described_class.for_person(p, user: user)
     expect(st.needs_you).to be false
-    expect(st.text).to start_with("Last exchange")
+    expect(st.kind).to eq(:last_exchange)
   end
 
-  it "composes an organization from its people's standings, leading with the reply you owe" do
-    org = create(:organization, workspace: workspace, name: "Cloudhost")
-    owe = person_with(name: "Rui", last_inbound: 3.days.ago, last_outbound: nil)
-    nudge = person_with(name: "Ana", last_inbound: 25.days.ago, last_outbound: 19.days.ago)
-    create(:organization_membership, person: owe, organization: org)
-    create(:organization_membership, person: nudge, organization: org)
+  it "Result.none has kind :none and needs_you false" do
+    expect(described_class::Result.none.kind).to eq(:none)
+    expect(described_class::Result.none.needs_you).to be false
+  end
 
+  # ── Organization path ─────────────────────────────────────────────────────
+
+  it "organization returns Result.none when no attention item" do
+    org = create(:organization, workspace: workspace, name: "Acme")
     st = described_class.for_organization(org, user: user)
-    expect(st.needs_you).to be true
-    expect(st.kind).to eq(:you_owe)
-    expect(st.overdue_days).to eq(3)
-    expect(st.text).to start_with("Waiting on your reply for 3 days.").and include("Nudge?")
+    expect(st.kind).to eq(:none)
+    expect(st.needs_you).to be false
   end
 
+  it "organization with attention item → needs_you true, kind :attention" do
+    org = create(:organization, workspace: workspace, name: "Acme")
+    item = stub_attention_item(verb: :chase, subject: "Invoice #42", wait_days: 14)
+    st = described_class.for_organization(org, user: user, attention: stub_attention_with(item))
+    expect(st.needs_you).to be true
+    expect(st.kind).to eq(:attention)
+    expect(st.verb).to eq(:chase)
+  end
+
+  # ── Priming parity ─────────────────────────────────────────────────────────
+  #
   # The batched list path (prime + reuse one instance) must return byte-for-byte
-  # the same Result as the single-record path (for_person/for_organization). This
-  # guards against drift between person_threads / latest_inbound_message /
-  # profile_summary / organization sampling and their primed equivalents.
+  # the same Result as the single-record path (for_person/for_organization).
+
   describe "priming parity (batched list path == single-record path)" do
     def primed(person)
       described_class.new(user, now: Time.current).prime(people: [ person ]).person(person)
     end
 
-    it "matches the single-record path for every person priority" do
+    it "matches the single-record path for every fallback case" do
       cases = {
-        you_owe:       person_with(name: "Sofia", last_inbound: 2.days.ago),
-        nudge:         person_with(name: "Miguel", last_inbound: 12.days.ago, last_outbound: 6.days.ago),
-        action_prompt: person_with(name: "Ana", last_inbound: 5.days.ago, last_outbound: 1.day.ago, ai_action_prompt: "She needs one receipt."),
-        own_profile:   person_with(name: "David", last_inbound: 5.days.ago, last_outbound: 1.day.ago, context_summary: "Long-time client. Prefers phone."),
+        own_profile:   person_with(name: "David", last_inbound: 5.days.ago, last_outbound: 1.day.ago,
+                                   context_summary: "Long-time client. Prefers phone."),
         last_exchange: person_with(name: "Quiet", last_email_at: 3.days.ago),
         nothing:       create(:person, workspace: workspace, name: "Empty", context_summary: nil)
       }
@@ -170,25 +177,8 @@ RSpec.describe People::Standing do
       create(:organization_membership, person: owe, organization: org)
 
       live = described_class.for_organization(org, user: user)
-      primed = described_class.new(user, now: Time.current).prime(organizations: [ org ]).organization(org)
-      expect(primed).to eq(live)
-    end
-
-    # The reply-owed gate re-reads the unanswered message's sender / subject /
-    # headers / category from the primed rows. It must never reach for the tags
-    # fallback behind EmailMessage#provider_category_hint (one query per message).
-    it "judges a primed you-owe thread from loaded rows alone (no queries)" do
-      person = person_with(name: "Sofia", last_inbound: 2.days.ago)
-      standing = described_class.new(user, now: Time.current).prime(people: [ person ])
-      standing.person(person) # warm the per-instance memos (readable accounts)
-
-      queries = 0
-      sub = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
-        queries += 1 unless payload[:cached] || %w[SCHEMA TRANSACTION].include?(payload[:name])
-      end
-      expect(standing.person(person).kind).to eq(:you_owe)
-      ActiveSupport::Notifications.unsubscribe(sub)
-      expect(queries).to eq(0)
+      primed_result = described_class.new(user, now: Time.current).prime(organizations: [ org ]).organization(org)
+      expect(primed_result).to eq(live)
     end
   end
 end

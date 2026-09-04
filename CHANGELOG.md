@@ -16,7 +16,19 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **Now shows replies you owe and bills you owe.** A message from someone you already
+  correspond with, unanswered for three days, becomes a card even when Scout has not
+  read the mail; a past-due expense invoice becomes a "You owe …" card with Mark paid.
+
 ### Changed
+
+- **People is sorted by what needs doing.** Need you is now the Now stack cut by
+  person: lanes Reply, Decide, Pay, Chase and Nudge, each row with its subject and
+  how long it has waited. The old "Waiting on your reply for N days" sentences are
+  gone; an organization gets a row only for its own bills; a group thread is one row;
+  unknown senders are marked New.
 
 - **A person's conversation reads as email threads.** Threads appear newest-first, each with its subject as a heading; older messages are folded to a one-line snippet and the newest message opens with From and To, attachments, and an inline Reply row. Scout's draft appears only when Scout actually drafted one — never from the message's action prompt.
 - **People loads from precomputed standings.** The People list (bold layout)

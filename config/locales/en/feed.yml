@@ -43,6 +43,17 @@ en:
           high_priority: High priority
           important: Important
           starred: Starred sender
+      late_payable_card:
+        owed: "You owe"
+        days_late:
+          one: "%{count} day late"
+          other: "%{count} days late"
+        headline: "You owe %{name} %{reference}"
+        invoice_ref: "invoice #%{number}"
+        an_invoice: "an invoice"
+        mark_paid: "Mark paid"
+        open_money: "Open in Money"
+        later: "Later"
       late_receivable_card:
         owed: "Owed to you"
         days_late:
