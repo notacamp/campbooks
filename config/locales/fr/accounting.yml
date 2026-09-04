@@ -92,6 +92,11 @@ fr:
         one: "1 association confirmée"
         other: "%{count} associations confirmées"
     bank_transactions:
+      upload_and_link:
+        uploaded_and_linked: "Facture envoyée et associée : %{filename}"
+        no_file: Aucun fichier sélectionné.
+        upload_failed: "Échec de l'envoi : %{message}"
+        save_failed: "Impossible de sauvegarder : %{message}"
       row:
         confirm: Confirmer
         reject: Rejeter
@@ -212,6 +217,26 @@ fr:
           other: "%{count} documents candidats vérifiés"
         use_this_match: Utiliser cette association
         not_this_one: Ce n'est pas ça
+        near_miss_title: Factures non associées les plus proches
+        near_miss_empty: Aucune correspondance proche trouvée.
+        reason_exact: montant exact
+        reason_close: dans les 2 %
+        reason_days:
+          one: 1 jour d'écart
+          other: "%{count} jours d'écart"
+        reason_same_vendor: même fournisseur
+        reason_name_diff: le nom semble différent
+        still_not_it: Toujours pas ça ?
+        skim_toggle:
+          one: Parcourir 1 facture de la période
+          other: "Parcourir %{count} factures de la période"
+        skim_sorted_hint: Trié par montant le plus proche de la ligne bancaire.
+        upload_title: Envoyer une facture
+        upload_drop_hint: Déposez la facture ici
+        upload_formats: "PDF, JPG ou PNG. Scout la lit et la relie à ce paiement."
+        upload_cta: Parcourir les fichiers
+        upload_auto_submit_hint: Sélectionner un fichier l'attache immédiatement.
+        unknown_party: Inconnu
         search_title: Rechercher vos documents
         search_placeholder: "Rechercher par nom, n° facture…"
         attach: Associer
@@ -236,9 +261,11 @@ fr:
           excluded: Mis de côté
           credit: Revenu associé
           unmatched: Sans facture
+          requested: Facture demandée
         revenue_label: revenu
         review_label: vérifier
         excluded_label: Mis de côté
+        requested_label: Facture demandée — en attente
         unmatched_chip: "Sans facture · Résoudre"
         unknown_party: Inconnu
         nif_missing: Numéro TVA manquant sur ce document

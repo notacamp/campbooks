@@ -144,6 +144,21 @@ RSpec.describe Campbooks::Accounting::ReconciliationGroup, type: :component do
     expect(html).not_to include("FT")
   end
 
+  it "renders a :requested group with a muted waiting label (no Resolve chip)" do
+    txn = make_txn(amount_cents: -20_000, status: :requested,
+                   description: "Pagamento fornecedor", counterparty: "Distribuidora Norte")
+    group = make_group(txns: [ txn ], docs: [], kind: :unmatched)
+
+    html = render_component(group)
+
+    # Shows "Invoice requested" label text (muted, no ember chip)
+    expect(html).to include("Invoice requested")
+    # Must NOT show the ember "Resolve" / "No invoice" chip for unmatched
+    expect(html).not_to include("No invoice")
+    # The "!" punctuation used in the unmatched chip must not appear
+    expect(html).not_to include(">!</")
+  end
+
   it "renders an excluded group as muted with set-aside label" do
     txn = make_txn(amount_cents: -350, status: :excluded,
                    description: "Comissão conta", counterparty: "BCP")
