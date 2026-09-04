@@ -21,6 +21,7 @@ module Campbooks
       ICON_FILE   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>'
       ICON_CALENDAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'
       SPARK = '<svg viewBox="0 0 24 24" fill="currentColor" class="h-[12px] w-[12px]" aria-hidden="true"><path d="M12 5l1.7 5.6L19.5 12l-5.8 1.4L12 19l-1.7-5.6L4.5 12l5.8-1.4z"/></svg>'
+      ICON_CLOSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>'
 
       def initialize(profile:, person: nil)
         @profile = profile
@@ -53,15 +54,25 @@ module Campbooks
 
       # ── Rail header ──────────────────────────────────────────────────────────
 
+      # Phones: Back on the left. lg and up (the sheet, and the rail at xl): a close
+      # control on the right — below xl it slides the sheet away, at xl it collapses
+      # the rail (the ⓘ button in the conversation header brings it back).
       def rail_header
-        div(class: "flex items-center justify-between border-b border-border px-3 py-2.5 xl:hidden") do
-          button(type: "button", class: "inline-flex items-center gap-1 text-[13px] text-accent-600 hover:text-accent-700",
+        div(class: "flex items-center justify-between border-b border-border px-3 py-2.5") do
+          button(type: "button", class: "inline-flex items-center gap-1 text-[13px] text-accent-600 hover:text-accent-700 lg:hidden",
                  data: { action: "click->people-details#close" }) do
             chevron_left_svg
             plain(t(".back"))
           end
+          span(class: "hidden w-7 lg:block") { }
           span(class: "text-[13px] font-medium text-foreground") { t(".title") }
-          span(class: "w-8") { }
+          span(class: "w-7 lg:hidden") { }
+          button(type: "button",
+                 class: "hidden h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground lg:inline-flex",
+                 title: t(".close"), "aria-label": t(".close"),
+                 data: { action: "click->people-details#close" }) do
+            raw(safe(ICON_CLOSE))
+          end
         end
       end
 

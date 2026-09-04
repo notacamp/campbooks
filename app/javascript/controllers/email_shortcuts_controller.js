@@ -160,6 +160,12 @@ export default class extends Controller {
     // c/a/r/e/arrows drive the calendar instead of email actions.
     if (document.body.dataset.calendarKeys) return true
 
+    // Defer to the People place's own keys (people_shortcuts_controller): its
+    // e/r/a/f/arrows act on the selected person, so this controller stays silent
+    // there except for compose and the cheat sheet.
+    if (document.querySelector("[data-controller~='people-shortcuts']") &&
+        !(event.key === "c" || event.key === "?" || event.key === "/")) return true
+
     // Respect the command palette
     const palette = document.querySelector(".command-palette-dialog[open]")
     if (palette) return true

@@ -133,6 +133,7 @@ fr:
       title: Paramètres de la boîte de réception
     keyboard_shortcuts_modal:
       contexts:
+        people: Personnes
         calendar: Calendrier
         email: Email
         feed: Fil
@@ -142,6 +143,16 @@ fr:
         selection: Sélection
       footer_hint: Appuyez sur ? pour ouvrir cette fenêtre à tout moment.
       shortcuts:
+        people_move: "Parcourir les personnes (s'ouvre après une pause)"
+        people_open: "Ouvrir la personne sélectionnée"
+        people_reply: "Répondre"
+        people_reply_all: "Répondre à tous"
+        people_forward: "Transférer"
+        people_archive: "Archiver la conversation"
+        people_done: "Terminé"
+        people_snooze: "Reporter à demain"
+        people_more: "Plus d'actions"
+        people_details: "Afficher ou masquer les détails"
         archive: Archiver
         cal_new: Nouvel événement
         cal_next: Période suivante

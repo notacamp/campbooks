@@ -62,9 +62,9 @@
         </svg>
       <% end %>
     <% end %>
-    <%# Details ⓘ button — visible below xl only; toggles the sheet. %>
+    <%# Details ⓘ button — toggles the sheet below xl, collapses/expands the rail at xl+. %>
     <button type="button"
-            class="xl:hidden inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary"
+            class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary"
             title="<%= t("people.details.title") %>"
             data-action="click->people-details#toggle"
             data-people-details-target="detailsBtn">
@@ -130,9 +130,11 @@
   </div>
   </div><%# /main conversation column %>
 
-  <%# Details rail / sheet. Static at xl+; sheet (translate-x-full → translate-x-0) below xl. %>
+  <%# Details rail / sheet. Static at xl+ (collapsible: the people-details controller
+      sets the hidden attribute and remembers the choice); a sheet (translate-x-full →
+      translate-x-0) below xl. It scrolls on its own, whatever the mode. %>
   <aside id="people_details_pane"
-         class="absolute inset-y-0 right-0 z-20 w-full lg:w-[400px] xl:w-[300px] translate-x-full
+         class="absolute inset-y-0 right-0 z-20 flex w-full flex-col overflow-y-auto lg:w-[400px] xl:w-[300px] translate-x-full
                 border-l border-border bg-card transition-transform duration-200
                 xl:static xl:translate-x-0 xl:flex-none"
          data-people-details-target="pane">

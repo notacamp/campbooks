@@ -74,10 +74,14 @@ module People
         latest = latest_inbound_message(person)
         last_subj = latest&.email_thread&.display_subject.to_s.strip.presence ||
                     latest&.subject.to_s.strip.presence
+        # The newest inbound message is what the row's Reply and Archive act on —
+        # without it a Latest row offers neither (only lane rows carried one).
         if (summary = profile_summary(person)).present?
-          result(first_sentence(summary), thread: latest&.email_thread, kind: :summary, subject_str: last_subj)
+          result(first_sentence(summary), thread: latest&.email_thread, kind: :summary, subject_str: last_subj,
+                                          email_message_id: latest&.id)
         elsif person.last_email_at.present?
-          result(nil, thread: latest&.email_thread, kind: :last_exchange, subject_str: last_subj)
+          result(nil, thread: latest&.email_thread, kind: :last_exchange, subject_str: last_subj,
+                      email_message_id: latest&.id)
         else
           Result.none
         end
@@ -124,14 +128,15 @@ module People
       )
     end
 
-    def result(text, thread: nil, kind: :none, subject_str: nil)
+    def result(text, thread: nil, kind: :none, subject_str: nil, email_message_id: nil)
       Result.new(
         text: text,
         needs_you: false,
         thread_id: thread&.id,
         overdue_days: 0,
         kind: kind,
-        subject: subject_str
+        subject: subject_str,
+        email_message_id: email_message_id
       )
     end
 

@@ -55,10 +55,12 @@ module Campbooks
       # The list-row wraps the <a> and the action cluster in a group div so the
       # cluster can be positioned absolutely without the <a> needing to be relative.
       def list_row
+        # aria-selected is the keyboard selection (people_shortcuts_controller); the
+        # open person's row is lit through `selected` on the link below.
         div(
           id: row_dom_id,
           data: { people_row: true },
-          class: "group relative"
+          class: "group relative rounded-xl aria-selected:bg-secondary aria-selected:ring-1 aria-selected:ring-border"
         ) do
           a(href: href,
             data: { turbo_frame: "people_detail", turbo_action: "advance", action: "click->email-mobile#showDetail" },
@@ -244,7 +246,8 @@ module Campbooks
                    data: { turbo_stream: true }) do
                 input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
                 button(type: "submit",
-                       class: "w-full px-4 py-2 text-left text-[13px] hover:bg-secondary") do
+                       class: "w-full px-4 py-2 text-left text-[13px] hover:bg-secondary",
+                       data: { people_archive: true }) do
                   plain(t(".actions.archive"))
                 end
               end

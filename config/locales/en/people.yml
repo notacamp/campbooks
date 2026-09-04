@@ -18,7 +18,7 @@ en:
           other: "%{count}d"
         actions:
           reply_hint: "Reply (r)"
-          done_hint: "Done (e)"
+          done_hint: "Done (d)"
           snooze_hint: "Snooze (s)"
           star_hint: "Star"
           unstar_hint: "Unstar"
@@ -46,6 +46,7 @@ en:
         reply_all_hint: "Reply all (a)"
         forward_hint: "Forward (f)"
       details:
+        close: Close
         title: Details
         back: Back
         save: Save
