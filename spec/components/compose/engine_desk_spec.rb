@@ -6,7 +6,7 @@ RSpec.describe Campbooks::Compose::Engine, type: :component do
   def render_desk(ai: true, **overrides)
     allow_any_instance_of(ApplicationController).to receive(:ai_provider_available?).and_return(ai)
     args = {
-      shell: :desk, desk: true, persistent_status: true, mode: :new_message,
+      shell: :desk, desk: true, mode: :new_message,
       action_url: "/email_messages/send_new", accounts: [], signatures: [],
       heading: "New message", back_url: "/email_messages"
     }.merge(overrides)
@@ -24,11 +24,10 @@ RSpec.describe Campbooks::Compose::Engine, type: :component do
     expect(html).to include("rounded-2xl border border-border")
   end
 
-  it "keeps the saved status persistent with a check glyph" do
+  it "renders the calm autosave status with a check glyph" do
     html = render_desk
 
-    expect(html).to include('data-compose-autosave-persistent-status-value="true"')
-    expect(html).to include('data-compose-autosave-saved-text-value="Saved just now"')
+    expect(html).to include('data-compose-autosave-saved-text-value="Saved"')
     expect(html).to include('data-compose-autosave-target="statusIcon"')
     expect(html).to include('data-compose-autosave-target="status"')
   end

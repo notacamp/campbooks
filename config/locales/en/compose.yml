@@ -23,7 +23,6 @@ en:
         cc_button: Cc
         collapse_envelope: Collapse recipient fields
         discard: Discard
-        draft_saved: Draft saved
         edit_recipients: Edit recipients and subject
         expand_quote_title: Show the quoted message and edit it
         label_bcc: Bcc
@@ -42,6 +41,7 @@ en:
         quoted_from_undated: "%{who} wrote"
         quoted_generic: Quoted message
         recipients_more: "%{name} +%{count}"
+        saved: Saved
         saving: Saving…
         schedule: Schedule
         schedule_at_label: Send at
@@ -57,7 +57,6 @@ en:
         rewrite_failed: Could not rewrite the draft
         rewrite_shorter: Shorter
         rewrite_warmer: Warmer
-        saved_just_now: Saved just now
         scout_draft_chip: Scout's draft · edit freely
         scout_draft_source: from your note and the thread
         undo_rewrite: Undo rewrite
@@ -66,7 +65,6 @@ en:
         placeholder: Tell Scout what to say, or start typing…
       pill:
         dismiss_title: Dismiss
-        draft_saved: Draft saved
         resume_aria: Resume your draft
         untitled: Draft
       context_rail:

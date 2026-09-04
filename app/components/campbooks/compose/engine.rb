@@ -26,8 +26,6 @@ module Campbooks
       # desk: the "compose from intent" layout — a top bar, the IntentInput, a chip
       #   envelope (subject-as-chip, inferred suffixes), a From·Signature meta line,
       #   and a bordered editor card with a tone-rewrite footer.
-      # persistent_status: keep the autosave status visible with a check ("Saved
-      #   just now") instead of the fading "Draft saved".
       # intent/heading/back_url: desk top-bar + IntentInput inputs.
       # to_inferred/subject_inferred: mark the prefilled chips "· inferred".
       def initialize(shell:, mode:, action_url:, message: nil, draft: nil,
@@ -35,7 +33,7 @@ module Campbooks
                      signatures: [], signature_id: nil, account: nil, accounts: [],
                      attachment_entries: [], scout_draft: nil,
                      form_id: nil, show_attachments: true,
-                     desk: false, persistent_status: false, intent: "",
+                     desk: false, intent: "",
                      heading: nil, back_url: nil, to_inferred: false, subject_inferred: false)
         @shell = shell
         @mode = mode.to_sym
@@ -57,7 +55,6 @@ module Campbooks
         @form_id = form_id
         @show_attachments = show_attachments
         @desk = desk
-        @persistent_status = persistent_status
         @intent = intent.to_s
         @heading = heading
         @back_url = back_url
@@ -86,11 +83,10 @@ module Campbooks
           compose_autosave_mode_value: @mode.to_s,
           compose_autosave_in_reply_to_id_value: @message&.id.to_s,
           compose_autosave_saving_text_value: t(".saving"),
-          compose_autosave_saved_text_value: desk? ? t(".saved_just_now") : t(".draft_saved")
+          compose_autosave_saved_text_value: t(".saved")
         }
         if desk?
           form_data[:scout_draft] = "false"
-          form_data[:compose_autosave_persistent_status_value] = "true"
           form_data[:compose_engine_rewrite_url_value] = helpers.rewrite_draft_email_messages_path
           form_data[:compose_engine_rewrite_done_text_value] = t(".rewrite_done")
           form_data[:compose_engine_rewrite_failed_text_value] = t(".rewrite_failed")
@@ -313,6 +309,26 @@ module Campbooks
         end
       end
 
+      # The autosave status shared by both footers: one calm, ambient indicator.
+      # A muted label that settles to "Saved" beside a small check and stays put —
+      # the compose-autosave controller updates it in place, never fading it out.
+      # Hidden on mobile (sm:inline-flex) where footer space is tight. Muted ink +
+      # a restrained green check, never Ember (a saved draft isn't Scout/live/win).
+      def saved_status(text_size:, extra: nil)
+        span(class: class_names(
+              "hidden items-center gap-1.5 text-muted-foreground sm:inline-flex", text_size, extra
+            )) do
+          span(class: "hidden text-green-600 dark:text-green-400",
+               data: { compose_autosave_target: "statusIcon" }, aria_hidden: "true") do
+            svg(class: "h-3.5 w-3.5", fill: "none", stroke: "currentColor", stroke_width: "2.4",
+                stroke_linecap: "round", stroke_linejoin: "round", viewBox: "0 0 24 24") do
+              raw(safe('<polyline points="20 6 9 17 4 12"/>'))
+            end
+          end
+          span(data: { compose_autosave_target: "status" })
+        end
+      end
+
       # ── footer ───────────────────────────────────────────────────
       def footer
         div(class: class_names(
@@ -325,8 +341,7 @@ module Campbooks
             render(EmailTemplatePicker.new(frame_id: "etp_#{@message&.id || @draft&.id || 'new'}"))
           end
           signature_chip if @signatures.any?
-          span(class: "text-[11px] text-gray-400 ml-2 hidden sm:inline",
-               data: { compose_autosave_target: "status" })
+          saved_status(text_size: "text-[11px]", extra: "ml-2")
           div(class: "flex-1")
           if dock?
             button(type: "button",
@@ -447,7 +462,7 @@ module Campbooks
         div(class: "sticky top-0 z-10 flex items-center gap-3 bg-card/90 px-4 py-3 backdrop-blur-md sm:px-6") do
           bold_heading
           div(class: "flex-1")
-          bold_saved_status
+          saved_status(text_size: "text-[13px]")
           bold_send_button
         end
       end
@@ -468,19 +483,6 @@ module Campbooks
         svg(class: "h-4 w-4", fill: "none", stroke: "currentColor", stroke_width: "2.2",
             stroke_linecap: "round", stroke_linejoin: "round", viewBox: "0 0 24 24") do
           raw(safe('<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>'))
-        end
-      end
-
-      def bold_saved_status
-        span(class: "hidden items-center gap-1.5 text-[13px] text-muted-foreground sm:inline-flex") do
-          span(class: "hidden text-green-600 dark:text-green-400",
-               data: { compose_autosave_target: "statusIcon" }, aria_hidden: "true") do
-            svg(class: "h-3.5 w-3.5", fill: "none", stroke: "currentColor", stroke_width: "2.4",
-                stroke_linecap: "round", stroke_linejoin: "round", viewBox: "0 0 24 24") do
-              raw(safe('<polyline points="20 6 9 17 4 12"/>'))
-            end
-          end
-          span(data: { compose_autosave_target: "status" })
         end
       end
 

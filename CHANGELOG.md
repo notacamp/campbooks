@@ -26,6 +26,10 @@ major, minor, or patch change here.
   `:settled`, `:partial`, or `:unsettled` based on how much of the invoice amount is
   accounted for across all confirmed matches.
 
+### Changed
+
+- Quieter draft-save feedback: the composer's autosave status settles to a calm "Saved" instead of a flashing label, and the parked-draft pill is now a compact, on-system capsule that reveals the draft on hover.
+
 ## [0.36.2] - 2026-09-04
 
 ### Changed
