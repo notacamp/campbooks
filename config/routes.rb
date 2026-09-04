@@ -134,6 +134,16 @@ Rails.application.routes.draw do
   # message's body (each a turbo-frame the person page renders as a placeholder).
   get  "people/:id/threads/:thread_id",   to: "people/threads#show",  as: :people_thread
   get  "people/:id/messages/:message_id", to: "people/messages#show", as: :people_message
+  # Details rail / sheet — the person's profile inside the People place.
+  get   "people/:id/details",             to: "people/details#show",    as: :people_details
+  patch "people/:id/details/rename",      to: "people/details#rename",  as: :rename_people_details
+  patch "people/:id/details/relationship",to: "people/details#relationship", as: :relationship_people_details
+  patch "people/:id/details/kind",        to: "people/details#kind",    as: :kind_people_details
+  patch "people/:id/details/state",       to: "people/details#state",   as: :state_people_details
+  patch "people/:id/details/undo",        to: "people/details#undo",    as: :undo_people_details
+  patch "people/:id/details/unblock",     to: "people/details#unblock", as: :unblock_people_details
+  post  "people/:id/details/analyze",     to: "people/details#analyze", as: :analyze_people_details
+  post  "people/:id/details/merge",       to: "people/details#merge",   as: :merge_people_details
   get  "people/:id",            to: "people#show",                as: :person_page
 
   # Workspace activity feed — a retrospective timeline of domain Events (distinct

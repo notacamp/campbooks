@@ -16,6 +16,10 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- **A person's details in People.** Their addresses, organization, relationship, Scout's read, the numbers, every thread, documents and events with them, and star / allow / block / merge — from the person's name, the row menu or the i key.
+
 ## [0.35.0] - 2026-09-04
 
 ### Added

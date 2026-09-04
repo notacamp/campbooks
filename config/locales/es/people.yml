@@ -23,6 +23,7 @@ es:
           star_hint: Destacar
           unstar_hint: Quitar destaque
           more_hint: "Más (.)"
+          details: Detalles
           archive: Archivar conversación
           block: Bloquear remitente
           open_profile: Abrir perfil clásico
@@ -43,6 +44,63 @@ es:
       thread_message:
         to_you: para ti
         to_name: "para %{name}"
+      details:
+        title: Detalles
+        back: Volver
+        save: Guardar
+        rename_label: Nombre de la persona
+        person_singular: persona
+        persons_plural: personas
+        since: "desde %{date}"
+        no_relationship: "Relación…"
+        starred: "Destacado"
+        blocked: "Bloqueado"
+        allowed: "Permitido"
+        primary_badge: principal
+        copy_email: Copiar dirección de correo
+        kind_person: Persona
+        kind_service: Servicio
+        make_person: Marcar como persona
+        make_service: Marcar como servicio
+        scout_not_read: "Scout no ha leído esta persona todavía."
+        read_on: "Leído el %{date}"
+        refresh: Actualizar
+        refresh_hint: Pedir a Scout que vuelva a leer esta persona
+        all_in_paper: Todo en Paper
+        open_time: Abrir Tiempo
+        no_event_title: "(sin título)"
+        unknown_kind: Documento
+        thread_message_one: mensaje
+        thread_messages_other: mensajes
+        sections:
+          scout_read: "Lectura de Scout"
+          numbers: Números
+          threads: Conversaciones
+          documents: Documentos
+          events: Eventos
+        patterns:
+          topics: Temas
+          tone: Tono
+          urgency: Urgencia
+          primary_role: Rol
+        numbers:
+          received: Recibidos
+          sent: Enviados
+          threads: Conversaciones
+          documents: Documentos
+          first_contact: Primer contacto
+          last_contact: Último contacto
+        threads_more: "y %{count} más"
+        manage:
+          star: Destacar
+          unstar: Quitar destacado
+          allow: Permitir siempre
+          block: Bloquear
+          block_confirm: "¿Bloquear esta persona? Sus correos se archivarán automáticamente."
+          unblock: Desbloquear
+          open_org: "Abrir %{org}"
+          same_person: "¿La misma persona?"
+          merge: "Fusionar con %{name}"
   people:
     index:
       tab_people: Personas
@@ -159,3 +217,69 @@ es:
       streams_heading: "Streams de %{org} · %{count}"
       no_streams: Aún no hay servicios.
       open_stream: Abrir stream
+    details:
+      title: Detalles
+      back: Volver
+      save: Guardar
+      rename_label: Nombre de la persona
+      person_singular: persona
+      persons_plural: personas
+      since: "desde %{date}"
+      no_relationship: "Relación…"
+      starred: "Destacado"
+      blocked: "Bloqueado"
+      allowed: "Permitido"
+      primary_badge: principal
+      copy_email: Copiar dirección de correo
+      kind_person: Persona
+      kind_service: Servicio
+      make_person: Marcar como persona
+      make_service: Marcar como servicio
+      scout_not_read: "Scout aún no ha leído a esta persona."
+      read_on: "Leído el %{date}"
+      refresh: Actualizar
+      refresh_hint: Pedir a Scout que vuelva a leer a esta persona
+      all_in_paper: Todo en Paper
+      open_time: Abrir Tiempo
+      no_event_title: "(sin título)"
+      unknown_kind: Documento
+      thread_message_one: mensaje
+      thread_messages_other: mensajes
+      sections:
+        scout_read: "Lectura de Scout"
+        numbers: Números
+        threads: Conversaciones
+        documents: Documentos
+        events: Eventos
+      patterns:
+        topics: Temas
+        tone: Tono
+        urgency: Urgencia
+        primary_role: Rol
+      numbers:
+        received: Recibidos
+        sent: Enviados
+        threads: Conversaciones
+        documents: Documentos
+        first_contact: Primer contacto
+        last_contact: Último contacto
+      threads_more: "y %{count} más"
+      manage:
+        star: Destacar
+        unstar: Quitar destaque
+        allow: Permitir siempre
+        block: Bloquear
+        block_confirm: "¿Bloquear esta persona? Sus correos se archivarán automáticamente."
+        unblock: Desbloquear
+        open_org: "Abrir %{org}"
+        same_person: "¿La misma persona?"
+        merge: "Unir con %{name}"
+      toasts:
+        starred: Destacado
+        unstarred: Destaque eliminado
+        allowed: Siempre permitido
+        blocked: Bloqueado
+        unblocked: Desbloqueado
+        analysis_queued: Scout está releyendo a esta persona
+        merged: "Unido con %{name}"
+        merge_dismissed: Descartado

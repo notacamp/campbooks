@@ -1,0 +1,6 @@
+<%# The Details rail rendered inside turbo-frame "people_details".
+    The turbo_frame wrapper lives in _conversation.html.erb.
+    This file is layout:false — rendered by People::DetailsController#show. %>
+<%= turbo_frame_tag "people_details" do %>
+  <%= render Campbooks::People::Details.new(profile: profile) %>
+<% end %>

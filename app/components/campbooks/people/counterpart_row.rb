@@ -250,6 +250,11 @@ module Campbooks
               end
             end
             if (contact_id = data["contact_id"])
+              # Details (opens the rail/sheet for this person)
+              a(href: helpers.people_details_path(@counterpart.id), data: { turbo_frame: "people_details" },
+                class: "block px-4 py-2 text-[13px] no-underline hover:bg-secondary") do
+                plain(t(".actions.details"))
+              end
               # Block sender (POST set_state, like the conversation kebab)
               form(action: helpers.set_state_contact_path(contact_id, state: :block),
                    method: "post", class: "block w-full", data: { turbo: false }) do
@@ -260,7 +265,7 @@ module Campbooks
               end
               # Open classic profile
               a(href: helpers.contact_path(contact_id), data: { turbo_frame: "_top" },
-                class: "block px-4 py-2 text-[13px] no-underline hover:bg-secondary") do
+                class: "block px-4 py-2 text-[13px] text-muted-foreground no-underline hover:bg-secondary") do
                 plain(t(".actions.open_profile"))
               end
             end
