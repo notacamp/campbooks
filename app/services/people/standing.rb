@@ -72,11 +72,11 @@ module People
         result_from_attention(attention_item)
       else
         latest = latest_inbound_message(person)
+        last_subj = latest&.email_thread&.display_subject.to_s.strip.presence ||
+                    latest&.subject.to_s.strip.presence
         if (summary = profile_summary(person)).present?
-          result(first_sentence(summary), thread: latest&.email_thread, kind: :summary)
+          result(first_sentence(summary), thread: latest&.email_thread, kind: :summary, subject_str: last_subj)
         elsif person.last_email_at.present?
-          last_subj = latest&.email_thread&.display_subject.to_s.strip.presence ||
-                      latest&.subject.to_s.strip
           result(nil, thread: latest&.email_thread, kind: :last_exchange, subject_str: last_subj)
         else
           Result.none

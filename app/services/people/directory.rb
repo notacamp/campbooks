@@ -256,49 +256,33 @@ module People
     # one, set its name to all participants (max 3 + "+N"), data["participant_ids"],
     # and drop the others.
 
-    def fold_group_threads(rows, attention)
-      need_you_rows, recent_rows = rows.partition { |cp| cp.needs_you? }
+    def fold_group_threads(rows, _attention)
+      need_you_rows, recent_rows = rows.partition(&:needs_you?)
+      dropped = Set.new
 
-      # Group Need-you rows by thread_id.
-      by_thread = need_you_rows.group_by { |cp| cp.standing.thread_id }
-      grouped_thread_ids = by_thread.filter_map { |tid, grp| tid if grp.size > 1 }.to_set
+      folded = need_you_rows.sort_by { |cp| -cp.priority }.filter_map do |cp|
+        next nil if dropped.include?(cp.id)
 
-      # Persons to drop from Recent (they appear in a group row instead).
-      dropped_ids = Set.new
-
-      folded_need_you = need_you_rows.filter_map do |cp|
         tid = cp.standing.thread_id
-        next nil if grouped_thread_ids.include?(tid) && by_thread[tid].max_by(&:priority) != cp
+        next cp if tid.blank?
 
-        if grouped_thread_ids.include?(tid)
-          # This is the winner. Build the group row.
-          group = by_thread[tid].sort_by(&:priority).reverse
-          group.each { |member| dropped_ids << member.id if member != cp }
-
-          participants = attention.participants(tid)
-          name = group_name(participants, group)
-          participant_ids = group.map(&:id)
-
-          data = cp.data.merge("participant_ids" => participant_ids)
-          cp.with(name: name, data: data)
-        else
-          cp
+        members = rows.select do |other|
+          other.id != cp.id && !dropped.include?(other.id) && other.record && on_thread?(other.record, tid)
         end
-      end.compact
+        next cp if members.empty?
 
-      # Drop group participants from Recent too.
-      filtered_recent = recent_rows.reject { |cp| dropped_ids.include?(cp.id) }
+        members.each { |member| dropped << member.id }
+        names = ([ cp.name ] + members.map(&:name)).uniq
+        name = names.size <= 3 ? names.join(", ") : "#{names.first(3).join(', ')} +#{names.size - 3}"
+        cp.with(name: name, data: cp.data.merge("participant_ids" => [ cp.id ] + members.map(&:id)))
+      end
 
-      folded_need_you + filtered_recent
+      folded + recent_rows.reject { |cp| dropped.include?(cp.id) }
     end
 
-    def group_name(participants, group)
-      names = (participants.map(&:display_name) + group.map(&:name)).uniq
-      if names.size <= 3
-        names.join(", ")
-      else
-        "#{names.first(3).join(', ')} +#{names.size - 3}"
-      end
+    # Does this person's inbox mail include the thread? (primed, no query)
+    def on_thread?(person, thread_id)
+      people_standing.threads_for(person).any? { |thread| thread.id == thread_id }
     end
 
     # ── Batch org count queries ───────────────────────────────────────────────

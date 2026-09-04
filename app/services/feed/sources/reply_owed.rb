@@ -46,6 +46,9 @@ module Feed
         return nil unless contact&.kind_person? && contact.sender_kind_source.present?
         return nil if Contacts::SenderKind.broadcast?(m, provider_hints: false)
         return nil if copied_only?(m)
+        thread = m.email_thread
+        return nil unless thread && m.received_at && thread.last_inbound_at
+        return nil if m.received_at < thread.last_inbound_at # an older message they followed up on; the newest one is the ask
         return nil unless established_relationship?(m, contact)
 
         age = age_days(m.received_at)
@@ -70,6 +73,7 @@ module Feed
                       .where("received_at <= ?", now - AGED_DAYS.days)
                       .where("received_at >= ?", now - MAX_AGE)
                       .where.not(contact_id: nil)
+                      .includes(:email_thread, contact: :person)
                       .select(:id, :received_at, :email_thread_id, :contact_id,
                               :from_address, :to_address, :cc_address,
                               :subject, :email_account_id, :provider_folder_id,
