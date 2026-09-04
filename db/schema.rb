@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_04_150000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_04_170000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -1880,6 +1880,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_04_150000) do
   end
 
   create_table "transaction_matches", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.bigint "allocated_cents"
     t.uuid "bank_transaction_id", null: false
     t.float "confidence"
     t.datetime "created_at", null: false

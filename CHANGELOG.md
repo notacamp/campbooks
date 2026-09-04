@@ -16,6 +16,16 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- Reconciliation matches now track `allocated_cents` — the portion of a document's
+  total amount covered by each individual bank transaction. This enables split
+  payments (one transfer across multiple invoices), installment matching (multiple
+  transfers settling one invoice), and partial payments (a deposit that leaves an
+  invoice outstanding). The `settlement_state` computed field on a document reports
+  `:settled`, `:partial`, or `:unsettled` based on how much of the invoice amount is
+  accounted for across all confirmed matches.
+
 ### Changed
 
 - Quieter draft-save feedback: the composer's autosave status settles to a calm "Saved" instead of a flashing label, and the parked-draft pill is now a compact, on-system capsule that reveals the draft on hover.
