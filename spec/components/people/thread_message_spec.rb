@@ -7,7 +7,7 @@ RSpec.describe Campbooks::People::ThreadMessage, type: :component do
   let(:thread) { create(:email_thread, email_account: account, subject: "Q3 deck") }
   let(:contact) { create(:contact, email: "sofia@brightloop.example", name: "Sofia Martins", email_account: account) }
 
-  def render_msg(message, open: false, full_body: false, lazy_src: nil, content_only: false)
+  def render_msg(message, open: false, full_body: false, lazy_src: nil, content_only: false, can_send: false)
     ApplicationController.render(
       described_class.new(
         message: message,
@@ -15,7 +15,8 @@ RSpec.describe Campbooks::People::ThreadMessage, type: :component do
         open: open,
         full_body: full_body,
         lazy_src: lazy_src,
-        content_only: content_only
+        content_only: content_only,
+        can_send: can_send
       ),
       layout: false
     )
@@ -74,6 +75,43 @@ RSpec.describe Campbooks::People::ThreadMessage, type: :component do
                  from_address: "sofia@brightloop.example", body: nil, summary: nil)
     html = render_msg(msg, open: true)
     expect(html).to include("No content")
+  end
+
+  describe "per-message actions" do
+    let(:msg) do
+      create(:email_message, email_account: account, email_thread: thread, contact: contact,
+             from_address: "sofia@brightloop.example", body: "Action test.")
+    end
+
+    it "renders Reply, Reply all and Forward forms when can_send is true" do
+      html = render_msg(msg, open: true, can_send: true)
+      expect(html).to include("mode=reply")
+      expect(html).to include("mode=reply_all")
+      expect(html).to include("mode=forward")
+      expect(html).to include("data-people-reply")
+      expect(html).to include("data-people-reply-all")
+      expect(html).to include("data-people-forward")
+    end
+
+    it "renders no action forms when can_send is false" do
+      html = render_msg(msg, open: true, can_send: false)
+      expect(html).not_to include("mode=reply_all")
+      expect(html).not_to include("mode=forward")
+      expect(html).not_to include("data-people-reply-all")
+    end
+
+    it "renders action forms in content_only mode when can_send is true" do
+      html = render_msg(msg, content_only: true, can_send: true)
+      expect(html).to include("mode=reply")
+      expect(html).to include("mode=reply_all")
+      expect(html).to include("mode=forward")
+    end
+
+    it "renders no action forms in content_only mode when can_send is false" do
+      html = render_msg(msg, content_only: true, can_send: false)
+      expect(html).not_to include("mode=reply_all")
+      expect(html).not_to include("mode=forward")
+    end
   end
 
   describe "lazy body" do

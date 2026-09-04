@@ -23,6 +23,7 @@ module People
         People::Standings.refresh_counterpart!(current_user, @person)
       end
       @conversation_thread = People::ConversationThread.new(thread: @thread, messages: messages)
+      @can_send = @thread.email_account.sendable_by?(current_user)
       render :show, layout: false
     rescue ActiveRecord::RecordNotFound
       head :not_found

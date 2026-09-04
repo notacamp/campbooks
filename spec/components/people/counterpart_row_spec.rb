@@ -103,6 +103,17 @@ RSpec.describe Campbooks::People::CounterpartRow, type: :component do
     expect(html).not_to include("data-people-done")
   end
 
+  it "the More menu carries data-controller=dropdown-close" do
+    person = create(:person, name: "Sofia Martins")
+    counterpart = People::Counterpart.new(kind: :person, record: person, name: "Sofia Martins",
+                                          subtitle: nil, avatar_email: "sofia@x.example",
+                                          avatar_initial: nil, last_activity: Time.current,
+                                          standing: standing,
+                                          data: {})
+    html = render(described_class.new(counterpart: counterpart))
+    expect(html).to include('data-controller="dropdown-close"')
+  end
+
   it "does not render the action cluster for organization rows" do
     org = create(:organization, name: "ACME")
     counterpart = People::Counterpart.new(kind: :organization, record: org, name: "ACME",
