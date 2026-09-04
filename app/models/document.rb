@@ -363,13 +363,57 @@ class Document < ApplicationRecord
     update!(settled_at: nil, settled_source: nil)
   end
 
+  # ── Partial-payment helpers ──────────────────────────────────────────────────
+
+  # Sum of `allocated_cents` across this document's confirmed transaction_matches.
+  # Returns 0 when there are no confirmed matches or all have nil allocated_cents
+  # (SQL SUM ignores NULLs; Rails maps a NULL aggregate to 0).
+  def settled_amount_cents
+    transaction_matches.confirmed.sum(:allocated_cents)
+  end
+
+  # Remaining unpaid amount, clamped to zero.
+  # Returns nil when the document has no amount (amount_cents not yet extracted).
+  def outstanding_cents
+    return nil if amount_cents.nil?
+
+    [ amount_cents - settled_amount_cents, 0 ].max
+  end
+
+  # Fine-grained payment state based on allocated amounts:
+  #   :settled   — allocated_cents >= amount_cents (within 1-cent float tolerance)
+  #   :partial   — some allocation recorded but < full amount
+  #   :unsettled — nothing allocated, or no amount on the document
+  def settlement_state
+    return :unsettled if amount_cents.nil? || amount_cents.zero?
+
+    paid = settled_amount_cents
+    if paid >= amount_cents - 1
+      :settled
+    elsif paid.positive?
+      :partial
+    else
+      :unsettled
+    end
+  end
+
   # Re-derive the bank-match settlement from the document's confirmed transaction
   # matches. Called from TransactionMatch#sync_document_settlement after a match is
-  # confirmed/rejected/reset. A confirmed match sets settled_at to the latest matched
-  # transaction's booked date (source `bank_match`, overriding a prior manual settle —
-  # a real bank match is stronger evidence); losing the last confirmed match clears a
-  # bank-match settlement but never a manual one. Uses update_columns to stay out of
-  # callbacks/validations (avoids re-triggering the match callback loop).
+  # confirmed/rejected/reset.
+  #
+  # Settlement semantics (amount-aware):
+  #   - When the document has an extracted amount_cents: settled_at is written only
+  #     when the document is *fully* covered (settlement_state == :settled). A partial
+  #     payment clears any existing bank-match settlement so the document stays in the
+  #     "outstanding" view.
+  #   - When amount_cents is nil (not yet extracted): any confirmed match marks the
+  #     document as settled, preserving legacy behaviour for documents that haven't
+  #     gone through the extraction pipeline.
+  #   - A manual settlement (settled_source == "manual") is never cleared here — it
+  #     belongs to the user, not the reconciliation engine.
+  #
+  # Uses update_columns to stay out of callbacks/validations (avoids re-triggering
+  # the match callback loop).
   def recompute_bank_settlement!
     booked = TransactionMatch.confirmed
                              .where(document_id: id)
@@ -377,16 +421,28 @@ class Document < ApplicationRecord
                              .maximum("bank_transactions.booked_on")
 
     if booked
-      # Anchor the settlement to the booked DATE in the app's zone, so settled_at.to_date
-      # reads back as that date (a bare Date#to_time uses system-local midnight, which a
-      # UTC offset can shift a day).
-      new_at = booked.in_time_zone
-      return if settled_bank_match? && settled_at == new_at
+      # When the document has an extracted amount, only fully-settled → bank_match.
+      # When amount is unknown fall back to: any confirmed match = settled.
+      fully_settled = amount_cents.nil? || settlement_state == :settled
 
-      update_columns(settled_at: new_at, settled_source: "bank_match")
+      if fully_settled
+        # Anchor the settlement to the booked DATE in the app's zone, so
+        # settled_at.to_date reads back as that date (a bare Date#to_time uses
+        # system-local midnight, which a UTC offset can shift by a day).
+        new_at = booked.in_time_zone
+        return if settled_bank_match? && settled_at == new_at
+
+        update_columns(settled_at: new_at, settled_source: "bank_match")
+      elsif settled_bank_match?
+        # Partial payment — invoice still outstanding; clear the bank-match flag
+        # so the document surfaces in the "unpaid" view.
+        update_columns(settled_at: nil, settled_source: nil)
+      end
     elsif settled_bank_match?
+      # No confirmed matches remain → clear the bank-match settlement.
       update_columns(settled_at: nil, settled_source: nil)
     end
+    # Manual settlements (settled_source == "manual") are never touched here.
   end
 
   def image?
