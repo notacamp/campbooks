@@ -21,6 +21,7 @@ class User < ApplicationRecord
   has_many :notification_preferences, dependent: :destroy
   has_many :devices, dependent: :destroy
   has_many :feed_items, dependent: :delete_all
+  has_many :people_standings, dependent: :delete_all
   # Scout-proposed / user-kept focus blocks (the bold Time agenda). Personal.
   has_many :focus_blocks, dependent: :destroy
   has_many :bug_reports, dependent: :destroy

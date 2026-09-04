@@ -1,0 +1,63 @@
+# frozen_string_literal: true
+
+# One materialized row in the People directory per (user, counterpart). Computed
+# by People::Standings.refresh! (People::StandingsRefreshJob) so the People list
+# reads a paginated table instead of recomputing standings on every request.
+#
+# `counterpart_type` is "Person" or "Organization". Display columns (name,
+# subtitle, avatar_email, avatar_initial) are snapshot-copied from the live
+# record at refresh time so each row renders without touching other tables.
+class PeopleStanding < ApplicationRecord
+  belongs_to :workspace
+  belongs_to :user
+  belongs_to :counterpart, polymorphic: true
+  belongs_to :email_thread, optional: true
+
+  STANDING_KINDS = %w[you_owe nudge prompt summary last_exchange none].freeze
+  validates :standing_kind, inclusion: { in: STANDING_KINDS }
+  validates :name, presence: true
+
+  scope :for_user,  ->(user) { where(user: user) }
+  scope :needing,   -> { where(needs_you: true) }
+  scope :recent,    -> { where(needs_you: false) }
+  # Primary sort: score descending, then persons before their org on ties (Person > Organization
+  # lexicographically), then livelier row, then id for stable pagination.
+  scope :ranked,    -> { order(score: :desc, counterpart_type: :desc, last_activity_at: :desc, id: :asc) }
+  scope :search, lambda { |query|
+    like = "%#{sanitize_sql_like(query.to_s.strip)}%"
+    where("name ILIKE :like OR subtitle ILIKE :like OR avatar_email ILIKE :like", like: like)
+  }
+
+  def person? = counterpart_type == "Person"
+  def organization? = counterpart_type == "Organization"
+
+  # Rebuild a People::Standing::Result from the stored columns so callers that
+  # need the result object don't have to recompute it live.
+  def standing
+    People::Standing::Result.new(
+      text: text,
+      needs_you: needs_you,
+      thread_id: email_thread_id,
+      overdue_days: overdue_days,
+      kind: standing_kind.to_sym
+    )
+  end
+
+  # Build a People::Counterpart from the stored display columns. No additional
+  # queries: record is nil, and the score is reconstructed from persisted fields.
+  def to_counterpart
+    People::Counterpart.new(
+      id: counterpart_id,
+      kind: person? ? :person : :organization,
+      record: nil,
+      name: name,
+      subtitle: subtitle,
+      avatar_email: avatar_email,
+      avatar_initial: avatar_initial,
+      last_activity: last_activity_at,
+      standing: standing,
+      facts: nil,
+      score: People::Priority::Score.new(value: score, needs_you: needs_you, strength: strength, recency: 0.0)
+    )
+  end
+end
