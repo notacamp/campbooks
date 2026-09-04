@@ -112,27 +112,30 @@ module People
 
       base = EmailMessage.where(contact_id: contact_ids).accessible_to(@user)
 
-      # One aggregate SQL call for received / sent / first / last.
-      # sent? logic mirrors EmailMessage#sent?: lower(from_address) LIKE '%addr%'.
-      agg_sql, bind_values = if account_emails.any?
+      # Received / first / last come from the person's own messages (contact-linked).
+      received_count, first_at, last_at =
+        base.pick(Arel.sql("count(*), min(received_at), max(received_at)"))
+
+      # "Sent" counts the way EmailMessage#sent? does — lower(from_address) LIKE
+      # '%<account address>%' (from_address may be "Name <addr>") — but across the
+      # person's THREADS, because your own replies carry no contact and would
+      # otherwise never be counted. The same thread-wide pass gives each thread's
+      # real message count and latest date.
+      thread_ids = base.where.not(email_thread_id: nil).distinct.pluck(:email_thread_id)
+      sent_case, bind_values = if account_emails.any?
         like_clauses = account_emails.map { "lower(from_address) LIKE ?" }.join(" OR ")
-        patterns     = account_emails.map { |e| "%#{e.downcase}%" }
-        sql = "count(*) AS total, " \
-              "count(CASE WHEN (#{like_clauses}) THEN 1 END) AS sent_total, " \
-              "min(received_at) AS first_at, max(received_at) AS last_at"
-        [ sql, patterns ]
+        [ "count(CASE WHEN (#{like_clauses}) THEN 1 END)", account_emails.map { |e| "%#{e.downcase}%" } ]
       else
-        [ "count(*) AS total, 0 AS sent_total, min(received_at) AS first_at, max(received_at) AS last_at", [] ]
+        [ "0", [] ]
       end
-
-      received_count, sent_count, first_at, last_at =
-        base.pick(Arel.sql(ActiveRecord::Base.sanitize_sql_array([ agg_sql, *bind_values ])))
-
-      # Thread ids + meta in one group query (accessible base).
-      threads_base = base.where.not(email_thread_id: nil)
-                         .group(:email_thread_id)
-                         .select("email_thread_id, count(*) AS msg_count, max(received_at) AS latest_at")
-      thread_stats = threads_base.to_a.sort_by { |r| r.latest_at || Time.at(0) }.reverse
+      stats_sql = ActiveRecord::Base.sanitize_sql_array([
+        "email_thread_id, count(*) AS msg_count, max(received_at) AS latest_at, #{sent_case} AS sent_total",
+        *bind_values
+      ])
+      thread_stats = EmailMessage.where(email_thread_id: thread_ids).accessible_to(@user)
+                                 .group(:email_thread_id).select(Arel.sql(stats_sql))
+                                 .to_a.sort_by { |r| r.latest_at || Time.at(0) }.reverse
+      sent_count   = thread_stats.sum { |r| r.sent_total.to_i }
       thread_count = thread_stats.size
       @more_threads = thread_count > THREAD_CAP
       capped_stats  = thread_stats.first(THREAD_CAP)

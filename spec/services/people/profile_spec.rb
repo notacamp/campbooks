@@ -76,6 +76,16 @@ RSpec.describe People::Profile do
       it "counts threads" do
         expect(profile.counts[:threads]).to be >= 1
       end
+
+      it "counts your own replies in the person's threads even when they carry no contact" do
+        create(:email_message, email_account: account, contact: nil, email_thread: thread,
+               received_at: 12.hours.ago,
+               from_address: "Me <#{account.email_address}>", to_address: contact.email)
+
+        expect(profile.counts[:sent]).to eq(2)
+        expect(profile.counts[:received]).to eq(1)
+        expect(profile.threads.first[:count]).to eq(3) # thread-wide, not contact-linked only
+      end
     end
 
     context "email aliases" do

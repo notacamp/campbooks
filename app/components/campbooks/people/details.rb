@@ -200,13 +200,13 @@ module Campbooks
             button(type: "submit", name: "kind", value: "person",
                    class: class_names("px-2.5 py-0.5 transition-colors",
                                       !is_service ? "bg-foreground text-background" : "text-muted-foreground hover:bg-secondary"),
-                   "aria-pressed": !is_service) do
+                   "aria-pressed": (!is_service).to_s) do
               t(".kind_person")
             end
             button(type: "submit", name: "kind", value: "service",
                    class: class_names("px-2.5 py-0.5 transition-colors",
                                       is_service ? "bg-foreground text-background" : "text-muted-foreground hover:bg-secondary"),
-                   "aria-pressed": is_service) do
+                   "aria-pressed": is_service.to_s) do
               t(".kind_service")
             end
           end
