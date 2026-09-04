@@ -16,12 +16,24 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- **People page reads a pre-computed standings table.** `GET /people` no longer
+  touches `email_messages` or `email_threads` at request time. On first visit
+  the directory is computed inline (same latency as before); subsequent visits
+  read the `people_standings` table and enqueue a background refresh when rows
+  are older than 10 minutes. `People::StandingsRefreshJob` (30-second debounce)
+  is enqueued automatically after every `Feed::RefreshJob` and after
+  `SenderKindBackfillJob` finishes, so the table stays current without a
+  dedicated polling job.
+
 ### Fixed
 
 - **An organization page in People crashed when the organization had documents.**
   The "N documents" chip on `/people/orgs/:id` pointed at a route helper that
   does not exist, so every organization with at least one document rendered a
   500 instead of its page. The chip now links to the organization's documents.
+
 
 ## [0.33.0] - 2026-09-04
 
