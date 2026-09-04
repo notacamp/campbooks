@@ -8,19 +8,13 @@
 # Two modes:
 #   idle          — Scout suggestions + the last 6 Scout threads (Recent); the
 #                   command catalog + live search are rendered client-side by
-#                   scout_overlay_controller.js into the same list the classic
-#                   palette uses.
+#                   scout_overlay_controller.js.
 #   conversation  — ?thread_id= renders that thread's last 20 messages, wired to
 #                   the SAME turbo-stream target ids the reply job broadcasts to
 #                   (agent_messages_list / agent_typing), so asking a question
 #                   streams the reply in place.
-#
-# Gated on the readiness flag alone (require_bold_layout_enabled), like the Now
-# page — a classic-mode user on a flag-on build can still reach it, they just
-# never see the launcher/bar that opens it.
 class ScoutOverlayController < ApplicationController
   before_action :require_authentication
-  before_action :require_bold_layout_enabled
 
   layout false
 

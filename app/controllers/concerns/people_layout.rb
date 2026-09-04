@@ -3,12 +3,12 @@
 require "pagy/extras/array" # PeopleController#build_conversation paginates thread ids
 require "pagy/extras/countless"
 
-# Shared chrome for the People place: the bold-layout gate, the "email" three-pane
-# layout, the readable-mailbox scoping the inbox uses, the streams count for the
-# segmented control, and the counterpart list (persons + organizations, split into
-# Need-you / Recent by People::Standing). Included by PeopleController and
+# Shared chrome for the People place: the "email" three-pane layout, the
+# readable-mailbox scoping the inbox uses, the streams count for the segmented
+# control, and the counterpart list (persons + organizations, split into Need-you /
+# Recent by People::Standing). Included by PeopleController and
 # People::OrganizationsController (which share the person-list left pane) and, for
-# the gate + streams count, People::StreamsController.
+# the streams count, People::StreamsController.
 module PeopleLayout
   extend ActiveSupport::Concern
   include Pagy::Backend
@@ -19,7 +19,6 @@ module PeopleLayout
   LANE_CAP = 5
 
   included do
-    before_action :require_bold_layout_enabled
     layout "email"
     helper_method :people_active_tab, :streams_count
   end

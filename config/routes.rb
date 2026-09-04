@@ -411,7 +411,6 @@ Rails.application.routes.draw do
     resource :account, only: [ :show, :update, :destroy ], controller: "account" do
       patch :language
       patch :compose_preference
-      patch :layout_preference
       patch :writing_style
       post :analyze_writing_style
       get :delete

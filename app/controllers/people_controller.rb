@@ -7,8 +7,8 @@
 # Need-you / Recent sections); right pane = the selected person, loaded into the
 # "people_detail" turbo frame (mirrors the email_detail pattern).
 #
-# Gated on Features.bold_layout? (PeopleLayout). Nothing here changes the send
-# path or the mail model — it's a new reading of email threads + people + orgs.
+# Nothing here changes the send path or the mail model — it's a reading of email
+# threads + people + orgs.
 class PeopleController < ApplicationController
   include PeopleLayout
 

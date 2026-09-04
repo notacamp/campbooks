@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_04_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_04_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -1906,7 +1906,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_04_130000) do
     t.datetime "email_otp_enabled_at"
     t.jsonb "hidden_calendar_ids", default: [], null: false
     t.jsonb "inbox_smart_groups", default: {}, null: false
-    t.integer "layout_mode", default: 0, null: false
     t.string "locale"
     t.datetime "mfa_last_totp_at"
     t.string "name"

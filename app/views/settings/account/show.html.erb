@@ -60,30 +60,6 @@
     <% end %>
   </div>
 
-  <% if Features.bold_layout? %>
-    <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-6">
-      <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".layout_title") %></h2>
-      <p class="text-sm text-gray-500 mb-4"><%= t(".layout_intro") %></p>
-
-      <%= form_with url: layout_preference_settings_account_path, method: :patch, class: "space-y-4" do |f| %>
-        <div class="space-y-2.5">
-          <% [ [ "bold", t(".layout_bold_title"), t(".layout_bold_desc") ], [ "classic", t(".layout_classic_title"), t(".layout_classic_desc") ] ].each do |value, title, desc| %>
-            <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-3.5 transition-colors hover:bg-gray-50 has-[:checked]:border-accent-500 has-[:checked]:bg-accent-50/40">
-              <%= f.radio_button :layout_mode, value, checked: current_user.layout_mode == value,
-                    class: "mt-0.5 h-4 w-4 border-gray-300 text-accent-600 focus:ring-accent-500" %>
-              <span class="min-w-0">
-                <span class="block text-sm font-medium text-gray-900"><%= title %></span>
-                <span class="mt-0.5 block text-xs text-gray-500"><%= desc %></span>
-              </span>
-            </label>
-          <% end %>
-        </div>
-
-        <%= render(Campbooks::Button.new(variant: :primary, type: :submit)) { t(".save_layout") } %>
-      <% end %>
-    </div>
-  <% end %>
-
   <div class="bg-card rounded-xl shadow-sm border border-gray-200 p-6">
     <h2 class="text-base font-semibold text-gray-900 mb-1"><%= t(".writing_style_title") %></h2>
     <p class="text-sm text-gray-500 mb-4"><%= t(".writing_style_subtitle") %></p>

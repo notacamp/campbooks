@@ -9,10 +9,9 @@ require "csv"
 # derived state (Scout's read, the timeline, the ledger) so totals and sections
 # stay honest after every action.
 #
-# Money exists only where accounting does — gated by the bold layout AND the same
-# accounting flag + entitlement as the classic reconciliation page.
+# Money exists only where accounting does — gated by the same accounting flag +
+# entitlement as the reconciliation page.
 class MoneyController < ApplicationController
-  before_action :require_bold_layout_enabled
   before_action :require_accounting_enabled
   before_action :require_accounting_entitlement
   before_action :set_obligation, only: %i[remind chase settle unsettle decide]

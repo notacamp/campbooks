@@ -1,13 +1,10 @@
 # frozen_string_literal: true
 
 module Settings
-  # Scout's memory (bold layout): the inbox/AI settings pages re-expressed as
-  # editable sentences. Reads the derived Scout::Memory::Catalog; teach creates a
-  # real record; confirm/remove act on a learned-or-taught entry. Gated on the
-  # bold-layout flag alone (the page works for classic-mode users when the flag is
-  # on) — see require_bold_layout_enabled.
+  # Scout's memory: the inbox/AI settings pages re-expressed as editable sentences.
+  # Reads the derived Scout::Memory::Catalog; teach creates a real record;
+  # confirm/remove act on a learned-or-taught entry.
   class MemoryController < Settings::BaseController
-    before_action :require_bold_layout_enabled
 
     def show
       @facet = normalize_facet(params[:facet])
