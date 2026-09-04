@@ -23,7 +23,6 @@ pt:
         cc_button: Cc
         collapse_envelope: Recolher os campos de destinatários
         discard: Descartar
-        draft_saved: Rascunho guardado
         edit_recipients: Editar destinatários e assunto
         expand_quote_title: Mostrar a mensagem citada e editá-la
         label_bcc: Bcc
@@ -42,6 +41,7 @@ pt:
         quoted_from_undated: "%{who} escreveu"
         quoted_generic: Mensagem citada
         recipients_more: "%{name} +%{count}"
+        saved: Guardado
         saving: A guardar…
         schedule: Agendar
         schedule_at_label: Enviar em
@@ -57,7 +57,6 @@ pt:
         rewrite_failed: Não foi possível reescrever o rascunho
         rewrite_shorter: Mais curto
         rewrite_warmer: Mais caloroso
-        saved_just_now: Guardado agora mesmo
         scout_draft_chip: Rascunho do Scout · edita à vontade
         scout_draft_source: a partir da tua nota e da conversa
         undo_rewrite: Anular reescrita
@@ -66,7 +65,6 @@ pt:
         placeholder: Diz ao Scout o que dizer, ou começa a escrever…
       pill:
         dismiss_title: Dispensar
-        draft_saved: Rascunho guardado
         resume_aria: Retomar o rascunho
         untitled: Rascunho
       context_rail:

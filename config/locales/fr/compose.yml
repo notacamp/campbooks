@@ -23,7 +23,6 @@ fr:
         cc_button: Cc
         collapse_envelope: Replier les champs de destinataires
         discard: Abandonner
-        draft_saved: Brouillon enregistré
         edit_recipients: Modifier les destinataires et l'objet
         expand_quote_title: Afficher le message cité et le modifier
         label_bcc: Cci
@@ -42,6 +41,7 @@ fr:
         quoted_from_undated: "%{who} a écrit"
         quoted_generic: Message cité
         recipients_more: "%{name} +%{count}"
+        saved: Enregistré
         saving: Enregistrement…
         schedule: Programmer
         schedule_at_label: Envoyer le
@@ -57,7 +57,6 @@ fr:
         rewrite_failed: Impossible de réécrire le brouillon
         rewrite_shorter: Plus court
         rewrite_warmer: Plus chaleureux
-        saved_just_now: Enregistré à l'instant
         scout_draft_chip: Brouillon de Scout · modifie librement
         scout_draft_source: d'après ta note et le fil
         undo_rewrite: Annuler la réécriture
@@ -66,7 +65,6 @@ fr:
         placeholder: Dis à Scout quoi écrire, ou commence à taper…
       pill:
         dismiss_title: Masquer
-        draft_saved: Brouillon enregistré
         resume_aria: Reprendre le brouillon
         untitled: Brouillon
       context_rail:

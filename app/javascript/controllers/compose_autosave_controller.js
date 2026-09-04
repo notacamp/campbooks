@@ -16,17 +16,15 @@ export default class extends Controller {
     mode: { type: String, default: "new_message" },
     inReplyToId: { type: String, default: "" },
     savingText: { type: String, default: "Saving…" },
-    savedText: { type: String, default: "Draft saved" },
-    // Bold layout: keep the saved status visible (no fade), with a check glyph.
-    persistentStatus: { type: Boolean, default: false }
+    savedText: { type: String, default: "Saved" }
   }
 
   static DEBOUNCE_MS = 1500
-  static SAVED_STATUS_MS = 2500 // how long "Draft saved" lingers before it fades away
+  static SAVING_INDICATOR_DELAY_MS = 400 // only surface "Saving…" if the save is genuinely slow
 
   connect() {
     this._timer = null
-    this._statusTimer = null
+    this._savingTimer = null
     this._suspended = false
     this._dirty = false
     this._creating = false
@@ -38,7 +36,7 @@ export default class extends Controller {
 
   disconnect() {
     clearTimeout(this._timer)
-    clearTimeout(this._statusTimer)
+    clearTimeout(this._savingTimer)
     document.removeEventListener("turbo:before-visit", this._flushBound)
     window.removeEventListener("pagehide", this._flushBound)
   }
@@ -108,7 +106,7 @@ export default class extends Controller {
     if (this._creating) { this.changed(); return }
 
     this._dirty = false
-    this._setStatus(this.savingTextValue)
+    this._armSavingIndicator()
 
     const body = JSON.stringify({ draft_email: this._payload() })
     const create = !this.draftIdValue
@@ -122,6 +120,7 @@ export default class extends Controller {
         keepalive
       })
       if (res.status === 404 && !create) {
+        this._clearSavingIndicator()
         // Pruned or deleted elsewhere — recreate on the next change.
         this._setDraftId("")
         this._dirty = true
@@ -130,9 +129,12 @@ export default class extends Controller {
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.id) {
         this._setDraftId(data.id)
-        this._setStatus(this.savedTextValue)
+        this._showSaved()
+      } else {
+        this._clearSavingIndicator()
       }
     } catch (_e) {
+      this._clearSavingIndicator()
       this._dirty = true // retry on the next change
     } finally {
       this._creating = false
@@ -183,36 +185,36 @@ export default class extends Controller {
     if (this.hasDraftIdInputTarget) this.draftIdInputTarget.value = id
   }
 
-  // The status label doubles as a toast. "Saving…" is transient state that the
-  // next status supersedes, but "Draft saved" is a terminal confirmation that
-  // would otherwise linger forever — so it auto-clears (with a short fade) like a
-  // toast, instead of sitting in the composer indefinitely.
-  _setStatus(text) {
-    if (!this.hasStatusTarget) return
-    clearTimeout(this._statusTimer)
-    const el = this.statusTarget
-    el.style.transition = ""
-    el.style.opacity = "1"
-    el.textContent = text
-
-    const saved = text === this.savedTextValue
-    // Bold: a check appears with "Saved just now" and both stay put.
-    if (this.hasStatusIconTarget) {
-      this.statusIconTarget.classList.toggle("hidden", !(saved && this.persistentStatusValue))
-    }
-    if (saved && !this.persistentStatusValue) {
-      this._statusTimer = setTimeout(() => this._fadeStatus(), this.constructor.SAVED_STATUS_MS)
-    }
+  // ── autosave status: a calm, ambient indicator ──────────────────
+  // Saving is expected, constant, background work — it must never nag. The
+  // "Saving…" flicker only surfaces if a save is genuinely slow
+  // (SAVING_INDICATOR_DELAY_MS); a quick save settles straight to "Saved". Once
+  // shown, "Saved" STAYS put — a subtle, low-contrast confirmation — and later
+  // saves update it in place; it never fades out on a timer only to re-enter on
+  // the next keystroke.
+  _armSavingIndicator() {
+    clearTimeout(this._savingTimer)
+    this._savingTimer = setTimeout(
+      () => this._renderStatus(this.savingTextValue, false),
+      this.constructor.SAVING_INDICATOR_DELAY_MS
+    )
   }
 
-  _fadeStatus() {
+  _clearSavingIndicator() {
+    clearTimeout(this._savingTimer)
+  }
+
+  _showSaved() {
+    clearTimeout(this._savingTimer)
+    this._renderStatus(this.savedTextValue, true)
+  }
+
+  // Writes the ambient status text and toggles the check. No fade, no auto-clear:
+  // the label settles and stays until the next save updates it in place.
+  _renderStatus(text, saved) {
     if (!this.hasStatusTarget) return
-    const el = this.statusTarget
-    el.style.transition = "opacity 300ms ease-out"
-    el.style.opacity = "0"
-    this._statusTimer = setTimeout(() => {
-      if (this.hasStatusTarget) this.statusTarget.textContent = ""
-    }, 300)
+    this.statusTarget.textContent = text
+    if (this.hasStatusIconTarget) this.statusIconTarget.classList.toggle("hidden", !saved)
   }
 
   _headers() {

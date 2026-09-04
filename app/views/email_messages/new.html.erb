@@ -9,7 +9,7 @@
       <% if @account %>
         <div class="flex-1 overflow-y-auto">
           <%= render(Campbooks::Compose::Engine.new(
-                shell: :desk, bold: true, persistent_status: true,
+                shell: :desk, bold: true,
                 mode: @mode,
                 action_url: @reply_source ? send_message_email_message_path(@reply_source) : send_new_email_messages_path,
                 message: @reply_source,
