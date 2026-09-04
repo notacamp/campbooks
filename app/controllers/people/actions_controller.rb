@@ -56,13 +56,13 @@ module People
 
     def set_email_message
       return unless @row
-      id = @row.email_message_id
+      id = @row.email_message_id.presence || params[:email_message_id].presence
       @message = id && EmailMessage.accessible_to(current_user).find_by(id: id)
     end
 
     def set_feed_item
       return unless @row
-      id = @row.feed_item_id
+      id = @row.feed_item_id.presence || params[:feed_item_id].presence
       @item = id && current_user.feed_items.find_by(id: id)
     end
 
@@ -97,7 +97,7 @@ module People
         message: t("people.actions.done", name: name),
         toast: undo_toast(t("people.actions.done", name: name),
                           endpoint: people_action_path(params[:id], :undo_done),
-                          undo_label: t("people.actions.undo"))
+                          params: { "feed_item_id" => @item.id })
       }
     end
 
@@ -127,7 +127,7 @@ module People
         message: t("people.actions.snoozed", until: l(snooze_until, format: :short)),
         toast: undo_toast(t("people.actions.snoozed", until: l(snooze_until, format: :short)),
                           endpoint: people_action_path(params[:id], :unsnooze),
-                          undo_label: t("people.actions.undo"))
+                          params: { "email_message_id" => @message.id })
       }
     end
 
@@ -153,8 +153,7 @@ module People
         success: true,
         message: t("people.actions.starred", name: name),
         toast: undo_toast(t("people.actions.starred", name: name),
-                          endpoint: people_action_path(params[:id], :unstar),
-                          undo_label: t("people.actions.undo"))
+                          endpoint: people_action_path(params[:id], :unstar))
       }
     end
 
@@ -168,8 +167,7 @@ module People
         success: true,
         message: t("people.actions.unstarred", name: name),
         toast: undo_toast(t("people.actions.unstarred", name: name),
-                          endpoint: people_action_path(params[:id], :star),
-                          undo_label: t("people.actions.undo"))
+                          endpoint: people_action_path(params[:id], :star))
       }
     end
 
@@ -187,7 +185,7 @@ module People
         message: t("people.actions.archived", name: name),
         toast: undo_toast(t("people.actions.archived", name: name),
                           endpoint: people_action_path(params[:id], :unarchive),
-                          undo_label: t("people.actions.undo"))
+                          params: { "email_message_id" => @message.id })
       }
     end
 
@@ -218,13 +216,15 @@ module People
       preset ? preset[2] : presets.find { |key, _l, _t| key == :tomorrow }&.last || 1.day.from_now.change(hour: 9)
     end
 
-    def undo_toast(message, endpoint:, undo_label: nil)
+    # The undo endpoint re-resolves the row, which may have lost its item or
+    # message after the refresh, so the ids ride along as params.
+    def undo_toast(message, endpoint:, params: {})
       turbo_stream.append(
         Campbooks::ActionToast::REGION_ID,
         render_to_string(
           Campbooks::ActionToast.new(
             message: message, variant: :success,
-            undo: { endpoint: endpoint, params: { "_method" => "post" }, label: undo_label || t("people.actions.undo") }
+            undo: { endpoint: endpoint, params: params, label: t("people.actions.undo") }
           ),
           layout: false
         )
