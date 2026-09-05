@@ -22,7 +22,6 @@ module Campbooks
     def view_template
       div(class: "relative inline-flex", data: { controller: "dropdown" }) do
         avatar_trigger
-        scrim if sheet?
         panel
       end
     end
@@ -45,38 +44,47 @@ module Campbooks
       end
     end
 
-    def scrim
-      div(
-        class: "fixed inset-0 z-40 bg-black/40 hidden",
-        data: { dropdown_target: "scrim", action: "click->dropdown#close" }
-      )
+    # Desktop: an absolutely-positioned popover the dropdown controller shows and
+    # hides. Phone: a <dialog> opened with showModal(), so it sits in the top layer
+    # (the sticky topbar's backdrop-filter would otherwise trap a fixed sheet inside
+    # the 56px header) and gets its scrim from ::backdrop.
+    def panel
+      if sheet?
+        dialog(
+          class: "user-menu-sheet m-0 mt-auto w-full max-w-none border-0 border-t border-border bg-popover text-popover-foreground p-0 shadow-lg backdrop:bg-black/40 dark:backdrop:bg-black/60",
+          open: @open ? "" : nil,
+          aria: { label: t(".label") },
+          data: { dropdown_target: "panel", action: "click->dropdown#backdropClose" }
+        ) do
+          div(role: "menu", class: "rounded-t-[22px] px-2.5 pt-2 pb-[calc(env(safe-area-inset-bottom)+14px)]") do
+            div(class: "mx-auto mb-2 h-1 w-9 rounded-full bg-border")
+            rows
+          end
+        end
+      else
+        div(
+          class: class_names(
+            "fixed z-50 bottom-3 left-[88px] w-[296px] rounded-2xl border border-border bg-popover text-popover-foreground p-1.5 shadow-lg",
+            @open ? nil : "hidden"
+          ),
+          data: { dropdown_target: "panel" },
+          role: "menu",
+          aria: { label: t(".label") }
+        ) { rows }
+      end
     end
 
-    def panel
-      panel_classes = if sheet?
-        "fixed z-50 inset-x-0 bottom-0 rounded-t-[22px] border-t border-border bg-popover text-popover-foreground px-2.5 pt-2 pb-[calc(env(safe-area-inset-bottom)+14px)] shadow-lg"
-      else
-        "fixed z-50 bottom-3 left-[88px] w-[296px] rounded-2xl border border-border bg-popover text-popover-foreground p-1.5 shadow-lg"
-      end
-
-      div(
-        class: class_names(panel_classes, @open ? nil : "hidden"),
-        data: { dropdown_target: "panel" },
-        role: "menu",
-        aria: { label: t(".label") }
-      ) do
-        div(class: "mx-auto mb-2 h-1 w-9 rounded-full bg-border") if sheet?
-        identity_row
-        workspace_row
-        separator
-        settings_row
-        shortcuts_row
-        separator
-        appearance_row
-        separator
-        admin_row if show_admin?
-        sign_out_row
-      end
+    def rows
+      identity_row
+      workspace_row
+      separator
+      settings_row
+      shortcuts_row
+      separator
+      appearance_row
+      separator
+      admin_row if show_admin?
+      sign_out_row
     end
 
     def identity_row

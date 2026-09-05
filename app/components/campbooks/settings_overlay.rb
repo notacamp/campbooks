@@ -163,19 +163,9 @@ module Campbooks
       item[:active_keys].include?(@current_section.to_s)
     end
 
+    # Layouts pass the real context; Lookbook previews render without one.
     def default_context
-      Settings::Catalog::Context.new(
-        user:   begin
-                  helpers.current_user
-                rescue
-                  nil
-                end,
-        native: begin
-                  helpers.hotwire_native_app?
-                rescue
-                  false
-                end
-      )
+      Settings::Catalog::Context.new(user: nil, native: false)
     end
 
     def icon_svg(name, css_class)

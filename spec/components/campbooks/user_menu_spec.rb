@@ -80,12 +80,13 @@ RSpec.describe Campbooks::UserMenu, type: :component do
     expect(render_menu).to include('href="/admin"')
   end
 
-  it "renders the popover beside the rail and the sheet from the bottom with a scrim" do
+  it "renders the popover beside the rail and the sheet as a bottom <dialog> with a backdrop" do
     expect(render_menu(variant: :popover)).to include("left-[88px]")
 
     sheet = render_menu(variant: :sheet)
-    expect(sheet).to include('data-dropdown-target="scrim"')
-    expect(sheet).to include("inset-x-0 bottom-0")
+    expect(sheet).to match(/<dialog[^>]*data-dropdown-target="panel"/)
+    expect(sheet).to include("backdrop:bg-black/40")
+    expect(sheet).to include("dropdown#backdropClose")
   end
 
   it "keeps the panel hidden until the dropdown opens it" do

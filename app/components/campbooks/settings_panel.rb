@@ -52,7 +52,7 @@ module Campbooks
     def crumb
       return if @current_section.blank?
 
-      context = @context || Settings::Catalog::Context.new(user: helpers.current_user, native: helpers.hotwire_native_app?)
+      context = @context || Settings::Catalog::Context.new(user: nil, native: false)
       item = Settings::Catalog.item_for_section(@current_section, context)
       return unless item
 

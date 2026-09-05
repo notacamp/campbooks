@@ -17,25 +17,43 @@ export default class extends Controller {
 
   toggle(event) {
     event.stopPropagation()
-    if (this.panelTarget.classList.contains("hidden")) {
-      this._open()
-    } else {
-      this._close()
-    }
+    this._isOpen() ? this._close() : this._open()
   }
 
   close() {
     this._close()
   }
 
+  // A <dialog> panel (the phone sheet) closes when its backdrop is tapped: the
+  // click's target is the dialog element itself, never one of its children.
+  backdropClose(event) {
+    if (event.target === this.panelTarget) this._close()
+  }
+
+  _isDialog() {
+    return this.panelTarget.tagName === "DIALOG"
+  }
+
+  _isOpen() {
+    return this._isDialog() ? this.panelTarget.open : !this.panelTarget.classList.contains("hidden")
+  }
+
   _open() {
-    this.panelTarget.classList.remove("hidden")
+    if (this._isDialog()) {
+      if (!this.panelTarget.open) this.panelTarget.showModal()
+    } else {
+      this.panelTarget.classList.remove("hidden")
+    }
     if (this.hasScrimTarget) this.scrimTarget.classList.remove("hidden")
     if (this.hasTriggerTarget) this.triggerTarget.setAttribute("aria-expanded", "true")
   }
 
   _close() {
-    this.panelTarget.classList.add("hidden")
+    if (this._isDialog()) {
+      if (this.panelTarget.open) this.panelTarget.close()
+    } else {
+      this.panelTarget.classList.add("hidden")
+    }
     if (this.hasScrimTarget) this.scrimTarget.classList.add("hidden")
     if (this.hasTriggerTarget) this.triggerTarget.setAttribute("aria-expanded", "false")
   }
@@ -47,7 +65,7 @@ export default class extends Controller {
   }
 
   keydown(event) {
-    if (event.key === "Escape" && !this.panelTarget.classList.contains("hidden")) {
+    if (event.key === "Escape" && this._isOpen()) {
       this._close()
     }
   }

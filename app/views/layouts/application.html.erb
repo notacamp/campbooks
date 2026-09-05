@@ -91,7 +91,8 @@
     <% if authenticated? %>
       <%= render(Campbooks::SettingsOverlay.new(
             current_section: (try(:current_section) if settings_overlay_page?),
-            content: settings_content)) %>
+            content: settings_content,
+            context: Settings::Catalog::Context.new(user: current_user, native: hotwire_native_app?))) %>
     <% end %>
     <%= render "shared/flash_toast_region" %>
     <% if authenticated? %><%= render "shared/swipe_dialogs" %><% end %>

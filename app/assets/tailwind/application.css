@@ -1608,3 +1608,11 @@ turbo-frame[busy] .settings-overlay-inner {
     display: none;
   }
 }
+
+/* The account menu's phone sheet: a modal <dialog> pinned to the bottom edge. */
+.user-menu-sheet[open] {
+  position: fixed;
+  inset: auto 0 0 0;
+  max-height: 85dvh;
+  overflow-y: auto;
+}

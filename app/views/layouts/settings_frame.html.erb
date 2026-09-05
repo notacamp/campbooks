@@ -11,6 +11,7 @@
   </head>
   <body>
     <% panel_content = capture { yield } %>
-    <%= render Campbooks::SettingsPanel.new(current_section: try(:current_section), content: panel_content, current_url: request.original_url) %>
+    <%= render Campbooks::SettingsPanel.new(current_section: try(:current_section), content: panel_content, current_url: request.original_url,
+                                          context: Settings::Catalog::Context.new(user: current_user, native: hotwire_native_app?)) %>
   </body>
 </html>

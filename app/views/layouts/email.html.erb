@@ -59,7 +59,7 @@
       <%= render(Campbooks::HintTip.new) %>
     <% end %>
     <%# The settings overlay is part of the shell (closed here; the account menu / ⌘, open it in place). %>
-    <%= render(Campbooks::SettingsOverlay.new) if authenticated? %>
+    <%= render(Campbooks::SettingsOverlay.new(context: Settings::Catalog::Context.new(user: current_user, native: hotwire_native_app?))) if authenticated? %>
     <%= render "shared/setup_modal" if authenticated? %>
     <%= render "shared/skim_overlay" if authenticated? %>
     <%= render "shared/email_drawer" if authenticated? %>
