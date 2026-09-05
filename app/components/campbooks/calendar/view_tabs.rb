@@ -58,7 +58,7 @@ module Campbooks
         shortcut = key_map[key]
         base_data = %w[agenda day week month].include?(key) ? { "calendar-view": key } : {}
         data = base_data.merge(hint_data(label, key: shortcut))
-        a(href: href, data: data, class: class_names(
+        a(href: href, data: data, aria: hint_aria(shortcut), class: class_names(
           "shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 font-medium no-underline transition-colors",
           @current == key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
         )) { label }

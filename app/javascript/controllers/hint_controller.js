@@ -187,13 +187,18 @@ export default class extends Controller {
 
     tip.style.left = `${x}px`
     tip.style.top  = `${y}px`
+    this.shown = true
 
     // Add is-on on next animation frame for the CSS transition to fire
     requestAnimationFrame(() => tip.classList.add("is-on"))
   }
 
+  // Only a tooltip that actually appeared opens the "warm" window — a pointer
+  // sweeping across controls faster than the delay must not turn later ones
+  // instant, or every pass over a toolbar would flash labels.
   _hide() {
-    if (!this.hasTipTarget) return
+    if (!this.hasTipTarget || !this.shown) return
+    this.shown = false
     const tip = this.tipTarget
     tip.classList.remove("is-on")
     if (typeof tip.hidePopover === "function" && tip.matches(":popover-open")) {

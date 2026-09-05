@@ -1,4 +1,7 @@
-<div class="flex flex-wrap items-center gap-4 p-6">
+<%# data-controller="hint" makes this example live: the controller binds to
+    document, so hovering / tabbing the buttons opens the real tooltip rendered
+    at the end. Standalone URL: /lookbook/preview/hint_tip/hinted_controls %>
+<div class="flex flex-wrap items-center gap-4 p-6" data-controller="hint">
   <%# Reply button example %>
   <button type="button"
           class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"

@@ -18,7 +18,7 @@ major, minor, or patch change here.
 
 ### Added
 
-- **Shortcut hints on hover (Proposal A, keycap tooltip):** hovering any keyboard-shortcuttable control on a fine-pointer (mouse/trackpad) device now shows a floating tooltip with the action label and its keyboard shortcut displayed as keycaps. The tooltip is driven by a single `hint_controller.js` Stimulus controller mounted on `<body>` and a shared `Campbooks::HintTip` element placed in the top layer via the Popover API so it rides above dialogs. Controls advertise their hint via `data-hint=`, `data-hint-key=`, and optional `data-hint-placement=right` (for rail items); the `HintHelper` module (`hint_data`, `hint_html_attrs`, `hint_aria`) is included in all Phlex components and ERB views. Touch devices never see hints (`(hover: hover) and (pointer: fine)` media query). Wired across the nav rail, email toolbar, People action cluster, feed cards, reminder rows, calendar nav, and compose buttons; also surfaces `aria-keyshortcuts` on every hinted element for screen readers.
+- **Shortcut hints:** resting the pointer on an action, or focusing it with the keyboard, shows its name and its keyboard shortcut in a small tooltip — on the People list and conversation, the nav rail, the inbox toolbar and reading pane, feed cards, reminders and the calendar header. Icon-only buttons gain a proper label at the same time, and every hinted control now carries `aria-keyshortcuts` for screen readers. Touch devices are unaffected; the existing on-card keycaps and legends stay as they were.
 
 ## [0.37.0] - 2026-09-05
 

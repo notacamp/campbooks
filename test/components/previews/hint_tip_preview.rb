@@ -18,7 +18,8 @@ class HintTipPreview < Lookbook::Preview
 
   # @label With modifier key
   def modifier_key
-    render Campbooks::HintTip.new(preview: { label: "Mark unread", keys: %w[Shift I] })
+    # A modifier combo is ONE cap ("⇧U"); only a sequence ("g p") splits into two.
+    render Campbooks::HintTip.new(preview: { label: "Mark unread", keys: %w[⇧U] })
   end
 
   # @label With sequence (two caps)
