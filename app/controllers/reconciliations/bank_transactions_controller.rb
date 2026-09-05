@@ -17,7 +17,7 @@ module Reconciliations
     before_action :set_reconciliation
     before_action :set_transaction
     before_action -> { require_entitlement!(:accounting, ignore_limit: true) },
-                  only: %i[confirm reject exclude reset manual_match resolve_panel request_invoice]
+                  only: %i[confirm reject exclude reset manual_match resolve_panel request_invoice upload_and_link]
 
     VALID_EXCLUSION_REASONS = %w[bank_fee salary transfer tax other].freeze
 
@@ -166,17 +166,74 @@ module Reconciliations
     # GET /reconciliations/:reconciliation_id/bank_transactions/:id/resolve_panel
     # Also handles doc-search within the panel (params[:q] filters candidates).
     def resolve_panel
-      @q                   = params[:q].to_s.strip
-      @suggested_matches   = @transaction.transaction_matches.suggested
-                                         .includes(:document)
-                                         .order(confidence: :desc)
-      @candidate_documents = candidate_documents_for(@transaction, q: @q)
-      @company_nif         = Current.workspace.company_nif.presence
+      @q                    = params[:q].to_s.strip
+      @suggested_matches    = @transaction.transaction_matches.suggested
+                                          .includes(:document)
+                                          .order(confidence: :desc)
+      @candidate_documents  = candidate_documents_for(@transaction, q: @q)
+      @company_nif          = Current.workspace.company_nif.presence
+      @near_miss_candidates = near_miss_candidates_for(@transaction)
+      @skim_documents       = skim_documents_for(@transaction)
 
       respond_to do |format|
         format.html
         format.turbo_stream # doc-search refinement updates the inner frame only
       end
+    end
+
+    # POST /reconciliations/:reconciliation_id/bank_transactions/:id/upload_and_link
+    # Upload an invoice file, create a Document (source: :manual_upload), and
+    # immediately attach it to this bank transaction as a confirmed match.
+    # Nothing is sent; the user provides the file from their own machine.
+    def upload_and_link
+      file = params[:file]
+      unless file
+        render turbo_stream: notify_stream(t(".no_file"), severity: :error),
+               status: :unprocessable_entity
+        return
+      end
+
+      document = Current.workspace.documents.build(
+        source:        :manual_upload,
+        ai_status:     :pending,
+        review_status: :pending
+      )
+      document.original_file.attach(file)
+
+      unless document.save
+        render turbo_stream: notify_stream(
+          t(".upload_failed", message: document.errors.full_messages.first.to_s),
+          severity: :error
+        ), status: :unprocessable_entity
+        return
+      end
+
+      # Kick off AI analysis (extracts amount, dates, parties etc.)
+      DocumentProcessJob.perform_later(document.id)
+
+      # Confirm the link immediately — allocated_cents defaults to the doc amount
+      # if already extracted, otherwise mirrors the transaction amount.
+      allocated = document.amount_cents.presence || @transaction.amount_cents.abs
+      match = @transaction.transaction_matches.find_or_initialize_by(document_id: document.id)
+      match.assign_attributes(
+        status:         :confirmed,
+        matched_by:     :manual,
+        confidence:     1.0,
+        match_reasons:  { "manual" => true, "uploaded" => true },
+        allocated_cents: allocated
+      )
+      match.save!
+      @transaction.update!(status: :matched)
+
+      filename = file.respond_to?(:original_filename) ? file.original_filename : file.try(:filename).to_s
+      render_workbench_streams(
+        notify:   t(".uploaded_and_linked", filename: filename),
+        undo_url: reset_reconciliation_bank_transaction_path(@reconciliation, @transaction)
+      )
+    rescue ActiveRecord::RecordInvalid => e
+      render turbo_stream: notify_stream(
+        t(".save_failed", message: e.message), severity: :error
+      ), status: :unprocessable_entity
     end
 
     private
@@ -206,9 +263,22 @@ module Reconciliations
       card_html    = render_card_html(@transaction)
       summary_html = render_summary_bar_html
 
-      toast_message = undo_url.present? ?
-        "#{notify} &mdash; <a class='font-medium underline' data-turbo-method='post' href='#{undo_url}'>#{t("shared.actions.undo")}</a>".html_safe :
-        notify
+      # Build the toast with safe_join so `notify` (which can contain a
+      # user-supplied filename) is HTML-escaped; only the trusted undo link is
+      # marked safe. Interpolating notify into an html_safe string was a
+      # reflected-XSS vector (CodeQL rb/reflected-xss).
+      toast_message =
+        if undo_url.present?
+          helpers.safe_join([
+            notify,
+            " — ",
+            helpers.link_to(t("shared.actions.undo"), undo_url,
+                            class: "font-medium underline",
+                            data:  { turbo_method: :post })
+          ])
+        else
+          notify
+        end
 
       render turbo_stream: [
         turbo_stream.replace(dom_id(@transaction),        html: row_html),
@@ -277,6 +347,26 @@ module Reconciliations
 
     def human_exclusion_reason(reason)
       I18n.t("reconciliations.bank_transactions.exclusion_reasons.#{reason}")
+    end
+
+    # Near-miss candidates: documents that score above zero but below the
+    # auto-suggest threshold. Surfaced in the hunt panel so the user can
+    # inspect and attach them manually.
+    def near_miss_candidates_for(txn)
+      Reconciliations::Candidates.new(
+        bank_transaction: txn,
+        workspace:        Current.workspace
+      ).below_threshold.first(5)
+    end
+
+    # All unlinked money-type documents in the reconciliation window, sorted by
+    # closest amount. Shown in the skim grid ("Browse all N invoices").
+    def skim_documents_for(txn)
+      Reconciliations::SkimDocuments.new(
+        bank_transaction: txn,
+        reconciliation:   @reconciliation,
+        workspace:        Current.workspace
+      ).call
     end
 
     # True when the transaction is matched and the top confirmed document has a

@@ -30,7 +30,11 @@ module Campbooks
 
         div(class: "divide-y divide-border") do
           @groups.each do |group|
-            render ReconciliationGroup.new(group: group, company_nif: @company_nif)
+            render ReconciliationGroup.new(
+              group:          group,
+              company_nif:    @company_nif,
+              reconciliation: @reconciliation
+            )
           end
         end
       end

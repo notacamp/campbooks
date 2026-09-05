@@ -269,6 +269,78 @@ RSpec.describe "Reconciliations::BankTransactions", type: :request do
     end
   end
 
+  # ── POST upload_and_link ─────────────────────────────────────────────────────
+
+  describe "POST /reconciliations/:reconciliation_id/bank_transactions/:id/upload_and_link" do
+    before do
+      sign_in(user)
+      allow(DocumentProcessJob).to receive(:perform_later)
+    end
+
+    let(:pdf_file) do
+      Rack::Test::UploadedFile.new(
+        StringIO.new("fake pdf content"),
+        "application/pdf",
+        true,
+        original_filename: "invoice.pdf"
+      )
+    end
+
+    def do_post(file: pdf_file)
+      post "/reconciliations/#{reconciliation.id}/bank_transactions/#{txn.id}/upload_and_link",
+           params:  { file: file },
+           headers: { "Accept" => "text/vnd.turbo-stream.html" }
+    end
+
+    it "creates a Document with source :manual_upload" do
+      expect { do_post }.to change(Document, :count).by(1)
+      expect(Document.last.source).to eq("manual_upload")
+    end
+
+    it "enqueues DocumentProcessJob for the new document" do
+      do_post
+      # A document was created and the job was enqueued for it (arg is its UUID)
+      expect(DocumentProcessJob).to have_received(:perform_later).with(kind_of(String))
+    end
+
+    it "creates a confirmed TransactionMatch" do
+      do_post
+      match = TransactionMatch.last
+      expect(match.status).to eq("confirmed")
+      expect(match.bank_transaction).to eq(txn)
+    end
+
+    it "marks the bank transaction as :matched" do
+      do_post
+      expect(txn.reload.status).to eq("matched")
+    end
+
+    it "returns turbo_stream 200" do
+      do_post
+      expect(response).to have_http_status(:ok)
+      expect(response.media_type).to eq("text/vnd.turbo-stream.html")
+    end
+
+    it "returns 422 when no file is provided" do
+      post "/reconciliations/#{reconciliation.id}/bank_transactions/#{txn.id}/upload_and_link",
+           params:  {},
+           headers: { "Accept" => "text/vnd.turbo-stream.html" }
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it "returns 404 for a transaction in another workspace" do
+      other_ws    = create(:workspace, plan: "pro")
+      other_recon = create(:reconciliation, workspace: other_ws, created_by: create(:user, workspace: other_ws))
+      other_txn   = create(:bank_transaction, reconciliation: other_recon, workspace: other_ws,
+                            booked_on: Date.new(2024, 1, 15), description: "Other", amount_cents: -1000,
+                            currency: "EUR")
+      post "/reconciliations/#{other_recon.id}/bank_transactions/#{other_txn.id}/upload_and_link",
+           params:  { file: pdf_file },
+           headers: { "Accept" => "text/vnd.turbo-stream.html" }
+      expect(response).to have_http_status(:not_found)
+    end
+  end
+
   # ── Entitlement guard ────────────────────────────────────────────────────────
 
   describe "entitlement check on mutation actions" do

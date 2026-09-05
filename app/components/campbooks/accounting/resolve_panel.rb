@@ -12,27 +12,35 @@ module Campbooks
     #   ③ No document needed (exclusion reason + exclude action)
     #   ④ Request invoice (asks for invoice from counterparty via composer)
     #
-    # @param transaction         [BankTransaction]
-    # @param reconciliation      [Reconciliation]
-    # @param suggested_matches   [Array<TransactionMatch>]
-    # @param candidate_documents [Array<Document>]
-    # @param company_nif         [String, nil]
+    # @param transaction          [BankTransaction]
+    # @param reconciliation       [Reconciliation]
+    # @param suggested_matches    [Array<TransactionMatch>]
+    # @param candidate_documents  [Array<Document>]
+    # @param company_nif          [String, nil]
+    # @param near_miss_candidates [Array<Hash>] — [{document:, score:, reasons:}]
+    # @param skim_documents       [Array<Document>] — all unlinked docs sorted by amount
     class ResolvePanel < Campbooks::Base
       EXCLUSION_REASONS = %w[bank_fee salary transfer tax other].freeze
+      NEAR_MISS_LIMIT   = 5
 
       def initialize(transaction:, reconciliation:, suggested_matches: [],
-                     candidate_documents: [], company_nif: nil)
-        @transaction         = transaction
-        @reconciliation      = reconciliation
-        @suggested_matches   = Array(suggested_matches)
-        @candidate_documents = Array(candidate_documents)
-        @company_nif         = company_nif
+                     candidate_documents: [], company_nif: nil,
+                     near_miss_candidates: [], skim_documents: [])
+        @transaction          = transaction
+        @reconciliation       = reconciliation
+        @suggested_matches    = Array(suggested_matches)
+        @candidate_documents  = Array(candidate_documents)
+        @company_nif          = company_nif
+        @near_miss_candidates = Array(near_miss_candidates).first(NEAR_MISS_LIMIT)
+        @skim_documents       = Array(skim_documents)
       end
 
       def view_template
         div(class: "p-4 space-y-6") do
           transaction_recap
           suggestions_section if @suggested_matches.any?
+          near_miss_section   if @near_miss_candidates.any?
+          still_not_it_section
           search_section
           exclude_section
           request_invoice_section
@@ -117,7 +125,210 @@ module Campbooks
         end
       end
 
-      # ── Section 2: Document search ────────────────────────────────────────────
+      # ── Section 2: Near-miss candidates ──────────────────────────────────────
+      #
+      # Documents that scored above zero but below the auto-confirm threshold —
+      # the matcher couldn't auto-suggest them, but they're still worth checking.
+
+      def near_miss_section
+        div(class: "space-y-3") do
+          h3(class: "text-sm font-semibold text-foreground") { t(".near_miss_title") }
+
+          @near_miss_candidates.each { |cand| near_miss_card(cand) }
+        end
+      end
+
+      def near_miss_card(cand)
+        doc        = cand[:document]
+        reasons    = cand[:reasons] || {}
+        nif_status = @company_nif ? doc.nif_status(@company_nif) : nil
+        manual_url = helpers.manual_match_reconciliation_bank_transaction_path(@reconciliation, @transaction)
+
+        div(class: "border border-border rounded-lg px-3 py-2.5 bg-card") do
+          div(class: "flex items-start justify-between gap-2") do
+            div(class: "min-w-0 flex-1") do
+              # Amount (prominent) + party
+              div(class: "flex items-baseline gap-2 flex-wrap") do
+                span(class: "text-[13.5px] font-semibold tabular-nums text-foreground") do
+                  plain format_amount_cents(doc.amount_cents, doc.currency)
+                end
+                span(class: "text-[12.5px] text-muted-foreground truncate") do
+                  plain near_miss_party(doc)
+                end
+              end
+              # Date + type + why
+              div(class: "mt-0.5 text-[11.5px] text-muted-foreground flex flex-wrap gap-x-1.5") do
+                plain near_miss_meta(doc, reasons)
+              end
+              nif_badge(doc) if nif_status&.in?(%i[missing mismatch])
+            end
+
+            raw helpers.button_to(
+              t(".attach"),
+              manual_url,
+              method: :post,
+              params: { document_id: doc.id },
+              class:  "shrink-0 text-xs font-semibold text-accent-600 hover:text-accent-700 mt-0.5 cursor-pointer"
+            )
+          end
+        end
+      end
+
+      def near_miss_party(doc)
+        doc.vendor_name.presence || doc.client_name.presence || t(".unknown_party")
+      end
+
+      def near_miss_meta(doc, reasons)
+        parts = []
+        parts << (doc.classification&.name || doc.document_type.humanize)
+        parts << helpers.l(doc.document_date, format: :date) if doc.document_date.present?
+        why = near_miss_why(reasons)
+        parts << why if why.present?
+        parts.join(" · ")
+      end
+
+      def near_miss_why(reasons)
+        parts = []
+        case reasons["amount"]
+        when "exact" then parts << t(".reason_exact")
+        when "close" then parts << t(".reason_close")
+        end
+        if (delta = reasons["date_delta_days"])
+          parts << t(".reason_days", count: delta)
+        end
+        if (sim = reasons["name_similarity"]).present? && sim.to_f > 0
+          parts << (sim.to_f >= 0.4 ? t(".reason_same_vendor") : t(".reason_name_diff"))
+        end
+        parts.join(", ")
+      end
+
+      # ── Section 3: Still not it? (skim + upload) ─────────────────────────────
+      #
+      # "Still not it?" — two toggles side by side:
+      #   ① Browse all N invoices in the period (sorted by closest amount)
+      #   ② Upload an invoice (file → Document → confirmed match)
+
+      def still_not_it_section
+        return if @skim_documents.empty?
+
+        div(class: "space-y-2") do
+          h3(class: "text-[11.5px] font-semibold uppercase tracking-[0.08em] text-muted-foreground") do
+            t(".still_not_it")
+          end
+
+          div(class: "flex flex-wrap gap-2") do
+            skim_toggle_button
+            upload_toggle_button
+          end
+
+          skim_grid_panel
+          upload_panel
+        end
+      end
+
+      def skim_toggle_button
+        skim_id   = "skim_#{@transaction.id}"
+        label_id  = "skim_lbl_#{@transaction.id}"
+        input(type: "checkbox", id: skim_id, class: "peer/skim hidden")
+        label(for: skim_id,
+              class: "inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-[12px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/40 transition-colors peer-checked/skim:bg-muted peer-checked/skim:text-foreground") do
+          plain t(".skim_toggle", count: @skim_documents.size)
+        end
+      end
+
+      def upload_toggle_button
+        up_id = "upload_#{@transaction.id}"
+        input(type: "checkbox", id: up_id, class: "peer/upload hidden")
+        label(for: up_id,
+              class: "inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 py-1 text-[12px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/40 transition-colors peer-checked/upload:bg-muted peer-checked/upload:text-foreground") do
+          plain t(".upload_title")
+        end
+      end
+
+      def skim_grid_panel
+        skim_id = "skim_#{@transaction.id}"
+        # Show when peer/skim checkbox is checked
+        div(class: "hidden peer-checked/skim:block mt-2") do
+          p(class: "text-[11.5px] text-muted-foreground mb-2") do
+            t(".skim_sorted_hint")
+          end
+          div(class: "grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1") do
+            @skim_documents.each { |doc| skim_card(doc) }
+          end
+        end
+      end
+
+      def skim_card(doc)
+        manual_url = helpers.manual_match_reconciliation_bank_transaction_path(@reconciliation, @transaction)
+
+        div(class: "flex items-start gap-2 border border-border rounded-lg p-2.5 bg-card hover:border-border/80") do
+          # Document icon
+          div(class: "shrink-0 w-8 h-10 bg-muted/60 border border-border rounded flex items-center justify-center text-muted-foreground") do
+            svg(class: "w-4 h-4", viewBox: "0 0 24 24", fill: "none",
+                stroke: "currentColor", stroke_width: "1.7") do |s|
+              s.path(d: "M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z")
+              s.path(d: "M14 3v6h6")
+            end
+          end
+
+          div(class: "min-w-0 flex-1") do
+            span(class: "block text-[13px] font-bold tabular-nums text-foreground") do
+              plain format_amount_cents(doc.amount_cents, doc.currency)
+            end
+            span(class: "block text-[12px] text-foreground truncate") do
+              plain doc.vendor_name.presence || doc.client_name.presence || t(".unknown_party")
+            end
+            span(class: "block text-[11px] text-muted-foreground") do
+              parts = [ doc.classification&.name || doc.document_type.humanize ]
+              parts << helpers.l(doc.document_date, format: :date) if doc.document_date.present?
+              plain parts.join(" · ")
+            end
+          end
+
+          raw helpers.button_to(
+            t(".attach"),
+            manual_url,
+            method: :post,
+            params: { document_id: doc.id },
+            class:  "shrink-0 mt-0.5 text-xs font-semibold text-accent-600 hover:text-accent-700 cursor-pointer"
+          )
+        end
+      end
+
+      def upload_panel
+        up_id      = "upload_#{@transaction.id}"
+        upload_url = helpers.upload_and_link_reconciliation_bank_transaction_path(@reconciliation, @transaction)
+
+        div(class: "hidden peer-checked/upload:block mt-2") do
+          div(class: "border border-dashed border-border rounded-xl p-4 bg-muted/30 text-center") do
+            svg(class: "w-6 h-6 text-muted-foreground mx-auto", viewBox: "0 0 24 24",
+                fill: "none", stroke: "currentColor",
+                stroke_linecap: "round", stroke_linejoin: "round", stroke_width: "1.7") do |s|
+              s.path(d: "M12 16V7")
+              s.path(d: "M8.5 10.5 12 7l3.5 3.5")
+              s.path(d: "M20 16.7A5 5 0 0 0 18 7.2 6.5 6.5 0 0 0 5.5 9 4.5 4.5 0 0 0 6 18h12")
+            end
+            p(class: "mt-2 text-sm font-semibold text-foreground") { t(".upload_drop_hint") }
+            p(class: "text-[11.5px] text-muted-foreground") { t(".upload_formats") }
+
+            # Native Phlex form — use hidden file input + label trick for styling
+            form(action: upload_url, method: :post, enctype: "multipart/form-data",
+                 class: "mt-3") do
+              input(type: "hidden", name: "authenticity_token",
+                    value: helpers.form_authenticity_token)
+              label(class: "inline-flex items-center gap-1.5 #{button_classes(:outline, size: :sm)} cursor-pointer") do
+                plain t(".upload_cta")
+                input(type: "file", name: "file", accept: "application/pdf,image/*",
+                      class: "sr-only",
+                      data: { action: "change->form-auto-submit#submit" })
+              end
+              p(class: "text-[10.5px] text-muted-foreground mt-1") { t(".upload_auto_submit_hint") }
+            end
+          end
+        end
+      end
+
+      # ── Section 4: Document search ────────────────────────────────────────────
 
       def search_section
         div(class: "space-y-2") do
@@ -338,6 +549,24 @@ module Campbooks
       end
 
       # ── Helpers ──────────────────────────────────────────────────────────────
+
+      def format_amount_cents(cents, currency)
+        return "—" if cents.nil?
+
+        symbol = { "EUR" => "€", "USD" => "$", "GBP" => "£", "BRL" => "R$" }
+                   .fetch(currency.to_s.upcase, "#{currency} ")
+        "#{symbol}#{sprintf("%.2f", cents.abs / 100.0)}"
+      end
+
+      def nif_badge(doc)
+        status = @company_nif ? doc.nif_status(@company_nif) : nil
+        return unless status&.in?(%i[missing mismatch])
+
+        title = status == :mismatch ? t("components.accounting.reconciliation_group.nif_mismatch") :
+                                      t("components.accounting.reconciliation_group.nif_missing")
+        span(class: "shrink-0 text-[10px] font-bold text-warning border border-warning/40 rounded px-1",
+             title: title) { plain "NIF" }
+      end
 
       def section_header_with_icon(title)
         div(class: "flex items-center gap-2") do

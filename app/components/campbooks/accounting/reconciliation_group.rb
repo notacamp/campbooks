@@ -13,15 +13,17 @@ module Campbooks
     #   - Credit      → green signed amount
     #   - Review      → amber "~" node + confidence% + NIF flag
     #
-    # @param group       [Reconciliations::Groups::Group]
-    # @param company_nif [String, nil]
+    # @param group          [Reconciliations::Groups::Group]
+    # @param company_nif   [String, nil]
+    # @param reconciliation [Reconciliation, nil]  — needed to open the hunt panel
     class ReconciliationGroup < Campbooks::Base
       # How many txns/docs before we show a ratio label (e.g. "2 → 1").
       MULTI_THRESHOLD = 1
 
-      def initialize(group:, company_nif: nil)
-        @group       = group
-        @company_nif = company_nif.presence
+      def initialize(group:, company_nif: nil, reconciliation: nil)
+        @group          = group
+        @company_nif    = company_nif.presence
+        @reconciliation = reconciliation
       end
 
       def view_template
@@ -29,15 +31,15 @@ module Campbooks
 
         if multi
           # Inset container for complex groups
-          div(class: "py-3") do
+          div(class: "py-3", **hunt_data_attrs) do
             div(class: "rounded-2xl border border-border bg-muted/40 px-4 py-4 space-y-0") do
               row_grid { group_body }
               balance_footer if show_footer?
             end
           end
         else
-          # Flat row for simple 1:1 / excluded / unmatched
-          div(class: "py-3.5") do
+          # Flat row for simple 1:1 / excluded / unmatched / requested
+          div(class: "py-3.5", **hunt_data_attrs) do
             row_grid { group_body }
           end
         end
@@ -115,9 +117,11 @@ module Campbooks
           [ "½", t(".state.partial"), "bg-warning/15 text-warning" ]
         when :excluded
           [ "—", t(".state.excluded"), "bg-muted text-muted-foreground" ]
+        when :requested
+          [ "→", t(".state.requested"), "bg-muted text-muted-foreground" ]
         when :credit
           [ check_svg, t(".state.credit"), "bg-success/15 text-success" ]
-        else # :unmatched / :needs_you
+        else # :unmatched
           [ "!", t(".state.unmatched"), "bg-ember/15 text-ember" ]
         end
       end
@@ -154,6 +158,8 @@ module Campbooks
           case group_state
           when :excluded
             excluded_label
+          when :requested
+            requested_label
           when :unmatched
             unmatched_chip
           else
@@ -193,10 +199,37 @@ module Campbooks
 
       def unmatched_chip
         button(
-          class: "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[12.5px] font-semibold bg-ember/10 text-ember cursor-pointer hover:bg-ember/15 transition-colors"
+          class: "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[12.5px] font-semibold bg-ember/10 text-ember cursor-pointer hover:bg-ember/15 transition-colors",
+          data:  { action: "click->transaction-resolve#toggle" }
         ) do
           plain t(".unmatched_chip")
         end
+      end
+
+      def requested_label
+        span(class: "text-[13px] text-muted-foreground") do
+          plain t(".requested_label")
+        end
+      end
+
+      # Emits Stimulus controller data on the group's root div so the
+      # "Resolve" chip can open the hunt panel via turbo_frame (same
+      # transaction-resolve controller used by the classic workbench table).
+      def hunt_data_attrs
+        return {} unless group_state == :unmatched
+
+        txn = @group.bank_transactions.first
+        return {} unless txn && @reconciliation
+
+        {
+          id:   helpers.dom_id(txn),
+          data: {
+            controller:                        "transaction-resolve",
+            transaction_resolve_url_value:      helpers.resolve_panel_reconciliation_bank_transaction_path(
+                                                  @reconciliation, txn),
+            transaction_resolve_frame_id_value: helpers.dom_id(txn, :resolve_frame)
+          }
+        }
       end
 
       # ── Balance footer (multi-item groups) ─────────────────────────────────
@@ -262,8 +295,13 @@ module Campbooks
           docs = @group.documents
 
           if docs.empty?
-            # All excluded? Then excluded. Otherwise unmatched.
-            txns.all?(&:excluded?) ? :excluded : :unmatched
+            if txns.all?(&:excluded?)
+              :excluded
+            elsif txns.all?(&:requested?)
+              :requested
+            else
+              :unmatched
+            end
           elsif @group.kind == :partial
             :partial
           elsif txns.any?(&:credit?) && txns.all?(&:credit?)

@@ -188,6 +188,7 @@ Rails.application.routes.draw do
         post :reset
         post :manual_match
         post :request_invoice
+        post :upload_and_link
         get  :resolve_panel
       end
     end
