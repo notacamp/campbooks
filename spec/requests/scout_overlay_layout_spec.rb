@@ -23,4 +23,18 @@ RSpec.describe "Scout overlay layout wiring", type: :request do
     # The Scout page suppresses its own launcher (layout_scout_launcher?).
     expect(response.body).not_to include('aria-label="Ask Scout"')
   end
+
+  describe "shortcut hint tip wiring" do
+    it "includes the hint-tip element on the application layout" do
+      get now_path
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include('id="hint-tip"')
+    end
+
+    it "mounts the hint Stimulus controller on the body element" do
+      get now_path
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to match(/data-controller="[^"]*hint[^"]*"/)
+    end
+  end
 end
