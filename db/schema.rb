@@ -1868,6 +1868,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_200000) do
     t.integer "priority", default: 1, null: false
     t.uuid "recurrence_parent_id"
     t.string "rrule"
+    t.datetime "snoozed_until"
     t.uuid "source_id"
     t.string "source_type"
     t.integer "status", default: 0, null: false
@@ -1879,6 +1880,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_200000) do
     t.index ["recurrence_parent_id"], name: "index_tasks_on_recurrence_parent_id"
     t.index ["source_type", "source_id"], name: "index_tasks_on_source"
     t.index ["workspace_id", "archived_at"], name: "index_tasks_on_workspace_id_and_archived_at"
+    t.index ["workspace_id", "snoozed_until"], name: "index_tasks_on_workspace_id_and_snoozed_until"
     t.index ["workspace_id", "status", "due_at"], name: "index_tasks_on_workspace_status_due"
     t.index ["workspace_id"], name: "index_tasks_on_workspace_id"
   end

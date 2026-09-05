@@ -22,7 +22,7 @@ module Campbooks
         "follow_up"       => Campbooks::Feed::FollowUpCard,
         "tag_suggestion"  => Campbooks::Feed::TagSuggestionCard,
         "reminder"        => Campbooks::Feed::ReminderCard,
-        "task"            => Campbooks::Feed::TaskCard,
+        "task"            => Campbooks::Feed::AskCard,
         "digest_issue"    => Campbooks::Feed::DigestCard,
         "late_receivable" => Campbooks::Feed::LateReceivableCard,
         "late_payable"    => Campbooks::Feed::LatePayableCard
@@ -101,7 +101,7 @@ module Campbooks
         when "reminder"
           { left: [ reminder_dismiss_stage ], right: [ reminder_confirm_stage ] }
         when "task"
-          { left: [ feed_dismiss_stage ], right: [ task_complete_stage ] }
+          ask_swipe_sides
         when "tag_suggestion"
           if @item.data["applied"]
             # Notice mode: swipe-left undoes the auto-filing; no swipe-right (already filed).
@@ -149,8 +149,36 @@ module Campbooks
           color: "neutral", endpoint: act_endpoint, params: { "tool" => "dismiss_reminder" } }
       end
 
-      def task_complete_stage
-        { key: "complete", label: t("components.feed.task_card.complete"), icon: :approve,
+      # The ask's swipe stages, keyed off its framing (stamped by Feed::Sources::Task):
+      # a due ask completes/dismisses; a suggested/undated one holds Scout's slot (when
+      # one is free) / snoozes. Mirrors the card's on-screen primary + escape exactly.
+      def ask_swipe_sides
+        if @item.data["framing"].to_s == "due"
+          { left: [ feed_dismiss_stage(t("components.feed.ask_card.not_now")) ], right: [ ask_complete_stage ] }
+        else
+          { left: [ ask_snooze_stage ], right: (ask_slot ? [ ask_hold_stage ] : []) }
+        end
+      end
+
+      # The hold slot (request-cached via Time::BusyIntervals); nil off a user context.
+      def ask_slot
+        return @ask_slot if defined?(@ask_slot)
+
+        @ask_slot = (@subject.is_a?(Task) && Current.user) ? Time::FocusHolder.preview(@subject, user: Current.user) : nil
+      end
+
+      def ask_snooze_stage
+        { key: "snooze", label: t("components.feed.ask_card.not_now"), icon: :dismiss,
+          color: "neutral", endpoint: act_endpoint, params: { "tool" => "snooze_task" } }
+      end
+
+      def ask_hold_stage
+        { key: "hold", label: t("components.feed.ask_card.hold"), icon: :approve,
+          color: "green", endpoint: act_endpoint, params: { "tool" => "hold_task" } }
+      end
+
+      def ask_complete_stage
+        { key: "complete", label: t("components.feed.ask_card.complete"), icon: :approve,
           color: "green", endpoint: act_endpoint, params: { "tool" => "complete" } }
       end
 

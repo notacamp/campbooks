@@ -12,7 +12,16 @@ class TimeDayNoteComponentPreview < ViewComponent::Preview
   def meetings_only
     render Campbooks::TimePage::DayNote.new(
       note: ::Time::DayNote::Result.new(date: Date.current, meetings_count: 3, deadlines_count: 0,
-        first_deadline_title: nil, focus: nil, late_obligation: nil),
+        first_deadline_title: nil, focus: nil, late_obligation: nil, undated_count: 0),
+      zone: zone
+    )
+  end
+
+  # Two undated asks and nothing else — just the "N asks have no date yet" clause.
+  def undated_only
+    render Campbooks::TimePage::DayNote.new(
+      note: ::Time::DayNote::Result.new(date: Date.current, meetings_count: 0, deadlines_count: 0,
+        first_deadline_title: nil, focus: nil, late_obligation: nil, undated_count: 2),
       zone: zone
     )
   end
@@ -21,7 +30,7 @@ class TimeDayNoteComponentPreview < ViewComponent::Preview
   def clear_day
     render Campbooks::TimePage::DayNote.new(
       note: ::Time::DayNote::Result.new(date: Date.current, meetings_count: 0, deadlines_count: 0,
-        first_deadline_title: nil, focus: nil, late_obligation: nil),
+        first_deadline_title: nil, focus: nil, late_obligation: nil, undated_count: 0),
       zone: zone
     )
   end
@@ -36,6 +45,7 @@ class TimeDayNoteComponentPreview < ViewComponent::Preview
       at: zone.now.change(hour: 10, min: 0) + 1.day, duration_minutes: 45
     )
     ::Time::DayNote::Result.new(date: Date.current, meetings_count: 2, deadlines_count: 1,
-      first_deadline_title: "Reply to Ines about the notice period", focus: focus, late_obligation: nil)
+      first_deadline_title: "Reply to Ines about the notice period", focus: focus,
+      late_obligation: nil, undated_count: 2)
   end
 end

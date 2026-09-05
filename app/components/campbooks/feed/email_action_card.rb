@@ -26,6 +26,9 @@ module Campbooks
           else
             email_body_preview(subject, margin: "mt-2.5")
           end
+          # The email's ask (if any) rides here as a chip row under Scout's note — no
+          # second card while the email still needs the reader.
+          render Campbooks::Feed::AskChips.new(item: item, subject: subject)
           meta_row
           action_bar
         end

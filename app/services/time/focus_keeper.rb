@@ -55,18 +55,21 @@ class Time::FocusKeeper
   end
 
   # CalendarEvent links back to an email source only; a document-sourced deadline
-  # keeps its link on the reminder.
+  # keeps its link on the reminder. A block can be held for a reminder OR an ask
+  # (Task), so fall back to the ask's source email.
   def source_email
-    @block.reminder&.source_email
+    @block.reminder&.source_email || @block.task&.source_email
   end
 
+  # The mailbox the block's subject came from (reminder or ask), so the kept event
+  # pushes back to that account's calendar (WritableTarget), sharing its grant.
   def source_email_account
-    reminder = @block.reminder
-    return nil unless reminder
+    source = @block.reminder&.source || @block.task&.source
+    return nil unless source
 
-    case reminder.source
-    when EmailMessage then reminder.source.email_account
-    when Document     then reminder.source.email_messages.first&.email_account
+    case source
+    when EmailMessage then source.email_account
+    when Document     then source.email_messages.first&.email_account
     end
   end
 end

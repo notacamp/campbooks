@@ -36,7 +36,8 @@ class AgentThread < ApplicationRecord
     if email_chat? && contextable && contextable.respond_to?(:latest_message)
       Rails.application.routes.url_helpers.email_message_path(contextable.latest_message)
     elsif task_chat? && contextable
-      Rails.application.routes.url_helpers.task_path(contextable)
+      # An ask has no page of its own now; its context is the Time surface.
+      Rails.application.routes.url_helpers.time_path
     end
   end
 end

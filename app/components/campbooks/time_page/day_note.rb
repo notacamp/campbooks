@@ -34,8 +34,17 @@ module Campbooks
       end
 
       def sentences
-        parts = [ counts_sentence, focus_sentence, late_sentence ].compact
+        parts = [ counts_sentence, focus_sentence, late_sentence, undated_sentence ].compact
         parts.empty? ? t(".clear") : parts.join(" ")
+      end
+
+      # "One ask has no date yet." / "N asks have no date yet." — honest, no
+      # "say the word" copy (that lives in Scout's chat, not the day note).
+      def undated_sentence
+        count = @note.undated_count
+        return unless count.positive?
+
+        t(".undated", count: count)
       end
 
       # "Two meetings and one deadline today." — degrades gracefully when only one

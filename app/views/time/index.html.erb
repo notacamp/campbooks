@@ -70,8 +70,7 @@
             snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails, tasks: @tasks, focus_blocks: @focus_blocks)) %>
     </div>
   <% else %>
-    <%= render(Campbooks::TimePage::AgendaList.new(items: @agenda, zone: @zone, move_slots: @move_slots,
-          snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails, has_calendars: @has_calendars)) %>
+    <%= render(agenda_list) %>
   <% end %>
 
   <%= render(Campbooks::Calendar::EventModal.new) %>

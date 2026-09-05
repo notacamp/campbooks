@@ -34,10 +34,16 @@ class Time::AgendaItem < Data.define(
   def task? = kind == :task
   def focus? = kind == :focus
 
+  # An undated ask (the "No date yet" section): no day, no instant. These are
+  # served by Time::Agenda#undated, never through #items.
+  def undated? = day.nil?
+
   # Sort key: within a day, all-day items come first, then by instant. Days
   # ascending. Overdue deadlines carry day == today, so they head today's list.
+  # Tolerates a nil day (undated asks) by sorting it last, though those never go
+  # through #items.
   def sort_key
-    [ day, all_day ? 0 : 1, at ]
+    [ day.nil? ? 1 : 0, day || ::Date.new(0), all_day ? 0 : 1, at || ::Time.at(0) ]
   end
 
   def action?(name)

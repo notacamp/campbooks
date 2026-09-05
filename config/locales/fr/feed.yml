@@ -17,10 +17,14 @@ fr:
         archive_hint: Archive toute la conversation. Vous pouvez annuler.
         attachment: Pièce jointe
         file_as: 'Classer : %{tag}'
+        held: Réservé %{when}
+        hold_at: Réserver %{when}
         messages:
           one: "%{count} message"
           other: "%{count} messages"
+        on_time: "%{day} dans Temps"
         open: Ouvrir
+        set_a_date: Définir une date
       email_preview_frame:
         unavailable: Ce message n'est plus disponible.
       expandable_preview:
@@ -112,18 +116,27 @@ fr:
         prefix: Classer
         under: sous
         undo: Annuler
-      task_card:
-        accept: Ajouter aux tâches
-        complete: Terminer
-        dismiss: Ignorer
-        in_days:
-          one: Dans %{count} jour
-          other: Dans %{count} jours
-        missed: Vous l'avez peut-être oublié
-        overdue: En retard
-        suggested: Tâche suggérée
-        today: À rendre aujourd'hui
-        tomorrow: À rendre demain
+      ask_card:
+        ask: demande
+        by: 'pour le %{date}'
+        complete: Terminé
+        due_today: pour aujourd'hui
+        friday: Vendredi
+        from_email: de l'email de %{name}
+        hold: Réserver
+        hold_at: Réserver %{when}
+        next_week: Semaine prochaine
+        no_date: sans date
+        not_now: Pas maintenant
+        open_thread: Ouvrir la conversation
+        overdue: en retard
+        pick: Choisir
+        scout_found: Scout a trouvé une demande
+        scout_slot: "%{when} est libre pendant %{minutes} minutes ; je peux la réserver."
+        set_a_date: Définir une date
+        today: Aujourd'hui
+        tomorrow: Demain
+        tomorrow_on_time: Demain dans Temps
     time_of_day_greeting:
       greeting:
         afternoon: Bon après-midi, %{name}.
@@ -132,6 +145,9 @@ fr:
         night: Tard dans la nuit, %{name}.
   feed:
     items:
+      ask_held: J'ai réservé %{when} pour ça.
+      ask_scheduled: Dans Temps pour %{date}.
+      ask_snoozed: De retour dans une semaine.
       dismissed: Ignoré.
       follow_up_dismissed: Suivi ignoré.
       gone: Ce n'est plus disponible.

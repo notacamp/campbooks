@@ -1,0 +1,16 @@
+---
+fr:
+  asks:
+    hold:
+      held: Réservé %{when}.
+      held_local: Réservé %{when}. Connectez un agenda pour le synchroniser automatiquement.
+      no_slot: Aucun créneau libre avant l'échéance. Essayez plutôt de définir une date.
+    schedule:
+      scheduled: Dans Temps pour %{date}.
+      invalid_date: Cette date n'a pas fonctionné. Choisissez-en une autre.
+    snooze:
+      snoozed: De retour dans une semaine.
+    done:
+      done: Terminé.
+    dismiss:
+      dismissed: Ignoré.
