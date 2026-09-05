@@ -1,0 +1,22 @@
+fr:
+  attention:
+    reasons:
+      replies_fast: "Vous répondez généralement en %{hours} heures"
+      replies: "Vous avez répondu à %{count} de leurs %{total} derniers messages"
+      two_way: "%{count} conversations dans les deux sens"
+      meetings: "Vous vous êtes rencontré %{count} fois récemment"
+      invoices: "%{count} factures et reçus entre vous"
+      pays_promptly: "Vous réglez leurs factures à temps"
+      engaged: "Vous avez agi sur %{count} de leurs e-mails"
+      starred: "Vous les avez mis en favori"
+      allowed: "Vous les avez autorisés"
+      vip: "Scout les identifie comme client, partenaire ou collègue"
+      urgent_sender: "Leurs e-mails ont tendance à être urgents"
+      ignored: "Vous archivez %{percent}% de leurs e-mails sans les lire"
+      dismissed: "Vous avez ignoré %{count} cartes à leur sujet"
+      service: "Un service, pas une personne"
+      taught_important: "Vous avez dit à Scout qu'ils sont importants"
+      taught_unimportant: "Vous avez dit à Scout qu'ils ne sont pas importants"
+      blocked: "Bloqué"
+      new: "Pas encore d'historique"
+      org_lead: "Via %{name}"

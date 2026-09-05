@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_04_170000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_05_200000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -140,6 +140,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_04_170000) do
     t.uuid "workspace_id", null: false
     t.index ["workspace_id", "purpose"], name: "index_ai_prompts_on_workspace_id_and_purpose", unique: true
     t.index ["workspace_id"], name: "index_ai_prompts_on_workspace_id"
+  end
+
+  create_table "attention_weights", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "computed_at", null: false
+    t.float "confidence", default: 0.0, null: false
+    t.datetime "created_at", null: false
+    t.jsonb "evidence", default: {}, null: false
+    t.datetime "last_activity_at"
+    t.float "raw_score", default: 0.0, null: false
+    t.jsonb "reasons", default: [], null: false
+    t.uuid "subject_id", null: false
+    t.string "subject_type", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "user_id", null: false
+    t.float "weight", default: 0.3, null: false
+    t.uuid "workspace_id", null: false
+    t.index ["subject_type", "subject_id"], name: "index_attention_weights_on_subject"
+    t.index ["user_id", "subject_type", "subject_id"], name: "index_attention_weights_on_user_subject", unique: true
+    t.index ["user_id", "weight"], name: "index_attention_weights_on_user_weight", order: { weight: :desc }
+    t.index ["workspace_id"], name: "index_attention_weights_on_workspace_id"
   end
 
   create_table "audit_events", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -2044,6 +2064,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_04_170000) do
   add_foreign_key "ai_configurations", "ai_adapters"
   add_foreign_key "ai_configurations", "workspaces"
   add_foreign_key "ai_prompts", "workspaces"
+  add_foreign_key "attention_weights", "users"
+  add_foreign_key "attention_weights", "workspaces"
   add_foreign_key "audit_events", "users", on_delete: :nullify
   add_foreign_key "authored_documents", "users", column: "author_id"
   add_foreign_key "authored_documents", "workspaces"
