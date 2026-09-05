@@ -570,5 +570,3 @@ pt:
         in_app_label: Na aplicação
         show_all: Mostrar todos os %{count} itens
         toggle_all: Alternar todos
-    sidebar:
-      aria_label: Navegação das definições

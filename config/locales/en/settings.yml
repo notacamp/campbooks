@@ -555,5 +555,3 @@ en:
         in_app_label: In-app
         show_all: Show all %{count} items
         toggle_all: Toggle all
-    sidebar:
-      aria_label: Settings navigation

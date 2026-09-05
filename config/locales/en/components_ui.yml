@@ -117,19 +117,6 @@ en:
     icon_picker:
       default: Default
       label: Choose an icon
-    inbox_settings_modal:
-      close_label: Close inbox settings
-      nav:
-        accounts: Accounts
-        contacts: Contacts
-        display: Display
-        document_types: Document types
-        filtering: Filtering
-        signatures: Signatures
-        tag_groups: Groups
-        tags: Tags
-      settings_sections_label: Settings sections
-      title: Inbox settings
     keyboard_shortcuts_modal:
       contexts:
         people: People

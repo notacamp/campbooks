@@ -14,9 +14,9 @@
   </head>
 
   <body class="h-full <%= "hotwire-native" if hotwire_native_app? %>"
-        data-controller="<%= "scout-overlay settings-overlay " unless hotwire_native_app? %>email-shortcuts theme skim-overlay product-tour<%= " hint" unless hotwire_native_app? %><%= " nav-shortcuts" if authenticated? && !hotwire_native_app? %>"
+        data-controller="<%= "scout-overlay " unless hotwire_native_app? %>settings-overlay email-shortcuts theme skim-overlay product-tour<%= " hint" unless hotwire_native_app? %><%= " nav-shortcuts" if authenticated? && !hotwire_native_app? %>"
         data-settings-overlay-default-url-value="<%= Settings::Catalog.default_path %>"
-        data-settings-overlay-return-url-value="<%= try(:root_path) || "/" %>"
+        data-settings-overlay-return-url-value="<%= now_path %>"
         data-command-palette-context-value="<%= content_for?(:cp_context) ? yield(:cp_context) : '' %>"
         data-command-palette-message-id-value="<%= content_for?(:cp_message_id) ? yield(:cp_message_id) : '' %>"
         data-command-palette-folders-value="<%= content_for?(:cp_folders) ? yield(:cp_folders) : '[]' %>"
@@ -85,8 +85,10 @@
       <%= render(Campbooks::KeyboardShortcutsModal.new) %>
       <%= render(Campbooks::HintTip.new) %>
     <% end %>
-    <%# Settings overlay — available on every authenticated page for all non-native surfaces. %>
-    <% if authenticated? && !hotwire_native_app? %>
+    <%# The settings overlay is part of the shell on every authenticated page (native
+        included): a settings page renders inside its frame, any other page carries
+        it closed so the account menu / ⌘, can open it in place. %>
+    <% if authenticated? %>
       <%= render(Campbooks::SettingsOverlay.new(
             current_section: (try(:current_section) if settings_overlay_page?),
             content: settings_content)) %>

@@ -170,9 +170,9 @@ module Settings
 
           path = if idef[:route].is_a?(Symbol)
                    h.public_send(idef[:route])
-                 else
+          else
                    idef[:route].call(h)
-                 end
+          end
           {
             key:         idef[:key],
             label:       I18n.t("settings.catalog.items.#{idef[:key]}"),

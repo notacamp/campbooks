@@ -117,19 +117,6 @@ es:
     icon_picker:
       default: Predeterminado
       label: Elegir un icono
-    inbox_settings_modal:
-      close_label: Cerrar configuración de la bandeja de entrada
-      nav:
-        accounts: Cuentas
-        contacts: Contactos
-        display: Visualización
-        document_types: Tipos de documento
-        filtering: Filtrado
-        signatures: Firmas
-        tag_groups: Grupos
-        tags: Etiquetas
-      settings_sections_label: Secciones de configuración
-      title: Configuración de la bandeja de entrada
     keyboard_shortcuts_modal:
       contexts:
         people: Personas

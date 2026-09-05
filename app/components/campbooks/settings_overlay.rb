@@ -44,7 +44,7 @@ module Campbooks
 
     def nav_aside
       aside(
-        data: { settings_overlay_target: "nav" },
+        data: { settings_overlay_target: "nav", pane: "index" },
         class: "flex min-h-0 w-full flex-col bg-sidebar lg:w-[248px] lg:flex-none lg:border-r lg:border-border"
       ) do
         nav_head
@@ -119,7 +119,7 @@ module Campbooks
 
     def content_section
       section(
-        data: { settings_overlay_target: "pane" },
+        data: { settings_overlay_target: "pane", pane: "detail" },
         class: "relative flex min-h-0 min-w-0 flex-1 flex-col"
       ) do
         phone_back_button
@@ -150,58 +150,12 @@ module Campbooks
     end
 
     def content_frame
-      current_url_attr = @content.present? ? { current_url: helpers.request.original_url } : {}
-      raw safe(
-        "<turbo-frame id=\"settings_panel\" " \
-        "data-turbo-action=\"advance\" " \
-        "data-settings-overlay-target=\"frame\" " \
-        "#{current_url_attr.map { |k, v| "data-#{k.to_s.dasherize}=\"#{v}\"" }.join(' ')} " \
-        "class=\"block min-h-0 flex-1 overflow-y-auto\">" \
-        "#{frame_content}" \
-        "</turbo-frame>"
+      render Campbooks::SettingsPanel.new(
+        current_section: @current_section,
+        content: @content,
+        current_url: (helpers.request.original_url if @content.present?),
+        context: @context
       )
-    end
-
-    def frame_content
-      if @content.present?
-        crumb_html = crumb_markup
-        "<div class=\"mx-auto w-full max-w-[720px] px-5 py-6 lg:px-10 lg:py-9\">#{crumb_html}#{flash_inline_html}#{@content}</div>"
-      else
-        skeleton_html
-      end
-    end
-
-    def crumb_markup
-      return "" if @current_section.blank?
-
-      item = Settings::Catalog.item_for_section(@current_section, @context)
-      return "" unless item
-
-      group_key = Settings::Catalog.groups(@context).find { |g| g.items.include?(item) }&.key
-      return "" unless group_key
-
-      label = I18n.t("settings.catalog.groups.#{group_key}")
-      "<p class=\"mb-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground\">#{CGI.escapeHTML(label)}</p>"
-    end
-
-    def flash_inline_html
-      # Render the flash partial for inline display inside the frame
-      begin
-        helpers.render("shared/flash_inline")
-      rescue
-        ""
-      end
-    end
-
-    def skeleton_html
-      <<~HTML
-        <div class="mx-auto w-full max-w-[720px] px-5 py-6 lg:px-10 lg:py-9">
-          <div class="h-6 w-40 animate-pulse rounded bg-muted mb-6"></div>
-          <div class="h-3 w-full animate-pulse rounded bg-muted mb-3"></div>
-          <div class="h-3 w-4/5 animate-pulse rounded bg-muted mb-3"></div>
-          <div class="h-3 w-2/3 animate-pulse rounded bg-muted"></div>
-        </div>
-      HTML
     end
 
     def active_item?(item)

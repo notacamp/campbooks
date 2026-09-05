@@ -55,14 +55,12 @@ class CommandPaletteCatalog
     )
     cat = I18n.t("command_palette.categories.settings")
     # Map catalog icon symbols to palette icon vocabulary
+    # Only names app/javascript/lib/command_items.js can draw; anything else falls back to "cog".
     icon_map = {
-      user: "users", lock: "key", bell: "bell", spark: "sparkles", cpu: "sparkles",
-      chat: "sparkles", template: "file-text", "mail-template": "mail", zap: "workflow",
-      tag: "tag", layers: "grid", filter: "filter", pen: "pen", eye: "eye",
-      file: "file-text", branch: "git-branch", at: "at-sign", calendar: "calendar",
-      drive: "folder", notion: "cog", cloud: "cloud", plug: "plug", key: "key",
-      building: "cog", users: "users", grid: "grid", "shield-check": "shield",
-      card: "credit-card", pulse: "cog", sliders: "cog"
+      user: "users", bell: "bell", spark: "sparkles", cpu: "sparkles", chat: "sparkles",
+      template: "file-text", "mail-template": "mail", zap: "workflow", tag: "tag", layers: "grid",
+      pen: "pen", file: "file-text", branch: "workflow", at: "at-sign", calendar: "calendar",
+      drive: "folder", cloud: "folder", users: "users", grid: "grid", pulse: "chart-bar"
     }
     Settings::Catalog.groups(context).flat_map do |group|
       group.items.map do |item|

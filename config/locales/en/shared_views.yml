@@ -89,6 +89,5 @@ en:
       search: Search…
       search_and_commands: Search and commands (⌘K)
       toggle_dark_mode: Toggle dark mode
-      toggle_theme: Toggle theme
     user_menu:
       sign_out: Sign out

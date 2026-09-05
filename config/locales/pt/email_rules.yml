@@ -9,10 +9,6 @@ pt:
       category: "categoria é"
       has_attachment: "tem um anexo"
       no_criteria: "Nenhuma condição definida"
-  components:
-    inbox_settings_modal:
-      nav:
-        rules: Regras
   inbox_settings:
     rules:
       index:

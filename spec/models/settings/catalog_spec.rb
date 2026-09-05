@@ -10,7 +10,7 @@ RSpec.describe Settings::Catalog do
     subject(:groups) { described_class.groups(context) }
 
     it "returns exactly 6 groups in order" do
-      expect(groups.map(&:key)).to eq([:you, :scout, :inbox, :paper, :connections, :workspace])
+      expect(groups.map(&:key)).to eq([ :you, :scout, :inbox, :paper, :connections, :workspace ])
     end
 
     it "marks only the scout group as ember" do

@@ -56,7 +56,7 @@ export default class extends Controller {
       try { stored = localStorage.getItem("theme") } catch (e) { stored = null }
       const active = stored || "system"
       this.optionTargets.forEach((btn) => {
-        const mode = btn.dataset.themeModePparam || btn.dataset["themeMode-param"] || btn.dataset.themeModeParam
+        const mode = btn.dataset.themeModeParam
         btn.setAttribute("aria-pressed", String(mode === active))
       })
     }

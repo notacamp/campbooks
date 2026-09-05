@@ -574,5 +574,3 @@ es:
         in_app_label: En la app
         show_all: Mostrar los %{count} elementos
         toggle_all: Activar/desactivar todo
-    sidebar:
-      aria_label: Navegación de configuración

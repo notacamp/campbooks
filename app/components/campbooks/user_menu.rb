@@ -40,7 +40,7 @@ module Campbooks
         data: { dropdown_target: "trigger", action: "click->dropdown#toggle" },
         class: "inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-full"
       ) do
-        render Campbooks::Avatar.new(name: helpers.current_user.name, size: :md)
+        render Campbooks::Avatar.new(name: user_name, size: :md)
       end
     end
 
@@ -80,10 +80,10 @@ module Campbooks
 
     def identity_row
       div(class: "flex items-center gap-3 px-2.5 pt-2.5 pb-3") do
-        render Campbooks::Avatar.new(name: helpers.current_user.name, size: :lg)
+        render Campbooks::Avatar.new(name: user_name, size: :lg)
         div do
-          b(class: "block text-sm font-semibold leading-tight text-foreground") { plain helpers.current_user.name }
-          span(class: "block text-[12.5px] text-muted-foreground") { plain helpers.current_user.email_address }
+          b(class: "block text-sm font-semibold leading-tight text-foreground") { plain user_name }
+          span(class: "block text-[12.5px] text-muted-foreground") { plain helpers.current_user&.email_address }
         end
       end
     end
@@ -129,7 +129,7 @@ module Campbooks
       button(
         type: "button",
         role: "menuitem",
-        onclick: "document.getElementById('keyboard-shortcuts-modal')?.showModal()",
+        data: { action: "click->dropdown#close click->email-shortcuts#showHelp" },
         class: class_names(row_classes, "hidden lg:flex")
       ) do
         raw safe(icon_svg(:keyboard, ICON_CLASSES))
@@ -182,21 +182,25 @@ module Campbooks
     end
 
     def sign_out_row
-      raw safe(
-        helpers.button_to(
-          helpers.session_path,
-          method: :delete,
-          class: class_names(row_classes, "text-muted-foreground"),
-          form_class: "contents",
-          role: "menuitem"
-        ) do
-          icon_svg(:logout, ICON_CLASSES) + "<span class=\"flex-1\">#{h(t("shared.user_menu.sign_out"))}</span>"
+      form(action: helpers.session_path, method: "post", class: "contents") do
+        input(type: "hidden", name: "_method", value: "delete", autocomplete: "off")
+        if helpers.protect_against_forgery?
+          input(type: "hidden", name: helpers.request_forgery_protection_token, value: helpers.form_authenticity_token, autocomplete: "off")
         end
-      )
+        button(type: "submit", role: "menuitem", class: class_names(row_classes, "text-muted-foreground")) do
+          raw safe(icon_svg(:logout, ICON_CLASSES))
+          span(class: "flex-1") { t("shared.user_menu.sign_out") }
+        end
+      end
     end
 
     def keycap(label, extra_class: nil)
       span(class: class_names(KEYCAP_CLASSES, extra_class)) { plain label }
+    end
+
+    # Lookbook renders the menu without a session; the app always has one.
+    def user_name
+      helpers.current_user&.name || "Preview"
     end
 
     def show_admin?
@@ -213,11 +217,6 @@ module Campbooks
       path = Settings::Catalog::ICON_PATHS[name.to_sym] || ""
       fill_attrs = 'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"'
       %(<svg class="w-[13px] h-[13px]" viewBox="0 0 24 24" #{fill_attrs} aria-hidden="true">#{path}</svg>)
-    end
-
-    # Escape HTML for safe embedding in raw strings
-    def h(str)
-      CGI.escapeHTML(str.to_s)
     end
   end
 end
