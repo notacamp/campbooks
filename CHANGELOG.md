@@ -16,18 +16,31 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
-### Changed
-
-- People: the Scout line on each row and the "where things stand" note now say what is actually open with that person — what they asked (Scout's read, or their own words quoted from the message), what you are still waiting for, or the overdue amount — instead of the contact's profile bio or a sentence that repeated the row. Both are composed in your language at render time. Latest rows that need you carry their verb (Reply, Nudge, Decide, Pay, Chase).
-
 ### Added
 
+- **Settings overlay:** Settings navigation is now a Discord/Notion-style fullscreen overlay (`<dialog id="settings-overlay">`) driven by a `settings_overlay` Stimulus controller. Opening any `/settings/*` URL opens the overlay and restores the previous page when dismissed. The left rail shows all six catalog groups (You, Scout, Inbox, Paper, Connections, Workspace); the ⌘, / Ctrl+, shortcut opens it from any page; clicking outside the overlay or pressing Escape navigates back. `Settings::Catalog` is the single source of truth for the settings information architecture, replacing the old `NavigationHelper#settings_nav_groups` and `inbox_settings_nav_group` methods.
+- **User menu as first-class identity panel:** The avatar in the nav rail now renders `Campbooks::UserMenu` (`:popover` variant beside the rail on desktop, `:sheet` variant from the topbar on mobile). The panel shows the current user's name and email, an appearance segmented control (light/dark/system), a settings shortcut row (⌘,), and the workspace label. The old `_user_menu.html.erb` partial is removed.
+- **Settings::Catalog:** Single source of truth for settings items and groups. Used by `Campbooks::SettingsOverlay`, `CommandPaletteCatalog`, and Lookbook previews.
 - Scout now learns how much each person and organization matters to you — from who you answer and how fast, who you meet, whose bills you settle, and whose mail you archive unread or dismiss — as a per-user attention weight refreshed in the background (the base every place will rank on; nothing changes on screen yet).
-
 - **Shortcut hints:** resting the pointer on an action, or focusing it with the keyboard, shows its name and its keyboard shortcut in a small tooltip — on the People list and conversation, the nav rail, the inbox toolbar and reading pane, feed cards, reminders and the calendar header. Icon-only buttons gain a proper label at the same time, and every hinted control now carries `aria-keyshortcuts` for screen readers. Touch devices are unaffected; the existing on-card keycaps and legends stay as they were.
 - People list rows show tag chips again: the person's own sender tags plus the email's tags (the same chips the old inbox rows carried), capped so a row stays tidy on mobile.
 - People: the note's actions match the situation — Draft reply / Done / Snooze, Draft follow-up / Let it go, Ask Scout (opens Scout with the suggestion), Open in Money / Mark paid.
 - Scout's full read of an email (summary, priority, suggested action and the new "ask") now runs for inbound mail from people — it was defined but never scheduled — so the Reply and Decide lanes fill in and the Now feed's email cards appear again.
+
+### Changed
+
+- Settings pages no longer render a sidebar. The `content_for :sidebar` blocks and the `settings/_sidebar.html.erb` / `settings/_with_sidebar.html.erb` partials are removed.
+- The gear button in the email reading pane now opens the settings overlay at the Tags section instead of the old `InboxSettingsModal`.
+- `CommandPaletteCatalog#settings` now derives its command list from `Settings::Catalog.groups` rather than a hand-maintained array.
+- People: the Scout line on each row and the "where things stand" note now say what is actually open with that person — what they asked (Scout's read, or their own words quoted from the message), what you are still waiting for, or the overdue amount — instead of the contact's profile bio or a sentence that repeated the row. Both are composed in your language at render time. Latest rows that need you carry their verb (Reply, Nudge, Decide, Pay, Chase).
+
+### Removed
+
+- `Campbooks::InboxSettingsModal` component and `inbox_settings_modal_controller.js` open/close/navigate logic (Display preferences stay in the trimmed controller).
+- `shared/_user_menu.html.erb` partial replaced by `Campbooks::UserMenu`.
+- `settings/_sidebar.html.erb` and `settings/_with_sidebar.html.erb` partials.
+- `NavigationHelper#settings_nav_groups` and `#inbox_settings_nav_group` methods.
+- `inbox_settings=` query parameter forwarding in `EmailMessagesController` redirects.
 
 ### Fixed
 
@@ -36,6 +49,7 @@ major, minor, or patch change here.
 ### Security
 
 - Bumped `rubyzip` 3.2.2 → 3.6.0 to close CVE-2026-85396, a High-severity path-traversal vulnerability in pre-3.4.0 rubyzip.
+
 
 ## [0.37.0] - 2026-09-05
 

@@ -1577,3 +1577,34 @@ dialog[open] {
   100% { transform: scale(1); }
 }
 .now-counter-tick { animation: now-counter-tick 0.15s ease-out; }
+
+/* ── Settings overlay ──────────────────────────────────────────────────────
+   Discord/Notion-style full-screen settings dialog with a left nav rail and
+   a right content pane. Phone mode: only one pane is visible at a time,
+   controlled by data-mode="index"|"detail" on the dialog element. Desktop
+   (lg+): both panes are always visible side-by-side. --------------------*/
+
+#settings-overlay {
+  max-width: 100%;
+  max-height: 100%;
+  border: none;
+  padding: 0;
+}
+
+/* Turbo frame busy indicator: dim the inner content while a request is in
+   flight so the loading skeleton is less jarring. */
+turbo-frame[busy] .settings-overlay-inner {
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+/* Phone mode: default shows the nav, detail shows the content pane.
+   Below lg both panes share the full viewport; only one is shown at a time. */
+@media (max-width: 1023px) {
+  #settings-overlay[data-mode="index"] [data-pane="detail"] {
+    display: none;
+  }
+  #settings-overlay[data-mode="detail"] [data-pane="index"] {
+    display: none;
+  }
+}
