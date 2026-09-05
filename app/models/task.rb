@@ -35,13 +35,23 @@ class Task < ApplicationRecord
   # confirm-to-calendar machinery instead of duplicating it.
   has_many :reminders, as: :source, dependent: :destroy
 
+  # Scout can hold focus time for an ask (Time::FocusHolder), the same way it does
+  # for a deadline reminder, through focus_blocks.task_id. Nullify (not destroy) so
+  # a held block survives the ask being completed. No unique index: an ask may be
+  # held again after a dismissed block.
+  has_many :focus_blocks, dependent: :nullify
+
   # A discussion thread (teammates + Scout on @scout), mirroring email threads.
   has_one :agent_thread, as: :contextable, dependent: :destroy
   has_many :agent_messages, through: :agent_thread
 
-  # Lifecycle / board stages. `suggested` = AI-proposed, lives only in the Skim
-  # triage queue; the board shows todo/in_progress/blocked/done; `cancelled` is a
-  # terminal escape. Integer-backed — APPEND new values, never reorder existing.
+  # Lifecycle stages. `suggested` = AI-proposed (Scout found an ask); `todo` = an
+  # accepted, open ask; `done`/`cancelled` are terminal. Integer-backed — APPEND
+  # new values, never reorder existing.
+  #
+  # `in_progress` and `blocked` are LEGACY values from the retired task board: the
+  # asks UI no longer distinguishes them (they read as "open", same as todo) and
+  # never writes them again. They stay in the enum so old rows keep loading.
   enum :status, {
     suggested:   0,
     todo:        1,
@@ -63,6 +73,9 @@ class Task < ApplicationRecord
   BOARD_STATUSES = %w[todo in_progress blocked done].freeze
   # "Accepted and not finished" — the set that counts as live work.
   ACTIVE_STATUSES = %w[todo in_progress blocked].freeze
+  # The asks the surfaces show: Scout-found (suggested) OR accepted (todo + the
+  # two legacy states), not done/cancelled. Combined with `awake` in `live`.
+  LIVE_STATUSES = %w[suggested todo in_progress blocked].freeze
 
   scope :not_archived, -> { where(archived_at: nil) }
   scope :archived,     -> { where.not(archived_at: nil) }
@@ -72,6 +85,17 @@ class Task < ApplicationRecord
   scope :open,     -> { not_archived.where.not(status: %i[done cancelled]) }
   scope :overdue,  -> { active.where.not(due_at: nil).where(due_at: ...Time.current) }
   scope :due_soon, ->(within = 3.days) { active.where(due_at: Time.current..(Time.current + within)) }
+
+  # Snooze ("Not now"): an ask put off keeps its status but drops out of every
+  # surface until snoozed_until lapses. `awake` = not snoozed (or snooze expired);
+  # `snoozed` = its future-dated inverse.
+  scope :awake,   -> { where("snoozed_until IS NULL OR snoozed_until <= ?", Time.current) }
+  scope :snoozed, -> { where.not(snoozed_until: nil).where(snoozed_until: Time.current..) }
+  # The live set every ask surface (Now/People/Time) reads: accepted or suggested,
+  # not archived, not snoozed, not done/cancelled.
+  scope :live,    -> { not_archived.where(status: LIVE_STATUSES).awake }
+  scope :dated,   -> { where.not(due_at: nil) }
+  scope :undated, -> { where(due_at: nil) }
 
   # Permission gate. Tasks are workspace-visible for v1 (like Documents) — every
   # member of the workspace sees them. Mirrors Reminder.accessible_to. Fails
@@ -121,8 +145,56 @@ class Task < ApplicationRecord
     ACTIVE_STATUSES.include?(status)
   end
 
+  # Alias of #active? — reads better where "has the user accepted this ask?" is
+  # the question (vs the raw board sense). Both are kept.
+  def accepted?
+    ACTIVE_STATUSES.include?(status)
+  end
+
   def overdue?
     active? && due_at.present? && due_at < Time.current
+  end
+
+  # Snoozed = put off to a still-future time. A lapsed snooze reads as awake.
+  def snoozed?
+    snoozed_until.present? && snoozed_until.future?
+  end
+
+  # Accept an ask: a suggested one becomes todo (the single status-move seam), an
+  # already-accepted one is a no-op. Either way a lingering snooze is cleared —
+  # acting on an ask wakes it. Idempotent.
+  def accept!(by: Current.user)
+    update!(snoozed_until: nil) if snoozed_until.present?
+    move_to_status!(:todo, by:) if suggested?
+    true
+  end
+
+  # "Not now" — put the ask off for a week (default) without changing its status,
+  # so a suggested ask stays suggested. It drops off every surface until then.
+  def snooze!(until_time = 1.week.from_now, by: Current.user)
+    update!(snoozed_until: until_time)
+    Events.publish("task.snoozed", subject: self, actor: by,
+                   payload: { title: title, until: until_time.iso8601 })
+    true
+  end
+
+  # "Set a date" — give the ask a due date (09:30 local, matching the agenda's
+  # morning rows) and accept it. Records the old→new due dates. Accepts a Date.
+  def schedule!(date, zone:, by: Current.user)
+    date = date.to_date
+    previous_due = due_at
+    new_due = zone.local(date.year, date.month, date.day, 9, 30)
+    update!(due_at: new_due, all_day: false)
+    accept!(by: by)
+    Events.publish("task.scheduled", subject: self, actor: by,
+                   payload: { title: title, from: previous_due&.iso8601, to: new_due.iso8601 })
+    true
+  end
+
+  # The focus block Scout is currently holding for this ask (earliest not-dismissed
+  # one), or nil. Used to show "held Thu 10:00" and to suppress a duplicate offer.
+  def held_block
+    focus_blocks.held.order(:start_at).first
   end
 
   # Soft-archive: hide from the active lists/board/feed without deleting. Orthogonal
@@ -198,7 +270,8 @@ class Task < ApplicationRecord
   end
 
   def feed_relevant?
-    saved_change_to_id? || saved_change_to_status? || saved_change_to_due_at? || saved_change_to_archived_at?
+    saved_change_to_id? || saved_change_to_status? || saved_change_to_due_at? ||
+      saved_change_to_archived_at? || saved_change_to_snoozed_until?
   end
 
   def refresh_feed
