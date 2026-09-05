@@ -25,9 +25,9 @@ module Campbooks
         button(
           type: "submit",
           class: button_classes,
-          title: aria_label,
           aria_label: aria_label,
-          aria_pressed: @starred.to_s
+          aria_pressed: @starred.to_s,
+          data: hint_data(aria_label)
         ) do
           raw(safe(star_svg))
         end

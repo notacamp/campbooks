@@ -421,6 +421,35 @@
 .nav-shortcut-badge { display: none; }
 body[data-nav-armed] .nav-shortcut-badge { display: inline-flex; }
 
+/* -- Shortcut hint tooltip (hint_controller.js + Campbooks::HintTip). One
+   fixed element, in the top layer via popover=manual so it rides above
+   dialogs. Ink pill: the functional color (inverts in dark), never Ember. -- */
+.hint-tip {
+  position: fixed; inset: auto; margin: 0; border: 0; overflow: visible;
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 6px 5px 9px; border-radius: 8px;
+  background: var(--primary); color: var(--primary-foreground);
+  font-size: 12px; line-height: 1; font-weight: 500; white-space: nowrap;
+  box-shadow: 0 8px 20px -8px oklch(20% 0.03 60 / 0.45);
+  pointer-events: none; z-index: 70;
+  opacity: 0; transform: translateY(3px);
+  transition: opacity 0.12s var(--ease-out-quint), transform 0.12s var(--ease-out-quint);
+}
+.hint-tip:popover-open { display: flex; }
+.hint-tip.is-on { opacity: 1; transform: none; }
+.hint-tip.is-preview { position: static; display: inline-flex; opacity: 1; transform: none; }
+.hint-tip-keys { display: inline-flex; gap: 2px; }
+.hint-tip-keys:empty { display: none; }
+.hint-tip-kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 16px; min-width: 16px; padding: 0 4px; border-radius: 4px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.02em; font-variant-numeric: tabular-nums;
+  background: color-mix(in oklch, var(--primary-foreground) 16%, transparent);
+  color: var(--primary-foreground);
+}
+.dark .hint-tip { box-shadow: 0 8px 20px -8px oklch(0% 0 0 / 0.7); }
+@media (prefers-reduced-motion: reduce) { .hint-tip { transition: none; } }
+
 @keyframes new-message-glow {
   0% { background-color: color-mix(in oklch, var(--ember-solid) 16%, transparent); }
   100% { background-color: transparent; }

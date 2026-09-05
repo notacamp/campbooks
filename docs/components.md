@@ -118,6 +118,49 @@ end
 - Form inputs must have associated labels (`for` attribute or wrapping)
 - Empty states should communicate status to screen readers
 
+### Shortcut hints
+
+Any control that has a keyboard shortcut should advertise it via the `HintHelper` module
+(included automatically in Phlex components via `Campbooks::Base` and in ERB via the helper
+module). On fine-pointer (mouse/trackpad) devices a floating keycap tooltip appears on hover
+showing the label and shortcut. Touch devices see nothing.
+
+**Phlex components** — merge `hint_data` into `data:` and `hint_aria` into `aria:`:
+
+```ruby
+render Campbooks::Button.new(
+  data: { my_controller: true, **hint_data(t(".label"), key: "r") },
+  aria: hint_aria("r")
+) { "Reply" }
+```
+
+**ERB views** — spread `hint_html_attrs` at the top-level options hash (NOT nested under `data:`):
+
+```erb
+<%= link_to t(".archive"), archive_path,
+      class: "...",
+      "aria-label": t(".archive"),
+      **hint_html_attrs(t(".archive"), key: "e") %>
+```
+
+`hint_html_attrs` returns flat string-keyed attrs (`"data-hint"`, `"data-hint-key"`,
+`"data-hint-placement"`, `"aria-keyshortcuts"`) that Rails tag helpers spread directly.
+
+**Options:**
+
+| Option | Values | Effect |
+|---|---|---|
+| `label` | String | Tooltip label text |
+| `key:` | `"r"`, `"g p"`, `"⌘K"`, `"⇧I"`, `"⏎"`, `"Esc"` | Keycap(s) shown in tooltip and `aria-keyshortcuts` |
+| `placement:` | `:right` (default: top) | For rail/sidebar items that appear on the right edge |
+
+Single ASCII letter keys are upper-cased in the JS. Modifier-symbol keys (`⌘`, `⇧`, `⌥`, `⌃`)
+produce one cap. Sequences like `"g p"` produce two caps. Remove any `title:` attribute from
+a control that gets a hint — the tooltip replaces it and `title` produces a competing native tooltip.
+
+The `Campbooks::HintTip` component is rendered once in the application layout. Its Lookbook
+preview is at `test/components/previews/hint_tip_preview.rb`.
+
 ## Tailwind v4 Notes
 
 - Use `@import "tailwindcss"` syntax (already configured)

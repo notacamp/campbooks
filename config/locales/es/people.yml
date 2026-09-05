@@ -17,12 +17,12 @@ es:
           one: "1d"
           other: "%{count}d"
         actions:
-          reply_hint: "Responder (r)"
-          done_hint: "Hecho (d)"
-          snooze_hint: "Posponer (s)"
+          reply_hint: "Responder"
+          done_hint: "Hecho"
+          snooze_hint: "Posponer"
           star_hint: Destacar
           unstar_hint: Quitar destaque
-          more_hint: "Más (.)"
+          more_hint: "Más"
           details: Detalles
           archive: Archivar conversación
           block: Bloquear remitente
@@ -42,9 +42,9 @@ es:
         reply: Responder
         reply_all: Responder a todos
         forward: Reenviar
-        reply_hint: "Responder (r)"
-        reply_all_hint: "Responder a todos (a)"
-        forward_hint: "Reenviar (f)"
+        reply_hint: "Responder"
+        reply_all_hint: "Responder a todos"
+        forward_hint: "Reenviar"
       details:
         close: Cerrar
         title: Detalles

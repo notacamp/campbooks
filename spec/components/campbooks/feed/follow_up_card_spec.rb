@@ -44,4 +44,18 @@ RSpec.describe Campbooks::Feed::FollowUpCard, type: :component do
     item.update!(data: item.data.except("sent_subject"))
     expect(render_card).to include("Q3 proposal") # clean_subject strips the "Re: "
   end
+
+  describe "shortcut hint wiring" do
+    it "dismiss button carries data-hint (no title= attribute)" do
+      html = render_card
+      expect(html).to match(/data-hint=/)
+      expect(html).not_to match(/data-feed-dismiss[^>]*title=/)
+    end
+
+    it "dismiss button carries data-hint-key with the escape glyph" do
+      html = render_card
+      # dismiss: true -> chip_glyph returns "<-" arrow
+      expect(html).to include("data-hint-key")
+    end
+  end
 end

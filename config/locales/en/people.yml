@@ -17,12 +17,12 @@ en:
           one: "1d"
           other: "%{count}d"
         actions:
-          reply_hint: "Reply (r)"
-          done_hint: "Done (d)"
-          snooze_hint: "Snooze (s)"
+          reply_hint: "Reply"
+          done_hint: "Done"
+          snooze_hint: "Snooze"
           star_hint: "Star"
           unstar_hint: "Unstar"
-          more_hint: "More (.)"
+          more_hint: "More"
           details: Details
           archive: Archive thread
           block: Block sender
@@ -42,9 +42,9 @@ en:
         reply: Reply
         reply_all: Reply all
         forward: Forward
-        reply_hint: "Reply (r)"
-        reply_all_hint: "Reply all (a)"
-        forward_hint: "Forward (f)"
+        reply_hint: "Reply"
+        reply_all_hint: "Reply all"
+        forward_hint: "Forward"
       details:
         close: Close
         title: Details

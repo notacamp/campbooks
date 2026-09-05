@@ -25,9 +25,8 @@ module Campbooks
       button(
         type: "button",
         aria_label: t(".label"),
-        title: t(".label"),
         class: class_names(DEFAULT_CLASSES, custom_class),
-        data: { bug_report_open: "" },
+        data: { bug_report_open: "", **hint_data(t(".label"), placement: :right) },
         **@attrs
       ) { raw(safe(Campbooks::BugReportButton.bug_svg(@icon_class))) }
     end

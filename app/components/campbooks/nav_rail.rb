@@ -75,7 +75,7 @@ module Campbooks
         href: item[:path],
         aria_current: item[:active] ? "page" : nil,
         aria_keyshortcuts: sk ? "g #{sk}" : nil,
-        data: sk ? { nav_shortcut_key: sk } : {},
+        data: { **(sk ? { nav_shortcut_key: sk } : {}), **hint_data(item[:label], key: sk ? "g #{sk}" : nil, placement: :right) },
         class: class_names(
           "relative flex w-12 flex-col items-center justify-center gap-1 rounded-xl py-1.5",
           "text-[9px] font-semibold tracking-tight transition-colors",
@@ -97,12 +97,13 @@ module Campbooks
     # Mirrors the mobile bottom nav.
     def scout_item(item)
       sk = item[:shortcut]
+      scout_label = scout_aria_label(item)
       a(
         href: item[:path],
-        aria_label: scout_aria_label(item),
+        aria_label: scout_label,
         aria_current: item[:active] ? "page" : nil,
         aria_keyshortcuts: sk ? "g #{sk}" : nil,
-        data: sk ? { nav_shortcut_key: sk } : {},
+        data: { **(sk ? { nav_shortcut_key: sk } : {}), **hint_data(item[:label], key: sk ? "g #{sk}" : nil, placement: :right) },
         class: class_names(
           "relative flex w-12 flex-col items-center justify-center gap-1 rounded-xl py-1.5",
           "text-[9px] font-semibold tracking-tight text-ember transition-colors",

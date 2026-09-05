@@ -54,8 +54,11 @@ module Campbooks
       def tab(key, label, href)
         # The calendar views carry a hook the calendar-nav keyboard controller
         # (d/w/m/a) and the Cmd+K palette read; the reminders tab does not.
-        data = %w[agenda day week month].include?(key) ? { "calendar-view": key } : {}
-        a(href: href, data: data, class: class_names(
+        key_map = { "day" => "d", "week" => "w", "month" => "m", "agenda" => "a" }
+        shortcut = key_map[key]
+        base_data = %w[agenda day week month].include?(key) ? { "calendar-view": key } : {}
+        data = base_data.merge(hint_data(label, key: shortcut))
+        a(href: href, data: data, aria: hint_aria(shortcut), class: class_names(
           "shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 font-medium no-underline transition-colors",
           @current == key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
         )) { label }

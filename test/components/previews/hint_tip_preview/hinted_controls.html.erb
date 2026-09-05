@@ -1,0 +1,56 @@
+<%# data-controller="hint" makes this example live: the controller binds to
+    document, so hovering / tabbing the buttons opens the real tooltip rendered
+    at the end. Standalone URL: /lookbook/preview/hint_tip/hinted_controls %>
+<div class="flex flex-wrap items-center gap-4 p-6" data-controller="hint">
+  <%# Reply button example %>
+  <button type="button"
+          class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          data-hint="Reply"
+          data-hint-key="r"
+          aria-keyshortcuts="r">
+    Reply
+  </button>
+
+  <%# Archive button example %>
+  <button type="button"
+          class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium border border-border hover:bg-muted transition-colors"
+          data-hint="Archive"
+          data-hint-key="e"
+          aria-keyshortcuts="e">
+    Archive
+  </button>
+
+  <%# Mark unread — modifier key %>
+  <button type="button"
+          class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium border border-border hover:bg-muted transition-colors"
+          data-hint="Mark unread"
+          data-hint-key="&#x21E7;U"
+          aria-keyshortcuts="Shift+U">
+    Mark unread
+  </button>
+
+  <%# People nav item — right-placement, two-key sequence %>
+  <a href="#"
+     class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium hover:bg-muted transition-colors"
+     data-hint="People"
+     data-hint-key="g p"
+     data-hint-placement="right">
+    People
+  </a>
+
+  <%# Star — label-only hint (no key) %>
+  <button type="button"
+          class="inline-flex items-center justify-center h-8 w-8 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
+          aria-label="Star"
+          data-hint="Star">
+    &#9733;
+  </button>
+
+  <%# The shared hint tip element (static preview) %>
+  <div class="mt-6 flex items-center gap-3">
+    <span class="text-xs text-muted-foreground font-medium">Tooltip previews:</span>
+    <%= render Campbooks::HintTip.new(preview: { label: "Reply", keys: %w[R] }) %>
+    <%= render Campbooks::HintTip.new(preview: { label: "People", keys: %w[G P] }) %>
+    <%= render Campbooks::HintTip.new(preview: { label: "Star", keys: [] }) %>
+  </div>
+</div>

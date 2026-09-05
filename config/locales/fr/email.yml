@@ -161,6 +161,7 @@ fr:
       show_discussion_title: Afficher la discussion
       snoozed_until_badge: Reporté jusqu'au %{time}
       toggle_chat_aria: Afficher/masquer le chat
+      toolbar_archive_title: Archiver
       toolbar_clear_selection_title: Effacer la sélection
       toolbar_delete_title: Supprimer
       toolbar_mark_read_title: Marquer comme lu

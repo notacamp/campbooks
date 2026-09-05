@@ -100,6 +100,21 @@ RSpec.describe Campbooks::People::ThreadMessage, type: :component do
       expect(html).not_to include("data-people-reply-all")
     end
 
+    it "puts data-hint-key=r on the reply button" do
+      html = render_msg(msg, open: true, can_send: true)
+      expect(html).to include('data-hint-key="r"')
+    end
+
+    it "puts data-hint-key=a on the reply-all button" do
+      html = render_msg(msg, open: true, can_send: true)
+      expect(html).to include('data-hint-key="a"')
+    end
+
+    it "puts data-hint-key=f on the forward button" do
+      html = render_msg(msg, open: true, can_send: true)
+      expect(html).to include('data-hint-key="f"')
+    end
+
     it "renders action forms in content_only mode when can_send is true" do
       html = render_msg(msg, content_only: true, can_send: true)
       expect(html).to include("mode=reply")

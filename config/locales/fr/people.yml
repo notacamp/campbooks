@@ -17,12 +17,12 @@ fr:
           one: "1j"
           other: "%{count}j"
         actions:
-          reply_hint: "Répondre (r)"
-          done_hint: "Terminé (d)"
-          snooze_hint: "Reporter (s)"
+          reply_hint: "Répondre"
+          done_hint: "Terminé"
+          snooze_hint: "Reporter"
           star_hint: Mettre en vedette
           unstar_hint: Retirer des favoris
-          more_hint: "Plus (.)"
+          more_hint: "Plus"
           details: Détails
           archive: Archiver la conversation
           block: Bloquer l'expéditeur
@@ -42,9 +42,9 @@ fr:
         reply: Répondre
         reply_all: Répondre à tous
         forward: Transférer
-        reply_hint: "Répondre (r)"
-        reply_all_hint: "Répondre à tous (a)"
-        forward_hint: "Transférer (f)"
+        reply_hint: "Répondre"
+        reply_all_hint: "Répondre à tous"
+        forward_hint: "Transférer"
       details:
         close: Fermer
         title: Détails

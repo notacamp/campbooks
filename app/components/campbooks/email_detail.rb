@@ -264,11 +264,15 @@ module Campbooks
     # A reply/forward control: a small POST form that asks the compose
     # controller to open the Dock (bottom-sheet composer) for this message.
     def compose_button(mode, label, icon_svg, primary:)
+      key_map = { "reply" => "r", "reply_all" => "a", "forward" => "f" }
+      key = key_map[mode.to_s]
       form(action: helpers.compose_email_message_path(@message, mode: mode),
            method: "post", class: "inline-flex") do
         input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
         button(
           type: "submit",
+          data: hint_data(label, key: key),
+          aria: hint_aria(key),
           class: class_names(
             "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors cursor-pointer",
             primary ? "border-accent-600 bg-accent-600 text-white hover:bg-accent-700" : "border-gray-300 bg-card text-gray-600 hover:bg-gray-50"

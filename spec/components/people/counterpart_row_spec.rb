@@ -137,6 +137,42 @@ RSpec.describe Campbooks::People::CounterpartRow, type: :component do
     expect(html).to include("text-amber-500")
   end
 
+  describe "shortcut hint wiring on action cluster buttons" do
+    let(:msg_standing) do
+      People::Standing::Result.new(text: nil, needs_you: true, thread_id: nil,
+                                   overdue_days: 0, kind: :attention, verb: :reply,
+                                   subject: "Q3 deck", wait_days: 2,
+                                   feed_item_id: 1, email_message_id: 1)
+    end
+
+    let(:person) { create(:person, name: "Sofia Martins") }
+    let(:counterpart) do
+      People::Counterpart.new(kind: :person, record: person, name: "Sofia Martins",
+                              subtitle: nil, avatar_email: "sofia@x.example",
+                              avatar_initial: nil, last_activity: Time.current,
+                              standing: msg_standing,
+                              data: { "can_reply" => true, "can_done" => true })
+    end
+
+    subject(:html) { render(described_class.new(counterpart: counterpart)) }
+
+    it "puts data-hint on the reply button" do
+      expect(html).to match(/data-hint=/)
+    end
+
+    it "puts data-hint-key=r on the reply button" do
+      expect(html).to include('data-hint-key="r"')
+    end
+
+    it "puts data-hint-key=d on the done button" do
+      expect(html).to include('data-hint-key="d"')
+    end
+
+    it "does not put a title= on the reply button" do
+      expect(html).not_to match(/data-people-reply[^>]*title=/)
+    end
+  end
+
   describe "tag chips" do
     it "renders a chip for each data['tags'] entry, with its name and colour" do
       person = create(:person, name: "Sofia Martins")
