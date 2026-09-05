@@ -79,7 +79,7 @@ class Time::DayNote
 
     Focus.new(
       title: block.title,
-      subject: block.reminder&.title.presence || block.title,
+      subject: block.subject_title,
       at: block.start_at,
       duration_minutes: block.duration_minutes
     )

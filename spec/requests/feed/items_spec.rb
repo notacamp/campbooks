@@ -249,6 +249,7 @@ RSpec.describe "Feed::Items", type: :request do
            params: { tool: "hold_task", args: { focus_block_id: block.id, previous_status: "suggested" } }
 
       expect(block.reload).to be_dismissed
+      expect(task.reload).to be_suggested
       expect(task_item.reload).to be_active
     end
 

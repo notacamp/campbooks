@@ -349,9 +349,11 @@ module Feed
       Rails.logger.error("[Feed::ItemsController] reverse_action failed: #{e.class}: #{e.message}")
     end
 
-    # Undo a hold: dismiss the focus block and delete any calendar event it spawned
+    # Undo a hold: put a merely-suggested ask back to suggested (holding accepted
+    # it), dismiss the focus block, and delete any calendar event the hold spawned
     # (the same outbound-delete path as CalendarEventsController#destroy).
-    def reverse_hold(_task)
+    def reverse_hold(task)
+      task.update!(status: :suggested) if params.dig(:args, :previous_status) == "suggested"
       block = FocusBlock.accessible_to(current_user).find_by(id: params.dig(:args, :focus_block_id))
       return unless block
 

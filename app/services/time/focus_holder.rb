@@ -66,23 +66,36 @@ class Time::FocusHolder
 
   private
 
+  HORIZON = 14.days
+
   # The earliest free 45-minute slot from an hour out to the ask's due date (minus
-  # the deadline buffer), or a fortnight out when it has no date. SlotFinder clamps
-  # to working hours and prefers 10:00. Memoized so #preview and #call agree.
+  # the deadline buffer), capped at a fortnight out. SlotFinder clamps to working
+  # hours and prefers 10:00. Memoized so #preview and #call agree.
+  #
+  # The search start is rounded up to the quarter hour and the busy set is always
+  # read for the full fortnight window, so every ask previewed in one request
+  # shares ONE Time::BusyIntervals cache entry (a superset of busy intervals is
+  # harmless: SlotFinder only checks overlaps).
   def slot
     return @slot if defined?(@slot)
 
-    from = ::Time.current + 1.hour
-    to = @task.due_at ? @task.due_at - Time::FocusProposer::DEADLINE_BUFFER : ::Time.current + 14.days
+    from = quarter_hour_after(::Time.current + 1.hour)
+    horizon = from + HORIZON
+    to = @task.due_at ? [ @task.due_at - Time::FocusProposer::DEADLINE_BUFFER, horizon ].min : horizon
     @slot =
       if from >= to
         nil
       else
         Time::SlotFinder.find(
           from: from, to: to, duration_minutes: DURATION_MINUTES,
-          busy: Time::BusyIntervals.for(@user, from, to), zone: @zone
+          busy: Time::BusyIntervals.for(@user, from, horizon), zone: @zone
         )
       end
+  end
+
+  def quarter_hour_after(time)
+    step = 15.minutes.to_i
+    ::Time.at((time.to_i / step.to_f).ceil * step).in_time_zone(@zone)
   end
 
   def failure(error)

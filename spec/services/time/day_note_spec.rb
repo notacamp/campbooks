@@ -22,6 +22,14 @@ RSpec.describe Time::DayNote do
     expect(result.any?).to be(true)
   end
 
+  it "names the ask, not the block's own title, as the held focus subject" do
+    ask = workspace.tasks.create!(title: "Comments to Sofia", status: :todo, due_at: 3.days.from_now)
+    FocusBlock.create!(workspace: workspace, user: user, task: ask, title: "Focus: Comments to Sofia",
+                       start_at: 1.day.from_now, end_at: 1.day.from_now + 45.minutes, status: :kept)
+
+    expect(described_class.for(user).focus.subject).to eq("Comments to Sofia")
+  end
+
   it "reports zero undated asks when tasks are gated off" do
     allow(Features).to receive(:tasks?).and_return(false)
     workspace.tasks.create!(title: "A", status: :todo)
