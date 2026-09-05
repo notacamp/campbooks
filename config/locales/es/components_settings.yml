@@ -1,0 +1,20 @@
+---
+es:
+  components:
+    settings_overlay:
+      title: "Configuración"
+      close: "Cerrar configuración"
+      back: "Volver a toda la configuración"
+      find: "Buscar un ajuste"
+      sections: "Secciones de configuración"
+      loading: "Cargando configuración…"
+    user_menu:
+      open: Tu menú
+      label: Tu menú
+      your_workspace: Tu espacio de trabajo
+      beta: Beta
+      settings: "Configuración"
+      appearance: "Apariencia"
+      theme_light: Claro
+      theme_dark: Oscuro
+      theme_system: Auto

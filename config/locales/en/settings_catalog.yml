@@ -1,0 +1,42 @@
+---
+en:
+  settings:
+    catalog:
+      groups:
+        you: You
+        scout: Scout
+        inbox: Inbox
+        paper: Paper
+        connections: Connections
+        workspace: Workspace
+      items:
+        account: Account
+        security: Security
+        notifications: Notifications
+        memory: "Scout’s memory"
+        ai: AI providers
+        guidance: AI guidance
+        document_templates: Document templates
+        email_templates: Email templates
+        automations: Automations
+        rules: Rules
+        tags: Tags
+        streams: Streams
+        filtering: Filtering
+        signatures: Signatures
+        display: Display
+        document_types: Document types
+        pipelines: Pipelines
+        mail_accounts: Mail accounts
+        calendars: Calendars
+        google_drive: Google Drive
+        notion: Notion
+        zoho_drive: Zoho WorkDrive
+        connections: Custom connections
+        api_access: API access
+        general: General
+        members: Members
+        modules: Modules
+        data_privacy: "Data & privacy"
+        plan: "Plan & billing"
+        system_health: System health

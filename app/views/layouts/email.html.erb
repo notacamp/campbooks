@@ -13,7 +13,9 @@
   </head>
 
   <body class="h-full <%= "hotwire-native" if hotwire_native_app? %>"
-        data-controller="<%= "scout-overlay " unless hotwire_native_app? %>email-shortcuts theme inbox-settings-modal skim-overlay<%= " hint" unless hotwire_native_app? %><%= " nav-shortcuts" if authenticated? && !hotwire_native_app? %>"
+        data-controller="<%= "scout-overlay settings-overlay " unless hotwire_native_app? %>email-shortcuts theme inbox-settings-modal skim-overlay<%= " hint" unless hotwire_native_app? %><%= " nav-shortcuts" if authenticated? && !hotwire_native_app? %>"
+        data-settings-overlay-default-url-value="<%= Settings::Catalog.default_path %>"
+        data-settings-overlay-return-url-value="<%= begin; people_path; rescue; "/"; end %>"
         data-command-palette-context-value="<%= content_for?(:cp_context) ? yield(:cp_context) : '' %>"
         data-command-palette-message-id-value="<%= content_for?(:cp_message_id) ? yield(:cp_message_id) : '' %>"
         data-command-palette-folders-value="<%= content_for?(:cp_folders) ? yield(:cp_folders) : '[]' %>"
@@ -56,7 +58,10 @@
       <%= render(Campbooks::KeyboardShortcutsModal.new) %>
       <%= render(Campbooks::HintTip.new) %>
     <% end %>
-    <%= render(Campbooks::InboxSettingsModal.new) if authenticated? %>
+    <%# Settings overlay — available on every authenticated page for all non-native surfaces. %>
+    <% if authenticated? && !hotwire_native_app? %>
+      <%= render(Campbooks::SettingsOverlay.new) %>
+    <% end %>
     <%= render "shared/setup_modal" if authenticated? %>
     <%= render "shared/skim_overlay" if authenticated? %>
     <%= render "shared/email_drawer" if authenticated? %>

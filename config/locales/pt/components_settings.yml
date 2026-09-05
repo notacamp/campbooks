@@ -1,0 +1,20 @@
+---
+pt:
+  components:
+    settings_overlay:
+      title: "Definições"
+      close: "Fechar definições"
+      back: "Voltar a todas as definições"
+      find: "Procurar uma definição"
+      sections: "Secções de definições"
+      loading: "A carregar definições…"
+    user_menu:
+      open: O seu menu
+      label: O seu menu
+      your_workspace: O seu espaço de trabalho
+      beta: Beta
+      settings: "Definições"
+      appearance: "Aparência"
+      theme_light: Claro
+      theme_dark: Escuro
+      theme_system: Auto

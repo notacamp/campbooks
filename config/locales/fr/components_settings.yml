@@ -1,0 +1,20 @@
+---
+fr:
+  components:
+    settings_overlay:
+      title: "Paramètres"
+      close: "Fermer les paramètres"
+      back: "Retour à tous les paramètres"
+      find: "Trouver un paramètre"
+      sections: "Sections des paramètres"
+      loading: "Chargement des paramètres…"
+    user_menu:
+      open: Votre menu
+      label: Votre menu
+      your_workspace: Votre espace de travail
+      beta: Bêta
+      settings: "Paramètres"
+      appearance: Apparence
+      theme_light: Clair
+      theme_dark: Sombre
+      theme_system: Auto

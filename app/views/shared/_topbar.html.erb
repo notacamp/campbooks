@@ -27,5 +27,5 @@
 
   <%= render(Campbooks::BugReportButton.new(class: "inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground cursor-pointer", icon_class: "w-5 h-5")) %>
 
-  <%= render "shared/user_menu" %>
+  <%= render(Campbooks::UserMenu.new(variant: :sheet)) %>
 </header>
