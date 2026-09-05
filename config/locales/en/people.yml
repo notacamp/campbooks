@@ -79,6 +79,8 @@ en:
         make_person: Mark as person
         make_service: Mark as service
         scout_not_read: "Scout hasn't read this person yet."
+        why_foot: "Learned from what you do · updated %{time} ago"
+        why_learning: "Scout is still learning what %{name} means to you."
         read_on: "Read on %{date}"
         refresh: Refresh
         refresh_hint: Ask Scout to re-read this person
@@ -89,6 +91,7 @@ en:
         thread_message_one: message
         thread_messages_other: messages
         sections:
+          why: "Why they rank here"
           scout_read: "Scout's read"
           numbers: Numbers
           threads: Threads

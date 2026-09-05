@@ -17,7 +17,8 @@ module People
                 :tags, :list_status,
                 :read, :patterns, :analyzed_at,
                 :counts, :threads,
-                :documents, :events, :duplicate_suggestion
+                :documents, :events, :duplicate_suggestion,
+                :attention
 
     def self.for(person, user:)
       new(person, user: user).tap(&:build!)
@@ -78,6 +79,10 @@ module People
         if (sugg = @primary_contact&.suggested_person)
           { id: sugg.id, name: sugg.display_name, reason: @primary_contact.suggested_reason }
         end
+
+      # 7. The learned attention weight (one query; nil when there is no row) —
+      # ::Attention, not People::Attention (the feed reader).
+      @attention = ::Attention::Weights.new(@user).for(@person)
 
       freeze
     end
