@@ -74,7 +74,10 @@ module Attention
         explicit_applied = true
       end
 
-      if vip? && w < FLOORS[:vip]
+      # An AI relationship label is an inference, not the user's word: it floors a
+      # client / partner / colleague only while the user's own behaviour doesn't say
+      # the opposite (their mail archived unread, cards about them dismissed).
+      if vip? && !negative_behaviour? && w < FLOORS[:vip]
         w = FLOORS[:vip]
         explicit_applied = true
       end
@@ -172,6 +175,27 @@ module Attention
       1 - Math.exp(-x.to_f / k)
     end
 
+    # Share of their mail you archived or trashed without opening (0 while there
+    # are too few messages to call it a habit).
+    def ignore_rate
+      return 0.0 if @f.inbound_count < MIN_INBOUND_FOR_RATES
+
+      ((@f.archived_unread_count + @f.trashed_count + @f.skim_archive_count).to_f / @f.inbound_count).clamp(0, 1)
+    end
+
+    # Share of the feed cards about them you dismissed rather than acted on (0
+    # while there are too few verdicts).
+    def dismiss_share
+      denom = @f.feed_dismissed_count + @f.feed_acted_count
+      return 0.0 if denom < 2
+
+      @f.feed_dismissed_count.to_f / denom
+    end
+
+    def negative_behaviour?
+      ignore_rate >= 0.5 || dismiss_share >= 0.5
+    end
+
     def vip?
       VIP_RELATIONSHIPS.include?(@f.relationship_type.to_s)
     end
@@ -237,7 +261,11 @@ module Attention
         candidates << [ Reason.new(key: "replies_fast", params: { hours: f.median_reply_hours.round }), mag ]
       elsif f.replied_count >= 1
         mag = terms[:replies].abs
-        candidates << [ Reason.new(key: "replies", params: { count: f.replied_count, total: f.addressed_count }), mag ]
+        # Against everything they sent in the window — a reply can answer mail that
+        # wasn't "addressed" (a Cc, a bulk-flavoured invoice), so the addressed count
+        # would read "1 of their last 0".
+        total = [ f.inbound_count, f.replied_count ].max
+        candidates << [ Reason.new(key: "replies", params: { count: f.replied_count, total: total }), mag ]
       end
 
       if f.two_way_threads >= 2

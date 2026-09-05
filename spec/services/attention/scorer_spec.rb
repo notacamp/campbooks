@@ -171,4 +171,35 @@ RSpec.describe Attention::Scorer do
       expect(t[:replies]).to be > 0
     end
   end
+
+  describe "an AI relationship label versus the user's own behaviour" do
+    it "floors a client the user engages with, but not one they archive unread" do
+      engaged = score(facts(relationship_type: "client", inbound_count: 4, opened_count: 4))
+      ignored = score(facts(relationship_type: "client", inbound_count: 4, archived_unread_count: 3))
+
+      expect(engaged.weight).to be >= described_class::FLOORS[:vip]
+      expect(ignored.weight).to be < described_class::FLOORS[:vip]
+      expect(ignored.reasons.map(&:key)).to include("ignored")
+    end
+
+    it "does not floor a client whose cards the user keeps dismissing" do
+      dismissed = score(facts(relationship_type: "client", feed_dismissed_count: 3, feed_acted_count: 0))
+      expect(dismissed.weight).to be < described_class::FLOORS[:vip]
+    end
+
+    it "still lets a star floor an ignored sender (the user's own explicit signal)" do
+      starred = score(facts(starred: true, inbound_count: 4, archived_unread_count: 3))
+      expect(starred.weight).to be >= described_class::FLOORS[:starred]
+    end
+  end
+
+  describe "the replies reason" do
+    it "counts answers against the mail they sent, never against zero addressed messages" do
+      result = score(facts(replied_count: 1, inbound_count: 3, addressed_count: 0, median_reply_hours: 40))
+      reason = result.reasons.find { |r| r.key == "replies" }
+
+      expect(reason).not_to be_nil
+      expect(reason.params).to eq("count" => 1, "total" => 3)
+    end
+  end
 end
