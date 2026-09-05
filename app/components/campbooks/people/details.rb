@@ -229,12 +229,14 @@ module Campbooks
       # Every reason behind the person's attention weight — the positive ones with
       # an Ember spark, the negative ones muted with a dash — so the rail explains
       # the place, including what lowers it. Falls back to a learning line when
-      # there is no row yet or Scout has too little evidence (confidence < 0.2).
+      # there is no row yet, Scout has too little evidence (confidence < 0.2), or
+      # the row has nothing to say (one message, no verdicts) — never a bare
+      # "updated N minutes ago" under an empty list.
       def attention_section
         row = @profile.attention
         div do
           section_heading(t(".sections.why"))
-          if row.nil? || row.confidence < 0.2
+          if row.nil? || row.confidence < 0.2 || row.reason_values.empty?
             p(class: "text-[12.5px] text-muted-foreground italic") { t(".why_learning", name: helpers.people_first_name(@person)) }
           else
             div(class: "flex flex-col gap-1.5") do

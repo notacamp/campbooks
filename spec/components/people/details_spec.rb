@@ -140,5 +140,13 @@ RSpec.describe Campbooks::People::Details, type: :component do
       expect(html).to include("Scout is still learning what Lena")
       expect(html).not_to include("You usually answer within 3 hours")
     end
+
+    it "shows the learning sentence, not a bare foot line, when the row has no reasons" do
+      profile = profile_with_weight(weight: 0.34, confidence: 0.34, reasons: [])
+      html = render(described_class.new(profile: profile))
+
+      expect(html).to include("Scout is still learning what Lena")
+      expect(html).not_to match(/Learned from what you do/)
+    end
   end
 end

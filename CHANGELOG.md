@@ -19,6 +19,7 @@ major, minor, or patch change here.
 ### Changed
 
 - People: the Scout line on each row and the "where things stand" note now say what is actually open with that person — what they asked (Scout's read, or their own words quoted from the message), what you are still waiting for, or the overdue amount — instead of the contact's profile bio or a sentence that repeated the row. Both are composed in your language at render time. Latest rows that need you carry their verb (Reply, Nudge, Decide, Pay, Chase).
+- Now and People rank on the same learned attention weight (who you answer and how fast, who you meet, whose bills you settle, whose mail you archive unread or dismiss) instead of fixed star and label boosts; dismissing a card now lowers that sender, not the whole kind. Workspaces with no history yet rank exactly as before.
 
 ### Added
 
@@ -34,9 +35,6 @@ major, minor, or patch change here.
 
 - People: an organization in the Pay or Chase lane no longer says "Nothing needs you here right now" on its page.
 
-### Changed
-
-- Now and People rank on the same learned attention weight (who you answer and how fast, who you meet, whose bills you settle, whose mail you archive unread or dismiss) instead of fixed star and label boosts; dismissing a card now lowers that sender, not the whole kind. Workspaces with no history yet rank exactly as before.
 
 ### Security
 
