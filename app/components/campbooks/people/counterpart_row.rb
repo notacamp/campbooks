@@ -33,6 +33,11 @@ module Campbooks
       ACTION_BTN = "inline-flex h-[28px] w-[28px] items-center justify-center rounded-lg text-muted-foreground " \
                    "hover:bg-secondary hover:text-foreground transition-colors"
 
+      # A minimal stand-in for a Tag record so the row renders Campbooks::TagChip
+      # straight from the materialized data["tags"] hashes — no Tag query at
+      # render time. Quacks like a Tag for the chip (name + color).
+      ChipTag = Data.define(:name, :color)
+
       # @param counterpart [People::Counterpart]
       # @param selected [Boolean] lit (left-pane selection)
       # @param nested [Boolean] organization-page row shape (trailing "Open" button)
@@ -101,6 +106,7 @@ module Campbooks
                 span(class: "min-w-0 truncate text-[12.5px] text-muted-foreground") { subj }
               end
             end
+            tags_cluster
             right_meta
           end
 
@@ -138,6 +144,23 @@ module Campbooks
           end
         elsif (snippet = data["snippet"]).present?
           div(class: "mt-0.5 text-[12px] leading-snug text-muted-foreground line-clamp-1") { snippet }
+        end
+      end
+
+      # Line-1 tag chips (before the wait/date): the person's sender tags and the
+      # email's own tags, precomputed into data["tags"] by People::Directory and
+      # capped there so the cluster never overflows the row. Rendered from plain
+      # hashes via ChipTag so the row touches no other table.
+      def tags_cluster
+        tags = data["tags"]
+        return unless tags.is_a?(Array) && tags.any?
+
+        div(class: "flex flex-shrink-0 items-center gap-1") do
+          tags.each do |t|
+            next unless t.is_a?(Hash) && t["name"].present?
+
+            render(Campbooks::TagChip.new(tag: ChipTag.new(name: t["name"], color: t["color"] || "#6b7280"), size: :sm))
+          end
         end
       end
 

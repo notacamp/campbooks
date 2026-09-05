@@ -19,6 +19,11 @@ major, minor, or patch change here.
 ### Added
 
 - **Shortcut hints:** resting the pointer on an action, or focusing it with the keyboard, shows its name and its keyboard shortcut in a small tooltip — on the People list and conversation, the nav rail, the inbox toolbar and reading pane, feed cards, reminders and the calendar header. Icon-only buttons gain a proper label at the same time, and every hinted control now carries `aria-keyshortcuts` for screen readers. Touch devices are unaffected; the existing on-card keycaps and legends stay as they were.
+- People list rows show tag chips again: the person's own sender tags plus the email's tags (the same chips the old inbox rows carried), capped so a row stays tidy on mobile.
+
+### Security
+
+- Bumped `rubyzip` 3.2.2 → 3.6.0 to close CVE-2026-85396, a High-severity path-traversal vulnerability in pre-3.4.0 rubyzip.
 
 ## [0.37.0] - 2026-09-05
 
