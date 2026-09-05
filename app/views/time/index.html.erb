@@ -13,15 +13,18 @@
       <div class="inline-flex items-center overflow-hidden rounded-lg border border-border">
         <%= link_to time_path(view: @view, date: @prev_date.iso8601),
               class: "px-2 py-1.5 text-muted-foreground hover:bg-muted transition-colors", "aria-label": t(".previous"),
-              data: { "calendar-prev": "" } do %>
+              "data-calendar-prev": "",
+              **hint_html_attrs(t(".previous"), key: "k") do %>
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
         <% end %>
         <%= link_to t(".today"), time_path(view: @view, date: Date.current.iso8601),
               class: "border-x border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted transition-colors",
-              data: { "calendar-today": "" } %>
+              "data-calendar-today": "",
+              **hint_html_attrs(t(".today"), key: "t") %>
         <%= link_to time_path(view: @view, date: @next_date.iso8601),
               class: "px-2 py-1.5 text-muted-foreground hover:bg-muted transition-colors", "aria-label": t(".next"),
-              data: { "calendar-next": "" } do %>
+              "data-calendar-next": "",
+              **hint_html_attrs(t(".next"), key: "j") do %>
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
         <% end %>
       </div>

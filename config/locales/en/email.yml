@@ -158,6 +158,7 @@ en:
       show_discussion_title: Show discussion
       snoozed_until_badge: Snoozed until %{time}
       toggle_chat_aria: Toggle chat
+      toolbar_archive_title: Archive
       toolbar_clear_selection_title: Clear selection
       toolbar_delete_title: Delete
       toolbar_mark_read_title: Mark read

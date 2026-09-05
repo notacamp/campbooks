@@ -161,6 +161,7 @@ es:
       show_discussion_title: Ver conversación
       snoozed_until_badge: Pospuesto hasta %{time}
       toggle_chat_aria: Alternar chat
+      toolbar_archive_title: Archivar
       toolbar_clear_selection_title: Deseleccionar todo
       toolbar_delete_title: Eliminar
       toolbar_mark_read_title: Marcar como leído
