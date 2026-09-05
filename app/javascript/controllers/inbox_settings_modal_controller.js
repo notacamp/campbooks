@@ -1,98 +1,23 @@
 import { Controller } from "@hotwired/stimulus"
 
-// Drives the inbox settings dialog (Campbooks::InboxSettingsModal).
-//
-// Responsibilities:
-//  - open/close the native <dialog> (gear icon, Done button, backdrop, Esc)
-//  - lazy-load the default panel into the content frame on first open
-//  - highlight the active left-nav item (aria-current)
-//  - restore/apply the localStorage-backed Display preferences whenever the
-//    Display panel is (re)loaded into the frame
-//  - honour ?inbox_settings=<section>[&id=<id>] deep-links on page load
+// Applies localStorage-backed Display preferences (thread density, tag/attachment
+// visibility, view mode) whenever the inbox re-renders. The open/close dialog
+// surface is gone — settings now live in the Settings overlay. This controller
+// stays on <body> in the email layout because the Display toggles apply globally.
 export default class extends Controller {
-  static targets = ["dialog", "panel", "navItem"]
-
   connect() {
-    this.loaded = false
     // Apply saved Display prefs on load, and re-apply whenever the inbox content
-    // (or any panel) reloads — turbo:frame-load bubbles to document. This takes
-    // over what the old inbox-settings controller did from inside the frame.
+    // reloads — turbo:frame-load bubbles to document.
     this._onFrameLoad = () => this.restore()
     document.addEventListener("turbo:frame-load", this._onFrameLoad)
     this.restore()
-    this._maybeOpenFromDeepLink()
   }
 
   disconnect() {
     document.removeEventListener("turbo:frame-load", this._onFrameLoad)
   }
 
-  // --- open / close -------------------------------------------------------
-
-  open() {
-    if (!this.hasDialogTarget) return
-    if (!this.dialogTarget.open) this.dialogTarget.showModal()
-    this._ensurePanelLoaded()
-  }
-
-  close() {
-    if (this.hasDialogTarget && this.dialogTarget.open) this.dialogTarget.close()
-  }
-
-  // Native <dialog> renders its backdrop as the dialog element's own box, so a
-  // click whose target IS the dialog (not its children) is a backdrop click.
-  backdropClose(event) {
-    if (event.target === this.dialogTarget) this.close()
-  }
-
-  _ensurePanelLoaded() {
-    if (this.loaded || !this.hasPanelTarget) return
-    this.loaded = true
-    const src = this.panelTarget.getAttribute("src") || this.panelTarget.dataset.defaultSrc
-    if (src) this.panelTarget.setAttribute("src", src)
-  }
-
-  // --- left-nav -----------------------------------------------------------
-
-  setActive(event) {
-    const item = event.currentTarget
-    this._setActiveItem(item)
-    // Let Turbo handle the frame navigation via the link's data-turbo-frame.
-  }
-
-  _setActiveItem(activeItem) {
-    this.navItemTargets.forEach((el) => {
-      if (el === activeItem) {
-        el.setAttribute("aria-current", "page")
-      } else {
-        el.removeAttribute("aria-current")
-      }
-    })
-  }
-
-  // --- deep-link ----------------------------------------------------------
-
-  _maybeOpenFromDeepLink() {
-    const params = new URLSearchParams(window.location.search)
-    const section = params.get("inbox_settings")
-    if (!section) return
-
-    const navItem = this.navItemTargets.find((el) => el.dataset.section === section)
-    if (!navItem) return
-
-    let src = navItem.getAttribute("href")
-    const id = params.get("id")
-    if (id) src += (src.includes("?") ? "&" : "?") + "id=" + encodeURIComponent(id)
-
-    if (this.hasPanelTarget) {
-      this.panelTarget.setAttribute("src", src)
-      this.loaded = true
-    }
-    this._setActiveItem(navItem)
-    this.open()
-  }
-
-  // --- Display preferences (localStorage; ported from inbox_settings) ------
+  // --- Display preferences (localStorage) -----------------------------------
 
   toggle(event) {
     const key = event.target.dataset.setting
@@ -110,7 +35,7 @@ export default class extends Controller {
 
   syncViewModeButtons() {
     const current = localStorage.getItem("inbox_view_mode") || "breathable"
-    this._scope().querySelectorAll("[data-view-mode]").forEach((btn) => {
+    document.querySelectorAll("[data-view-mode]").forEach((btn) => {
       if (btn.dataset.viewMode === current) {
         btn.classList.add("ring-2", "ring-accent-500", "bg-accent-50")
         btn.classList.remove("bg-gray-100", "text-gray-600")
@@ -131,7 +56,7 @@ export default class extends Controller {
 
   syncThreadViewButtons() {
     const current = localStorage.getItem("inbox_thread_view") || "bubbles"
-    this._scope().querySelectorAll("[data-thread-view]").forEach((btn) => {
+    document.querySelectorAll("[data-thread-view]").forEach((btn) => {
       const active = btn.dataset.threadView === current
       btn.classList.toggle("ring-2", active)
       btn.classList.toggle("ring-accent-500", active)
@@ -160,7 +85,7 @@ export default class extends Controller {
     }
 
     // Reflect saved state into the Display panel controls when they're rendered.
-    this._scope().querySelectorAll("input[data-setting]").forEach((cb) => {
+    document.querySelectorAll("input[data-setting]").forEach((cb) => {
       cb.checked = localStorage.getItem(`inbox_${cb.dataset.setting}`) !== "false"
     })
     this.syncViewModeButtons()
@@ -205,10 +130,5 @@ export default class extends Controller {
         }
         break
     }
-  }
-
-  // Display controls live inside the dialog; scope queries there when possible.
-  _scope() {
-    return this.hasDialogTarget ? this.dialogTarget : this.element
   }
 }

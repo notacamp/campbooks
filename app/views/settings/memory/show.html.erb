@@ -1,7 +1,5 @@
 <%# Scout's memory — the inbox/AI settings re-expressed as editable sentences.
     Settings sidebar via content_for (never a lazy t(".") inside a layout block). %>
-<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
-
 <%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
 
 <div data-controller="memory">

@@ -1,4 +1,3 @@
-<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
 <%= render(Campbooks::PageHeader.new(title: "#{@config.document_type.name.humanize} — Drive Settings", subtitle: t(".subtitle"), back_href: settings_integrations_google_drive_path, back_label: t(".back"))) %>
 
 <div class="max-w-lg">

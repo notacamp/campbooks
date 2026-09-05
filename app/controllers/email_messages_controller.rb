@@ -64,7 +64,7 @@ class EmailMessagesController < ApplicationController
         latest = scope.order(received_at: :desc).first
         if latest
           folder_id = params[:folder_name].present? ? nil : (params[:folder_id].presence || inbox_folder_id)
-          redirect_to email_message_path(latest, folder_id: folder_id, folder_name: params[:folder_name].presence, group: params[:group].presence, inbox_settings: params[:inbox_settings].presence, show_list: params[:show_list].presence)
+          redirect_to email_message_path(latest, folder_id: folder_id, folder_name: params[:folder_name].presence, group: params[:group].presence, show_list: params[:show_list].presence)
         else
           @accounts = Current.user.readable_email_accounts.ordered
           # With everything collapsed the main list is empty but the inbox isn't:
@@ -151,7 +151,7 @@ class EmailMessagesController < ApplicationController
     if params[:folder_id].blank? && params[:folder_name].blank? && @message.provider_folder_id.present?
       inbox_ids = inbox_folder_ids
       if inbox_ids.any? && !inbox_ids.include?(@message.provider_folder_id)
-        return redirect_to email_message_path(@message, folder_id: @message.provider_folder_id, inbox_settings: params[:inbox_settings].presence)
+        return redirect_to email_message_path(@message, folder_id: @message.provider_folder_id)
       end
     end
 
