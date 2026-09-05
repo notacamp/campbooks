@@ -92,6 +92,11 @@ es:
         one: "1 asociación confirmada"
         other: "%{count} asociaciones confirmadas"
     bank_transactions:
+      upload_and_link:
+        uploaded_and_linked: "Factura enviada y asociada: %{filename}"
+        no_file: No se seleccionó ningún archivo.
+        upload_failed: "Error al subir: %{message}"
+        save_failed: "No se pudo guardar: %{message}"
       row:
         confirm: Confirmar
         reject: Rechazar
@@ -212,6 +217,26 @@ es:
           other: "Revisados %{count} documentos candidatos"
         use_this_match: Usar esta asociación
         not_this_one: No es este
+        near_miss_title: Facturas sin asociar más cercanas
+        near_miss_empty: No se encontraron coincidencias cercanas.
+        reason_exact: importe exacto
+        reason_close: dentro del 2%
+        reason_days:
+          one: 1 día de diferencia
+          other: "%{count} días de diferencia"
+        reason_same_vendor: mismo proveedor
+        reason_name_diff: el nombre parece diferente
+        still_not_it: ¿Tampoco es este?
+        skim_toggle:
+          one: Ver 1 factura del período
+          other: "Ver %{count} facturas del período"
+        skim_sorted_hint: Ordenado por el importe más cercano a la línea bancaria.
+        upload_title: Subir una factura
+        upload_drop_hint: Suelte la factura aquí
+        upload_formats: "PDF, JPG o PNG. Scout la lee y la asocia a este pago."
+        upload_cta: Buscar archivos
+        upload_auto_submit_hint: Seleccionar un archivo lo adjunta inmediatamente.
+        unknown_party: Desconocido
         search_title: Buscar sus documentos
         search_placeholder: "Buscar por nombre, n.º factura…"
         attach: Asociar
@@ -236,9 +261,11 @@ es:
           excluded: Apartado
           credit: Ingreso asociado
           unmatched: Sin factura
+          requested: Factura solicitada
         revenue_label: ingreso
         review_label: revisar
         excluded_label: Apartado
+        requested_label: Factura solicitada — en espera
         unmatched_chip: "Sin factura · Resolver"
         unknown_party: Desconocido
         nif_missing: NIF faltante en este documento

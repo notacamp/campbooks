@@ -92,6 +92,11 @@ en:
         one: "1 match confirmed"
         other: "%{count} matches confirmed"
     bank_transactions:
+      upload_and_link:
+        uploaded_and_linked: "Invoice uploaded and linked: %{filename}"
+        no_file: No file was selected.
+        upload_failed: "Upload failed: %{message}"
+        save_failed: "Could not save: %{message}"
       row:
         confirm: Confirm
         reject: Reject
@@ -212,6 +217,26 @@ en:
           other: "Checked %{count} candidate documents"
         use_this_match: Use this match
         not_this_one: Not this one
+        near_miss_title: Closest unlinked invoices
+        near_miss_empty: No close matches found.
+        reason_exact: exact amount
+        reason_close: within 2%
+        reason_days:
+          one: 1 day apart
+          other: "%{count} days apart"
+        reason_same_vendor: same vendor
+        reason_name_diff: name looks different
+        still_not_it: Still not it?
+        skim_toggle:
+          one: Browse 1 invoice in the period
+          other: "Browse %{count} invoices in the period"
+        skim_sorted_hint: Sorted by closest amount to the bank line.
+        upload_title: Upload an invoice
+        upload_drop_hint: Drop the invoice here
+        upload_formats: "PDF, JPG or PNG. Scout reads it and links it to this payment."
+        upload_cta: Browse files
+        upload_auto_submit_hint: Selecting a file attaches it immediately.
+        unknown_party: Unknown
         search_title: Search your documents
         search_placeholder: "Search by name, invoice no…"
         attach: Attach
@@ -236,9 +261,11 @@ en:
           excluded: Set aside
           credit: Revenue matched
           unmatched: No invoice
+          requested: Invoice requested
         revenue_label: revenue
         review_label: review
         excluded_label: Set aside
+        requested_label: Invoice requested — waiting
         unmatched_chip: "No invoice · Resolve"
         unknown_party: Unknown
         nif_missing: NIF missing on this document

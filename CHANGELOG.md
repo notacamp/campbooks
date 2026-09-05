@@ -38,6 +38,19 @@ major, minor, or patch change here.
   recent reconciliations with bank name, period, progress bar (resolved/total
   transactions), currency, and a direct link to the workbench. Loaded with N+1-safe
   batch counts.
+- **Money Hunt Panel**: the grouped ledger's "Resolve" chip on unmatched transactions now
+  opens an inline resolve panel (via the `transaction-resolve` Stimulus controller). The
+  panel shows up to five **near-miss candidates** — invoices scored between 0 and
+  Scout's auto-suggest threshold that may be a loose match — with reasons (exact amount,
+  within 2%, date proximity, same vendor). A "Browse invoices" toggle expands a grid of
+  all unlinked money documents in the reconciliation window sorted by closest amount. An
+  **Upload & link** flow lets you drop an invoice file directly onto the panel: the file
+  is saved as a `Document` (source: `manual_upload`), queued for Scout's AI extraction,
+  and immediately confirmed as a match in one step.
+- `:requested` transactions in the grouped ledger now show a distinct **"Invoice
+  requested — waiting"** chip (muted/passive) instead of the ember "Resolve" chip,
+  accurately reflecting that the supplier has been contacted and no user action is
+  needed.
 
 ### Changed
 
