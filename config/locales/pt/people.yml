@@ -26,6 +26,17 @@ pt:
           details: Detalhes
           archive: Arquivar conversa
           block: Bloquear remetente
+      stand_note:
+        ask_scout_context: "Sobre o email “%{subject}” de %{name}:"
+        chips:
+          draft_reply: Redigir resposta
+          draft_follow_up: Redigir insistência
+          ask_scout: Perguntar ao Scout
+          done: Concluído
+          let_it_go: Deixar estar
+          snooze: Adiar até amanhã
+          open_money: "Abrir em Dinheiro"
+          mark_paid: Marcar como paga
       search_bar:
         placeholder: Encontrar uma pessoa ou empresa…
         clear: Limpar
@@ -157,18 +168,54 @@ pt:
       not_found: Não encontrado
       needs_message: Nenhuma mensagem para esta ação
       snooze_title: Adiar
+      paid: "Fatura de %{name} marcada como paga"
     standing:
-      money_subject: "%{amount} · vence %{date}"
+      invoice_ref: "fatura %{number}"
+      an_invoice: "fatura"
+    stand:
+      asks_for: "Pede %{ask}"
+      asks_quote: "Pergunta: “%{quote}”"
+      waiting_for: "À espera de %{what}"
+      no_answer_since: "Sem resposta desde %{date}"
+      you_wrote_last: "Foi você a escrever por último, %{date}"
+      money_late:
+        one: "%{amount} venceu a %{date} · %{count} dia de atraso"
+        other: "%{amount} venceu a %{date} · %{count} dias de atraso"
+      money_owed_to_you:
+        one: "Deve-lhe %{amount} desde %{date} · %{count} dia de atraso"
+        other: "Deve-lhe %{amount} desde %{date} · %{count} dias de atraso"
     conversation:
-      standing_reply:
-        one: "%{name} escreveu há %{count} dia sobre “%{subject}” e aguarda a sua resposta."
-        other: "%{name} escreveu há %{count} dias sobre “%{subject}” e aguarda a sua resposta."
-      standing_nudge:
-        one: "Escreveu a %{name} há %{count} dia sobre “%{subject}”; ainda sem resposta."
-        other: "Escreveu a %{name} há %{count} dias sobre “%{subject}”; ainda sem resposta."
-      standing_decide:
-        one: "O Scout assinalou “%{subject}” para si há %{count} dia."
-        other: "O Scout assinalou “%{subject}” para si há %{count} dias."
+      stand:
+        reply_ask:
+          zero: "%{name} pediu %{ask} hoje em “%{subject}” e aguarda a sua resposta."
+          one: "%{name} pediu %{ask} há %{count} dia em “%{subject}” e continua à espera da sua resposta."
+          other: "%{name} pediu %{ask} há %{count} dias em “%{subject}” e continua à espera da sua resposta."
+        reply_quote:
+          zero: "%{name} escreveu hoje em “%{subject}”: “%{quote}” Aguarda a sua resposta."
+          one: "%{name} escreveu há %{count} dia em “%{subject}”: “%{quote}” Continua à espera da sua resposta."
+          other: "%{name} escreveu há %{count} dias em “%{subject}”: “%{quote}” Continua à espera da sua resposta."
+        reply_plain:
+          zero: "%{name} escreveu hoje sobre “%{subject}” e aguarda a sua resposta."
+          one: "%{name} escreveu há %{count} dia sobre “%{subject}” e continua à espera da sua resposta."
+          other: "%{name} escreveu há %{count} dias sobre “%{subject}” e continua à espera da sua resposta."
+        nudge:
+          zero: "Escreveu a %{name} hoje sobre “%{subject}”; ainda sem resposta."
+          one: "Escreveu a %{name} há %{count} dia sobre “%{subject}” e ainda não obteve resposta."
+          other: "Escreveu a %{name} há %{count} dias sobre “%{subject}” e ainda não obteve resposta."
+        nudge_reason: "Continua à espera de %{what}."
+        decide: "O Scout leu “%{subject}” de %{name} e sugere: %{prompt}"
+        pay:
+          one: "A %{reference} de %{name}, de %{amount}, venceu a %{date}, há %{count} dia."
+          other: "A %{reference} de %{name}, de %{amount}, venceu a %{date}, há %{count} dias."
+        chase:
+          one: "%{name} deve-lhe %{amount} (%{reference}), com vencimento a %{date}, há %{count} dia."
+          other: "%{name} deve-lhe %{amount} (%{reference}), com vencimento a %{date}, há %{count} dias."
+        you_wrote_last: "Foi você a escrever por último, a %{date}. Nada está à sua espera."
+        fresh_ask: "%{name} pediu %{ask} a %{date}. Ainda nada em atraso."
+        fresh_ask_undated: "%{name} pediu %{ask}. Ainda nada em atraso."
+        fresh_quote: "%{name} escreveu a %{date}: “%{quote}”"
+        fresh_quote_undated: "%{name} escreveu: “%{quote}”"
+        draft_below: "O rascunho do Scout está abaixo."
       you: Você
       back: Pessoas
       menu: Mais
@@ -214,7 +261,6 @@ pt:
         one: "%{count} documento"
         other: "%{count} documentos"
       open_page: Página da organização
-      no_standing: Nada precisa de si por agora.
       people_heading: "Pessoas em %{org} · %{count}"
       no_people: Ainda sem pessoas.
       streams_heading: "Streams de %{org} · %{count}"

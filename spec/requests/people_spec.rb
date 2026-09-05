@@ -86,6 +86,18 @@ RSpec.describe "People", type: :request do
         expect(response.body).to include("Sofia Martins").and include("Ana Reis")
       end
 
+      it "never puts the contact's profile bio on a row — the Scout line is what they asked" do
+        person, contact, = make_person(name: "David Reis", email: "david@newoffice.example")
+        person.update!(context_summary: "Long-time client. Prefers phone.")
+        contact.update!(context_summary: "Long-time client. Prefers phone.")
+        EmailMessage.where(contact_id: contact.id).update_all(body: "Could you send the signed order by Friday?")
+        refresh_standings!
+
+        get people_path, headers: { "Turbo-Frame" => "people_results" }
+        expect(response.body).not_to include("Long-time client")
+        expect(response.body).to include("Asks: “Could you send the signed order by Friday?”")
+      end
+
       it "filters by ?q= through the standings table" do
         make_person(name: "Sofia Martins", email: "sofia@brightloop.example")
         make_person(name: "Ana Reis", email: "ana@accounting.example")
@@ -394,7 +406,7 @@ RSpec.describe "People", type: :request do
         expect(response.body).to include("people_conversation")
       end
 
-      it "explains a reply you owe in Scout's note when Scout has no read of its own" do
+      it "shows the StandNote with the where-things-stand note when Scout detects a reply you owe" do
         person, contact, thread = make_person(name: "Ines Almeida", email: "ines@almeidasa.example", replied: true)
         thread.update!(subject: "Contract clause 7.2")
         thread.email_messages.update_all(received_at: 8.days.ago)
@@ -405,7 +417,9 @@ RSpec.describe "People", type: :request do
 
         get person_page_path(person)
         expect(response).to have_http_status(:ok)
-        expect(response.body).to include("waiting on your reply")
+        # StandNote renders the where-things-stand label and the counterpart name.
+        expect(response.body).to include("where things stand")
+        expect(response.body).to include("Ines")
         expect(response.body).not_to include("Nothing needs you here right now")
       end
 

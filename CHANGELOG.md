@@ -16,10 +16,20 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- People: the Scout line on each row and the "where things stand" note now say what is actually open with that person — what they asked (Scout's read, or their own words quoted from the message), what you are still waiting for, or the overdue amount — instead of the contact's profile bio or a sentence that repeated the row. Both are composed in your language at render time. Latest rows that need you carry their verb (Reply, Nudge, Decide, Pay, Chase).
+
 ### Added
 
 - **Shortcut hints:** resting the pointer on an action, or focusing it with the keyboard, shows its name and its keyboard shortcut in a small tooltip — on the People list and conversation, the nav rail, the inbox toolbar and reading pane, feed cards, reminders and the calendar header. Icon-only buttons gain a proper label at the same time, and every hinted control now carries `aria-keyshortcuts` for screen readers. Touch devices are unaffected; the existing on-card keycaps and legends stay as they were.
 - People list rows show tag chips again: the person's own sender tags plus the email's tags (the same chips the old inbox rows carried), capped so a row stays tidy on mobile.
+- People: the note's actions match the situation — Draft reply / Done / Snooze, Draft follow-up / Let it go, Ask Scout (opens Scout with the suggestion), Open in Money / Mark paid.
+- Scout's full read of an email (summary, priority, suggested action and the new "ask") now runs for inbound mail from people — it was defined but never scheduled — so the Reply and Decide lanes fill in and the Now feed's email cards appear again.
+
+### Fixed
+
+- People: an organization in the Pay or Chase lane no longer says "Nothing needs you here right now" on its page.
 
 ### Security
 

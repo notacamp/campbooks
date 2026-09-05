@@ -57,7 +57,8 @@ RSpec.describe People::Directory do
       create(:organization_membership, person: person, organization: org)
 
       org_item = instance_double(People::Attention::Item,
-                                 verb: :chase, subject: "Invoice #1", wait_days: 14, text: nil,
+                                 verb: :chase, subject: "Invoice #1", wait_days: 14,
+                                 detail: nil, detail_kind: nil, money: nil,
                                  thread_id: nil, message: nil, attention: true,
                                  feed_item: instance_double(FeedItem, id: SecureRandom.uuid, score: 80.0, sort_at: Time.current))
 
@@ -248,7 +249,8 @@ RSpec.describe People::Directory do
       create(:organization_membership, person: person, organization: org)
 
       org_item = instance_double(People::Attention::Item,
-                                 verb: :chase, subject: "Invoice #1", wait_days: 14, text: nil,
+                                 verb: :chase, subject: "Invoice #1", wait_days: 14,
+                                 detail: nil, detail_kind: nil, money: nil,
                                  thread_id: nil, message: nil, attention: true,
                                  feed_item: instance_double(FeedItem, id: SecureRandom.uuid, score: 80.0, sort_at: Time.current))
 
@@ -305,7 +307,7 @@ RSpec.describe People::Directory do
 
       attn_item = instance_double("People::Attention::Item",
                                   feed_item: item,
-                                  message: msg, text: "Reply needed",
+                                  message: msg, detail: nil, detail_kind: nil, money: nil,
                                   subject: "Thread Sofia",
                                   thread_id: thread.id, verb: :reply,
                                   wait_days: 2, attention: true)

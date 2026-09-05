@@ -86,6 +86,58 @@ RSpec.describe "People::Actions", type: :request do
     expect(response).to have_http_status(:not_found)
   end
 
+  # ── paid ────────────────────────────────────────────────────────────────────
+
+  context "paid" do
+    # A late expense invoice from this person: the feed's late_payable item is
+    # real (it passes still_valid?), so refresh! projects it onto the row as Pay.
+    def make_late_invoice(contact:, msg:)
+      doc = create(:document, workspace: workspace, document_type: :expense_invoice,
+                              ai_status: :completed, review_status: :pending)
+      doc.update!(metadata: (doc.metadata || {}).merge(
+        "amount_cents" => 24_800, "currency" => "EUR",
+        "due_date" => 20.days.ago.to_date.iso8601, "invoice_number" => "FT2026/2756"
+      ))
+      DocumentEmailMessage.create!(document: doc, email_message: msg)
+      item = FeedItem.create!(user: user, workspace: workspace, subject: doc, kind: "late_payable",
+                              score: 90.0, dedupe_key: "late_payable:#{doc.id}", sort_at: 20.days.ago,
+                              attention: true,
+                              data: { "due_date" => 20.days.ago.to_date.iso8601, "days_late" => 20,
+                                      "amount_cents" => 24_800, "currency" => "EUR" })
+      [ doc, item ]
+    end
+
+    it "settles the invoice, retires the card, and re-renders the list" do
+      person, contact, _thread, msg = make_person(name: "Cloudhost Billing", email: "billing@cloudhost.example")
+      doc, item = make_late_invoice(contact: contact, msg: msg)
+      refresh_standings!
+      row = PeopleStanding.for_user(user).find_by(counterpart: person)
+      expect(row.verb).to eq("pay")
+      expect(row.feed_item_id).to eq(item.id)
+
+      post people_action_path(person.id, :paid),
+           headers: { "Accept" => "text/vnd.turbo-stream.html" }
+
+      expect(response).to have_http_status(:ok)
+      expect(doc.reload).to be_settled
+      expect(item.reload.dismissed_at).to be_present
+      expect(response.body).to include('<turbo-stream action="update" target="people_results"')
+      expect(response.body).to include("marked paid").or include("invoice paid")
+    end
+
+    it "404s when the row's item is not a money item" do
+      person, contact, thread, msg = make_person(name: "Sofia", email: "sofia@x.example", owe: true)
+      item = make_feed_item(user: user, person: person, contact: contact,
+                            thread: thread, msg: msg, kind: "reply_reminder")
+      refresh_standings!
+      link_feed_item!(person, item, msg)
+
+      post people_action_path(person.id, :paid),
+           headers: { "Accept" => "text/vnd.turbo-stream.html" }
+      expect(response).to have_http_status(:not_found)
+    end
+  end
+
   # ── done / undo_done ────────────────────────────────────────────────────────
 
   context "done" do

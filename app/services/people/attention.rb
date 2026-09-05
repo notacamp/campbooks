@@ -17,7 +17,7 @@ module People
     KINDS = %w[reply_reminder reply_owed follow_up email_action late_receivable late_payable].freeze
 
     # A resolved attention item for one counterpart.
-    Item = Data.define(:feed_item, :verb, :wait_days, :subject, :text, :thread_id, :message, :attention)
+    Item = Data.define(:feed_item, :verb, :wait_days, :subject, :detail, :detail_kind, :money, :thread_id, :message, :attention)
 
     def initialize(user, now: Time.current)
       @user = user
@@ -122,7 +122,8 @@ module People
 
       wait     = wait_days_for(fi, subject)
       subj_str = subject_string(fi, subject, counterpart)
-      txt      = text_for(fi, subject)
+      detail, detail_kind = detail_for(fi, subject)
+      money    = money_for(fi, subject)
       thread   = thread_for(fi, subject)
       msg      = subject.is_a?(EmailMessage) ? subject : nil
 
@@ -131,7 +132,9 @@ module People
         verb: verb,
         wait_days: wait,
         subject: subj_str,
-        text: txt,
+        detail: detail,
+        detail_kind: detail_kind,
+        money: money,
         thread_id: thread,
         message: msg,
         attention: fi.attention
@@ -168,25 +171,53 @@ module People
         thread = subject.email_thread
         (thread&.display_subject.presence || subject.subject).to_s.strip
       when Document
-        # Money subject: amount + due date
-        cents = fi.data["amount_cents"] || subject.amount_cents
-        due_raw = fi.data["due_date"] || subject.due_date&.iso8601
-        amount_str = cents.present? ? ::Money.new(cents, subject.currency).format : nil
-        due_str = due_raw.present? ? I18n.l(Date.parse(due_raw.to_s), format: :short) : nil
-
-        I18n.t("people.standing.money_subject", amount: amount_str, date: due_str)
+        # Subject for money items: the raw invoice number (nil when absent).
+        subject.invoice_number.to_s.strip.presence
       end
     end
 
-    def text_for(fi, subject)
+    def detail_for(fi, subject)
       case fi.kind
-      when "reply_reminder", "email_action"
-        subject.is_a?(EmailMessage) ? subject.ai_action_prompt.to_s.strip.presence : nil
+      when "reply_reminder", "reply_owed"
+        ask = People::Ask.for(subject.is_a?(EmailMessage) ? subject : nil)
+        if ask
+          [ ask.text, ask.kind == :ai ? :ask_ai : :ask_quote ]
+        else
+          [ nil, nil ]
+        end
+      when "email_action"
+        ask = People::Ask.for(subject.is_a?(EmailMessage) ? subject : nil)
+        if ask
+          [ ask.text, ask.kind == :ai ? :ask_ai : :ask_quote ]
+        else
+          prompt = subject.is_a?(EmailMessage) ? subject.ai_action_prompt.to_s.strip.presence : nil
+          [ prompt, prompt ? :prompt : nil ]
+        end
       when "follow_up"
-        subject.is_a?(EmailMessage) ? subject.email_thread&.follow_up_reason.to_s.presence : nil
+        reason = subject.is_a?(EmailMessage) ? subject.email_thread&.follow_up_reason.to_s.strip.presence : nil
+        if reason
+          [ reason, :reason ]
+        else
+          since = fi.data["since"].presence
+          [ since, since ? :silence : nil ]
+        end
+      when "late_payable", "late_receivable"
+        [ nil, :money ]
       else
-        nil
+        [ nil, nil ]
       end
+    end
+
+    def money_for(fi, subject)
+      return nil unless %w[late_payable late_receivable].include?(fi.kind)
+
+      {
+        "amount_cents" => fi.data["amount_cents"] || (subject.respond_to?(:amount_cents) ? subject.amount_cents : nil),
+        "currency"     => fi.data["currency"] || (subject.respond_to?(:currency) ? subject.currency : nil),
+        "due_date"     => fi.data["due_date"] || (subject.respond_to?(:due_date) ? subject.due_date&.iso8601 : nil),
+        "days_late"    => fi.data["days_late"].to_i,
+        "reference"    => subject.respond_to?(:invoice_number) ? subject.invoice_number.to_s.strip.presence : nil
+      }
     end
 
     def thread_for(fi, subject)
