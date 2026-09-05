@@ -23,6 +23,7 @@ major, minor, or patch change here.
 ### Added
 
 - Scout now learns how much each person and organization matters to you — from who you answer and how fast, who you meet, whose bills you settle, and whose mail you archive unread or dismiss — as a per-user attention weight refreshed in the background (the base every place will rank on; nothing changes on screen yet).
+- Now cards and People rows now say why they rank first — "You usually answer Sofia within 3 hours", "You met twice recently" — and the People details rail explains every person's place, including the reasons that lower it.
 
 - **Shortcut hints:** resting the pointer on an action, or focusing it with the keyboard, shows its name and its keyboard shortcut in a small tooltip — on the People list and conversation, the nav rail, the inbox toolbar and reading pane, feed cards, reminders and the calendar header. Icon-only buttons gain a proper label at the same time, and every hinted control now carries `aria-keyshortcuts` for screen readers. Touch devices are unaffected; the existing on-card keycaps and legends stay as they were.
 - People list rows show tag chips again: the person's own sender tags plus the email's tags (the same chips the old inbox rows carried), capped so a row stays tidy on mobile.
@@ -32,6 +33,10 @@ major, minor, or patch change here.
 ### Fixed
 
 - People: an organization in the Pay or Chase lane no longer says "Nothing needs you here right now" on its page.
+
+### Changed
+
+- Now and People rank on the same learned attention weight (who you answer and how fast, who you meet, whose bills you settle, whose mail you archive unread or dismiss) instead of fixed star and label boosts; dismissing a card now lowers that sender, not the whole kind. Workspaces with no history yet rank exactly as before.
 
 ### Security
 
