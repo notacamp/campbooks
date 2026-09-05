@@ -40,6 +40,7 @@ module Campbooks
           # Scrollable body
           div(class: "flex-1 px-4 pb-6") do
             identity_section
+            attention_section
             scout_read_section
             numbers_section
             threads_section
@@ -220,6 +221,38 @@ module Campbooks
                    "aria-pressed": is_service.to_s) do
               t(".kind_service")
             end
+          end
+        end
+      end
+
+      # ── 1b. Why they rank here ─────────────────────────────────────────────
+      # Every reason behind the person's attention weight — the positive ones with
+      # an Ember spark, the negative ones muted with a dash — so the rail explains
+      # the place, including what lowers it. Falls back to a learning line when
+      # there is no row yet, Scout has too little evidence (confidence < 0.2), or
+      # the row has nothing to say (one message, no verdicts) — never a bare
+      # "updated N minutes ago" under an empty list.
+      def attention_section
+        row = @profile.attention
+        div do
+          section_heading(t(".sections.why"))
+          if row.nil? || row.confidence < 0.2 || row.reason_values.empty?
+            p(class: "text-[12.5px] text-muted-foreground italic") { t(".why_learning", name: helpers.people_first_name(@person)) }
+          else
+            div(class: "flex flex-col gap-1.5") do
+              row.reason_values.first(3).each do |reason|
+                div(class: class_names("flex items-start gap-1.5 text-[12.5px] leading-snug",
+                                       reason.positive? ? "text-foreground" : "text-muted-foreground")) do
+                  if reason.positive?
+                    span(class: "mt-[3px] flex-shrink-0", style: "color: var(--ember-solid)") { raw(safe(SPARK)) }
+                  else
+                    span(class: "mt-[3px] h-[12px] w-[12px] flex-shrink-0 text-center text-muted-foreground/60") { "–" }
+                  end
+                  span { reason.sentence }
+                end
+              end
+            end
+            p(class: "mt-2 text-[11px] text-muted-foreground") { t(".why_foot", time: helpers.time_ago_in_words(row.computed_at)) }
           end
         end
       end

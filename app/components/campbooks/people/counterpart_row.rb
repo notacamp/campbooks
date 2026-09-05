@@ -67,7 +67,7 @@ module Campbooks
           data: { people_row: true },
           class: "group relative rounded-xl aria-selected:bg-secondary aria-selected:ring-1 aria-selected:ring-border"
         ) do
-          a(href: href,
+          a(href: href, title: reason_title,
             data: { turbo_frame: "people_detail", turbo_action: "advance", action: "click->email-mobile#showDetail" },
             class: class_names(
               "flex items-start gap-2.5 rounded-xl px-3 py-[7px] no-underline transition-colors",
@@ -85,7 +85,8 @@ module Campbooks
         div(class: "flex items-start gap-2.5 py-[7px]") do
           avatar_with_dot
           body
-          a(href: href, data: { turbo_frame: "people_detail", turbo_action: "advance", action: "click->email-mobile#showDetail" },
+          a(href: href, title: reason_title,
+            data: { turbo_frame: "people_detail", turbo_action: "advance", action: "click->email-mobile#showDetail" },
             class: "mt-0.5 inline-flex h-[26px] flex-shrink-0 items-center rounded-lg border border-border px-2.5 text-[12px] font-medium text-foreground no-underline hover:bg-secondary") do
             plain(t(".open"))
           end
@@ -112,7 +113,42 @@ module Campbooks
 
           # Line 2: spark text (when present)
           standing_line
+          # Line 3: the top positive reason this counterpart ranks here (lanes only)
+          why_line
         end
+      end
+
+      # A third, quiet line — "↑ <top positive reason>" — on lane rows only (never
+      # on Latest, never on the org-page nested rows). Negative reasons never show
+      # here; they live in the Details rail's "Why they rank here".
+      def why_line
+        return unless @variant == :lane && !@nested
+
+        why = first_positive_reason
+        return unless why
+
+        div(class: "mt-0.5 truncate text-[11px] leading-snug text-muted-foreground", data: { people_why: true }) do
+          span(class: "opacity-60", aria_hidden: "true") { "↑ " }
+          plain why.sentence
+        end
+      end
+
+      # The first POSITIVE Attention::Reason among the row's stamped reasons, or nil.
+      def first_positive_reason
+        Array(data["why"]).map { |h| ::Attention::Reason.from_h(h) }.find(&:positive?)
+      rescue StandardError
+        nil
+      end
+
+      # Every reason sentence (positive and negative) joined for the row's title
+      # tooltip; nil when there are none, so the <a> carries no empty title.
+      def reason_title
+        reasons = Array(data["why"]).map { |h| ::Attention::Reason.from_h(h) }
+        return nil if reasons.empty?
+
+        reasons.map(&:sentence).join(" · ")
+      rescue StandardError
+        nil
       end
 
       def right_meta

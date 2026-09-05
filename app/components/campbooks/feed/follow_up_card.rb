@@ -13,6 +13,7 @@ module Campbooks
         div(class: "-mx-3 flex items-start gap-3 rounded-2xl px-3 py-3 transition-colors duration-150 hover:bg-muted/50") do
           icon_circle
           div(class: "min-w-0 flex-1") do
+            attention_kicker
             div(class: "text-[12.5px] text-muted-foreground") do
               # "To Ana", not "Ana": this card is the mail YOU sent and are chasing,
               # so it leads with the recipient you're waiting on — never framed as a

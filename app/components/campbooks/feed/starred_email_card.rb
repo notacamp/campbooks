@@ -11,6 +11,7 @@ module Campbooks
 
       def view_template
         article(class: "rounded-2xl border border-accent-300/70 bg-card p-5 shadow-sm transition-shadow hover:shadow-md") do
+          attention_kicker
           header_row
           h3(class: "mt-3.5 text-[17px] font-semibold leading-snug tracking-tight text-foreground") do
             a(href: helpers.email_message_path(subject), class: "rounded-sm outline-none transition-colors hover:text-foreground/70 focus-visible:ring-2 focus-visible:ring-ring") { clean_subject(subject) }

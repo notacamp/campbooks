@@ -79,6 +79,8 @@ pt:
         make_person: Marcar como pessoa
         make_service: Marcar como serviço
         scout_not_read: "O Scout ainda não leu esta pessoa."
+        why_foot: "Aprendido com o que faz · atualizado há %{time}"
+        why_learning: "O Scout ainda está a aprender o que %{name} significa para si."
         read_on: "Lido a %{date}"
         refresh: Atualizar
         refresh_hint: Pedir ao Scout para reler esta pessoa
@@ -89,6 +91,7 @@ pt:
         thread_message_one: mensagem
         thread_messages_other: mensagens
         sections:
+          why: "Porque aparecem aqui"
           scout_read: "Leitura do Scout"
           numbers: Números
           threads: Conversas
