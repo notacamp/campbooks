@@ -1,5 +1,5 @@
 ---
 es:
   money:
-    index:
-      accounting: "Contabilidad"
+    statements:
+      title: "Extractos Bancarios"

@@ -23,7 +23,7 @@ pt:
 
   command_palette:
     commands:
-      accounting: Contabilidade
+      statements: Extratos Bancários
 
   reconciliations:
     untitled_statement: Extrato bancário
@@ -82,11 +82,21 @@ pt:
       col_counterparty: Contraparte
       col_amount: Montante
       col_match: Associação
+      grouped_ledger_title: Extrato
+      group_count:
+        one: "%{count} grupo"
+        other: "%{count} grupos"
+      workbench_title: Bancada de trabalho
     confirm_all_suggestions:
       confirmed:
         one: "1 associação confirmada"
         other: "%{count} associações confirmadas"
     bank_transactions:
+      upload_and_link:
+        uploaded_and_linked: "Fatura enviada e associada: %{filename}"
+        no_file: Nenhum ficheiro foi selecionado.
+        upload_failed: "Erro ao enviar: %{message}"
+        save_failed: "Não foi possível guardar: %{message}"
       row:
         confirm: Confirmar
         reject: Rejeitar
@@ -207,6 +217,26 @@ pt:
           other: "Verificados %{count} documentos candidatos"
         use_this_match: Usar esta associação
         not_this_one: Não é este
+        near_miss_title: Faturas por associar mais próximas
+        near_miss_empty: Nenhuma correspondência próxima encontrada.
+        reason_exact: montante exato
+        reason_close: dentro de 2%
+        reason_days:
+          one: 1 dia de diferença
+          other: "%{count} dias de diferença"
+        reason_same_vendor: mesmo fornecedor
+        reason_name_diff: nome parece diferente
+        still_not_it: Ainda não é este?
+        skim_toggle:
+          one: Ver 1 fatura no período
+          other: "Ver %{count} faturas no período"
+        skim_sorted_hint: Ordenado pelo montante mais próximo da linha bancária.
+        upload_title: Enviar uma fatura
+        upload_drop_hint: Largue a fatura aqui
+        upload_formats: "PDF, JPG ou PNG. O Scout lê e associa ao pagamento."
+        upload_cta: Procurar ficheiros
+        upload_auto_submit_hint: Selecionar um ficheiro associa-o imediatamente.
+        unknown_party: Desconhecido
         search_title: Pesquisar os seus documentos
         search_placeholder: "Pesquisar por nome, n.º fatura…"
         attach: Associar
@@ -220,6 +250,45 @@ pt:
         request_invoice_to_placeholder: "fornecedor@exemplo.com"
         request_invoice_subject: Assunto
         request_invoice_open_composer: Rever no compositor
+      grouped_ledger:
+        empty: Nenhuma transação a apresentar.
+      reconciliation_group:
+        state:
+          matched: Associado
+          review: Rever esta associação
+          partial: Parcialmente pago
+          partial_label: parcial
+          excluded: Posto de lado
+          credit: Receita associada
+          unmatched: Sem fatura
+          requested: Fatura solicitada
+        revenue_label: receita
+        review_label: rever
+        excluded_label: Posto de lado
+        requested_label: Fatura solicitada — a aguardar
+        unmatched_chip: "Sem fatura · Resolver"
+        unknown_party: Desconhecido
+        nif_missing: NIF em falta neste documento
+        nif_mismatch: NIF não corresponde ao da empresa
+        footer:
+          balances: equilibrado
+          "of": de
+          outstanding: em dívida
+          installments: Dois pagamentos liquidam uma fatura.
+          split: Um pagamento liquida várias faturas.
+          partial_deposit: Sinal pago.
+          multi_txn:
+            one: Um pagamento
+            other: "%{count} pagamentos liquidam uma fatura."
+          multi_doc:
+            one: Uma fatura
+            other: "Um pagamento liquida %{count} faturas."
+      reconciliations_rail:
+        title: Extratos bancários
+        view_all: Ver todos
+        untitled: Extrato sem nome
+        progress: "%{resolved} de %{total}"
+        open: Abrir →
     money:
       summary:
         late_receivable_html: "A fatura de %{name} está %{overdue}, por isso redigi um lembrete."

@@ -6,7 +6,7 @@
 
 <div data-controller="upload doc-skim-overlay">
   <%# Document Skim — the review overlay the Scout note's "Review" button opens. %>
-  <%= turbo_stream_from "doc_skim_#{Current.workspace.id}" if Current.workspace %>
+  <%= turbo_stream_from "doc_skim_user_#{current_user.id}" %>
   <%= turbo_frame_tag "doc_skim_tray", src: document_skim_tray_path, loading: :lazy, class: "hidden" %>
   <%= render "shared/doc_skim_overlay" %>
 

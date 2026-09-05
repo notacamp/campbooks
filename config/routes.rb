@@ -89,6 +89,7 @@ Rails.application.routes.draw do
   # the accounting gate/entitlement. An obligation id is "doc:<uuid>" or
   # "rem:<uuid>", so :id carries a colon.
   get "money", to: "money#index", as: :money
+  get "money/statements", to: "money#statements", as: :money_statements
   get "money/export", to: "money#export", as: :money_export
   scope "money/obligations/:id", constraints: { id: %r{[a-z]+:[^/]+} } do
     post   "remind", to: "money#remind",   as: :money_obligation_remind
@@ -172,7 +173,9 @@ Rails.application.routes.draw do
   # Features.accounting? and the :accounting entitlement.
   # PR 2 adds: matching engine, workbench actions (nested bank_transactions),
   # and confirm_all_suggestions.
-  get "accounting", to: "reconciliations#index", as: :accounting
+  # The index now lives at /money/statements; /accounting redirects there so
+  # self-hosters' bookmarks keep working.
+  get "accounting", to: redirect("/money/statements", status: 302), as: :accounting
   resources :reconciliations, only: %i[new create show destroy] do
     member do
       post :confirm_all_suggestions
@@ -188,6 +191,7 @@ Rails.application.routes.draw do
         post :reset
         post :manual_match
         post :request_invoice
+        post :upload_and_link
         get  :resolve_panel
       end
     end

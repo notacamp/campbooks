@@ -1,6 +1,9 @@
 ---
 en:
   email_messages:
+    archived_notice:
+      default: This conversation has been archived.
+      dismiss_aria: Dismiss archived notice
     board:
       index:
         heading: Board

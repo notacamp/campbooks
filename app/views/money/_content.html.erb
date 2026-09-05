@@ -7,8 +7,15 @@
     <div class="mt-10 rounded-2xl border border-border bg-card px-6 py-12 text-center">
       <p class="text-[15px] font-semibold text-foreground"><%= t("money.index.empty_title") %></p>
       <p class="mx-auto mt-1.5 max-w-md text-sm text-muted-foreground"><%= t("money.index.empty_body") %></p>
-      <%= link_to t("money.index.accounting"), accounting_path,
+      <%= link_to t("money.statements.title"), money_statements_path,
             class: "mt-4 inline-block text-sm font-medium text-foreground underline underline-offset-4" %>
     </div>
+  <% end %>
+
+  <%# ── Bank statements section ─────────────────────────────────────────────
+      Lists recent reconciliations so Money is the entry point for bank
+      statement work (the standalone /accounting nav will be retired later). %>
+  <% if @recent_reconciliations&.any? %>
+    <%= render Campbooks::Accounting::ReconciliationsRail.new(reconciliations: @recent_reconciliations) %>
   <% end %>
 </div>

@@ -1,7 +1,7 @@
 <%= render Campbooks::PageHeader.new(
       title:      t(".title"),
-      back_href:  accounting_path,
-      back_label: t("reconciliations.index.title")) %>
+      back_href:  money_statements_path,
+      back_label: t("money.statements.title")) %>
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
   <%# ── Option A: pick an existing bank_statement document ── %>

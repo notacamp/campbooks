@@ -51,28 +51,42 @@ class Notification < ApplicationRecord
       return nil if suppressed_by_preference?(user, preference)
     end
 
-    existing =
+    grouped = false
+    notif =
       if group_key.present?
-        user.notifications.active
-          .where(group_key: group_key)
-          .where("created_at > ?", group_window.ago)
-          .order(created_at: :desc)
-          .first
+        # Serialize concurrent notify calls for the same group_key with a
+        # Postgres advisory lock so two racing processes cannot both see
+        # existing=nil and each create a duplicate notification row.
+        transaction do
+          lock_key = "notif:#{user.id}:#{group_key}"
+          connection.execute(sanitize_sql_array([ "SELECT pg_advisory_xact_lock(hashtext(?))", lock_key ]))
+          existing = user.notifications.active
+                       .where(group_key: group_key)
+                       .where("created_at > ?", group_window.ago)
+                       .order(created_at: :desc)
+                       .first
+          if existing
+            existing.update!(count: existing.count + 1, body: body, created_at: Time.current, read: false)
+            grouped = true
+            existing
+          else
+            create!(
+              user: user, category: category, priority: priority,
+              title: title, body: body, link_url: link_url,
+              group_key: group_key, notifiable: notifiable, count: 1
+            )
+          end
+        end
+      else
+        create!(
+          user: user, category: category, priority: priority,
+          title: title, body: body, link_url: link_url,
+          group_key: group_key, notifiable: notifiable, count: 1
+        )
       end
 
-    if existing
-      existing.with_lock do
-        existing.update!(count: existing.count + 1, body: body, created_at: Time.current, read: false)
-      end
-      existing.broadcast_grouped_update
-      existing
-    else
-      create!(
-        user: user, category: category, priority: priority,
-        title: title, body: body, link_url: link_url,
-        group_key: group_key, notifiable: notifiable, count: 1
-      )
-    end
+    notif.broadcast_grouped_update if grouped
+    notif
   end
 
   # Resolve every active notification about this subject+category, across all

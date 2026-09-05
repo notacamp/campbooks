@@ -20,8 +20,47 @@ major, minor, or patch change here.
 
 - People list rows show tag chips again: the person's own sender tags plus the email's tags (the same chips the old inbox rows carried), capped so a row stays tidy on mobile.
 
+## [0.37.0] - 2026-09-05
+
+### Added
+
+- Reconciliation matches now track `allocated_cents` — the portion of a document's
+  total amount covered by each individual bank transaction. This enables split
+  payments (one transfer across multiple invoices), installment matching (multiple
+  transfers settling one invoice), and partial payments (a deposit that leaves an
+  invoice outstanding). The `settlement_state` computed field on a document reports
+  `:settled`, `:partial`, or `:unsettled` based on how much of the invoice amount is
+  accounted for across all confirmed matches.
+- Bank reconciliation show page now displays a **grouped paired ledger** — transactions
+  and their matched invoices are presented side-by-side in a three-column grid (bank
+  left · connector node · invoice right), with distinct visual states for each group:
+  matched (green ✓), under review (~, amber with confidence %), partial payment (½),
+  credit/revenue (+), excluded (—, muted), and unmatched (!, ember). Multi-transaction
+  or multi-invoice groups are presented in an inset card with a balance footer. NIF
+  validation flags are shown inline when the workspace has a company NIF configured.
+  The flat transaction workbench table remains below the ledger in a collapsed
+  `<details>` block for manual match actions.
+- Money page (`/money`) now shows a **Bank Statements rail** at the bottom — up to six
+  recent reconciliations with bank name, period, progress bar (resolved/total
+  transactions), currency, and a direct link to the workbench. Loaded with N+1-safe
+  batch counts.
+- **Money Hunt Panel**: the grouped ledger's "Resolve" chip on unmatched transactions now
+  opens an inline resolve panel (via the `transaction-resolve` Stimulus controller). The
+  panel shows up to five **near-miss candidates** — invoices scored between 0 and
+  Scout's auto-suggest threshold that may be a loose match — with reasons (exact amount,
+  within 2%, date proximity, same vendor). A "Browse invoices" toggle expands a grid of
+  all unlinked money documents in the reconciliation window sorted by closest amount. An
+  **Upload & link** flow lets you drop an invoice file directly onto the panel: the file
+  is saved as a `Document` (source: `manual_upload`), queued for Scout's AI extraction,
+  and immediately confirmed as a match in one step.
+- `:requested` transactions in the grouped ledger now show a distinct **"Invoice
+  requested — waiting"** chip (muted/passive) instead of the ember "Resolve" chip,
+  accurately reflecting that the supplier has been contacted and no user action is
+  needed.
+
 ### Changed
 
+- **Money is now the accounting home.** The bank statement list and "New reconciliation" entry live at `/money/statements` under the Money surface. `/accounting` redirects there (302) so self-hosters' bookmarks and any integrations pointing at the old URL keep working. Breadcrumbs on the reconciliation workbench and new-reconciliation page now point back to Bank Statements. The ⌘K palette's "Accounting" entry is replaced by "Bank Statements" at the same destination.
 - Quieter draft-save feedback: the composer's autosave status settles to a calm "Saved" instead of a flashing label, and the parked-draft pill is now a compact, on-system capsule that reveals the draft on hover.
 
 ## [0.36.2] - 2026-09-04
@@ -41,6 +80,20 @@ major, minor, or patch change here.
   updating — the action was applied but every later one had nothing to render into.
   The list keeps its frame now, the keyboard selection survives the re-render, and
   archiving from the keyboard moves the conversation on to the person's next thread.
+- Scout's chat surfaces (the Scout page, the command-palette overlay, compose, and task
+  discussions) and the AI setup assistant no longer leave a typing indicator spinning, or a
+  reply stuck out of sight, when a reply is retried or arrives during a brief connection drop:
+  the indicator clears, failures show a retry card, and the reply lands.
+- Live views (People, Scout chat, task discussions, the setup dialog) now catch up after a
+  dropped connection. When the socket reconnects they refresh, so what you see cannot quietly
+  fall out of step with the server.
+- The document review tray counts only what you can open: a document filed in a restricted
+  folder you do not have access to is no longer counted in your "needs review" tray.
+- Starring or unstarring a sender now updates that conversation's row in your other open tabs.
+- Grouped notifications no longer double up (a duplicate toast and an inflated bell count) when
+  two events land at the same instant.
+- When Scout archives a conversation you have open, it shows a dismissible "archived" notice
+  instead of replacing the whole reading pane, so a reply you were drafting is not lost.
 
 ## [0.36.1] - 2026-09-04
 

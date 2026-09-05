@@ -84,4 +84,17 @@ RSpec.describe Tasks::ChatReplyJob, type: :job do
     expect(message.reload.reply_status).to eq("failed")
     expect(thread.agent_messages.where(author_type: :ai)).to be_empty
   end
+
+  it "on the final attempt, marks the message failed (not stuck pending) and removes scout_typing" do
+    allow(Ai::ChatService).to receive(:reply_to).and_raise(StandardError, "AI service down")
+
+    job = described_class.new
+    allow(job).to receive(:executions).and_return(2)
+
+    expect { job.perform(message.id) }.not_to raise_error
+
+    expect(message.reload.reply_status).to eq("failed")
+    expect(Turbo::StreamsChannel).to have_received(:broadcast_remove_to)
+      .with(task, target: "scout_typing")
+  end
 end

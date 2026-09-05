@@ -1,10 +1,11 @@
 ---
 en:
   money:
+    statements:
+      title: "Bank Statements"
     index:
       title: "Money"
       subtitle: "What you're owed, what you owe, and what the bank says."
-      accounting: "Accounting"
       export: "Export %{quarter}"
       add: "Add"
       add_title: "Add documents"

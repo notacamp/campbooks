@@ -6,9 +6,11 @@
     The inner frame "resolve_doc_search_<id>" is navigated by the search form. %>
 <turbo-frame id="<%= dom_id(@transaction, :resolve_frame) %>">
   <%= render Campbooks::Accounting::ResolvePanel.new(
-        transaction:         @transaction,
-        reconciliation:      @reconciliation,
-        suggested_matches:   @suggested_matches,
-        candidate_documents: @candidate_documents,
-        company_nif:         @company_nif) %>
+        transaction:          @transaction,
+        reconciliation:       @reconciliation,
+        suggested_matches:    @suggested_matches,
+        candidate_documents:  @candidate_documents,
+        company_nif:          @company_nif,
+        near_miss_candidates: @near_miss_candidates,
+        skim_documents:       @skim_documents) %>
 </turbo-frame>

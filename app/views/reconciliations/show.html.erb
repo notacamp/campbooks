@@ -2,8 +2,8 @@
 
 <%= render Campbooks::PageHeader.new(
       title:      @reconciliation.statement_document&.original_file&.filename&.to_s || t(".title"),
-      back_href:  accounting_path,
-      back_label: t("reconciliations.index.title")) do |header| %>
+      back_href:  money_statements_path,
+      back_label: t("money.statements.title")) do |header| %>
   <% header.with_actions do %>
     <% unless @reconciliation.parsing? || @reconciliation.matching? %>
       <%# Export button — stateful; updated live by ExportJob broadcasts. %>
@@ -56,7 +56,9 @@
   <%= render "reconciliations/show_content",
                reconciliation: @reconciliation,
                transactions:   @transactions,
-               next_page:      @pagy.next %>
+               next_page:      @pagy.next,
+               groups:         @groups,
+               company_nif:    @company_nif %>
 </div>
 
 <%# In-place invoice preview — lives outside #reconciliation_content so

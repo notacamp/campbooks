@@ -75,6 +75,9 @@ class ReconciliationsController < ApplicationController
       limit: 50
     )
 
+    @groups      = Reconciliations::Groups.new(@reconciliation).call
+    @company_nif = Current.workspace&.company_nif.presence
+
     respond_to do |format|
       format.html
       format.turbo_stream
@@ -128,7 +131,7 @@ class ReconciliationsController < ApplicationController
     return if require_entitlement!(:accounting, ignore_limit: true)
 
     @reconciliation.destroy
-    redirect_to accounting_path, success: t(".destroyed")
+    redirect_to money_statements_path, success: t(".destroyed")
   end
 
   # POST /reconciliations/:id/confirm_all_suggestions

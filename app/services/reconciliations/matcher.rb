@@ -69,25 +69,33 @@ module Reconciliations
     private
 
     def match_transaction(txn)
-      candidates = candidate_pool(txn)
+      # Delegate pool + scoring to the shared Candidates query object.
+      cands_obj = Reconciliations::Candidates.new(
+        bank_transaction:    txn,
+        workspace:           @workspace,
+        cross_recon_doc_ids: @cross_recon_doc_ids
+      )
 
-      scored = candidates.map { |doc| [ doc, score(txn, doc) ] }
-                         .sort_by { |_, s| -s }
-
-      top_score = scored.first&.last || 0.0
+      scored_hashes = cands_obj.call # [{document:, score:, reasons:}] sorted desc
+      top_score     = scored_hashes.first&.fetch(:score, 0.0) || 0.0
+      candidates    = cands_obj.pool # raw [Document] list (for AI disambiguation)
 
       if top_score >= SCORE_AUTO_SUGGEST
-        create_suggested_matches(txn, scored.first(MAX_SUGGESTIONS), method: :heuristic)
+        create_suggested_matches(txn, scored_hashes.first(MAX_SUGGESTIONS), method: :heuristic)
       elsif candidates.any? && ai_text_configured?
         # If AI produced no suggestions (no config rows, error, or empty result),
         # fall through to the heuristic fallback so self-hosted installs still
         # get a suggestion when the score is ≥ SCORE_HEURISTIC_FALLBACK.
-        ai_suggested = ai_match(txn, scored.first(AI_MAX_CANDIDATES))
+        # ai_match needs the [[doc, score]] format for the AI prompt builder.
+        ai_format     = scored_hashes.first(AI_MAX_CANDIDATES).map { |h| [ h[:document], h[:score] ] }
+        ai_suggested  = ai_match(txn, ai_format, cands_obj)
         unless ai_suggested
-          create_suggested_matches(txn, scored.first(1), method: :heuristic) if top_score >= SCORE_HEURISTIC_FALLBACK
+          if top_score >= SCORE_HEURISTIC_FALLBACK
+            create_suggested_matches(txn, scored_hashes.first(1), method: :heuristic)
+          end
         end
       elsif top_score >= SCORE_HEURISTIC_FALLBACK
-        create_suggested_matches(txn, scored.first(1), method: :heuristic)
+        create_suggested_matches(txn, scored_hashes.first(1), method: :heuristic)
       end
       # else: stays unmatched, no broadcast needed
     rescue *Ai::Adapters::Base::TRANSIENT_ERRORS
@@ -96,94 +104,32 @@ module Reconciliations
       Rails.logger.error("[Reconciliations::Matcher] txn #{txn.id} failed: #{e.class}: #{e.message}")
     end
 
-    # ── Candidate pool ──────────────────────────────────────────────────────────
-
-    def candidate_pool(txn)
-      base = @workspace.documents
-                       .where(document_type: txn.candidate_document_types)
-                       .where(
-                         "documents.metadata->>'amount_cents' IS NOT NULL AND " \
-                         "(CASE WHEN documents.metadata->>'amount_cents' ~ ? " \
-                         "THEN (documents.metadata->>'amount_cents')::bigint END) <> 0",
-                         Document::AMOUNT_CENTS_REGEX
-                       )
-
-      # Currency equality — normalize both sides to ISO codes.
-      txn_currency = normalize_currency(txn.currency.to_s)
-      # We filter in Ruby after fetching to avoid complex SQL on a normalized value.
-
-      # Date window: document_date within 90d before / 15d after booked_on,
-      # OR due_date within ±30d of booked_on.
-      booked = txn.booked_on
-      doc_date_range = ((booked - 90.days)..(booked + 15.days))
-      due_date_range = ((booked - 30.days)..(booked + 30.days))
-
-      docs = base.where(
-        "(documents.metadata->>'document_date' >= :dstart AND documents.metadata->>'document_date' <= :dend) " \
-        "OR (documents.metadata->>'due_date' >= :dustart AND documents.metadata->>'due_date' <= :duend)",
-        dstart:  doc_date_range.begin.to_s,  dend:  doc_date_range.end.to_s,
-        dustart: due_date_range.begin.to_s, duend: due_date_range.end.to_s
-      ).limit(50).to_a
-
-      # Filter by normalized currency match.
-      docs.select { |doc| normalize_currency(doc.currency.to_s) == txn_currency }
-    end
-
-    # ── Scoring ─────────────────────────────────────────────────────────────────
-
-    def score(txn, doc)
-      amount_score(txn, doc) + date_score(txn, doc) + name_score(txn, doc)
+    # ── Scoring helpers ──────────────────────────────────────────────────────────
+    # The scoring implementation now lives in Reconciliations::Candidates (shared
+    # with the hunt panel). These thin delegators keep Matcher's scoring contract
+    # stable for callers and unit tests after the extraction.
+    def scorer_for(txn)
+      Reconciliations::Candidates.new(bank_transaction: txn, workspace: @workspace)
     end
 
     def amount_score(txn, doc)
-      txn_abs = txn.amount_cents.abs
-      doc_abs = doc.amount_cents.abs
-      return 0.0 if txn_abs.zero? || doc_abs.zero?
-
-      if txn_abs == doc_abs
-        0.5
-      elsif (txn_abs - doc_abs).abs.to_f / [ txn_abs, doc_abs ].max <= 0.02
-        0.35
-      else
-        0.0
-      end
+      scorer_for(txn).send(:amount_score, doc)
     end
 
     def date_score(txn, doc)
-      dates = [ doc.document_date, doc.due_date ].compact
-      return 0.0 if dates.empty?
-
-      min_delta = dates.map { |d| (txn.booked_on - d).abs }.min
-      return 0.25 if min_delta <= 1
-      return 0.0  if min_delta >= DATE_DECAY_DAYS
-
-      0.25 * (1.0 - (min_delta.to_f - 1) / (DATE_DECAY_DAYS - 1))
+      scorer_for(txn).send(:date_score, doc)
     end
 
     def name_score(txn, doc)
-      # Fix 13b: delegate to name_jaccard so both this and build_reasons share the cache.
-      sim = name_jaccard(txn, doc)
-      sim >= 0.4 ? 0.25 * sim : 0.0
+      scorer_for(txn).send(:name_score, doc)
     end
 
-    # Jaccard similarity on two sets of word tokens.
-    def jaccard_similarity(set_a, set_b)
-      return 0.0 if set_a.empty? || set_b.empty?
-
-      intersection = (set_a & set_b).size.to_f
-      union        = (set_a | set_b).size.to_f
-      union.zero? ? 0.0 : intersection / union
+    def normalize_currency(raw)
+      scorer_for(nil).send(:normalize_currency, raw)
     end
 
-    # Normalize text to word tokens: downcase, strip diacritics, split on non-alnum.
-    def tokenize(text)
-      normalized = text.unicode_normalize(:nfkd)
-                       .encode("ASCII", invalid: :replace, undef: :replace, replace: "")
-                       .downcase
-      normalized.split(/[^a-z0-9]+/).reject(&:empty?).to_set
-    end
+    # ── Currency map (kept here as the source-of-truth; Candidates references it) ──
 
-    # Normalize currency codes from symbols and full names to ISO-4217.
     CURRENCY_MAP = {
       "€"          => "EUR", "euro"       => "EUR", "euros"      => "EUR",
       "eur"        => "EUR",
@@ -196,11 +142,6 @@ module Reconciliations
       "chf"        => "CHF", "franc"      => "CHF"
     }.freeze
 
-    def normalize_currency(raw)
-      stripped = raw.strip.downcase
-      CURRENCY_MAP[stripped] || stripped.upcase
-    end
-
     # ── Match creation ──────────────────────────────────────────────────────────
 
     # Fix 13a: Uses the prefetched Set from call() — O(1) lookup instead of EXISTS query.
@@ -208,10 +149,22 @@ module Reconciliations
       @cross_recon_doc_ids&.include?(doc.id) || false
     end
 
+    # Accepts either the legacy [[doc, score_val]] format (AI path) or the
+    # Candidates hash format [{document:, score:, reasons:}].
     def create_suggested_matches(txn, scored_docs, method:)
       txn_changed = false
-      scored_docs.each do |doc, score_val|
-        reasons = build_reasons(txn, doc, score_val)
+      scored_docs.each do |entry|
+        # Normalise: accept both legacy [doc, score] pairs and Candidates hashes.
+        if entry.is_a?(Hash)
+          doc       = entry[:document]
+          score_val = entry[:score]
+          reasons   = entry[:reasons]
+        else
+          doc, score_val = entry
+          reasons = nil # caller supplies via ai_match path
+        end
+        reasons ||= {}
+
         match = TransactionMatch.find_or_initialize_by(
           bank_transaction_id: txn.id,
           document_id:         doc.id
@@ -219,9 +172,9 @@ module Reconciliations
         next if match.confirmed?
 
         match.assign_attributes(
-          status:       :suggested,
-          matched_by:   method,
-          confidence:   score_val.round(4),
+          status:        :suggested,
+          matched_by:    method,
+          confidence:    score_val.round(4),
           match_reasons: reasons
         )
         match.save! if match.changed?
@@ -372,34 +325,10 @@ module Reconciliations
       }
     end
 
-    def build_reasons(txn, doc, score_val)
-      reasons = {}
-      # Amount
-      txn_abs = txn.amount_cents.abs
-      doc_abs = doc.amount_cents.abs
-      if txn_abs == doc_abs
-        reasons["amount"] = "exact"
-      elsif (txn_abs - doc_abs).abs.to_f / [ txn_abs, doc_abs ].max <= 0.02
-        reasons["amount"] = "close"
-      end
-      # Date
-      dates = [ doc.document_date, doc.due_date ].compact
-      if dates.any?
-        delta = dates.map { |d| (txn.booked_on - d).abs }.min
-        reasons["date_delta_days"] = delta.to_i
-      end
-      # Name similarity
-      sim = name_jaccard(txn, doc)
-      reasons["name_similarity"] = sim.round(2) if sim > 0
-      # Cross-reconciliation
-      if cross_reconciliation_warning?(doc)
-        reasons["cross_reconciliation_warning"] = true
-      end
-      reasons
-    end
-
-    # Fix 13b: memoize per (txn, doc) pair — score() and build_reasons() both call
-    # this, so without the cache we'd compute Jaccard twice per candidate.
+    # Jaccard over word tokens — needed by entity_agreement? (AI grounding path).
+    # NOTE: scoring is fully delegated to Reconciliations::Candidates. This stays
+    # here only for the AI grounding helpers that compare txn↔doc entity tokens
+    # without going through the full Candidates scoring pipeline.
     def name_jaccard(txn, doc)
       @jaccard_cache ||= {}
       key = [ txn.id, doc.id ]
@@ -411,10 +340,20 @@ module Reconciliations
       sim = if txn_text.blank? || doc_text.blank?
         0.0
       else
-        jaccard_similarity(tokenize(txn_text), tokenize(doc_text))
+        intersection = (tokenize(txn_text) & tokenize(doc_text)).size.to_f
+        union        = (tokenize(txn_text) | tokenize(doc_text)).size.to_f
+        union.zero? ? 0.0 : intersection / union
       end
 
       @jaccard_cache[key] = sim
+    end
+
+    # Strip diacritics and split on non-alnum (shared with Candidates).
+    def tokenize(text)
+      text.unicode_normalize(:nfkd)
+          .encode("ASCII", invalid: :replace, undef: :replace, replace: "")
+          .downcase
+          .split(/[^a-z0-9]+/).reject(&:empty?).to_set
     end
 
     # ── AI disambiguation ────────────────────────────────────────────────────────
@@ -423,7 +362,10 @@ module Reconciliations
       Ai::ProviderSetup.configured?(@workspace, :text)
     end
 
-    def ai_match(txn, scored_candidates)
+    # scored_candidates: [[Document, Float]] for the AI prompt.
+    # cands_obj:         the Reconciliations::Candidates for this txn, used to
+    #                    build match_reasons via the shared build_reasons method.
+    def ai_match(txn, scored_candidates, cands_obj = nil)
       config = Ai::Configuration.for_any(Ai::ReminderExtractor::PURPOSES)
       return nil unless config
 
@@ -502,7 +444,8 @@ module Reconciliations
 
       txn_changed = false
       grounded.first(MAX_SUGGESTIONS).each do |m, doc|
-        reasons = build_reasons(txn, doc, m["confidence"].to_f)
+        conf    = m["confidence"].to_f
+        reasons = cands_obj ? cands_obj.build_reasons(doc, conf) : {}
         reasons["ai_reason"] = m["reason"] if m["reason"].present?
 
         match = TransactionMatch.find_or_initialize_by(

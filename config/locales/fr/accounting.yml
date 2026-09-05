@@ -23,7 +23,7 @@ fr:
 
   command_palette:
     commands:
-      accounting: Comptabilité
+      statements: Relevés Bancaires
 
   reconciliations:
     untitled_statement: Relevé bancaire
@@ -82,11 +82,21 @@ fr:
       col_counterparty: Contrepartie
       col_amount: Montant
       col_match: Association
+      grouped_ledger_title: Relevé
+      group_count:
+        one: "%{count} groupe"
+        other: "%{count} groupes"
+      workbench_title: Atelier de rapprochement
     confirm_all_suggestions:
       confirmed:
         one: "1 association confirmée"
         other: "%{count} associations confirmées"
     bank_transactions:
+      upload_and_link:
+        uploaded_and_linked: "Facture envoyée et associée : %{filename}"
+        no_file: Aucun fichier sélectionné.
+        upload_failed: "Échec de l'envoi : %{message}"
+        save_failed: "Impossible de sauvegarder : %{message}"
       row:
         confirm: Confirmer
         reject: Rejeter
@@ -207,6 +217,26 @@ fr:
           other: "%{count} documents candidats vérifiés"
         use_this_match: Utiliser cette association
         not_this_one: Ce n'est pas ça
+        near_miss_title: Factures non associées les plus proches
+        near_miss_empty: Aucune correspondance proche trouvée.
+        reason_exact: montant exact
+        reason_close: dans les 2 %
+        reason_days:
+          one: 1 jour d'écart
+          other: "%{count} jours d'écart"
+        reason_same_vendor: même fournisseur
+        reason_name_diff: le nom semble différent
+        still_not_it: Toujours pas ça ?
+        skim_toggle:
+          one: Parcourir 1 facture de la période
+          other: "Parcourir %{count} factures de la période"
+        skim_sorted_hint: Trié par montant le plus proche de la ligne bancaire.
+        upload_title: Envoyer une facture
+        upload_drop_hint: Déposez la facture ici
+        upload_formats: "PDF, JPG ou PNG. Scout la lit et la relie à ce paiement."
+        upload_cta: Parcourir les fichiers
+        upload_auto_submit_hint: Sélectionner un fichier l'attache immédiatement.
+        unknown_party: Inconnu
         search_title: Rechercher vos documents
         search_placeholder: "Rechercher par nom, n° facture…"
         attach: Associer
@@ -220,6 +250,45 @@ fr:
         request_invoice_to_placeholder: "fournisseur@exemple.com"
         request_invoice_subject: Objet
         request_invoice_open_composer: Réviser dans le compositeur
+      grouped_ledger:
+        empty: Aucune transaction à afficher.
+      reconciliation_group:
+        state:
+          matched: Associé
+          review: Vérifier cette association
+          partial: Paiement partiel
+          partial_label: partiel
+          excluded: Mis de côté
+          credit: Revenu associé
+          unmatched: Sans facture
+          requested: Facture demandée
+        revenue_label: revenu
+        review_label: vérifier
+        excluded_label: Mis de côté
+        requested_label: Facture demandée — en attente
+        unmatched_chip: "Sans facture · Résoudre"
+        unknown_party: Inconnu
+        nif_missing: Numéro TVA manquant sur ce document
+        nif_mismatch: Le numéro TVA ne correspond pas à celui de l'entreprise
+        footer:
+          balances: équilibré
+          "of": sur
+          outstanding: en attente
+          installments: Deux paiements soldent une facture.
+          split: Un virement solde plusieurs factures.
+          partial_deposit: Acompte payé.
+          multi_txn:
+            one: Un paiement
+            other: "%{count} paiements soldent une facture."
+          multi_doc:
+            one: Une facture
+            other: "Un virement solde %{count} factures."
+      reconciliations_rail:
+        title: Relevés bancaires
+        view_all: Voir tout
+        untitled: Relevé sans nom
+        progress: "%{resolved} sur %{total}"
+        open: Ouvrir →
     money:
       summary:
         late_receivable_html: "La facture de %{name} est %{overdue}, j'ai donc rédigé un rappel."

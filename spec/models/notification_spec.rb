@@ -200,6 +200,24 @@ RSpec.describe Notification, type: :model do
     end
   end
 
+  describe ".notify advisory lock (concurrent deduplication)" do
+    it "collapses two same-group_key notifies into one row, incrementing count" do
+      key = "concurrent/test-#{SecureRandom.hex(4)}"
+
+      2.times { Notification.notify(user: user, category: :activity, priority: :activity, title: "concurrent", group_key: key) }
+
+      rows = user.notifications.where(group_key: key)
+      expect(rows.count).to eq(1), "two calls with the same group_key must collapse to one row, not create a duplicate"
+      expect(rows.first.count).to eq(2), "the count must be incremented to 2 rather than each call creating count=1"
+    end
+
+    it "creates a fresh row when group_key is absent (no deduplication)" do
+      expect {
+        2.times { Notification.notify(user: user, category: :activity, priority: :activity, title: "no-key") }
+      }.to change(Notification, :count).by(2)
+    end
+  end
+
   describe ".resolve (extended coverage)" do
     before do
       @workspace = create(:workspace)
