@@ -13,7 +13,7 @@
   </head>
 
   <body class="h-full <%= "hotwire-native" if hotwire_native_app? %>"
-        data-controller="<%= "scout-overlay " unless hotwire_native_app? %>email-shortcuts theme inbox-settings-modal skim-overlay<%= " nav-shortcuts" if authenticated? && !hotwire_native_app? %>"
+        data-controller="<%= "scout-overlay " unless hotwire_native_app? %>email-shortcuts theme inbox-settings-modal skim-overlay<%= " hint" unless hotwire_native_app? %><%= " nav-shortcuts" if authenticated? && !hotwire_native_app? %>"
         data-command-palette-context-value="<%= content_for?(:cp_context) ? yield(:cp_context) : '' %>"
         data-command-palette-message-id-value="<%= content_for?(:cp_message_id) ? yield(:cp_message_id) : '' %>"
         data-command-palette-folders-value="<%= content_for?(:cp_folders) ? yield(:cp_folders) : '[]' %>"
@@ -54,6 +54,7 @@
     <% unless hotwire_native_app? %>
       <%= render(Campbooks::ScoutOverlay.new) %>
       <%= render(Campbooks::KeyboardShortcutsModal.new) %>
+      <%= render(Campbooks::HintTip.new) %>
     <% end %>
     <%= render(Campbooks::InboxSettingsModal.new) if authenticated? %>
     <%= render "shared/setup_modal" if authenticated? %>

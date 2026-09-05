@@ -3,6 +3,7 @@ require "tailwind_merge"
 module Campbooks
   class Base < Phlex::HTML
     include EmailMessageHelpers
+    include HintHelper
 
     # One shared, Tailwind-aware merger so caller overrides actually win
     # (e.g. passing `class: "rounded-none"` resolves against a component's
