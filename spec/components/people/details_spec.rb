@@ -90,4 +90,55 @@ RSpec.describe Campbooks::People::Details, type: :component do
       expect(html).not_to include('data-controller="people-details"')
     end
   end
+
+  describe "the attention section (Why they rank here)" do
+    def profile_with_weight(weight:, confidence:, reasons:, computed_at: 10.minutes.ago)
+      contact
+      AttentionWeight.create!(user: user, workspace: workspace, subject: person,
+                              weight: weight, confidence: confidence, reasons: reasons,
+                              computed_at: computed_at)
+      People::Profile.for(person, user: user)
+    end
+
+    it "renders each reason, with the Ember spark on positive ones and the negative one muted" do
+      profile = profile_with_weight(weight: 0.9, confidence: 0.9, reasons: [
+        { "key" => "replies_fast", "params" => { "hours" => 3 } },
+        { "key" => "two_way", "params" => { "count" => 2 } },
+        { "key" => "ignored", "params" => { "percent" => 20 } }
+      ])
+      html = render(described_class.new(profile: profile))
+
+      expect(html).to include("Why they rank here")
+      expect(html).to include("You usually answer within 3 hours")
+      expect(html).to include("2 conversations both ways")
+      expect(html).to include("You archive 20% of their mail unread") # negative reason still shown here
+      expect(html).to include("color: var(--ember-solid)")            # spark on the positive reasons
+    end
+
+    it "shows the foot line with the relative time" do
+      profile = profile_with_weight(weight: 0.9, confidence: 0.9,
+                                    reasons: [ { "key" => "replies_fast", "params" => { "hours" => 3 } } ])
+      html = render(described_class.new(profile: profile))
+
+      expect(html).to match(/Learned from what you do .* updated .* ago/)
+    end
+
+    it "shows the learning sentence (named) when there is no attention row" do
+      contact
+      profile = People::Profile.for(person, user: user)
+      html = render(described_class.new(profile: profile))
+
+      expect(html).to include("Why they rank here")
+      expect(html).to include("Scout is still learning what Lena means to you.")
+    end
+
+    it "shows the learning sentence when confidence is below 0.2" do
+      profile = profile_with_weight(weight: 0.5, confidence: 0.1,
+                                    reasons: [ { "key" => "replies_fast", "params" => { "hours" => 3 } } ])
+      html = render(described_class.new(profile: profile))
+
+      expect(html).to include("Scout is still learning what Lena")
+      expect(html).not_to include("You usually answer within 3 hours")
+    end
+  end
 end
