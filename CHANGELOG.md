@@ -20,6 +20,10 @@ major, minor, or patch change here.
 
 - People list rows show tag chips again: the person's own sender tags plus the email's tags (the same chips the old inbox rows carried), capped so a row stays tidy on mobile.
 
+### Security
+
+- Bumped `rubyzip` 3.2.2 → 3.6.0 to close CVE-2026-85396, a High-severity path-traversal vulnerability in pre-3.4.0 rubyzip.
+
 ## [0.37.0] - 2026-09-05
 
 ### Added

@@ -702,7 +702,7 @@ GEM
       ffi (~> 1.12)
       logger
     ruby_ui (1.3.0)
-    rubyzip (3.2.2)
+    rubyzip (3.6.0)
     safety_net_attestation (0.5.0)
       jwt (>= 2.0, < 4.0)
     searchkick (6.1.1)
@@ -884,7 +884,7 @@ DEPENDENCIES
   rubocop-rails-omakase
   ruby-openai (~> 8.3)
   ruby_ui
-  rubyzip
+  rubyzip (>= 3.4)
   searchkick
   selenium-webdriver
   sentry-rails

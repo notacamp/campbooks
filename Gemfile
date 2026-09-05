@@ -77,7 +77,7 @@ gem "mini_magick"
 gem "money-rails"
 
 # ZIP generation for monthly reports
-gem "rubyzip", require: "zip"
+gem "rubyzip", ">= 3.4", require: "zip" # >= 3.4 closes CVE-2026-85396 (path traversal); roo caps it < 4.0
 
 # Pagination
 gem "pagy", "~> 9.0"
