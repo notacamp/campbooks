@@ -118,19 +118,6 @@ fr:
     icon_picker:
       default: Par défaut
       label: Choisir une icône
-    inbox_settings_modal:
-      close_label: Fermer les paramètres de la boîte de réception
-      nav:
-        accounts: Comptes
-        contacts: Contacts
-        display: Affichage
-        document_types: Types de documents
-        filtering: Filtrage
-        signatures: Signatures
-        tag_groups: Groupes
-        tags: Étiquettes
-      settings_sections_label: Sections des paramètres
-      title: Paramètres de la boîte de réception
     keyboard_shortcuts_modal:
       contexts:
         people: Personnes

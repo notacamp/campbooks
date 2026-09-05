@@ -287,6 +287,12 @@ export default class extends Controller {
     this._compose()
   }
 
+  // Public entry point for the account menu's "Keyboard shortcuts" row (Phlex
+  // forbids inline onclick handlers).
+  showHelp() {
+    this._showHelp()
+  }
+
   _showHelp() {
     const dialog = document.getElementById("keyboard-shortcuts-modal")
     if (dialog) dialog.showModal()

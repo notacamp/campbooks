@@ -1,4 +1,3 @@
-<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
 <%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: @connection.name)) %>
 <%= render(Campbooks::Card.new(padding: :lg)) do %>
   <%= render "form", connection: @connection %>

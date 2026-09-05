@@ -13,10 +13,15 @@ module People
   # a starred sender tops, client/partner/colleague are VIP, an engaged thread is
   # one you wrote in.
   #
-  # Strength (0..~9) — evidence of a real relationship: threads with mail both
-  # ways (dominant), threads you wrote in at all, mail volume, an explicit star,
-  # a whitelist, a sender-kind verdict (vs the never-classified default), and the
-  # labelled relationship. Every term saturates, so no single signal runs away.
+  # Strength (0..~9) — how much this counterpart matters. When the user has a
+  # learned attention weight for them it IS the strength (weight × 9, so the
+  # 0..1 weight lands on the same 0..9 band the legacy formula spanned); Now and
+  # People then rank on one number and never disagree. Without a weight (a fresh
+  # workspace, or a row not yet computed) it falls back to the legacy evidence of
+  # a real relationship: threads with mail both ways (dominant), threads you wrote
+  # in at all, mail volume, an explicit star, a whitelist, a sender-kind verdict
+  # (vs the never-classified default), and the labelled relationship. Every legacy
+  # term saturates, so no single signal runs away.
   #
   # Need you = urgency × (1 + strength) + bonuses, where urgency is
   #   a reply you owe          1 + wait            an obligation — always ahead of
@@ -56,6 +61,10 @@ module People
 
     RECENT_STRENGTH_WEIGHT = 0.5
 
+    # The legacy strength's ceiling: scaling the 0..1 attention weight by this
+    # keeps `item_score + strength` meaning the same as before the weight existed.
+    ATTENTION_STRENGTH_SCALE = 9.0
+
     Facts = Data.define(
       :standing,           # People::Standing::Result
       :two_way_threads,    # threads with both an inbound and an outbound
@@ -66,8 +75,12 @@ module People
       :classified,         # any contact carries a sender_kind verdict
       :relationship_type,  # Person::RELATIONSHIP_TYPES value or nil
       :item_score,         # feed item's ranked score (0.0 when no attention item)
-      :last_activity       # Time or nil
-    )
+      :last_activity,      # Time or nil
+      :attention_weight    # learned 0..1 weight, or nil to fall back to the legacy strength
+    ) do
+      # Default the weight so every existing Facts.new(...) (and #with) keeps working.
+      def initialize(attention_weight: nil, **rest) = super(attention_weight: attention_weight, **rest)
+    end
 
     Score = Data.define(:value, :needs_you, :strength, :recency)
 
@@ -77,7 +90,8 @@ module People
       # Builds the Facts for one person from already-loaded records. Pure over the
       # records handed in — no queries. `item_score` is the feed item's ranked
       # score for attention rows; 0.0 for recent rows.
-      def facts_for(standing:, threads:, contacts:, relationship_type:, last_activity:, item_score: 0.0, **_)
+      def facts_for(standing:, threads:, contacts:, relationship_type:, last_activity:,
+                    item_score: 0.0, attention_weight: nil, **_)
         Facts.new(
           standing: standing,
           two_way_threads: threads.count { |t| t.last_inbound_at.present? && t.last_outbound_at.present? },
@@ -88,7 +102,8 @@ module People
           classified: contacts.any? { |c| c.sender_kind_source.present? },
           relationship_type: relationship_type.presence,
           item_score: item_score.to_f,
-          last_activity: last_activity
+          last_activity: last_activity,
+          attention_weight: attention_weight
         )
       end
     end
@@ -107,8 +122,11 @@ module People
       )
     end
 
-    # How much this counterpart matters, 0..~9.
+    # How much this counterpart matters, 0..~9. The learned attention weight wins
+    # when present (scaled onto the legacy band); otherwise the legacy evidence sum.
     def strength
+      return (@facts.attention_weight * ATTENTION_STRENGTH_SCALE).round(4) if @facts.attention_weight
+
       w = STRENGTH_WEIGHTS
       w[:two_way] * saturate(@facts.two_way_threads, THREAD_SATURATION) +
         w[:outbound] * saturate(@facts.outbound_threads, THREAD_SATURATION) +

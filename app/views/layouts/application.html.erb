@@ -14,7 +14,9 @@
   </head>
 
   <body class="h-full <%= "hotwire-native" if hotwire_native_app? %>"
-        data-controller="<%= "scout-overlay " unless hotwire_native_app? %>email-shortcuts theme skim-overlay product-tour<%= " hint" unless hotwire_native_app? %><%= " nav-shortcuts" if authenticated? && !hotwire_native_app? %>"
+        data-controller="<%= "scout-overlay " unless hotwire_native_app? %>settings-overlay email-shortcuts theme skim-overlay product-tour<%= " hint" unless hotwire_native_app? %><%= " nav-shortcuts" if authenticated? && !hotwire_native_app? %>"
+        data-settings-overlay-default-url-value="<%= Settings::Catalog.default_path %>"
+        data-settings-overlay-return-url-value="<%= now_path %>"
         data-command-palette-context-value="<%= content_for?(:cp_context) ? yield(:cp_context) : '' %>"
         data-command-palette-message-id-value="<%= content_for?(:cp_message_id) ? yield(:cp_message_id) : '' %>"
         data-command-palette-folders-value="<%= content_for?(:cp_folders) ? yield(:cp_folders) : '[]' %>"
@@ -26,6 +28,11 @@
     <% if authenticated? %>
       <%= render(Campbooks::NavRail.new) %>
     <% end %>
+
+    <%# Capture settings page content BEFORE the main tag so it can be passed to
+        SettingsOverlay. On non-settings pages settings_content is nil and the
+        overlay renders a skeleton placeholder. %>
+    <% settings_content = settings_overlay_page? ? capture { yield } : nil %>
 
     <%# When the docked Scout bar is rendered (bold layout), the shell reserves
         extra bottom room so nothing hides under it — pb-36 on mobile (bottom nav
@@ -41,16 +48,8 @@
       <%= section_nav if authenticated? %>
 
       <main id="main-content" class="<%= content_for?(:main_class) ? yield(:main_class) : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8' %>" tabindex="-1">
-      <%= render "shared/flash_inline" %>
-
-      <% if content_for?(:sidebar) %>
-        <div class="flex flex-col gap-6 lg:flex-row lg:gap-8">
-          <%= yield :sidebar %>
-          <div class="flex-1 min-w-0">
-            <%= yield %>
-          </div>
-        </div>
-      <% else %>
+      <% unless settings_overlay_page? %>
+        <%= render "shared/flash_inline" %>
         <%= yield %>
       <% end %>
       </main>
@@ -85,6 +84,15 @@
       <%= render(Campbooks::ScoutOverlay.new) %>
       <%= render(Campbooks::KeyboardShortcutsModal.new) %>
       <%= render(Campbooks::HintTip.new) %>
+    <% end %>
+    <%# The settings overlay is part of the shell on every authenticated page (native
+        included): a settings page renders inside its frame, any other page carries
+        it closed so the account menu / ⌘, can open it in place. %>
+    <% if authenticated? %>
+      <%= render(Campbooks::SettingsOverlay.new(
+            current_section: (try(:current_section) if settings_overlay_page?),
+            content: settings_content,
+            context: Settings::Catalog::Context.new(user: current_user, native: hotwire_native_app?))) %>
     <% end %>
     <%= render "shared/flash_toast_region" %>
     <% if authenticated? %><%= render "shared/swipe_dialogs" %><% end %>

@@ -2,11 +2,12 @@
 
 require "rails_helper"
 
-# Nav labels with apostrophes or & are HTML-escaped in ERB:
-#   "Scout's memory"      → "Scout&#39;s memory"
-#   "AI & automation"     → "AI &amp; automation"
-#   "Workspace & people"  → "Workspace &amp; people"
-# We assert on safe fragments or on CGI.escapeHTML of the i18n string.
+# The settings overlay now shows six catalog groups: You, Scout, Inbox, Paper,
+# Connections, Workspace. The old five-group sidebar ("Workspace & people", "Account",
+# "Plan", "AI & automation") is gone.
+#
+# Nav labels with apostrophes are HTML-escaped in ERB:
+#   "Scout's memory" → "Scout&#39;s memory"
 
 RSpec.describe "Settings memory nav", type: :request do
   let(:ws) { Workspace.create!(name: "Nav WS", slug: "nav-#{SecureRandom.hex(4)}") }
@@ -20,22 +21,30 @@ RSpec.describe "Settings memory nav", type: :request do
 
   before { sign_in(user) }
 
-  it "shows all five nav labels on the memory page" do
+  it "shows all six overlay nav group labels on the memory page" do
     get settings_memory_path
     expect(response).to have_http_status(:ok)
 
-    # Labels with special chars are HTML-escaped by ERB (apostrophe → &#39;,
-    # & → &amp;), so we match on the escaped versions.
-    expect(response.body).to include("Scout&#39;s memory")      # Scout's memory
+    # The new overlay nav groups:
+    expect(response.body).to include("You")
+    expect(response.body).to include("Scout")
+    expect(response.body).to include("Inbox")
+    expect(response.body).to include("Paper")
     expect(response.body).to include("Connections")
-    expect(response.body).to include("Workspace &amp; people")  # Workspace & people
-    expect(response.body).to include("Account")
-    expect(response.body).to include("Plan")
+    expect(response.body).to include("Workspace")
   end
 
-  it "does not show the classic 'AI & automation' group heading" do
+  it "includes Scout's memory as a nav item" do
     get settings_memory_path
     expect(response).to have_http_status(:ok)
+    # Apostrophe is HTML-escaped in ERB output
+    expect(response.body).to include("Scout&#39;s memory")
+  end
+
+  it "does not show the old sidebar group headings" do
+    get settings_memory_path
+    expect(response).to have_http_status(:ok)
+    expect(response.body).not_to include("Workspace &amp; people")
     expect(response.body).not_to include("AI &amp; automation")
     expect(response.body).not_to include("AI &amp; Automation")
   end

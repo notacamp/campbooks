@@ -191,16 +191,31 @@ RSpec.describe People::Profile do
       end
     end
 
+    context "attention weight" do
+      before { contact }
+
+      it "exposes the person's attention weight row when one exists" do
+        row = AttentionWeight.create!(user: user, workspace: workspace, subject: person,
+                                      weight: 0.8, confidence: 0.9,
+                                      reasons: [ { "key" => "two_way", "params" => { "count" => 3 } } ],
+                                      computed_at: Time.current)
+        expect(profile.attention).to eq(row)
+      end
+
+      it "is nil when the person has no attention row" do
+        expect(profile.attention).to be_nil
+      end
+    end
+
     context "query budget" do
       before do
         contact
         make_message(contact: contact)
       end
 
-      it "resolves in ≤ 13 queries" do
-        # ≤ 13 because build_events now uses two queries (upcoming + past) to ensure
-        # upcoming events are never crowded out by a window full of past events.
-        # Warm all caches first.
+      it "resolves in ≤ 14 queries" do
+        # ≤ 14: two queries for build_events (upcoming + past) plus one for the
+        # learned attention weight (Attention::Weights#for). Warm all caches first.
         described_class.for(person, user: user)
 
         query_count = 0
@@ -210,7 +225,7 @@ RSpec.describe People::Profile do
           described_class.for(person, user: user)
         end
 
-        expect(query_count).to be <= 13
+        expect(query_count).to be <= 14
       end
     end
   end

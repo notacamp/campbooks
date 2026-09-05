@@ -19,15 +19,15 @@ RSpec.describe "SettingsTemplatesNav", type: :request do
   it "hides the template links when the readiness flags are off (the default)" do
     get settings_root_path
     expect(response).to have_http_status(:ok)
-    # Sanity: the AI & Automation group renders, so the absences below are real.
+    # Sanity: the AI settings item renders in the overlay nav, so the absences below are real.
     expect(response.body).to include(settings_ai_path)
     expect(response.body).not_to include(settings_document_templates_path)
     expect(response.body).not_to include(settings_email_templates_path)
   end
 
   it "the template pages are accessible when the readiness flags are on" do
-    # In bold layout, templates are reached via Scout's memory edit links, not via
-    # direct sidebar entries. Verify the pages themselves are reachable when gated on.
+    # In the overlay nav, templates may or may not appear depending on the flags;
+    # verify the pages themselves are reachable when gated on.
     keys = %w[ENABLE_DOCUMENT_TEMPLATES ENABLE_EMAIL_TEMPLATES]
     with_env(keys.index_with { "1" }) do
       get settings_document_templates_path

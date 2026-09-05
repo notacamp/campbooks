@@ -149,6 +149,16 @@ class EmailProcessJob < ApplicationJob
       ContactAnalysisJob.perform_later(contact.id)
     end
 
+    # Scout's full read (summary, priority, action prompt, the ask) — the fourth rung
+    # of the triage ladder (Emails::Categorizer). Inbound human mail only, first ingest
+    # only, never bulk/automated senders. People's Reply/Decide lanes and the Now feed
+    # read from it.
+    if text_ai_available && !was_already_processed && !is_outbound?(email) &&
+       Contacts::AnalysisGate.analyze?(email) &&
+       !Contacts::SenderKind.broadcast?(email, provider_hints: false)
+      EmailAnalysisJob.perform_later(email.id)
+    end
+
     apply_sender_rules(email)
     apply_email_rules(email) unless was_already_processed
 

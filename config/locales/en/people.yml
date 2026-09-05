@@ -26,6 +26,17 @@ en:
           details: Details
           archive: Archive thread
           block: Block sender
+      stand_note:
+        ask_scout_context: "About the email “%{subject}” from %{name}:"
+        chips:
+          draft_reply: Draft reply
+          draft_follow_up: Draft follow-up
+          ask_scout: Ask Scout
+          done: Done
+          let_it_go: Let it go
+          snooze: Snooze until tomorrow
+          open_money: Open in Money
+          mark_paid: Mark paid
       search_bar:
         placeholder: Find a person or company…
         clear: Clear
@@ -68,6 +79,8 @@ en:
         make_person: Mark as person
         make_service: Mark as service
         scout_not_read: "Scout hasn't read this person yet."
+        why_foot: "Learned from what you do · updated %{time} ago"
+        why_learning: "Scout is still learning what %{name} means to you."
         read_on: "Read on %{date}"
         refresh: Refresh
         refresh_hint: Ask Scout to re-read this person
@@ -78,6 +91,7 @@ en:
         thread_message_one: message
         thread_messages_other: messages
         sections:
+          why: "Why they rank here"
           scout_read: "Scout's read"
           numbers: Numbers
           threads: Threads
@@ -157,18 +171,54 @@ en:
       not_found: Not found
       needs_message: No message for this action
       snooze_title: Snooze
+      paid: "Marked %{name}'s invoice paid"
     standing:
-      money_subject: "%{amount} · due %{date}"
+      invoice_ref: "invoice %{number}"
+      an_invoice: "invoice"
+    stand:
+      asks_for: "Asks for %{ask}"
+      asks_quote: 'Asks: “%{quote}”'
+      waiting_for: "Waiting for %{what}"
+      no_answer_since: "No answer since %{date}"
+      you_wrote_last: "You wrote last, %{date}"
+      money_late:
+        one: "%{amount} due %{date} · %{count} day late"
+        other: "%{amount} due %{date} · %{count} days late"
+      money_owed_to_you:
+        one: "Owes you %{amount} since %{date} · %{count} day late"
+        other: "Owes you %{amount} since %{date} · %{count} days late"
     conversation:
-      standing_reply:
-        one: "%{name} wrote %{count} day ago about “%{subject}” and is waiting on your reply."
-        other: "%{name} wrote %{count} days ago about “%{subject}” and is waiting on your reply."
-      standing_nudge:
-        one: "You wrote to %{name} %{count} day ago about “%{subject}”; no reply yet."
-        other: "You wrote to %{name} %{count} days ago about “%{subject}”; no reply yet."
-      standing_decide:
-        one: "Scout flagged “%{subject}” for you %{count} day ago."
-        other: "Scout flagged “%{subject}” for you %{count} days ago."
+      stand:
+        reply_ask:
+          zero: "%{name} asked for %{ask} today in “%{subject}” and is waiting on you."
+          one: "%{name} asked for %{ask} %{count} day ago in “%{subject}” and is still waiting on you."
+          other: "%{name} asked for %{ask} %{count} days ago in “%{subject}” and is still waiting on you."
+        reply_quote:
+          zero: "%{name} wrote today in “%{subject}”: “%{quote}” Waiting on you."
+          one: "%{name} wrote %{count} day ago in “%{subject}”: “%{quote}” Still waiting on you."
+          other: "%{name} wrote %{count} days ago in “%{subject}”: “%{quote}” Still waiting on you."
+        reply_plain:
+          zero: "%{name} wrote today about “%{subject}” and is waiting on you."
+          one: "%{name} wrote %{count} day ago about “%{subject}” and is still waiting on you."
+          other: "%{name} wrote %{count} days ago about “%{subject}” and is still waiting on you."
+        nudge:
+          zero: "You wrote to %{name} today about “%{subject}”; no reply yet."
+          one: "You wrote to %{name} %{count} day ago about “%{subject}” and have not heard back."
+          other: "You wrote to %{name} %{count} days ago about “%{subject}” and have not heard back."
+        nudge_reason: "Still waiting for %{what}."
+        decide: "Scout read “%{subject}” from %{name} and suggests: %{prompt}"
+        pay:
+          one: "The %{reference} from %{name} for %{amount} was due %{date}, %{count} day ago."
+          other: "The %{reference} from %{name} for %{amount} was due %{date}, %{count} days ago."
+        chase:
+          one: "%{name} owes you %{amount} (%{reference}), due %{date}, %{count} day ago."
+          other: "%{name} owes you %{amount} (%{reference}), due %{date}, %{count} days ago."
+        you_wrote_last: "You wrote last, on %{date}. Nothing is waiting on you."
+        fresh_ask: "%{name} asked for %{ask} on %{date}. Nothing is overdue yet."
+        fresh_ask_undated: "%{name} asked for %{ask}. Nothing is overdue yet."
+        fresh_quote: "%{name} wrote on %{date}: “%{quote}”"
+        fresh_quote_undated: "%{name} wrote: “%{quote}”"
+        draft_below: "Scout's draft is below."
       you: You
       back: People
       menu: More
@@ -214,7 +264,6 @@ en:
         one: "%{count} document"
         other: "%{count} documents"
       open_page: Organization page
-      no_standing: Nothing needs you here right now.
       people_heading: "People at %{org} · %{count}"
       no_people: No people yet.
       streams_heading: "Streams from %{org} · %{count}"

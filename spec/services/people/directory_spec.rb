@@ -57,7 +57,8 @@ RSpec.describe People::Directory do
       create(:organization_membership, person: person, organization: org)
 
       org_item = instance_double(People::Attention::Item,
-                                 verb: :chase, subject: "Invoice #1", wait_days: 14, text: nil,
+                                 verb: :chase, subject: "Invoice #1", wait_days: 14,
+                                 detail: nil, detail_kind: nil, money: nil,
                                  thread_id: nil, message: nil, attention: true,
                                  feed_item: instance_double(FeedItem, id: SecureRandom.uuid, score: 80.0, sort_at: Time.current))
 
@@ -248,7 +249,8 @@ RSpec.describe People::Directory do
       create(:organization_membership, person: person, organization: org)
 
       org_item = instance_double(People::Attention::Item,
-                                 verb: :chase, subject: "Invoice #1", wait_days: 14, text: nil,
+                                 verb: :chase, subject: "Invoice #1", wait_days: 14,
+                                 detail: nil, detail_kind: nil, money: nil,
                                  thread_id: nil, message: nil, attention: true,
                                  feed_item: instance_double(FeedItem, id: SecureRandom.uuid, score: 80.0, sort_at: Time.current))
 
@@ -305,7 +307,7 @@ RSpec.describe People::Directory do
 
       attn_item = instance_double("People::Attention::Item",
                                   feed_item: item,
-                                  message: msg, text: "Reply needed",
+                                  message: msg, detail: nil, detail_kind: nil, money: nil,
                                   subject: "Thread Sofia",
                                   thread_id: thread.id, verb: :reply,
                                   wait_days: 2, attention: true)
@@ -364,6 +366,88 @@ RSpec.describe People::Directory do
       make_person(name: "Ana", email: "ana@x.example")
       cp = directory.counterparts.find { |c| c.name == "Ana" }
       expect(cp.data["tags"]).to eq([])
+    end
+  end
+
+  describe "attention weights" do
+    def weight_person(person, weight, reasons: [])
+      AttentionWeight.create!(user: user, workspace: workspace, subject: person,
+                              weight: weight, confidence: 0.9, reasons: reasons,
+                              computed_at: Time.current)
+    end
+
+    it "ranks a low-activity high-weight person above a fresh low-weight one in Recent" do
+      stale_important, = make_person(name: "Stale Important", email: "si@x.example",
+                                     inbound_at: 10.days.ago, emails: 3)
+      fresh_trivial,   = make_person(name: "Fresh Trivial", email: "ft@x.example",
+                                     inbound_at: 1.day.ago, emails: 3)
+      weight_person(stale_important, 0.9)
+      weight_person(fresh_trivial, 0.1)
+
+      counterparts = directory.counterparts
+      hi = counterparts.find { |c| c.name == "Stale Important" }
+      lo = counterparts.find { |c| c.name == "Fresh Trivial" }
+
+      expect(hi.priority).to be > lo.priority
+    end
+
+    it "leads the lane with the higher-weight person on an equal-score Need-you item" do
+      hi_person, _hc, hi_thread = make_person(name: "Hi Weight", email: "hi@x.example", emails: 5)
+      lo_person, _lc, lo_thread = make_person(name: "Lo Weight", email: "lo@x.example", emails: 5)
+
+      [ hi_thread, lo_thread ].each do |thread|
+        msg = thread.email_messages.first
+        msg.update_columns(skimmed_at: nil, ai_todo_dismissed: false, provider_folder_id: "INBOX",
+                           received_at: 3.days.ago, read: false)
+        thread.update_columns(last_inbound_at: 3.days.ago, last_outbound_at: nil)
+        FeedItem.create!(user: user, workspace: workspace, kind: "reply_owed", subject: msg,
+                         dedupe_key: "reply_owed:#{msg.id}", sort_at: msg.received_at,
+                         score: 60.0, attention: true, data: { "age_days" => 3 })
+      end
+
+      weight_person(hi_person, 0.9)
+      weight_person(lo_person, 0.2)
+
+      counterparts = directory.counterparts
+      hi = counterparts.find { |c| c.name == "Hi Weight" }
+      lo = counterparts.find { |c| c.name == "Lo Weight" }
+
+      expect(hi).to be_needs_you
+      expect(lo).to be_needs_you
+      expect(hi.priority).to be > lo.priority
+    end
+
+    it "stamps data['weight'] (rounded) and data['why'] (all three reasons) from the row" do
+      person, = make_person(name: "Sofia", email: "sofia@x.example")
+      weight_person(person, 0.874, reasons: [
+        { "key" => "replies_fast", "params" => { "hours" => 3 } },
+        { "key" => "ignored", "params" => { "percent" => 20 } }
+      ])
+
+      cp = directory.counterparts.find { |c| c.name == "Sofia" }
+      expect(cp.data["weight"]).to eq(0.87)
+      expect(cp.data["why"]).to eq([
+        { "key" => "replies_fast", "params" => { "hours" => 3 } },
+        { "key" => "ignored", "params" => { "percent" => 20 } }
+      ])
+    end
+
+    it "leaves rows without weight/why when the user has no attention rows" do
+      make_person(name: "Nadia", email: "nadia@x.example")
+      cp = directory.counterparts.find { |c| c.name == "Nadia" }
+
+      expect(cp.data).not_to have_key("weight")
+      expect(cp.data).not_to have_key("why")
+    end
+
+    it "stamps the same weight + why on a single-row refresh (counterpart_for)" do
+      person, = make_person(name: "Sofia", email: "sofia@x.example")
+      weight_person(person, 0.9, reasons: [ { "key" => "two_way", "params" => { "count" => 4 } } ])
+
+      cp = directory.counterpart_for(person)
+      expect(cp.data["weight"]).to eq(0.9)
+      expect(cp.data["why"]).to eq([ { "key" => "two_way", "params" => { "count" => 4 } } ])
+      expect(cp.facts.attention_weight).to eq(0.9)
     end
   end
 end

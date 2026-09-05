@@ -37,7 +37,9 @@ class PeopleStanding < ApplicationRecord
   # need the result object don't have to recompute it live.
   def standing
     People::Standing::Result.new(
-      text: text,
+      detail: detail,
+      detail_kind: detail_kind&.to_sym,
+      money: (data || {})["money"],
       needs_you: needs_you,
       thread_id: email_thread_id,
       overdue_days: wait_days,

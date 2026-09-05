@@ -1,4 +1,3 @@
-<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
 <%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) do |h|
   if current_entitlements.feature?(:email_templates)
     h.with_actions do %><%= link_to t(".new_template"), new_settings_email_template_path, class: "inline-flex items-center px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg shadow-sm" %><% end

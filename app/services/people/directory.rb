@@ -27,6 +27,7 @@ module People
       persons   = eligible_persons
       orgs      = eligible_orgs
 
+      load_attention_weights(persons, orgs)
       prefetch_org_counts(orgs)
       prime_standing(people: persons, organizations: orgs)
 
@@ -57,6 +58,10 @@ module People
     def counterpart_for(person)
       attention = People::Attention.new(@user, now: @now)
       people_standing.prime(people: [ person ])
+      # The person's learned weight for this single-row refresh (one query; nil
+      # when there is no row) — the same facts + data the full directory stamps.
+      @weight_rows = { person.id => ::Attention::Weights.new(@user).for(person) }
+      @org_weight_rows ||= {}
       # Re-check the same eligibility criteria used in eligible_persons so that
       # refresh_counterpart! can delete a row when the person becomes ineligible.
       contacts = person.contacts.to_a
@@ -122,6 +127,31 @@ module People
       contacts.any? { |contact| owner.include?(contact.email.to_s.downcase) }
     end
 
+    # ── Attention weights ─────────────────────────────────────────────────────
+    # Two batched lookups (persons + orgs) for the whole list. Skipped entirely
+    # when the user has no rows yet, so a fresh workspace ranks exactly as before.
+
+    def load_attention_weights(persons, orgs)
+      # ::Attention — the top-level module, not People::Attention (the feed reader).
+      weights = ::Attention::Weights.new(@user)
+      if weights.missing?
+        @weight_rows = {}
+        @org_weight_rows = {}
+      else
+        @weight_rows     = weights.persons(persons.map(&:id))
+        @org_weight_rows = weights.organizations(orgs.map(&:id))
+      end
+    end
+
+    # The row's materialized attention: the rounded weight + up to three reasons
+    # (positive AND negative — the row picks the first positive for its quiet line,
+    # the Details rail shows all three). Empty when there is no row.
+    def attention_data(row)
+      return {} unless row
+
+      { "weight" => row.weight.round(2), "why" => row.reason_values.first(3).map(&:to_h) }
+    end
+
     # ── Counterpart construction ──────────────────────────────────────────────
 
     def person_facts(person, standing, item_score: 0.0)
@@ -131,7 +161,8 @@ module People
         contacts: person.contacts.to_a,
         relationship_type: person.relationship_type,
         last_activity: person.last_email_at,
-        item_score: item_score
+        item_score: item_score,
+        attention_weight: @weight_rows[person.id]&.weight
       )
     end
 
@@ -159,7 +190,7 @@ module People
         standing: standing,
         facts: facts,
         score: People::Priority.score(facts, now: @now),
-        data: {}
+        data: attention_data(@weight_rows[person.id])
       )
     end
 
@@ -177,6 +208,8 @@ module People
       lead           = org_lead(org, person_rows_by_id)
       item_score     = org_attention_item&.feed_item&.score.to_f
 
+      org_weight_row = @org_weight_rows[org.id]
+
       facts = if lead&.facts
                 lead.facts.with(standing: standing, item_score: item_score)
       else
@@ -184,6 +217,9 @@ module People
                                            relationship_type: nil, last_activity: last_activity,
                                            item_score: item_score)
       end
+      # An org's own learned weight wins over its lead person's when it has one;
+      # otherwise it inherits the lead's (as before the org had a weight of its own).
+      facts = facts.with(attention_weight: org_weight_row.weight) if org_weight_row
 
       People::Counterpart.new(
         kind: :organization,
@@ -197,6 +233,7 @@ module People
         facts: facts,
         score: People::Priority.score(facts, now: @now),
         data: { "people_count" => people_count, "services_count" => services_count }
+          .merge(attention_data(org_weight_row))
       )
     end
 

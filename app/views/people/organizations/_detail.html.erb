@@ -43,8 +43,7 @@
 
   <div class="flex-1 overflow-y-auto">
     <div class="mx-auto w-full max-w-[760px] px-5 pb-10 pt-5 sm:px-6">
-      <%= render Campbooks::ScoutNote.new(message: @standing.text.presence || t("people.org.no_standing"),
-            time: t("people.conversation.where_things_stand")) %>
+      <%= render Campbooks::People::StandNote.new(standing: @standing, counterpart: @organization) %>
 
       <%# People at <org>. %>
       <div class="flex items-center gap-1.5 pb-1 pt-6 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">

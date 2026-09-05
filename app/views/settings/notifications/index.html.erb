@@ -1,5 +1,4 @@
-<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
-  <%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
+<%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
 
   <%# Email digests — currently just the daily "waiting on replies" nudge. %>
   <div class="bg-card shadow-sm rounded-lg border border-gray-200 mb-6">

@@ -94,6 +94,5 @@ es:
       search: Buscar…
       search_and_commands: Buscar y comandos (⌘K)
       toggle_dark_mode: Alternar modo oscuro
-      toggle_theme: Alternar tema
     user_menu:
       sign_out: Cerrar sesión

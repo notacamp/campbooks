@@ -81,6 +81,7 @@ module People
       when "unstar"     then do_unstar
       when "archive"    then do_archive
       when "unarchive"  then do_unarchive
+      when "paid"       then do_paid
       else
         failure(t("people.actions.unsupported"))
       end
@@ -201,6 +202,22 @@ module People
 
       { success: true, message: t("people.actions.unarchived"),
         toast: notify_stream(t("people.actions.unarchived"), severity: :success) }
+    end
+
+    # ── Paid ───────────────────────────────────────────────────────────────────
+
+    # Mark a late invoice paid from the person/organization page: settles the
+    # document (a bank match, when it lands, still wins) and retires the card.
+    def do_paid
+      return head :not_found unless @item && %w[late_payable late_receivable].include?(@item.kind)
+
+      document = @item.subject
+      return failure(t("people.actions.not_found")) unless document.is_a?(Document) && document.workspace_id == current_user.workspace_id
+
+      document.mark_settled!
+      @item.dismiss!
+      message = t("people.actions.paid", name: @row.name)
+      { success: true, message: message, toast: notify_stream(message, severity: :success) }
     end
 
     # ── Helpers ────────────────────────────────────────────────────────────────

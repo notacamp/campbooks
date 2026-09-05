@@ -10,6 +10,7 @@ module Campbooks
     class EmailActionCard < Campbooks::Feed::Base
       def view_template
         article do
+          attention_kicker
           header_row
           h3(class: "mt-3 text-[17px] font-semibold leading-snug tracking-tight text-foreground") do
             a(href: helpers.email_message_path(subject), class: "rounded-sm outline-none transition-colors hover:text-foreground/70 focus-visible:ring-2 focus-visible:ring-ring") { clean_subject(subject) }

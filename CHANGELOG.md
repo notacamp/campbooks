@@ -16,7 +16,18 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- **Settings open as an overlay** over the page you are on (⌘, or the account menu); Esc puts you back exactly where you were, and deep links to `/settings/...` still work. Every settings page now sits under one of six groups (You, Scout, Inbox, Paper, Connections, Workspace) with a find box, so Members, Security, Notifications, Data & privacy, System health, templates, AI guidance and every inbox panel are one click away again.
+- People: the Scout line on each row and the "where things stand" note now say what is actually open with that person — what they asked (Scout's read, or their own words quoted from the message), what you are still waiting for, or the overdue amount — instead of the contact's profile bio or a sentence that repeated the row. Both are composed in your language at render time. Latest rows that need you carry their verb (Reply, Nudge, Decide, Pay, Chase).
+- Now and People rank on the same learned attention weight (who you answer and how fast, who you meet, whose bills you settle, whose mail you archive unread or dismiss) instead of fixed star and label boosts; dismissing a card now lowers that sender, not the whole kind. Workspaces with no history yet rank exactly as before.
+- ⚠️ **Tasks are now _asks_, and live on Now and Time — the task pages are retired.** (Pre-1.0 web-UI break.) An ask is still the same record, but it has no page of its own: it appears as a card on Now while it needs a decision and as a row on Time once it has a date (undated ones sit under "No date yet"). The task **board, list, Skim triage page, task detail/edit pages and per-task discussions are gone**; the manual priority / tag / document / assignee pickers go with them. `/tasks` and `/tasks/:id` now **redirect to Time**, so old notification and digest links keep working. The `Task` table, the public REST API (`/api/v1/tasks`) and the MCP tools are **unchanged**.
+
 ### Added
+
+- **A first-class account menu.** The avatar now opens a small identity panel: who you are, your workspace, Settings, an Appearance control (light, dark, or match the system), keyboard shortcuts, and sign out. It opens beside the rail on desktop and as a bottom sheet on phones.
+- Scout now learns how much each person and organization matters to you — from who you answer and how fast, who you meet, whose bills you settle, and whose mail you archive unread or dismiss — as a per-user attention weight refreshed in the background (the base every place will rank on; nothing changes on screen yet).
+- Now cards and People rows now say why they rank first — "You usually answer Sofia within 3 hours", "You met twice recently" — and the People details rail explains every person's place, including the reasons that lower it.
 
 - **Shortcut hints:** resting the pointer on an action, or focusing it with the keyboard, shows its name and its keyboard shortcut in a small tooltip — on the People list and conversation, the nav rail, the inbox toolbar and reading pane, feed cards, reminders and the calendar header. Icon-only buttons gain a proper label at the same time, and every hinted control now carries `aria-keyshortcuts` for screen readers. Touch devices are unaffected; the existing on-card keycaps and legends stay as they were.
 - People list rows show tag chips again: the person's own sender tags plus the email's tags (the same chips the old inbox rows carried), capped so a row stays tidy on mobile.
@@ -24,10 +35,18 @@ major, minor, or patch change here.
 - **The ask rides its email card.** While an email still needs you, its ask is a chip row under Scout's note (Hold the slot, or jump to its day on Time) rather than a second card — acting on a chip updates it in place and never dismisses the email.
 - **Time's "No date yet" section** collects every undated ask at the foot of the agenda, each with Set a date / Hold / Done; Scout's day note now counts them ("2 asks have no date yet.").
 - Scout holds focus time for accepted dated **asks** the same way it already does for deadlines, and an ask's held slot shows on its Time row ("held Thu 10:00").
+- People: the note's actions match the situation — Draft reply / Done / Snooze, Draft follow-up / Let it go, Ask Scout (opens Scout with the suggestion), Open in Money / Mark paid.
+- Scout's full read of an email (summary, priority, suggested action and the new "ask") now runs for inbound mail from people — it was defined but never scheduled — so the Reply and Decide lanes fill in and the Now feed's email cards appear again.
 
-### Changed
+### Removed
 
-- ⚠️ **Tasks are now _asks_, and live on Now and Time — the task pages are retired.** (Pre-1.0 web-UI break.) An ask is still the same record, but it has no page of its own: it appears as a card on Now while it needs a decision and as a row on Time once it has a date (undated ones sit under "No date yet"). The task **board, list, Skim triage page, task detail/edit pages and per-task discussions are gone**; the manual priority / tag / document / assignee pickers go with them. `/tasks` and `/tasks/:id` now **redirect to Time**, so old notification and digest links keep working. The `Task` table, the public REST API (`/api/v1/tasks`) and the MCP tools are **unchanged**.
+- The inbox gear modal; its panels live under Settings → Inbox.
+
+### Fixed
+
+- The AI-providers hint on Settings → General rendered raw HTML instead of a link.
+- ⌘K settings commands (Tags, Document types, Signatures, Sync) pointed at the old inbox modal and landed on People; they now open the matching settings page.
+- People: an organization in the Pay or Chase lane no longer says "Nothing needs you here right now" on its page.
 
 ### Security
 

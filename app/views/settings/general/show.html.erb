@@ -1,4 +1,3 @@
-<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
 <%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) %>
 
 <div class="max-w-2xl">
@@ -32,6 +31,6 @@
   <% end %>
 
   <p class="text-sm text-gray-500 mt-4">
-    <%= t(".ai_providers_hint", link: link_to(t(".ai_providers_link_text"), settings_ai_path, class: "font-medium text-accent-600 hover:text-accent-700")) %>
+    <%= t(".ai_providers_hint_html", link: link_to(t(".ai_providers_link_text"), settings_ai_path, class: "font-medium text-accent-600 hover:text-accent-700")) %>
   </p>
 </div>

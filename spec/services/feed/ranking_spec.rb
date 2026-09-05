@@ -187,9 +187,125 @@ RSpec.describe Feed::Ranking do
     end
   end
 
+  describe "attention weight boosts (the user has attention rows)" do
+    def attention_boost(weight)
+      ((weight - described_class::ATTENTION_PIVOT) * described_class::ATTENTION_SPAN).round
+    end
+
+    # A contact whose person carries an AttentionWeight of `weight`.
+    def weighted_contact(weight:, reasons: [], starred: false, confidence: 0.9)
+      person = create(:person, workspace: workspace)
+      contact = create(:contact, workspace: workspace, person: person,
+                       starred_at: starred ? now : nil)
+      AttentionWeight.create!(user: user, workspace: workspace, subject: person,
+                              weight: weight, confidence: confidence, reasons: reasons,
+                              computed_at: now)
+      contact
+    end
+
+    it "boosts a high-weight sender by the centered weight, and never adds the legacy star boost" do
+      # Also starred, to prove the fixed +STARRED_CONTACT_BOOST is not stacked on top.
+      high  = message(contact: weighted_contact(weight: 0.9, starred: true))
+      plain = message
+
+      a = rank("email_action", candidate(high, score: 45, sort_at: 1.hour.ago))
+      b = rank("email_action", candidate(plain, score: 45, sort_at: 1.hour.ago))
+
+      expect(a[:score]).to eq(b[:score] + attention_boost(0.9))
+      expect(a[:score]).to eq(b[:score] + 36)
+    end
+
+    it "penalizes a low-weight sender below the neutral prior" do
+      low   = message(contact: weighted_contact(weight: 0.05))
+      plain = message
+
+      a = rank("email_action", candidate(low, score: 45, sort_at: 1.hour.ago))
+      b = rank("email_action", candidate(plain, score: 45, sort_at: 1.hour.ago))
+
+      expect(a[:score]).to eq(b[:score] + attention_boost(0.05))
+    end
+
+    it "gives a contact with no row the neutral prior (zero lift) even on a user who has rows" do
+      weighted_contact(weight: 0.9) # ensures the user is not 'missing'
+      bare = create(:contact, workspace: workspace, person: create(:person, workspace: workspace))
+
+      c = rank("email_action", candidate(message(contact: bare), score: 45, sort_at: 1.hour.ago))
+      expect(c[:score]).to eq(45 + attention_boost(described_class::ATTENTION_PIVOT))
+      expect(c[:score]).to eq(45)
+    end
+
+    it "stamps the first positive reason and the rounded weight into data['why']/data['weight']" do
+      contact = weighted_contact(weight: 0.9,
+                                 reasons: [ { "key" => "replies_fast", "params" => { "hours" => 3 } } ])
+      c = rank("email_action", candidate(message(contact: contact), score: 45, sort_at: 1.hour.ago))
+
+      expect(c[:data]["why"]).to eq("key" => "replies_fast", "params" => { "hours" => 3 })
+      expect(c[:data]["weight"]).to eq(0.9)
+    end
+
+    it "stamps the weight but no why when the row's reasons are all negative" do
+      contact = weighted_contact(weight: 0.05,
+                                 reasons: [ { "key" => "ignored", "params" => { "percent" => 80 } } ])
+      c = rank("email_action", candidate(message(contact: contact), score: 45, sort_at: 1.hour.ago))
+
+      expect(c[:data]).to have_key("weight")
+      expect(c[:data]).not_to have_key("why")
+    end
+
+    it "drops a stale why when the row no longer has a positive reason" do
+      contact = weighted_contact(weight: 0.05,
+                                 reasons: [ { "key" => "ignored", "params" => { "percent" => 80 } } ])
+      stale = { "key" => "replies_fast", "params" => { "hours" => 2 } }
+      c = rank("email_action", candidate(message(contact: contact), score: 45, sort_at: 1.hour.ago,
+                                         data: { "why" => stale }))
+
+      expect(c[:data]).not_to have_key("why")
+    end
+
+    it "picks the first POSITIVE reason even when a negative one is listed first" do
+      contact = weighted_contact(weight: 0.9, reasons: [
+        { "key" => "ignored", "params" => { "percent" => 55 } },
+        { "key" => "two_way", "params" => { "count" => 4 } }
+      ])
+      c = rank("email_action", candidate(message(contact: contact), score: 45, sort_at: 1.hour.ago))
+
+      expect(c[:data]["why"]).to eq("key" => "two_way", "params" => { "count" => 4 })
+    end
+
+    it "lifts a late-payable Document via the vendor contact on its linked message" do
+      contact = weighted_contact(weight: 0.9)
+      msg = message(contact: contact)
+      doc = create(:document, workspace: workspace)
+      DocumentEmailMessage.create!(document: doc, email_message: msg)
+
+      c = rank("late_payable", candidate(doc, score: 45, sort_at: 1.hour.ago))
+
+      expect(c[:score]).to eq(45 + attention_boost(0.9))
+      expect(c[:data]["weight"]).to eq(0.9)
+    end
+
+    it "leaves a reminder subject untouched (no contact, no stamping)" do
+      weighted_contact(weight: 0.9) # user has rows
+      reminder = create(:reminder, workspace: workspace)
+      c = rank("reminder", candidate(reminder, score: 60, sort_at: 1.day.from_now))
+
+      expect(c[:score]).to eq(60)
+      expect(c[:data]).not_to have_key("weight")
+      expect(c[:data]).not_to have_key("why")
+    end
+  end
+
   describe "resilience" do
     it "falls back to the source score when a boost lookup blows up" do
       allow(Contact).to receive(:where).and_raise("boom")
+      c = rank("email_action", candidate(message, score: 45, attention: true, sort_at: 1.hour.ago))
+
+      expect(c[:score]).to eq(45)
+      expect(c[:attention]).to be(true)
+    end
+
+    it "leaves every candidate on its source score when the attention preload blows up" do
+      allow(Attention::Weights).to receive(:new).and_raise("boom")
       c = rank("email_action", candidate(message, score: 45, attention: true, sort_at: 1.hour.ago))
 
       expect(c[:score]).to eq(45)

@@ -126,7 +126,7 @@ Rails.application.routes.draw do
   get  "people/streams/:name",  to: "people/streams#show",        as: :people_stream, constraints: { name: %r{[^/]+} }, format: false
   get  "people/orgs/:id",       to: "people/organizations#show",  as: :people_organization
   post "people/:id/actions/:kind", to: "people/actions#create",  as: :people_action,
-       constraints: { kind: /done|undo_done|snooze|unsnooze|star|unstar|archive|unarchive/ }
+       constraints: { kind: /done|undo_done|snooze|unsnooze|star|unstar|archive|unarchive|paid/ }
   # Lazy pieces of a person's conversation: an older thread's messages, a folded
   # message's body (each a turbo-frame the person page renders as a placeholder).
   get  "people/:id/threads/:thread_id",   to: "people/threads#show",  as: :people_thread

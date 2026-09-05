@@ -13,6 +13,10 @@ module Campbooks
       # something to reveal, without dumping a whole newsletter into the feed.
       EXPANDED_EXCERPT_LENGTH = 1500
 
+      # At/above this weight the kicker wears the Ember dot and full-ink text (the
+      # counterpart matters to you); below it the kicker is a quiet grey structural note.
+      KICKER_EMBER_AT = 0.6
+
       def initialize(item:, subject:, **attrs)
         @item = item
         @subject = subject
@@ -232,6 +236,28 @@ module Campbooks
         else
           l(date, format: :long)
         end
+      end
+
+      # The learned reason this card ranks where it does (Feed::Ranking stamps the top
+      # positive Attention::Reason into item.data["why"]). Ember dot when the counterpart
+      # matters (weight ≥ KICKER_EMBER_AT), quiet grey otherwise. Mirrors HighlightCard's
+      # kicker so the Rewind and the deck speak one visual language. Renders nothing
+      # (and never raises) when the card carries no positive reason.
+      def attention_kicker(margin: "mb-2")
+        why = item.data["why"]
+        return unless why.is_a?(Hash) && why["key"].present?
+
+        sentence = Attention::Reason.from_h(why).sentence
+        ember = item.data["weight"].to_f >= KICKER_EMBER_AT
+        div(class: class_names(margin, "flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em]",
+                               ember ? "text-foreground" : "text-muted-foreground"),
+            data: { attention_kicker: true }) do
+          span(class: "h-1.5 w-1.5 flex-shrink-0 rounded-full", style: "background-color: var(--ember-solid)") if ember
+          plain sentence
+        end
+      rescue I18n::MissingTranslationData, ArgumentError => e
+        Rails.logger.warn("[Feed::Base] attention kicker skipped: #{e.class}: #{e.message}")
+        nil
       end
 
       # A small Ember dot is the sanctioned priority accent (DESIGN.md: Ember means

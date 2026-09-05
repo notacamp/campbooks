@@ -59,6 +59,14 @@ module Feed
     # Contact analysis's read on how urgent a sender's mail tends to run.
     SENDER_URGENCY_BOOST = { "high" => 8, "low" => -5 }.freeze
 
+    # Learned relevance: the counterpart's attention weight, centered on the neutral
+    # prior so an unknown sender gets no lift and no penalty. 0.3 → 0, 0.9 → +36,
+    # 0.02 → −17, 1.0 → +42 — the same band the legacy star/label boosts spanned.
+    # Replaces the fixed star / known-relationship / sender-urgency boosts once the
+    # user has any attention rows; a fresh workspace (no rows) keeps the legacy path.
+    ATTENTION_PIVOT = Attention::Scorer::PRIOR
+    ATTENTION_SPAN  = 60
+
     # A card the user was shown this long ago and never touched drifts down.
     SEEN_IGNORE_AFTER = 2.days
     SEEN_IGNORE_PENALTY = 8
@@ -81,9 +89,15 @@ module Feed
     end
 
     # Rewrites :score and :attention on each [kind, candidate] pair in place.
-    # Batch-loads the contact/thread signals once for the whole run.
+    # Batch-loads the contact/thread/attention signals once for the whole run.
     def apply!(pairs)
       preload(pairs.map { |_kind, c| c[:subject] })
+    rescue => e
+      # A batch-level failure (e.g. attention weights unavailable) must never take
+      # the feed down — leave every candidate on its source score, untouched.
+      Rails.logger.warn("[Feed::Ranking] preload failed: #{e.class}: #{e.message}")
+      pairs
+    else
       pairs.each do |kind, candidate|
         rank(kind, candidate)
       rescue => e
@@ -102,6 +116,10 @@ module Feed
                engagement_multiplier(kind)).round
       candidate[:score] = final
       candidate[:attention] = !!candidate[:attention] && final >= ATTENTION_FLOOR
+      # Record why this card ranks where it does (the top positive reason + weight),
+      # so the card can print a kicker. Runs inside the per-candidate rescue, so a
+      # stamping hiccup keeps the ranked score rather than dropping the card.
+      stamp_attention(candidate)
     end
 
     # The generator stamps each candidate with the seen_at of the row it already
@@ -148,22 +166,64 @@ module Feed
       0.5**(age / half_life)
     end
 
+    # Relevance boosts. The counterpart term is learned (the attention weight)
+    # once the user has any rows; on a fresh workspace it falls back to the legacy
+    # fixed star / known-relationship / sender-urgency boosts, so nothing changes
+    # until Scout has watched the user. Thread and category boosts are email-only
+    # and unchanged; the counterpart term now also lifts a Document (a late bill
+    # from a weighted vendor) via its linked message's contact.
     def boosts(candidate)
       subject = candidate[:subject]
-      return 0 unless subject.is_a?(EmailMessage)
-
-      contact = contacts_by_id[subject.contact_id]
-      thread_count = candidate.dig(:data, "thread_count").to_i
+      contact_id = contact_id_for(subject)
 
       total = 0
-      if contact
-        total += STARRED_CONTACT_BOOST if contact[:starred]
-        total += KNOWN_RELATIONSHIP_BOOST if contact[:known_relationship]
-        total += SENDER_URGENCY_BOOST.fetch(contact[:urgency], 0)
+      if @weights_missing
+        # Legacy path: the fixed star / relationship / urgency boosts, read from the
+        # contact's flags. Consulted for every email subject (as the pre-attention
+        # code did) so a contact-lookup failure is caught per-candidate, not batch.
+        total += legacy_contact_boosts(contact_id) if subject.is_a?(EmailMessage) || contact_id
+      elsif contact_id
+        total += attention_boost(weight_for(contact_id))
       end
-      total += ENGAGED_THREAD_BOOST if engaged_thread_ids.include?(subject.email_thread_id)
-      total += BUSY_THREAD_BOOST if thread_count >= BUSY_THREAD_AT
-      total + category_boost(subject)
+
+      if subject.is_a?(EmailMessage)
+        thread_count = candidate.dig(:data, "thread_count").to_i
+        total += ENGAGED_THREAD_BOOST if engaged_thread_ids.include?(subject.email_thread_id)
+        total += BUSY_THREAD_BOOST if thread_count >= BUSY_THREAD_AT
+        total += category_boost(subject)
+      end
+
+      total
+    end
+
+    # The contact behind a subject: an email's sender, or (for a Document) the
+    # contact of the message it arrived on. nil for reminders, tasks, events.
+    def contact_id_for(subject)
+      case subject
+      when EmailMessage then subject.contact_id
+      when Document then @doc_contact_ids[subject.id]
+      end
+    end
+
+    # Today's fixed relevance block, kept for the no-attention-rows fallback.
+    def legacy_contact_boosts(contact_id)
+      contact = contacts_by_id[contact_id]
+      return 0 unless contact
+
+      total = 0
+      total += STARRED_CONTACT_BOOST if contact[:starred]
+      total += KNOWN_RELATIONSHIP_BOOST if contact[:known_relationship]
+      total += SENDER_URGENCY_BOOST.fetch(contact[:urgency], 0)
+      total
+    end
+
+    # Centered on the neutral prior so an unknown/absent row lifts nothing.
+    def attention_boost(weight)
+      ((weight - ATTENTION_PIVOT) * ATTENTION_SPAN).round
+    end
+
+    def weight_for(contact_id)
+      @weights_by_contact[contact_id]&.weight || Attention::Weights::DEFAULT_WEIGHT
     end
 
     # Provider/AI category verdict: important mail up, bulk noise down. Sources
@@ -179,12 +239,61 @@ module Feed
     end
 
     def preload(subjects)
-      messages = subjects.grep(EmailMessage)
-      @contact_ids = messages.filter_map(&:contact_id).uniq
-      @thread_ids = messages.filter_map(&:email_thread_id).uniq
+      messages  = subjects.grep(EmailMessage)
+      documents = subjects.grep(Document)
+
+      @thread_ids      = messages.filter_map(&:email_thread_id).uniq
+      @doc_contact_ids = document_contact_ids(documents.map(&:id))
+
+      # Both message senders and the vendors behind late-bill documents.
+      @contact_ids = (messages.filter_map(&:contact_id) + @doc_contact_ids.values).uniq
+
+      # Learned relevance: one weights lookup for the whole batch. Missing (no rows
+      # for this user yet) keeps the legacy boosts and skips stamping entirely.
+      @weights            = Attention::Weights.new(@user)
+      @weights_missing    = @weights.missing?
+      @weights_by_contact = @weights_missing ? {} : @weights.contacts(@contact_ids)
+
       # Reset the memoized lookups so apply! is safely re-entrant.
       @contacts_by_id = nil
       @engaged_thread_ids = nil
+    end
+
+    # { document_id => first non-nil linked-message contact_id } in one query.
+    def document_contact_ids(doc_ids)
+      return {} if doc_ids.blank?
+
+      map = {}
+      DocumentEmailMessage.where(document_id: doc_ids).joins(:email_message)
+        .pluck(:document_id, "email_messages.contact_id")
+        .each do |doc_id, contact_id|
+          next if contact_id.nil?
+
+          map[doc_id] ||= contact_id
+        end
+      map
+    end
+
+    # Persist the top positive reason + weight onto the candidate's data so the
+    # card can print its kicker. A no-op without attention rows or a contact; when
+    # the row has no positive reason (all structural / negative), stamp the weight
+    # but drop any stale `why` so a card never prints a reason it no longer has.
+    def stamp_attention(candidate)
+      return if @weights_missing
+
+      contact_id = contact_id_for(candidate[:subject])
+      return if contact_id.nil?
+
+      data = (candidate[:data] || {}).dup
+      if (row = @weights_by_contact[contact_id])
+        data["weight"] = row.weight.round(2)
+        why = row.reason_values.find(&:positive?)
+        why ? data["why"] = why.to_h : data.delete("why")
+      else
+        data.delete("weight")
+        data.delete("why")
+      end
+      candidate[:data] = data
     end
 
     def contacts_by_id

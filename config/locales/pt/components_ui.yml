@@ -117,19 +117,6 @@ pt:
     icon_picker:
       default: Predefinido
       label: Escolher um ícone
-    inbox_settings_modal:
-      close_label: Fechar definições da caixa de entrada
-      nav:
-        accounts: Contas
-        contacts: Contactos
-        display: Apresentação
-        document_types: Tipos de documento
-        filtering: Filtragem
-        signatures: Assinaturas
-        tag_groups: Grupos
-        tags: Etiquetas
-      settings_sections_label: Secções de definições
-      title: Definições da caixa de entrada
     keyboard_shortcuts_modal:
       contexts:
         people: Pessoas

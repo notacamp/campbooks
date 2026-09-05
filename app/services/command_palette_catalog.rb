@@ -41,7 +41,7 @@ class CommandPaletteCatalog
       *(Features.workflows? ? [ cmd("workflows", I18n.t("command_palette.commands.workflows"), I18n.t("command_palette.categories.navigate"), "workflow", workflows_path) ] : []),
       # Bank statements — the accounting reconciliation list, reached from Money. Gated by Features.accounting?.
       *(Features.accounting? ? [ cmd("statements", I18n.t("command_palette.commands.statements"), I18n.t("command_palette.categories.navigate"), "credit-card", money_statements_path) ] : []),
-      cmd("email-scans", I18n.t("command_palette.commands.email_scans"), I18n.t("command_palette.categories.navigate"), "search", email_messages_path(inbox_settings: "accounts")),
+      cmd("email-scans", I18n.t("command_palette.commands.email_scans"), I18n.t("command_palette.categories.navigate"), "search", settings_inbox_section_path("accounts")),
       cmd("notifications", I18n.t("command_palette.commands.notifications"), I18n.t("command_palette.categories.navigate"), "bell", notifications_path),
       cmd("calendar", I18n.t("command_palette.commands.calendar"), I18n.t("command_palette.categories.navigate"), "calendar", calendar_path),
       cmd("contacts", I18n.t("command_palette.commands.settings_contacts"), I18n.t("command_palette.categories.navigate"), "users", contacts_path)
@@ -49,21 +49,25 @@ class CommandPaletteCatalog
   end
 
   def settings
-    [
-      cmd("settings", I18n.t("command_palette.commands.settings"), I18n.t("command_palette.categories.settings"), "cog", settings_root_path),
-      cmd("settings-ai", I18n.t("command_palette.commands.settings_ai"), I18n.t("command_palette.categories.settings"), "sparkles", settings_ai_path),
-      cmd("settings-account", I18n.t("command_palette.commands.settings_account"), I18n.t("command_palette.categories.settings"), "users", settings_account_path),
-      cmd("settings-tags", I18n.t("command_palette.commands.settings_tags"), I18n.t("command_palette.categories.settings"), "tag", email_messages_path(inbox_settings: "tags")),
-      cmd("settings-doctypes", I18n.t("command_palette.commands.settings_doctypes"), I18n.t("command_palette.categories.docs"), "file-text", email_messages_path(inbox_settings: "document_types")),
-      cmd("settings-signatures", I18n.t("command_palette.commands.settings_signatures"), I18n.t("command_palette.categories.settings"), "pen", email_messages_path(inbox_settings: "signatures")),
-      cmd("settings-members", I18n.t("command_palette.commands.settings_members"), I18n.t("command_palette.categories.settings"), "users", settings_members_path),
-      cmd("settings-notifications", I18n.t("command_palette.commands.settings_notifications"), I18n.t("command_palette.categories.settings"), "bell", settings_notifications_path),
-      cmd("settings-sync", I18n.t("command_palette.commands.settings_sync"), I18n.t("command_palette.categories.settings"), "at-sign", email_messages_path(inbox_settings: "accounts")),
-      cmd("settings-integrations", I18n.t("command_palette.commands.settings_integrations"), I18n.t("command_palette.categories.settings"), "cog", settings_integrations_root_path),
-      cmd("settings-notion", I18n.t("command_palette.commands.settings_notion"), I18n.t("command_palette.categories.settings"), "cog", settings_integrations_notion_path),
-      cmd("settings-gdrive", I18n.t("command_palette.commands.settings_gdrive"), I18n.t("command_palette.categories.settings"), "folder", settings_integrations_google_drive_path),
-      cmd("settings-zdrive", I18n.t("command_palette.commands.settings_zdrive"), I18n.t("command_palette.categories.settings"), "folder", settings_integrations_zoho_drive_path)
-    ]
+    context = Settings::Catalog::Context.new(
+      user:   @user,
+      native: false
+    )
+    cat = I18n.t("command_palette.categories.settings")
+    # Map catalog icon symbols to palette icon vocabulary
+    # Only names app/javascript/lib/command_items.js can draw; anything else falls back to "cog".
+    icon_map = {
+      user: "users", bell: "bell", spark: "sparkles", cpu: "sparkles", chat: "sparkles",
+      template: "file-text", "mail-template": "mail", zap: "workflow", tag: "tag", layers: "grid",
+      pen: "pen", file: "file-text", branch: "workflow", at: "at-sign", calendar: "calendar",
+      drive: "folder", cloud: "folder", users: "users", grid: "grid", pulse: "chart-bar"
+    }
+    Settings::Catalog.groups(context).flat_map do |group|
+      group.items.map do |item|
+        icon = icon_map[item[:icon]] || "cog"
+        cmd("settings-#{item[:key]}", item[:label], cat, icon, item[:path])
+      end
+    end
   end
 
   def actions
