@@ -137,6 +137,39 @@ RSpec.describe Campbooks::People::CounterpartRow, type: :component do
     expect(html).to include("text-amber-500")
   end
 
+  describe "tag chips" do
+    it "renders a chip for each data['tags'] entry, with its name and colour" do
+      person = create(:person, name: "Sofia Martins")
+      counterpart = People::Counterpart.new(kind: :person, record: person, name: "Sofia Martins",
+                                            subtitle: nil, avatar_email: "sofia@x.example",
+                                            avatar_initial: nil, last_activity: Time.current,
+                                            standing: standing(subject: "Q3 deck"),
+                                            data: { "tags" => [
+                                              { "id" => "1", "name" => "Client",  "color" => "#3b82f6" },
+                                              { "id" => "2", "name" => "Receipt", "color" => "#f59e0b" }
+                                            ] })
+      html = render(described_class.new(counterpart: counterpart))
+
+      expect(html).to include("Client")
+      expect(html).to include("Receipt")
+      expect(html).to include("#3b82f6")
+      # Rendered through the shared TagChip component.
+      expect(html).to include("max-w-[160px]")
+    end
+
+    it "renders no chip markup when there are no tags" do
+      person = create(:person, name: "Sofia Martins")
+      counterpart = People::Counterpart.new(kind: :person, record: person, name: "Sofia Martins",
+                                            subtitle: nil, avatar_email: "sofia@x.example",
+                                            avatar_initial: nil, last_activity: Time.current,
+                                            standing: standing, data: {})
+      html = render(described_class.new(counterpart: counterpart))
+
+      expect(html).to include("Sofia Martins")
+      expect(html).not_to include("max-w-[160px]")
+    end
+  end
+
   describe "the latest variant (the inbox list)" do
     it "carries its own id, shows the date instead of the wait, and the message's first line" do
       person = create(:person, name: "Sofia Martins")

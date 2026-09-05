@@ -16,6 +16,10 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- People list rows show tag chips again: the person's own sender tags plus the email's tags (the same chips the old inbox rows carried), capped so a row stays tidy on mobile.
+
 ### Changed
 
 - Quieter draft-save feedback: the composer's autosave status settles to a calm "Saved" instead of a flashing label, and the parked-draft pill is now a compact, on-system capsule that reveals the draft on hover.
