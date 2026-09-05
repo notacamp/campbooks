@@ -243,8 +243,8 @@ class Time::Agenda
       # Collect all attendee emails from all events in the window.
       all_emails = base_events.joins(nil)
         .flat_map { |e| e.guests.map { |g| g.email.downcase } }.uniq
-      Contact.where(workspace_id: @user.workspace_id, address: all_emails)
-        .index_by { |c| c.address.downcase }
+      Contact.where(workspace_id: @user.workspace_id, email: all_emails)
+        .index_by { |c| c.email.downcase }
     end
   end
 
