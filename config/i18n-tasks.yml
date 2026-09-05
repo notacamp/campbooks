@@ -68,6 +68,7 @@ ignore_unused:
   - 'paper.status.*'        # Paper's derived status labels — Documents::Status.for reads paper.status.<status> dynamically
   - 'paper.kinds.*'         # Paper's kind labels — Documents::Facts reads paper.kinds.<document_type> dynamically
   - 'people.details.toasts.*' # People::DetailsController resolves t(toast_key) with a full string key variable at runtime
+  - 'attention.reasons.*'    # Resolved dynamically in Attention::Reason#sentence (key built from stored reason data)
 
 # Enum value keys are built dynamically (human_enum_name), so don't flag them as
 # missing from the static scan — parity across locales still covers them.

@@ -39,4 +39,39 @@ RSpec.describe Feed::RefreshJob do
 
     expect(Feed::LiveDeck).not_to have_received(:broadcast)
   end
+
+  describe "attention refresh integration" do
+    before do
+      allow(Attention::Refresh).to receive(:call).and_return(0)
+    end
+
+    it "refreshes attention when weights are stale" do
+      # No rows at all -> stale
+      described_class.new.perform(user.id)
+      expect(Attention::Refresh).to have_received(:call).with(user)
+    end
+
+    it "skips attention refresh when weights are fresh" do
+      # Seed a fresh row so stale? returns false
+      person = create(:person)
+      AttentionWeight.create!(
+        user: user, workspace: workspace,
+        subject_type: "Person", subject_id: person.id,
+        weight: 0.5, confidence: 0.5, raw_score: 1.0,
+        reasons: [], evidence: {}, computed_at: Time.current
+      )
+
+      described_class.new.perform(user.id)
+      expect(Attention::Refresh).not_to have_received(:call)
+    end
+
+    it "does not stop feed generation when attention refresh raises" do
+      allow(Attention::Refresh).to receive(:call).and_raise("attention exploded")
+      create(:email_message, email_account: account, ai_action_prompt: "Reply", received_at: 1.hour.ago)
+
+      # Should not raise; feed generation should proceed
+      expect { described_class.new.perform(user.id) }.not_to raise_error
+      expect(Feed::LiveDeck).to have_received(:broadcast)
+    end
+  end
 end

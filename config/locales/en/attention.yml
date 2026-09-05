@@ -1,0 +1,22 @@
+en:
+  attention:
+    reasons:
+      replies_fast: "You usually answer within %{hours} hours"
+      replies: "You answered %{count} of their last %{total} messages"
+      two_way: "%{count} conversations both ways"
+      meetings: "You met %{count} times recently"
+      invoices: "%{count} invoices and receipts between you"
+      pays_promptly: "You settle their bills on time"
+      engaged: "You acted on %{count} of their emails"
+      starred: "You starred them"
+      allowed: "You allowed them"
+      vip: "Scout reads them as a client, partner or colleague"
+      urgent_sender: "Their mail tends to be urgent"
+      ignored: "You archive %{percent}% of their mail unread"
+      dismissed: "You dismissed %{count} cards about them"
+      service: "A service, not a person"
+      taught_important: "You told Scout they matter"
+      taught_unimportant: "You told Scout they don't matter"
+      blocked: "Blocked"
+      new: "No history yet"
+      org_lead: "Through %{name}"

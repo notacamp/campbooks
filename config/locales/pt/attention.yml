@@ -1,0 +1,22 @@
+pt:
+  attention:
+    reasons:
+      replies_fast: "Costuma responder em %{hours} horas"
+      replies: "Respondeu a %{count} das últimas %{total} mensagens"
+      two_way: "%{count} conversas em ambos os sentidos"
+      meetings: "Reuniu-se %{count} vezes recentemente"
+      invoices: "%{count} faturas e recibos entre vocês"
+      pays_promptly: "Liquida as faturas deles a tempo"
+      engaged: "Atuou em %{count} dos e-mails deles"
+      starred: "Marcou com estrela"
+      allowed: "Permitiu este remetente"
+      vip: "O Scout identifica-os como cliente, parceiro ou colega"
+      urgent_sender: "O correio deles tende a ser urgente"
+      ignored: "Arquiva %{percent}% do correio deles sem ler"
+      dismissed: "Dispensou %{count} cartões sobre eles"
+      service: "Um serviço, não uma pessoa"
+      taught_important: "Disse ao Scout que são importantes"
+      taught_unimportant: "Disse ao Scout que não são importantes"
+      blocked: "Bloqueado"
+      new: "Sem histórico ainda"
+      org_lead: "Através de %{name}"
