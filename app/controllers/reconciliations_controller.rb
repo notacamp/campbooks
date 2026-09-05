@@ -131,7 +131,7 @@ class ReconciliationsController < ApplicationController
     return if require_entitlement!(:accounting, ignore_limit: true)
 
     @reconciliation.destroy
-    redirect_to accounting_path, success: t(".destroyed")
+    redirect_to money_statements_path, success: t(".destroyed")
   end
 
   # POST /reconciliations/:id/confirm_all_suggestions

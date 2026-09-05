@@ -11,10 +11,25 @@ RSpec.describe "Reconciliations", type: :request do
     with_env("ENABLE_ACCOUNTING" => "1") { example.run }
   end
 
-  describe "GET /accounting" do
+  # /accounting is now a permanent-ish redirect to /money/statements so that
+  # self-hosters' bookmarks keep working. Auth and gate checks happen at the
+  # destination; the redirect itself is a plain 302 at the Rack level.
+  describe "GET /accounting (legacy redirect)" do
+    it "redirects to /money/statements regardless of auth state" do
+      get "/accounting"
+      expect(response).to have_http_status(:found)
+      expect(response.location).to end_with(money_statements_path)
+    end
+
+    it "accounting_path helper still resolves to /accounting" do
+      expect(accounting_path).to eq("/accounting")
+    end
+  end
+
+  describe "GET /money/statements" do
     context "when not signed in" do
       it "redirects to sign-in" do
-        get "/accounting"
+        get money_statements_path
         expect(response).to redirect_to(/session/)
       end
     end
@@ -23,25 +38,24 @@ RSpec.describe "Reconciliations", type: :request do
       before { sign_in(user) }
 
       it "returns 200" do
-        get "/accounting"
+        get money_statements_path
         expect(response).to have_http_status(:ok)
       end
 
       it "lists reconciliations" do
         r = create(:reconciliation, workspace:, created_by: user)
-        get "/accounting"
+        get money_statements_path
         expect(response.body).to include("/reconciliations/#{r.id}")
       end
 
-      # Finding 7: turbo_stream format returns 200 (pagination)
-      it "responds with turbo_stream for pagination" do
-        get "/accounting", headers: { "Accept" => "text/vnd.turbo-stream.html" }
-        expect(response).to have_http_status(:ok)
+      it "shows the New reconciliation button" do
+        get money_statements_path
+        expect(response.body).to include(new_reconciliation_path)
       end
 
-      # Finding 12: /reconciliations (index route) was removed; accounting_path is canonical
-      it "accounting_path helper resolves to /accounting, not /reconciliations" do
-        expect(accounting_path).to eq("/accounting")
+      it "responds with turbo_stream for pagination" do
+        get money_statements_path, headers: { "Accept" => "text/vnd.turbo-stream.html" }
+        expect(response).to have_http_status(:ok)
       end
     end
   end
@@ -126,7 +140,7 @@ RSpec.describe "Reconciliations", type: :request do
         delete "/reconciliations/#{reconciliation.id}"
       }.to change(Reconciliation, :count).by(-1)
 
-      expect(response).to redirect_to(accounting_path)
+      expect(response).to redirect_to(money_statements_path)
     end
   end
 
@@ -262,9 +276,16 @@ RSpec.describe "Reconciliations", type: :request do
       with_env("ENABLE_ACCOUNTING" => nil) { example.run }
     end
 
-    it "returns 404 when ENABLE_ACCOUNTING is not set" do
-      sign_in(user)
+    # /accounting now redirects at the Rack level; the gate fires at /money/statements.
+    it "redirects /accounting to /money/statements even without ENABLE_ACCOUNTING" do
       get "/accounting"
+      expect(response).to have_http_status(:found)
+      expect(response.location).to end_with(money_statements_path)
+    end
+
+    it "returns 404 at /money/statements when ENABLE_ACCOUNTING is not set" do
+      sign_in(user)
+      get money_statements_path
       expect(response).to have_http_status(:not_found)
     end
   end

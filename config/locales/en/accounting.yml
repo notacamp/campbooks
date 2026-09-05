@@ -23,7 +23,7 @@ en:
 
   command_palette:
     commands:
-      accounting: Accounting
+      statements: Bank Statements
 
   reconciliations:
     untitled_statement: Bank statement

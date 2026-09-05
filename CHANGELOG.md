@@ -54,6 +54,7 @@ major, minor, or patch change here.
 
 ### Changed
 
+- **Money is now the accounting home.** The bank statement list and "New reconciliation" entry live at `/money/statements` under the Money surface. `/accounting` redirects there (302) so self-hosters' bookmarks and any integrations pointing at the old URL keep working. Breadcrumbs on the reconciliation workbench and new-reconciliation page now point back to Bank Statements. The ⌘K palette's "Accounting" entry is replaced by "Bank Statements" at the same destination.
 - Quieter draft-save feedback: the composer's autosave status settles to a calm "Saved" instead of a flashing label, and the parked-draft pill is now a compact, on-system capsule that reveals the draft on hover.
 
 ## [0.36.2] - 2026-09-04

@@ -1,5 +1,5 @@
 ---
 pt:
   money:
-    index:
-      accounting: "Contabilidade"
+    statements:
+      title: "Extratos Bancários"
