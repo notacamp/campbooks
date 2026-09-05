@@ -10,6 +10,7 @@ module Campbooks
         div(class: "-mx-3 flex items-start gap-3 rounded-2xl px-3 py-3 transition-colors duration-150 hover:bg-muted/50") do
           icon_circle
           div(class: "min-w-0 flex-1") do
+            attention_kicker(margin: "mb-1.5")
             div(class: "flex flex-wrap items-center gap-x-1.5 text-[12.5px]") do
               span(class: "font-medium text-foreground") { t(".owed") }
               span(class: "text-muted-foreground/50") { "·" }
