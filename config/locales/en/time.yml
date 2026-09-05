@@ -16,6 +16,7 @@ en:
         from_document: "from %{title}"
         scout_suggested: Scout suggested
         task: Task
+        held: held %{when}
         someone: someone
         google_calendar: Google Calendar
         zoho_calendar: Zoho Calendar
@@ -38,6 +39,8 @@ en:
         all_day: all day
         overdue: overdue
         deadline: deadline
+        ask: ask
+        no_date: no date
         minutes:
           one: "%{count} min"
           other: "%{count} min"
@@ -52,6 +55,14 @@ en:
         move: Move
         move_to: Move to
         keep: Keep
+        set_a_date: Set a date
+        change_date: Change date
+        friday: Friday
+        next_week: Next week
+        pick: Pick
+        hold: Hold time
+        hold_at: Hold %{when}
+        not_now: Not now
         add_to_calendar: Add to calendar
         dismiss: Dismiss
         today: Today
@@ -60,6 +71,8 @@ en:
         today: Today
         tomorrow: Tomorrow
         empty_today: Nothing scheduled.
+        no_date_yet: No date yet
+        no_date_hint: Set a date, hold time, or finish it.
       day_note:
         today: today
         clear: Your day is clear — nothing due and no meetings.
@@ -71,6 +84,9 @@ en:
           other: "%{count} deadlines"
         summary_both: "%{meetings} and %{deadlines} today."
         summary_one: "%{phrase} today."
+        undated:
+          one: One ask has no date yet.
+          other: "%{count} asks have no date yet."
         focus: I held %{duration} %{when} for %{subject}.
         minutes:
           one: "%{count} minute"

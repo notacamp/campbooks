@@ -53,11 +53,6 @@ en:
       s3_rem_added: On your calendar
 
       # Slide 4: Tasks (feature-gated)
-      tasks_mod: Tasks
-      s4_title: Turn any email into a task.
-      s4_body1_html: "Scout spots the asks hiding in your mail — \"can you send the report by Friday?\" — and offers to turn them into tasks with <b>due dates attached</b>."
-      s4_body2_html: "Work them as a list or a board; check things off and <b>nothing promised gets lost</b> three replies deep in a thread."
-
       # Slide 5: Documents
       docs_mod: Documents
       s5_title: Paperwork that files itself.

@@ -53,11 +53,6 @@ es:
       s3_rem_added: En tu calendario
 
       # Diapositiva 4: Tareas (con bandera de funcionalidad)
-      tasks_mod: Tareas
-      s4_title: Convierte cualquier correo en una tarea.
-      s4_body1_html: "Scout detecta las peticiones ocultas en tu correo — \"¿puedes enviar el informe antes del viernes?\" — y se ofrece a convertirlas en tareas con <b>fechas de entrega asociadas</b>."
-      s4_body2_html: "Trabájalas en lista o en tablero; márcalas como completadas y <b>nada prometido se pierde</b> tres respuestas más abajo en un hilo."
-
       # Diapositiva 5: Documentos
       docs_mod: Documentos
       s5_title: El papeleo que se archiva solo.

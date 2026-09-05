@@ -236,6 +236,52 @@ RSpec.describe "Feed::Items", type: :request do
       expect(task_item.reload.acted?).to be true
     end
 
+    it "hold_task holds Scout's slot, offers undo, and undo dismisses the block" do
+      post act_feed_item_path(task_item, format: :turbo_stream), params: { tool: "hold_task" }
+
+      expect(response).to have_http_status(:ok)
+      block = FocusBlock.for_task(task).held.first
+      expect(block).to be_present
+      expect(task_item.reload.acted?).to be true
+      expect(response.body).to include(undo_feed_item_path(task_item))
+
+      post undo_feed_item_path(task_item, format: :turbo_stream),
+           params: { tool: "hold_task", args: { focus_block_id: block.id, previous_status: "suggested" } }
+
+      expect(block.reload).to be_dismissed
+      expect(task_item.reload).to be_active
+    end
+
+    it "schedule_task dates the ask, offers undo, and undo restores it" do
+      post act_feed_item_path(task_item, format: :turbo_stream), params: { tool: "schedule_task", args: { on: "friday" } }
+
+      expect(response).to have_http_status(:ok)
+      expect(task.reload.due_at).to be_present
+      expect(task.reload).to be_todo
+      expect(task_item.reload.acted?).to be true
+
+      post undo_feed_item_path(task_item, format: :turbo_stream),
+           params: { tool: "schedule_task", args: { previous_due_at: "", previous_status: "suggested" } }
+
+      expect(task.reload.due_at).to be_nil
+      expect(task.reload).to be_suggested
+      expect(task_item.reload).to be_active
+    end
+
+    it "snooze_task snoozes the ask, offers undo, and undo wakes it" do
+      post act_feed_item_path(task_item, format: :turbo_stream), params: { tool: "snooze_task" }
+
+      expect(response).to have_http_status(:ok)
+      expect(task.reload.snoozed?).to be true
+      expect(task_item.reload.acted?).to be true
+
+      post undo_feed_item_path(task_item, format: :turbo_stream),
+           params: { tool: "snooze_task", args: { previous_status: "suggested" } }
+
+      expect(task.reload.snoozed?).to be false
+      expect(task_item.reload).to be_active
+    end
+
     it "another user's task item 404s" do
       other = workspace.users.create!(
         name: "Other",
@@ -251,6 +297,35 @@ RSpec.describe "Feed::Items", type: :request do
 
       expect(response).to have_http_status(:not_found)
       expect(task.reload.suggested?).to be true
+    end
+  end
+
+  # An ask chip fired from an EMAIL card (args[task_id]) acts on the ask but must
+  # leave the email card in place — only the chip row is replaced.
+  context "an ask riding an email card" do
+    let(:email) { create(:email_message, email_account: account, ai_action_prompt: "Reply") }
+    let(:email_item) do
+      FeedItem.create!(user: user, workspace: workspace, kind: "email_action", subject: email,
+                       dedupe_key: "email_action:#{email.id}", sort_at: Time.current)
+    end
+    let(:email_ask) do
+      Task.create!(workspace: workspace, title: "Send the contract", status: :todo,
+                   priority: :normal, source: email)
+    end
+
+    before { sign_in(user) }
+
+    it "runs the ask action, leaves the email card un-acted, and replaces the chip row" do
+      email_item
+      email_ask
+
+      post act_feed_item_path(email_item, format: :turbo_stream),
+           params: { tool: "snooze_task", args: { task_id: email_ask.id } }
+
+      expect(response).to have_http_status(:ok)
+      expect(email_ask.reload.snoozed?).to be true
+      expect(email_item.reload.acted?).to be false
+      expect(response.body).to include("ask_chips_#{email.id}")
     end
   end
 end

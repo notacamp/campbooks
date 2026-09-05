@@ -14,6 +14,7 @@ pt:
         from_document: "de %{title}"
         scout_suggested: Sugerido pelo Scout
         task: Tarefa
+        held: reservado %{when}
         someone: alguém
         google_calendar: Google Calendar
         zoho_calendar: Zoho Calendar
@@ -35,6 +36,8 @@ pt:
         all_day: dia inteiro
         overdue: em atraso
         deadline: prazo
+        ask: pedido
+        no_date: sem data
         minutes:
           one: "%{count} min"
           other: "%{count} min"
@@ -49,6 +52,14 @@ pt:
         move: Mover
         move_to: Mover para
         keep: Manter
+        set_a_date: Definir data
+        change_date: Alterar data
+        friday: Sexta
+        next_week: Próxima semana
+        pick: Escolher
+        hold: Reservar tempo
+        hold_at: Reservar %{when}
+        not_now: Agora não
         add_to_calendar: Adicionar ao calendário
         dismiss: Dispensar
         today: Hoje
@@ -57,6 +68,8 @@ pt:
         today: Hoje
         tomorrow: Amanhã
         empty_today: Nada agendado.
+        no_date_yet: Sem data ainda
+        no_date_hint: Definir uma data, reservar tempo ou concluir.
       day_note:
         today: hoje
         clear: O seu dia está livre — nada a vencer e sem reuniões.
@@ -68,6 +81,9 @@ pt:
           other: "%{count} prazos"
         summary_both: "%{meetings} e %{deadlines} hoje."
         summary_one: "%{phrase} hoje."
+        undated:
+          one: Um pedido ainda não tem data.
+          other: "%{count} pedidos ainda não têm data."
         focus: Reservei %{duration} %{when} para %{subject}.
         minutes:
           one: "%{count} minuto"

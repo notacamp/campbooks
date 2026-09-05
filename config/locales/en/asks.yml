@@ -1,0 +1,16 @@
+---
+en:
+  asks:
+    hold:
+      held: Held %{when}.
+      held_local: Held %{when}. Connect a calendar to sync it automatically.
+      no_slot: No free slot before the deadline. Try setting a date instead.
+    schedule:
+      scheduled: On Time for %{date}.
+      invalid_date: That date didn't work. Pick another.
+    snooze:
+      snoozed: Back in a week.
+    done:
+      done: Done.
+    dismiss:
+      dismissed: Dismissed.

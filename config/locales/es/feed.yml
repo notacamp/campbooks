@@ -17,10 +17,14 @@ es:
         archive_hint: Archiva toda la conversación. Puedes deshacerlo.
         attachment: Adjunto
         file_as: 'Etiquetar: %{tag}'
+        held: Reservado %{when}
+        hold_at: Reservar %{when}
         messages:
           one: "%{count} mensaje"
           other: "%{count} mensajes"
+        on_time: "%{day} en Tiempo"
         open: Abrir
+        set_a_date: Poner fecha
       email_preview_frame:
         unavailable: Este mensaje ya no está disponible.
       expandable_preview:
@@ -112,18 +116,27 @@ es:
         prefix: Etiquetar
         under: como
         undo: Deshacer
-      task_card:
-        accept: Añadir a tareas
-        complete: Completar
-        dismiss: Descartar
-        in_days:
-          one: Entrega en %{count} día
-          other: Entrega en %{count} días
-        missed: Puede que se te haya pasado
-        overdue: Atrasada
-        suggested: Tarea sugerida
-        today: Entrega hoy
-        tomorrow: Entrega mañana
+      ask_card:
+        ask: encargo
+        by: 'para el %{date}'
+        complete: Hecho
+        due_today: para hoy
+        friday: Viernes
+        from_email: del email de %{name}
+        hold: Reservar
+        hold_at: Reservar %{when}
+        next_week: Próxima semana
+        no_date: sin fecha
+        not_now: Ahora no
+        open_thread: Abrir conversación
+        overdue: atrasado
+        pick: Elegir
+        scout_found: Scout encontró un encargo
+        scout_slot: "%{when} está libre %{minutes} minutos; puedo reservarlo."
+        set_a_date: Poner fecha
+        today: Hoy
+        tomorrow: Mañana
+        tomorrow_on_time: Mañana en Tiempo
     time_of_day_greeting:
       greeting:
         afternoon: Buenas tardes, %{name}.
@@ -132,6 +145,9 @@ es:
         night: De madrugada, %{name}.
   feed:
     items:
+      ask_held: Reservé %{when} para esto.
+      ask_scheduled: En Tiempo para %{date}.
+      ask_snoozed: De vuelta en una semana.
       dismissed: Descartado.
       follow_up_dismissed: Seguimiento descartado.
       gone: Esto ya no está disponible.
