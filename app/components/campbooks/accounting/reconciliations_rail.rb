@@ -31,7 +31,7 @@ module Campbooks
             end
             span(class: "text-[11.5px] text-muted-foreground") { plain @reconciliations.size.to_s }
           end
-          a(href: helpers.accounting_path,
+          a(href: helpers.money_statements_path,
             class: "text-[12.5px] text-muted-foreground hover:text-foreground transition-colors") do
             plain t(".view_all")
           end

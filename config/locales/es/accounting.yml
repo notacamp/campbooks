@@ -23,7 +23,7 @@ es:
 
   command_palette:
     commands:
-      accounting: Contabilidad
+      statements: Extractos Bancarios
 
   reconciliations:
     untitled_statement: Extracto bancario

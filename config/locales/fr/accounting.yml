@@ -23,7 +23,7 @@ fr:
 
   command_palette:
     commands:
-      accounting: Comptabilité
+      statements: Relevés Bancaires
 
   reconciliations:
     untitled_statement: Relevé bancaire
