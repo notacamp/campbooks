@@ -54,6 +54,33 @@ RSpec.describe People::Priority do
     end
   end
 
+  describe "attention weight (the learned strength)" do
+    it "sets strength to the weight scaled onto the 0..9 band" do
+      expect(strength(facts(attention_weight: 0.8))).to eq((0.8 * described_class::ATTENTION_STRENGTH_SCALE).round(4))
+      expect(strength(facts(attention_weight: 0.8))).to eq(7.2)
+    end
+
+    it "falls back to the legacy strength when there is no weight (nil)" do
+      expect(strength(regular(attention_weight: nil))).to eq(strength(regular))
+    end
+
+    it "uses a zero weight as a real zero strength (not a fallback)" do
+      expect(strength(regular(attention_weight: 0.0))).to eq(0.0)
+    end
+
+    it "orders two equal-item_score Need-you rows by their weight" do
+      high = regular(standing: needing, item_score: 50.0, attention_weight: 0.9)
+      low  = regular(standing: needing, item_score: 50.0, attention_weight: 0.2)
+      expect(score(high)).to be > score(low)
+    end
+
+    it "orders two equally-recent Recent rows by their weight" do
+      high = facts(last_activity: now - 2.days, attention_weight: 0.9)
+      low  = facts(last_activity: now - 2.days, attention_weight: 0.2)
+      expect(score(high)).to be > score(low)
+    end
+  end
+
   describe "Need you (obligation = item_score + strength)" do
     it "a genuine ask from a regular outranks a stranger's with a lower-scored item" do
       # regular has much more strength, so even with a somewhat higher item_score on the one_off,
@@ -127,7 +154,13 @@ RSpec.describe People::Priority do
       bare = described_class.facts_for(standing: standing, threads: [], contacts: [],
                                        relationship_type: nil, last_activity: nil, now: now)
       expect(bare).to have_attributes(email_count: 0, item_score: 0.0, starred: false,
-                                      classified: false, relationship_type: nil)
+                                      classified: false, relationship_type: nil, attention_weight: nil)
+    end
+
+    it "carries the attention weight through when given" do
+      f = described_class.facts_for(standing: standing, threads: [], contacts: [],
+                                    relationship_type: nil, last_activity: nil, attention_weight: 0.7)
+      expect(f.attention_weight).to eq(0.7)
     end
   end
 end
