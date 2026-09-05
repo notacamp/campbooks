@@ -109,12 +109,16 @@ module Campbooks
 
       def compose_form_button(mode, icon_svg, label, data_key)
         short_key = data_key.delete_prefix("people_")
-        hint_key = ".#{short_key}_hint"
-        # Use a symbol so Phlex dasherizes the data attribute (people_reply → data-people-reply)
+        hint_key  = ".#{short_key}_hint"
+        hint_label = t(hint_key, default: label)
+        key_map = { "reply" => "r", "reply_all" => "a", "forward" => "f" }
+        key = key_map[short_key]
+        # Use a symbol so Phlex dasherizes the data attribute (people_reply -> data-people-reply)
         form(action: helpers.compose_email_message_path(@message, mode: mode), method: "post", class: "inline-flex") do
           input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
-          button(type: "submit", data: { data_key.to_sym => true },
-                 title: t(hint_key, default: label),
+          button(type: "submit",
+                 data: { data_key.to_sym => true, **hint_data(hint_label, key: key) },
+                 aria: hint_aria(key),
                  class: "inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-[12px] font-medium text-foreground hover:bg-secondary") do
             raw(safe(icon_svg)); whitespace; plain(label)
           end

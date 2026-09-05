@@ -87,10 +87,13 @@ module Campbooks
     end
 
     def confirm_form
+      confirm_label = t(".confirm")
       form(id: confirm_form_id, action: helpers.confirm_reminder_path(@reminder), method: :post, class: "inline-flex") do
         input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
-        render Campbooks::Button.new(variant: :primary, size: :sm, type: "submit", data: { reminders_action: "confirm" }) do
-          plain t(".confirm")
+        render Campbooks::Button.new(variant: :primary, size: :sm, type: "submit",
+                                     data: { reminders_action: "confirm", **hint_data(confirm_label, key: "⏎") },
+                                     aria: hint_aria("⏎")) do
+          plain confirm_label
           key_chip("⏎", on_primary: true)
         end
       end
@@ -99,7 +102,9 @@ module Campbooks
     def post_button(url, label, action:, key:)
       form(action: url, method: :post, class: "inline-flex") do
         input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
-        render Campbooks::Button.new(variant: :ghost, size: :sm, type: "submit", data: { reminders_action: action }) do
+        render Campbooks::Button.new(variant: :ghost, size: :sm, type: "submit",
+                                     data: { reminders_action: action, **hint_data(label, key: key) },
+                                     aria: hint_aria(key)) do
           plain label
           key_chip(key)
         end

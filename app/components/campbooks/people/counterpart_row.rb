@@ -182,8 +182,8 @@ module Campbooks
                method: "post", class: "contents") do
             input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
             button(type: "submit", class: ACTION_BTN,
-                   title: t(".actions.reply_hint"),
-                   data: { people_reply: true }) do
+                   aria: { label: t(".actions.reply_hint"), **hint_aria("r") },
+                   data: { people_reply: true, **hint_data(t(".actions.reply_hint"), key: "r") }) do
               action_icon(ICON_REPLY)
             end
           end
@@ -195,8 +195,9 @@ module Campbooks
              method: :post, class: "contents",
              data: { turbo_stream: true }) do
           input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
-          button(type: "submit", class: ACTION_BTN, title: t(".actions.done_hint"),
-                 data: { people_done: true }) do
+          button(type: "submit", class: ACTION_BTN,
+                 aria: { label: t(".actions.done_hint"), **hint_aria("d") },
+                 data: { people_done: true, **hint_data(t(".actions.done_hint"), key: "d") }) do
             action_icon(ICON_DONE)
           end
         end
@@ -208,8 +209,9 @@ module Campbooks
              data: { turbo_stream: true }) do
           input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
           input(type: "hidden", name: "until", value: "tomorrow")
-          button(type: "submit", class: ACTION_BTN, title: t(".actions.snooze_hint"),
-                 data: { people_snooze: true }) do
+          button(type: "submit", class: ACTION_BTN,
+                 aria: { label: t(".actions.snooze_hint"), **hint_aria("s") },
+                 data: { people_snooze: true, **hint_data(t(".actions.snooze_hint"), key: "s") }) do
             action_icon(ICON_SNOOZE)
           end
         end
@@ -218,14 +220,15 @@ module Campbooks
       def star_button
         kind  = starred? ? :unstar : :star
         icon  = starred? ? ICON_STAR_FILLED : ICON_STAR_OUTLINE
-        title = starred? ? t(".actions.unstar_hint") : t(".actions.star_hint")
+        label = starred? ? t(".actions.unstar_hint") : t(".actions.star_hint")
         form(action: helpers.people_action_path(@counterpart.id, kind),
              method: :post, class: "contents",
              data: { turbo_stream: true }) do
           input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
           button(type: "submit",
                  class: class_names(ACTION_BTN, starred? ? "text-amber-500" : nil),
-                 title: title) do
+                 aria: { label: label },
+                 data: hint_data(label)) do
             action_icon(icon)
           end
         end
@@ -234,8 +237,8 @@ module Campbooks
       def more_menu
         details(class: "relative", data: { controller: "dropdown-close" }) do
           summary(class: class_names(ACTION_BTN, "list-none cursor-pointer"),
-                  title: t(".actions.more_hint"),
-                  data: { people_more: true }) do
+                  aria: { label: t(".actions.more_hint"), **hint_aria(".") },
+                  data: { people_more: true, **hint_data(t(".actions.more_hint"), key: ".") }) do
             action_icon(ICON_MORE)
           end
           div(class: "absolute right-0 top-full z-50 mt-1 w-48 rounded-xl border border-border bg-card py-1 shadow-lg") do

@@ -36,10 +36,16 @@ module Campbooks
       # (see #key_chip) on the focused card. Mobile reaches the same actions by
       # swiping (Feed::Card configures the Swipeable from the same tools).
       def act_button(tool:, label:, args: {}, variant: :ghost, size: :sm, hint: nil, key: nil, primary: false, dismiss: false)
+        hint_label = hint || label
+        glyph = chip_glyph(key:, primary:, dismiss:)
         action_form(helpers.act_feed_item_path(item), fields: { tool: tool.to_s }.merge(arg_fields(args))) do
           render Campbooks::Button.new(
-            variant: variant, size: size, type: "submit", title: hint,
-            data: feed_action_attrs(key:, primary:, dismiss:).merge(turbo_submits_with: t("components.feed.shared.working"))
+            variant: variant, size: size, type: "submit",
+            data: feed_action_attrs(key:, primary:, dismiss:).merge(
+              turbo_submits_with: t("components.feed.shared.working"),
+              **hint_data(hint_label, key: glyph.present? ? glyph : nil)
+            ),
+            aria: hint_aria(glyph.present? ? glyph : nil)
           ) do
             plain label
             key_chip(key:, primary:, dismiss:)
@@ -50,10 +56,16 @@ module Campbooks
       # "Not now" — hides just this card (POST /feed/items/:id/dismiss). The
       # card's escape by default (← / swipe-left), so `dismiss:` defaults true.
       def dismiss_button(label:, variant: :ghost, size: :sm, hint: nil, key: nil, dismiss: true)
+        hint_label = hint || label
+        glyph = chip_glyph(key:, dismiss:)
         action_form(helpers.dismiss_feed_item_path(item)) do
           render Campbooks::Button.new(
-            variant: variant, size: size, type: "submit", title: hint,
-            data: feed_action_attrs(key:, dismiss:).merge(turbo_submits_with: t("components.feed.shared.working"))
+            variant: variant, size: size, type: "submit",
+            data: feed_action_attrs(key:, dismiss:).merge(
+              turbo_submits_with: t("components.feed.shared.working"),
+              **hint_data(hint_label, key: glyph.present? ? glyph : nil)
+            ),
+            aria: hint_aria(glyph.present? ? glyph : nil)
           ) do
             plain label
             key_chip(key:, dismiss:)
@@ -65,9 +77,13 @@ module Campbooks
       # surface — "Open", "Reply", "Fix" — rather than a one-tap mutation. These are
       # a card's primary, so `primary:` defaults true (→ / Enter / o).
       def link_button(href:, label:, variant: :primary, size: :sm, key: nil, primary: true, dismiss: false)
+        glyph = chip_glyph(key:, primary:, dismiss:)
         render Campbooks::Button.new(
           variant: variant, size: size, href: href,
-          data: feed_action_attrs(key:, primary:, dismiss:)
+          data: feed_action_attrs(key:, primary:, dismiss:).merge(
+            **hint_data(label, key: glyph.present? ? glyph : nil)
+          ),
+          aria: hint_aria(glyph.present? ? glyph : nil)
         ) do
           plain label
           key_chip(key:, primary:, dismiss:)
