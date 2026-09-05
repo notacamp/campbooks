@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-09-05
+
 ### Added
 
 - Reconciliation matches now track `allocated_cents` — the portion of a document's
