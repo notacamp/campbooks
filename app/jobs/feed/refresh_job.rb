@@ -15,6 +15,10 @@ module Feed
       user = User.find_by(id: user_id)
       return unless user&.workspace_id
 
+      # Learned attention weights ride the feed cadence: recompute when stale so the
+      # ranking (PR 2) and People read fresh relevance. Never lets the feed fail.
+      refresh_attention(user)
+
       generator = Feed::Generator.new(user)
       generator.call
       # Slide any brand-new cards into an open Now page's deck (no-op when none).
@@ -52,6 +56,14 @@ module Feed
       return unless workspace
 
       workspace.users.pluck(:id).each { |uid| enqueue_for(uid) }
+    end
+
+    private
+
+    def refresh_attention(user)
+      Attention::Refresh.call(user) if Attention::Weights.new(user).stale?(threshold: 10.minutes)
+    rescue => e
+      Rails.logger.warn("[Feed::RefreshJob] attention refresh failed: #{e.class}: #{e.message}")
     end
   end
 end
