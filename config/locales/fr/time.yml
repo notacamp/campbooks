@@ -11,7 +11,8 @@ fr:
       untitled: Sans titre
       why:
         with: "avec %{name}, %{reason}"
-        open: "en attente : %{subject}, demande il y a %{days} jours"
+        open: "en attente : %{subject}, demandé il y a %{days} jours"
+        open_detail: "%{subject} est toujours en attente, demandé il y a %{days} jours"
       source:
         from_email: de l'e-mail de %{name}
         from_document: "de %{title}"

@@ -76,9 +76,12 @@ module Campbooks
         end
       end
 
+      # An Ember dot + "PREP" in small caps (DESIGN.md: a priority accent is a small
+      # Ember dot, never a colored block) — the mark from the approved prototype.
       def prep_chip
-        span(class: "ml-1.5 inline-flex items-center gap-1 rounded-md bg-ember-gradient px-1.5 py-0.5 text-[11px] font-medium text-white") do
-          span(class: "inline-block h-1.5 w-1.5 rounded-full bg-white/80")
+        span(class: "ml-2 inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-foreground",
+             data: { agenda_prep: true }) do
+          span(class: "inline-block h-1.5 w-1.5 rounded-full", style: "background-color: var(--ember-solid)")
           plain t(".prep")
         end
       end

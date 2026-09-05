@@ -11,7 +11,8 @@ es:
       untitled: Sin título
       why:
         with: "con %{name}, %{reason}"
-        open: "pendiente: %{subject}, preguntado hace %{days} dias"
+        open: "pendiente: %{subject}, preguntado hace %{days} días"
+        open_detail: "%{subject} sigue pendiente, preguntado hace %{days} días"
       source:
         from_email: del correo de %{name}
         from_document: "de %{title}"

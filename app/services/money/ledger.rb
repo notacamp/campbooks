@@ -174,6 +174,13 @@ class Money
         end
       end
 
+      # 3. The ledger's own scale, for a counterpart with no history: an open
+      # bill is measured against the median open amount, so a €4,000 invoice from
+      # a first-time vendor still outranks an €80 receipt (the "why" line never
+      # claims "their usual" for it — that phrase needs the counterpart's history).
+      open_amounts = list.reject(&:settled?).filter_map(&:amount_cents).select(&:positive?)
+      open_median  = open_amounts.size >= 3 ? median(open_amounts) : nil
+
       list.each do |o|
         person = o.instance_variable_get(:@_person)
         org    = o.instance_variable_get(:@_org)
@@ -199,9 +206,11 @@ class Money
         unless o.settled?
           days_late  = o.late? ? o.days_late(@today) : 0
           days_until = o.due_on ? (o.due_on - @today).to_i.clamp(0, nil) : nil
+          size_ratio = o.amount_ratio
+          size_ratio ||= (o.amount_cents.to_f / open_median if open_median && o.amount_cents)
           input = Money::Priority::Input.new(
             status: o.status, days_late: days_late, days_until: days_until,
-            amount_ratio: o.amount_ratio, counterpart_weight: o.counterpart_weight,
+            amount_ratio: size_ratio, counterpart_weight: o.counterpart_weight,
             usual_delay_days: o.usual_delay_days, payable: o.payable?
           )
           o.priority = Money::Priority.score(input)
@@ -241,7 +250,11 @@ class Money
     end
 
     def money_documents
+      # The enrichment pass walks each document's source message → contact →
+      # person → organization; preloaded here so a ledger of hundreds of bills
+      # costs four queries for that chain, not four per row.
       @money_documents ||= @workspace.documents.accessible_to(@user).money_types
+                                     .includes(email_message: { contact: { person: :primary_organization } })
                                      .reject(&:review_rejected?)
                                      .select { |doc| doc.amount_cents.present? && doc.direction }
     end

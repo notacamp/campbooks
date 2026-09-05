@@ -94,6 +94,7 @@ en:
         late_receivable_html: "%{name}'s invoice is %{overdue}, so I drafted a reminder."
         late_payable_html: "%{name} is %{overdue}."
         matters_html: "The one that matters is %{name}, %{amount}, %{overdue} — %{why}."
+        matters_plain_html: "The one that matters is %{name}, %{amount}, %{overdue}."
         renewal_html: "A renewal (%{amount}) lands %{date}."
         nothing_else: "Nothing else is due this month."
         clear: "Nothing is owed or due right now."

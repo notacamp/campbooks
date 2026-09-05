@@ -12,6 +12,7 @@ en:
       why:
         with: "with %{name}, %{reason}"
         open: "open: %{subject}, asked %{days} days ago"
+        open_detail: "%{subject} is still open, asked %{days} days ago"
       # Provenance shown after a row's title, e.g. "30 min · Google Calendar" or
       # "deadline · from Ana's email". Built by Time::Agenda.
       source:

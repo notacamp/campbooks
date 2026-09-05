@@ -8,11 +8,12 @@ pt:
       pays_on_time: "costuma pagar a tempo"
       usually_late: "habitualmente pago com %{count} dias de atraso"
       recurring: "Recorrente"
-      service: "um servico"
+      service: "um serviço"
   components:
     money:
       summary:
         matters_html: "O mais importante: %{name}, %{amount}, %{overdue} — %{why}."
+        matters_plain_html: "O mais importante: %{name}, %{amount}, %{overdue}."
       ledger:
         strip:
           label: "Ordenar"

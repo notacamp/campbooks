@@ -47,6 +47,53 @@ RSpec.describe Time::Agenda do
       expect(event.emphasis).to eq(:normal)
     end
 
+    def weighted_person(name:, email:, weight:, reasons: [ { "key" => "replies_fast", "params" => { "hours" => 3 } } ])
+      person  = create(:person, workspace: workspace, name: name)
+      contact = create(:contact, workspace: workspace, person: person, email: email)
+      AttentionWeight.create!(user: user, workspace: workspace, subject: person, weight: weight, confidence: 0.9,
+                              reasons: reasons, computed_at: Time.current)
+      [ person, contact ]
+    end
+
+    def meeting_with(contact)
+      create(:calendar_event, calendar: calendar, start_at: 2.hours.from_now, end_at: 3.hours.from_now,
+             rsvp_status: :accepted, attendees: [ { "email" => contact.email, "rsvp_status" => "accepted" } ])
+    end
+
+    it "marks a meeting with someone who matters :prep, with the why line, first name and detail" do
+      _person, contact = weighted_person(name: "Sofia Martins", email: "sofia@brightloop.example", weight: 0.9)
+      meeting_with(contact)
+
+      event = described_class.for(user, **window).find(&:event?)
+
+      expect(event).to be_prep
+      expect(event.why).to eq("with Sofia, you usually answer within 3 hours")
+      expect(event.prep_name).to eq("Sofia")
+      expect(event.prep_detail).to eq("you usually answer within 3 hours")
+    end
+
+    it "quotes the open item with that person as the prep detail" do
+      person, contact = weighted_person(name: "Sofia Martins", email: "sofia@brightloop.example", weight: 0.9)
+      PeopleStanding.create!(user: user, workspace: workspace, counterpart: person, name: "Sofia Martins",
+                             needs_you: true, standing_kind: "attention", verb: "reply", subject: "Q3 deck",
+                             wait_days: 2, refreshed_at: Time.current)
+      meeting_with(contact)
+
+      event = described_class.for(user, **window).find(&:event?)
+
+      expect(event.why).to include("open: Q3 deck, asked 2 days ago")
+      expect(event.prep_detail).to eq("Q3 deck is still open, asked 2 days ago")
+    end
+
+    it "leaves a meeting with someone below the prep threshold :normal" do
+      _person, contact = weighted_person(name: "Rui Santos", email: "rui@cloudhost.example", weight: 0.4)
+      meeting_with(contact)
+
+      event = described_class.for(user, **window).find(&:event?)
+      expect(event.emphasis).to eq(:normal)
+      expect(event.why).to be_nil
+    end
+
     it "assigns :quiet when the user declined the event" do
       create(:calendar_event, calendar: calendar,
              start_at: 2.hours.from_now, end_at: 3.hours.from_now, rsvp_status: :declined)

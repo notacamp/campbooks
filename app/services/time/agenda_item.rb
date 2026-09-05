@@ -32,10 +32,14 @@
 class Time::AgendaItem < Data.define(
   :kind, :at, :day, :all_day, :overdue, :duration_minutes,
   :title, :source_label, :source_path, :color, :record, :actions,
-  :emphasis, :why
+  :emphasis, :why, :prep_name, :prep_detail
 )
-  def initialize(emphasis: :normal, why: nil, **kwargs)
-    super(emphasis: emphasis, why: why, **kwargs)
+  # prep_name / prep_detail: for a :prep row, the first name of the person worth
+  # preparing for and the one clause the day note quotes ("Q3 deck is still open,
+  # asked 2 days ago", else the learned reason) — kept apart from `why` so the
+  # note can say "with Sofia: …" without repeating "with Sofia" inside.
+  def initialize(emphasis: :normal, why: nil, prep_name: nil, prep_detail: nil, **kwargs)
+    super(emphasis: emphasis, why: why, prep_name: prep_name, prep_detail: prep_detail, **kwargs)
   end
 
   def event? = kind == :event

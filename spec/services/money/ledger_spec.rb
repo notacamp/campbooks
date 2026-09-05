@@ -225,6 +225,19 @@ RSpec.describe Money::Ledger do
       expect(ledger.most_pressing).to be_nil
     end
 
+    it "measures a counterpart with no history against the ledger's open median, without claiming 'their usual'" do
+      expense(vendor_name: "Big Newcomer", amount_cents: 400_000, due_date: today - 5)
+      expense(vendor_name: "Small Newcomer", amount_cents: 8_000, due_date: today - 5)
+      expense(vendor_name: "Mid Newcomer", amount_cents: 30_000, due_date: today - 5)
+
+      sorted = described_class.for(workspace, user, today: today, sort: :priority, dir: :desc)
+      late = sorted.sections.to_h[:late]
+
+      expect(late.map(&:counterpart)).to eq([ "Big Newcomer", "Mid Newcomer", "Small Newcomer" ])
+      expect(late.first.why).to be_empty
+      expect(late.first.amount_ratio).to be_nil
+    end
+
     it "initializes why as an array" do
       expense(vendor_name: "Usual", amount_cents: 10_000, due_date: today - 3)
       ob = ledger.late.first

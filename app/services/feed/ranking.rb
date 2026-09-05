@@ -327,16 +327,19 @@ module Feed
     def event_contact_ids(events)
       return {} if events.blank?
 
-      # Collect all attendee email addresses across all events.
+      # Collect all attendee email addresses across all events (rows may be hashes
+      # or bare strings — the same normalization CalendarEvent#guests applies).
       event_emails = events.each_with_object({}) do |event, acc|
-        guest_emails = Array(event.try(:attendees)).filter_map { |r| r["email"] }.map(&:downcase)
+        guest_emails = Array(event.try(:attendees)).filter_map do |r|
+          (r.is_a?(Hash) ? r["email"] : r).to_s.downcase.presence
+        end
         acc[event.id] = guest_emails if guest_emails.any?
       end
       return {} if event_emails.empty?
 
       all_emails = event_emails.values.flatten.uniq
-      contact_map = Contact.where(workspace_id: @user.workspace_id, address: all_emails)
-        .pluck(:address, :id)
+      contact_map = Contact.where(workspace_id: @user.workspace_id, email: all_emails)
+        .pluck(:email, :id)
         .to_h { |addr, id| [ addr.downcase, id ] }
 
       event_emails.transform_values do |emails|

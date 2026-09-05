@@ -86,8 +86,8 @@ class Time::DayNote
     PrepMeeting.new(
       title: prep.title,
       at: prep.at,
-      first_name: prep.why.to_s.split(",").first.to_s.split.last.presence,
-      why: prep.why
+      first_name: prep.prep_name.presence,
+      why: prep.prep_detail.presence || prep.why
     )
   rescue StandardError
     nil

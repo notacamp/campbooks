@@ -70,14 +70,16 @@ module Campbooks
         t(".late_payable_html", name: o.counterpart, overdue: overdue_phrase(o))
       end
 
-      # Richer clause for the highest-priority late obligation (any direction).
+      # Richer clause for the highest-priority late obligation (any direction). With
+      # nothing learned about it yet there is no "why" to append, so the sentence
+      # ends on the overdue phrase instead of a dangling dash.
       def matters_clause(o)
         why_text = Array(o.why).join(", ")
-        t(".matters_html",
-          name: o.counterpart,
-          amount: bold(fmt(o.amount)),
-          overdue: overdue_phrase(o),
-          why: why_text)
+        if why_text.blank?
+          t(".matters_plain_html", name: o.counterpart, amount: bold(fmt(o.amount)), overdue: overdue_phrase(o))
+        else
+          t(".matters_html", name: o.counterpart, amount: bold(fmt(o.amount)), overdue: overdue_phrase(o), why: why_text)
+        end
       end
 
       def renewal_clause

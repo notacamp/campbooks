@@ -252,6 +252,31 @@ RSpec.describe Feed::Ranking do
       expect(c[:data]).not_to have_key("why")
     end
 
+    it "lifts a calendar event by its highest-weight guest (PR 3)" do
+      contact = weighted_contact(weight: 0.9)
+      calendar = create(:calendar, calendar_account: create(:calendar_account, workspace: workspace))
+      with_guest = create(:calendar_event, calendar: calendar, start_at: 1.hour.from_now, end_at: 2.hours.from_now,
+                          attendees: [ { "email" => contact.email, "rsvp_status" => "accepted" } ])
+      without = create(:calendar_event, calendar: calendar, start_at: 1.hour.from_now, end_at: 2.hours.from_now)
+
+      a = rank("calendar_event", candidate(with_guest, score: 60, sort_at: 1.hour.from_now))
+      b = rank("calendar_event", candidate(without, score: 60, sort_at: 1.hour.from_now))
+
+      expect(a[:score]).to eq(b[:score] + attention_boost(0.9))
+      expect(a[:data]["weight"]).to eq(0.9)
+    end
+
+    it "lifts a reminder by the sender of the email it came from (PR 3)" do
+      contact = weighted_contact(weight: 0.9)
+      reminder = create(:reminder, workspace: workspace, source: message(contact: contact))
+      plain = create(:reminder, workspace: workspace)
+
+      a = rank("reminder", candidate(reminder, score: 60, sort_at: 1.day.from_now))
+      b = rank("reminder", candidate(plain, score: 60, sort_at: 1.day.from_now))
+
+      expect(a[:score]).to eq(b[:score] + attention_boost(0.9))
+    end
+
     it "drops a stale why when the row no longer has a positive reason" do
       contact = weighted_contact(weight: 0.05,
                                  reasons: [ { "key" => "ignored", "params" => { "percent" => 80 } } ])
