@@ -146,7 +146,12 @@ class Money
       person_ids = []
       org_ids    = []
       list.each do |o|
-        person = o.source_email_message&.contact&.person
+        # A document knows its mail two ways: the message it was attached to
+        # (email_message, by provider id) or the messages it was linked from
+        # (document_email_messages) — the second is the only link for a document
+        # that arrived as a link or was matched later, so fall back to it.
+        source = o.source_email_message || o.document&.email_messages&.first
+        person = source&.contact&.person
         if person
           org = person.primary_organization
           person_ids << person.id
@@ -188,7 +193,9 @@ class Money
         # Counterpart weight: prefer org row, fall back to person row.
         weight_row = (org && org_rows[org.id]) || (person && person_rows[person.id])
         o.counterpart_weight = weight_row&.weight
-        o.attention_reason   = weight_row&.reason_values&.find(&:positive?)
+        # An organization's row leads with "Through <person>" (how it inherited its
+        # weight) — on a bill that says nothing, so take the first reason after it.
+        o.attention_reason   = weight_row&.reason_values&.find { |r| r.positive? && r.key != "org_lead" }
 
         # Usual amount and delay — document obligations only.
         if o.document
@@ -233,7 +240,7 @@ class Money
       end
       reasons << o.attention_reason.sentence if o.attention_reason && reasons.size < 2
       reasons << I18n.t("money.why.recurring") if o.recurring? && reasons.empty?
-      contact = o.source_email_message&.contact
+      contact = (o.source_email_message || o.document&.email_messages&.first)&.contact
       reasons << I18n.t("money.why.service") if contact&.kind_service? && o.attention_reason.nil? && reasons.empty?
       reasons.first(2)
     end
@@ -254,7 +261,8 @@ class Money
       # person → organization; preloaded here so a ledger of hundreds of bills
       # costs four queries for that chain, not four per row.
       @money_documents ||= @workspace.documents.accessible_to(@user).money_types
-                                     .includes(email_message: { contact: { person: :primary_organization } })
+                                     .includes(email_message: { contact: { person: :primary_organization } },
+                                               email_messages: { contact: { person: :primary_organization } })
                                      .reject(&:review_rejected?)
                                      .select { |doc| doc.amount_cents.present? && doc.direction }
     end
