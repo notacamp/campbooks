@@ -77,6 +77,12 @@ en:
       cancelled: "Cancellation draft ready in the composer."
       gone: "That obligation is no longer here."
       undo: "Undo"
+    why:
+      times_usual: "%{times}x their usual"
+      pays_on_time: "you pay them on time"
+      usually_late: "usually paid %{count} days late"
+      recurring: "Recurring"
+      service: "a service"
   components:
     money:
       summary:
@@ -87,6 +93,8 @@ en:
           other: "You owe %{amount} across %{count} bills."
         late_receivable_html: "%{name}'s invoice is %{overdue}, so I drafted a reminder."
         late_payable_html: "%{name} is %{overdue}."
+        matters_html: "The one that matters is %{name}, %{amount}, %{overdue} — %{why}."
+        matters_plain_html: "The one that matters is %{name}, %{amount}, %{overdue}."
         renewal_html: "A renewal (%{amount}) lands %{date}."
         nothing_else: "Nothing else is due this month."
         clear: "Nothing is owed or due right now."
@@ -112,9 +120,12 @@ en:
           older_title: "%{count} overdue by more than three weeks · %{amount}. Open the ledger below."
           later_title: "%{count} due beyond the next month · %{amount}. Open the ledger below."
       ledger:
+        strip:
+          label: "Order"
         sort:
           label: "Sort"
           by: "Sort by %{column}"
+          priority_desc: "Priority"
           date_desc: "Newest first"
           date_asc: "Oldest first"
           amount_desc: "Largest amount first"

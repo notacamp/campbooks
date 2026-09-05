@@ -30,7 +30,10 @@ class Time::Agenda
   end
 
   def items
-    (event_items + deadline_items + task_items + focus_items).sort_by(&:sort_key)
+    events     = event_items
+    others     = deadline_items + task_items + focus_items
+    enriched   = enrich_event_items!(events)
+    (enriched + others).sort_by(&:sort_key)
   end
 
   private
@@ -48,7 +51,7 @@ class Time::Agenda
     @base_events ||= begin
       base = CalendarEvent.accessible_to(@user).visible
                           .where(calendars: { syncing: true })
-                          .includes(:event_type, calendar: :calendar_account)
+                          .includes(:event_type, calendar: :calendar_account, source_email_message: :contact)
       hidden = Array(@user.hidden_calendar_ids)
       hidden.any? ? base.where.not(calendar_id: hidden) : base
     end
@@ -148,6 +151,106 @@ class Time::Agenda
       source_label: I18n.t("time.agenda.source.scout_suggested"), source_path: nil,
       color: nil, record: block, actions: [ :move, :keep, :dismiss_focus ]
     )
+  end
+
+  # ── Enrichment pass ───────────────────────────────────────────────────────
+  # Adds :emphasis and :why to each event AgendaItem by reading the attention
+  # weight of its guests and any open standing with their person. Returns a new
+  # array (AgendaItems are Data structs, so we replace each with a mutated copy).
+  def enrich_event_items!(items) # rubocop:disable Metrics/MethodLength
+    return items if items.empty?
+
+    # 1. First pass: mark declined events :quiet (no attendee lookup needed).
+    after_decline = items.map do |item|
+      item.record.rsvp_declined? ? item.with(emphasis: :quiet) : item
+    end
+
+    # 2. Collect guest person IDs and source-email person IDs for prep detection.
+    user_addresses = user_own_addresses
+    contacts_by_email = contact_cache_for(after_decline.map(&:record))
+    event_guest_person_ids = {}  # event index → [person_id, ...]
+    source_person_ids       = {}  # event index → person_id
+
+    after_decline.each_with_index do |item, idx|
+      next if item.quiet? # declined events don't need prep analysis
+
+      event = item.record
+      # Guest persons (skip self_row and the user's own addresses)
+      guest_person_ids = event.guests
+        .reject(&:self_row)
+        .reject { |g| user_addresses.include?(g.email.downcase) }
+        .filter_map { |g| contacts_by_email[g.email.downcase]&.person_id }
+        .compact.uniq
+      event_guest_person_ids[idx] = guest_person_ids
+
+      # Source email person
+      sp = event.source_email_message&.contact&.person_id
+      source_person_ids[idx] = sp if sp
+    end
+
+    all_person_ids = (event_guest_person_ids.values.flatten + source_person_ids.values).uniq
+    return after_decline if all_person_ids.empty?
+
+    # One query for every name the prep lines may need.
+    names_by_person_id = Person.where(id: all_person_ids).pluck(:id, :name).to_h
+
+    # 3. Attention weights for all relevant persons (one query).
+    weights_obj = Attention::Weights.new(@user)
+    person_weights = weights_obj.persons(all_person_ids) # { person_id => AttentionWeight }
+
+    # 4. PeopleStanding for persons who need attention (one query).
+    standing_rows = PeopleStanding
+      .for_user(@user)
+      .needing
+      .where(counterpart_type: "Person", counterpart_id: all_person_ids)
+      .pluck(:counterpart_id, :verb, :subject, :wait_days)
+      .each_with_object({}) { |(pid, verb, subj, days), acc| acc[pid] = { verb: verb, subject: subj, wait_days: days } }
+
+    # 5. Rebuild non-declined items with :prep when a notable person is attending.
+    after_decline.each_with_index.map do |item, idx|
+      next item if item.quiet? # already marked
+
+      guest_ids = event_guest_person_ids[idx].to_a
+      src_pid   = source_person_ids[idx]
+      all_ids   = (guest_ids + [ src_pid ]).compact.uniq
+
+      # Best = guest / source-email person with highest attention weight.
+      best_weight = all_ids.filter_map { |pid| person_weights[pid]&.weight }.max
+      threshold   = 0.6
+
+      if best_weight && best_weight >= threshold
+        best_pid = all_ids.max_by { |pid| person_weights[pid]&.weight || 0 }
+        weight_row = person_weights[best_pid]
+        why_parts = []
+        first_name = names_by_person_id[best_pid].to_s.split.first.presence
+        reason_sentence = weight_row&.reason_values&.find(&:positive?)&.sentence
+        why_parts << I18n.t("time.agenda.why.with", name: first_name, reason: reason_sentence.downcase) if first_name && reason_sentence
+        open_detail = nil
+        if (standing = standing_rows[best_pid]) && standing[:subject].present?
+          days_asked = standing[:wait_days].to_i
+          why_parts << I18n.t("time.agenda.why.open", subject: standing[:subject].to_s, days: days_asked)
+          open_detail = I18n.t("time.agenda.why.open_detail", subject: standing[:subject].to_s, days: days_asked)
+        end
+        why_text = why_parts.join(" · ").presence
+        next item.with(emphasis: :prep, why: why_text, prep_name: first_name,
+                       prep_detail: open_detail || reason_sentence&.downcase)
+      end
+
+      item
+    end
+  end
+
+  def user_own_addresses
+    @user_own_addresses ||= @user.email_accounts.pluck(:email_address).map(&:downcase).to_set
+  end
+
+  # { email_address → Contact } for the guests of the WINDOW's events only (never
+  # the whole calendar), in one query.
+  def contact_cache_for(events)
+    all_emails = events.flat_map { |e| e.guests.map { |g| g.email.to_s.downcase } }.reject(&:blank?).uniq
+    return {} if all_emails.empty?
+
+    Contact.where(workspace_id: @user.workspace_id, email: all_emails).index_by { |c| c.email.downcase }
   end
 
   # ── Shared helpers ──────────────────────────────────────────────────────────

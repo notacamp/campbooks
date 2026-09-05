@@ -37,10 +37,14 @@ module Feed
       "reply_reminder" => 14.0,
       "reply_owed" => 14.0,
       "task" => 14.0,
-      "starred_email" => 10.0,
-      "late_payable" => 7.0
+      "starred_email" => 10.0
     }.freeze
     DEFAULT_HALF_LIFE_DAYS = 7.0
+
+    # These kinds do not decay: a bill 20 days late ranks at least as high as one
+    # that was 2 days late last week. Decay would reward slowness; urgency + the
+    # Money::Priority score already encode the time dimension.
+    NO_DECAY_KINDS = %w[late_payable late_receivable].freeze
 
     # Everything keeps full strength this long, so today's items rank purely on
     # urgency and relevance rather than shuffling by the hour.
@@ -155,9 +159,12 @@ module Feed
     end
 
     # 1.0 while the action moment is in the future or within GRACE, then
-    # exponential: halves every HALF_LIFE_DAYS past it.
+    # exponential: halves every HALF_LIFE_DAYS past it. Late-bill kinds never decay
+    # (NO_DECAY_KINDS) — a bill 20 days late must not rank below one that was 2 days
+    # late last week.
     def decay(kind, sort_at)
       return 1.0 if sort_at.nil?
+      return 1.0 if NO_DECAY_KINDS.include?(kind.to_s)
 
       age = @now - sort_at.to_time - GRACE.to_f
       return 1.0 if age <= 0
@@ -196,12 +203,17 @@ module Feed
       total
     end
 
-    # The contact behind a subject: an email's sender, or (for a Document) the
-    # contact of the message it arrived on. nil for reminders, tasks, events.
+    # The contact behind a subject:
+    #   EmailMessage  → sender contact
+    #   Document      → linked message's contact
+    #   Reminder/Task → their source EmailMessage's contact (one map, built in preload)
+    #   CalendarEvent → highest-weight guest contact (one map, built in preload)
     def contact_id_for(subject)
       case subject
-      when EmailMessage then subject.contact_id
-      when Document then @doc_contact_ids[subject.id]
+      when EmailMessage    then subject.contact_id
+      when Document        then @doc_contact_ids[subject.id]
+      when Reminder, Task  then @source_email_contact_ids[subject.id]
+      when CalendarEvent   then @event_contact_ids[subject.id]
       end
     end
 
@@ -238,15 +250,31 @@ module Feed
       end
     end
 
-    def preload(subjects)
+    def preload(subjects) # rubocop:disable Metrics/MethodLength
       messages  = subjects.grep(EmailMessage)
       documents = subjects.grep(Document)
+      reminders = subjects.grep(Reminder)
+      tasks     = subjects.grep(Task)
+      events    = subjects.grep(CalendarEvent)
 
       @thread_ids      = messages.filter_map(&:email_thread_id).uniq
       @doc_contact_ids = document_contact_ids(documents.map(&:id))
 
+      # Reminders and Tasks: contact from their source EmailMessage (≤ 1 query).
+      @source_email_contact_ids = source_email_contact_ids(
+        (reminders + tasks).map { |r| [ r.class.name, r.id, r.source_type, r.source_id ] }
+      )
+
+      # CalendarEvents: take the highest-weight guest by attention weight (≤ 2 queries).
+      @event_contact_ids = event_contact_ids(events)
+
       # Both message senders and the vendors behind late-bill documents.
-      @contact_ids = (messages.filter_map(&:contact_id) + @doc_contact_ids.values).uniq
+      @contact_ids = (
+        messages.filter_map(&:contact_id) +
+        @doc_contact_ids.values +
+        @source_email_contact_ids.values +
+        @event_contact_ids.values
+      ).uniq
 
       # Learned relevance: one weights lookup for the whole batch. Missing (no rows
       # for this user yet) keeps the legacy boosts and skips stamping entirely.
@@ -272,6 +300,51 @@ module Feed
           map[doc_id] ||= contact_id
         end
       map
+    end
+
+    # { reminder_or_task_id => contact_id } from their source EmailMessage, one query.
+    # `rows` is [[class_name, record_id, source_type, source_id], ...]
+    def source_email_contact_ids(rows)
+      return {} if rows.blank?
+
+      email_source_ids = rows.filter_map { |_, _, st, si| si if st == "EmailMessage" }.uniq
+      return {} if email_source_ids.blank?
+
+      contact_by_email_id = EmailMessage.where(id: email_source_ids)
+        .pluck(:id, :contact_id)
+        .to_h
+
+      rows.each_with_object({}) do |(_klass, record_id, source_type, source_id), acc|
+        next unless source_type == "EmailMessage"
+
+        contact_id = contact_by_email_id[source_id]
+        acc[record_id] = contact_id if contact_id
+      end
+    end
+
+    # { event_id => contact_id } — for each event, the guest email that resolves to
+    # the highest-attention contact; two queries max.
+    def event_contact_ids(events)
+      return {} if events.blank?
+
+      # Collect all attendee email addresses across all events (rows may be hashes
+      # or bare strings — the same normalization CalendarEvent#guests applies).
+      event_emails = events.each_with_object({}) do |event, acc|
+        guest_emails = Array(event.try(:attendees)).filter_map do |r|
+          (r.is_a?(Hash) ? r["email"] : r).to_s.downcase.presence
+        end
+        acc[event.id] = guest_emails if guest_emails.any?
+      end
+      return {} if event_emails.empty?
+
+      all_emails = event_emails.values.flatten.uniq
+      contact_map = Contact.where(workspace_id: @user.workspace_id, email: all_emails)
+        .pluck(:email, :id)
+        .to_h { |addr, id| [ addr.downcase, id ] }
+
+      event_emails.transform_values do |emails|
+        emails.filter_map { |email| contact_map[email] }.first
+      end.compact
     end
 
     # Persist the top positive reason + weight onto the candidate's data so the

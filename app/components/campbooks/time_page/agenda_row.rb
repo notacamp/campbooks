@@ -40,10 +40,22 @@ module Campbooks
       def body_cell
         div(class: "min-w-0") do
           dot
-          span(class: "text-sm font-semibold text-foreground") { @item.title }
+          title_span
           overdue_badge if @item.overdue
+          prep_chip if @item.prep?
+          declined_badge if @item.quiet?
           meta_suffix
+          prep_why_line if @item.prep? && @item.why.present?
         end
+      end
+
+      def title_span
+        title_class = if @item.quiet?
+          "text-sm font-medium text-muted-foreground"
+        else
+          "text-sm font-semibold text-foreground"
+        end
+        span(class: title_class) { @item.title }
       end
 
       # A 10px rounded square inline before the title, colour-coded by kind: the
@@ -51,16 +63,35 @@ module Campbooks
       # ring (a proposed focus block) or an ink outline (a task).
       def dot
         base = "mr-2 inline-block h-2.5 w-2.5 shrink-0 rounded-[3px] align-[-1px]"
+        opacity = @item.quiet? ? " opacity-45" : ""
         case @item.kind
         when :event
-          span(class: base, style: "background-color: #{@item.color}")
+          span(class: "#{base}#{opacity}", style: "background-color: #{@item.color}")
         when :deadline
-          span(class: class_names(base, "bg-ember-gradient"))
+          span(class: class_names(base, "bg-ember-gradient") + opacity)
         when :focus
-          span(class: class_names(base, "border border-dashed border-muted-foreground"))
+          span(class: class_names(base, "border border-dashed border-muted-foreground") + opacity)
         else # :task
-          span(class: class_names(base, "border border-foreground/50"))
+          span(class: class_names(base, "border border-foreground/50") + opacity)
         end
+      end
+
+      # An Ember dot + "PREP" in small caps (DESIGN.md: a priority accent is a small
+      # Ember dot, never a colored block) — the mark from the approved prototype.
+      def prep_chip
+        span(class: "ml-2 inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-foreground",
+             data: { agenda_prep: true }) do
+          span(class: "inline-block h-1.5 w-1.5 rounded-full", style: "background-color: var(--ember-solid)")
+          plain t(".prep")
+        end
+      end
+
+      def declined_badge
+        span(class: "ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground") { t(".declined") }
+      end
+
+      def prep_why_line
+        div(class: "mt-0.5 text-[12px] text-foreground/70") { @item.why }
       end
 
       def meta_suffix
