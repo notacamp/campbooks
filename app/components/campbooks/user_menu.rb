@@ -2,7 +2,8 @@
 
 module Campbooks
   # First-class identity panel / account menu.
-  # :popover — used by NavRail (desktop, pops beside the rail)
+  # :popover — used by NavRail (desktop): a fixed panel beside the 80px rail,
+  #             bottom-aligned with the avatar that opened it
   # :sheet    — used by the mobile topbar (bottom sheet)
   #
   # The panel is hidden by default (driven by the `dropdown` Stimulus
@@ -55,7 +56,7 @@ module Campbooks
       panel_classes = if sheet?
         "fixed z-50 inset-x-0 bottom-0 rounded-t-[22px] border-t border-border bg-popover text-popover-foreground px-2.5 pt-2 pb-[calc(env(safe-area-inset-bottom)+14px)] shadow-lg"
       else
-        "absolute z-50 bottom-0 left-full ml-3 w-[296px] rounded-2xl border border-border bg-popover text-popover-foreground p-1.5 shadow-lg"
+        "fixed z-50 bottom-3 left-[88px] w-[296px] rounded-2xl border border-border bg-popover text-popover-foreground p-1.5 shadow-lg"
       end
 
       div(

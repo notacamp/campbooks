@@ -81,7 +81,7 @@ RSpec.describe Campbooks::UserMenu, type: :component do
   end
 
   it "renders the popover beside the rail and the sheet from the bottom with a scrim" do
-    expect(render_menu(variant: :popover)).to include("left-full")
+    expect(render_menu(variant: :popover)).to include("left-[88px]")
 
     sheet = render_menu(variant: :sheet)
     expect(sheet).to include('data-dropdown-target="scrim"')

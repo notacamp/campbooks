@@ -102,7 +102,15 @@ export default class extends Controller {
     this._setMode("detail")
 
     if (this.hasFrameTarget && url) {
-      this.frameTarget.src = url
+      // Turbo.visit with a frame promotes the frame load to a page visit (the
+      // frame's data-turbo-action="advance"), so the URL becomes the settings page
+      // and a reload or a shared link lands on the same view. A bare `frame.src =`
+      // would swap the pane without touching history.
+      if (typeof Turbo !== "undefined") {
+        Turbo.visit(url, { frame: "settings_panel", action: "advance" })
+      } else {
+        this.frameTarget.src = url
+      }
     }
   }
 
