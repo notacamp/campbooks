@@ -9,6 +9,9 @@ es:
       new_event: Nuevo
     agenda:
       untitled: Sin título
+      why:
+        with: "con %{name}, %{reason}"
+        open: "pendiente: %{subject}, preguntado hace %{days} dias"
       source:
         from_email: del correo de %{name}
         from_document: "de %{title}"
@@ -34,6 +37,8 @@ es:
       agenda_row:
         all_day: todo el día
         overdue: atrasado
+        prep: "Preparar"
+        declined: "Rechazado"
         deadline: fecha límite
         minutes:
           one: "%{count} min"
@@ -59,6 +64,7 @@ es:
         empty_today: Nada programado.
       day_note:
         today: hoy
+        prep: "La que vale la pena preparar es a las %{time} con %{name}: %{why}."
         clear: "Tu día está despejado: nada pendiente ni reuniones."
         meetings:
           one: "%{count} reunión"

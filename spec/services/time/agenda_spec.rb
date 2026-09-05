@@ -29,4 +29,31 @@ RSpec.describe Time::Agenda do
       expect(item.source_path).to eq(document_path(document))
     end
   end
+
+  describe "event emphasis enrichment" do
+    let(:calendar_account) { create(:calendar_account, workspace: workspace) }
+    let(:calendar)         { create(:calendar, calendar_account: calendar_account, syncing: true, color: "#4a90e2") }
+
+    before do
+      create(:calendar_account_user, calendar_account: calendar_account, user: user, can_read: true)
+    end
+
+    it "assigns :normal emphasis to a plain event with no notable attendees" do
+      create(:calendar_event, calendar: calendar,
+             start_at: 2.hours.from_now, end_at: 3.hours.from_now, rsvp_status: :accepted)
+      items = described_class.for(user, **window)
+      event = items.find(&:event?)
+      expect(event).to be_present
+      expect(event.emphasis).to eq(:normal)
+    end
+
+    it "assigns :quiet when the user declined the event" do
+      create(:calendar_event, calendar: calendar,
+             start_at: 2.hours.from_now, end_at: 3.hours.from_now, rsvp_status: :declined)
+      items = described_class.for(user, **window)
+      event = items.find(&:event?)
+      expect(event).to be_present
+      expect(event).to be_quiet
+    end
+  end
 end

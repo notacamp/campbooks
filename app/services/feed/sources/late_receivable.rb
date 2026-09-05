@@ -7,6 +7,8 @@ module Feed
     # the reminder already drafted. It rides on the same Money substrate as the Money
     # page (Document#direction / #settled? / due_date), so the two never disagree.
     class LateReceivable < Feed::Source
+      include Feed::Sources::MoneyUsual
+
       def self.key = "late_receivable"
 
       def candidates
@@ -15,14 +17,16 @@ module Feed
           next unless due && doc.amount_cents.present? && due < now.to_date
 
           days_late = (now.to_date - due).to_i
+          ratio = amount_ratio_for(doc)
           {
             subject: doc,
             dedupe_key: "late_receivable:#{doc.id}",
             sort_at: due.in_time_zone, # a stable anchor (the due date), never `now`
-            score: score_for(days_late),
+            score: score_for(days_late, ratio),
             attention: true,
             data: { "due_date" => due.iso8601, "days_late" => days_late,
-                    "amount_cents" => doc.amount_cents, "currency" => doc.currency }
+                    "amount_cents" => doc.amount_cents, "currency" => doc.currency,
+                    "amount_ratio" => ratio }
           }
         end
       end
@@ -46,9 +50,11 @@ module Feed
       end
 
       # The overdue-ness sets urgency: a high band that ramps with lateness, capped
-      # so it never crowds out a genuine emergency.
-      def score_for(days_late)
-        [ 86 + (days_late / 3), 97 ].min
+      # so it never crowds out a genuine emergency. An unusually large amount boosts
+      # the score by 8.
+      def score_for(days_late, ratio = nil)
+        base = [ 86 + (days_late / 3), 97 ].min
+        ratio && ratio >= 2.0 ? [ base + 8, 97 ].min : base
       end
 
       def safe_due(doc)

@@ -3,3 +3,18 @@ fr:
   money:
     statements:
       title: "Relevés Bancaires"
+    why:
+      times_usual: "%{times}x leur habitude"
+      pays_on_time: "vous payez a temps"
+      usually_late: "generalement paye avec %{count} jours de retard"
+      recurring: "Recurrent"
+      service: "un service"
+  components:
+    money:
+      summary:
+        matters_html: "Le plus important est %{name}, %{amount}, %{overdue} — %{why}."
+      ledger:
+        strip:
+          label: "Ordre"
+        sort:
+          priority_desc: "Priorite"

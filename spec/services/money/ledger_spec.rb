@@ -184,4 +184,51 @@ RSpec.describe Money::Ledger do
     doc = expense(vendor_name: "Findable", amount_cents: 1_000, due_date: today - 1)
     expect(ledger.find("doc:#{doc.id}").counterpart).to eq("Findable")
   end
+
+  describe "priority sort and enrichment" do
+    it "sets a non-nil priority on open obligations" do
+      expense(vendor_name: "Vendex", amount_cents: 10_000, due_date: today - 5)
+      obligation = ledger.late.first
+      expect(obligation.priority).to be_a(Float)
+      expect(obligation.priority).to be > 0
+    end
+
+    it "does not set a priority on settled obligations" do
+      expense(vendor_name: "Paid", amount_cents: 5_000, due_date: today - 10,
+              settled_at: (today - 3).to_time, settled_source: "manual")
+      settled = ledger.settled.first
+      expect(settled.priority).to be_nil
+    end
+
+    it "sorts by priority descending when :priority sort is chosen" do
+      # The obligation that is more overdue scores higher (all else equal).
+      expense(vendor_name: "Older", amount_cents: 1_000, due_date: today - 20)
+      expense(vendor_name: "Newer", amount_cents: 1_000, due_date: today - 2)
+
+      sorted = described_class.for(workspace, user, today: today, sort: :priority, dir: :desc)
+      late = sorted.sections.to_h[:late].map(&:counterpart)
+      expect(late.first).to eq("Older") # more overdue → higher urgency → higher priority
+    end
+
+    it "returns the highest-priority open obligation from most_pressing" do
+      expense(vendor_name: "SmallNew", amount_cents: 1_000, due_date: today - 2)
+      expense(vendor_name: "BigOld",  amount_cents: 100_000, due_date: today - 25)
+
+      pressing = ledger.most_pressing
+      expect(pressing).not_to be_nil
+      expect(pressing.counterpart).to eq("BigOld")
+    end
+
+    it "returns nil from most_pressing when there are no open obligations" do
+      expense(vendor_name: "Paid", amount_cents: 5_000, due_date: today - 5,
+              settled_at: (today - 1).to_time, settled_source: "manual")
+      expect(ledger.most_pressing).to be_nil
+    end
+
+    it "initializes why as an array" do
+      expense(vendor_name: "Usual", amount_cents: 10_000, due_date: today - 3)
+      ob = ledger.late.first
+      expect(ob.why).to be_an(Array)
+    end
+  end
 end

@@ -9,6 +9,9 @@ fr:
       new_event: Nouveau
     agenda:
       untitled: Sans titre
+      why:
+        with: "avec %{name}, %{reason}"
+        open: "en attente : %{subject}, demande il y a %{days} jours"
       source:
         from_email: de l'e-mail de %{name}
         from_document: "de %{title}"
@@ -34,6 +37,8 @@ fr:
       agenda_row:
         all_day: toute la journée
         overdue: en retard
+        prep: "Préparer"
+        declined: "Refusé"
         deadline: échéance
         minutes:
           one: "%{count} min"
@@ -59,6 +64,7 @@ fr:
         empty_today: Rien de prévu.
       day_note:
         today: aujourd'hui
+        prep: "Celle qui mérite préparation est à %{time} avec %{name} : %{why}."
         clear: Votre journée est libre — rien à échéance et aucune réunion.
         meetings:
           one: "%{count} réunion"

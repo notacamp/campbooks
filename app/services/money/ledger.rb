@@ -21,9 +21,9 @@ class Money
     # How the ledger's sections are ordered: by date (newest first by default),
     # by amount (largest first) or by counterpart (A–Z). `sections` applies it;
     # `obligations` stays in ascending date order for the timeline and the export.
-    SORTS = %i[date amount counterpart].freeze
+    SORTS = %i[priority date amount counterpart].freeze
     DIRS  = %i[desc asc].freeze
-    DEFAULT_DIRS = { date: :desc, amount: :desc, counterpart: :asc }.freeze
+    DEFAULT_DIRS = { priority: :desc, date: :desc, amount: :desc, counterpart: :asc }.freeze
 
     def self.for(workspace, user, today: Date.current, horizon: DEFAULT_HORIZON, lookback: DEFAULT_LOOKBACK,
                  sort: :date, dir: nil)
@@ -45,7 +45,11 @@ class Money
     end
 
     def obligations
-      @obligations ||= (document_obligations + reminder_obligations).sort_by { |o| [ o.due_on, o.counterpart.to_s ] }
+      @obligations ||= begin
+        list = (document_obligations + reminder_obligations).sort_by { |o| [ o.due_on, o.counterpart.to_s ] }
+        enrich_obligations!(list)
+        list
+      end
     end
 
     def late
@@ -68,8 +72,20 @@ class Money
     end
 
     def sorted(list)
+      if @sort == :priority
+        # Settled stays newest-first; open items sort by descending priority, then due date, then counterpart.
+        settled, open = list.partition(&:settled?)
+        ranked = open.sort_by { |o| [ -(o.priority || 0.0), o.due_on, o.counterpart.to_s.downcase ] }
+        return ranked + settled.sort_by { |o| o.settled_on || o.due_on }.reverse
+      end
+
       ordered = list.sort_by { |o| [ sort_key(o), o.counterpart.to_s.downcase, o.id ] }
       @dir == :desc ? ordered.reverse : ordered
+    end
+
+    # The highest-priority open late/due obligation, or nil when there are none.
+    def most_pressing
+      open_obligations.reject(&:settled?).max_by { |o| o.priority || 0.0 }
     end
 
     def any?
@@ -109,6 +125,7 @@ class Money
       case @sort
       when :amount      then obligation.amount_cents.to_i
       when :counterpart then obligation.counterpart.to_s.downcase
+      when :priority    then obligation.priority || 0.0
       else (obligation.settled? ? (obligation.settled_on || obligation.due_on) : obligation.due_on) || Date.new(1970, 1, 1)
       end
     end
@@ -116,6 +133,106 @@ class Money
     def open_sum(direction)
       open_obligations.select { |o| o.direction == direction }
                       .each_with_object({}) { |o, acc| acc[o.currency] = (acc[o.currency] || 0) + o.amount_cents.to_i }
+    end
+
+    # ── Attention enrichment ──────────────────────────────────────────────────
+    # Mutates each obligation in place to add: counterpart_weight, attention_reason,
+    # amount_ratio, usual_delay_days, priority, and why. One pass, ≤ 3 extra queries.
+    def enrich_obligations!(list) # rubocop:disable Metrics/MethodLength
+      return if list.empty?
+
+      # 1. Resolve persons / orgs from each obligation's source email contact.
+      weights_obj = Attention::Weights.new(@user)
+      person_ids = []
+      org_ids    = []
+      list.each do |o|
+        person = o.source_email_message&.contact&.person
+        if person
+          org = person.primary_organization
+          person_ids << person.id
+          org_ids << org.id if org
+          o.instance_variable_set(:@_person, person)
+          o.instance_variable_set(:@_org, org)
+        end
+      end
+      person_rows = weights_obj.persons(person_ids.uniq)
+      org_rows    = weights_obj.organizations(org_ids.uniq)
+
+      # 2. Usual amounts and usual delay: group all docs by recurrence key.
+      doc_by_key = money_documents.group_by { |d| Money::Recurrence.group_key(d) }
+                                  .transform_values { |docs| docs.map(&:amount_cents).compact }
+      delay_by_key = money_documents.group_by { |d| Money::Recurrence.group_key(d) }
+                                    .transform_values do |docs|
+        docs.filter_map do |d|
+          next unless d.settled_at && d.due_date
+
+          settled = d.settled_at.to_date rescue nil
+          due     = d.due_date.to_date rescue nil
+          next unless settled && due
+
+          (settled - due).to_i
+        end
+      end
+
+      list.each do |o|
+        person = o.instance_variable_get(:@_person)
+        org    = o.instance_variable_get(:@_org)
+
+        # Counterpart weight: prefer org row, fall back to person row.
+        weight_row = (org && org_rows[org.id]) || (person && person_rows[person.id])
+        o.counterpart_weight = weight_row&.weight
+        o.attention_reason   = weight_row&.reason_values&.find(&:positive?)
+
+        # Usual amount and delay — document obligations only.
+        if o.document
+          key = Money::Recurrence.group_key(o.document)
+          if key
+            others = doc_by_key[key].to_a - [ o.document.amount_cents ]
+            o.amount_ratio = (others.size >= 2 ? o.document.amount_cents.to_f / median(others) : nil)
+
+            delays = delay_by_key[key].to_a
+            o.usual_delay_days = delays.size >= 2 ? median(delays).round : nil
+          end
+        end
+
+        # Priority score (nil for settled).
+        unless o.settled?
+          days_late  = o.late? ? o.days_late(@today) : 0
+          days_until = o.due_on ? (o.due_on - @today).to_i.clamp(0, nil) : nil
+          input = Money::Priority::Input.new(
+            status: o.status, days_late: days_late, days_until: days_until,
+            amount_ratio: o.amount_ratio, counterpart_weight: o.counterpart_weight,
+            usual_delay_days: o.usual_delay_days, payable: o.payable?
+          )
+          o.priority = Money::Priority.score(input)
+        end
+
+        # Why — up to 2 reasons, localized.
+        o.why = build_why(o)
+      end
+    end
+
+    def build_why(o) # rubocop:disable Metrics/CyclomaticComplexity
+      reasons = []
+      reasons << I18n.t("money.why.times_usual", times: o.amount_ratio.round.to_s) if o.amount_ratio && o.amount_ratio >= 2.0
+      if o.payable? && o.usual_delay_days
+        if o.usual_delay_days <= 0
+          reasons << I18n.t("money.why.pays_on_time")
+        elsif o.usual_delay_days > 3
+          reasons << I18n.t("money.why.usually_late", count: o.usual_delay_days)
+        end
+      end
+      reasons << o.attention_reason.sentence if o.attention_reason && reasons.size < 2
+      reasons << I18n.t("money.why.recurring") if o.recurring? && reasons.empty?
+      contact = o.source_email_message&.contact
+      reasons << I18n.t("money.why.service") if contact&.kind_service? && o.attention_reason.nil? && reasons.empty?
+      reasons.first(2)
+    end
+
+    def median(array)
+      sorted = array.sort
+      mid    = sorted.size / 2
+      sorted.size.odd? ? sorted[mid].to_f : (sorted[mid - 1] + sorted[mid]) / 2.0
     end
 
     # ── Documents ────────────────────────────────────────────────────────────

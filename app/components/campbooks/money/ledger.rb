@@ -16,7 +16,15 @@ module Campbooks
       # Column → the ledger sort it drives (Money::Ledger::SORTS).
       SORTABLE = { counterpart: :counterpart, amount: :amount, due: :date }.freeze
       # The phone's sort select, in display order.
-      ORDERS = %w[date_desc date_asc amount_desc amount_asc counterpart_asc counterpart_desc].freeze
+      ORDERS = %w[priority_desc date_desc date_asc amount_desc amount_asc counterpart_asc counterpart_desc].freeze
+
+      # Strip links above the table.
+      STRIP_SORTS = [
+        [ :priority, :desc ],
+        [ :date,     :desc ],
+        [ :amount,   :desc ],
+        [ :counterpart, :asc ]
+      ].freeze
 
       def initialize(ledger:, **attrs)
         @ledger = ledger
@@ -25,12 +33,34 @@ module Campbooks
 
       def view_template
         div(id: "money_ledger", class: class_names("mt-2", @attrs.delete(:class)), **@attrs) do
+          order_strip
           desktop_table
           mobile_cards
         end
       end
 
       private
+
+      # ── Order strip ──────────────────────────────────────────────────────────
+      def order_strip
+        div(class: "mb-3 flex flex-wrap items-center gap-1 text-[12.5px] text-muted-foreground") do
+          span(class: "font-medium") { t(".strip.label") }
+          span { " · " }
+          STRIP_SORTS.each do |sort_key, default_dir|
+            active = @ledger.sort == sort_key
+            label  = t(".sort.#{sort_key}_#{default_dir}")
+            if active
+              dir_arrow = @ledger.dir == :asc ? " ↑" : " ↓"
+              span(class: "font-semibold text-foreground") { "#{label}#{dir_arrow}" }
+            else
+              next_dir = ::Money::Ledger.default_dir(sort_key)
+              a(href: helpers.money_path(sort: sort_key, dir: next_dir, range: helpers.params[:range].presence),
+                class: "hover:text-foreground no-underline") { label }
+            end
+            span { " · " } unless [ sort_key, default_dir ] == STRIP_SORTS.last
+          end
+        end
+      end
 
       # ── Desktop ────────────────────────────────────────────────────────────
       def desktop_table
@@ -124,7 +154,8 @@ module Campbooks
           div(class: "flex items-start justify-between gap-3") do
             div(class: "min-w-0") do
               div(class: "font-semibold text-foreground") { obligation.counterpart }
-              div(class: "mt-0.5 text-[12.5px] text-muted-foreground") { what_cell(obligation) }
+              div(class: "mt-0.5 text-[12.5px] text-muted-foreground") { obligation.what }
+              why_line(obligation) unless obligation.settled?
             end
             div(class: "whitespace-nowrap text-right tabular-nums", style: amount_style(obligation)) { amount_text(obligation) }
           end
@@ -149,6 +180,20 @@ module Campbooks
           if obligation.recurring? && obligation.next_renewal_on
             div(class: "text-[11.5px] text-muted-foreground/70") { t(".next_renews", date: l(obligation.next_renewal_on, format: :date)) }
           end
+          why_line(obligation) unless obligation.settled?
+        end
+      end
+
+      # A 11.5px reason line under the what cell for open obligations.
+      def why_line(obligation)
+        why = Array(obligation.why)
+        return if why.empty?
+
+        weight = obligation.counterpart_weight.to_f
+        dot_class = weight >= 0.6 ? "bg-ember-gradient" : "bg-muted-foreground/40"
+        div(class: "mt-0.5 flex items-center gap-1 text-[11.5px] text-muted-foreground/80") do
+          span(class: "inline-block h-1.5 w-1.5 shrink-0 rounded-full #{dot_class}")
+          plain why.join(" · ")
         end
       end
 

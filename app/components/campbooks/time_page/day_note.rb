@@ -34,7 +34,7 @@ module Campbooks
       end
 
       def sentences
-        parts = [ counts_sentence, focus_sentence, late_sentence ].compact
+        parts = [ counts_sentence, focus_sentence, prep_sentence, late_sentence ].compact
         parts.empty? ? t(".clear") : parts.join(" ")
       end
 
@@ -77,6 +77,14 @@ module Campbooks
         when today + 1 then t(".tomorrow_word")
         else l(date, format: "%A")
         end
+      end
+
+      def prep_sentence
+        pm = @note.prep_meeting
+        return unless pm
+
+        time_str = pm.at.in_time_zone(@zone).strftime("%H:%M")
+        t(".prep", time: time_str, name: pm.first_name.to_s, why: pm.why.to_s)
       end
 
       def late_sentence

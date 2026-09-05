@@ -34,14 +34,30 @@ class Time::FocusProposer
 
   private
 
+  # Sort by descending attention-weight × proximity so the focus block lands for
+  # the most important deadline first (the slot-finder may fail for later ones if
+  # the week fills up).
   def eligible_deadlines
     horizon = (@today + LOOKAHEAD).end_of_day
-    Reminder.accessible_to(@user).pending
-            .where(calendar_event_id: nil)
-            .where(reminder_type: ELIGIBLE_TYPES)
-            .where(due_at: ::Time.current..horizon)
-            .where.not(id: FocusBlock.where.not(reminder_id: nil).select(:reminder_id))
-            .order(:due_at)
+    reminders = Reminder.accessible_to(@user).pending
+                        .where(calendar_event_id: nil)
+                        .where(reminder_type: ELIGIBLE_TYPES)
+                        .where(due_at: ::Time.current..horizon)
+                        .where.not(id: FocusBlock.where.not(reminder_id: nil).select(:reminder_id))
+                        .to_a
+
+    weights_obj = Attention::Weights.new(@user)
+    person_ids  = reminders.filter_map { |r| r.source_email&.contact&.person_id }.uniq
+    person_map  = weights_obj.persons(person_ids)
+
+    today_time = ::Time.current.in_time_zone(@zone)
+    reminders.sort_by do |r|
+      pid    = r.source_email&.contact&.person_id
+      weight = pid ? (person_map[pid]&.weight || Attention::Scorer::PRIOR) : Attention::Scorer::PRIOR
+      days_until = [ ((r.due_at - today_time) / 1.day.to_f).round, 0 ].max
+      proximity = days_until <= 2 ? 1.0 : [ 1.0 - 0.5 * (days_until - 2).to_f / 5.0, 0.5 ].max
+      -(weight * proximity)
+    end
   end
 
   def propose_for(reminder)

@@ -22,17 +22,29 @@
 #                    focus (dashed) and task (ink outline) — the row draws those
 # - record           the underlying AR record (EventRow-style edit links, etc.)
 # - actions          available row actions, in order (see Time::Agenda)
+# - emphasis         :prep | :normal | :quiet (default :normal)
+#                    :prep  → event with a weighted attendee, worth preparing for
+#                    :quiet → event the user has declined
+# - why              String or nil — the one-line reason shown under a :prep row
 #
 # Namespaced under Ruby's core Time (reopened via the compact Time::AgendaItem
 # form — never a bare `class Time`, which would clash class-vs-module).
 class Time::AgendaItem < Data.define(
   :kind, :at, :day, :all_day, :overdue, :duration_minutes,
-  :title, :source_label, :source_path, :color, :record, :actions
+  :title, :source_label, :source_path, :color, :record, :actions,
+  :emphasis, :why
 )
+  def initialize(emphasis: :normal, why: nil, **kwargs)
+    super(emphasis: emphasis, why: why, **kwargs)
+  end
+
   def event? = kind == :event
   def deadline? = kind == :deadline
   def task? = kind == :task
   def focus? = kind == :focus
+
+  def prep?  = emphasis == :prep
+  def quiet? = emphasis == :quiet
 
   # Sort key: within a day, all-day items come first, then by instant. Days
   # ascending. Overdue deadlines carry day == today, so they head today's list.

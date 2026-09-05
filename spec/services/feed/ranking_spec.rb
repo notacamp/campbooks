@@ -295,6 +295,27 @@ RSpec.describe Feed::Ranking do
     end
   end
 
+  describe "no-decay for late bills" do
+    it "does not decay late_payable even when sort_at is long past" do
+      doc = create(:document, :approved, workspace: workspace, document_type: :expense_invoice,
+                   amount_cents: 10_000, due_date: 30.days.ago)
+      c = rank("late_payable", candidate(doc, score: 90, sort_at: 30.days.ago, attention: true))
+      expect(c[:score]).to eq(90)
+    end
+
+    it "does not decay late_receivable even when sort_at is long past" do
+      doc = create(:document, :approved, :revenue_invoice, workspace: workspace,
+                   amount_cents: 10_000, due_date: 30.days.ago)
+      c = rank("late_receivable", candidate(doc, score: 90, sort_at: 30.days.ago, attention: true))
+      expect(c[:score]).to eq(90)
+    end
+
+    it "still decays follow_up as before" do
+      c = rank("follow_up", candidate(message, score: 80, sort_at: (14.days + 36.hours).ago))
+      expect(c[:score]).to be_within(2).of(40)
+    end
+  end
+
   describe "resilience" do
     it "falls back to the source score when a boost lookup blows up" do
       allow(Contact).to receive(:where).and_raise("boom")

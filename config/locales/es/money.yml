@@ -3,3 +3,18 @@ es:
   money:
     statements:
       title: "Extractos Bancarios"
+    why:
+      times_usual: "%{times}x lo habitual"
+      pays_on_time: "sueles pagar a tiempo"
+      usually_late: "habitualmente pagado con %{count} dias de retraso"
+      recurring: "Recurrente"
+      service: "un servicio"
+  components:
+    money:
+      summary:
+        matters_html: "El mas importante es %{name}, %{amount}, %{overdue} — %{why}."
+      ledger:
+        strip:
+          label: "Orden"
+        sort:
+          priority_desc: "Prioridad"
