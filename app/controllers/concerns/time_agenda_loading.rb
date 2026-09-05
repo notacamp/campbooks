@@ -15,9 +15,10 @@ module TimeAgendaLoading
     helper_method :agenda_list
   end
 
-  def load_time_agenda(date: Date.current)
-    @date = date
+  # Anchors on the user's today (their zone) unless a date is given.
+  def load_time_agenda(date: nil)
     @zone = current_user.effective_time_zone
+    @date = date || Time.current.in_time_zone(@zone).to_date
 
     data = Calendars::PageData.for(user: current_user, view: "agenda", date: @date, entitlements: current_entitlements)
     @calendar_accounts = data.calendar_accounts
