@@ -207,9 +207,13 @@ module People
       parts.join(" · ")
     end
 
-    # ── Person data flags (new / unread / has_attachment / starred / can_reply / can_done) ──
+    # ── Person data flags (new / unread / has_attachment / starred / can_reply / can_done / tags) ──
 
     DONE_KINDS = %w[reply_reminder reply_owed email_action follow_up].freeze
+
+    # How many chips a list row shows. Both tag sources (sender + email) feed one
+    # capped cluster so a dense row never overflows on mobile.
+    TAG_CAP = 2
 
     def add_person_flags!(rows, attention)
       return if rows.empty?
@@ -225,6 +229,13 @@ module People
       standing_msg_ids = rows.filter_map { |cp| cp.standing.email_message_id }
       msg_account_map  = standing_msg_ids.any? ?
         EmailMessage.where(id: standing_msg_ids).pluck(:id, :email_account_id).to_h : {}
+
+      # Two batched tag loads for the whole list (one query each): the person's
+      # own sender tags (per contact) and the email's tags (thread-union), both
+      # visible-only and workspace-scoped like every other chip render site.
+      all_contact_ids       = rows.flat_map { |cp| cp.record&.contacts&.to_a }.compact.map(&:id)
+      sender_tags_by_contact = sender_tags_for(all_contact_ids)
+      inbox_tags_by_thread   = inbox_tags_for(standing_thread_ids)
 
       rows.map! do |cp|
         person = cp.record
@@ -251,9 +262,59 @@ module People
         data["snippet"]        = snippet_for(latest_inbound)
         data["can_reply"]      = msg_id.present? && acct_id && sendable_account_ids.include?(acct_id)
         data["can_done"]       = item.present? && DONE_KINDS.include?(item.feed_item.kind)
+        data["tags"]           = row_tags(contacts, cp.standing.thread_id,
+                                          sender_tags_by_contact, inbox_tags_by_thread)
 
         cp.with(data: data)
       end
+    end
+
+    # ── Row tag chips (sender + email, capped) ────────────────────────────────
+    # Materialized into data["tags"] so the row renders from the table with no
+    # extra query. Same staleness as the row's subject/snippet: the cluster
+    # refreshes with the standings, not on every manual tag edit.
+
+    # Sender (contact-level) tags for a set of contacts — visible, workspace
+    # scoped — keyed by contact_id. One query for the whole list.
+    def sender_tags_for(contact_ids)
+      return {} if contact_ids.blank?
+
+      map = {}
+      ContactTag.joins(:tag)
+                .where(contact_id: contact_ids, tags: { workspace_id: @workspace.id, hidden: false })
+                .order("tags.name")
+                .pluck(:contact_id, "tags.id", "tags.name", "tags.color")
+                .each { |cid, id, name, color| (map[cid] ||= []) << tag_hash(id, name, color) }
+      map
+    end
+
+    # Email (message-level) tags for a set of threads — thread-union, visible,
+    # workspace scoped — keyed by thread_id. One query for the whole list.
+    def inbox_tags_for(thread_ids)
+      return {} if thread_ids.blank?
+
+      map = {}
+      EmailMessageTag.joins(:email_message, :tag)
+                     .where(email_messages: { email_thread_id: thread_ids })
+                     .where(tags: { workspace_id: @workspace.id, hidden: false })
+                     .distinct
+                     .order("tags.name")
+                     .pluck("email_messages.email_thread_id", "tags.id", "tags.name", "tags.color")
+                     .each { |tid, id, name, color| (map[tid] ||= []) << tag_hash(id, name, color) }
+      map
+    end
+
+    # Sender tags first (they identify the person), then the email's own tags,
+    # de-duplicated by id and capped. Deterministic order (both loads sort by
+    # name) keeps the materialized JSONB stable so it doesn't churn broadcasts.
+    def row_tags(contacts, thread_id, sender_map, inbox_map)
+      sender = contacts.flat_map { |c| sender_map[c.id] || [] }
+      inbox  = (thread_id && inbox_map[thread_id]) || []
+      (sender + inbox).uniq { |t| t["id"] }.first(TAG_CAP)
+    end
+
+    def tag_hash(id, name, color)
+      { "id" => id, "name" => name, "color" => color }
     end
 
     # One line of the newest message from them, for rows without a Scout read:

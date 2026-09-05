@@ -317,4 +317,53 @@ RSpec.describe People::Directory do
       expect(cp.data["can_done"]).to be true
     end
   end
+
+  describe "data['tags']" do
+    it "combines the person's sender tags and the email's tags, sender first, capped" do
+      _person, contact, thread = make_person(name: "Sofia", email: "sofia@x.example")
+      msg = thread.email_messages.first
+
+      client  = create(:tag, workspace: workspace, name: "Client",  color: "#111111")
+      receipt = create(:tag, workspace: workspace, name: "Receipt", color: "#222222")
+      zeta    = create(:tag, workspace: workspace, name: "Zeta",    color: "#333333")
+      ContactTag.create!(contact: contact, tag: client)
+      create(:email_message_tag, email_message: msg, tag: receipt)
+      create(:email_message_tag, email_message: msg, tag: zeta)
+
+      cp = directory.counterparts.find { |c| c.name == "Sofia" }
+      tags = cp.data["tags"]
+
+      # Sender tag (Client) leads; the email's tags follow by name; capped at TAG_CAP.
+      expect(tags.map { |t| t["name"] }).to eq(%w[Client Receipt])
+      expect(tags.first).to include("id", "name", "color")
+      expect(tags.first["color"]).to eq("#111111")
+    end
+
+    it "omits hidden tags (provider system statuses / low-value labels)" do
+      _person, _contact, thread = make_person(name: "Rui", email: "rui@x.example")
+      msg = thread.email_messages.first
+      hidden = create(:tag, workspace: workspace, name: "CATEGORY_UPDATES", hidden: true)
+      create(:email_message_tag, email_message: msg, tag: hidden)
+
+      cp = directory.counterparts.find { |c| c.name == "Rui" }
+      expect(cp.data["tags"]).to eq([])
+    end
+
+    it "does not surface another workspace's tags" do
+      _person, _contact, thread = make_person(name: "Nadia", email: "nadia@x.example")
+      msg = thread.email_messages.first
+      other_ws = create(:workspace)
+      foreign = create(:tag, workspace: other_ws, name: "Foreign")
+      create(:email_message_tag, email_message: msg, tag: foreign)
+
+      cp = directory.counterparts.find { |c| c.name == "Nadia" }
+      expect(cp.data["tags"]).to eq([])
+    end
+
+    it "is an empty array when the person has no tags" do
+      make_person(name: "Ana", email: "ana@x.example")
+      cp = directory.counterparts.find { |c| c.name == "Ana" }
+      expect(cp.data["tags"]).to eq([])
+    end
+  end
 end
