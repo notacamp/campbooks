@@ -6,7 +6,7 @@ RSpec.describe People::Priority do
   let(:now) { Time.zone.local(2026, 9, 3, 12, 0, 0) }
 
   def standing(needs_you: false, kind: :none)
-    People::Standing::Result.new(text: nil, needs_you: needs_you, kind: kind)
+    People::Standing::Result.new(needs_you: needs_you, kind: kind)
   end
 
   def needing = standing(needs_you: true, kind: :attention)

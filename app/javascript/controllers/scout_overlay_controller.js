@@ -38,8 +38,10 @@ export default class extends Controller {
     this.boundDialogClick = this._handleDialogClick.bind(this)
     this.boundChipClick = this._handleChipClick.bind(this)
     this.boundMouseMove = () => { this.engine.keyboardNav = false }
+    this.boundAskEvent = this._askFromEvent.bind(this)
     document.addEventListener("keydown", this.boundKeydown)
     if (this.hasDialogTarget) this.dialogTarget.addEventListener("click", this.boundChipClick)
+    window.addEventListener("scout:ask", this.boundAskEvent)
 
     // Keep the conversation pinned to the newest message as replies stream in.
     this.observer = new MutationObserver(() => this._scrollConversation())
@@ -48,6 +50,7 @@ export default class extends Controller {
   disconnect() {
     document.removeEventListener("keydown", this.boundKeydown)
     if (this.hasDialogTarget) this.dialogTarget.removeEventListener("click", this.boundChipClick)
+    window.removeEventListener("scout:ask", this.boundAskEvent)
     this.observer?.disconnect()
     this.engine.reset()
   }
@@ -403,6 +406,21 @@ export default class extends Controller {
       const btn = this.listTarget.querySelector(`[data-index="${this.engine.selectedIndex}"]`)
       if (btn) btn.scrollIntoView({ block: "nearest" })
     })
+  }
+
+  // ── "Ask Scout" from a page ─────────────────────────────────────────────────
+
+  // A page element (the People note's "Ask Scout" chip, via scout_ask_controller)
+  // dispatched a window "scout:ask" event: open and ask, even before the body frame
+  // has told us whether AI is available — the loaded shell settles that, and
+  // bodyLoaded posts the pending question once the conversation shell is in.
+  _askFromEvent(event) {
+    const text = (event.detail?.text || "").trim()
+    if (!text) return
+    this.open()
+    this.inputTarget.value = ""
+    this.pendingQuestion = text
+    this._loadFrame(`${OVERLAY_SRC}?current=1`)
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────────

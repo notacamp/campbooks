@@ -3,9 +3,11 @@
 require "rails_helper"
 
 RSpec.describe Campbooks::People::CounterpartRow, type: :component do
-  def standing(text: nil, needs_you: false, verb: nil, subject: nil, wait_days: 0)
-    People::Standing::Result.new(text: text, needs_you: needs_you, thread_id: nil, overdue_days: 0,
-                                 verb: verb, subject: subject, wait_days: wait_days, kind: :none)
+  def standing(detail: nil, detail_kind: nil, needs_you: false, verb: nil, subject: nil, wait_days: 0)
+    People::Standing::Result.new(detail: detail, detail_kind: detail_kind, needs_you: needs_you,
+                                 thread_id: nil, overdue_days: 0, money: nil,
+                                 verb: verb, subject: subject, wait_days: wait_days,
+                                 feed_item_id: nil, email_message_id: nil, kind: :none)
   end
 
   def render(component)
@@ -48,7 +50,7 @@ RSpec.describe Campbooks::People::CounterpartRow, type: :component do
     counterpart = People::Counterpart.new(kind: :person, record: person, name: "Rui Santos",
                                           subtitle: "Support", avatar_email: "rui@cloudhost.example",
                                           avatar_initial: nil, last_activity: Time.current,
-                                          standing: standing(text: "Waiting."),
+                                          standing: standing(detail: "Waiting.", detail_kind: :prompt),
                                           data: {})
     html = render(described_class.new(counterpart: counterpart, nested: true))
     expect(html).to include("Open")
@@ -67,7 +69,8 @@ RSpec.describe Campbooks::People::CounterpartRow, type: :component do
 
   it "renders the action cluster for person rows when can_reply is true" do
     person = create(:person, name: "Sofia Martins")
-    msg_standing = People::Standing::Result.new(text: nil, needs_you: true, thread_id: nil,
+    msg_standing = People::Standing::Result.new(detail: nil, detail_kind: nil, money: nil,
+                                                needs_you: true, thread_id: nil,
                                                 overdue_days: 0, kind: :attention, verb: :reply,
                                                 subject: "Q3 deck", wait_days: 2,
                                                 feed_item_id: 1, email_message_id: 1)
@@ -139,8 +142,8 @@ RSpec.describe Campbooks::People::CounterpartRow, type: :component do
 
   describe "shortcut hint wiring on action cluster buttons" do
     let(:msg_standing) do
-      People::Standing::Result.new(text: nil, needs_you: true, thread_id: nil,
-                                   overdue_days: 0, kind: :attention, verb: :reply,
+      People::Standing::Result.new(detail: nil, detail_kind: nil, money: nil, needs_you: true,
+                                   thread_id: nil, overdue_days: 0, kind: :attention, verb: :reply,
                                    subject: "Q3 deck", wait_days: 2,
                                    feed_item_id: 1, email_message_id: 1)
     end
@@ -225,6 +228,27 @@ RSpec.describe Campbooks::People::CounterpartRow, type: :component do
       # UUID id can contain "2d" and made this assertion flaky.
       expect(lane).to match(%r{>\s*2d\s*<})        # the lane shape shows how long they have waited
       expect(latest).not_to match(%r{>\s*2d\s*<})  # the inbox shape shows when the message arrived
+    end
+
+    it "prefixes the verb label on a needs_you latest row that has standing text" do
+      person = create(:person, name: "Rui Santos")
+      st = People::Standing::Result.new(
+        detail: "the signed NDA", detail_kind: :ask_ai, money: nil, needs_you: true,
+        thread_id: nil, overdue_days: 2, kind: :attention, verb: :reply,
+        subject: "Q3 deck", wait_days: 2, feed_item_id: "f1", email_message_id: "m1"
+      )
+      counterpart = People::Counterpart.new(kind: :person, record: person, name: "Rui Santos",
+                                            subtitle: nil, avatar_email: "rui@x.example",
+                                            avatar_initial: nil, last_activity: Time.current,
+                                            standing: st, data: {})
+      latest_html = render(described_class.new(counterpart: counterpart, variant: :latest))
+      lane_html   = render(described_class.new(counterpart: counterpart, variant: :lane))
+
+      # The Latest row (outside the lanes) carries the verb before the stand line …
+      expect(latest_html).to include("Reply</span> · Asks for the signed NDA")
+      # … the lane row does not: its lane heading already names the verb.
+      expect(lane_html).to include("Asks for the signed NDA")
+      expect(lane_html).not_to include("Reply</span> · ")
     end
   end
 end

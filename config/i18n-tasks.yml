@@ -41,6 +41,14 @@ ignore_unused:
   - 'accounts.deactivation_reasons.*' # resolved dynamically by deactivation_reason column (ProviderSyncDeactivation#deactivation_reason_label)
   - 'now.index.ledger.buckets.*' # Scout's ledger phrases — the bucket key is built dynamically from the event name (NowHelper#now_ledger_bucket)
   - 'now.undo_log.not_reversible' # NowController's private #not_reversible resolves t('.not_reversible') against the undo_log action at runtime; the static scan can't see it
+  # People's stand copy: People::StandCopy builds the keys dynamically (people.stand.<kind>,
+  # people.conversation.stand.<verb>) and Campbooks::People::StandNote renders the header
+  # (components/* excluded from scan).
+  - 'people.stand.*'
+  - 'people.standing.*'
+  - 'people.conversation.stand.*'
+  - 'people.conversation.no_standing'
+  - 'people.conversation.where_things_stand'
   # The inbox zero-state copy moved from home/index.html.erb into
   # Campbooks::InboxEmptyState (a Phlex component, and app/components is excluded
   # from the scan), shared by Home and the Now deck. The keys stay under

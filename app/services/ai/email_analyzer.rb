@@ -19,6 +19,7 @@ module Ai
         ai_summary: result["summary"],
         ai_priority: result["priority"],
         ai_action_prompt: result["action_prompt"].presence,
+        ai_ask: result["ask"].to_s.strip.presence&.truncate(120),
         ai_suggested_actions: result["suggested_actions"] || [],
         ai_provenance: Ai::Provenance.for_purpose(PURPOSE, legacy_model: MODEL),
         ai_analyzed_at: Time.current
@@ -47,7 +48,7 @@ module Ai
         Important: Check the email headers (To:, CC:) and greeting to determine whether you are the primary recipient or just CC'd. If you're only CC'd, you likely don't need to take action — adjust priority and skip action suggestions accordingly.
       MSG
 
-      config = Ai::Configuration.for(PURPOSE)
+      config = Ai::Configuration.for_any(%w[email_analysis email_classification])
       if config
         call_adapter(config, user_message, 300)
       else
@@ -134,8 +135,10 @@ module Ai
            - "options": array of 2-4 short option labels
            Return an empty array if you have enough context. Only ask when genuinely needed.
 
+        6. **Ask**: What the sender wants from you, as a short noun phrase that completes the sentence "They ask for …" — e.g. "your comments on slides 4 to 9 by Friday", "a signed copy of the NDA", "the June receipt". At most 12 words, no trailing period. Empty string when nothing is asked of you (FYIs, receipts, newsletters, CC-only).
+
         Respond with valid JSON only, using this schema:
-        {"summary": "string", "priority": "low"|"medium"|"high", "action_prompt": "string", "suggested_actions": [...], "questions": [...]}
+        {"summary": "string", "priority": "low"|"medium"|"high", "action_prompt": "string", "suggested_actions": [...], "questions": [...], "ask": "string"}
         #{Ai::Configuration.user_prompt_suffix(PURPOSE)}
       PROMPT
     end

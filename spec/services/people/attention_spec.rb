@@ -190,30 +190,62 @@ RSpec.describe People::Attention do
     expect(item&.subject).to include("Q3 kick-off")
   end
 
-  it "subject is an amount + date string for money document items" do
+  it "subject for money document items is the invoice number (not the formatted money string)" do
     person = create(:person, workspace: workspace)
     make_doc_feed_item(kind: "late_payable", person: person, days_late: 10)
     item = attention.for(person)
-    expect(item&.subject).to include("€500.00")
+    expect(item).not_to be_nil
+    # Subject is the raw invoice number, not a formatted money amount.
+    expect(item.subject).not_to include("€")
   end
 
-  # ── text only for reply_reminder / email_action / follow_up ──────────────
+  # ── detail / detail_kind for reply_reminder / email_action / follow_up / money ──
 
-  it "text is ai_action_prompt for email_action items" do
+  it "email_action with ai_action_prompt and no ask → detail_kind :prompt, detail == prompt" do
     _fi, person, = make_email_feed_item(kind: "email_action", age_days: 3,
                                         ai_action_prompt: "Please approve the budget.")
-    expect(attention.for(person)&.text).to eq("Please approve the budget.")
+    item = attention.for(person)
+    expect(item&.detail_kind).to eq(:prompt)
+    expect(item&.detail).to eq("Please approve the budget.")
   end
 
-  it "text is nil for reply_owed items (no AI prompt)" do
-    _fi, person, = make_email_feed_item(kind: "reply_owed", age_days: 5)
-    expect(attention.for(person)&.text).to be_nil
+  it "reply_owed whose message asks a question → the sender's own sentence, :ask_quote" do
+    _fi, person, = make_email_feed_item(kind: "reply_owed", age_days: 5,
+                                        body: "Hi! Could you send the signed NDA by Friday?")
+    item = attention.for(person)
+    expect(item&.detail_kind).to eq(:ask_quote)
+    expect(item&.detail).to eq("Could you send the signed NDA by Friday?")
   end
 
-  it "text is nil for late_payable items" do
+  it "reply_reminder with Scout's read → the ask phrase, :ask_ai (wins over the quote)" do
+    _fi, person, = make_email_feed_item(kind: "reply_reminder", age_days: 4,
+                                        ai_action_prompt: "Draft a reply.", ai_ask: "the signed NDA",
+                                        body: "Could you send the signed NDA by Friday?")
+    item = attention.for(person)
+    expect(item&.detail_kind).to eq(:ask_ai)
+    expect(item&.detail).to eq("the signed NDA")
+  end
+
+  it "follow_up → the awaited thing when the AI named it, else the silence since your last message" do
+    fi, person, _contact, thread, = make_email_feed_item(kind: "follow_up", age_days: 6)
+    thread.update_columns(follow_up_reason: "Rui's confirmation of the backup window",
+                          last_outbound_at: 6.days.ago, last_inbound_at: 9.days.ago)
+    fi.update!(data: { "age_days" => 6, "since" => 6.days.ago.iso8601 })
+    expect(attention.for(person)&.detail_kind).to eq(:reason)
+    expect(attention.for(person)&.detail).to eq("Rui's confirmation of the backup window")
+
+    thread.update_columns(follow_up_reason: nil)
+    expect(attention.for(person)&.detail_kind).to eq(:silence)
+    expect(attention.for(person)&.detail).to eq(fi.data["since"])
+  end
+
+  it "late_payable → detail_kind :money, money hash present" do
     person = create(:person, workspace: workspace)
     make_doc_feed_item(kind: "late_payable", person: person)
-    expect(attention.for(person)&.text).to be_nil
+    item = attention.for(person)
+    expect(item&.detail_kind).to eq(:money)
+    expect(item&.money).to be_a(Hash)
+    expect(item&.money&.keys).to include("amount_cents", "currency", "days_late")
   end
 
   # ── still_valid? false items are skipped ─────────────────────────────────

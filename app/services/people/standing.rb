@@ -8,21 +8,23 @@ module People
   # Priority:
   #   1. Attention item present (feed items: reply, nudge, decide, pay, chase)
   #      -> needs_you: true, kind: :attention, verb/wait_days/subject from the item.
-  #   2. Profile summary -> kind: :summary (no needs_you, text = first sentence).
-  #   3. Last exchange -> kind: :last_exchange (no text, subject = thread subject).
-  #   4. None -> Result.none.
+  #   2. Last exchange with ask or hold signal -> kind: :last_exchange (no needs_you).
+  #   3. None -> Result.none.
   #
   # The old "Waiting on your reply for N days." / "No reply to <subject>. Nudge?"
   # sentence templates are gone - verbs and subjects now come from the feed.
   class Standing
-    Result = Data.define(:text, :needs_you, :thread_id, :overdue_days, :kind,
+    Result = Data.define(:detail, :detail_kind, :money, :needs_you, :thread_id, :overdue_days, :kind,
                          :verb, :subject, :wait_days, :feed_item_id, :email_message_id) do
-      def initialize(text:, needs_you: false, thread_id: nil, overdue_days: 0, kind: :none,
+      def initialize(detail: nil, detail_kind: nil, money: nil, needs_you: false,
+                     thread_id: nil, overdue_days: 0, kind: :none,
                      verb: nil, subject: nil, wait_days: 0, feed_item_id: nil, email_message_id: nil)
         super
       end
-      def self.none = new(text: nil)
-      def present? = text.present?
+      def self.none = new(detail: nil)
+      # Composed at render time in the current locale.
+      def text = People::StandCopy.line(self)
+      def present? = detail.present? || detail_kind == :money
     end
 
     ORG_PEOPLE_SAMPLE = 5
@@ -72,16 +74,21 @@ module People
         result_from_attention(attention_item)
       else
         latest = latest_inbound_message(person)
+        thread = latest&.email_thread
         last_subj = latest&.email_thread&.display_subject.to_s.strip.presence ||
                     latest&.subject.to_s.strip.presence
-        # The newest inbound message is what the row's Reply and Archive act on —
-        # without it a Latest row offers neither (only lane rows carried one).
-        if (summary = profile_summary(person)).present?
-          result(first_sentence(summary), thread: latest&.email_thread, kind: :summary, subject_str: last_subj,
-                                          email_message_id: latest&.id)
-        elsif person.last_email_at.present?
-          result(nil, thread: latest&.email_thread, kind: :last_exchange, subject_str: last_subj,
-                      email_message_id: latest&.id)
+
+        if thread&.holds_last_word? && thread.last_outbound_at
+          result(detail: thread.last_outbound_at.to_date.iso8601, detail_kind: :you_wrote_last,
+                 thread: latest&.email_thread, kind: :last_exchange, subject_str: last_subj,
+                 email_message_id: latest&.id)
+        elsif (ask = People::Ask.for(latest))
+          result(detail: ask.text, detail_kind: (ask.kind == :ai ? :ask_ai : :ask_quote),
+                 thread: latest&.email_thread, kind: :last_exchange, subject_str: last_subj,
+                 email_message_id: latest&.id)
+        elsif latest || person.last_email_at.present?
+          result(detail: nil, detail_kind: nil, thread: latest&.email_thread,
+                 kind: :last_exchange, subject_str: last_subj, email_message_id: latest&.id)
         else
           Result.none
         end
@@ -115,7 +122,9 @@ module People
     def result_from_attention(item)
       fi = item.feed_item
       Result.new(
-        text: item.text,
+        detail: item.detail,
+        detail_kind: item.detail_kind,
+        money: item.money,
         needs_you: true,
         thread_id: item.thread_id,
         overdue_days: item.wait_days,
@@ -128,9 +137,10 @@ module People
       )
     end
 
-    def result(text, thread: nil, kind: :none, subject_str: nil, email_message_id: nil)
+    def result(detail:, detail_kind:, thread: nil, kind: :none, subject_str: nil, email_message_id: nil)
       Result.new(
-        text: text,
+        detail: detail,
+        detail_kind: detail_kind,
         needs_you: false,
         thread_id: thread&.id,
         overdue_days: 0,
@@ -166,23 +176,6 @@ module People
                   .accessible_to(@user)
                   .order(received_at: :desc)
                   .first
-    end
-
-    def profile_summary(person)
-      own = person.read_attribute(:context_summary).presence
-      return own if own
-
-      if person.contacts.loaded?
-        person.contacts.select { |c| c.context_summary.present? }
-              .max_by { |c| c.email_count.to_i }&.context_summary
-      else
-        person.contacts.where.not(context_summary: [ nil, "" ])
-              .order(email_count: :desc).limit(1).pick(:context_summary)
-      end
-    end
-
-    def first_sentence(text)
-      text.to_s.strip.split(/(?<=[.!?])\s+/).first.to_s
     end
 
     def primed?(person)
@@ -249,7 +242,7 @@ module People
       cols = %w[
         id email_thread_id contact_id received_at from_address to_address cc_address
         subject category header_list_unsubscribe header_precedence header_auto_submitted
-        ai_action_prompt ai_priority email_account_id provider_folder_id
+        ai_action_prompt ai_priority ai_ask email_account_id provider_folder_id
       ].join(", ")
 
       messages = EmailMessage.select("DISTINCT ON (email_thread_id) #{cols}")

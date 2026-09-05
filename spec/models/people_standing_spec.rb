@@ -10,14 +10,15 @@ RSpec.describe PeopleStanding do
   before { create(:email_account_user, user: user, email_account: account, can_read: true) }
 
   def make_standing(counterpart:, score: 0.5, needs_you: false, last_activity_at: 1.day.ago,
-                    standing_kind: "last_exchange", text: "Last exchange yesterday.")
+                    standing_kind: "last_exchange", detail: nil, detail_kind: nil)
     PeopleStanding.create!(
       workspace: workspace,
       user: user,
       counterpart: counterpart,
       needs_you: needs_you,
       standing_kind: standing_kind,
-      text: text,
+      detail: detail,
+      detail_kind: detail_kind,
       score: score,
       strength: 1.0,
       last_activity_at: last_activity_at,
@@ -62,8 +63,8 @@ RSpec.describe PeopleStanding do
     it "matches by name (case-insensitive)" do
       person = create(:person, workspace: workspace, name: "Sofia Martins")
       other  = create(:person, workspace: workspace, name: "Ana Reis")
-      make_standing(counterpart: person, text: "Last exchange.")
-      make_standing(counterpart: other,  text: "Last exchange.")
+      make_standing(counterpart: person)
+      make_standing(counterpart: other)
 
       results = described_class.for_user(user).search("sofia")
       expect(results.pluck(:name)).to include("Sofia Martins")
@@ -74,7 +75,7 @@ RSpec.describe PeopleStanding do
       person = create(:person, workspace: workspace, name: "Rui")
       PeopleStanding.create!(
         workspace: workspace, user: user, counterpart: person,
-        needs_you: false, standing_kind: "last_exchange", text: "t",
+        needs_you: false, standing_kind: "last_exchange",
         score: 0.0, strength: 0.0, name: "Rui",
         subtitle: "Cloudhost Corp",
         refreshed_at: Time.current
@@ -87,7 +88,7 @@ RSpec.describe PeopleStanding do
       person = create(:person, workspace: workspace, name: "Nadia")
       PeopleStanding.create!(
         workspace: workspace, user: user, counterpart: person,
-        needs_you: false, standing_kind: "last_exchange", text: "t",
+        needs_you: false, standing_kind: "last_exchange",
         score: 0.0, strength: 0.0, name: "Nadia",
         avatar_email: "nadia@brightloop.example",
         refreshed_at: Time.current
@@ -104,7 +105,7 @@ RSpec.describe PeopleStanding do
       row = PeopleStanding.create!(
         workspace: workspace, user: user, counterpart: person,
         needs_you: true, standing_kind: "attention",
-        text: nil, verb: "reply", subject: "Q3 deck", wait_days: 2,
+        verb: "reply", subject: "Q3 deck", wait_days: 2,
         score: 1.5, strength: 2.0,
         last_activity_at: 2.days.ago, name: "Ines",
         subtitle: "Brightloop", avatar_email: "ines@brightloop.example",

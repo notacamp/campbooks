@@ -228,6 +228,43 @@ RSpec.describe EmailProcessJob, type: :job do
         expect(captured).to eq(account.workspace)
         expect(Current.workspace).to be_nil # reset in `ensure`
       end
+
+      # Scout's full read (EmailAnalysisJob) is the fourth rung of the triage ladder:
+      # inbound mail from a person, first ingest only — never our own outbound, never
+      # bulk/automated senders.
+      context "Scout's full read" do
+        def stub_triage(category: "personal")
+          decision = Emails::Triage::Decision.new(category: category, confidence: 0.9, tag: nil, source: :rules)
+          allow(Emails::Triage).to receive(:new).and_return(instance_double(Emails::Triage, call: decision))
+        end
+
+        it "enqueues EmailAnalysisJob for inbound mail from a person" do
+          stub_triage
+          expect { described_class.perform_now(email_message.id) }
+            .to have_enqueued_job(EmailAnalysisJob).with(email_message.id)
+        end
+
+        it "does not enqueue it for our own outbound mail" do
+          stub_triage
+          email_message.update_columns(from_address: account.email_address)
+          expect { described_class.perform_now(email_message.id) }
+            .not_to have_enqueued_job(EmailAnalysisJob)
+        end
+
+        it "does not enqueue it for bulk / junk senders" do
+          stub_triage(category: "promotions")
+          email_message.update_columns(header_precedence: "junk")
+          expect { described_class.perform_now(email_message.id) }
+            .not_to have_enqueued_job(EmailAnalysisJob)
+        end
+
+        it "does not enqueue it again on a re-process" do
+          stub_triage
+          email_message.update_columns(status: EmailMessage.statuses[:processed])
+          expect { described_class.perform_now(email_message.id) }
+            .not_to have_enqueued_job(EmailAnalysisJob)
+        end
+      end
     end
 
     # Future mail from a blocked sender is auto-archived at ingest, so it never

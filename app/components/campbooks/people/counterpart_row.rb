@@ -137,13 +137,28 @@ module Campbooks
       # message's first line, muted — the row then reads like an inbox row.
       def standing_line
         text = standing.text
+        show_verb_prefix = @variant == :latest && needs_you? && standing.verb
+
         if text.present?
           div(class: "mt-0.5 flex items-start gap-1 text-[12px] leading-snug text-foreground/70 line-clamp-1") do
             span(class: "mt-[2px] flex-shrink-0", style: "color: var(--ember-solid)") { raw(safe(SPARK)) }
-            span(class: "min-w-0 line-clamp-1") { text }
+            span(class: "min-w-0 line-clamp-1") do
+              if show_verb_prefix
+                span(class: "font-semibold text-foreground") { t("people.index.lanes.#{standing.verb}") }
+                plain " · "
+              end
+              plain text
+            end
           end
         elsif (snippet = data["snippet"]).present?
-          div(class: "mt-0.5 text-[12px] leading-snug text-muted-foreground line-clamp-1") { snippet }
+          if show_verb_prefix
+            div(class: "mt-0.5 flex items-start gap-1 text-[12px] leading-snug text-muted-foreground line-clamp-1") do
+              span(class: "font-semibold text-foreground") { t("people.index.lanes.#{standing.verb}") }
+              plain " · #{snippet}"
+            end
+          else
+            div(class: "mt-0.5 text-[12px] leading-snug text-muted-foreground line-clamp-1") { snippet }
+          end
         end
       end
 

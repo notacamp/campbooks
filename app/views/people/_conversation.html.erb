@@ -80,15 +80,9 @@
     <div class="w-full px-6 pb-6 pt-5">
 
       <%# Scout's standing pinned above the threads. %>
-      <%= render Campbooks::ScoutNote.new(message: @standing.text.presence || people_standing_note(@standing, @person) || t("people.conversation.no_standing"),
-            time: t("people.conversation.where_things_stand"), class: "mb-3") %>
-
-      <% if @can_send && @reply_target %>
-        <div class="mb-3">
-          <%= render Campbooks::EmailScoutActions.new(message: @reply_target, surface: :detail,
-                can_send: @can_send, show_note: false) %>
-        </div>
-      <% end %>
+      <%= render Campbooks::People::StandNote.new(standing: @standing, counterpart: @person,
+            reply_target: @reply_target, can_send: @can_send,
+            draft_present: @scout_draft.present?, class: "mb-3") %>
 
       <%# Slot for Scout's draft-questions form (EmailToolsController streams into here). %>
       <div id="thread_compose_target"></div>

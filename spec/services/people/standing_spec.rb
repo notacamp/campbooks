@@ -39,7 +39,8 @@ RSpec.describe People::Standing do
     attn
   end
 
-  def stub_attention_item(verb:, subject: "Q3 deck", wait_days: 2, score: 50.0)
+  def stub_attention_item(verb:, subject: "Q3 deck", wait_days: 2, score: 50.0,
+                          detail: nil, detail_kind: nil, money: nil)
     fi = instance_double(FeedItem,
                          id: SecureRandom.uuid,
                          score: score,
@@ -50,7 +51,9 @@ RSpec.describe People::Standing do
                     verb: verb,
                     subject: subject,
                     wait_days: wait_days,
-                    text: nil,
+                    detail: detail,
+                    detail_kind: detail_kind,
+                    money: money,
                     thread_id: nil,
                     message: nil,
                     attention: true)
@@ -68,8 +71,8 @@ RSpec.describe People::Standing do
     msg    = instance_double(EmailMessage, id: msg_id)
     item   = instance_double(People::Attention::Item,
                              feed_item: fi, verb: :reply, subject: "Q3 deck",
-                             wait_days: 2, text: nil, thread_id: nil,
-                             message: msg, attention: true)
+                             wait_days: 2, detail: nil, detail_kind: nil, money: nil,
+                             thread_id: nil, message: msg, attention: true)
     attn   = stub_attention_with(item)
 
     st = described_class.for_person(p, user: user, attention: attn)
@@ -99,20 +102,59 @@ RSpec.describe People::Standing do
 
   # ── Fallback path (no attention item) ─────────────────────────────────────
 
-  it "falls to the profile summary's first sentence when no attention item" do
-    p = person_with(name: "David", last_inbound: 5.days.ago, last_outbound: 1.day.ago,
-                    context_summary: "Long-time client. Prefers phone.")
-    st = described_class.for_person(p, user: user)
-    expect(st.needs_you).to be false
-    expect(st.kind).to eq(:summary)
-    expect(st.text).to eq("Long-time client.")
-  end
-
-  it "falls back to last_exchange when no attention item and no summary" do
+  it "falls back to last_exchange when no attention item" do
     p = person_with(name: "Quiet", context_summary: nil, last_email_at: 3.days.ago)
     st = described_class.for_person(p, user: user)
     expect(st.needs_you).to be false
     expect(st.kind).to eq(:last_exchange)
+  end
+
+  it "profile bio (context_summary) is NOT reflected in the standing text" do
+    p = person_with(name: "David", last_inbound: 5.days.ago, last_outbound: 1.day.ago,
+                    context_summary: "Long-time client. Prefers phone.")
+    st = described_class.for_person(p, user: user)
+    expect(st.needs_you).to be false
+    # bio is never surfaced in the standing row — it stays in the Details rail
+    expect(st.text).not_to include("Long-time client")
+  end
+
+  it "you hold the last word → detail_kind :you_wrote_last, kind :last_exchange" do
+    p = person_with(name: "Sofia", last_inbound: 5.days.ago, last_outbound: 1.day.ago)
+    st = described_class.for_person(p, user: user)
+    expect(st.needs_you).to be false
+    expect(st.kind).to eq(:last_exchange)
+    expect(st.detail_kind).to eq(:you_wrote_last)
+  end
+
+  it "they wrote last and asked something → their own sentence, :ask_quote, no needs_you" do
+    p = person_with(name: "Quiet", context_summary: nil, last_inbound: 1.day.ago)
+    newest = EmailMessage.where(contact_id: p.contacts.ids).order(received_at: :desc).first
+    newest.update_columns(body: "Olá! Consegues enviar a fatura de junho?")
+
+    st = described_class.for_person(p, user: user)
+    expect(st.needs_you).to be false
+    expect(st.kind).to eq(:last_exchange)
+    expect(st.detail_kind).to eq(:ask_quote)
+    expect(st.detail).to eq("Consegues enviar a fatura de junho?")
+    expect(st.text).to eq("Asks: “Consegues enviar a fatura de junho?”")
+    expect(st.email_message_id).to eq(newest.id)
+  end
+
+  it "they wrote last with nothing to ask → no line (the row shows the snippet)" do
+    p = person_with(name: "Quiet", context_summary: nil, last_inbound: 3.days.ago)
+    st = described_class.for_person(p, user: user)
+    expect(st.kind).to eq(:last_exchange)
+    expect(st.detail_kind).to be_nil
+    expect(st.text).to be_nil
+  end
+
+  it "nothing asked and no inbound → Result.none" do
+    # A person with no contact records at all has no email history.
+    p = create(:person, workspace: workspace, name: "Ghost", context_summary: nil)
+    st = described_class.for_person(p, user: user)
+    expect(st.kind).to eq(:none)
+    expect(st.detail).to be_nil
+    expect(st.text).to be_nil
   end
 
   it "carries the newest inbound message without an attention item, so the row can reply and archive" do

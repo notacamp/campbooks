@@ -35,7 +35,7 @@ module People
               unique_by: :index_people_standings_on_user_counterpart,
               record_timestamps: false,
               update_only: %i[
-                needs_you standing_kind text email_thread_id overdue_days
+                needs_you standing_kind detail detail_kind email_thread_id overdue_days
                 score strength last_activity_at name subtitle avatar_email
                 avatar_initial data verb subject wait_days feed_item_id
                 email_message_id refreshed_at updated_at
@@ -99,7 +99,7 @@ module People
           unique_by: :index_people_standings_on_user_counterpart,
           record_timestamps: false,
           update_only: %i[
-            needs_you standing_kind text email_thread_id overdue_days
+            needs_you standing_kind detail detail_kind email_thread_id overdue_days
             score strength last_activity_at name subtitle avatar_email
             avatar_initial data verb subject wait_days feed_item_id
             email_message_id refreshed_at updated_at
@@ -138,7 +138,8 @@ module People
           counterpart_id:    cp.id,
           needs_you:         cp.needs_you?,
           standing_kind:     standing.kind.to_s,
-          text:              standing.text,
+          detail:            standing.detail,
+          detail_kind:       standing.detail_kind&.to_s,
           email_thread_id:   standing.thread_id,
           overdue_days:      standing.overdue_days,
           verb:              standing.verb&.to_s,
@@ -153,7 +154,7 @@ module People
           subtitle:          cp.subtitle,
           avatar_email:      cp.avatar_email,
           avatar_initial:    cp.avatar_initial,
-          data:              build_data(cp, directory),
+          data:              build_data(cp, directory).merge(standing.money ? { "money" => standing.money } : {}),
           refreshed_at:      now,
           updated_at:        now,
           created_at:        now
@@ -228,8 +229,8 @@ module People
 
       # What the row renders: any difference here is worth a replace, nothing else is.
       def fingerprint(row)
-        [ row.needs_you, row.verb, row.subject, row.wait_days, row.text, row.score.round(2),
-          row.name, row.subtitle, row.avatar_email, row.data ]
+        [ row.needs_you, row.verb, row.subject, row.wait_days, row.detail, row.detail_kind,
+          row.score.round(2), row.name, row.subtitle, row.avatar_email, row.data ]
       end
 
       def broadcast_replace_row!(user, standing_row)

@@ -698,6 +698,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_200000) do
     t.text "ai_action_prompt"
     t.uuid "ai_analysis_message_id"
     t.datetime "ai_analyzed_at"
+    t.string "ai_ask"
     t.integer "ai_priority", default: 1, null: false
     t.jsonb "ai_provenance", default: {}, null: false
     t.jsonb "ai_suggested_actions", default: [], null: false
@@ -1325,6 +1326,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_200000) do
     t.string "counterpart_type", null: false
     t.datetime "created_at", null: false
     t.jsonb "data", default: {}, null: false
+    t.text "detail"
+    t.string "detail_kind"
     t.uuid "email_message_id"
     t.uuid "email_thread_id"
     t.uuid "feed_item_id"
@@ -1338,7 +1341,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_200000) do
     t.float "strength", default: 0.0, null: false
     t.string "subject"
     t.string "subtitle"
-    t.text "text"
     t.datetime "updated_at", null: false
     t.uuid "user_id", null: false
     t.string "verb"
