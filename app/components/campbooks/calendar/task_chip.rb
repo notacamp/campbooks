@@ -20,7 +20,7 @@ module Campbooks
       private
 
       def row
-        a(href: helpers.task_path(@task),
+        a(href: link_href,
           class: "-mx-3 flex items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-muted/50 no-underline") do
           span(class: "w-16 shrink-0 text-xs text-muted-foreground tabular-nums") { time_label }
           task_dot("h-2.5 w-2.5")
@@ -33,7 +33,7 @@ module Campbooks
       end
 
       def chip
-        a(href: helpers.task_path(@task), title: @task.title,
+        a(href: link_href, title: @task.title,
           class: "flex items-center gap-1 truncate rounded bg-muted px-1.5 py-0.5 text-[10px] leading-tight text-foreground/80 no-underline sm:text-[11px]") do
           task_dot("h-1.5 w-1.5")
           span(class: "truncate") { label }
@@ -42,6 +42,16 @@ module Campbooks
 
       def task_dot(size)
         span(class: "#{size} shrink-0 rounded-[2px] border border-foreground/50")
+      end
+
+      # An ask has no page of its own: link back to its source email when it has one,
+      # else to its day on Time. Never to the retired task page.
+      def link_href
+        if @task.source_email
+          helpers.email_message_path(@task.source_email)
+        else
+          helpers.time_path(date: @task.due_at&.to_date&.iso8601)
+        end
       end
 
       # Matches EventRow's countdown so tasks read on the same "when" column.

@@ -197,36 +197,27 @@ Rails.application.routes.draw do
     end
   end
 
-  # Tasks — actionable items (manual or AI-extracted) that move through a status
-  # board, carry assignees + labels, and link to emails. Gated by Features.tasks?
-  # and the :tasks entitlement (TasksController). Board + skim + email-linking
-  # routes are added in their respective phases.
-  resources :tasks do
+  # Asks — the rethought Tasks module. An ask (still a Task row) has no page of its
+  # own: it lives on Now (its email card, or a decision card) and Time (agenda rows
+  # + the "No date yet" section). These member actions are the three ways out — hold
+  # Scout's free slot, set a date, "Not now" — plus done/dismiss, each re-rendering
+  # the Time agenda. Gated by Features.tasks? + the :tasks entitlement (AsksController).
+  resources :asks, only: [] do
     member do
-      patch  :complete        # mark done (quick action)
-      patch  :move            # change status (status control + the board drag)
-      post   :assign          # update assignees
-      get    :email_picker    # search emails to link (turbo-frame)
-      post   :link_email      # link an existing email to this task
-      delete :unlink_email    # remove a task↔email link
-      get    :document_picker # search documents to attach (turbo-frame)
-      post   :attach_document # attach a workspace document
-      delete :detach_document # remove an attached document
-      post   :remind          # create a linked deadline reminder
-      patch  :accept          # suggested → todo (Skim triage)
-      patch  :dismiss         # suggested → cancelled (Skim triage)
-      patch  :archive         # soft-archive (hide without deleting)
-      patch  :unarchive       # restore an archived task
-    end
-    collection do
-      get :skim               # triage AI-suggested tasks
-    end
-
-    # Discussion thread (teammates + Scout on @scout).
-    resources :comments, only: [ :create ], controller: "tasks/comments" do
-      collection { get :poll }
+      post  :hold      # Time::FocusHolder — hold Scout's free slot for the ask
+      patch :schedule  # give the ask a due date (preset or ISO)
+      post  :snooze    # "Not now" — a week's snooze
+      patch :done      # mark the ask done
+      post  :dismiss   # dismiss a suggested ask (→ cancelled)
     end
   end
+
+  # Tasks — the board, list, skim, task page, task form and task discussions
+  # retired into Time (asks). The Task record, the API (/api/v1/tasks) and the MCP
+  # tools are unchanged; these two routes survive so old notification/digest links
+  # keep working: /tasks and /tasks/:id redirect to Time (TasksController). Still
+  # gated by Features.tasks? and the :tasks entitlement.
+  resources :tasks, only: [ :index, :show ]
 
   # Scheduled digests — user-owned, workspace-scoped, multi-source + optional AI.
   # ScheduledDigest.model_name = "Digest" so helpers resolve as digest_*/digests_*.
