@@ -2,8 +2,9 @@
 
 # The "Move" popover's options: the next few free slots to shift a focus block to,
 # avoiding busy events, the OTHER held blocks, and the block's own current slot
-# (so every option is a genuine alternative). Bounded by the block's deadline
-# (reminder due − 2h) when it has one, else a two-week horizon.
+# (so every option is a genuine alternative). Bounded by the block's deadline —
+# the reminder's or the ask's due date, minus 2h — when it has one, else a
+# two-week horizon.
 class Time::SlotSuggester
   DEFAULT_HORIZON = 14.days
 
@@ -36,17 +37,14 @@ class Time::SlotSuggester
   end
 
   def window_to
-    deadline = @block.reminder&.due_at
+    deadline = @block.reminder&.due_at || @block.task&.due_at
     deadline ? deadline - Time::FocusProposer::DEADLINE_BUFFER : (window_from + DEFAULT_HORIZON)
   end
 
+  # The shared busy set (events + all held blocks in the window), plus the block's
+  # own current slot explicitly — so it never appears among its own alternatives
+  # even if it sits outside the search window.
   def busy
-    events = CalendarEvent.accessible_to(@user).visible.where(all_day: false)
-                          .in_range(window_from, window_to)
-                          .pluck(:start_at, :end_at)
-                          .map { |s, e| [ s, e || (s + 30.minutes) ] }
-    others = FocusBlock.accessible_to(@user).held.where.not(id: @block.id)
-                       .where(start_at: window_from..window_to).pluck(:start_at, :end_at)
-    events + others + [ [ @block.start_at, @block.end_at ] ]
+    Time::BusyIntervals.for(@user, window_from, window_to) + [ [ @block.start_at, @block.end_at ] ]
   end
 end

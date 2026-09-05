@@ -2,10 +2,11 @@
 
 # Merges everything with a time into one chronological agenda for the bold Time
 # surface: calendar events (recurring series expanded into occurrences), deadlines
-# Scout found in mail (pending Reminders with no calendar event yet), due-dated
-# active Tasks, and held FocusBlocks. Returns a flat, display-sorted list of
-# Time::AgendaItem — the Rethink's core claim that a meeting, a deadline and a
-# reminder are the same thing (a commitment with a time) made literal.
+# Scout found in mail (pending Reminders with no calendar event yet), live due-dated
+# asks (Tasks, suggested or accepted), and held FocusBlocks. Returns a flat,
+# display-sorted list of Time::AgendaItem — the Rethink's core claim that a meeting,
+# a deadline and a reminder are the same thing (a commitment with a time) made
+# literal. Undated asks are served separately by #undated (they have no day/time).
 #
 # Sorted: days ascending; within a day all-day items first, then by instant.
 # Overdue deadlines are PINNED into today (never silently dropped). Bucketing and
@@ -21,6 +22,12 @@ class Time::Agenda
     new(user, from:, to:).items
   end
 
+  # The undated asks (the "No date yet" section) — separate from #items because
+  # they have no day/instant to bucket or sort by.
+  def self.undated_for(user)
+    new(user, from: nil, to: nil).undated
+  end
+
   def initialize(user, from:, to:)
     @user = user
     @from = from
@@ -31,6 +38,18 @@ class Time::Agenda
 
   def items
     (event_items + deadline_items + task_items + focus_items).sort_by(&:sort_key)
+  end
+
+  # Live, accepted-or-suggested asks with no due date, minus the ones Scout is
+  # already holding a focus block for (those show as their focus row instead).
+  # Newest first. These never enter #items — they carry day: nil.
+  def undated
+    return [] unless Features.tasks?
+
+    Task.accessible_to(@user).live.undated
+        .where.not(id: FocusBlock.held.where.not(task_id: nil).select(:task_id))
+        .order(created_at: :desc)
+        .map { |task| undated_item(task) }
   end
 
   private
@@ -116,23 +135,86 @@ class Time::Agenda
     reminder.source if reminder.source_type == "Document"
   end
 
-  # ── Tasks (active, due-dated; suggested excluded by the active scope) ────────
+  # ── Asks (live, due-dated; suggested ones now show as rows too) ──────────────
+  # Forward asks due in the window, plus overdue asks pinned into today (like
+  # deadlines) so a slipped ask is never silently dropped.
   def task_items
     return [] unless Features.tasks?
 
-    tasks = Task.accessible_to(@user).active.where.not(due_at: nil).where(due_at: @from..@to)
-    tasks.map { |task| task_item(task) }
+    base = Task.accessible_to(@user).live.dated
+    forward = base.where(due_at: @from..@to)
+    forward.map { |task| task_item(task, overdue: false) } +
+      overdue_tasks(base).map { |task| task_item(task, overdue: true) }
   end
 
-  def task_item(task)
-    label, path = source_for(email: task.source_email) ||
-                  [ I18n.t(task.ai_suggested? ? "time.agenda.source.scout_suggested" : "time.agenda.source.task"), nil ]
+  def overdue_tasks(base)
+    return Task.none unless @from <= ::Time.current
+
+    base.where(due_at: (@from - OVERDUE_LOOKBACK)...@from)
+  end
+
+  def task_item(task, overdue: false)
+    label, path = task_source(task)
     Time::AgendaItem.new(
-      kind: :task, at: task.due_at, day: day_of(task.due_at),
-      all_day: task.all_day, overdue: false, duration_minutes: 0,
+      kind: :task, at: task.due_at, day: overdue ? @today : day_of(task.due_at),
+      all_day: task.all_day, overdue: overdue, duration_minutes: 0,
       title: task.title, source_label: label, source_path: path,
-      color: nil, record: task, actions: [ :done ]
+      color: nil, record: task, actions: task_actions(task)
     )
+  end
+
+  def undated_item(task)
+    label, path = task_source(task)
+    Time::AgendaItem.new(
+      kind: :task, at: nil, day: nil, all_day: true, overdue: false, duration_minutes: 0,
+      title: task.title, source_label: label, source_path: path,
+      color: nil, record: task, actions: undated_actions(task)
+    )
+  end
+
+  # The provenance meta for an ask: "Scout suggested" (when AI-found) · "from Rita's
+  # email" (or "Task" for a manual, source-less one) · "held Thu 10:00" (when Scout
+  # is holding a focus block for it). Returns [label, back-link path].
+  def task_source(task)
+    segments = []
+    segments << I18n.t("time.agenda.source.scout_suggested") if task.ai_suggested?
+    email_label, path = task.source_email ? source_for(email: task.source_email) : nil
+    if email_label
+      segments << email_label
+    elsif segments.empty?
+      segments << I18n.t("time.agenda.source.task")
+    end
+    block = task.held_block
+    segments << I18n.t("time.agenda.source.held", when: held_when(block)) if block
+    [ segments.join(" · "), path ]
+  end
+
+  def held_when(block)
+    I18n.l(block.start_at.in_time_zone(@zone), format: "%a %H:%M")
+  end
+
+  # Dated ask row: Open thread + Done, with change-date / hold / not-now / dismiss
+  # in the kebab. Hold is offered only when nothing is held yet; dismiss only for a
+  # still-suggested ask.
+  def task_actions(task)
+    actions = []
+    actions << :open_thread if task.source_email
+    actions << :done
+    actions << :change_date
+    actions << :hold unless task.held_block
+    actions << :snooze
+    actions << :dismiss_ask if task.suggested?
+    actions
+  end
+
+  # Undated ask row: Set a date + Hold + Done as buttons, not-now / dismiss in the
+  # kebab.
+  def undated_actions(task)
+    actions = []
+    actions << :open_thread if task.source_email
+    actions += %i[schedule hold done snooze]
+    actions << :dismiss_ask if task.suggested?
+    actions
   end
 
   # ── Focus blocks (held: proposed / moved / kept-but-local) ──────────────────
@@ -141,12 +223,15 @@ class Time::Agenda
   end
 
   def focus_item(block)
+    actions = [ :move, :keep ]
+    actions << :done_ask if block.task_id # the ask's appearance when it is undated
+    actions << :dismiss_focus
     Time::AgendaItem.new(
       kind: :focus, at: block.start_at, day: day_of(block.start_at),
       all_day: false, overdue: false, duration_minutes: block.duration_minutes,
       title: block.title,
       source_label: I18n.t("time.agenda.source.scout_suggested"), source_path: nil,
-      color: nil, record: block, actions: [ :move, :keep, :dismiss_focus ]
+      color: nil, record: block, actions: actions
     )
   end
 
