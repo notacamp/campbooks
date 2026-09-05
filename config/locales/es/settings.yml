@@ -260,7 +260,7 @@ es:
       show:
         company_nif_label: "NIF / número de identificación fiscal"
         company_nif_hint: "El número de identificación fiscal de su empresa. Se utiliza para verificar que las facturas están correctamente dirigidas a usted."
-        ai_providers_hint: "¿Busca proveedores de IA y ajustes de modelos? Ahora se
+        ai_providers_hint_html: "¿Busca proveedores de IA y ajustes de modelos? Ahora se
           encuentran en %{link}."
         ai_providers_link_text: Proveedores y servicios de IA
         profile_configured: Perfil configurado — Scout tiene contexto sobre su espacio
@@ -574,5 +574,3 @@ es:
         in_app_label: En la app
         show_all: Mostrar los %{count} elementos
         toggle_all: Activar/desactivar todo
-    sidebar:
-      aria_label: Navegación de configuración

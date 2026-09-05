@@ -18,11 +18,13 @@ major, minor, or patch change here.
 
 ### Changed
 
+- **Settings open as an overlay** over the page you are on (⌘, or the account menu); Esc puts you back exactly where you were, and deep links to `/settings/...` still work. Every settings page now sits under one of six groups (You, Scout, Inbox, Paper, Connections, Workspace) with a find box, so Members, Security, Notifications, Data & privacy, System health, templates, AI guidance and every inbox panel are one click away again.
 - People: the Scout line on each row and the "where things stand" note now say what is actually open with that person — what they asked (Scout's read, or their own words quoted from the message), what you are still waiting for, or the overdue amount — instead of the contact's profile bio or a sentence that repeated the row. Both are composed in your language at render time. Latest rows that need you carry their verb (Reply, Nudge, Decide, Pay, Chase).
 - Now and People rank on the same learned attention weight (who you answer and how fast, who you meet, whose bills you settle, whose mail you archive unread or dismiss) instead of fixed star and label boosts; dismissing a card now lowers that sender, not the whole kind. Workspaces with no history yet rank exactly as before.
 
 ### Added
 
+- **A first-class account menu.** The avatar now opens a small identity panel: who you are, your workspace, Settings, an Appearance control (light, dark, or match the system), keyboard shortcuts, and sign out. It opens beside the rail on desktop and as a bottom sheet on phones.
 - Scout now learns how much each person and organization matters to you — from who you answer and how fast, who you meet, whose bills you settle, and whose mail you archive unread or dismiss — as a per-user attention weight refreshed in the background (the base every place will rank on; nothing changes on screen yet).
 - Now cards and People rows now say why they rank first — "You usually answer Sofia within 3 hours", "You met twice recently" — and the People details rail explains every person's place, including the reasons that lower it.
 
@@ -31,10 +33,15 @@ major, minor, or patch change here.
 - People: the note's actions match the situation — Draft reply / Done / Snooze, Draft follow-up / Let it go, Ask Scout (opens Scout with the suggestion), Open in Money / Mark paid.
 - Scout's full read of an email (summary, priority, suggested action and the new "ask") now runs for inbound mail from people — it was defined but never scheduled — so the Reply and Decide lanes fill in and the Now feed's email cards appear again.
 
+### Removed
+
+- The inbox gear modal; its panels live under Settings → Inbox.
+
 ### Fixed
 
+- The AI-providers hint on Settings → General rendered raw HTML instead of a link.
+- ⌘K settings commands (Tags, Document types, Signatures, Sync) pointed at the old inbox modal and landed on People; they now open the matching settings page.
 - People: an organization in the Pay or Chase lane no longer says "Nothing needs you here right now" on its page.
-
 
 ### Security
 

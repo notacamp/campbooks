@@ -19,7 +19,12 @@ class ApplicationController < ActionController::Base
                 :workflows_enabled?, :email_board_enabled?, :microsoft_enabled?, :imap_enabled?,
                 :document_templates_enabled?, :email_templates_enabled?, :tasks_enabled?, :accounting_enabled?,
                 :ai_provider_available?, :show_beta_banner?, :current_entitlements,
-                :layout_scout_bar?, :layout_scout_launcher?
+                :layout_scout_bar?, :layout_scout_launcher?,
+                :settings_overlay_page?
+
+  def settings_overlay_page?
+    controller_path.start_with?("settings/")
+  end
 
   private
 

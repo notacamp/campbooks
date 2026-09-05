@@ -1,0 +1,17 @@
+<%# Turbo-Frame requests aimed at the settings overlay's frame ("Turbo-Frame:
+    settings_panel") render straight into that frame, with the same inner wrapper the
+    overlay uses on a full render, so moving between settings pages swaps only the
+    pane. Chosen by Settings::BaseController#settings_layout; every other frame
+    request keeps turbo-rails' default frame layout. %>
+<!DOCTYPE html>
+<html lang="<%= I18n.locale %>">
+  <head>
+    <title><%= page_title %></title>
+    <%= yield :head %>
+  </head>
+  <body>
+    <% panel_content = capture { yield } %>
+    <%= render Campbooks::SettingsPanel.new(current_section: try(:current_section), content: panel_content, current_url: request.original_url,
+                                          context: Settings::Catalog::Context.new(user: current_user, native: hotwire_native_app?)) %>
+  </body>
+</html>

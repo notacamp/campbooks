@@ -117,60 +117,6 @@ module NavigationHelper
     current_user.workspace.module_visible?(key)
   end
 
-  # Grouped settings navigation, shared by the settings sidebar
-  # (app/views/settings/_sidebar.html.erb) and the topbar user menu
-  # (app/views/shared/_user_menu.html.erb) so both expose the same sections in
-  # the same order. Each group is [heading, items]; each item is
-  # [path, active_keys, label, icon_path]. A sidebar link is active when
-  # current_section is in its active_keys list (the user menu ignores active_keys
-  # since it renders outside the settings controllers).
-  # Five places: Scout's memory, Connections, Workspace & people, Account, Plan.
-  def settings_nav_groups
-    behaviour_sections = InboxSettings::Sections::ALL
-      .map { |section| "inbox_#{section[:key]}" }
-      .reject { |key| key == "inbox_accounts" }
-
-    items = [
-      [ settings_memory_path,
-        %w[memory ai ai_prompts pipelines document_templates email_templates] + behaviour_sections,
-        t("navigation.settings.memory"),
-        "M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.456-2.456L14.25 6l1.035-.259a3.375 3.375 0 002.456-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" ],
-      [ settings_integrations_root_path,
-        %w[integrations notion google_drive zoho_drive calendars inbox_accounts api_clients],
-        t("navigation.settings.connections"),
-        "M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" ],
-      [ settings_root_path,
-        %w[general setup_template members data_privacy system_health],
-        t("navigation.settings.workspace_people"),
-        "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" ],
-      [ settings_account_path,
-        %w[account security totp passkeys recovery_codes email_otp audit_log notifications],
-        t("navigation.settings.account"),
-        "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" ],
-      [ settings_plan_path, %w[plan], t("navigation.settings.plan"),
-        "M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 18.75z" ],
-      # API Access (OAuth developer clients) is developer-only — hide it in the
-      # native app shell, where managing client secrets / curl snippets is pointless.
-      (hotwire_native_app? ? nil : [ settings_api_clients_path, %w[api_clients], t("navigation.settings.items.api_access"), "M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" ])
-    ].compact
-
-    [ [ nil, items ] ]
-  end
-
-  # The "Inbox" settings group: one sidebar item per inbox-settings panel, sourced
-  # from the shared InboxSettings::Sections catalog so it stays in lockstep with the
-  # inbox gear-icon modal. Each item is [path, active_keys, label, icon_path]; the
-  # active key is "inbox_<section>" (set by Settings::InboxController#current_section).
-  def inbox_settings_nav_group
-    items = InboxSettings::Sections::ALL.map do |section|
-      [ settings_inbox_section_path(section[:key]),
-        [ "inbox_#{section[:key]}" ],
-        t(InboxSettings::Sections.label_key(section[:key])),
-        InboxSettings::Sections::ICON_PATHS[section[:icon]] ]
-    end
-    [ t("navigation.settings.groups.inbox"), items ]
-  end
-
   # Renders the section nav for the current area, or nothing when the current
   # controller isn't part of one.
   def section_nav

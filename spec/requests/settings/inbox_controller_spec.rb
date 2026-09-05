@@ -35,14 +35,12 @@ RSpec.describe "Settings::InboxController", type: :request do
       expect(response).to have_http_status(:not_found)
     end
 
-    it "a section page renders under the settings layout with the active sidebar item highlighted" do
+    it "a section page renders under the settings overlay with the active nav item highlighted" do
       get settings_inbox_section_path("tags")
       expect(response).to have_http_status(:ok)
       # The inbox settings frame is present.
       expect(response.body).to include("inbox_settings_panel")
-      # In bold layout, inbox sections fall under Scout's memory — the memory sidebar
-      # item carries all inbox_* active_keys, so it gets aria-current when any section
-      # page is open.
+      # In the overlay nav, the active item for an inbox section page carries aria-current="page".
       expect(response.body).to include('aria-current="page"')
     end
   end

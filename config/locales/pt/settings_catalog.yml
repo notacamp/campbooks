@@ -1,0 +1,42 @@
+---
+pt:
+  settings:
+    catalog:
+      groups:
+        you: Tu
+        scout: Scout
+        inbox: "Caixa de entrada"
+        paper: Papel
+        connections: "Ligações"
+        workspace: "Espaço de trabalho"
+      items:
+        account: Conta
+        security: "Segurança"
+        notifications: "Notificações"
+        memory: "Memória do Scout"
+        ai: "Fornecedores de IA"
+        guidance: "Orientação da IA"
+        document_templates: "Modelos de documento"
+        email_templates: "Modelos de email"
+        automations: "Automatizações"
+        rules: Regras
+        tags: "Etiquetas"
+        streams: "Fluxos"
+        filtering: "Filtragem"
+        signatures: "Assinaturas"
+        display: "Apresentação"
+        document_types: "Tipos de documento"
+        pipelines: Pipelines
+        mail_accounts: "Contas de email"
+        calendars: "Calendários"
+        google_drive: Google Drive
+        notion: Notion
+        zoho_drive: Zoho WorkDrive
+        connections: "Ligações personalizadas"
+        api_access: "Acesso à API"
+        general: Geral
+        members: Membros
+        modules: "Módulos"
+        data_privacy: "Dados e privacidade"
+        plan: "Plano e faturação"
+        system_health: "Estado do sistema"

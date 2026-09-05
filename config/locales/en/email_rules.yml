@@ -9,10 +9,6 @@ en:
       category: "category is"
       has_attachment: "has an attachment"
       no_criteria: "No conditions set"
-  components:
-    inbox_settings_modal:
-      nav:
-        rules: Rules
   inbox_settings:
     rules:
       index:

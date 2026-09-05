@@ -106,10 +106,3 @@ es:
       teach_box:
         placeholder: Enseña algo a Scout, p. ej. "tratar las notificaciones de GitHub como un flujo"
         button: Enseñar
-  navigation:
-    settings:
-      memory: Memoria de Scout
-      connections: Conexiones
-      workspace_people: Espacio y personas
-      account: Cuenta
-      plan: Plan

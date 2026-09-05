@@ -106,10 +106,3 @@ en:
       teach_box:
         placeholder: Teach Scout something, e.g. "treat GitHub notifications as a stream"
         button: Teach
-  navigation:
-    settings:
-      memory: Scout's memory
-      connections: Connections
-      workspace_people: Workspace & people
-      account: Account
-      plan: Plan

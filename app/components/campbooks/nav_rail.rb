@@ -159,7 +159,7 @@ module Campbooks
 
     def avatar
       if helpers.current_user
-        raw(safe(helpers.render(partial: "shared/user_menu", locals: { compact: true, placement: :left, drop: :up })))
+        render Campbooks::UserMenu.new(variant: :popover)
       else
         # Preview / unauthenticated fallback.
         render Campbooks::Avatar.new(size: :md)

@@ -1,5 +1,3 @@
-<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
-
 <%= render(Campbooks::PageHeader.new(title: t(".title"), subtitle: t(".subtitle"))) do |header| %>
   <% if current_entitlements.feature?(:document_templates) %>
     <% header.with_actions do %>

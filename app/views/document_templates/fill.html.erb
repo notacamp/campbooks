@@ -1,4 +1,4 @@
-<% content_for :sidebar do %><%= render "settings/sidebar" %><% end %>
+
 <%= render(Campbooks::PageHeader.new(title: t("document_templates.fill.title", name: @template.name), subtitle: @template.description.presence)) %>
 
 <% type_map = { "date" => :date, "number" => :number, "email" => :email } %>

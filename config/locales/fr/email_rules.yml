@@ -9,10 +9,6 @@ fr:
       category: "catégorie est"
       has_attachment: "a une pièce jointe"
       no_criteria: "Aucune condition définie"
-  components:
-    inbox_settings_modal:
-      nav:
-        rules: Règles
   inbox_settings:
     rules:
       index:
