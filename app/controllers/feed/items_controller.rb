@@ -7,12 +7,18 @@ module Feed
     include ActionView::RecordIdentifier # dom_id(feed_item) ⇒ "feed_item_<id>"
 
     # Actions the feed can roll back (see #undo). Everything else gets a plain toast.
-    REVERSIBLE = %w[archive add_tag].freeze
+    REVERSIBLE = %w[archive add_tag hold_task schedule_task snooze_task].freeze
+
+    # Ask tools that can be triggered from an email card's chip row (carrying the
+    # ask's id) — they act on the ask without removing the email card.
+    ASK_CHIP_TOOLS = %w[hold_task schedule_task snooze_task].freeze
 
     before_action :set_item
 
     # POST /feed/items/:id/act — perform the chosen action on the underlying record.
     def act
+      return act_on_email_ask if email_ask_action?
+
       result = perform_action
       if result[:success]
         @item.mark_acted!
@@ -28,11 +34,49 @@ module Feed
       respond_to do |format|
         format.turbo_stream do
           if result[:success]
-            render turbo_stream: [ turbo_stream.remove(dom_id(@item)), success_toast(result[:message]) ]
+            render turbo_stream: [ turbo_stream.remove(dom_id(@item)), success_toast(result) ]
           else
             render turbo_stream: notify_stream(result[:message], severity: :error), status: :unprocessable_entity
           end
         end
+        format.html { redirect_back fallback_location: root_path }
+      end
+    end
+
+    # An ask action fired from an EMAIL card's chip row (args[task_id] present): run
+    # it on that ask, but leave the email card in place — only the chip row updates.
+    def email_ask_action?
+      @item.subject_type == "EmailMessage" &&
+        ASK_CHIP_TOOLS.include?(params[:tool].to_s) &&
+        params.dig(:args, :task_id).present?
+    end
+
+    def act_on_email_ask
+      email = @item.subject
+      task = Task.accessible_to(current_user).find_by(id: params.dig(:args, :task_id))
+      return render_ask_chip_error(t("feed.items.gone")) unless email && task
+
+      result = run_task_action(task)
+      if result[:success]
+        People::StandingsRefreshJob.enqueue_for(current_user.id)
+        respond_to do |format|
+          format.turbo_stream do
+            render turbo_stream: [
+              turbo_stream.replace("ask_chips_#{email.id}",
+                render_to_string(Campbooks::Feed::AskChips.new(item: @item, subject: email), layout: false)),
+              notify_stream(result[:message], severity: :success)
+            ]
+          end
+          format.html { redirect_back fallback_location: root_path }
+        end
+      else
+        render_ask_chip_error(result[:message])
+      end
+    end
+
+    def render_ask_chip_error(message)
+      respond_to do |format|
+        format.turbo_stream { render turbo_stream: notify_stream(message, severity: :error), status: :unprocessable_entity }
         format.html { redirect_back fallback_location: root_path }
       end
     end
@@ -206,9 +250,9 @@ module Feed
       end
     end
 
-    # Act on a task from the feed: complete an active one, or triage an
-    # AI-suggested one (accept → todo, dismiss_task → cancelled — the suggestion
-    # itself is resolved, unlike the generic card-hiding feed dismiss).
+    # Act on an ask from the feed: complete/accept/dismiss it, or take one of its
+    # three ways out — hold Scout's slot, set a date, or snooze ("Not now"). The last
+    # three carry undo_args so the toast can roll them back.
     def run_task_action(task)
       return failure(t("feed.items.gone")) unless task.workspace_id == current_user.workspace_id
 
@@ -222,9 +266,40 @@ module Feed
       when "dismiss_task"
         task.move_to_status!(:cancelled, by: current_user)
         { success: true, message: t("feed.items.task_dismissed") }
+      when "hold_task"   then hold_ask(task)
+      when "schedule_task" then schedule_ask(task)
+      when "snooze_task" then snooze_ask(task)
       else
         failure(t("feed.items.unsupported"))
       end
+    end
+
+    def hold_ask(task)
+      previous = task.status
+      result = Time::FocusHolder.call(task, user: current_user)
+      return { success: false, message: result.error } unless result.success?
+
+      when_label = I18n.l(result.slot.in_time_zone(current_user.effective_time_zone), format: "%A %H:%M")
+      { success: true, message: t("feed.items.ask_held", when: when_label),
+        undo_args: { "focus_block_id" => result.focus_block.id, "previous_status" => previous } }
+    end
+
+    def schedule_ask(task)
+      previous = task.status
+      old_due = task.due_at
+      date = Asks::PresetDate.resolve(params.dig(:args, :on), current_user.effective_time_zone)
+      return failure(t("feed.items.unsupported")) unless date
+
+      task.schedule!(date, zone: current_user.effective_time_zone, by: current_user)
+      { success: true, message: t("feed.items.ask_scheduled", date: I18n.l(date, format: :long)),
+        undo_args: { "previous_due_at" => old_due&.iso8601, "previous_status" => previous } }
+    end
+
+    def snooze_ask(task)
+      previous = task.status
+      task.snooze!(by: current_user)
+      { success: true, message: t("feed.items.ask_snoozed"),
+        undo_args: { "previous_status" => previous } }
     end
 
     # EmailActions re-checks read/send permission against the mailbox, so a viewer
@@ -263,14 +338,46 @@ module Feed
         Tools::Unarchive.call(subject) if subject.is_a?(EmailMessage)
       when "add_tag"
         EmailActions.run("remove_tag", email_message: subject, args: params[:args] || {}, user: current_user) if subject.is_a?(EmailMessage)
+      when "hold_task"
+        reverse_hold(subject) if subject.is_a?(Task)
+      when "schedule_task"
+        reverse_schedule(subject) if subject.is_a?(Task)
+      when "snooze_task"
+        subject.update!(snoozed_until: nil) if subject.is_a?(Task)
       end
     rescue => e
       Rails.logger.error("[Feed::ItemsController] reverse_action failed: #{e.class}: #{e.message}")
     end
 
-    def success_toast(message)
+    # Undo a hold: dismiss the focus block and delete any calendar event it spawned
+    # (the same outbound-delete path as CalendarEventsController#destroy).
+    def reverse_hold(_task)
+      block = FocusBlock.accessible_to(current_user).find_by(id: params.dig(:args, :focus_block_id))
+      return unless block
+
+      event = block.calendar_event
+      block.dismissed!
+      return unless event
+
+      event.update_columns(outbound_pending: true)
+      Calendars::EventWriteJob.perform_later(event.id, "delete")
+      Events.publish("calendar_event.deleted", subject: event, workspace: event.calendar.workspace,
+                     payload: { "title" => event.title })
+    end
+
+    # Undo a schedule: restore the prior due date (nil clears it) and, if the ask was
+    # only a suggestion before, put it back to suggested.
+    def reverse_schedule(task)
+      previous_due = params.dig(:args, :previous_due_at)
+      task.update!(due_at: previous_due.present? ? Time.iso8601(previous_due) : nil)
+      task.update!(status: :suggested) if params.dig(:args, :previous_status) == "suggested"
+    end
+
+    def success_toast(result)
+      message = result[:message]
       if REVERSIBLE.include?(params[:tool].to_s)
-        undo_toast(message, tool: params[:tool], args: (params[:args]&.to_unsafe_h || {}))
+        args = (params[:args]&.to_unsafe_h || {}).merge(result[:undo_args] || {})
+        undo_toast(message, tool: params[:tool], args: args)
       else
         notify_stream(message, severity: :success)
       end
