@@ -22,6 +22,7 @@ major, minor, or patch change here.
 - People: the Scout line on each row and the "where things stand" note now say what is actually open with that person — what they asked (Scout's read, or their own words quoted from the message), what you are still waiting for, or the overdue amount — instead of the contact's profile bio or a sentence that repeated the row. Both are composed in your language at render time. Latest rows that need you carry their verb (Reply, Nudge, Decide, Pay, Chase).
 - Now and People rank on the same learned attention weight (who you answer and how fast, who you meet, whose bills you settle, whose mail you archive unread or dismiss) instead of fixed star and label boosts; dismissing a card now lowers that sender, not the whole kind. Workspaces with no history yet rank exactly as before.
 - ⚠️ **Tasks are now _asks_, and live on Now and Time — the task pages are retired.** (Pre-1.0 web-UI break.) An ask is still the same record, but it has no page of its own: it appears as a card on Now while it needs a decision and as a row on Time once it has a date (undated ones sit under "No date yet"). The task **board, list, Skim triage page, task detail/edit pages and per-task discussions are gone**; the manual priority / tag / document / assignee pickers go with them. `/tasks` and `/tasks/:id` now **redirect to Time**, so old notification and digest links keep working. The `Task` table, the public REST API (`/api/v1/tasks`) and the MCP tools are **unchanged**.
+- **Personal surfaces now show only _your_ asks.** In a shared workspace, Now, Time and People's Do lane list the asks that are yours — assigned to you, or unassigned and sourced from mail you can read — not every ask in the workspace. (The public API and MCP still list the whole workspace.)
 
 ### Added
 
@@ -40,6 +41,9 @@ major, minor, or patch change here.
 - People: the note's actions match the situation — Draft reply / Done / Snooze, Draft follow-up / Let it go, Ask Scout (opens Scout with the suggestion), Open in Money / Mark paid.
 - Scout's full read of an email (summary, priority, suggested action and the new "ask") now runs for inbound mail from people — it was defined but never scheduled — so the Reply and Decide lanes fill in and the Now feed's email cards appear again.
 - **The People Do lane.** When you accepted an ask from someone, they move into a new Do lane in People (between Decide and Pay: Reply, Decide, **Do**, Pay, Chase, Nudge). The row note says what you owe and when, the right cell shows the due date (red if overdue), and the "where things stand" note on their page carries Done, Hold time, a jump to Time, and Ask Scout. Done and Hold from that note update the note in place — the Time agenda frame is not needed there.
+- **Hand an ask to a teammate.** An ask's kebab (on Now and Time) offers "Hand to…" — it moves to that person: it leaves your surfaces and lands on theirs as a "Needs you" notice and an ask card marked "from you". You (or a workspace admin) can take it back, and finishing or cancelling the ask clears the notice.
+- **Scout answers "what do I owe people?"** with tappable ask cards under its reply — each showing when it is due, any held time and who it is from, with Open and Done — from a new read tool. Its empty-state suggestions lead with that question whenever you have a live ask.
+- **`/api/v1/asks`** is now an alias of `/api/v1/tasks` (same payloads and scopes); the web UI calls them asks, and one assignee means the ask is handed to that member.
 
 ### Removed
 

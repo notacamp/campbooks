@@ -120,6 +120,8 @@ en:
       title: Scout replied
     subject_label:
       fallback: your inbox
+    task_handed_off:
+      title: "%{actor_name} handed you an ask"
     task_assigned:
       title: "%{actor_name} assigned you a task"
     task_mention:

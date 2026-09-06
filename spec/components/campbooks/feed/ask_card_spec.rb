@@ -78,4 +78,13 @@ RSpec.describe Campbooks::Feed::AskCard, type: :component do
     expect(html).to include("Open thread")
     expect(html).to include("from Rita") # "from Rita's email" (apostrophe HTML-escaped)
   end
+
+  it "leads the provenance with who handed it over on the assignee's card" do
+    assigner = create(:user, workspace: workspace, name: "Guilherme A")
+    task = make_task(status: :todo) # no source email → handed_by is the only provenance
+    Asks::HandOff.call(task, to: user, by: assigner)
+
+    html = render_card(task.reload, framing: "undated")
+    expect(html).to include("from Guilherme")
+  end
 end

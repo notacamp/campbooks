@@ -49,6 +49,14 @@ en:
       settings_zdrive: Zoho Drive integration
       workflows: Workflows
   scout:
+    ask_cards:
+      by: by %{date}
+      due_today: due today
+      from: from %{name}
+      handed_to: handed to %{name}
+      held: held %{when}
+      no_date: no date
+      overdue: overdue
     briefing:
       greeting:
         afternoon: Good afternoon
@@ -84,6 +92,7 @@ en:
         newsletters: Which newsletters can I archive?
         recent_invoices: Find my recent invoices
         week_summary: Summarize this week's emails
+        owe: What do I owe people?
     status:
       generate_report: Crunching the numbers…
       query_contacts: Checking your contacts…

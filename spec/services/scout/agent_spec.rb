@@ -99,4 +99,27 @@ RSpec.describe Scout::Agent do
     result = described_class.new(thread).run("hi")
     expect(result.reply).to eq("legacy answer")
   end
+
+  it "keeps a cards-flagged tool's cards in the step but collapses other arrays" do
+    tool_turn = Ai::ChatResult.new(
+      tool_calls: [ Ai::ChatResult::ToolCall.new(id: "c1", name: "query_asks", arguments: {}) ]
+    )
+    final_turn = Ai::ChatResult.new(text: "You owe two people.")
+    adapter, = fake_adapter([ tool_turn, final_turn ])
+    allow(Ai::Configuration).to receive(:for).and_return(config_for(adapter))
+    cards = Array.new(3) { |i| { "id" => "x#{i}", "title" => "T#{i}", "meta" => "m", "path" => nil, "kind" => "ask" } }
+    allow(Tools::QueryAsks).to receive(:call).and_return(
+      { count: 3, asks: [ { id: "1" }, { id: "2" }, { id: "3" } ], cards: cards }
+    )
+
+    result = described_class.new(thread).run("what do I owe?")
+
+    step = result.steps.find { |st| st["tool"] == "query_asks" }
+    # Mirror persistence: steps are stored in a jsonb column, so the chat reads
+    # string keys. cards are kept (capped), other arrays collapse to "N items".
+    persisted = JSON.parse(step["result"].to_json)
+    expect(persisted["cards"].size).to eq(3)
+    expect(persisted["cards"]).to all(include("kind" => "ask"))
+    expect(persisted["asks"]).to eq("3 items")
+  end
 end

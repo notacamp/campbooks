@@ -148,4 +148,68 @@ RSpec.describe "Asks", type: :request do
       expect(response).to redirect_to(people_path)
     end
   end
+
+  context "hand-off" do
+    before { sign_in(user) }
+
+    let(:member) { create(:user, workspace: workspace, name: "Ana Ng") }
+
+    it "hands an ask to a member, notifies them, and re-renders the agenda" do
+      task = ask
+      post hand_off_ask_path(task), params: { user_id: member.id }, headers: turbo
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("time_agenda")
+      expect(task.reload.handed_to).to eq(member)
+      expect(member.notifications.where(category: :task).count).to eq(1)
+    end
+
+    it "404s when handing to yourself" do
+      task = ask
+      post hand_off_ask_path(task), params: { user_id: user.id }, headers: turbo
+
+      expect(response).to have_http_status(:not_found)
+      expect(task.reload.handed?).to be(false)
+    end
+
+    it "404s when handing to a non-member" do
+      outsider = create(:user) # a different workspace
+      task = ask
+      post hand_off_ask_path(task), params: { user_id: outsider.id }, headers: turbo
+
+      expect(response).to have_http_status(:not_found)
+    end
+
+    it "lets the assigner take it back" do
+      task = ask
+      Asks::HandOff.call(task, to: member, by: user)
+
+      post take_back_ask_path(task), headers: turbo
+
+      expect(response).to have_http_status(:ok)
+      expect(task.reload.handed?).to be(false)
+    end
+
+    it "forbids another member from taking it back (404)" do
+      task = ask
+      Asks::HandOff.call(task, to: member, by: user)
+      sign_in_as(create(:user, workspace: workspace))
+
+      post take_back_ask_path(task), headers: turbo
+
+      expect(response).to have_http_status(:not_found)
+      expect(task.reload.handed?).to be(true)
+    end
+
+    it "lets a workspace admin take it back" do
+      task = ask
+      Asks::HandOff.call(task, to: member, by: user)
+      sign_in_as(create(:user, workspace: workspace, role: :admin))
+
+      post take_back_ask_path(task), headers: turbo
+
+      expect(response).to have_http_status(:ok)
+      expect(task.reload.handed?).to be(false)
+    end
+  end
 end

@@ -1,0 +1,7 @@
+---
+es:
+  components:
+    scout:
+      ask_cards:
+        done: Hecho
+        open: Abrir

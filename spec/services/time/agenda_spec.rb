@@ -179,4 +179,37 @@ RSpec.describe Time::Agenda do
       expect(event).to be_quiet
     end
   end
+
+  describe "hand-off" do
+    before { allow(Features).to receive(:tasks?).and_return(true) }
+
+    let(:teammate) do
+      workspace.users.create!(name: "Ana Lima", email_address: "ana-#{SecureRandom.hex(3)}@example.com", password: "password123")
+    end
+
+    def ask(**attrs)
+      workspace.tasks.create!({ title: "Ask #{SecureRandom.hex(2)}", status: :todo, priority: :normal }.merge(attrs))
+    end
+
+    it "shows the assigner a handed dated ask with handed: true and take_back/done" do
+      task = ask(status: :todo, due_at: 2.days.from_now)
+      Asks::HandOff.call(task, to: teammate, by: user)
+
+      item = described_class.for(user, **window).find { |i| i.task? && i.record == task }
+      expect(item).to be_present
+      expect(item.handed?).to be(true)
+      expect(item.actions).to eq(%i[take_back done])
+      expect(item.record.handed_to).to eq(teammate)
+    end
+
+    it "shows the assignee the ask with handed_by provenance" do
+      task = ask(status: :todo, due_at: 2.days.from_now)
+      Asks::HandOff.call(task, to: teammate, by: user)
+
+      item = described_class.for(teammate, **window).find { |i| i.task? && i.record == task }
+      expect(item).to be_present
+      expect(item.handed?).to be(false)
+      expect(item.source_label).to include("from #{user.name.split.first}")
+    end
+  end
 end

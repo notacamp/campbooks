@@ -14,3 +14,7 @@ es:
       done: Hecho.
     dismiss:
       dismissed: Descartado.
+    hand_off:
+      handed: Entregado a %{name}.
+    take_back:
+      taken_back: Recuperado.
