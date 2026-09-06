@@ -36,12 +36,20 @@ module Entitlements
     # Returns an array of human-readable error strings ([] when valid). `schema` is
     # a positional optional (not a kwarg) so a bare string-keyed hash literal can be
     # passed without Ruby consuming it as keywords.
+    # Features that left the catalog. An override for one of these is a leftover from
+    # when the feature was paid (a data migration strips them, but a restored dump can
+    # bring one back); it is ignored rather than failing the whole workspace record.
+    RETIRED_FEATURES = %w[tasks].freeze
+
     def validate_overrides(overrides, schema = nil)
       return [] if overrides.blank?
 
+      live = overrides.deep_stringify_keys.except(*RETIRED_FEATURES)
+      return [] if live.blank?
+
       schema ||= Rails.application.config.try(:entitlements_schema) || build
       schemer = JSONSchemer.schema(schema)
-      schemer.validate(overrides.deep_stringify_keys).map { |err| message_for(err) }
+      schemer.validate(live).map { |err| message_for(err) }
     end
 
     def message_for(err)

@@ -30,4 +30,19 @@ RSpec.describe Workspace, type: :model do
       expect(workspace.company_nif).to be_nil
     end
   end
+  describe "a retired entitlement override" do
+    it "no longer fails validation (asks left the paid catalog)" do
+      workspace = create(:workspace)
+      workspace.update_columns(entitlement_overrides: { "tasks" => { "allowed" => true } })
+
+      expect(workspace.reload).to be_valid
+      expect(Entitlements::SchemaComposer.validate_overrides(workspace.entitlement_overrides)).to eq([])
+    end
+
+    it "still rejects an unknown feature next to the retired one" do
+      workspace = build(:workspace, entitlement_overrides: { "tasks" => { "allowed" => true }, "nonsense" => { "allowed" => true } })
+
+      expect(workspace).not_to be_valid
+    end
+  end
 end
