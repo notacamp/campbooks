@@ -269,4 +269,123 @@ RSpec.describe People::Attention do
 
     expect(attention.for(person)).to be_nil
   end
+
+  # ── Do lane (ask items) ───────────────────────────────────────────────────
+
+  def make_person_with_email_source
+    person  = create(:person, workspace: workspace)
+    contact = create(:contact, workspace: workspace, email_account: account, person: person,
+                     sender_kind: :person, sender_kind_source: "heuristic",
+                     email: "#{person.name.parameterize}@x.example")
+    thread = create(:email_thread, email_account: account)
+    msg = create(:email_message, email_account: account, contact: contact, email_thread: thread,
+                 from_address: contact.email, to_address: account.email_address,
+                 provider_folder_id: "INBOX", received_at: 5.days.ago)
+    [ person, contact, thread, msg ]
+  end
+
+  context "with ENABLE_TASKS=1" do
+    before { allow(Features).to receive(:tasks?).and_return(true) }
+
+    it "an accepted ask with a person counterpart yields a :do item" do
+      person, _contact, _thread, msg = make_person_with_email_source
+      task = workspace.tasks.create!(title: "Review deck", status: :todo,
+                                     priority: :normal, created_by: user,
+                                     source: msg)
+      item = attention.for(person)
+      expect(item).not_to be_nil
+      expect(item.verb).to eq(:do)
+      expect(item.detail_kind).to eq(:ask_do)
+      expect(item.detail).to eq(task.title)
+      expect(item.ask).to be_a(Hash)
+      expect(item.ask["id"]).to eq(task.id)
+    end
+
+    it "a suggested ask does not create a :do item" do
+      person, _contact, _thread, msg = make_person_with_email_source
+      workspace.tasks.create!(title: "Suggested task", status: :suggested,
+                              priority: :normal, created_by: user, source: msg)
+      expect(attention.for(person)).to be_nil
+    end
+
+    it "a snoozed ask does not create a :do item" do
+      person, _contact, _thread, msg = make_person_with_email_source
+      workspace.tasks.create!(title: "Snoozed task", status: :todo,
+                              priority: :normal, created_by: user, source: msg,
+                              snoozed_until: 3.days.from_now)
+      expect(attention.for(person)).to be_nil
+    end
+
+    it "does not create a Do item for an org (only for persons)" do
+      org = create(:organization, workspace: workspace)
+      person = create(:person, workspace: workspace, primary_organization: org)
+      contact = create(:contact, workspace: workspace, email_account: account, person: person,
+                       sender_kind: :person, sender_kind_source: "heuristic",
+                       email: "sofia@corp.example")
+      thread = create(:email_thread, email_account: account)
+      msg = create(:email_message, email_account: account, contact: contact, email_thread: thread,
+                   from_address: contact.email, to_address: account.email_address,
+                   provider_folder_id: "INBOX", received_at: 5.days.ago)
+      workspace.tasks.create!(title: "Corp work", status: :todo,
+                              priority: :normal, created_by: user, source: msg)
+      # The person gets the do item; the org gets nothing because asks don't propagate to orgs
+      expect(attention.for(org)).to be_nil
+      expect(attention.for(person)&.verb).to eq(:do)
+    end
+
+    it "carries due_on and held_at in the ask hash" do
+      person, _contact, _thread, msg = make_person_with_email_source
+      # Use noon UTC to avoid date-shift across timezones.
+      due = Date.current + 3
+      task = workspace.tasks.create!(title: "Dated work", status: :todo,
+                                     priority: :normal, created_by: user,
+                                     source: msg, due_at: Time.zone.local(due.year, due.month, due.day))
+      block = FocusBlock.create!(workspace: workspace, user: user, task: task,
+                                 title: "Focus: Dated work",
+                                 start_at: 1.day.from_now.change(hour: 10),
+                                 end_at: 1.day.from_now.change(hour: 10, min: 45),
+                                 status: :proposed, reason: "ask_held")
+      item = attention.for(person)
+      expect(item.ask["due_on"]).to eq(due.iso8601)
+      expect(item.ask["held_at"]).to eq(block.start_at.iso8601)
+    end
+
+    it "a late_payable (score 90) beats a Do item (score 70)" do
+      person = create(:person, workspace: workspace)
+      # Set up a late_payable feed item for this person via a document.
+      contact = create(:contact, workspace: workspace, email_account: account, person: person,
+                       sender_kind: :person, sender_kind_source: "heuristic", email: "p@doc.example")
+      thread = create(:email_thread, email_account: account)
+      msg = create(:email_message, email_account: account, contact: contact, email_thread: thread,
+                   from_address: contact.email, to_address: account.email_address,
+                   provider_folder_id: "INBOX", received_at: 5.days.ago)
+      doc = create(:document, :approved, workspace: workspace,
+                   amount_cents: 50_000, currency: "EUR", due_date: 10.days.ago)
+      doc.email_messages << msg
+      FeedItem.create!(user: user, workspace: workspace, kind: "late_payable", subject: doc,
+                       dedupe_key: "late_payable:#{doc.id}", sort_at: 10.days.ago,
+                       score: 90.0, attention: true,
+                       data: { "days_late" => 10, "amount_cents" => 50_000, "currency" => "EUR" })
+      # Also add an accepted ask from the same person
+      workspace.tasks.create!(title: "Deck draft", status: :todo,
+                              priority: :normal, created_by: user, source: msg)
+
+      item = attention.for(person)
+      # late_payable (90) beats Do (70)
+      expect(item.verb).to eq(:pay)
+    end
+
+    it "a Do item (score 70) beats a follow_up (score 60)" do
+      person, _contact, _thread, msg = make_person_with_email_source
+      # Also a follow_up feed item
+      FeedItem.create!(user: user, workspace: workspace, kind: "follow_up", subject: msg,
+                       dedupe_key: "follow_up:#{msg.id}", sort_at: msg.received_at,
+                       score: 60.0, attention: false, data: { "age_days" => 5 })
+      workspace.tasks.create!(title: "Do work", status: :todo,
+                              priority: :normal, created_by: user, source: msg)
+
+      item = attention.for(person)
+      expect(item.verb).to eq(:do)
+    end
+  end
 end

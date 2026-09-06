@@ -56,7 +56,8 @@ RSpec.describe People::Standing do
                     money: money,
                     thread_id: nil,
                     message: nil,
-                    attention: true)
+                    attention: true,
+                    ask: nil)
   end
 
   # ── Attention path ─────────────────────────────────────────────────────────
@@ -72,7 +73,7 @@ RSpec.describe People::Standing do
     item   = instance_double(People::Attention::Item,
                              feed_item: fi, verb: :reply, subject: "Q3 deck",
                              wait_days: 2, detail: nil, detail_kind: nil, money: nil,
-                             thread_id: nil, message: msg, attention: true)
+                             thread_id: nil, message: msg, attention: true, ask: nil)
     attn   = stub_attention_with(item)
 
     st = described_class.for_person(p, user: user, attention: attn)

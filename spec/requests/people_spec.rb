@@ -647,4 +647,28 @@ RSpec.describe "People", type: :request do
         expect(response).to have_http_status(:unprocessable_content)
       end
     end
+
+    describe "Do lane" do
+      before { allow(Features).to receive(:tasks?).and_return(true) }
+
+      before do
+        workspace.update!(entitlement_overrides: { "tasks" => { "allowed" => true } })
+      end
+
+      it "renders a Do lane between Decide and Pay" do
+        person, _contact = make_person(name: "Sofia", email: "sofia@x.example")
+        thread = EmailThread.where(email_account_id: account.id).last
+        msg = thread.email_messages.first
+
+        task = workspace.tasks.create!(title: "Do deck review", status: :todo,
+                                       priority: :normal, created_by: user, source: msg)
+        People::Standings.refresh!(user)
+        row = PeopleStanding.for_user(user).find_by(counterpart: person)
+        expect(row&.verb).to eq("do")
+
+        get people_path
+        expect(response).to have_http_status(:ok)
+        expect(response.body).to include(I18n.t("people.index.lanes.do"))
+      end
+    end
 end
