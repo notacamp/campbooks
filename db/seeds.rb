@@ -541,6 +541,36 @@ if admin_user && !Reconciliation.exists?(workspace: org)
     match_reasons: { "amount_exact" => true, "date_diff_days" => 1, "name_similarity" => 91 }
   )
 
+
+  # ── Loan Demo Data ──────────────────────────────────────────
+  unless Loan.exists?(workspace: org)
+    loan = org.loans.create!(
+      lender: "Millennium BCP",
+      source_counterparty: "MILLENNIUM BCP",
+      principal_cents: 4_680_000,
+      instalment_cents: 78_000,
+      first_instalment_on: Date.new(2023, 8, 5),
+      term_months: 60,
+      rate_note: "Euribor 12M + 1.5%",
+      created_by: admin_user
+    )
+    Loans::Schedule.build!(loan)
+    # Link instalment 6 to tx8 (the seeded explained transaction)
+    inst6 = loan.instalments.find_by!(number: 6)
+    inst6.update!(
+      bank_transaction: tx8,
+      status: :paid,
+      amount_cents: tx8.amount_cents.abs
+    )
+    # Instalments 1-5 are before our first statement — mark unverified
+    loan.instalments.where(number: 1..5).update_all(status: LoanInstalment.statuses[:unverified])
+    # Status refresh so expected/missed are set correctly
+    Loans::Status.refresh!(loan)
+    puts "Loans: seeded Millennium BCP loan (#{loan.id})"
+  else
+    puts "Loans: already seeded — skipping"
+  end
+
   puts "Accounting: reconciliation seeded (#{recon.id})"
 else
   puts "Accounting: reconciliation already seeded — skipping"

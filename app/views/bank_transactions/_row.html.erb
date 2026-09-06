@@ -117,6 +117,25 @@
               class: "text-xs text-accent-600 hover:text-accent-700 font-medium" %>
       </div>
 
+    <% elsif transaction.explained? %>
+      <%# Loan instalment chip + Reset %>
+      <div class="flex items-center gap-2 flex-wrap">
+        <% ins = transaction.loan_instalment %>
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-secondary text-foreground">
+          <span class="w-1.5 h-1.5 rounded-full bg-foreground inline-block"></span>
+          <% if ins %>
+            <%= t("components.accounting.reconciliation_group.explained_chip",
+                  number: ins.number, total: ins.loan.term_months) %>
+          <% else %>
+            <%= t("components.accounting.reconciliation_group.explained_label") %>
+          <% end %>
+        </span>
+        <%= button_to t("shared.actions.undo"),
+              reset_reconciliation_bank_transaction_path(reconciliation, transaction),
+              method: :post,
+              class: "text-xs text-accent-600 hover:text-accent-700 font-medium" %>
+      </div>
+
     <% else %>
       <%# ❓ Unmatched: amber "no invoice" pill + Resolve button %>
       <div class="flex items-center gap-2">

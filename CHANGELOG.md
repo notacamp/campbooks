@@ -16,6 +16,10 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- Track a loan in Money: Scout spots a monthly bank debit with no invoice and offers to track it; once tracked, every instalment is matched to its bank line and reads "Loan - instalment N of T" on the statement, and Money shows what's paid, what's to go, the next instalment, and anything odd (a missing instalment, an amount change after a rate reset).
+
 ## [0.38.1] - 2026-09-06
 
 ### Fixed
