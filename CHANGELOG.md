@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-09-06
+
 ### Changed
 
 - Scout's read of a new email now knows how much the sender matters to you, so its priority and suggested action follow your habits, not just the email's wording.
@@ -34,7 +36,6 @@ major, minor, or patch change here.
 - Now cards and People rows now say why they rank first — "You usually answer Sofia within 3 hours", "You met twice recently" — and the People details rail explains every person's place, including the reasons that lower it.
 - Money opens in Priority order — lateness, the amount against what that counterpart usually bills you, how much they matter to you, and how you normally pay them — with a one-line why on every open bill, and Scout's read names the one that matters. Date, Amount and Counterpart stay one tap away.
 - Time marks the meetings worth preparing for (with someone who matters to you, and the open thread beneath), mutes the ones you declined, and holds focus time for the deadline that matters most; the day note leads with the meeting to prepare.
-
 - **Shortcut hints:** resting the pointer on an action, or focusing it with the keyboard, shows its name and its keyboard shortcut in a small tooltip — on the People list and conversation, the nav rail, the inbox toolbar and reading pane, feed cards, reminders and the calendar header. Icon-only buttons gain a proper label at the same time, and every hinted control now carries `aria-keyshortcuts` for screen readers. Touch devices are unaffected; the existing on-card keycaps and legends stay as they were.
 - People list rows show tag chips again: the person's own sender tags plus the email's tags (the same chips the old inbox rows carried), capped so a row stays tidy on mobile.
 - **Asks — the three ways out.** An ask that needs a decision asks only one question: _when_. On Now and Time you can **Hold time** (Scout holds its earliest free working-hours slot as a focus block — a real calendar event when a calendar is connected), **Set a date** (today / tomorrow / Friday / next week, or a picked date), or **Not now** (a week's snooze). Each is undoable.
