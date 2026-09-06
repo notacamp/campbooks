@@ -77,6 +77,19 @@ class Time::FocusProposer
           .order(:due_at)
   end
 
+  # Accepted, dated asks due within the lookahead that don't already hold a block —
+  # one block per ask ever (a dismissed block is not re-proposed), like reminders.
+  # Suggested (untriaged) asks are never auto-proposed: holding time for an ask
+  # Scout only guessed at would clutter the calendar. `.live.where(status:
+  # ACTIVE_STATUSES)` = accepted, awake, not archived.
+  def eligible_tasks
+    horizon = (@today + LOOKAHEAD).end_of_day
+    ::Task.accessible_to(@user).live.where(status: ::Task::ACTIVE_STATUSES).dated
+          .where(due_at: ::Time.current..horizon)
+          .where.not(id: FocusBlock.where.not(task_id: nil).select(:task_id))
+          .order(:due_at)
+  end
+
   def propose_for(reminder)
     propose(subject: :reminder, record: reminder, deadline: reminder.due_at,
             reason: "deadline_due_#{reminder.due_at.to_date.iso8601}")

@@ -193,7 +193,6 @@ class AsksController < ApplicationController
           notify_stream(message)
         ]
       end
-      format.html { redirect_to time_path, success: message }
     end
   end
 

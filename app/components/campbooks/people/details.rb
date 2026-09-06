@@ -234,6 +234,7 @@ module Campbooks
       # "updated N minutes ago" under an empty list.
       def attention_section
         row = @profile.attention
+        current_verdict = row ? ::Attention::Teach.verdict(person: @person, user: helpers.current_user) : nil
         div do
           section_heading(t(".sections.why"))
           if row.nil? || row.confidence < 0.2 || row.reason_values.empty?
@@ -253,6 +254,39 @@ module Campbooks
               end
             end
             p(class: "mt-2 text-[11px] text-muted-foreground") { t(".why_foot", time: helpers.time_ago_in_words(row.computed_at)) }
+          end
+
+          # Verdict buttons
+          div(class: "mt-3 flex items-center gap-2") do
+            verdict_button("important", current_verdict)
+            verdict_button("unimportant", current_verdict)
+            if current_verdict
+              form(action: helpers.attention_people_details_path(@person), method: "post",
+                   data: { turbo_stream: true }) do
+                input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
+                input(type: "hidden", name: "verdict", value: "forget")
+                button(type: "submit",
+                       class: "text-[11.5px] text-muted-foreground hover:text-foreground transition-colors underline-offset-2 hover:underline") do
+                  t(".why_forget")
+                end
+              end
+            end
+          end
+        end
+      end
+
+      def verdict_button(verdict, current_verdict)
+        pressed = current_verdict == verdict
+        form(action: helpers.attention_people_details_path(@person), method: "post",
+             data: { turbo_stream: true },
+             class: "flex-1") do
+          input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
+          input(type: "hidden", name: "verdict", value: verdict)
+          button(type: "submit",
+                 class: class_names("w-full rounded-lg border px-3 py-1.5 text-[12px] font-medium transition-colors",
+                                    pressed ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:bg-secondary"),
+                 "aria-pressed": pressed.to_s) do
+            plain(verdict == "important" ? t(".why_more") : t(".why_less"))
           end
         end
       end

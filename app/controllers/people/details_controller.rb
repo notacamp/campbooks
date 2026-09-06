@@ -91,6 +91,36 @@ module People
       after_write(toast_key: toast_key, undo: undo)
     end
 
+    # POST /people/:id/details/attention
+    def attention
+      verdict = params[:verdict].to_s
+      unless %w[important unimportant forget].include?(verdict)
+        return head(:unprocessable_entity)
+      end
+
+      name = @person.display_name
+
+      undo = nil
+      case verdict
+      when "important"
+        ::Attention::Teach.record(person: @person, user: current_user, label: "important", source: "rail")
+        undo = { endpoint: attention_people_details_path(@person),
+                 params: { verdict: "forget" },
+                 label: t("people.actions.undo") }
+      when "unimportant"
+        ::Attention::Teach.record(person: @person, user: current_user, label: "unimportant", source: "rail")
+        undo = { endpoint: attention_people_details_path(@person),
+                 params: { verdict: "forget" },
+                 label: t("people.actions.undo") }
+      when "forget"
+        ::Attention::Teach.forget(person: @person, user: current_user)
+      end
+
+      after_write(toast_key: "people.details.toasts.attention_#{verdict}",
+                  toast_params: { name: name },
+                  undo: undo)
+    end
+
     # POST /people/:id/details/analyze
     def analyze
       return if require_ai_provider!(:text)
@@ -132,7 +162,7 @@ module People
       @person.contacts.order(email_count: :desc).first
     end
 
-    def after_write(toast_key: nil, undo: nil)
+    def after_write(toast_key: nil, toast_params: {}, undo: nil)
       People::Standings.refresh_counterpart!(current_user, @person)
       @profile = People::Profile.for(@person, user: current_user)
 
@@ -142,8 +172,9 @@ module People
             "people/details/show", locals: { profile: @profile }, layout: false
           )) ]
           if toast_key
+            message = toast_params.any? ? t(toast_key, **toast_params) : t(toast_key)
             toast = render_to_string(
-              Campbooks::ActionToast.new(message: t(toast_key), variant: :success, undo: undo),
+              Campbooks::ActionToast.new(message: message, variant: :success, undo: undo),
               layout: false
             )
             streams << turbo_stream.append(Campbooks::ActionToast::REGION_ID, toast)

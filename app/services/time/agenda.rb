@@ -59,6 +59,18 @@ class Time::Agenda
     mine + handed
   end
 
+  # Live, accepted-or-suggested asks with no due date, minus the ones Scout is
+  # already holding a focus block for (those show as their focus row instead).
+  # Newest first. These never enter #items — they carry day: nil.
+  def undated
+    return [] unless Features.tasks?
+
+    Task.accessible_to(@user).live.undated
+        .where.not(id: FocusBlock.held.where.not(task_id: nil).select(:task_id))
+        .order(created_at: :desc)
+        .map { |task| undated_item(task) }
+  end
+
   private
 
   # ── Events ────────────────────────────────────────────────────────────────
@@ -344,8 +356,8 @@ class Time::Agenda
         weight_row = person_weights[best_pid]
         why_parts = []
         first_name = names_by_person_id[best_pid].to_s.split.first.presence
-        reason_sentence = weight_row&.reason_values&.find(&:positive?)&.sentence
-        why_parts << I18n.t("time.agenda.why.with", name: first_name, reason: reason_sentence.downcase) if first_name && reason_sentence
+        reason_sentence = weight_row&.reason_values&.find(&:positive?)&.clause
+        why_parts << I18n.t("time.agenda.why.with", name: first_name, reason: reason_sentence) if first_name && reason_sentence
         open_detail = nil
         if (standing = standing_rows[best_pid]) && standing[:subject].present?
           days_asked = standing[:wait_days].to_i
@@ -354,7 +366,7 @@ class Time::Agenda
         end
         why_text = why_parts.join(" · ").presence
         next item.with(emphasis: :prep, why: why_text, prep_name: first_name,
-                       prep_detail: open_detail || reason_sentence&.downcase)
+                       prep_detail: open_detail || reason_sentence)
       end
 
       item
