@@ -35,7 +35,7 @@ module People
     SUBJECT_PREFIX_RE = /\A(?:(?:re|fwd?|fw|aw|sv|tr|enc)\s*:\s*)+/i
 
     # Header note. nil when the standing has nothing to say (caller shows no_standing).
-    def note(result, name:, date: nil)
+    def note(result, name:, date: nil, zone: Time.zone)
       verb = result.verb
       dk   = result.detail_kind
       subj = result.subject.to_s.sub(SUBJECT_PREFIX_RE, "").strip.truncate(60)
@@ -94,7 +94,7 @@ module People
           end
 
           if held_at.present?
-            base + " " + I18n.t("people.conversation.stand.do_held", when: fmt_held(held_at))
+            base + " " + I18n.t("people.conversation.stand.do_held", when: fmt_held(held_at, zone: zone))
           else
             base
           end

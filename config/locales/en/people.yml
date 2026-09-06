@@ -27,7 +27,7 @@ en:
           archive: Archive thread
           block: Block sender
       stand_note:
-        ask_scout_context: "About the email \"%{subject}\" from %{name}:"
+        ask_scout_context: "About the email “%{subject}” from %{name}:"
         chips:
           draft_reply: Draft reply
           draft_follow_up: Draft follow-up
@@ -185,8 +185,8 @@ en:
       waiting_for: "Waiting for %{what}"
       no_answer_since: "No answer since %{date}"
       you_wrote_last: "You wrote last, %{date}"
-      do: "Do: %{ask}"
-      do_by: "Do: %{ask} by %{date}"
+      do: "%{ask}"
+      do_by: "%{ask} by %{date}"
       held: "%{when} held."
       money_late:
         one: "%{amount} due %{date} · %{count} day late"
@@ -223,15 +223,15 @@ en:
         you_wrote_last: "You wrote last, on %{date}. Nothing is waiting on you."
         fresh_ask: "%{name} asked for %{ask} on %{date}. Nothing is overdue yet."
         fresh_ask_undated: "%{name} asked for %{ask}. Nothing is overdue yet."
-        fresh_quote: "%{name} wrote on %{date}: \"%{quote}\""
-        fresh_quote_undated: "%{name} wrote: \"%{quote}\""
+        fresh_quote: "%{name} wrote on %{date}: “%{quote}”"
+        fresh_quote_undated: "%{name} wrote: “%{quote}”"
         draft_below: "Scout's draft is below."
-        do: "You owe %{name} %{ask}; no date was set. %{name} is waiting on the work, not a reply."
-        do_by: "You owe %{name} %{ask} by %{date}. %{name} is waiting on the work, not a reply."
+        do: "Open with %{name}: %{ask}. No date was set; %{name} is waiting on the work, not a reply."
+        do_by: "Open with %{name}: %{ask}, by %{date}. %{name} is waiting on the work, not a reply."
         do_held: "%{when} is held for it."
         do_overdue:
-          one: "%{ask} for %{name} was due %{date}, %{count} day ago."
-          other: "%{ask} for %{name} was due %{date}, %{count} days ago."
+          one: "Overdue with %{name}: %{ask}, due %{date}, %{count} day ago."
+          other: "Overdue with %{name}: %{ask}, due %{date}, %{count} days ago."
       you: You
       back: People
       menu: More

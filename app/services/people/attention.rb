@@ -131,7 +131,7 @@ module People
     def build_ask_item(task, held_block)
       source_email = task.source
       held_at = held_block&.start_at&.iso8601
-      due_on  = task.due_at&.in_time_zone&.to_date&.iso8601
+      due_on  = task.due_at&.in_time_zone(@user.effective_time_zone)&.to_date&.iso8601
 
       ask_hash = {
         "id"       => task.id,
@@ -145,7 +145,7 @@ module People
         feed_item:   nil,
         verb:        :do,
         wait_days:   wait,
-        subject:     task.title,
+        subject:     (source_email.email_thread&.display_subject.presence || source_email.subject).to_s.strip,
         detail:      task.title,
         detail_kind: :ask_do,
         money:       nil,

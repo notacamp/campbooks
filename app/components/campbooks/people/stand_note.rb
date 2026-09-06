@@ -38,20 +38,24 @@ module Campbooks
 
       # Stable DOM id for turbo_stream replace after ask actions.
       def dom_id
-        type = @counterpart.is_a?(Person) ? "person" : "organization"
-        cid  = @counterpart.respond_to?(:id) ? @counterpart.id : @counterpart.counterpart_id rescue @counterpart.id
-        "stand_note_#{type}_#{cid}"
+        org = @counterpart.is_a?(Organization) || @counterpart.try(:kind) == :organization
+        "stand_note_#{org ? 'organization' : 'person'}_#{@counterpart.id}"
       end
 
       def note_message
         name = counterpart_name
-        base = ::People::StandCopy.note(@standing, name: name, date: @reply_target&.received_at)
+        base = ::People::StandCopy.note(@standing, name: name, date: @reply_target&.received_at, zone: render_zone)
         base ||= t("people.conversation.no_standing")
         if @draft_present && @standing.verb == :reply
           "#{base} #{t("people.conversation.stand.draft_below")}"
         else
           base
         end
+      end
+
+      # Held slots are shown in the viewer's zone (the standing stores them as ISO).
+      def render_zone
+        Current.user&.effective_time_zone || Time.zone
       end
 
       def counterpart_name
@@ -160,7 +164,7 @@ module Campbooks
         if held_at.present?
           # Already held: show the slot as a muted chip (not a button)
           time_label = begin
-            ::People::StandCopy.fmt_held(held_at)
+            ::People::StandCopy.fmt_held(held_at, zone: render_zone)
           rescue StandardError
             held_at.to_s
           end

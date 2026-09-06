@@ -23,7 +23,7 @@ module People
       end
       def self.none = new(detail: nil)
       # Composed at render time in the current locale.
-      def text = People::StandCopy.line(self)
+      def text = People::StandCopy.line(self, zone: Current.user&.effective_time_zone || Time.zone)
       def present? = detail.present? || detail_kind == :money
     end
 

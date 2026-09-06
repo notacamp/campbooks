@@ -185,9 +185,9 @@ fr:
       waiting_for: "En attente de %{what}"
       no_answer_since: "Sans réponse depuis le %{date}"
       you_wrote_last: "Vous avez écrit en dernier, le %{date}"
-      do: "Faire : %{ask}"
-      do_by: "Faire : %{ask} avant le %{date}"
-      held: "%{when} reservé."
+      do: "%{ask}"
+      do_by: "%{ask} avant le %{date}"
+      held: "%{when} réservé."
       money_late:
         one: "%{amount} dû le %{date} · %{count} jour de retard"
         other: "%{amount} dû le %{date} · %{count} jours de retard"
@@ -226,12 +226,12 @@ fr:
         fresh_quote: "%{name} a écrit le %{date} : « %{quote} »"
         fresh_quote_undated: "%{name} a écrit : « %{quote} »"
         draft_below: "Le brouillon de Scout est ci-dessous."
-        do: "Vous devez a %{name} %{ask} ; aucune date n'a été fixée. %{name} attend le travail, pas une réponse."
-        do_by: "Vous devez a %{name} %{ask} avant le %{date}. %{name} attend le travail, pas une réponse."
+        do: "En cours avec %{name} : %{ask}. Aucune date fixée ; %{name} attend le travail, pas une réponse."
+        do_by: "En cours avec %{name} : %{ask}, avant le %{date}. %{name} attend le travail, pas une réponse."
         do_held: "%{when} est réservé pour cela."
         do_overdue:
-          one: "%{ask} pour %{name} était dû le %{date}, il y a %{count} jour."
-          other: "%{ask} pour %{name} était dû le %{date}, il y a %{count} jours."
+          one: "En retard avec %{name} : %{ask}, dû le %{date}, il y a %{count} jour."
+          other: "En retard avec %{name} : %{ask}, dû le %{date}, il y a %{count} jours."
       you: Vous
       back: Personnes
       menu: Plus
