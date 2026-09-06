@@ -7,9 +7,10 @@
 # present — the most overdue obligation. The component turns these facts into
 # sentence(s) via i18n; here there is no copy, just the counts and titles.
 class Time::DayNote
-  Result = Data.define(:date, :meetings_count, :deadlines_count, :first_deadline_title, :focus, :late_obligation, :prep_meeting) do
+  Result = Data.define(:date, :meetings_count, :deadlines_count, :first_deadline_title, :focus, :late_obligation, :prep_meeting, :undated_count) do
     def any?
-      meetings_count.positive? || deadlines_count.positive? || !focus.nil? || !late_obligation.nil? || !prep_meeting.nil?
+      meetings_count.positive? || deadlines_count.positive? || !focus.nil? ||
+        !late_obligation.nil? || !prep_meeting.nil? || undated_count.positive?
     end
   end
 
@@ -35,11 +36,22 @@ class Time::DayNote
       first_deadline_title: today_deadlines.first&.title,
       focus: next_focus,
       late_obligation: late_obligation,
-      prep_meeting: next_prep_meeting
+      prep_meeting: next_prep_meeting,
+      undated_count: undated_count
     )
   end
 
   private
+
+  # Live undated asks Scout isn't already holding time for — the "N asks have no
+  # date yet" tail of the note. Matches Time::Agenda#undated's set.
+  def undated_count
+    return 0 unless Features.tasks?
+
+    Task.accessible_to(@user).live.undated
+        .where.not(id: FocusBlock.held.where.not(task_id: nil).select(:task_id))
+        .count
+  end
 
   def day_range
     from = @zone.local(@today.year, @today.month, @today.day).beginning_of_day
@@ -69,7 +81,7 @@ class Time::DayNote
 
     Focus.new(
       title: block.title,
-      subject: block.reminder&.title.presence || block.title,
+      subject: block.subject_title,
       at: block.start_at,
       duration_minutes: block.duration_minutes
     )

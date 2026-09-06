@@ -86,7 +86,7 @@ module Campbooks
         case source_type
         when "email"          then helpers.email_message_path(source_id)
         when "calendar_event" then helpers.calendar_path
-        when "task"           then helpers.tasks_path
+        when "task"           then helpers.time_path
         when "reminder"       then helpers.reminders_path
         when "document"       then helpers.document_path(source_id)
         else "/"

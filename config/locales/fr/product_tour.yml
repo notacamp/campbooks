@@ -53,11 +53,6 @@ fr:
       s3_rem_added: Dans votre agenda
 
       # Diapositive 4 : Tâches (contrôlée par indicateur)
-      tasks_mod: Tâches
-      s4_title: Transformez n'importe quel e-mail en tâche.
-      s4_body1_html: "Scout repère les demandes cachées dans vos e-mails — \"pouvez-vous envoyer le rapport avant vendredi ?\" — et propose de les transformer en tâches avec <b>une date d'échéance associée</b>."
-      s4_body2_html: "Traitez-les en liste ou en tableau ; cochez-les et <b>rien de promis ne se perd</b> trois réponses plus bas dans un fil."
-
       # Diapositive 5 : Documents
       docs_mod: Documents
       s5_title: "La paperasse qui se classe toute seule."

@@ -14,8 +14,12 @@ class TimeController < ApplicationController
     @view = VIEWS.include?(params[:view]) ? params[:view] : "agenda"
     # Native apps get the agenda only (the grids are too dense for a phone).
     @view = "agenda" if hotwire_native_app? && %w[week month].include?(@view)
-    @date = parse_date(params[:date]) || Date.current
+    # "Today" is the user's today (their zone), not the server's UTC date — near
+    # midnight the two differ, and the header, the day note and the agenda's day
+    # buckets must agree on which day that is.
     @zone = current_user.effective_time_zone
+    today = Time.current.in_time_zone(@zone).to_date
+    @date = parse_date(params[:date]) || today
 
     # The classic calendar's shared loading gives us the accounts, the window, and
     # the snoozed-thread / scheduled-email collections (rendered after the merged
@@ -32,9 +36,11 @@ class TimeController < ApplicationController
 
     if @view == "agenda"
       @agenda = Time::Agenda.for(current_user, from: agenda_from, to: agenda_to)
+      @undated = Time::Agenda.undated_for(current_user)
       @move_slots = agenda_move_slots(@agenda)
+      @hold_slots = agenda_hold_slots(@agenda + @undated)
       # Scout's note is about today, so it rides the default (today) agenda only.
-      @day_note = Time::DayNote.for(current_user) if @date == Date.current
+      @day_note = Time::DayNote.for(current_user) if @date == today
     else
       @range = data.range
       @events = data.events
@@ -73,13 +79,13 @@ class TimeController < ApplicationController
     end
   end
 
-  # Active, due-dated tasks in the grid window (suggested ones already excluded by
-  # `active`). Empty — and unqueried — when Tasks is gated off, so the agenda and
-  # grids render fine without it.
+  # Live, due-dated asks in the grid window (suggested ones now show too, so the
+  # grids match the agenda). Empty — and unqueried — when Tasks is gated off, so the
+  # agenda and grids render fine without it.
   def tasks_in_range(range)
     return Task.none unless Features.tasks?
 
-    Task.accessible_to(current_user).active.where.not(due_at: nil).where(due_at: range.begin..range.end)
+    Task.accessible_to(current_user).live.dated.where(due_at: range.begin..range.end)
   end
 
   # Ask Scout to hold focus time for upcoming deadlines — at most once an hour per

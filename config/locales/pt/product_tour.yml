@@ -53,11 +53,6 @@ pt:
       s3_rem_added: No seu calendário
 
       # Diapositivo 4: Tarefas (controlado por funcionalidade)
-      tasks_mod: Tarefas
-      s4_title: Transforme qualquer email numa tarefa.
-      s4_body1_html: "O Scout detecta os pedidos escondidos no seu email — \"pode enviar o relatório até sexta?\" — e oferece-se para os transformar em tarefas com <b>datas de entrega associadas</b>."
-      s4_body2_html: "Trabalhe-as em lista ou em painel; marque-as como concluídas e <b>nada prometido se perde</b> três respostas abaixo num fio de conversa."
-
       # Diapositivo 5: Documentos
       docs_mod: Documentos
       s5_title: A papelada que se arquiva sozinha.

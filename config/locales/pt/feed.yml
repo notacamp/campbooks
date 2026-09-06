@@ -17,10 +17,14 @@ pt:
         archive_hint: Arquiva toda a conversa. Pode anular.
         attachment: Anexo
         file_as: 'Etiquetar: %{tag}'
+        held: Reservado %{when}
+        hold_at: Reservar %{when}
         messages:
           one: "%{count} mensagem"
           other: "%{count} mensagens"
+        on_time: "%{day} no Tempo"
         open: Abrir
+        set_a_date: Definir data
       email_preview_frame:
         unavailable: Esta mensagem já não está disponível.
       expandable_preview:
@@ -112,18 +116,27 @@ pt:
         prefix: Etiquetar
         under: como
         undo: Anular
-      task_card:
-        accept: Adicionar às tarefas
-        complete: Concluir
-        dismiss: Dispensar
-        in_days:
-          one: Entrega em %{count} dia
-          other: Entrega em %{count} dias
-        missed: Pode ter passado despercebido
-        overdue: Em atraso
-        suggested: Tarefa sugerida
-        today: Entrega hoje
-        tomorrow: Entrega amanhã
+      ask_card:
+        ask: pedido
+        by: 'até %{date}'
+        complete: Concluído
+        due_today: para hoje
+        friday: Sexta
+        from_email: do email de %{name}
+        hold: Reservar
+        hold_at: Reservar %{when}
+        next_week: Próxima semana
+        no_date: sem data
+        not_now: Agora não
+        open_thread: Abrir conversa
+        overdue: em atraso
+        pick: Escolher
+        scout_found: O Scout encontrou um pedido
+        scout_slot: "%{when} está livre por %{minutes} minutos; posso reservar."
+        set_a_date: Definir data
+        today: Hoje
+        tomorrow: Amanhã
+        tomorrow_on_time: Amanhã no Tempo
     time_of_day_greeting:
       greeting:
         afternoon: Boa tarde, %{name}.
@@ -132,6 +145,9 @@ pt:
         night: Tarde da noite, %{name}.
   feed:
     items:
+      ask_held: Reservei %{when} para isto.
+      ask_scheduled: No Tempo para %{date}.
+      ask_snoozed: De volta daqui a uma semana.
       dismissed: Dispensado.
       follow_up_dismissed: Acompanhamento dispensado.
       gone: Isto já não está disponível.

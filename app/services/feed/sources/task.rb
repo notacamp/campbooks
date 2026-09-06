@@ -1,105 +1,115 @@
 module Feed
   module Sources
-    # Tasks on the feed, in two flavors:
+    # Asks on the feed. An ask (a Task row) earns a card of its own only when it
+    # needs a decision from the reader — otherwise it rides its source email's card
+    # (Campbooks::Feed::EmailActionCard) or lives quietly on Time. Three flavours,
+    # all drawn from the live set (so snoozed asks never appear; a lapsed snooze
+    # brings the ask back through the normal rules):
     #
-    # SUGGESTIONS — fresh, confident AI-extracted tasks awaiting triage, carrying
-    # Accept/Dismiss right on the card (mirrors Sources::Reminder's pending cards).
-    # Their own dedupe_key ("task_suggestion:") so accepting one doesn't block the
-    # accepted task from surfacing later as an attention card — acted state is
-    # preserved per dedupe_key across refreshes.
+    #   suggested — a fresh, confident AI-found ask awaiting a first decision, UNLESS
+    #               its source email still has an active card (then it rides that).
+    #   undated   — an accepted ask with no date: it needs a "when".
+    #   due       — an accepted ask due today or overdue: it needs doing now.
     #
-    # ACTIVE tasks needing attention — assigned to the user, OR due within the
-    # horizon / overdue, OR blocked. Done and cancelled tasks are out. Ranked by
-    # urgency (overdue first); suggestions slot between due-soon and someday.
+    # No other dated ask gets a card — future-dated ones live on Time. `framing` is
+    # stamped into data so the card doesn't recompute it.
     class Task < Feed::Source
-      HORIZON = 14.days
-      ATTENTION_WITHIN = 1.day
-      # Suggestions below this confidence stay on the tasks triage page only.
+      # Suggestions below this confidence stay off the feed (triageable on Time).
       SUGGESTION_MIN_CONFIDENCE = 0.6
-      # Older untriaged suggestions stop crowding the feed; they stay triageable
-      # from the tasks page.
+      # Older untriaged suggestions stop crowding the feed.
       SUGGESTION_WINDOW = 14.days
 
       def self.key = "task"
 
       def candidates
-        active_candidates + suggestion_candidates
+        suggestion_candidates + active_candidates
       end
 
       def still_valid?(item, task)
-        return false if task.nil? || task.archived?
+        return false if task.nil? || task.archived? || task.snoozed?
 
-        suggestion_item?(item) ? task.suggested? : task.active?
+        if suggestion_item?(item)
+          task.suggested?
+        else
+          task.active? && (task.due_at.nil? || task.due_at <= end_of_today)
+        end
       end
 
       private
 
-      def active_candidates
-        # `::Task` — disambiguate the model from this source class.
-        relevant = ::Task.accessible_to(user).active.includes(:assignees, :tags)
-          .left_joins(:task_assignments)
-          .where(
-            "task_assignments.user_id = :uid OR tasks.status = :blocked OR (tasks.due_at IS NOT NULL AND tasks.due_at <= :horizon)",
-            uid: user.id, blocked: ::Task.statuses[:blocked], horizon: now + HORIZON
-          )
-          .distinct
-
-        relevant.map do |task|
-          {
-            subject: task,
-            dedupe_key: "task:#{task.id}",
-            sort_at: task.due_at || task.updated_at,
-            score: score_for(task),
-            attention: attention?(task),
-            data: { "status" => task.status, "due_at" => task.due_at&.iso8601 }
-          }
-        end
-      end
-
+      # 1. Suggested asks (a first decision), minus the ones whose source email still
+      #    has an active card — the ask rides that card, so a second one would double up.
       def suggestion_candidates
-        suggestions = ::Task.accessible_to(user).triage
+        suggestions = ::Task.accessible_to(user).live.where(status: :suggested)
           .where(confidence: SUGGESTION_MIN_CONFIDENCE..)
           .where(created_at: (now - SUGGESTION_WINDOW)..)
+          .includes(:source)
 
-        suggestions.map do |task|
+        carded = threads_with_active_email_card
+        suggestions.reject { |task| rides_email_card?(task, carded) }.map do |task|
           {
             subject: task,
             dedupe_key: "task_suggestion:#{task.id}",
             sort_at: task.created_at,
             score: 55,
             attention: false,
-            data: { "status" => task.status, "due_at" => task.due_at&.iso8601 }
+            data: framing_data(task, "suggested")
           }
         end
+      end
+
+      # 2 + 3. Accepted asks that need a decision: undated (needs a "when"), or due
+      #        today / overdue (needs doing). Future-dated ones are Time-only.
+      def active_candidates
+        base = ::Task.accessible_to(user).live.where(status: ::Task::ACTIVE_STATUSES).includes(:source)
+
+        undated = base.where(due_at: nil).map do |task|
+          {
+            subject: task, dedupe_key: "task:#{task.id}", sort_at: task.updated_at,
+            score: 40, attention: false, data: framing_data(task, "undated")
+          }
+        end
+
+        due = base.where.not(due_at: nil).where(due_at: ..end_of_today).map do |task|
+          overdue = task.due_at < now
+          {
+            subject: task, dedupe_key: "task:#{task.id}", sort_at: task.due_at,
+            score: overdue ? 92 : 88, attention: true, data: framing_data(task, "due")
+          }
+        end
+
+        undated + due
+      end
+
+      def framing_data(task, framing)
+        { "status" => task.status, "due_at" => task.due_at&.iso8601, "framing" => framing }
       end
 
       def suggestion_item?(item)
         item.dedupe_key.to_s.start_with?("task_suggestion:")
       end
 
-      def attention?(task)
-        task.blocked? || (task.due_at.present? && task.due_at <= now + ATTENTION_WITHIN)
+      def rides_email_card?(task, carded)
+        email = task.source_email
+        return false unless email
+
+        carded.include?(email.email_thread_id || email.id)
       end
 
-      # Blocked is a state, not a date — flat. Dated tasks glide: 92 overdue,
-      # 78 at one day out, 48 at a week, 22 at the horizon's edge.
-      def score_for(task)
-        return 85 if task.blocked?
+      # The thread keys (email_thread_id, or the message id when threadless) that
+      # currently carry an active email_action card for this user — one grouped query.
+      def threads_with_active_email_card
+        message_ids = user.feed_items.active
+          .where(kind: "email_action", subject_type: "EmailMessage")
+          .pluck(:subject_id)
+        return Set.new if message_ids.empty?
 
-        if task.due_at
-          days = (task.due_at - now) / 1.day
-          return 92 if days <= 0 # overdue
+        EmailMessage.where(id: message_ids).pluck(:id, :email_thread_id)
+                    .map { |id, thread_id| thread_id || id }.to_set
+      end
 
-          if days <= 1
-            ramp(days, from: 0, to: 1, at_from: 92, at_to: 78)
-          elsif days <= 7
-            ramp(days, from: 1, to: 7, at_from: 78, at_to: 48)
-          else
-            ramp(days, from: 7, to: 14, at_from: 48, at_to: 22)
-          end
-        else
-          20 # assigned to me, no due date
-        end
+      def end_of_today
+        @end_of_today ||= now.in_time_zone(user.effective_time_zone).end_of_day
       end
     end
   end

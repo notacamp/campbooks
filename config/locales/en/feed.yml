@@ -17,10 +17,14 @@ en:
         archive_hint: Archives the whole thread. You can undo it.
         attachment: Attachment
         file_as: 'File: %{tag}'
+        held: Held %{when}
+        hold_at: Hold %{when}
         messages:
           one: "%{count} message"
           other: "%{count} messages"
+        on_time: "%{day} on Time"
         open: Open
+        set_a_date: Set a date
       email_preview_frame:
         unavailable: This message is no longer available.
       expandable_preview:
@@ -112,18 +116,27 @@ en:
         prefix: File
         under: under
         undo: Undo
-      task_card:
-        accept: Add to tasks
-        complete: Complete
-        dismiss: Dismiss
-        in_days:
-          one: Due in %{count} day
-          other: Due in %{count} days
-        missed: You may have missed this
-        overdue: Overdue
-        suggested: Suggested task
-        today: Due today
-        tomorrow: Due tomorrow
+      ask_card:
+        ask: ask
+        by: 'by %{date}'
+        complete: Done
+        due_today: due today
+        friday: Friday
+        from_email: from %{name}'s email
+        hold: Hold
+        hold_at: Hold %{when}
+        next_week: Next week
+        no_date: no date
+        not_now: Not now
+        open_thread: Open thread
+        overdue: overdue
+        pick: Pick
+        scout_found: Scout found an ask
+        scout_slot: "%{when} is free for %{minutes} minutes; I can hold it."
+        set_a_date: Set a date
+        today: Today
+        tomorrow: Tomorrow
+        tomorrow_on_time: Tomorrow on Time
     time_of_day_greeting:
       greeting:
         afternoon: Afternoon, %{name}.
@@ -132,6 +145,9 @@ en:
         night: Late night, %{name}.
   feed:
     items:
+      ask_held: Held %{when} for it.
+      ask_scheduled: On Time for %{date}.
+      ask_snoozed: Back in a week.
       dismissed: Dismissed.
       follow_up_dismissed: Follow-up dismissed.
       gone: That is no longer available.

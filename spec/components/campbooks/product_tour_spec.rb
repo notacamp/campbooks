@@ -10,6 +10,8 @@ RSpec.describe Campbooks::ProductTour, type: :component do
   end
 
   describe "slide count" do
+    # Asks retired into Now + Time — there is no dedicated tour slide any more, so
+    # the deck is always five slides regardless of the tasks readiness flag.
     context "when tasks are disabled (default)" do
       before { allow(Features).to receive(:tasks?).and_return(false) }
 
@@ -28,14 +30,14 @@ RSpec.describe Campbooks::ProductTour, type: :component do
     context "when tasks are enabled" do
       before { allow(Features).to receive(:tasks?).and_return(true) }
 
-      it "includes 6 progress segments" do
+      it "still includes only 5 progress segments (no tasks slide)" do
         html = render_tour
-        expect(html.scan(/tour-seg-btn/).size).to eq(6)
+        expect(html.scan(/tour-seg-btn/).size).to eq(5)
       end
 
-      it "includes a tasks slide" do
+      it "does not include a tasks slide" do
         html = render_tour
-        expect(html).to include('data-tour-slide-type="tasks"')
+        expect(html).not_to include('data-tour-slide-type="tasks"')
       end
     end
   end

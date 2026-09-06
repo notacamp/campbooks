@@ -3,9 +3,10 @@
 # Finds the earliest free working-hours slot for a focus block. Pure and
 # deterministic: given a search window, a duration, and the busy intervals to
 # avoid, it returns the start Time of the first free slot (or nil). Working hours
-# are 09:00–18:00 in the caller's zone; candidates sit on a 30-minute grid; within
-# a day 10:00 is preferred (Scout's "45 minutes tomorrow at 10"), otherwise the
-# earliest free slot that day, otherwise the next day.
+# are 09:00–18:00 on weekdays in the caller's zone (Saturdays and Sundays are
+# skipped); candidates sit on a 30-minute grid; within a day 10:00 is preferred
+# (Scout's "45 minutes tomorrow at 10"), otherwise the earliest free slot that
+# day, otherwise the next working day.
 #
 # No database access — Time::FocusProposer gathers the busy intervals and hands
 # them in, which keeps the placement logic trivially testable.
@@ -63,11 +64,13 @@ class Time::SlotFinder
 
   private
 
+  # Working days only: a focus block held on a Saturday or Sunday is a slot nobody
+  # asked for, so weekends are skipped the way evenings are.
   def each_day
     date = @from.in_time_zone(@zone).to_date
     last = @to.in_time_zone(@zone).to_date
     while date <= last
-      yield date
+      yield date unless date.saturday? || date.sunday?
       date += 1
     end
   end

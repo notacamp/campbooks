@@ -3,14 +3,17 @@
 module Campbooks
   module TimePage
     # The bold Time agenda: day sections (TODAY / TOMORROW / FRIDAY / a full date)
-    # each listing the merged Time::AgendaItem rows, then the snoozed threads and
-    # scheduled emails that already rode the classic agenda (nothing lost). Empty
-    # days are skipped — except today, which shows "Nothing scheduled." Wraps the
-    # #time_agenda container so a focus action can replace it in place.
+    # each listing the merged Time::AgendaItem rows, then a final "No date yet"
+    # section for undated asks, then the snoozed threads and scheduled emails that
+    # already rode the classic agenda (nothing lost). Empty days are skipped —
+    # except today, which shows "Nothing scheduled." Wraps the #time_agenda
+    # container so a focus/ask action can replace it in place.
     class AgendaList < Campbooks::Base
-      def initialize(items:, zone:, move_slots: {}, snoozed_threads: [], scheduled_emails: [], has_calendars: true)
+      def initialize(items:, zone:, undated: [], move_slots: {}, hold_slots: {}, snoozed_threads: [], scheduled_emails: [], has_calendars: true)
         @items = Array(items)
+        @undated = Array(undated)
         @move_slots = move_slots || {}
+        @hold_slots = hold_slots || {}
         @snoozed_threads = Array(snoozed_threads)
         @scheduled_emails = Array(scheduled_emails)
         @zone = zone
@@ -20,10 +23,29 @@ module Campbooks
       def view_template
         section(id: "time_agenda", class: "mt-6 space-y-7") do
           days.each { |day| render_day(day) }
+          render_undated
         end
       end
 
       private
+
+      # The "No date yet" section: undated asks, with the three ways out on each row
+      # (Set a date / Hold / Done). Same h3 grammar as a day section, plus a muted
+      # count and a right-aligned hint.
+      def render_undated
+        return if @undated.empty?
+
+        section do
+          div(class: "mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5") do
+            h3(class: "text-xs font-semibold uppercase tracking-wide text-muted-foreground") do
+              plain t(".no_date_yet")
+              span(class: "ml-1.5 font-normal normal-case tracking-normal text-muted-foreground/70") { "· #{@undated.size}" }
+            end
+            span(class: "text-[11px] font-normal normal-case tracking-normal text-muted-foreground") { t(".no_date_hint") }
+          end
+          div { @undated.each { |item| render_item(item) } }
+        end
+      end
 
       def render_day(day)
         rows = items_by_day[day] || []
@@ -48,7 +70,8 @@ module Campbooks
       def render_item(item)
         render Campbooks::TimePage::AgendaRow.new(
           item: item, zone: @zone,
-          move_slots: item.focus? ? Array(@move_slots[item.record.id]) : []
+          move_slots: item.focus? ? Array(@move_slots[item.record.id]) : [],
+          hold_slot: item.task? ? @hold_slots[item.record.id] : nil
         )
       end
 

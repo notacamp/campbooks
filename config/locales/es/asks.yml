@@ -1,0 +1,16 @@
+---
+es:
+  asks:
+    hold:
+      held: Reservado %{when}.
+      held_local: Reservado %{when}. Conecta un calendario para sincronizar automáticamente.
+      no_slot: No hay hueco libre antes de la fecha límite. Prueba a poner una fecha.
+    schedule:
+      scheduled: En Tiempo para %{date}.
+      invalid_date: Esa fecha no funcionó. Elige otra.
+    snooze:
+      snoozed: De vuelta en una semana.
+    done:
+      done: Hecho.
+    dismiss:
+      dismissed: Descartado.

@@ -19,15 +19,26 @@ class TimeAgendaRowComponentPreview < ViewComponent::Preview
     render Campbooks::TimePage::AgendaRow.new(item: deadline_item(overdue: true), zone: zone)
   end
 
-  # A due-dated task → the "Done" action.
-  def task
-    render Campbooks::TimePage::AgendaRow.new(item: task_item, zone: zone)
+  # A dated ask → Open thread + Done, with change-date / hold / not-now in the kebab.
+  def dated_ask
+    render Campbooks::TimePage::AgendaRow.new(item: task_item, zone: zone, hold_slot: at(10) + 1.day)
   end
 
-  # A proposed focus block → Move (with a slot popover), Keep, and a dismiss kebab.
+  # An undated ask → Set a date + Hold <slot> + Done as buttons, kebab for the rest.
+  def undated_ask
+    render Campbooks::TimePage::AgendaRow.new(item: undated_ask_item, zone: zone, hold_slot: at(10) + 1.day)
+  end
+
+  # A proposed focus block for a deadline → Move (slot popover), Keep, dismiss kebab.
   def focus
     render Campbooks::TimePage::AgendaRow.new(item: focus_item, zone: zone,
       move_slots: [ at(9), at(11), at(12) ])
+  end
+
+  # A focus block held for an ask → adds the "Done" (done_ask) action.
+  def ask_focus
+    render Campbooks::TimePage::AgendaRow.new(item: ask_focus_item, zone: zone,
+      move_slots: [ at(9), at(11) ])
   end
 
   private
@@ -55,9 +66,21 @@ class TimeAgendaRowComponentPreview < ViewComponent::Preview
 
   def task_item
     Time::AgendaItem.new(
-      kind: :task, at: at(16), day: Date.current, all_day: false, overdue: false,
-      duration_minutes: 0, title: "Review the Q3 budget", source_label: "Scout suggested",
-      source_path: nil, color: nil, record: Task.new(id: SecureRandom.uuid), actions: [ :done ]
+      kind: :task, at: at(9, 30), day: Date.current, all_day: false, overdue: false,
+      duration_minutes: 0, title: "Comments to Sofia on slides 4 to 9",
+      source_label: "Scout suggested · from Sofia's email · held Thu 10:00", source_path: "/email_messages/1",
+      color: nil, record: Task.new(id: SecureRandom.uuid),
+      actions: [ :open_thread, :done, :change_date, :hold, :snooze, :dismiss_ask ]
+    )
+  end
+
+  def undated_ask_item
+    Time::AgendaItem.new(
+      kind: :task, at: nil, day: nil, all_day: true, overdue: false,
+      duration_minutes: 0, title: "Send the signed contract back to Acme",
+      source_label: "from Rita's email", source_path: "/email_messages/2",
+      color: nil, record: Task.new(id: SecureRandom.uuid),
+      actions: [ :open_thread, :schedule, :hold, :done, :snooze, :dismiss_ask ]
     )
   end
 
@@ -66,6 +89,16 @@ class TimeAgendaRowComponentPreview < ViewComponent::Preview
       kind: :focus, at: at(10), day: Date.current + 1, all_day: false, overdue: false,
       duration_minutes: 45, title: "Focus: Q3 deck comments", source_label: "Scout suggested",
       source_path: nil, color: nil, record: FocusBlock.new(id: SecureRandom.uuid), actions: [ :move, :keep, :dismiss_focus ]
+    )
+  end
+
+  def ask_focus_item
+    Time::AgendaItem.new(
+      kind: :focus, at: at(10), day: Date.current + 1, all_day: false, overdue: false,
+      duration_minutes: 45, title: "Focus: Acme contract", source_label: "Scout suggested",
+      source_path: nil, color: nil,
+      record: FocusBlock.new(id: SecureRandom.uuid, task: Task.new(id: SecureRandom.uuid)),
+      actions: [ :move, :keep, :done_ask, :dismiss_focus ]
     )
   end
 end

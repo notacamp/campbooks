@@ -31,14 +31,10 @@ module Campbooks
       @attrs = attrs
     end
 
-    # The ordered list of slide keys for this render. Tasks is omitted when the
-    # feature flag is off so segments + counter adapt automatically.
+    # The ordered list of slide keys for this render. (Asks have no page of their
+    # own now — they live on Now and Time — so there is no dedicated tour slide.)
     def slides
-      @slides ||= begin
-        list = %i[intro inbox calendar docs more]
-        list.insert(3, :tasks) if Features.tasks?
-        list
-      end
+      @slides ||= %i[intro inbox calendar docs more]
     end
 
     def view_template
@@ -137,7 +133,6 @@ module Campbooks
             when :intro    then slide_intro
             when :inbox    then slide_inbox
             when :calendar then slide_calendar
-            when :tasks    then slide_tasks
             when :docs     then slide_docs
             when :more     then slide_more
             end
@@ -315,47 +310,6 @@ module Campbooks
             class: "tour-morph-btn ml-2 text-[12px] font-[550] rounded-[9px] px-2.5 py-1.5 cursor-default bg-foreground text-background border-0 font-semibold flex-shrink-0",
             data: { tour_morph_at: "4600", tour_morph_text: t(".s3_rem_added"), tour_original_text: t(".s3_rem_add") }
           ) { plain t(".s3_rem_add") }
-        end
-      end
-    end
-
-    # ── Slide 4: Tasks (feature-gated) ───────────────────────────────────────
-
-    def slide_tasks
-      feature_head(key: "s4")
-
-      div(class: "mt-5 min-w-0") do
-        # Task 1 — ticks and strikes after 2600ms
-        div(class: "tour-stage-el flex items-center gap-2.5 py-2.5 border-t border-border") do
-          span(
-            class: "w-[19px] h-[19px] rounded-[7px] border-[1.5px] border-border flex items-center justify-center text-[11px] bg-background flex-shrink-0",
-            data: { tour_tick: "true" }
-          )
-          span(
-            class: "text-[13.5px] font-[550] flex-1 min-w-0",
-            data: { tour_tick_text: "true" }
-          ) { plain "Send Q3 report to Jordan" }
-          span(class: "inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-semibold flex-shrink-0", style: "background-color: oklch(97% 0.03 85); border-color: oklch(90% 0.06 85); color: oklch(52% 0.12 78)") do
-            plain "🕒 Friday"
-          end
-        end
-
-        # Task 2
-        div(class: "tour-stage-el flex items-center gap-2.5 py-2.5 border-t border-border") do
-          span(class: "w-[19px] h-[19px] rounded-[7px] border-[1.5px] border-border flex items-center justify-center text-[11px] bg-background flex-shrink-0")
-          span(class: "text-[13.5px] font-[550] flex-1 min-w-0") { plain "Confirm bank transfer to Acme Corp" }
-          span(class: "inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-semibold flex-shrink-0", style: "background-color: oklch(97% 0.03 85); border-color: oklch(90% 0.06 85); color: oklch(52% 0.12 78)") do
-            plain "🕒 Today, 5 PM"
-          end
-        end
-
-        # Task 3
-        div(class: "tour-stage-el flex items-center gap-2.5 py-2.5 border-t border-b border-border") do
-          span(class: "w-[19px] h-[19px] rounded-[7px] border-[1.5px] border-border flex items-center justify-center text-[11px] bg-background flex-shrink-0")
-          span(class: "text-[13.5px] font-[550] flex-1 min-w-0") { plain "Countersign the Oakwood contract" }
-          span(class: "inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-semibold flex-shrink-0", style: "background-color: oklch(97% 0.03 85); border-color: oklch(90% 0.06 85); color: oklch(52% 0.12 78)") do
-            plain "🕒 Thursday"
-          end
         end
       end
     end

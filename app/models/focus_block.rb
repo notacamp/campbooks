@@ -31,6 +31,7 @@ class FocusBlock < ApplicationRecord
   # we never draw it twice).
   scope :renderable, -> { held.where(calendar_event_id: nil) }
   scope :in_range, ->(from, to) { where(start_at: from..to) }
+  scope :for_task, ->(task) { where(task_id: task.id) }
 
   # A focus block is a personal record, so accessibility is simply ownership.
   # Fails closed: a nil user sees nothing.
@@ -40,6 +41,12 @@ class FocusBlock < ApplicationRecord
     return 0 unless start_at && end_at
 
     ((end_at - start_at) / 60).round
+  end
+
+  # The subject the block is held for: a deadline reminder, an ask (Task), or —
+  # falling back — the block's own "Focus: …" title.
+  def subject_title
+    reminder&.title || task&.title || title
   end
 
   # Once Kept into a real event, the block's own agenda row is suppressed so the
