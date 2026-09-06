@@ -48,24 +48,20 @@ en:
           important: Important
           starred: Starred sender
       late_payable_card:
-        owed: "You owe"
-        days_late:
-          one: "%{count} day late"
-          other: "%{count} days late"
-        headline: "You owe %{name} %{reference}"
+        headline: "%{name}'s %{reference} has no bank line yet"
+        not_on_statement: "Not on %{label}'s statement"
+        not_on_a_statement: "Not on a statement"
         invoice_ref: "invoice #%{number}"
         an_invoice: "an invoice"
         mark_paid: "Mark paid"
         open_money: "Open in Money"
         later: "Later"
       late_receivable_card:
-        owed: "Owed to you"
-        days_late:
-          one: "%{count} day late"
-          other: "%{count} days late"
-        headline: "%{name} hasn't paid %{reference}"
-        invoice_ref: "invoice #%{number}"
-        an_invoice: "an invoice"
+        headline: "%{reference} to %{name} isn't on a statement"
+        not_on_statement: "Not on %{label}'s statement"
+        not_on_a_statement: "Not on a statement"
+        invoice_ref: "Invoice #%{number}"
+        an_invoice: "An invoice"
         scout_note: "I drafted a reminder."
         send_reminder: "Send reminder"
         mark_paid: "Mark paid"

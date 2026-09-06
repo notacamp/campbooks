@@ -3,19 +3,128 @@ fr:
   money:
     statements:
       title: "Relevés Bancaires"
-    why:
-      times_usual: "%{times}x leur habitude"
-      pays_on_time: "vous payez à temps"
-      usually_late: "généralement payé avec %{count} jours de retard"
-      recurring: "Récurrent"
-      service: "un service"
+      all_lines: "Toutes les %{count} lignes de %{label}"
+    index:
+      title: "Finances"
+      subtitle: "Ce que dit la banque, associé aux documents correspondants."
+      export_accountant: "Exporter pour le comptable"
+      add_statement: "Ajouter un relevé"
+    what:
+      invoice_sent: "Facture #%{number} envoyée"
+      invoice: "Facture #%{number}"
+    settled:
+      line: "ligne %{number}"
+    needs_you:
+      no_name: "Virement, sans nom sur la ligne"
+      no_invoice:
+        title: "Aucune facture pour ce paiement"
+      review:
+        title: "Vérifiez cette correspondance"
+        likely: "probable"
+      partial:
+        title: "%{vendor} n'est payé qu'en partie"
+        meta: "%{paid} sur %{total} · %{outstanding} encore en attente"
+      nif:
+        title: "La facture a besoin d'un NIF"
+        flag: "NIF manquant"
+    export:
+      filename: "finances-%{quarter}"
+      headers:
+        counterpart: "Contrepartie"
+        what: "Description"
+        direction: "Direction"
+        amount: "Montant"
+        currency: "Devise"
+        date: "Date"
+        status: "Statut"
+        settled_on: "Réglé le"
+        statement: "Relevé"
+        source: "Source"
+      direction:
+        receivable: "à recevoir"
+        payable: "à payer"
+      status:
+        settled: "réglé"
+        missing: "n'est pas sur le relevé"
+        unconfirmed: "pas encore de relevé"
+    reminder_draft:
+      chase:
+        subject: "Facture #%{reference} · rappel de paiement"
+        subject_generic: "Rappel de paiement"
+        invoice_ref: "facture #%{reference}"
+        this_invoice: "cette facture"
+        body: "Bonjour %{counterpart}, j'espère que vous allez bien. Ceci est un rappel amical que %{reference} d'un montant de %{amount} n'apparaît pas encore de notre côté. Pourriez-vous m'indiquer quand vous prévoyez de le régler ? Merci beaucoup."
+      cancellation:
+        subject: "%{counterpart} · demande de résiliation"
+        body: "Bonjour, je vous écris au sujet de %{counterpart}, dont le renouvellement est prévu le %{date}. Je souhaite le résilier avant ce renouvellement. Pourriez-vous m'indiquer ce dont vous avez besoin de ma part ? Je vous remercie."
+    actions:
+      marked_paid: "Marqué comme payé."
+      marked_unpaid: "Marqué comme non payé."
+      reminder_opened: "Brouillon prêt dans le compositeur."
+      line_confirmed: "Correspondance confirmée."
+      line_excluded: "Ligne mise de côté."
+      line_reset: "Réinitialisé."
+      line_not_found: "Correspondance introuvable."
+      invalid_reason: "Motif invalide."
+      gone: "Cet élément n'est plus disponible."
+      undo: "Annuler"
   components:
     money:
-      summary:
-        matters_html: "Le plus important est %{name}, %{amount}, %{overdue} — %{why}."
-        matters_plain_html: "Le plus important est %{name}, %{amount}, %{overdue}."
-      ledger:
-        strip:
-          label: "Ordre"
-        sort:
-          priority_desc: "Priorité"
+      read:
+        read_statement: "j'ai lu le relevé de %{label}"
+        no_statements_when: "pas encore de relevés"
+        no_statements_html: "Pas encore de relevé bancaire. %{link} et j'associerai chaque ligne au document correspondant."
+        add_one: "Ajoutez-en un"
+        the_bank: "la banque"
+        statement_html: "Le relevé de %{label} de %{bank} est chargé : %{explained} sur %{total} lignes ont leur document."
+        needs_invoice_html_one: "Une nécessite encore une facture"
+        needs_invoice_html: "%{count} nécessitent encore une facture"
+        review_html_one: "une correspondance doit être vérifiée"
+        review_html: "%{count} correspondances doivent être vérifiées"
+        partial_html_one: "Une facture n'est réglée qu'en partie."
+        partial_html:
+          one: "Une facture n'est réglée qu'en partie."
+          other: "%{count} factures ne sont réglées qu'en partie."
+        missing_html_one: "Une facture de %{label} n'est pas sur ce relevé."
+        missing_html:
+          one: "Une facture de %{label} n'est pas sur ce relevé."
+          other: "%{count} factures de %{label} ne sont pas sur ce relevé."
+        all_explained_html: "Chaque ligne a son document."
+      strip:
+        explained: "expliqué"
+        needs_invoice: "Nécessitent une facture"
+        not_on_a_statement: "Pas sur un relevé"
+        payments:
+          one: "%{count} paiement"
+          other: "%{count} paiements"
+        invoices:
+          one: "%{count} facture"
+          other: "%{count} factures"
+      needs_you:
+        title: "Votre attention requise"
+        note: "extrait du relevé ci-dessous"
+        resolve: "Résoudre"
+        change: "Modifier"
+        confirm: "Confirmer"
+        open_statement: "Ouvrir le relevé"
+        ask_for_invoice: "Demander une facture corrigée"
+        overflow: "+%{count} de plus sur le relevé"
+        overflow_link: "Ouvrir le relevé"
+      statements:
+        title: "Relevés"
+        note: ""
+        empty_title: "Pas encore de relevé bancaire."
+        empty_body: "Importez votre premier relevé pour commencer à associer les lignes aux factures."
+        add_statement: "Ajouter un relevé"
+        earlier: "Précédents..."
+        all_lines: "Toutes les %{count} lignes de %{label}"
+      unbanked:
+        title: "Pas sur un relevé"
+        note: "daté d'un mois réconcilié, sans ligne bancaire"
+        all_on_statement: "Toutes les factures des mois réconciliés sont sur un relevé."
+        not_on_label: "pas sur le relevé de %{label}"
+        you_sent: "vous l'avez envoyée"
+        mark_paid: "Marquer comme payé"
+        paid_elsewhere: "C'est sur la carte"
+        send_reminder: "Envoyer un rappel"
+        evidence_note: "Une facture n'apparaît ici qu'une fois qu'un relevé réconcilié couvre sa date et ne montre aucun paiement. Jusqu'alors Finances ne dit rien : pas de dates d'échéance, pas de \"en retard\", pas de totaux à payer, car le dépassement d'une échéance n'est pas une preuve."

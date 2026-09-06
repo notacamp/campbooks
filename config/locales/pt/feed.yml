@@ -48,24 +48,20 @@ pt:
           important: Importante
           starred: Remetente com estrela
       late_payable_card:
-        owed: "Deve"
-        days_late:
-          one: "%{count} dia em atraso"
-          other: "%{count} dias em atraso"
-        headline: "Deve a %{name} %{reference}"
+        headline: "%{reference} de %{name} ainda não tem linha bancária"
+        not_on_statement: "Não está no extrato de %{label}"
+        not_on_a_statement: "Não está no extrato"
         invoice_ref: "fatura #%{number}"
         an_invoice: "uma fatura"
         mark_paid: "Marcar como pago"
         open_money: "Abrir em Dinheiro"
         later: "Mais tarde"
       late_receivable_card:
-        owed: "A receber"
-        days_late:
-          one: "%{count} dia em atraso"
-          other: "%{count} dias em atraso"
-        headline: "%{name} não pagou %{reference}"
-        invoice_ref: "fatura #%{number}"
-        an_invoice: "uma fatura"
+        headline: "%{reference} para %{name} não está no extrato"
+        not_on_statement: "Não está no extrato de %{label}"
+        not_on_a_statement: "Não está no extrato"
+        invoice_ref: "Fatura #%{number}"
+        an_invoice: "Uma fatura"
         scout_note: "Rascunhei um lembrete."
         send_reminder: "Enviar lembrete"
         mark_paid: "Marcar como pago"

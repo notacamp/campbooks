@@ -3,19 +3,128 @@ es:
   money:
     statements:
       title: "Extractos Bancarios"
-    why:
-      times_usual: "%{times}x lo habitual"
-      pays_on_time: "sueles pagar a tiempo"
-      usually_late: "habitualmente pagado con %{count} días de retraso"
-      recurring: "Recurrente"
-      service: "un servicio"
+      all_lines: "Todas las %{count} líneas de %{label}"
+    index:
+      title: "Dinero"
+      subtitle: "Lo que dice el banco, asociado al papel que hay detrás."
+      export_accountant: "Exportar para el contable"
+      add_statement: "Añadir extracto"
+    what:
+      invoice_sent: "Factura #%{number} enviada"
+      invoice: "Factura #%{number}"
+    settled:
+      line: "línea %{number}"
+    needs_you:
+      no_name: "Transferencia, sin nombre en la línea"
+      no_invoice:
+        title: "Ninguna factura para este pago"
+      review:
+        title: "Revise esta coincidencia"
+        likely: "probable"
+      partial:
+        title: "%{vendor} está pagado solo parcialmente"
+        meta: "%{paid} de %{total} · %{outstanding} aún pendiente"
+      nif:
+        title: "La factura necesita NIF"
+        flag: "NIF ausente"
+    export:
+      filename: "dinero-%{quarter}"
+      headers:
+        counterpart: "Contraparte"
+        what: "Descripción"
+        direction: "Dirección"
+        amount: "Importe"
+        currency: "Divisa"
+        date: "Fecha"
+        status: "Estado"
+        settled_on: "Liquidado el"
+        statement: "Extracto"
+        source: "Origen"
+      direction:
+        receivable: "por cobrar"
+        payable: "por pagar"
+      status:
+        settled: "liquidado"
+        missing: "no está en el extracto"
+        unconfirmed: "sin extracto aún"
+    reminder_draft:
+      chase:
+        subject: "Factura #%{reference} · recordatorio de pago"
+        subject_generic: "Recordatorio de pago"
+        invoice_ref: "factura #%{reference}"
+        this_invoice: "esta factura"
+        body: "Hola %{counterpart}, espero que esté bien. Le escribo para recordarle que %{reference} por %{amount} aún no aparece en nuestro sistema. ¿Podría indicarme cuándo espera realizarlo? Muchas gracias."
+      cancellation:
+        subject: "%{counterpart} · solicitud de cancelación"
+        body: "Hola, le escribo sobre %{counterpart}, que está programado para renovarse el %{date}. Me gustaría cancelarlo antes de la renovación. ¿Podría indicarme qué necesita de mi parte? Gracias."
+    actions:
+      marked_paid: "Marcado como pagado."
+      marked_unpaid: "Marcado como no pagado."
+      reminder_opened: "Borrador listo en el compositor."
+      line_confirmed: "Coincidencia confirmada."
+      line_excluded: "Línea apartada."
+      line_reset: "Restablecido."
+      line_not_found: "Coincidencia no encontrada."
+      invalid_reason: "Motivo inválido."
+      gone: "Este elemento ya no está aquí."
+      undo: "Deshacer"
   components:
     money:
-      summary:
-        matters_html: "El más importante es %{name}, %{amount}, %{overdue} — %{why}."
-        matters_plain_html: "El más importante es %{name}, %{amount}, %{overdue}."
-      ledger:
-        strip:
-          label: "Orden"
-        sort:
-          priority_desc: "Prioridad"
+      read:
+        read_statement: "leí el extracto de %{label}"
+        no_statements_when: "sin extractos aún"
+        no_statements_html: "Todavía no hay extractos bancarios. %{link} y asociaré cada línea al papel que hay detrás."
+        add_one: "Añada uno"
+        the_bank: "el banco"
+        statement_html: "El extracto de %{label} del %{bank} está cargado: %{explained} de %{total} líneas tienen su papel."
+        needs_invoice_html_one: "Una aún necesita factura"
+        needs_invoice_html: "%{count} aún necesitan factura"
+        review_html_one: "una coincidencia quiere revisarse"
+        review_html: "%{count} coincidencias quieren revisarse"
+        partial_html_one: "Una factura está solo parcialmente pagada."
+        partial_html:
+          one: "Una factura está solo parcialmente pagada."
+          other: "%{count} facturas están solo parcialmente pagadas."
+        missing_html_one: "Una factura de %{label} no está en este extracto."
+        missing_html:
+          one: "Una factura de %{label} no está en este extracto."
+          other: "%{count} facturas de %{label} no están en este extracto."
+        all_explained_html: "Cada línea tiene su papel."
+      strip:
+        explained: "explicado"
+        needs_invoice: "Necesitan factura"
+        not_on_a_statement: "No está en el extracto"
+        payments:
+          one: "%{count} pago"
+          other: "%{count} pagos"
+        invoices:
+          one: "%{count} factura"
+          other: "%{count} facturas"
+      needs_you:
+        title: "Necesita su atención"
+        note: "extraído del extracto a continuación"
+        resolve: "Resolver"
+        change: "Cambiar"
+        confirm: "Confirmar"
+        open_statement: "Abrir el extracto"
+        ask_for_invoice: "Pedir factura corregida"
+        overflow: "+%{count} más en el extracto"
+        overflow_link: "Abrir el extracto"
+      statements:
+        title: "Extractos"
+        note: ""
+        empty_title: "Todavía no hay extractos bancarios."
+        empty_body: "Importe su primer extracto para empezar a asociar líneas a facturas."
+        add_statement: "Añadir extracto"
+        earlier: "Anteriores..."
+        all_lines: "Todas las %{count} líneas de %{label}"
+      unbanked:
+        title: "No está en el extracto"
+        note: "fechado en un mes ya conciliado, sin línea bancaria"
+        all_on_statement: "Todas las facturas de los meses conciliados están en el extracto."
+        not_on_label: "no está en el extracto de %{label}"
+        you_sent: "la envió"
+        mark_paid: "Marcar como pagado"
+        paid_elsewhere: "Está en la tarjeta"
+        send_reminder: "Enviar recordatorio"
+        evidence_note: "Una factura solo aparece aquí cuando un extracto conciliado cubre su fecha y no muestra ningún pago. Hasta entonces Dinero no dice nada: sin fechas de vencimiento, sin \"atrasado\", sin totales a pagar, porque el vencimiento de una fecha no es evidencia de nada."

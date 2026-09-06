@@ -349,12 +349,15 @@ class Document < ApplicationRecord
   end
 
   def settled_manual?
-    settled_source == "manual"
+    %w[manual elsewhere].include?(settled_source)
   end
 
-  # "Mark paid" by hand (Paper row menu). Records the manual settlement instant.
-  def mark_settled!(at: Time.current)
-    update!(settled_at: at, settled_source: "manual")
+  # "Mark paid" by hand (Paper row menu, Money surface). Records the settlement instant.
+  # `source` must be "manual" or "elsewhere" (ArgumentError otherwise).
+  def mark_settled!(at: Time.current, source: "manual")
+    raise ArgumentError, "source must be manual or elsewhere" unless %w[manual elsewhere].include?(source.to_s)
+
+    update!(settled_at: at, settled_source: source.to_s)
   end
 
   # "Mark unpaid" — clears a manual settlement. A bank-match settlement is owned by

@@ -3,19 +3,128 @@ pt:
   money:
     statements:
       title: "Extratos Bancários"
-    why:
-      times_usual: "%{times}x do habitual"
-      pays_on_time: "costuma pagar a tempo"
-      usually_late: "habitualmente pago com %{count} dias de atraso"
-      recurring: "Recorrente"
-      service: "um serviço"
+      all_lines: "Todas as %{count} linhas de %{label}"
+    index:
+      title: "Dinheiro"
+      subtitle: "O que o banco diz, associado ao papel por detrás."
+      export_accountant: "Exportar para o contabilista"
+      add_statement: "Adicionar extrato"
+    what:
+      invoice_sent: "Fatura #%{number} enviada"
+      invoice: "Fatura #%{number}"
+    settled:
+      line: "linha %{number}"
+    needs_you:
+      no_name: "Transferência, sem nome na linha"
+      no_invoice:
+        title: "Nenhuma fatura para este pagamento"
+      review:
+        title: "Reveja esta correspondência"
+        likely: "provável"
+      partial:
+        title: "%{vendor} está apenas parcialmente pago"
+        meta: "%{paid} de %{total} · %{outstanding} ainda em dívida"
+      nif:
+        title: "Fatura precisa de NIF"
+        flag: "NIF em falta"
+    export:
+      filename: "dinheiro-%{quarter}"
+      headers:
+        counterpart: "Contraparte"
+        what: "Descrição"
+        direction: "Direção"
+        amount: "Montante"
+        currency: "Moeda"
+        date: "Data"
+        status: "Estado"
+        settled_on: "Liquidado em"
+        statement: "Extrato"
+        source: "Origem"
+      direction:
+        receivable: "a receber"
+        payable: "a pagar"
+      status:
+        settled: "liquidado"
+        missing: "não está no extrato"
+        unconfirmed: "sem extrato ainda"
+    reminder_draft:
+      chase:
+        subject: "Fatura #%{reference} · lembrete de pagamento"
+        subject_generic: "Lembrete de pagamento"
+        invoice_ref: "fatura #%{reference}"
+        this_invoice: "esta fatura"
+        body: "Olá %{counterpart}, espero que esteja bem. Este é um lembrete amigável de que %{reference} no valor de %{amount} ainda não aparece do nosso lado. Poderia informar-me quando espera efetuar o pagamento? Obrigado."
+      cancellation:
+        subject: "%{counterpart} · pedido de cancelamento"
+        body: "Olá, escrevo sobre %{counterpart}, que está definido para renovar em %{date}. Gostaria de cancelar antes da renovação. Pode indicar-me o que preciso de fazer? Obrigado pela ajuda."
+    actions:
+      marked_paid: "Marcado como pago."
+      marked_unpaid: "Marcado como não pago."
+      reminder_opened: "Rascunho pronto no compositor."
+      line_confirmed: "Correspondência confirmada."
+      line_excluded: "Linha colocada de parte."
+      line_reset: "Reposto."
+      line_not_found: "Correspondência não encontrada."
+      invalid_reason: "Motivo inválido."
+      gone: "Este item já não está aqui."
+      undo: "Desfazer"
   components:
     money:
-      summary:
-        matters_html: "O mais importante: %{name}, %{amount}, %{overdue} — %{why}."
-        matters_plain_html: "O mais importante: %{name}, %{amount}, %{overdue}."
-      ledger:
-        strip:
-          label: "Ordenar"
-        sort:
-          priority_desc: "Prioridade"
+      read:
+        read_statement: "li o extrato de %{label}"
+        no_statements_when: "sem extratos ainda"
+        no_statements_html: "Ainda não há extratos bancários. %{link} e associarei cada linha ao papel por detrás."
+        add_one: "Adicione um"
+        the_bank: "o banco"
+        statement_html: "O extrato de %{label} do %{bank} está carregado: %{explained} de %{total} linhas têm o seu papel."
+        needs_invoice_html_one: "Uma ainda precisa de fatura"
+        needs_invoice_html: "%{count} ainda precisam de fatura"
+        review_html_one: "uma correspondência quer ser revista"
+        review_html: "%{count} correspondências querem ser revistas"
+        partial_html_one: "Uma fatura está apenas parcialmente paga."
+        partial_html:
+          one: "Uma fatura está apenas parcialmente paga."
+          other: "%{count} faturas estão apenas parcialmente pagas."
+        missing_html_one: "Uma fatura de %{label} não está neste extrato."
+        missing_html:
+          one: "Uma fatura de %{label} não está neste extrato."
+          other: "%{count} faturas de %{label} não estão neste extrato."
+        all_explained_html: "Cada linha tem o seu papel."
+      strip:
+        explained: "explicado"
+        needs_invoice: "Precisam de fatura"
+        not_on_a_statement: "Não está no extrato"
+        payments:
+          one: "%{count} pagamento"
+          other: "%{count} pagamentos"
+        invoices:
+          one: "%{count} fatura"
+          other: "%{count} faturas"
+      needs_you:
+        title: "Precisa de si"
+        note: "retirado do extrato abaixo"
+        resolve: "Resolver"
+        change: "Alterar"
+        confirm: "Confirmar"
+        open_statement: "Abrir o extrato"
+        ask_for_invoice: "Pedir fatura corrigida"
+        overflow: "+%{count} mais no extrato"
+        overflow_link: "Abrir o extrato"
+      statements:
+        title: "Extratos"
+        note: ""
+        empty_title: "Ainda não há extratos bancários."
+        empty_body: "Importe o seu primeiro extrato para começar a associar linhas a faturas."
+        add_statement: "Adicionar extrato"
+        earlier: "Anteriores..."
+        all_lines: "Todas as %{count} linhas de %{label}"
+      unbanked:
+        title: "Não está no extrato"
+        note: "datado num mês já reconciliado, sem linha bancária"
+        all_on_statement: "Todas as faturas dos meses reconciliados estão no extrato."
+        not_on_label: "não está no extrato de %{label}"
+        you_sent: "enviou"
+        mark_paid: "Marcar como pago"
+        paid_elsewhere: "Está no cartão"
+        send_reminder: "Enviar lembrete"
+        evidence_note: "Uma fatura só aparece aqui quando um extrato reconciliado cobre a sua data e não mostra pagamento. Até então o Dinheiro não diz nada: sem datas de vencimento, sem \"em atraso\", sem totais a pagar, porque o vencimento de uma data não é prova de nada."

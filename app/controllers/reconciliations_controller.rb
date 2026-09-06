@@ -28,7 +28,7 @@ class ReconciliationsController < ApplicationController
     tx_totals    = BankTransaction.where(reconciliation_id: rids)
                                   .group(:reconciliation_id).count
     tx_resolved  = BankTransaction.where(reconciliation_id: rids,
-                                         status: %i[matched excluded requested])
+                                         status: BankTransaction::RESOLVED_STATUSES)
                                   .group(:reconciliation_id).count
 
     # Pre-populate the memoized ivars on each Reconciliation instance so the

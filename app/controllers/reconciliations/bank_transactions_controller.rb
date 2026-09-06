@@ -254,6 +254,7 @@ module Reconciliations
     #   - replaces the table row (desktop)
     #   - replaces the card (mobile)
     #   - replaces the summary bar
+    #   - when surface=money, also replaces money_content
     #   - appends a toast notification (with optional undo link)
     def render_workbench_streams(notify:, undo_url: nil)
       @transaction.reload
@@ -280,15 +281,27 @@ module Reconciliations
           notify
         end
 
-      render turbo_stream: [
+      streams = [
         turbo_stream.replace(dom_id(@transaction),        html: row_html),
         turbo_stream.replace(dom_id(@transaction, :card), html: card_html),
         # Remove the stale resolve panel sibling row/div if still open
         turbo_stream.remove("#{dom_id(@transaction)}_resolve_panel"),
         turbo_stream.remove("#{dom_id(@transaction, :card)}_resolve_panel"),
-        turbo_stream.replace("reconciliation_summary_bar", html: summary_html),
-        notify_stream(toast_message)
+        turbo_stream.replace("reconciliation_summary_bar", html: summary_html)
       ]
+
+      # surface=money: also refresh the Money content region.
+      if params[:surface] == "money"
+        page = Money::Page.for(Current.workspace, current_user,
+                               statement_id: @reconciliation.id)
+        streams << turbo_stream.replace("money_content",
+                                        partial: "money/content",
+                                        locals:  { page: page })
+      end
+
+      streams << notify_stream(toast_message)
+
+      render turbo_stream: streams
     end
 
     def render_row_html(txn)
