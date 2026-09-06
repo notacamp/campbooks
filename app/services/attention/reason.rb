@@ -18,5 +18,11 @@ module Attention
     def to_h = { "key" => key, "params" => params }
     def sentence = I18n.t("attention.reasons.#{key}", **params.symbolize_keys)
     def positive? = POSITIVE_KEYS.include?(key)
+
+    # The sentence as a mid-sentence clause ("…: you usually answer within 3
+    # hours"): the leading capital is dropped unless it is Scout's own name.
+    def clause
+      sentence.sub(/\A(?!Scout\b)([[:upper:]])/) { Regexp.last_match(1).downcase }
+    end
   end
 end

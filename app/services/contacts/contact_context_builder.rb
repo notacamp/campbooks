@@ -73,9 +73,8 @@ module Contacts
         .ranked
         .limit(5)
 
-      names = top.filter_map do |aw|
-        Person.find_by(id: aw.subject_id)&.display_name
-      end
+      people = Person.where(id: top.map(&:subject_id)).includes(:contacts).index_by(&:id)
+      names = top.filter_map { |aw| people[aw.subject_id]&.display_name }
 
       return nil if names.empty?
 

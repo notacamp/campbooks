@@ -15,6 +15,7 @@ fr:
       learned_skim: Appris de votre façon de trier
       learned_style: Appris de vos courriels envoyés
       learned_labels: Appris de vos étiquettes
+      learned_attention: "Appris de ce que vous faites"
       learned_corrections:
         one: Appris de %{count} correction
         other: Appris de %{count} corrections

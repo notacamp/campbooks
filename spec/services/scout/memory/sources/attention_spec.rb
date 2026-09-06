@@ -11,7 +11,7 @@ RSpec.describe Scout::Memory::Sources::Attention do
     person = Person.create!(name: name, workspace: ws)
     contact = ws.contacts.create!(name: name, email: "#{name.downcase.tr(' ', '.')}@example.com",
                                    sender_kind: :person, person: person)
-    [person, contact]
+    [ person, contact ]
   end
 
   def make_weight(person, weight:, confidence: 0.7, reasons: [], sender_kind: "person")
@@ -40,7 +40,7 @@ RSpec.describe Scout::Memory::Sources::Attention do
   describe "#entries — taught verdicts" do
     it "shows a taught_important entry for a person marked important" do
       person, _contact = make_person("Sofia Martins")
-      make_weight(person, weight: 0.9, reasons: [{ "key" => "replies_fast", "params" => {} }])
+      make_weight(person, weight: 0.9, reasons: [ { "key" => "replies_fast", "params" => {} } ])
       teach(person, "important")
 
       entries = source.entries
@@ -55,7 +55,7 @@ RSpec.describe Scout::Memory::Sources::Attention do
 
     it "shows a taught_unimportant entry for a person marked unimportant" do
       person, _contact = make_person("Spam Newsletter")
-      make_weight(person, weight: 0.05, confidence: 0.8, reasons: [{ "key" => "new", "params" => {} }])
+      make_weight(person, weight: 0.05, confidence: 0.8, reasons: [ { "key" => "new", "params" => {} } ])
       teach(person, "unimportant")
 
       entries = source.entries
@@ -69,7 +69,7 @@ RSpec.describe Scout::Memory::Sources::Attention do
     it "includes the top-weight person with a positive reason" do
       person, _contact = make_person("Ana Reis")
       make_weight(person, weight: 0.85, confidence: 0.8,
-                   reasons: [{ "key" => "replies_fast", "params" => {} }])
+                   reasons: [ { "key" => "replies_fast", "params" => {} } ])
 
       entries = source.entries
       high = entries.find { |e| e.id == "attention:#{person.id}:high" }
@@ -83,7 +83,7 @@ RSpec.describe Scout::Memory::Sources::Attention do
     it "excludes persons with confidence < 0.5" do
       person, _contact = make_person("Low Conf")
       make_weight(person, weight: 0.9, confidence: 0.3,
-                   reasons: [{ "key" => "replies_fast", "params" => {} }])
+                   reasons: [ { "key" => "replies_fast", "params" => {} } ])
 
       entries = source.entries
       expect(entries.find { |e| e.id.include?(person.id.to_s) }).to be_nil
@@ -92,7 +92,7 @@ RSpec.describe Scout::Memory::Sources::Attention do
     it "excludes persons who have a taught verdict" do
       person, _contact = make_person("Already Taught")
       make_weight(person, weight: 0.9, confidence: 0.8,
-                   reasons: [{ "key" => "replies_fast", "params" => {} }])
+                   reasons: [ { "key" => "replies_fast", "params" => {} } ])
       teach(person, "important")
 
       entries = source.entries
@@ -102,15 +102,26 @@ RSpec.describe Scout::Memory::Sources::Attention do
   end
 
   describe "#entries — learned low" do
-    it "includes a low-weight person with sender_kind person" do
+    it "includes a low-weight person, explained by what keeps them out of the way" do
       person, _contact = make_person("Noise Sender")
       make_weight(person, weight: 0.05, confidence: 0.6, sender_kind: "person",
-                   reasons: [{ "key" => "new", "params" => {} }])
+                   reasons: [ { "key" => "ignored", "params" => { "percent" => 80 } } ])
 
       entries = source.entries
       low = entries.find { |e| e.id == "attention:#{person.id}:low" }
-      # Low entries need a positive reason — "new" is not positive, so this may not surface
-      expect(low).to be_nil
+      expect(low).to be_present
+      expect(low.origin).to eq(:learned)
+      expect(low.plain).to include("Noise Sender")
+      expect(low.plain).to include("you archive 80% of their mail unread")
+      expect(low.actions).to include(:confirm, :remove)
+    end
+
+    it "keeps Scout's own name capitalized inside a learned sentence" do
+      person, _contact = make_person("Tiago Nunes")
+      make_weight(person, weight: 0.8, confidence: 0.8, reasons: [ { "key" => "vip", "params" => {} } ])
+
+      high = source.entries.find { |e| e.id == "attention:#{person.id}:high" }
+      expect(high.plain).to include("Scout reads them as a client")
     end
   end
 
@@ -118,7 +129,7 @@ RSpec.describe Scout::Memory::Sources::Attention do
     it "records important for a high entry and returns true" do
       person, _contact = make_person("High Person")
       make_weight(person, weight: 0.8, confidence: 0.7,
-                   reasons: [{ "key" => "replies_fast", "params" => {} }])
+                   reasons: [ { "key" => "replies_fast", "params" => {} } ])
 
       entry = source.entries.find { |e| e.id == "attention:#{person.id}:high" }
       expect(entry).to be_present
@@ -136,7 +147,7 @@ RSpec.describe Scout::Memory::Sources::Attention do
   describe "#remove" do
     it "forgets a taught verdict and returns true" do
       person, _contact = make_person("Taught Person")
-      make_weight(person, weight: 0.9, reasons: [{ "key" => "replies_fast", "params" => {} }])
+      make_weight(person, weight: 0.9, reasons: [ { "key" => "replies_fast", "params" => {} } ])
       teach(person, "important")
 
       entry = source.entries.find { |e| e.id == "attention:#{person.id}:taught" }
@@ -153,7 +164,7 @@ RSpec.describe Scout::Memory::Sources::Attention do
     it "records unimportant for a high entry when removed" do
       person, _contact = make_person("High Removed")
       make_weight(person, weight: 0.85, confidence: 0.8,
-                   reasons: [{ "key" => "replies_fast", "params" => {} }])
+                   reasons: [ { "key" => "replies_fast", "params" => {} } ])
 
       entry = source.entries.find { |e| e.id == "attention:#{person.id}:high" }
       expect(entry).to be_present

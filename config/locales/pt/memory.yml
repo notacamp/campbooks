@@ -15,6 +15,7 @@ pt:
       learned_skim: Aprendido com a tua triagem
       learned_style: Aprendido do teu correio enviado
       learned_labels: Aprendido com as tuas etiquetas
+      learned_attention: "Aprendido com o que fazes"
       learned_corrections:
         one: Aprendido com %{count} correção
         other: Aprendido com %{count} correções

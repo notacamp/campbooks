@@ -65,22 +65,26 @@ module Scout
           end
         end
 
+        # { person_id => newest taught label }. Reads the verdict rows first (a
+        # handful) and maps only their contacts to people — never the whole
+        # workspace's contact list.
         def taught_verdicts
           @taught_verdicts ||= begin
-            contact_ids = user.workspace.contacts.where.not(person_id: nil).pluck(:id, :person_id)
-            contact_to_person = contact_ids.to_h { |cid, pid| [ cid, pid ] }
-
             rows = LearningDecision
               .where(domain: ::Attention::Teach::DOMAIN, user_id: user.id)
-              .where(contact_id: contact_to_person.keys)
+              .where.not(contact_id: nil)
               .order(created_at: :desc)
+              .pluck(:contact_id, :label)
+            contact_to_person = Contact.where(id: rows.map(&:first).uniq, workspace_id: workspace.id)
+                                       .where.not(person_id: nil)
+                                       .pluck(:id, :person_id).to_h
 
-            # newest row per person
             verdicts = {}
-            rows.each do |row|
-              pid = contact_to_person[row.contact_id]
+            rows.each do |contact_id, label|
+              pid = contact_to_person[contact_id]
               next unless pid
-              verdicts[pid] ||= row.label
+
+              verdicts[pid] ||= label # newest row per person wins
             end
             verdicts
           end
@@ -127,11 +131,13 @@ module Scout
           name = person_name_for(aw.subject_id)
           return nil unless name.present?
 
+          # A high entry explains itself with what lifts the person; a low one with
+          # what keeps them out of the way ("you archive 100% of their mail unread").
           reasons = aw.reason_values
-          first_positive = reasons.find(&:positive?)
-          return nil unless first_positive
+          reason = kind == :low ? (reasons.find { |r| !r.positive? } || reasons.first) : reasons.find(&:positive?)
+          return nil unless reason
 
-          reason_text = first_positive.sentence.sub(/\.\z/, "").downcase
+          reason_text = reason.clause.sub(/\.\z/, "")
 
           i18n_key = kind == :low ? "learned_low" : "learned"
           build(
@@ -139,7 +145,7 @@ module Scout
             facet: :people,
             sentence: sentence("scout_memory.sources.attention.#{i18n_key}", name: name, reason: reason_text),
             origin: :learned,
-            origin_detail: I18n.t("scout_memory.origins.#{kind == :low ? 'default' : 'taught'}"),
+            origin_detail: I18n.t("scout_memory.origins.learned_attention"),
             actions: %i[confirm remove]
           )
         end

@@ -15,6 +15,7 @@ en:
       learned_skim: Learned from how you skim
       learned_style: Learned from your sent mail
       learned_labels: Learned from your labels
+      learned_attention: "Learned from what you do"
       learned_corrections:
         one: Learned from %{count} correction
         other: Learned from %{count} corrections
