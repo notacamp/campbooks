@@ -139,6 +139,7 @@ Rails.application.routes.draw do
   # state accepts PATCH (component forms) and POST (ActionToast undo buttons).
   match "people/:id/details/state",        to: "people/details#state",        as: :state_people_details, via: %i[patch post]
   post  "people/:id/details/analyze",      to: "people/details#analyze",      as: :analyze_people_details
+  post  "people/:id/details/attention",    to: "people/details#attention",    as: :attention_people_details
   post  "people/:id/details/merge",        to: "people/details#merge",        as: :merge_people_details
   get "people/:id",            to: "people#show",                as: :person_page
 

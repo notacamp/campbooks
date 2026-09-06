@@ -6,6 +6,7 @@ es:
       stack: Pila
       replies: Respuestas
       streams: Flujos
+      people: Personas
       style: Estilo
       automations: Automatizaciones
     origins:
@@ -73,6 +74,11 @@ es:
         default: "Para %{purpose}, Scout usa la guía integrada."
       defaults:
         review: Cada documento que leo espera tu revisión antes de archivarse definitivamente.
+      attention:
+        taught_important: "**%{name}** es importante para ti."
+        taught_unimportant: "**%{name}** no necesita tu atención."
+        learned: "**%{name}** es importante para ti: %{reason}."
+        learned_low: "Mantengo a **%{name}** fuera del camino: %{reason}."
       workflows:
         sentence: "Cuando %{trigger}, %{actions}."
         and: y

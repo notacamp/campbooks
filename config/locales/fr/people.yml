@@ -81,6 +81,9 @@ fr:
         scout_not_read: "Scout n'a pas encore lu cette personne."
         why_foot: "Appris de ce que vous faites · mis à jour il y a %{time}"
         why_learning: "Scout apprend encore ce que %{name} représente pour vous."
+        why_more: "Plus important"
+        why_less: "Moins important"
+        why_forget: "Oublier"
         read_on: "Lu le %{date}"
         refresh: Actualiser
         refresh_hint: Demander à Scout de relire cette personne
@@ -278,5 +281,8 @@ fr:
         blocked: Bloqué
         unblocked: Débloqué
         analysis_queued: Scout relit cette personne
+        attention_important: "Compris — %{name} compte pour vous."
+        attention_unimportant: "Compris — je garderai %{name} à l'écart."
+        attention_forget: "Oublié — retour à ce que vous faites."
         merged: "Fusionné avec %{name}"
         merge_dismissed: Ignoré

@@ -16,7 +16,7 @@ module Scout
     class Teacher
       PARSERS = [
         Parsers::Stream, Parsers::FileRule, Parsers::TagRule,
-        Parsers::Priority, Parsers::Block, Parsers::Signature
+        Parsers::Attention, Parsers::Priority, Parsers::Block, Parsers::Signature
       ].freeze
 
       # The intent shapes the executor understands, and the keys each requires.
@@ -25,6 +25,7 @@ module Scout
         stream: %i[value group],
         file: %i[from folder],
         tag: %i[from tag],
+        attention: %i[contact label],
         priority: %i[contact],
         block: %i[contact],
         signature: %i[name]
@@ -94,6 +95,7 @@ module Scout
         when :stream    then created("group:#{stream_rule(intent).id}")
         when :file      then created("rule:#{file_rule(intent).id}")
         when :tag       then created("rule:#{tag_rule(intent).id}")
+        when :attention then attention(intent)
         when :priority  then priority(intent)
         when :block     then blocking(intent)
         when :signature then signature(intent)
@@ -121,6 +123,17 @@ module Scout
           name: rule_name(intent[:from]), criteria: { "from" => [ intent[:from] ] },
           tags: [ tag ], created_by: @user
         )
+      end
+
+      def attention(intent)
+        contact = find_contact(intent[:contact])
+        return unknown unless contact
+
+        person = contact.person
+        return unknown unless person
+
+        ::Attention::Teach.record(person: person, user: @user, label: intent[:label].to_s, source: "teach")
+        created("attention:#{person.id}:#{intent[:label]}")
       end
 
       def priority(intent)

@@ -6,6 +6,7 @@ fr:
       stack: Pile
       replies: Réponses
       streams: Flux
+      people: Personnes
       style: Style
       automations: Automatisations
     origins:
@@ -73,6 +74,11 @@ fr:
         default: "Pour %{purpose}, Scout utilise les instructions intégrées."
       defaults:
         review: Chaque document que je lis attend votre révision avant d'être classé définitivement.
+      attention:
+        taught_important: "**%{name}** compte pour vous."
+        taught_unimportant: "**%{name}** n'a pas besoin de votre attention."
+        learned: "**%{name}** compte pour vous : %{reason}."
+        learned_low: "Je tiens **%{name}** à l'écart : %{reason}."
       workflows:
         sentence: "Quand %{trigger}, %{actions}."
         and: et
