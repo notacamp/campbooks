@@ -27,7 +27,7 @@ pt:
           archive: Arquivar conversa
           block: Bloquear remetente
       stand_note:
-        ask_scout_context: "Sobre o email “%{subject}” de %{name}:"
+        ask_scout_context: "Sobre o email \"%{subject}\" de %{name}:"
         chips:
           draft_reply: Redigir resposta
           draft_follow_up: Redigir insistência
@@ -37,6 +37,9 @@ pt:
           snooze: Adiar até amanhã
           open_money: "Abrir em Dinheiro"
           mark_paid: Marcar como paga
+          done_ask: Concluído
+          hold_time: Reservar tempo
+          held_slot: "reservado %{when}"
       search_bar:
         placeholder: Encontrar uma pessoa ou empresa…
         clear: Limpar
@@ -147,6 +150,7 @@ pt:
       lanes:
         reply: Responder
         decide: Decidir
+        do: Fazer
         pay: Pagar
         chase: Cobrar
         nudge: Insistir
@@ -177,10 +181,13 @@ pt:
       an_invoice: "fatura"
     stand:
       asks_for: "Pede %{ask}"
-      asks_quote: "Pergunta: “%{quote}”"
+      asks_quote: "Pergunta: \"%{quote}\""
       waiting_for: "À espera de %{what}"
       no_answer_since: "Sem resposta desde %{date}"
       you_wrote_last: "Foi você a escrever por último, %{date}"
+      do: "Fazer: %{ask}"
+      do_by: "Fazer: %{ask} até %{date}"
+      held: "%{when} reservado."
       money_late:
         one: "%{amount} venceu a %{date} · %{count} dia de atraso"
         other: "%{amount} venceu a %{date} · %{count} dias de atraso"
@@ -219,6 +226,12 @@ pt:
         fresh_quote: "%{name} escreveu a %{date}: “%{quote}”"
         fresh_quote_undated: "%{name} escreveu: “%{quote}”"
         draft_below: "O rascunho do Scout está abaixo."
+        do: "Deve a %{name} %{ask}; não foi definida data. %{name} aguarda o trabalho, não uma resposta."
+        do_by: "Deve a %{name} %{ask} até %{date}. %{name} aguarda o trabalho, não uma resposta."
+        do_held: "%{when} está reservado para isso."
+        do_overdue:
+          one: "%{ask} para %{name} tinha prazo a %{date}, há %{count} dia."
+          other: "%{ask} para %{name} tinha prazo a %{date}, há %{count} dias."
       you: Você
       back: Pessoas
       menu: Mais

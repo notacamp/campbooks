@@ -27,7 +27,7 @@ fr:
           archive: Archiver la conversation
           block: Bloquer l'expéditeur
       stand_note:
-        ask_scout_context: "À propos de l'e-mail « %{subject} » de %{name} :"
+        ask_scout_context: "À propos de l'e-mail \"%{subject}\" de %{name} :"
         chips:
           draft_reply: Rédiger une réponse
           draft_follow_up: Rédiger une relance
@@ -37,6 +37,9 @@ fr:
           snooze: Reporter à demain
           open_money: "Ouvrir dans Argent"
           mark_paid: Marquer comme payée
+          done_ask: Terminé
+          hold_time: Réserver du temps
+          held_slot: "réservé %{when}"
       search_bar:
         placeholder: Rechercher une personne ou une entreprise…
         clear: Effacer
@@ -147,6 +150,7 @@ fr:
       lanes:
         reply: Répondre
         decide: Décider
+        do: Faire
         pay: Payer
         chase: Relancer
         nudge: Rappeler
@@ -177,10 +181,13 @@ fr:
       an_invoice: "facture"
     stand:
       asks_for: "Demande %{ask}"
-      asks_quote: "Demande : « %{quote} »"
+      asks_quote: "Demande : \"%{quote}\""
       waiting_for: "En attente de %{what}"
       no_answer_since: "Sans réponse depuis le %{date}"
       you_wrote_last: "Vous avez écrit en dernier, le %{date}"
+      do: "Faire : %{ask}"
+      do_by: "Faire : %{ask} avant le %{date}"
+      held: "%{when} reservé."
       money_late:
         one: "%{amount} dû le %{date} · %{count} jour de retard"
         other: "%{amount} dû le %{date} · %{count} jours de retard"
@@ -219,6 +226,12 @@ fr:
         fresh_quote: "%{name} a écrit le %{date} : « %{quote} »"
         fresh_quote_undated: "%{name} a écrit : « %{quote} »"
         draft_below: "Le brouillon de Scout est ci-dessous."
+        do: "Vous devez a %{name} %{ask} ; aucune date n'a été fixée. %{name} attend le travail, pas une réponse."
+        do_by: "Vous devez a %{name} %{ask} avant le %{date}. %{name} attend le travail, pas une réponse."
+        do_held: "%{when} est réservé pour cela."
+        do_overdue:
+          one: "%{ask} pour %{name} était dû le %{date}, il y a %{count} jour."
+          other: "%{ask} pour %{name} était dû le %{date}, il y a %{count} jours."
       you: Vous
       back: Personnes
       menu: Plus

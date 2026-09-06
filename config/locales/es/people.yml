@@ -27,7 +27,7 @@ es:
           archive: Archivar conversación
           block: Bloquear remitente
       stand_note:
-        ask_scout_context: "Sobre el correo “%{subject}” de %{name}:"
+        ask_scout_context: "Sobre el correo \"%{subject}\" de %{name}:"
         chips:
           draft_reply: Redactar respuesta
           draft_follow_up: Redactar recordatorio
@@ -37,6 +37,9 @@ es:
           snooze: Posponer hasta mañana
           open_money: "Abrir en Dinero"
           mark_paid: Marcar como pagada
+          done_ask: Hecho
+          hold_time: Reservar tiempo
+          held_slot: "reservado %{when}"
       search_bar:
         placeholder: Buscar una persona o empresa…
         clear: Borrar
@@ -147,6 +150,7 @@ es:
       lanes:
         reply: Responder
         decide: Decidir
+        do: Hacer
         pay: Pagar
         chase: Cobrar
         nudge: Recordar
@@ -177,10 +181,13 @@ es:
       an_invoice: "factura"
     stand:
       asks_for: "Pide %{ask}"
-      asks_quote: "Pregunta: “%{quote}”"
+      asks_quote: "Pregunta: \"%{quote}\""
       waiting_for: "A la espera de %{what}"
       no_answer_since: "Sin respuesta desde el %{date}"
       you_wrote_last: "Escribiste por último el %{date}"
+      do: "Hacer: %{ask}"
+      do_by: "Hacer: %{ask} para el %{date}"
+      held: "%{when} reservado."
       money_late:
         one: "%{amount} vencía el %{date} · %{count} día de retraso"
         other: "%{amount} vencía el %{date} · %{count} días de retraso"
@@ -219,6 +226,12 @@ es:
         fresh_quote: "%{name} escribió el %{date}: “%{quote}”"
         fresh_quote_undated: "%{name} escribió: “%{quote}”"
         draft_below: "El borrador de Scout está abajo."
+        do: "Le debes a %{name} %{ask}; no se ha fijado fecha. %{name} espera el trabajo, no una respuesta."
+        do_by: "Le debes a %{name} %{ask} para el %{date}. %{name} espera el trabajo, no una respuesta."
+        do_held: "%{when} está reservado para ello."
+        do_overdue:
+          one: "%{ask} para %{name} vencía el %{date}, hace %{count} día."
+          other: "%{ask} para %{name} vencía el %{date}, hace %{count} días."
       you: Tú
       back: Personas
       menu: Más
