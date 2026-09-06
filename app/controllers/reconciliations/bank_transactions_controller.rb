@@ -19,7 +19,7 @@ module Reconciliations
     before_action -> { require_entitlement!(:accounting, ignore_limit: true) },
                   only: %i[confirm reject exclude reset manual_match resolve_panel request_invoice upload_and_link]
 
-    VALID_EXCLUSION_REASONS = %w[bank_fee salary transfer tax other].freeze
+    VALID_EXCLUSION_REASONS = %w[bank_fee salary transfer tax loan other].freeze
 
     # POST /reconciliations/:reconciliation_id/bank_transactions/:id/confirm
     def confirm
@@ -55,6 +55,25 @@ module Reconciliations
 
       @transaction.update!(status: :excluded, exclusion_reason: reason)
 
+      # When excluding with reason "loan" and an active loan matches, trigger Loans::Matcher
+      # to immediately link it; if no loan matches, the toast suggests tracking one.
+      if reason == "loan"
+        Loans::Matcher.new(@reconciliation).call
+        @transaction.reload
+
+        if @transaction.explained?
+          render_workbench_streams(notify: t(".excluded", reason: human_exclusion_reason(reason)),
+                                   undo_url: reset_reconciliation_bank_transaction_path(@reconciliation, @transaction))
+          return
+        else
+          toast = t(".excluded_as_loan_no_match_html",
+                    link: helpers.link_to(t(".excluded_as_loan_no_match_link"), helpers.money_path,
+                                         class: "font-medium underline"))
+          render_workbench_streams(notify: toast)
+          return
+        end
+      end
+
       render_workbench_streams(notify: t(".excluded", reason: human_exclusion_reason(reason)),
                                undo_url: reset_reconciliation_bank_transaction_path(@reconciliation, @transaction))
     end
@@ -62,6 +81,14 @@ module Reconciliations
     # POST /reconciliations/:reconciliation_id/bank_transactions/:id/reset
     def reset
       ActiveRecord::Base.transaction do
+        # If explained by a loan, reset the instalment back to expected
+        if @transaction.explained?
+          ins = @transaction.loan_instalment
+          if ins
+            ins.update!(bank_transaction: nil, status: :expected, previous_amount_cents: nil)
+          end
+        end
+
         # Confirmed matches → rejected; suggested matches stay
         @transaction.transaction_matches.confirmed.update_all(status: TransactionMatch.statuses[:rejected])
         @transaction.update!(

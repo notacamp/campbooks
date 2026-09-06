@@ -109,7 +109,7 @@ Services: `Money::Evidence` (single source of truth, `app/services/money/evidenc
 
 `surface=money` contract: when `params[:surface] == "money"`, `BankTransactionsController#render_workbench_streams` appends `turbo_stream.replace("money_content", partial: "money/content", locals: { page: Money::Page.for(...) })` so the Money surface refreshes after workbench actions.
 
-Loan slot: a `<%# loan slot %>` comment in `app/views/money/_content.html.erb` marks where the loan PR (branch `feat/money-loan`) renders its card.
+**The loan** (`Loan` → `LoanInstalment`, one row per month of the term; `app/services/loans/`): a standing explanation with a schedule. `Loans::Matcher` runs as a pre-pass in `Reconciliations::MatchJob` (keyword or lender-token evidence, amount within 3%, ±12-day window then catch-up) and sets the line to `BankTransaction` status `explained: 5` (append-only; part of `RESOLVED_STATUSES`). `Loans::Status.refresh!` then derives everything from the statements: rate resets from the chronological sequence of paid amounts (`previous_amount_cents`, the loan's current `instalment_cents`, the amounts still to come) and `unverified` (before the first statement) / `missed` (a reconciled statement reaches expected_on + 12 days with no line) / `expected`. `Loans::Backfill` claims past instalments when a loan is created; `Loans::Spotter` proposes an untracked loan from monthly bank-ish debits with no invoice (never bank fees: minimum €50, dismissable via `workspace.settings["dismissed_loan_suggestions"]`). `LoansController` under `/money/loans`; components `LoanCard`, `LoanSuggestionRow`, `LoanAlertRow`, `LoanForm`, `LoanStat` (checkbox-peer disclosures, no JS); the reconciliation surface renders `:explained` groups as "Loan · instalment N of T", and the hunt panel's "Loan instalment" reason links a line by hand.
 
 ## Calendar
 
@@ -198,3 +198,4 @@ The app ships in **English (source), Portuguese (pt-PT), Spanish, and French**, 
 Deployment, secrets, and ops are private — see **"🔒 PUBLIC REPO — KEEP IT CLEAN"**
 at the top of this file and the private `campbooks-cloud` repo. Self-hosting
 instructions are in [`docs/self-hosting.md`](docs/self-hosting.md).
+

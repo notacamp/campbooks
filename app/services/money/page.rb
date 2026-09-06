@@ -1,16 +1,18 @@
 # frozen_string_literal: true
 
 class Money
-  # One builder for the entire Money surface. Both MoneyController and
-  # Reconciliations::BankTransactionsController (when surface=money) render
-  # money/_content from this object, keeping derived state consistent after
-  # every action.
+  # One builder for the entire Money surface. MoneyController, LoansController and
+  # Reconciliations::BankTransactionsController (when surface=money) all render
+  # money/_content from this object, keeping derived state consistent after every
+  # action.
   #
   #   page = Money::Page.for(workspace, user, today:, statement_id:)
   #   page.evidence           # Money::Evidence
   #   page.ledger             # Money::Ledger
   #   page.read               # Money::Read (always about the NEWEST statement)
-  #   page.needs_you          # Array<Money::NeedsYouItem> (newest statement)
+  #   page.needs_you          # Array<Money::NeedsYouItem> (newest statement + the loan)
+  #   page.loans              # active Loans, oldest first
+  #   page.loan_suggestions   # Loans::Spotter suggestions (only when nothing is tracked yet)
   #   page.selected_statement # Reconciliation or nil (the Statements tab)
   #   page.statement_counts   # { reconciliation_id => [resolved, total] } for the tabs
   class Page
@@ -34,10 +36,12 @@ class Money
       @evidence = Money::Evidence.for(workspace)
       @ledger   = Money::Ledger.for(workspace, user, today: today, evidence: @evidence)
       @read     = Money::Read.for(workspace, user,
-                                  today:    today,
-                                  evidence: @evidence,
-                                  ledger:   @ledger,
-                                  groups:   newest_groups)
+                                  today:       today,
+                                  evidence:    @evidence,
+                                  ledger:      @ledger,
+                                  groups:      newest_groups,
+                                  loans:       loans,
+                                  suggestions: loan_suggestions)
     end
 
     # The statement Scout reads and Needs-you is lifted from.
@@ -80,6 +84,17 @@ class Money
       end
     end
 
+    # ── The loan ─────────────────────────────────────────────────────────────
+    def loans
+      @loans ||= @workspace.loans.active_loans.order(:created_at).to_a
+    end
+
+    # Scout's guess at an untracked loan. Only worth raising while nothing is
+    # tracked yet; a second loan is added by hand.
+    def loan_suggestions
+      @loan_suggestions ||= loans.empty? ? Loans::Spotter.new(@workspace).call : []
+    end
+
     def needs_you
       all_needs_you.first(NEEDS_YOU_CAP)
     end
@@ -101,10 +116,10 @@ class Money
     end
 
     def all_needs_you
-      @all_needs_you ||= build_all_needs_you
+      @all_needs_you ||= statement_needs_you + loan_needs_you
     end
 
-    def build_all_needs_you # rubocop:disable Metrics/MethodLength
+    def statement_needs_you # rubocop:disable Metrics/MethodLength
       stmt = newest_statement
       return [] unless stmt
 
@@ -120,8 +135,6 @@ class Money
         items << NeedsYouItem.new(
           kind:        :no_invoice,
           transaction: txn,
-          match:       nil,
-          group:       nil,
           title:       I18n.t("money.needs_you.no_invoice.title"),
           meta:        build_no_invoice_meta(txn),
           actions:     [ :resolve ]
@@ -138,7 +151,6 @@ class Money
           kind:        :review,
           transaction: txn,
           match:       match,
-          group:       nil,
           title:       I18n.t("money.needs_you.review.title"),
           meta:        build_review_meta(txn, match, nif_flag),
           actions:     [ :change, :confirm ]
@@ -153,7 +165,6 @@ class Money
         items << NeedsYouItem.new(
           kind:        :partial,
           transaction: txn,
-          match:       nil,
           group:       group,
           title:       I18n.t("money.needs_you.partial.title", vendor: vendor),
           meta:        build_partial_meta(group),
@@ -169,13 +180,32 @@ class Money
           items << NeedsYouItem.new(
             kind:        :nif,
             transaction: txn,
-            match:       nil,
-            group:       nil,
             title:       I18n.t("money.needs_you.nif.title"),
             meta:        [ txn.counterparty.presence || I18n.t("money.needs_you.no_name"), format_amount(txn) ],
             actions:     [ :request_invoice ]
           )
         end
+      end
+
+      items
+    end
+
+    # 5. the loan: an instalment missing from a reconciled statement, an amount
+    #    change nobody has waved through, or Scout's untracked-loan guess.
+    def loan_needs_you
+      items = []
+
+      loans.each do |loan|
+        loan.missed_instalments.each do |instalment|
+          items << NeedsYouItem.new(kind: :loan_missed, payload: { loan: loan, instalment: instalment })
+        end
+        if (changed = loan.unacknowledged_change)
+          items << NeedsYouItem.new(kind: :loan_changed, payload: { loan: loan, instalment: changed })
+        end
+      end
+
+      loan_suggestions.each do |suggestion|
+        items << NeedsYouItem.new(kind: :loan_suggestion, payload: suggestion)
       end
 
       items
@@ -191,7 +221,7 @@ class Money
       inv = match.document&.invoice_number
       parts << I18n.t("money.what.invoice", number: inv) if inv.present?
       parts << "#{(match.confidence.to_f * 100).round}% #{I18n.t('money.needs_you.review.likely')}"
-      parts << I18n.t("money.needs_you.nif.flag") if nif_flag
+      parts << { nif: true } if nif_flag
       parts
     end
 

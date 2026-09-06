@@ -16,6 +16,7 @@ es:
           matched: Asociado
           excluded: Excluido
           requested: Factura solicitada
+          explained: Cuota de préstamo
 
   shared:
     nav:
@@ -111,6 +112,7 @@ es:
         transfer: Transferencia interna
         tax: Pago de impuestos
         other: Otro
+        loan: Cuota de préstamo
       confirm:
         confirmed: Asociación confirmada
       reject:
@@ -118,6 +120,8 @@ es:
       exclude:
         excluded: "Marcado como excluido: %{reason}"
         invalid_reason: Motivo de exclusión no válido.
+        excluded_as_loan_no_match_html: "Apartado como cuota de préstamo. %{link} para explicarlas automáticamente."
+        excluded_as_loan_no_match_link: Sigue el préstamo en Dinero
       reset:
         reset: Asociación eliminada
       manual_match:
@@ -179,6 +183,9 @@ es:
         requested:
           one: solicitado
           other: solicitados
+        explained:
+          one: explicada por el préstamo
+          other: explicadas por el préstamo
         nif_exceptions_title: Transacciones con problemas de NIF
         nif_exceptions:
           one: problema de NIF
@@ -262,11 +269,14 @@ es:
           credit: Ingreso asociado
           unmatched: Sin factura
           requested: Factura solicitada
+          explained: Cuota de préstamo
         revenue_label: ingreso
         review_label: revisar
         excluded_label: Apartado
         requested_label: Factura solicitada — en espera
         unmatched_chip: "Sin factura · Resolver"
+        explained_chip: "Préstamo · cuota %{number} de %{total}"
+        explained_label: Cuota de préstamo
         unknown_party: Desconocido
         nif_missing: NIF faltante en este documento
         nif_mismatch: El NIF no coincide con el de la empresa

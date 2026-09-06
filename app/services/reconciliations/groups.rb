@@ -23,7 +23,7 @@ module Reconciliations
     # Value object returned for each connected component.
     Group = Struct.new(:bank_transactions, :documents, :line_total_cents,
                        :invoice_total_cents, :allocated_cents, :outstanding_cents,
-                       :balanced, :kind, keyword_init: true) do
+                       :balanced, :kind, :loan_instalment, keyword_init: true) do
       def balanced?
         balanced
       end
@@ -36,7 +36,7 @@ module Reconciliations
     def call
       txns = @reconciliation
                .bank_transactions
-               .includes(transaction_matches: :document)
+               .includes(transaction_matches: :document, loan_instalment: :loan)
                .order(:booked_on, :position)
                .to_a
 
@@ -59,6 +59,9 @@ module Reconciliations
         txn_key = "t:#{txn.id}"
         uf.add(txn_key)
         txn_map[txn.id] = txn
+
+        # Explained transactions form their own isolated group (no invoice match)
+        next if txn.explained?
 
         txn.transaction_matches.each do |match|
           next if match.rejected?
@@ -102,6 +105,12 @@ module Reconciliations
         outstanding   = [ invoice_total - alloc, 0 ].max
         balanced_flag = (line_total - invoice_total).abs <= 1
 
+        # For explained groups, expose the loan_instalment directly
+        loan_ins = nil
+        if group_txns.all?(&:explained?)
+          loan_ins = group_txns.first&.loan_instalment
+        end
+
         Group.new(
           bank_transactions:   group_txns,
           documents:           group_docs,
@@ -110,7 +119,8 @@ module Reconciliations
           allocated_cents:     alloc,
           outstanding_cents:   outstanding,
           balanced:            balanced_flag,
-          kind:                determine_kind(group_txns, group_docs, alloc, invoice_total)
+          kind:                determine_kind(group_txns, group_docs, alloc, invoice_total),
+          loan_instalment:     loan_ins
         )
       end
     end
@@ -122,6 +132,7 @@ module Reconciliations
     #   2. partial   — invoice not fully covered (outstanding > 0 AND some allocation)
     #   3. count-based — fully-paid shapes
     def determine_kind(txns, docs, allocated, invoice_total)
+      return :explained if txns.all?(&:explained?)
       return :unmatched if docs.empty?
 
       outstanding = [ invoice_total - allocated, 0 ].max

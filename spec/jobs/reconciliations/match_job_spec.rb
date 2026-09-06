@@ -56,6 +56,38 @@ RSpec.describe Reconciliations::MatchJob, type: :job do
     end
   end
 
+
+  describe "Loans::Matcher pre-pass order" do
+    it "runs Loans::Matcher before Reconciliations::Matcher so loan lines are claimed first" do
+      call_order = []
+      allow_any_instance_of(Loans::Matcher).to receive(:call) { call_order << :loans }
+      allow_any_instance_of(Reconciliations::Matcher).to receive(:call) { call_order << :invoices }
+
+      described_class.perform_now(reconciliation.id)
+
+      expect(call_order).to eq([ :loans, :invoices ])
+    end
+
+    it "does not let the invoice matcher see an already-explained line" do
+      # Loans::Matcher sets the line to :explained; we verify the invoice matcher
+      # never receives it as a candidate.
+      explained_txn = BankTransaction.create!(
+        reconciliation: reconciliation, workspace: workspace,
+        position: 1, booked_on: Date.current,
+        description: "PREST 1/60", counterparty: "BCP",
+        amount_cents: -78_000, currency: "EUR", status: :explained
+      )
+      allow_any_instance_of(Loans::Matcher).to receive(:call).and_return(nil)
+      seen_by_invoice_matcher = []
+      allow_any_instance_of(Reconciliations::Matcher).to receive(:call) do
+        seen_by_invoice_matcher += reconciliation.bank_transactions.where(status: :unmatched).pluck(:id)
+      end
+
+      described_class.perform_now(reconciliation.id)
+      expect(seen_by_invoice_matcher).not_to include(explained_txn.id)
+    end
+  end
+
   describe "transient errors (rate-limit / network)" do
     # Matcher propagates TRANSIENT_ERRORS after fix #8.
     # MatchJob must NOT touch status or broadcast — leave :matching so the

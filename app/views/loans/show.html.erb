@@ -1,0 +1,41 @@
+<%# All the loan's instalments: the same card as Money, then every instalment
+    with what the statements say about it. %>
+<% content_for :main_class, "mx-auto w-full max-w-[1180px] px-4 sm:px-6 lg:px-8 py-8" %>
+<% content_for :title, @loan.lender %>
+
+<%= render Campbooks::PageHeader.new(title: @loan.lender, back_href: money_path, back_label: t(".back")) %>
+
+<div id="money_content">
+  <%= render Campbooks::Money::LoanCard.new(loan: @loan, class: "mt-2") %>
+</div>
+
+<h2 class="mt-10 mb-3 text-[11px] font-bold uppercase tracking-widest text-muted-foreground"><%= t(".all_instalments") %></h2>
+
+<div class="divide-y divide-border/40">
+  <% @instalments.each do |ins| %>
+    <div id="<%= dom_id(ins) %>" class="grid grid-cols-[40px_1fr_auto] items-center gap-3 py-3 text-[13px] sm:grid-cols-[48px_130px_1fr_auto]">
+      <span class="text-[12px] tabular-nums text-muted-foreground">#<%= ins.number %></span>
+      <span class="text-[12px] text-muted-foreground"><%= l(ins.expected_on, format: :date) %></span>
+      <span class="hidden text-[12.5px] text-muted-foreground sm:block">
+        <% if ins.bank_transaction %>
+          <%= link_to "#{ins.bank_transaction.description} · #{l(ins.bank_transaction.booked_on, format: :date)}",
+                      reconciliation_path(ins.bank_transaction.reconciliation, anchor: dom_id(ins.bank_transaction)),
+                      class: "underline decoration-border underline-offset-2 hover:text-foreground",
+                      data: { turbo_frame: "_top" } %>
+        <% end %>
+      </span>
+      <span class="flex items-center justify-end gap-3">
+        <span class="font-medium tabular-nums"><%= Money.new(ins.amount_cents, @loan.currency).format %></span>
+        <% chip = case ins.status
+                  when "paid"       then "bg-success/15 text-success"
+                  when "missed"     then "bg-warning/15 text-warning"
+                  when "unverified" then "bg-secondary text-foreground"
+                  else                   "bg-secondary text-muted-foreground"
+                  end %>
+        <span class="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium <%= chip %>">
+          <%= t(".statuses.#{ins.status}") %>
+        </span>
+      </span>
+    </div>
+  <% end %>
+</div>

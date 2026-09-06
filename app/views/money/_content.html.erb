@@ -10,7 +10,9 @@
       class: "mt-8"
     ) %>
   <% end %>
-  <%# loan slot: the loan PR renders its card here %>
+  <% page.loans.each do |loan| %>
+    <%= render Campbooks::Money::LoanCard.new(loan: loan, class: "mt-9") %>
+  <% end %>
   <%= render Campbooks::Money::Statements.new(page: page, class: "mt-8") %>
   <% if page.selected_statement %>
     <%= render "money/statement_frame", page: page %>

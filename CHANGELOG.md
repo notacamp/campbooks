@@ -16,6 +16,10 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- Track a loan in Money: Scout spots a monthly bank debit with no invoice and offers to track it; once you confirm the terms, every instalment is matched to its bank line and reads "Loan · instalment N of T" on the statement, and Money shows what's paid, what's to go, the next instalment, and anything odd (an instalment missing from a reconciled statement, an amount change after a rate reset).
+
 ### Changed
 
 - Money is now about the bank: Scout's read, a Needs-you list lifted from the newest statement, the paired ledger with month tabs, and "Not on a statement" for paper with no bank line. An invoice is only flagged once a reconciled statement covers its date and shows no payment.

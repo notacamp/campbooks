@@ -102,6 +102,12 @@ Rails.application.routes.draw do
     post "set_aside", to: "money#set_aside_line", as: :set_aside_line_money
     post "reset",     to: "money#reset_line",     as: :reset_line_money
   end
+  # Tracked loans live under Money: Scout spots one, you confirm the terms, every
+  # instalment is matched to its bank line.
+  scope "money" do
+    post "loans/dismiss", to: "loans#dismiss", as: :dismiss_money_loan
+    resources :loans, as: :money_loans, path: "loans", only: %i[create update destroy show]
+  end
 
   # The Time surface: one agenda interleaving calendar events, deadlines Scout found
   # in mail, tasks and Scout's proposed focus blocks (agenda|week|month).

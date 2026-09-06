@@ -249,4 +249,37 @@ RSpec.describe Reconciliations::Groups, type: :service do
       expect(groups.first.documents).to match_array([ doc1, doc2 ])
     end
   end
+
+  # ── :explained group (loan instalments) ─────────────────────────────────────
+
+  describe ":explained group" do
+    it "produces a group with kind :explained for an explained transaction" do
+      loan = create(:loan, :with_schedule, workspace: workspace, created_by: user,
+                           instalment_cents: 78_000,
+                           first_instalment_on: Date.new(2024, 1, 5), term_months: 3)
+      txn = make_txn(amount_cents: -78_000, booked_on: Date.new(2024, 1, 5), position: 99)
+      txn.update!(status: :explained)
+      inst = loan.instalments.find_by!(number: 1)
+      inst.update!(bank_transaction: txn, status: :paid, amount_cents: 78_000)
+
+      groups = call_service
+      explained = groups.select { |g| g.kind == :explained }
+      expect(explained.size).to eq(1)
+      expect(explained.first.bank_transactions).to contain_exactly(txn)
+    end
+
+    it "attaches the loan_instalment to the group struct" do
+      loan = create(:loan, :with_schedule, workspace: workspace, created_by: user,
+                           instalment_cents: 78_000,
+                           first_instalment_on: Date.new(2024, 1, 5), term_months: 3)
+      txn = make_txn(amount_cents: -78_000, booked_on: Date.new(2024, 1, 5), position: 98)
+      txn.update!(status: :explained)
+      inst = loan.instalments.find_by!(number: 1)
+      inst.update!(bank_transaction: txn, status: :paid, amount_cents: 78_000)
+
+      groups = call_service
+      explained_group = groups.find { |g| g.kind == :explained }
+      expect(explained_group.loan_instalment).to eq(inst)
+    end
+  end
 end

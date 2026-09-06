@@ -4,24 +4,30 @@ class Money
   # Pure data object the Scout note and the Strip read from.
   # Built from an Evidence and Ledger that Money::Page has already constructed.
   #
-  #   read = Money::Read.for(workspace, user, today:, evidence:, ledger:, groups:)
+  #   read = Money::Read.for(workspace, user, today:, evidence:, ledger:, groups:, loans:, suggestions:)
   #   read.lines_total        # integer
   #   read.explained_pct      # 0-100
   #   read.any_statements?    # boolean
+  #   read.loan_state         # :none | :suggestion | :tracked | :on_schedule | :seen | :missed | :changed
   class Read
-    def self.for(workspace, user, today: Date.current, evidence: nil, ledger: nil, groups: nil)
+    ON_TIME_GRACE = 5 # days after expected_on an instalment still reads "on time"
+
+    def self.for(workspace, user, today: Date.current, evidence: nil, ledger: nil, groups: nil,
+                 loans: nil, suggestions: nil)
       ev  = evidence || Money::Evidence.for(workspace)
       led = ledger  || Money::Ledger.for(workspace, user, today: today, evidence: ev)
-      new(workspace, user, today, ev, led, groups)
+      new(workspace, user, today, ev, led, groups, loans, suggestions)
     end
 
-    def initialize(workspace, user, today, evidence, ledger, prebuilt_groups = nil)
-      @workspace        = workspace
-      @user             = user
-      @today            = today
-      @evidence         = evidence
-      @ledger           = ledger
-      @prebuilt_groups  = prebuilt_groups
+    def initialize(workspace, user, today, evidence, ledger, prebuilt_groups = nil, loans = nil, suggestions = nil)
+      @workspace       = workspace
+      @user            = user
+      @today           = today
+      @evidence        = evidence
+      @ledger          = ledger
+      @prebuilt_groups = prebuilt_groups
+      @loans           = loans
+      @suggestions     = suggestions
     end
 
     # The newest ready statement, or nil.
@@ -60,7 +66,7 @@ class Money
     def needs_invoice_count
       @needs_invoice_count ||=
         if statement
-          statement.bank_transactions.where(status: :unmatched).count
+          statement.bank_transactions.where(status: :unmatched).where("amount_cents < 0").count
         else
           0
         end
@@ -112,6 +118,52 @@ class Money
       return 0 if lines_total.zero?
 
       (lines_explained * 100.0 / lines_total).round
+    end
+
+    # ── The loan ─────────────────────────────────────────────────────────────
+
+    def loans
+      @loans ||= @workspace.loans.active_loans.order(:created_at).to_a
+    end
+
+    def loan
+      loans.first
+    end
+
+    def loan_suggestion
+      suggestions.first
+    end
+
+    def suggestions
+      @suggestions ||= loans.empty? ? Loans::Spotter.new(@workspace).call : []
+    end
+
+    # What Scout can say about the loan, most pressing first.
+    def loan_state
+      @loan_state ||=
+        if loan.nil?
+          loan_suggestion ? :suggestion : :none
+        elsif loan.unacknowledged_change
+          :changed
+        elsif loan.missed_instalments.exists?
+          :missed
+        elsif loan.last_seen.nil?
+          :tracked
+        elsif loan_on_time?
+          :on_schedule
+        else
+          :seen
+        end
+    end
+
+    def loan_last_seen
+      loan&.last_seen
+    end
+
+    def loan_on_time?
+      seen = loan_last_seen
+      txn  = seen&.bank_transaction
+      seen && txn && txn.booked_on <= seen.expected_on + ON_TIME_GRACE.days
     end
 
     private

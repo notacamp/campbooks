@@ -2,14 +2,17 @@
 
 module Campbooks
   module Money
-    # "Needs you": the lines of the newest statement that want a decision, as flat
-    # rows (Ember dot, title, meta, right-aligned actions). Hidden when empty.
+    # "Needs you": the lines of the newest statement that want a decision, plus the
+    # loan's alerts and Scout's untracked-loan guess, as flat rows (Ember dot, title,
+    # meta, right-aligned actions). Hidden when empty.
     #
     # A "No invoice" row carries the same transaction-resolve Stimulus contract as
     # the reconciliation page, so Resolve opens the hunt panel in place: the row's
     # root is a block wrapper (id = dom_id(txn)) around the flex row, and the panel
     # the controller appends lands below the row inside that wrapper.
     class NeedsYou < Campbooks::Base
+      include Campbooks::Money::WorkRowShell
+
       def initialize(items:, overflow:, statement:, **attrs)
         @items     = items
         @overflow  = overflow
@@ -42,21 +45,21 @@ module Campbooks
       end
 
       def row(item)
-        div(**wrapper_attrs(item)) do
-          div(class: "flex flex-wrap items-start gap-3 rounded-xl px-4 py-3.5 transition-colors hover:bg-muted/50 sm:flex-nowrap sm:px-6") do
-            span(class: "mt-[6px] h-2 w-2 shrink-0 rounded-full bg-ember-gradient shadow-ember-glow", aria_hidden: "true")
-            div(class: "min-w-0 flex-1 basis-[calc(100%-1.25rem)] sm:basis-auto") do
-              div(class: "text-[14px] font-semibold leading-snug text-foreground") { plain item.title }
-              meta_line(item) if item.meta.present?
-            end
-            # Phones: actions take their own line, aligned under the title.
-            div(class: "flex w-full flex-wrap items-center justify-end gap-2 pl-5 sm:w-auto sm:shrink-0 sm:pl-0") { actions(item) }
+        case item.kind
+        when :loan_suggestion
+          render Campbooks::Money::LoanSuggestionRow.new(suggestion: item.payload)
+        when :loan_missed, :loan_changed
+          render Campbooks::Money::LoanAlertRow.new(loan: item.payload[:loan], instalment: item.payload[:instalment],
+                                                    kind: item.kind == :loan_missed ? :missed : :changed)
+        else
+          div(**wrapper_attrs(item)) do
+            work_row(title: item.title, meta: item.meta) { actions(item) }
           end
         end
       end
 
       def wrapper_attrs(item)
-        attrs = { class: "-mx-4 sm:-mx-6" }
+        attrs = { class: WRAPPER_CLASSES }
         return attrs unless item.kind == :no_invoice && item.transaction && @statement
 
         txn = item.transaction
@@ -69,25 +72,12 @@ module Campbooks
         attrs
       end
 
-      def meta_line(item)
-        div(class: "mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12.5px] text-muted-foreground") do
-          item.meta.each_with_index do |part, i|
-            span(class: "mx-0.5 opacity-40", aria_hidden: "true") { plain "·" } if i.positive?
-            if part.to_s == t("money.needs_you.nif.flag")
-              span(class: "rounded border border-warning/40 px-1 text-[10px] font-bold text-warning") { plain "NIF" }
-            else
-              span { plain part.to_s }
-            end
-          end
-        end
-      end
-
       def actions(item)
         case item.kind
         when :no_invoice
           return unless item.transaction && @statement
 
-          button(type: "button", class: outline_classes, data: { action: "click->transaction-resolve#toggle" }) { t(".resolve") }
+          button(type: "button", class: button_classes(:outline), data: { action: "click->transaction-resolve#toggle" }) { t(".resolve") }
         when :review
           return unless item.transaction && @statement
 
@@ -123,18 +113,6 @@ module Campbooks
           a(href: helpers.reconciliation_path(@statement), class: "underline underline-offset-2 hover:text-foreground",
             data: { turbo_frame: "_top" }) { t(".overflow_link") }
         end
-      end
-
-      def post_form(action, hidden: {})
-        form(action: action, method: :post, class: "inline-flex") do
-          input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
-          hidden.each { |name, value| input(type: "hidden", name: name.to_s, value: value.to_s) }
-          yield
-        end
-      end
-
-      def outline_classes
-        class_names(Campbooks::Button::BASE_CLASSES, Campbooks::Button::VARIANT_CLASSES[:outline], Campbooks::Button::SIZE_CLASSES[:sm])
       end
     end
   end

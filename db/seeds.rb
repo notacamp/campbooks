@@ -443,6 +443,7 @@ if admin_user && !Reconciliation.exists?(workspace: org)
   # ── Bank statement document (the CSV the reconciliation is based on)
   statement_csv = <<~CSV
     Date,Description,Counterparty,Amount,Balance
+    2024-01-05,PREST EMPRESTIMO 6/60,MILLENNIUM BCP,-780.00,8714.21
     2024-01-05,Debito direto telecomunicacoes,VODAFONE PORTUGAL S.A.,-45.90,8454.10
     2024-01-10,Energia eletrica janeiro,EDP ENERGIAS DE PORTUGAL,-112.07,8342.03
     2024-01-14,Material de escritorio,STAPLES PORTUGAL LDA,-84.32,8257.71
@@ -457,7 +458,7 @@ if admin_user && !Reconciliation.exists?(workspace: org)
       ai_status: :completed, review_status: :approved, source: :manual_upload,
       bank_name: "Millennium BCP",
       period_start: Date.new(2024, 1, 1), period_end: Date.new(2024, 1, 31),
-      opening_balance_cents: 850000, closing_balance_cents: 949421,
+      opening_balance_cents: 850000, closing_balance_cents: 871421,
       document_date: Date.new(2024, 1, 31), currency: "EUR", company_vat_present: false },
     filename: "millennium_jan2024.csv",
     content: statement_csv,
@@ -474,7 +475,7 @@ if admin_user && !Reconciliation.exists?(workspace: org)
     period_start: Date.new(2024, 1, 1),
     period_end: Date.new(2024, 1, 31),
     opening_balance_cents: 850000,
-    closing_balance_cents: 949421,
+    closing_balance_cents: 871421,
     status: :ready,
     export_status: :export_none
   )
@@ -525,6 +526,10 @@ if admin_user && !Reconciliation.exists?(workspace: org)
     description: "Pagamento fornecedor", counterparty: "DISTRIBUIDORA NORTE LDA",
     amount_cents: -20000, balance_after_cents: 949421, status: :unmatched)
 
+  tx8 = create_tx(recon, position: 8, booked_on: Date.new(2024, 1, 5),
+    description: "PREST EMPRESTIMO 6/60", counterparty: "MILLENNIUM BCP",
+    amount_cents: -78_000, balance_after_cents: 871_421, status: :explained)
+
   # ── Matches
   TransactionMatch.create!(
     bank_transaction: tx1, document: vodafone_doc,
@@ -550,6 +555,36 @@ if admin_user && !Reconciliation.exists?(workspace: org)
     confidence: 0.99,
     match_reasons: { "amount_exact" => true, "date_diff_days" => 1, "name_similarity" => 91 }
   )
+
+
+  # ── Loan Demo Data ──────────────────────────────────────────
+  unless Loan.exists?(workspace: org)
+    loan = org.loans.create!(
+      lender: "Millennium BCP",
+      source_counterparty: "MILLENNIUM BCP",
+      principal_cents: 4_680_000,
+      instalment_cents: 78_000,
+      first_instalment_on: Date.new(2023, 8, 5),
+      term_months: 60,
+      rate_note: "Euribor 12M + 1.5%",
+      created_by: admin_user
+    )
+    Loans::Schedule.build!(loan)
+    # Link instalment 6 to tx8 (the seeded explained transaction)
+    inst6 = loan.instalments.find_by!(number: 6)
+    inst6.update!(
+      bank_transaction: tx8,
+      status: :paid,
+      amount_cents: tx8.amount_cents.abs
+    )
+    # Instalments 1-5 are before our first statement — mark unverified
+    loan.instalments.where(number: 1..5).update_all(status: LoanInstalment.statuses[:unverified])
+    # Status refresh so expected/missed are set correctly
+    Loans::Status.refresh!(loan)
+    puts "Loans: seeded Millennium BCP loan (#{loan.id})"
+  else
+    puts "Loans: already seeded — skipping"
+  end
 
   puts "Accounting: reconciliation seeded (#{recon.id})"
 else
