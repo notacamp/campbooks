@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_06_130000) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_06_200100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -1106,6 +1106,42 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_06_130000) do
     t.index ["workspace_id", "domain", "created_at"], name: "index_learning_decisions_on_workspace_domain_time"
   end
 
+  create_table "loan_instalments", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.bigint "amount_cents", null: false
+    t.uuid "bank_transaction_id"
+    t.datetime "created_at", null: false
+    t.date "expected_on", null: false
+    t.uuid "loan_id", null: false
+    t.string "note"
+    t.integer "number", null: false
+    t.bigint "previous_amount_cents"
+    t.integer "status", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["bank_transaction_id"], name: "index_loan_instalments_on_bank_transaction_id", unique: true
+    t.index ["loan_id", "number"], name: "index_loan_instalments_on_loan_id_and_number", unique: true
+    t.index ["loan_id"], name: "index_loan_instalments_on_loan_id"
+  end
+
+  create_table "loans", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "change_acknowledged_at"
+    t.datetime "created_at", null: false
+    t.uuid "created_by_id", null: false
+    t.string "currency", default: "EUR", null: false
+    t.date "first_instalment_on", null: false
+    t.bigint "instalment_cents", null: false
+    t.string "lender", null: false
+    t.text "notes"
+    t.bigint "principal_cents", null: false
+    t.string "rate_note"
+    t.string "source_counterparty"
+    t.integer "status", default: 0, null: false
+    t.integer "term_months", null: false
+    t.datetime "updated_at", null: false
+    t.uuid "workspace_id", null: false
+    t.index ["workspace_id", "status"], name: "index_loans_on_workspace_id_and_status"
+    t.index ["workspace_id"], name: "index_loans_on_workspace_id"
+  end
+
   create_table "mail_folder_users", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.boolean "can_manage", default: false, null: false
     t.boolean "can_read", default: true, null: false
@@ -2171,6 +2207,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_06_130000) do
   add_foreign_key "learning_decisions", "contacts"
   add_foreign_key "learning_decisions", "users"
   add_foreign_key "learning_decisions", "workspaces"
+  add_foreign_key "loan_instalments", "bank_transactions"
+  add_foreign_key "loan_instalments", "loans"
+  add_foreign_key "loans", "users", column: "created_by_id"
+  add_foreign_key "loans", "workspaces"
   add_foreign_key "mail_folder_users", "mail_folders"
   add_foreign_key "mail_folder_users", "users"
   add_foreign_key "mail_folders", "mail_folders", column: "parent_id"

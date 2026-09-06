@@ -428,6 +428,7 @@ if admin_user && !Reconciliation.exists?(workspace: org)
   # ── Bank statement document (the CSV the reconciliation is based on)
   statement_csv = <<~CSV
     Date,Description,Counterparty,Amount,Balance
+    2024-01-05,PREST EMPRESTIMO 6/60,MILLENNIUM BCP,-780.00,8714.21
     2024-01-05,Debito direto telecomunicacoes,VODAFONE PORTUGAL S.A.,-45.90,8454.10
     2024-01-10,Energia eletrica janeiro,EDP ENERGIAS DE PORTUGAL,-112.07,8342.03
     2024-01-14,Material de escritorio,STAPLES PORTUGAL LDA,-84.32,8257.71
@@ -442,7 +443,7 @@ if admin_user && !Reconciliation.exists?(workspace: org)
       ai_status: :completed, review_status: :approved, source: :manual_upload,
       bank_name: "Millennium BCP",
       period_start: Date.new(2024, 1, 1), period_end: Date.new(2024, 1, 31),
-      opening_balance_cents: 850000, closing_balance_cents: 949421,
+      opening_balance_cents: 850000, closing_balance_cents: 871421,
       document_date: Date.new(2024, 1, 31), currency: "EUR", company_vat_present: false },
     filename: "millennium_jan2024.csv",
     content: statement_csv,
@@ -459,7 +460,7 @@ if admin_user && !Reconciliation.exists?(workspace: org)
     period_start: Date.new(2024, 1, 1),
     period_end: Date.new(2024, 1, 31),
     opening_balance_cents: 850000,
-    closing_balance_cents: 949421,
+    closing_balance_cents: 871421,
     status: :ready,
     export_status: :export_none
   )
@@ -509,6 +510,10 @@ if admin_user && !Reconciliation.exists?(workspace: org)
   _tx7 = create_tx(recon, position: 7, booked_on: Date.new(2024, 1, 28),
     description: "Pagamento fornecedor", counterparty: "DISTRIBUIDORA NORTE LDA",
     amount_cents: -20000, balance_after_cents: 949421, status: :unmatched)
+
+  tx8 = create_tx(recon, position: 8, booked_on: Date.new(2024, 1, 5),
+    description: "PREST EMPRESTIMO 6/60", counterparty: "MILLENNIUM BCP",
+    amount_cents: -78_000, balance_after_cents: 871_421, status: :explained)
 
   # ── Matches
   TransactionMatch.create!(

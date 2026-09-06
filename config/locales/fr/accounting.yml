@@ -16,6 +16,7 @@ fr:
           matched: Associé
           excluded: Exclu
           requested: Facture demandée
+          explained: "Échéance de prêt"
 
   shared:
     nav:
@@ -111,6 +112,7 @@ fr:
         transfer: Virement interne
         tax: Paiement d'impôt
         other: Autre
+        loan: "Échéance de prêt"
       confirm:
         confirmed: Association confirmée
       reject:
@@ -262,11 +264,14 @@ fr:
           credit: Revenu associé
           unmatched: Sans facture
           requested: Facture demandée
+          explained: "Échéance de prêt"
         revenue_label: revenu
         review_label: vérifier
         excluded_label: Mis de côté
         requested_label: Facture demandée — en attente
         unmatched_chip: "Sans facture · Résoudre"
+        explained_chip: "Prêt · échéance %{number} sur %{total}"
+        explained_label: "Échéance de prêt"
         unknown_party: Inconnu
         nif_missing: Numéro TVA manquant sur ce document
         nif_mismatch: Le numéro TVA ne correspond pas à celui de l'entreprise

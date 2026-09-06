@@ -42,10 +42,10 @@ class Reconciliation < ApplicationRecord
     @total_transactions ||= bank_transactions.count
   end
 
-  # Transactions that are no longer "unmatched" — matched, excluded, or with a
-  # pending invoice request count as "resolved" for the progress counter.
+  # Transactions that are no longer "unmatched" — matched, excluded, requested, or
+  # explained by a loan instalment count as "resolved" for the progress counter.
   def resolved_count
-    @resolved_count ||= bank_transactions.where(status: %i[matched excluded requested]).count
+    @resolved_count ||= bank_transactions.where(status: BankTransaction::RESOLVED_STATUSES).count
   end
 
   def progress_label

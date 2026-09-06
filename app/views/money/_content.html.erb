@@ -12,6 +12,23 @@
     </div>
   <% end %>
 
+  <%# loan slot — renders tracked loans and the suggestion row %>
+  <%# TODO(money-evidence): move into Money::Page / Money::Read when feat/money-evidence merges %>
+  <% if defined?(@loans) && @loans&.any? %>
+    <% @loans.each do |loan| %>
+      <%= render Campbooks::Money::LoanCard.new(loan: loan) %>
+      <%# Standalone LoanStat (before PR A's Strip merges) %>
+    <% end %>
+  <% end %>
+
+  <% if defined?(@loan_suggestions) && @loan_suggestions&.any? %>
+    <div class="mt-6 space-y-1">
+      <% @loan_suggestions.each do |suggestion| %>
+        <%= render Campbooks::Money::LoanSuggestionRow.new(suggestion: suggestion) %>
+      <% end %>
+    </div>
+  <% end %>
+
   <%# ── Bank statements section ─────────────────────────────────────────────
       Lists recent reconciliations so Money is the entry point for bank
       statement work (the standalone /accounting nav will be retired later). %>

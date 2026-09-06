@@ -110,6 +110,7 @@ en:
         salary: Salary
         transfer: Internal transfer
         tax: Tax payment
+        loan: Loan instalment
         other: Other
       confirm:
         confirmed: Match confirmed
@@ -118,6 +119,8 @@ en:
       exclude:
         excluded: "Marked as excluded: %{reason}"
         invalid_reason: Invalid exclusion reason.
+        excluded_as_loan_no_match: "Set aside as a loan instalment. %{link} to explain these automatically."
+        excluded_as_loan_no_match_link: Track the loan in Money
       reset:
         reset: Match cleared
       manual_match:
@@ -179,6 +182,9 @@ en:
         requested:
           one: requested
           other: requested
+        explained:
+          one: explained by the loan
+          other: explained by the loan
         nif_exceptions_title: Transactions with NIF issues
         nif_exceptions:
           one: NIF issue
@@ -262,11 +268,14 @@ en:
           credit: Revenue matched
           unmatched: No invoice
           requested: Invoice requested
+          explained: Loan instalment
         revenue_label: revenue
         review_label: review
         excluded_label: Set aside
         requested_label: Invoice requested — waiting
         unmatched_chip: "No invoice · Resolve"
+        explained_chip: "Loan · instalment %{number} of %{total}"
+        explained_label: Loan instalment
         unknown_party: Unknown
         nif_missing: NIF missing on this document
         nif_mismatch: NIF does not match your company's

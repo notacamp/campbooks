@@ -16,6 +16,7 @@ pt:
           matched: Associado
           excluded: Excluído
           requested: Fatura solicitada
+          explained: Prestação de empréstimo
 
   shared:
     nav:
@@ -110,6 +111,7 @@ pt:
         salary: Salário
         transfer: Transferência interna
         tax: Pagamento de imposto
+        loan: Prestação de empréstimo
         other: Outro
       confirm:
         confirmed: Associação confirmada
@@ -117,6 +119,9 @@ pt:
         rejected: Associação rejeitada
       exclude:
         excluded: "Marcado como excluído: %{reason}"
+        invalid_reason:
+        excluded_as_loan_no_match: "Reservado como prestação de empréstimo. %{link} para explicar automaticamente."
+        excluded_as_loan_no_match_link: Acompanhe o empréstimo no Money
         invalid_reason: Motivo de exclusão inválido.
       reset:
         reset: Associação removida
@@ -262,11 +267,14 @@ pt:
           credit: Receita associada
           unmatched: Sem fatura
           requested: Fatura solicitada
+          explained: Prestação de empréstimo
         revenue_label: receita
         review_label: rever
         excluded_label: Posto de lado
         requested_label: Fatura solicitada — a aguardar
         unmatched_chip: "Sem fatura · Resolver"
+        explained_chip: "Empréstimo · prestação %{number} de %{total}"
+        explained_label: Prestação de empréstimo
         unknown_party: Desconhecido
         nif_missing: NIF em falta neste documento
         nif_mismatch: NIF não corresponde ao da empresa

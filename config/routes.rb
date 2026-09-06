@@ -91,6 +91,14 @@ Rails.application.routes.draw do
   get "money", to: "money#index", as: :money
   get "money/statements", to: "money#statements", as: :money_statements
   get "money/export", to: "money#export", as: :money_export
+
+  # Loan tracking — lives under the Money surface.
+  scope "money" do
+    post   "loans/dismiss",  to: "loans#dismiss",  as: :dismiss_money_loan
+    resources :loans, as: :money_loans,
+              path: "loans",
+              only: %i[create update destroy show]
+  end
   scope "money/obligations/:id", constraints: { id: %r{[a-z]+:[^/]+} } do
     post   "remind", to: "money#remind",   as: :money_obligation_remind
     post   "chase",  to: "money#chase",    as: :money_obligation_chase

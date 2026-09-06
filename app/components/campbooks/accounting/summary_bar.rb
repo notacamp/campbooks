@@ -29,6 +29,7 @@ module Campbooks
           unmatched_chip
           excluded_chip
           requested_chip
+          explained_chip
           nif_chip
           confirm_all_button
         end
@@ -86,6 +87,15 @@ module Campbooks
 
         render(Campbooks::Badge.new(variant: :info)) do
           "#{n} #{t(".requested", count: n)}"
+        end
+      end
+
+      def explained_chip
+        n = count(:explained)
+        return if n.zero?
+
+        render(Campbooks::Badge.new(variant: :neutral)) do
+          "#{n} #{t(".explained", count: n)}"
         end
       end
 

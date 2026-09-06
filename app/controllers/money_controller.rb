@@ -33,7 +33,7 @@ class MoneyController < ApplicationController
     tx_totals   = BankTransaction.where(reconciliation_id: rids)
                                  .group(:reconciliation_id).count
     tx_resolved = BankTransaction.where(reconciliation_id: rids,
-                                        status: %i[matched excluded requested])
+                                        status: BankTransaction::RESOLVED_STATUSES)
                                  .group(:reconciliation_id).count
 
     @reconciliations.each do |r|
@@ -138,12 +138,23 @@ class MoneyController < ApplicationController
     rids = @recent_reconciliations.map(&:id)
     tx_totals   = BankTransaction.where(reconciliation_id: rids).group(:reconciliation_id).count
     tx_resolved = BankTransaction.where(reconciliation_id: rids,
-                                        status: %i[matched excluded requested])
+                                        status: BankTransaction::RESOLVED_STATUSES)
                                  .group(:reconciliation_id).count
     @recent_reconciliations.each do |r|
       r.instance_variable_set(:@total_transactions, tx_totals.fetch(r.id, 0))
       r.instance_variable_set(:@resolved_count,     tx_resolved.fetch(r.id, 0))
     end
+
+    # TODO(money-evidence): move into Money::Page / Money::Read when feat/money-evidence merges
+    @loans            = Current.workspace.loans.active_loans
+                               .includes(instalments: :bank_transaction)
+                               .order(:created_at)
+    @loan_suggestions = Loans::Spotter.new(Current.workspace).call
+  rescue => e
+    # Loan data is additive — if it fails, Money still renders.
+    Rails.logger.warn("[MoneyController] loan data load failed: #{e.class}: #{e.message}")
+    @loans            = []
+    @loan_suggestions = []
   end
 
   # The ledger's order: ?sort=&dir= (the column links), ?order=date_desc (the

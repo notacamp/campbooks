@@ -17,6 +17,10 @@ module Reconciliations
       @reconciliation = Reconciliation.find(reconciliation_id)
       Current.workspace = @reconciliation.workspace
 
+      # Pre-pass: loan instalments claim their lines first so the invoice
+      # matcher only ever sees truly unmatched transactions.
+      Loans::Matcher.new(@reconciliation).call
+
       Reconciliations::Matcher.new(
         reconciliation: @reconciliation,
         workspace:      @reconciliation.workspace

@@ -17,8 +17,15 @@ class BankTransaction < ApplicationRecord
     suggested: 1,
     matched:   2,
     excluded:  3,
-    requested: 4  # invoice requested from counterparty
+    requested: 4,  # invoice requested from counterparty
+    explained: 5   # explained by a tracked loan instalment — append only, never reorder
   }
+
+  # Statuses that count as "resolved" for progress bars and reconciliation counts.
+  # Include :explained so loan instalments lift the resolved counter.
+  RESOLVED_STATUSES = %i[matched excluded requested explained].freeze
+
+  has_one :loan_instalment
 
   validates :position, uniqueness: { scope: :reconciliation_id }
   validates :booked_on, presence: true
@@ -35,6 +42,10 @@ class BankTransaction < ApplicationRecord
 
   def credit?
     amount_cents >= 0
+  end
+
+  def explained_by_loan?
+    explained? && loan_instalment.present?
   end
 
   # Which Document types to suggest when hunting for a match. Debits (money out)

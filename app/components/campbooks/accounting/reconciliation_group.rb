@@ -121,9 +121,15 @@ module Campbooks
           [ "→", t(".state.requested"), "bg-muted text-muted-foreground" ]
         when :credit
           [ check_svg, t(".state.credit"), "bg-success/15 text-success" ]
+        when :explained
+          [ bank_svg, t(".state.explained"), "bg-foreground text-background" ]
         else # :unmatched
           [ "!", t(".state.unmatched"), "bg-ember/15 text-ember" ]
         end
+      end
+
+      def bank_svg
+        raw(safe('<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V10l7-6 7 6v11"/><path d="M10 21v-5h4v5"/></svg>'))
       end
 
       def check_svg
@@ -137,6 +143,8 @@ module Campbooks
           true
         when :matched, :credit, :partial
           multi_item? # only show ratio on complex groups
+        when :explained
+          false
         else
           false
         end
@@ -162,6 +170,8 @@ module Campbooks
             requested_label
           when :unmatched
             unmatched_chip
+          when :explained
+            explained_chip
           else
             @group.documents.each { |doc| invoice_line(doc) }
           end
@@ -209,6 +219,25 @@ module Campbooks
       def requested_label
         span(class: "text-[13px] text-muted-foreground") do
           plain t(".requested_label")
+        end
+      end
+
+      def explained_chip
+        ins = @group.loan_instalment
+        label = if ins
+                  t(".explained_chip",
+                    number: ins.number,
+                    total:  ins.loan.term_months)
+                else
+                  t(".explained_label")
+                end
+
+        anchor_target = ins ? helpers.money_path(anchor: "money_loan") : "#"
+
+        a(href:  anchor_target,
+          class: "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[12.5px] font-medium bg-secondary text-foreground hover:bg-secondary/80 transition-colors") do
+          span(class: "w-1.5 h-1.5 rounded-full bg-foreground flex-none", aria_hidden: "true")
+          plain label
         end
       end
 
@@ -294,7 +323,9 @@ module Campbooks
           txns = @group.bank_transactions
           docs = @group.documents
 
-          if docs.empty?
+          if @group.kind == :explained || txns.all?(&:explained?)
+            :explained
+          elsif docs.empty?
             if txns.all?(&:excluded?)
               :excluded
             elsif txns.all?(&:requested?)
