@@ -969,7 +969,7 @@ scopes the client holds):
 
 **Tasks** (`tasks:read` / `:write`) — `list_tasks` · `get_task` · `create_task` ·
 `update_task` · `complete_task` · `create_task_from_email`
-*(requires `ENABLE_TASKS`)*
+*(unless `ENABLE_TASKS=0`)*
 
 **Calendar** (`calendar:read` / `:write`) — `list_calendars` · `list_calendar_events` ·
 `get_calendar_event` · `create_calendar_event` · `update_calendar_event` ·

@@ -24,6 +24,7 @@ major, minor, or patch change here.
 - Now and People rank on the same learned attention weight (who you answer and how fast, who you meet, whose bills you settle, whose mail you archive unread or dismiss) instead of fixed star and label boosts; dismissing a card now lowers that sender, not the whole kind. Workspaces with no history yet rank exactly as before.
 - ⚠️ **Tasks are now _asks_, and live on Now and Time — the task pages are retired.** (Pre-1.0 web-UI break.) An ask is still the same record, but it has no page of its own: it appears as a card on Now while it needs a decision and as a row on Time once it has a date (undated ones sit under "No date yet"). The task **board, list, Skim triage page, task detail/edit pages and per-task discussions are gone**; the manual priority / tag / document / assignee pickers go with them. `/tasks` and `/tasks/:id` now **redirect to Time**, so old notification and digest links keep working. The `Task` table, the public REST API (`/api/v1/tasks`) and the MCP tools are **unchanged**.
 - **Personal surfaces now show only _your_ asks.** In a shared workspace, Now, Time and People's Do lane list the asks that are yours — assigned to you, or unassigned and sourced from mail you can read — not every ask in the workspace. (The public API and MCP still list the whole workspace.)
+- **Asks are core, and cost one AI read.** Asks now ship on by default and are no longer a paid feature — set `ENABLE_TASKS=0` to hide them. Scout's single read of a new email finds and stages the asks in the same pass, so the separate task-extraction call that ran two minutes later is gone (the manual backfill task still uses it).
 
 ### Added
 
@@ -50,6 +51,7 @@ major, minor, or patch change here.
 ### Removed
 
 - The inbox gear modal; its panels live under Settings → Inbox.
+- The `tasks` billing entitlement — asks are no longer plan-gated, so it is gone from the plan catalog and every check site (any per-workspace `tasks` override is now inert).
 
 ### Fixed
 

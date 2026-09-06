@@ -288,7 +288,8 @@ The MCP endpoint (`POST /api/mcp`) ships enabled on every self-hosted instance â
 flag or service needed. Any MCP-capable agent (Claude Code, Cursor, Windsurf, or any client
 that speaks streamable HTTP JSON-RPC) can connect by pointing at `https://<your-host>/api/mcp`
 with an MCP key from **Settings â†’ API access**. Scopes, tool families, feature-gated tools
-(`ENABLE_TASKS`, `ENABLE_WORKFLOWS`), and step-by-step agent configuration are documented in
+(`ENABLE_WORKFLOWS` to enable workflow tools; `ENABLE_TASKS=0` to hide the task tools, which
+ship on), and step-by-step agent configuration are documented in
 [`docs/ai-agents.md`](ai-agents.md).
 
 ---
