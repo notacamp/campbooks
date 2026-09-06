@@ -44,27 +44,19 @@ class Time::Agenda
   end
 
   # Live, accepted-or-suggested asks with no due date, minus the ones Scout is
-  # already holding a focus block for (those show as their focus row instead).
-  # Newest first. These never enter #items — they carry day: nil.
+  # already holding a focus block for (those show as their focus row instead) —
+  # this user's own (for_user), plus the undated asks they handed to a teammate
+  # (rendered with the "with <name>" pill + Take it back / Done). Newest first.
+  # These never enter #items — they carry day: nil.
   def undated
     return [] unless Features.tasks?
 
-    Task.accessible_to(@user).live.undated
-        .where.not(id: FocusBlock.held.where.not(task_id: nil).select(:task_id))
-        .order(created_at: :desc)
-        .map { |task| undated_item(task) }
-  end
-
-  # Live, accepted-or-suggested asks with no due date, minus the ones Scout is
-  # already holding a focus block for (those show as their focus row instead).
-  # Newest first. These never enter #items — they carry day: nil.
-  def undated
-    return [] unless Features.tasks?
-
-    Task.accessible_to(@user).live.undated
-        .where.not(id: FocusBlock.held.where.not(task_id: nil).select(:task_id))
-        .order(created_at: :desc)
-        .map { |task| undated_item(task) }
+    mine = Task.for_user(@user).live.undated
+               .where.not(id: FocusBlock.held.where.not(task_id: nil).select(:task_id))
+               .order(created_at: :desc)
+               .map { |task| undated_item(task) }
+    handed = handed_tasks.undated.order(created_at: :desc).map { |task| undated_item(task, handed: true) }
+    mine + handed
   end
 
   private
@@ -156,10 +148,12 @@ class Time::Agenda
   def task_items
     return [] unless Features.tasks?
 
-    base = Task.accessible_to(@user).live.dated
-    forward = base.where(due_at: @from..@to)
-    forward.map { |task| task_item(task, overdue: false) } +
-      overdue_tasks(base).map { |task| task_item(task, overdue: true) }
+    base = Task.for_user(@user).live.dated
+    handed = handed_tasks.dated
+    base.where(due_at: @from..@to).map { |task| task_item(task, overdue: false) } +
+      overdue_tasks(base).map { |task| task_item(task, overdue: true) } +
+      handed.where(due_at: @from..@to).map { |task| task_item(task, overdue: false, handed: true) } +
+      overdue_tasks(handed).map { |task| task_item(task, overdue: true, handed: true) }
   end
 
   def overdue_tasks(base)
@@ -168,30 +162,49 @@ class Time::Agenda
     base.where(due_at: (@from - OVERDUE_LOOKBACK)...@from)
   end
 
-  def task_item(task, overdue: false)
-    label, path = task_source(task)
+  # Live asks this user handed to a teammate (assigned_by them, to someone else) —
+  # they leave for_user (no longer theirs to work) but still show on the assigner's
+  # Time so they can Take it back or mark it Done.
+  def handed_tasks
+    Task.where(workspace_id: @user.workspace_id).live
+        .joins(:task_assignments)
+        .where(task_assignments: { assigned_by_id: @user.id })
+        .where.not(task_assignments: { user_id: @user.id })
+  end
+
+  def task_item(task, overdue: false, handed: false)
+    label, path = task_source(task, handed: handed)
     Time::AgendaItem.new(
       kind: :task, at: task.due_at, day: overdue ? @today : day_of(task.due_at),
       all_day: task.all_day, overdue: overdue, duration_minutes: 0,
       title: task.title, source_label: label, source_path: path,
-      color: nil, record: task, actions: task_actions(task)
+      color: nil, record: task, handed: handed,
+      actions: handed ? %i[take_back done] : task_actions(task)
     )
   end
 
-  def undated_item(task)
-    label, path = task_source(task)
+  def undated_item(task, handed: false)
+    label, path = task_source(task, handed: handed)
     Time::AgendaItem.new(
       kind: :task, at: nil, day: nil, all_day: true, overdue: false, duration_minutes: 0,
       title: task.title, source_label: label, source_path: path,
-      color: nil, record: task, actions: undated_actions(task)
+      color: nil, record: task, handed: handed,
+      actions: handed ? %i[take_back done] : undated_actions(task)
     )
   end
 
-  # The provenance meta for an ask: "Scout suggested" (when AI-found) · "from Rita's
-  # email" (or "Task" for a manual, source-less one) · "held Thu 10:00" (when Scout
-  # is holding a focus block for it). Returns [label, back-link path].
-  def task_source(task)
+  # The provenance meta for an ask. Three shapes:
+  #   handed (assigner's row) → "handed over 6 Sept" (no back-link; it's theirs now)
+  #   handed to you           → "from Guilherme · …" then the usual source
+  #   otherwise               → "Scout suggested" · "from Rita's email" (or "Task")
+  #                             · "held Thu 10:00". Returns [label, back-link path].
+  def task_source(task, handed: false)
+    return [ I18n.t("time.agenda.source.handed_over", when: handed_over_when(task)), nil ] if handed
+
     segments = []
+    if task.handed? && (by = task.handed_by)
+      segments << I18n.t("time.agenda.source.handed_by", name: user_first_name(by))
+    end
     segments << I18n.t("time.agenda.source.scout_suggested") if task.ai_suggested?
     email_label, path = task.source_email ? source_for(email: task.source_email) : nil
     if email_label
@@ -202,6 +215,17 @@ class Time::Agenda
     block = task.held_block
     segments << I18n.t("time.agenda.source.held", when: held_when(block)) if block
     [ segments.join(" · "), path ]
+  end
+
+  # The date the ask went over to the teammate (the assignment instant), as a short
+  # day/month in the viewer's zone.
+  def handed_over_when(task)
+    at = task.task_assignments.minimum(:created_at) || task.updated_at
+    I18n.l(at.in_time_zone(@zone).to_date, format: :day_month)
+  end
+
+  def user_first_name(user)
+    user.name.to_s.split(/\s+/).first.presence || user.name.presence || user.email_address
   end
 
   def held_when(block)

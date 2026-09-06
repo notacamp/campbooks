@@ -113,7 +113,7 @@ module People
 
     # Load accepted open asks whose source email has a person counterpart.
     def build_ask_items
-      tasks = Task.accessible_to(@user)
+      tasks = Task.for_user(@user)
                   .live
                   .where(status: Task::ACTIVE_STATUSES)
                   .where(source_type: "EmailMessage")

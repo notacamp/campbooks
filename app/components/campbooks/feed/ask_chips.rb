@@ -49,7 +49,7 @@ module Campbooks
         return @live_ask if defined?(@live_ask)
 
         ids = @email.email_thread_id ? EmailMessage.where(email_thread_id: @email.email_thread_id).pluck(:id) : [ @email.id ]
-        @live_ask = ::Task.accessible_to(@user).live
+        @live_ask = ::Task.for_user(@user).live
                           .where(source_type: "EmailMessage", source_id: ids)
                           .order(created_at: :desc).first
       end

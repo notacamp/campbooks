@@ -60,7 +60,15 @@ module TimeAgendaLoading
       items: @agenda, undated: @undated,
       move_slots: @move_slots, hold_slots: @hold_slots,
       snoozed_threads: @snoozed_threads, scheduled_emails: @scheduled_emails,
+      members: agenda_members,
       zone: @zone, has_calendars: @has_calendars
     )
+  end
+
+  # The workspace's other members (ordered by name) — the "Hand to…" list on an
+  # ask row's kebab. Empty in a solo workspace, so the control simply doesn't show.
+  # Memoized so the whole agenda costs one members query.
+  def agenda_members
+    @agenda_members ||= current_user.workspace.users.where.not(id: current_user.id).order(:name).to_a
   end
 end

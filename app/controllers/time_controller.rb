@@ -85,7 +85,7 @@ class TimeController < ApplicationController
   def tasks_in_range(range)
     return Task.none unless Features.tasks?
 
-    Task.accessible_to(current_user).live.dated.where(due_at: range.begin..range.end)
+    Task.for_user(current_user).live.dated.where(due_at: range.begin..range.end)
   end
 
   # Ask Scout to hold focus time for upcoming deadlines — at most once an hour per
