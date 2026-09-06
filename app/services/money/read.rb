@@ -47,7 +47,7 @@ class Money
     def lines_explained
       @lines_explained ||=
         if statement
-          status_counts.values_at(*BankTransaction::RESOLVED_STATUSES.map(&:to_s)).sum(0)
+          status_counts.values_at(*BankTransaction::RESOLVED_STATUSES.map(&:to_s)).sum { |v| v.to_i }
         else
           0
         end

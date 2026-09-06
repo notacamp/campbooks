@@ -46,7 +46,7 @@ RSpec.describe Money::Ledger do
 
     it "excludes documents with no amount_cents or direction" do
       create(:document, :approved, workspace: workspace,
-             document_type: :expense_invoice, amount_cents: nil)
+             document_type: :expense_invoice, amount_cents: nil, tax_amount_cents: nil)
       expect(ledger.obligations).to be_empty
     end
 

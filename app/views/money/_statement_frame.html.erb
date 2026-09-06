@@ -1,5 +1,5 @@
 <%# Rendered inside the money_statement turbo-frame. %>
-<%= helpers.turbo_frame_tag("money_statement") do %>
+<%= turbo_frame_tag("money_statement") do %>
   <% if page.selected_statement %>
     <%= render Campbooks::Accounting::GroupedLedger.new(
       groups:         page.selected_groups,
