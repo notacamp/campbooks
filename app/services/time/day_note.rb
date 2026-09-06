@@ -7,15 +7,16 @@
 # present — the most overdue obligation. The component turns these facts into
 # sentence(s) via i18n; here there is no copy, just the counts and titles.
 class Time::DayNote
-  Result = Data.define(:date, :meetings_count, :deadlines_count, :first_deadline_title, :focus, :late_obligation, :undated_count) do
+  Result = Data.define(:date, :meetings_count, :deadlines_count, :first_deadline_title, :focus, :late_obligation, :prep_meeting, :undated_count) do
     def any?
       meetings_count.positive? || deadlines_count.positive? || !focus.nil? ||
-        !late_obligation.nil? || undated_count.positive?
+        !late_obligation.nil? || !prep_meeting.nil? || undated_count.positive?
     end
   end
 
   Focus = Data.define(:title, :subject, :at, :duration_minutes)
   LateObligation = Data.define(:name, :days_overdue)
+  PrepMeeting    = Data.define(:title, :at, :first_name, :why)
 
   def self.for(user, date: nil)
     new(user, date).call
@@ -35,6 +36,7 @@ class Time::DayNote
       first_deadline_title: today_deadlines.first&.title,
       focus: next_focus,
       late_obligation: late_obligation,
+      prep_meeting: next_prep_meeting,
       undated_count: undated_count
     )
   end
@@ -83,6 +85,24 @@ class Time::DayNote
       at: block.start_at,
       duration_minutes: block.duration_minutes
     )
+  end
+
+  # The first :prep event today, built from Time::Agenda so the enrichment pass runs.
+  def next_prep_meeting
+    start_of_day = @zone.local(@today.year, @today.month, @today.day).beginning_of_day
+    end_of_day   = start_of_day.end_of_day
+    prep = ::Time::Agenda.for(@user, from: start_of_day, to: end_of_day)
+                         .find(&:prep?)
+    return nil unless prep
+
+    PrepMeeting.new(
+      title: prep.title,
+      at: prep.at,
+      first_name: prep.prep_name.presence,
+      why: prep.prep_detail.presence || prep.why
+    )
+  rescue StandardError
+    nil
   end
 
   # The most overdue money obligation — only when the Money PR is present. On this

@@ -59,4 +59,20 @@ RSpec.describe Money::Summary do
       expect(summary.nothing_else_this_month?).to be(true)
     end
   end
+
+  describe "#matters_most" do
+    it "returns the highest-priority open obligation" do
+      expense(vendor_name: "SmallNew", amount_cents: 1_000, due_date: today - 2)
+      expense(vendor_name: "BigOld",   amount_cents: 90_000, due_date: today - 20)
+
+      expect(summary.matters_most).not_to be_nil
+      expect(summary.matters_most.counterpart).to eq("BigOld")
+    end
+
+    it "returns nil when no open obligations exist" do
+      expense(vendor_name: "Cleared", amount_cents: 1_000, due_date: today - 3,
+              settled_at: (today - 1).to_time, settled_source: "manual")
+      expect(summary.matters_most).to be_nil
+    end
+  end
 end

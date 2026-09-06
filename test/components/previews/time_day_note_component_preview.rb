@@ -12,7 +12,7 @@ class TimeDayNoteComponentPreview < ViewComponent::Preview
   def meetings_only
     render Campbooks::TimePage::DayNote.new(
       note: ::Time::DayNote::Result.new(date: Date.current, meetings_count: 3, deadlines_count: 0,
-        first_deadline_title: nil, focus: nil, late_obligation: nil, undated_count: 0),
+        first_deadline_title: nil, focus: nil, late_obligation: nil, prep_meeting: nil, undated_count: 0),
       zone: zone
     )
   end
@@ -21,7 +21,7 @@ class TimeDayNoteComponentPreview < ViewComponent::Preview
   def undated_only
     render Campbooks::TimePage::DayNote.new(
       note: ::Time::DayNote::Result.new(date: Date.current, meetings_count: 0, deadlines_count: 0,
-        first_deadline_title: nil, focus: nil, late_obligation: nil, undated_count: 2),
+        first_deadline_title: nil, focus: nil, late_obligation: nil, prep_meeting: nil, undated_count: 2),
       zone: zone
     )
   end
@@ -30,7 +30,7 @@ class TimeDayNoteComponentPreview < ViewComponent::Preview
   def clear_day
     render Campbooks::TimePage::DayNote.new(
       note: ::Time::DayNote::Result.new(date: Date.current, meetings_count: 0, deadlines_count: 0,
-        first_deadline_title: nil, focus: nil, late_obligation: nil, undated_count: 0),
+        first_deadline_title: nil, focus: nil, late_obligation: nil, prep_meeting: nil, undated_count: 0),
       zone: zone
     )
   end
@@ -46,6 +46,6 @@ class TimeDayNoteComponentPreview < ViewComponent::Preview
     )
     ::Time::DayNote::Result.new(date: Date.current, meetings_count: 2, deadlines_count: 1,
       first_deadline_title: "Reply to Ines about the notice period", focus: focus,
-      late_obligation: nil, undated_count: 2)
+      late_obligation: nil, prep_meeting: nil, undated_count: 2)
   end
 end

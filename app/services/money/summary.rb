@@ -42,6 +42,10 @@ class Money
     def late_receivable = @ledger.late.select(&:receivable?).max_by(&:amount_cents)
     def late_payable    = @ledger.late.select(&:payable?).max_by(&:amount_cents)
 
+    # The highest-priority open obligation (late or due), regardless of direction.
+    # Used by the summary component to name "the one that matters".
+    def matters_most = @ledger.most_pressing
+
     def late_receivable_count = @ledger.late.count(&:receivable?)
     def late_payable_count    = @ledger.late.count(&:payable?)
 
