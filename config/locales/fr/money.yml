@@ -19,28 +19,6 @@ fr:
           label: "Ordre"
         sort:
           priority_desc: "Priorité"
-  loans:
-    create:
-      created_with_count:
-        one: "Suivi du prêt. 1 échéance trouvée sur vos relevés."
-        other: "Suivi du prêt. %{count} échéances trouvées sur vos relevés."
-      created_no_match: "Suivi du prêt. Les échéances seront associées au fil des relevés."
-    update:
-      updated: "Conditions mises à jour."
-    destroy:
-      destroyed: "Suivi du prêt arrêté."
-    dismiss:
-      dismissed: "Très bien, ce n'est pas un prêt."
-    show:
-      back: "Money"
-      edit_terms: "Modifier les conditions"
-      paid_label: "Payé"
-      to_go_label: "Restant"
-      next_label: "Prochaine"
-      all_instalments: "Toutes les échéances"
-      of: "sur"
-  components:
-    money:
       loan_card:
         section_title: "Le prêt"
         loan_type: "prêt professionnel"
@@ -121,3 +99,23 @@ fr:
         paid_of: "%{paid} sur %{total} payées"
         to_go: "%{amount} restant"
         next: "prochaine le %{date}"
+  loans:
+    create:
+      created_with_count:
+        one: "Suivi du prêt. 1 échéance trouvée sur vos relevés."
+        other: "Suivi du prêt. %{count} échéances trouvées sur vos relevés."
+      created_no_match: "Suivi du prêt. Les échéances seront associées au fil des relevés."
+    update:
+      updated: "Conditions mises à jour."
+    destroy:
+      destroyed: "Suivi du prêt arrêté."
+    dismiss:
+      dismissed: "Très bien, ce n'est pas un prêt."
+    show:
+      back: "Money"
+      edit_terms: "Modifier les conditions"
+      paid_label: "Payé"
+      to_go_label: "Restant"
+      next_label: "Prochaine"
+      all_instalments: "Toutes les échéances"
+      of: "sur"

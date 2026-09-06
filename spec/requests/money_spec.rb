@@ -174,4 +174,46 @@ RSpec.describe "Money", type: :request do
       expect(response.body).to include(reconciliation_path(recon))
     end
   end
+
+  describe "loan card rendering" do
+    around { |ex| with_flags { ex.run } }
+    before do
+      sign_in(user)
+      allow_any_instance_of(Loans::Spotter).to receive(:call).and_return([])
+    end
+
+    it "renders a LoanCard when an active loan exists" do
+      loan = create(:loan, :with_schedule, workspace:, created_by: user,
+                           lender: "Millennium BCP",
+                           first_instalment_on: Date.new(2024, 1, 5),
+                           term_months: 60)
+
+      get money_path
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include(loan.lender)
+    end
+
+    it "renders a LoanSuggestionRow when Spotter finds a suggestion" do
+      suggestion = Loans::Spotter::Suggestion.new(
+        lender_guess: "Test Bank",
+        source_counterparty: "TEST BANK",
+        instalment_cents: 78_000,
+        currency: "EUR",
+        first_seen_on: 1.year.ago.to_date,
+        last_seen_on: 1.month.ago.to_date,
+        count: 12,
+        day_of_month: 5,
+        previous_instalment_cents: nil,
+        sample_transaction_ids: [],
+        key: "test bank|78000"
+      )
+      allow_any_instance_of(Loans::Spotter).to receive(:call).and_return([ suggestion ])
+
+      get money_path
+      expect(response).to have_http_status(:ok)
+      # The suggestion row renders the lender guess
+      expect(response.body).to include("Test Bank")
+    end
+  end
+
 end

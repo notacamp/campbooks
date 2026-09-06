@@ -75,17 +75,6 @@ module Loans
       recent_recs = @workspace.reconciliations.where(status: :ready).order(created_at: :desc).limit(COVERAGE_RECONCILIATIONS)
       return [] if recent_recs.empty?
 
-      BankTransaction
-        .where(reconciliation_id: recent_recs.map(&:id))
-        .where(status: [ BankTransaction.statuses[:unmatched], BankTransaction.statuses[:excluded] ])
-        .where("amount_cents < 0")
-        .where(bank_transactions: { id: LoanInstalment.select(:bank_transaction_id).where.not(bank_transaction_id: nil) }.then { |sub|
-                 BankTransaction.where.not(id: sub).select(:id)
-               }.map(&:id))
-        .to_a
-    rescue
-      # Fallback: simpler query without the NOT IN subquery
-      recent_recs = @workspace.reconciliations.where(status: :ready).order(created_at: :desc).limit(COVERAGE_RECONCILIATIONS)
       linked_ids = LoanInstalment.where.not(bank_transaction_id: nil).pluck(:bank_transaction_id)
 
       txns = BankTransaction
@@ -96,6 +85,9 @@ module Loans
 
       linked_set = linked_ids.to_set
       txns.reject { |t| linked_set.include?(t.id) }
+    rescue StandardError => e
+      Rails.logger.warn("[Loans::Spotter] candidate_transactions failed: #{e.class}: #{e.message}")
+      []
     end
 
     def build_candidate(cp, rounded_cents, txns)
@@ -195,7 +187,7 @@ module Loans
 
     def already_tracked?(candidate, tracked_tokens, tracked_amounts)
       cp_tokens = counterparty_tokens(candidate[:counterparty])
-      return true if (cp_tokens & tracked_tokens).any?
+      return true if (cp_tokens & tracked_tokens.to_a).any?
 
       abs = candidate[:amount_cents]
       tracked_amounts.any? { |ta| ta.present? && (abs - ta).abs.to_f / ta <= 0.03 }

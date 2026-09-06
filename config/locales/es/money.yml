@@ -19,28 +19,6 @@ es:
           label: "Orden"
         sort:
           priority_desc: "Prioridad"
-  loans:
-    create:
-      created_with_count:
-        one: "Siguiendo el préstamo. Encontré 1 cuota en los extractos."
-        other: "Siguiendo el préstamo. Encontré %{count} cuotas en los extractos."
-      created_no_match: "Siguiendo el préstamo. Enlazaré las cuotas a medida que lleguen los extractos."
-    update:
-      updated: "Condiciones actualizadas."
-    destroy:
-      destroyed: "Se dejó de seguir este préstamo."
-    dismiss:
-      dismissed: "De acuerdo, no es un préstamo."
-    show:
-      back: "Money"
-      edit_terms: "Editar condiciones"
-      paid_label: "Pagado"
-      to_go_label: "Por pagar"
-      next_label: "Próxima"
-      all_instalments: "Todas las cuotas"
-      of: "de"
-  components:
-    money:
       loan_card:
         section_title: "El préstamo"
         loan_type: "préstamo empresarial"
@@ -121,3 +99,23 @@ es:
         paid_of: "%{paid} de %{total} pagadas"
         to_go: "%{amount} por pagar"
         next: "próxima %{date}"
+  loans:
+    create:
+      created_with_count:
+        one: "Siguiendo el préstamo. Encontré 1 cuota en los extractos."
+        other: "Siguiendo el préstamo. Encontré %{count} cuotas en los extractos."
+      created_no_match: "Siguiendo el préstamo. Enlazaré las cuotas a medida que lleguen los extractos."
+    update:
+      updated: "Condiciones actualizadas."
+    destroy:
+      destroyed: "Se dejó de seguir este préstamo."
+    dismiss:
+      dismissed: "De acuerdo, no es un préstamo."
+    show:
+      back: "Money"
+      edit_terms: "Editar condiciones"
+      paid_label: "Pagado"
+      to_go_label: "Por pagar"
+      next_label: "Próxima"
+      all_instalments: "Todas las cuotas"
+      of: "de"

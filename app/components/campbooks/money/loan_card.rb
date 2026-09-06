@@ -170,7 +170,7 @@ module Campbooks
           instalment_row
 
           div(class: "mt-1 flex flex-wrap gap-2") do
-            link_to t(".all_instalments", count: @loan.term_months),
+            helpers.link_to t(".all_instalments", count: @loan.term_months),
                     helpers.money_loan_path(@loan),
                     class: "inline-flex items-center px-2.5 py-1 rounded-lg border border-border text-[12px] font-medium text-muted-foreground hover:bg-muted/40 transition-colors"
 
@@ -334,7 +334,7 @@ module Campbooks
         # "N earlier instalments" link
         earlier = @loan.paid_count - recent.size
         if earlier > 0
-          link_to t(".earlier_instalments", count: earlier),
+          helpers.link_to t(".earlier_instalments", count: earlier),
                   helpers.money_loan_path(@loan),
                   class: "inline-block mt-2 text-[12.5px] text-muted-foreground underline decoration-border/60 underline-offset-2 hover:text-foreground"
         end

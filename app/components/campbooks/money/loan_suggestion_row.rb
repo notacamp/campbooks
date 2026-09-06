@@ -61,7 +61,7 @@ module Campbooks
           end
 
           # Disclosure form (hidden by default; JS toggles it)
-          div(id: "loan-suggestion-form-#{helpers.dom_id_for_key(@suggestion.key)}",
+          div(id: "loan-suggestion-form-#{@suggestion.key.parameterize}",
               class: "hidden",
               data:  { loan_form_target: "panel" }) do
             render(Campbooks::Money::LoanForm.new(suggestion: @suggestion))

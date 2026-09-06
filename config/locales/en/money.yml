@@ -153,28 +153,6 @@ en:
         next_renews: "next renews %{date}"
         source_email: "Open the source email"
         source_document: "Open the document"
-  loans:
-    create:
-      created_with_count:
-        one: "Tracking the loan. Found 1 instalment on your statements."
-        other: "Tracking the loan. Found %{count} instalments on your statements."
-      created_no_match: "Tracking the loan. I'll link instalments as statements come in."
-    update:
-      updated: "Terms updated."
-    destroy:
-      destroyed: "Stopped tracking this loan."
-    dismiss:
-      dismissed: "Okay, not a loan."
-    show:
-      back: "Money"
-      edit_terms: "Edit the terms"
-      paid_label: "Paid"
-      to_go_label: "To go"
-      next_label: "Next"
-      all_instalments: "All instalments"
-      of: "of"
-  components:
-    money:
       loan_card:
         section_title: "The loan"
         loan_type: "business loan"
@@ -255,3 +233,23 @@ en:
         paid_of: "%{paid} of %{total} paid"
         to_go: "%{amount} to go"
         next: "next %{date}"
+  loans:
+    create:
+      created_with_count:
+        one: "Tracking the loan. Found 1 instalment on your statements."
+        other: "Tracking the loan. Found %{count} instalments on your statements."
+      created_no_match: "Tracking the loan. I'll link instalments as statements come in."
+    update:
+      updated: "Terms updated."
+    destroy:
+      destroyed: "Stopped tracking this loan."
+    dismiss:
+      dismissed: "Okay, not a loan."
+    show:
+      back: "Money"
+      edit_terms: "Edit the terms"
+      paid_label: "Paid"
+      to_go_label: "To go"
+      next_label: "Next"
+      all_instalments: "All instalments"
+      of: "of"

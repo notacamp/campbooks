@@ -19,28 +19,6 @@ pt:
           label: "Ordenar"
         sort:
           priority_desc: "Prioridade"
-  loans:
-    create:
-      created_with_count:
-        one: "A acompanhar o empréstimo. Encontrei 1 prestação nos extratos."
-        other: "A acompanhar o empréstimo. Encontrei %{count} prestações nos extratos."
-      created_no_match: "A acompanhar o empréstimo. Vou associar as prestações à medida que os extratos chegarem."
-    update:
-      updated: "Condições atualizadas."
-    destroy:
-      destroyed: "Deixei de acompanhar este empréstimo."
-    dismiss:
-      dismissed: "Não é um empréstimo."
-    show:
-      back: "Money"
-      edit_terms: "Editar condições"
-      paid_label: "Pago"
-      to_go_label: "Em falta"
-      next_label: "Próxima"
-      all_instalments: "Todas as prestações"
-      of: "de"
-  components:
-    money:
       loan_card:
         section_title: "O empréstimo"
         loan_type: "empréstimo empresarial"
@@ -121,3 +99,23 @@ pt:
         paid_of: "%{paid} de %{total} pagas"
         to_go: "%{amount} em falta"
         next: "próxima %{date}"
+  loans:
+    create:
+      created_with_count:
+        one: "A acompanhar o empréstimo. Encontrei 1 prestação nos extratos."
+        other: "A acompanhar o empréstimo. Encontrei %{count} prestações nos extratos."
+      created_no_match: "A acompanhar o empréstimo. Vou associar as prestações à medida que os extratos chegarem."
+    update:
+      updated: "Condições atualizadas."
+    destroy:
+      destroyed: "Deixei de acompanhar este empréstimo."
+    dismiss:
+      dismissed: "Não é um empréstimo."
+    show:
+      back: "Money"
+      edit_terms: "Editar condições"
+      paid_label: "Pago"
+      to_go_label: "Em falta"
+      next_label: "Próxima"
+      all_instalments: "Todas as prestações"
+      of: "de"

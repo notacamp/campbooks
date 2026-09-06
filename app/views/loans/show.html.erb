@@ -56,7 +56,15 @@
         <span class="text-muted-foreground text-[12px] tabular-nums">#<%= ins.number %></span>
         <span class="text-muted-foreground text-[12px]"><%= l(ins.expected_on, format: :date) %></span>
         <span class="tabular-nums font-medium"><%= number_to_currency(ins.amount_cents / 100.0, unit: "€", precision: 2) %></span>
-        <%= status_chip(ins) %>
+        <span class="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset
+          <%= case ins.status
+              when 'paid'       then 'bg-green-50  text-green-700  ring-green-600/20  dark:bg-green-900/20 dark:text-green-400'
+              when 'missed'     then 'bg-red-50    text-red-700    ring-red-600/20    dark:bg-red-900/20   dark:text-red-400'
+              when 'unverified' then 'bg-yellow-50 text-yellow-700 ring-yellow-600/20 dark:bg-yellow-900/20 dark:text-yellow-400'
+              else                   'bg-zinc-50   text-zinc-600   ring-zinc-500/20   dark:bg-zinc-800     dark:text-zinc-400'
+              end %>">
+          <%= t("activerecord.attributes.loan_instalment.statuses.#{ins.status}", default: ins.status.humanize) %>
+        </span>
       </div>
     <% end %>
   </div>
