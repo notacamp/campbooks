@@ -224,7 +224,7 @@ RSpec.describe People::Standings do
       due_date = Date.current + 5
       task = workspace.tasks.create!(title: "Do the thing", status: :todo,
                                      priority: :normal, created_by: user,
-                                     source: msg, due_at: Time.zone.local(due_date.year, due_date.month, due_date.day))
+                                     source: msg, due_at: Time.zone.local(due_date.year, due_date.month, due_date.day, 12))
       described_class.refresh!(user)
 
       row = PeopleStanding.for_user(user).find_by!(counterpart: person)

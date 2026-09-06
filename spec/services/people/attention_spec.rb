@@ -339,7 +339,7 @@ RSpec.describe People::Attention do
       due = Date.current + 3
       task = workspace.tasks.create!(title: "Dated work", status: :todo,
                                      priority: :normal, created_by: user,
-                                     source: msg, due_at: Time.zone.local(due.year, due.month, due.day))
+                                     source: msg, due_at: Time.zone.local(due.year, due.month, due.day, 12))
       block = FocusBlock.create!(workspace: workspace, user: user, task: task,
                                  title: "Focus: Dated work",
                                  start_at: 1.day.from_now.change(hour: 10),
