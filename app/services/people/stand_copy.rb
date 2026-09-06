@@ -7,7 +7,7 @@ module People
     module_function
 
     # Row line. nil when there is nothing to say (the row then shows the snippet).
-    def line(result)
+    def line(result, zone: Time.zone)
       case result.detail_kind
       when :ask_ai        then I18n.t("people.stand.asks_for", ask: result.detail)
       when :ask_quote     then I18n.t("people.stand.asks_quote", quote: result.detail)
@@ -16,6 +16,18 @@ module People
       when :prompt        then sentence_case(result.detail)
       when :you_wrote_last then I18n.t("people.stand.you_wrote_last", date: fmt_date(result.detail))
       when :money         then money_line(result)
+      when :ask_do
+        ask = result.ask || {}
+        base = if ask["due_on"].present?
+          I18n.t("people.stand.do_by", ask: result.detail, date: fmt_date(ask["due_on"]))
+        else
+          I18n.t("people.stand.do", ask: result.detail)
+        end
+        if ask["held_at"].present?
+          base + " " + I18n.t("people.stand.held", when: fmt_held(ask["held_at"], zone: zone))
+        else
+          base
+        end
       end
     end
 
@@ -64,6 +76,28 @@ module People
           money_note(result, name: name, key: "pay")
         when :chase
           money_note(result, name: name, key: "chase")
+        when :do
+          ask = result.ask || {}
+          ask_text = result.detail.to_s.truncate(120)
+          today = Date.current
+          due_on = ask["due_on"].present? ? Date.parse(ask["due_on"]) : nil
+          held_at = ask["held_at"].presence
+
+          base = if due_on && due_on < today
+            I18n.t("people.conversation.stand.do_overdue", ask: ask_text, name: name,
+                   date: fmt_date(due_on), count: (today - due_on).to_i)
+          elsif due_on
+            I18n.t("people.conversation.stand.do_by", name: name, ask: ask_text,
+                   date: fmt_date(due_on))
+          else
+            I18n.t("people.conversation.stand.do", name: name, ask: ask_text)
+          end
+
+          if held_at.present?
+            base + " " + I18n.t("people.conversation.stand.do_held", when: fmt_held(held_at))
+          else
+            base
+          end
         end
       else
         # No verb: nothing is overdue, but the latest exchange may still say something.
@@ -91,6 +125,14 @@ module People
     # ("Aug 30"); anything unparseable comes back as-is rather than blowing up a row.
     def fmt_date(value)
       I18n.l(value.to_date, format: :day_month)
+    rescue ArgumentError, TypeError, NoMethodError
+      value.to_s
+    end
+
+    # Format a held-block start_at as "Thursday 10:00" in the given zone.
+    def fmt_held(value, zone: Time.zone)
+      time = value.is_a?(::Time) ? value : Time.zone.parse(value.to_s)
+      time.in_time_zone(zone).strftime("%A %H:%M")
     rescue ArgumentError, TypeError, NoMethodError
       value.to_s
     end
