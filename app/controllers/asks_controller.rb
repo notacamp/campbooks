@@ -6,7 +6,7 @@
 # to /time (HTML). The only decision an ask ever puts to the reader is *when* — Hold
 # Scout's free slot, Set a date, or Not now — and all three land it on Time.
 #
-# Gated by Features.tasks? (readiness) and the :tasks entitlement (billing).
+# Gated by Features.tasks? (readiness) only — asks are core, not a paid feature.
 # Personal-to-the-workspace, so a miss 404s (never 403), matching the app convention.
 class AsksController < ApplicationController
   include TimeAgendaLoading # load_time_agenda / agenda_list / agenda_move_slots
@@ -14,7 +14,6 @@ class AsksController < ApplicationController
   before_action :require_authentication
   before_action :require_tasks_enabled
   before_action :set_ask
-  before_action :require_tasks_entitlement
 
   # Hold Scout's earliest free slot for the ask (a kept focus block → a real
   # calendar event when a writable calendar exists, local otherwise).
@@ -101,12 +100,6 @@ class AsksController < ApplicationController
     @ask = Task.accessible_to(current_user).find(params[:id])
   rescue ActiveRecord::RecordNotFound
     head :not_found
-  end
-
-  # Safety net for a direct POST when the plan doesn't allow tasks (the UI hides the
-  # controls). Renders the upgrade response and halts the action.
-  def require_tasks_entitlement
-    require_entitlement!(:tasks)
   end
 
   def resolve_date(param)

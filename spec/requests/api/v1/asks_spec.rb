@@ -5,7 +5,7 @@ require "rails_helper"
 # The /api/v1/asks routes are a thin alias of /api/v1/tasks (same controller,
 # scopes and payloads). These specs prove the alias responds like tasks.
 RSpec.describe "API v1 asks (tasks alias)", type: :request do
-  let(:workspace) { create(:workspace, entitlement_overrides: { "tasks" => { "allowed" => true } }) }
+  let(:workspace) { create(:workspace) } # asks need no entitlement (the API gates on scopes only)
   let(:user) { create(:user, workspace: workspace) }
 
   def read_headers = api_auth_headers(workspace: workspace, user: user, scopes: "tasks:read")

@@ -17,11 +17,13 @@ module Digests
       end
     end
 
-    # Source keys available for a given workspace. Excludes the tasks source when
-    # the tasks feature is not enabled for that workspace.
-    def self.available_keys(workspace)
+    # Source keys available for a given workspace. Excludes the tasks (asks) source
+    # only when the readiness flag is off (ENABLE_TASKS=0); asks are no longer a paid
+    # feature, so no entitlement is checked (the workspace arg is kept for the
+    # signature its callers already use).
+    def self.available_keys(_workspace)
       KEYS.reject do |key|
-        key == "tasks" && !(Features.tasks? && workspace.entitlements.feature?(:tasks))
+        key == "tasks" && !Features.tasks?
       end
     end
   end

@@ -62,18 +62,19 @@ RSpec.describe Digests::Sources do
     expect(ids).not_to include(msg_b.id)
   end
 
-  # -- tasks source — gated when tasks feature is off -------------------------
+  # -- tasks (asks) source — gated only by the opt-out readiness flag ----------
+  # Asks are no longer a paid feature, so no entitlement is checked; only
+  # ENABLE_TASKS=0 hides the source.
 
-  it "available_keys excludes tasks when ENABLE_TASKS is off and entitlement missing" do
-    with_env("ENABLE_TASKS" => nil) do
+  it "available_keys excludes tasks when ENABLE_TASKS is off (0)" do
+    with_env("ENABLE_TASKS" => "0") do
       keys = described_class.available_keys(ws)
       expect(keys).not_to include("tasks")
     end
   end
 
-  it "available_keys includes tasks when ENABLE_TASKS is on and entitlement granted" do
-    with_env("ENABLE_TASKS" => "1") do
-      ws.update!(entitlement_overrides: { "tasks" => { "allowed" => true, "enabled" => true } })
+  it "available_keys includes tasks by default (no entitlement needed)" do
+    with_env("ENABLE_TASKS" => nil) do
       keys = described_class.available_keys(ws)
       expect(keys).to include("tasks")
     end

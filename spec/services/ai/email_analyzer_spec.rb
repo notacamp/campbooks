@@ -87,4 +87,104 @@ RSpec.describe Ai::EmailAnalyzer do
       expect(email.reload.ai_analyzed_at).to be_nil
     end
   end
+
+  # The analyzer's single read now also stages the asks it found (PR4): the work
+  # Ai::TaskExtractor / Tasks::EmailExtractionJob used to do two minutes later.
+  describe "#analyze! staging asks" do
+    def stub_response(asks:)
+      resp = {
+        "summary" => "Sender requests review of Q3 slides.", "priority" => "medium",
+        "action_prompt" => "", "ask" => "review of the Q3 slides",
+        "suggested_actions" => [], "questions" => [], "asks" => asks
+      }.to_json
+      config = { adapter: double(chat: resp), model: "test-model", temperature: 0.1 }
+      allow(Ai::Configuration).to receive(:for_any).and_return(config)
+    end
+
+    let(:one_ask) do
+      [ { "title" => "Review the Q3 slides", "description" => "Look at slides 4 to 9 and reply with comments.",
+          "due_date" => nil, "due_time" => nil, "priority" => "normal",
+          "confidence" => 0.9, "justification" => '"Please review the attached slides."' } ]
+    end
+
+    it "persists the email fields AND stages a suggested Task through the builder" do
+      stub_response(asks: one_ask)
+
+      expect { described_class.new(email).analyze! }.to change { Task.count }.by(1)
+
+      email.reload
+      expect(email.ai_ask).to eq("review of the Q3 slides")
+      task = Task.last
+      expect(task).to be_suggested
+      expect(task).to be_ai_suggested
+      expect(task.title).to eq("Review the Q3 slides")
+      expect(task.source).to eq(email)
+      expect(task.workspace).to eq(workspace)
+    end
+
+    it "fingerprints on the email's thread so a restated ask collapses" do
+      thread = create(:email_thread, email_account: account)
+      email.update!(email_thread: thread)
+      stub_response(asks: one_ask)
+
+      described_class.new(email).analyze!
+
+      expect(Task.last.extraction_fingerprint).to eq(
+        Task.fingerprint_for(source_type: "EmailThread", source_id: thread.id, title: "Review the Q3 slides")
+      )
+    end
+
+    it "drops an ask below the builder's confidence floor" do
+      stub_response(asks: [ one_ask.first.merge("confidence" => 0.3) ])
+      expect { described_class.new(email).analyze! }.not_to change { Task.count }
+      expect(email.reload.ai_analyzed_at).to be_present
+    end
+
+    it "stages nothing for a vetoed (machine-category) email but still saves the analysis" do
+      email.update_columns(category: "notifications")
+      stub_response(asks: one_ask)
+
+      expect { described_class.new(email).analyze! }.not_to change { Task.count }
+      expect(email.reload.ai_summary).to be_present
+    end
+
+    it "stages nothing when the readiness flag is off" do
+      allow(Features).to receive(:tasks?).and_return(false)
+      stub_response(asks: one_ask)
+      expect { described_class.new(email).analyze! }.not_to change { Task.count }
+      expect(email.reload.ai_ask).to eq("review of the Q3 slides")
+    end
+
+    it "never lets a builder failure break the analysis (email fields already saved)" do
+      stub_response(asks: one_ask)
+      allow(Tasks::Builder).to receive(:call).and_raise(StandardError, "boom")
+
+      expect { described_class.new(email).analyze! }.not_to raise_error
+      expect(email.reload.ai_analyzed_at).to be_present
+      expect(email.ai_ask).to eq("review of the Q3 slides")
+    end
+
+    it "includes the received date and tracked commitments in the prompt" do
+      workspace.tasks.create!(title: "Send the signed NDA", status: :todo, priority: :normal,
+                              due_at: 3.days.from_now)
+      captured = nil
+      adapter = double
+      allow(adapter).to receive(:chat) do |**kw|
+        captured = kw
+        { "summary" => "s", "priority" => "low", "action_prompt" => "", "ask" => "",
+          "suggested_actions" => [], "questions" => [], "asks" => [] }.to_json
+      end
+      allow(Ai::Configuration).to receive(:for_any).and_return(
+        { adapter: adapter, model: "m", temperature: 0.0 }
+      )
+
+      described_class.new(email).analyze!
+
+      content = captured[:messages].first[:content]
+      expect(content).to include("<already_tracked_commitments>")
+      expect(content).to include("Send the signed NDA")
+      expect(content).to include("Received: #{email.received_at.to_date.iso8601}")
+      expect(captured[:max_tokens]).to eq(900)
+    end
+  end
 end

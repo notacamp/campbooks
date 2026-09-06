@@ -613,10 +613,9 @@ RSpec.describe "API MCP endpoint", type: :request do
       expect(names).not_to include("list_tasks", "create_task", "complete_task")
     end
 
-    it "shows and runs task tools when Features.tasks? is on" do
+    it "shows and runs task tools when Features.tasks? is on (no entitlement needed)" do
       allow(Features).to receive(:tasks?).and_return(true)
-      # entitlements builds a fresh resolver per call — grant tasks via the plan, not a stub.
-      workspace.update!(plan: "pro")
+      # Default (free) plan — asks are core now, so the tools run without an entitlement.
 
       rpc({ jsonrpc: "2.0", id: 71, method: "tools/call",
             params: { name: "list_tasks", arguments: {} } },
@@ -668,7 +667,6 @@ RSpec.describe "API MCP endpoint", type: :request do
   describe "create_task" do
     before do
       allow(Features).to receive(:tasks?).and_return(true)
-      workspace.update!(plan: "pro")
     end
 
     it "succeeds without all_day (defaults false, no NOT NULL crash)" do
@@ -688,7 +686,6 @@ RSpec.describe "API MCP endpoint", type: :request do
   describe "update_task" do
     before do
       allow(Features).to receive(:tasks?).and_return(true)
-      workspace.update!(plan: "pro")
     end
 
     it "returns isError for an invalid status value" do

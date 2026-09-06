@@ -330,7 +330,7 @@ require no scope.
 | `complete_task` | Mark a task as done. | `tasks:write` ¹ |
 | `create_task_from_email` | Extract and create a task from an email via the action registry. | `tasks:write` ¹ |
 
-> ¹ Task tools appear only when `ENABLE_TASKS=1`.
+> ¹ Task tools appear unless `ENABLE_TASKS=0`.
 
 ### Calendar
 
@@ -456,7 +456,7 @@ Google and Zoho support both modes.
 - **Same scopes, same tools:** the MCP endpoint ships enabled on every self-hosted instance —
   no extra flag or service required. Scopes, tool families, and permission semantics are
   identical to Campbooks Cloud.
-- **Feature-gated families:** `tasks:*` tools appear only when `ENABLE_TASKS=1`; `workflows:*`
+- **Feature-gated families:** `tasks:*` tools appear unless `ENABLE_TASKS=0`; `workflows:*`
   tools only when `ENABLE_WORKFLOWS=1`; `list_email_templates` only when
   `ENABLE_EMAIL_TEMPLATES=1`. All other tool families are available out of the box with no
   additional configuration.

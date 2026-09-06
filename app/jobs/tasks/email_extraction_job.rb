@@ -1,7 +1,9 @@
 module Tasks
-  # Best-effort task extraction from a newly processed email. Gated by a cheap
-  # pre-filter (so most mail never costs an LLM call), the readiness flag, and the
-  # workspace's :tasks entitlement. Enqueued from EmailProcessJob.
+  # Best-effort task extraction from an email. No longer enqueued per email — the
+  # email analyzer (Ai::EmailAnalyzer) stages the asks in its single read. This job
+  # survives for the backfill rake task (lib/tasks/tasks_module.rake), which re-runs
+  # extraction over mail ingested before asks shipped. Gated by a cheap pre-filter
+  # (so most mail never costs an LLM call) and the readiness flag.
   class EmailExtractionJob < ApplicationJob
     queue_as :default
     retry_on StandardError, wait: :polynomially_longer, attempts: 3
@@ -19,7 +21,6 @@ module Tasks
       return unless Tasks::ExtractionGate.email_allows?(email)
 
       workspace = email.email_account.workspace
-      return unless workspace.entitlements.feature?(:tasks)
       return unless Ai::ProviderSetup.configured?(workspace, :text)
 
       Current.workspace = workspace
@@ -30,7 +31,7 @@ module Tasks
       body = Emails::PlainText.of(email.body)
       content = [ email.subject, email.ai_summary, body ].compact_blank.join("\n\n")
 
-      memory = task_learning_memory(workspace)
+      memory = Tasks::LearningMemory.for(workspace)
       known  = Commitments::Known.for(workspace: workspace, source: email)
 
       items = Ai::TaskExtractor.new(
@@ -67,15 +68,6 @@ module Tasks
       Task.where(source_type: "EmailMessage",
                  source_id: EmailMessage.where(email_thread_id: email.email_thread_id).select(:id))
           .order(created_at: :desc).limit(20).pluck(:title)
-    end
-
-    # One memory per run, shared by the extractor (soft prompt hint) and the builder
-    # (deterministic suppression). Best-effort: a failure here just means no learning.
-    def task_learning_memory(workspace)
-      Learning::Memory.new(source: Learning::Sources::Tasks.new(workspace))
-    rescue => e
-      Rails.logger.warn("[#{self.class.name}] learning_memory failed: #{e.message}")
-      nil
     end
   end
 end

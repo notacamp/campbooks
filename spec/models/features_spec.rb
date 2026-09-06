@@ -4,7 +4,7 @@ require "rails_helper"
 # afterwards (the suite defaults them ON in config/environments/test.rb).
 RSpec.describe Features do
   around do |example|
-    keys = %w[ENABLE_WORKFLOWS ENABLE_EMAIL_BOARD ENABLE_MICROSOFT ENABLE_MICROSOFT_MAILBOX]
+    keys = %w[ENABLE_WORKFLOWS ENABLE_EMAIL_BOARD ENABLE_MICROSOFT ENABLE_MICROSOFT_MAILBOX ENABLE_TASKS]
     saved = keys.index_with { |k| ENV[k] }
     begin
       example.run
@@ -54,6 +54,20 @@ RSpec.describe Features do
     it "honors the legacy ENABLE_MICROSOFT_MAILBOX flag" do
       ENV["ENABLE_MICROSOFT_MAILBOX"] = "1"
       expect(Features.microsoft?).to be(true)
+    end
+  end
+
+  # Asks are core: tasks? is an opt-OUT readiness flag (like imap?), on by default.
+  describe ".tasks?" do
+    it "is on by default and off only when ENABLE_TASKS == '0'" do
+      ENV.delete("ENABLE_TASKS")
+      expect(Features.tasks?).to be(true)
+
+      ENV["ENABLE_TASKS"] = "1"
+      expect(Features.tasks?).to be(true)
+
+      ENV["ENABLE_TASKS"] = "0"
+      expect(Features.tasks?).to be(false)
     end
   end
 end

@@ -2,7 +2,7 @@ module Tasks
   # Best-effort task extraction from a processed document — a contract or proposal
   # may carry an action the reader owns (sign, review, return). Runs a cheap TEXT
   # pass over the already-extracted structured data (no second vision call). Gated
-  # by the readiness flag and the :tasks entitlement. Enqueued from DocumentProcessJob.
+  # by the readiness flag. Enqueued from DocumentProcessJob.
   class DocumentExtractionJob < ApplicationJob
     queue_as :default
     retry_on StandardError, wait: :polynomially_longer, attempts: 3
@@ -18,7 +18,6 @@ module Tasks
       return if SKIP_TYPES.include?(document.document_type)
 
       workspace = document.workspace
-      return unless workspace.entitlements.feature?(:tasks)
       return unless Ai::ProviderSetup.configured?(workspace, :text)
 
       Current.workspace = workspace
@@ -29,7 +28,7 @@ module Tasks
         document.metadata.presence&.to_json
       ].compact_blank.join("\n")
 
-      memory = task_learning_memory(workspace)
+      memory = Tasks::LearningMemory.for(workspace)
       known  = Commitments::Known.for(workspace: workspace, source: document)
 
       items = Ai::TaskExtractor.new(
@@ -49,17 +48,6 @@ module Tasks
       Feed::RefreshJob.enqueue_for_workspace(workspace) if tasks.any?
     ensure
       Current.workspace = nil
-    end
-
-    private
-
-    # One memory per run, shared by the extractor (soft prompt hint) and the builder
-    # (deterministic suppression). Best-effort: a failure here just means no learning.
-    def task_learning_memory(workspace)
-      Learning::Memory.new(source: Learning::Sources::Tasks.new(workspace))
-    rescue => e
-      Rails.logger.warn("[#{self.class.name}] learning_memory failed: #{e.message}")
-      nil
     end
   end
 end

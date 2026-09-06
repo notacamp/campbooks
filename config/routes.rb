@@ -202,7 +202,7 @@ Rails.application.routes.draw do
   # own: it lives on Now (its email card, or a decision card) and Time (agenda rows
   # + the "No date yet" section). These member actions are the three ways out — hold
   # Scout's free slot, set a date, "Not now" — plus done/dismiss, each re-rendering
-  # the Time agenda. Gated by Features.tasks? + the :tasks entitlement (AsksController).
+  # the Time agenda. Gated by Features.tasks? only — asks are core, not paid (AsksController).
   resources :asks, only: [] do
     member do
       post  :hold      # Time::FocusHolder — hold Scout's free slot for the ask
@@ -218,8 +218,8 @@ Rails.application.routes.draw do
   # Tasks — the board, list, skim, task page, task form and task discussions
   # retired into Time (asks). The Task record, the API (/api/v1/tasks) and the MCP
   # tools are unchanged; these two routes survive so old notification/digest links
-  # keep working: /tasks and /tasks/:id redirect to Time (TasksController). Still
-  # gated by Features.tasks? and the :tasks entitlement.
+  # keep working: /tasks and /tasks/:id redirect to Time (TasksController). Gated by
+  # Features.tasks? only (opt-out via ENABLE_TASKS=0) — no longer a paid feature.
   resources :tasks, only: [ :index, :show ]
 
   # Scheduled digests — user-owned, workspace-scoped, multi-source + optional AI.

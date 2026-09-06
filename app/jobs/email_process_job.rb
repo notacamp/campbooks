@@ -195,12 +195,10 @@ class EmailProcessJob < ApplicationJob
     # Needs a text model, so it's skipped when no AI provider is configured.
     Reminders::EmailExtractionJob.perform_later(email.id) if text_ai_available && !was_already_processed
 
-    # Best-effort: extract action items (tasks) the reader must do. Gated by the
-    # Tasks readiness flag here; the job re-checks the workspace's :tasks entitlement.
-    # Staggered 2 minutes behind the reminders job so the novelty gate in the tasks
-    # builder can see reminder rows the same email just staged (the two jobs share the
-    # ai_email_extraction concurrency key and otherwise race).
-    Tasks::EmailExtractionJob.set(wait: 2.minutes).perform_later(email.id) if Features.tasks? && text_ai_available && !was_already_processed
+    # Asks (action items the reader must do) are no longer mined by a separate
+    # per-email job: Ai::EmailAnalyzer (enqueued above as EmailAnalysisJob) stages
+    # them in its single read. Tasks::EmailExtractionJob survives only for the
+    # backfill rake task.
 
     # An outbound reply may deserve a follow-up if the other party goes quiet — let
     # the AI decide whether and when. Outbound-only, once per first ingest (so a full

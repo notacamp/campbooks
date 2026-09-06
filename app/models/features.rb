@@ -57,12 +57,13 @@ module Features
       flag?("ENABLE_MICROSOFT") || flag?("ENABLE_MICROSOFT_MAILBOX")
     end
 
-    # The Tasks module: AI task extraction, the task board/skim/feed surfaces,
-    # Scout + Cmd+K email linking, and the public API. Gated end-to-end (nav, web,
-    # API, extraction jobs) until production-ready. Orthogonal to the per-workspace
-    # `:tasks` billing entitlement — both must pass.
+    # Asks (the rethought Tasks module): asks on Now / People / Time, the analyzer's
+    # ask extraction, and the public API + MCP task tools. Unlike the opt-in gates
+    # this one is ON by default — asks are as core as deadlines — and ENABLE_TASKS=0
+    # is the opt-OUT for deployments that want to hide them (same shape as imap?). No
+    # longer a paid feature: the :tasks billing entitlement was removed.
     def tasks?
-      flag?("ENABLE_TASKS")
+      ENV.fetch("ENABLE_TASKS", "1") == "1"
     end
 
     # User-configured scheduled digests: saved scopes + rrule + optional AI

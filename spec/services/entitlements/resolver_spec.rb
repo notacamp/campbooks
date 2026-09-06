@@ -14,6 +14,12 @@ RSpec.describe Entitlements::Resolver do
       expect(resolver_for.feature?(:workflows)).to be(false)
     end
 
+    it "is false for tasks on every plan — asks are no longer a billing entitlement" do
+      %w[free pro business unlimited].each do |plan|
+        expect(resolver_for(plan: plan).feature?(:tasks)).to be(false)
+      end
+    end
+
     it "is true for managed_ai on every cloud plan (billing is via the deferred quota)" do
       %w[free pro business].each do |plan|
         expect(resolver_for(plan: plan).feature?(:managed_ai)).to be(true)

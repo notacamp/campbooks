@@ -37,4 +37,14 @@ RSpec.describe Campbooks::Feed::EmailActionCard, type: :component do
     expect(html).to include("ask_chips_#{email.id}")
     expect(html).to include("Set a date").or include("Hold")
   end
+
+  it "renders no ask chips when the readiness flag is off (ENABLE_TASKS=0)" do
+    workspace.tasks.create!(title: "Send the contract", status: :todo, priority: :normal, source: email)
+    allow(Features).to receive(:tasks?).and_return(false)
+    html = render_card
+
+    expect(html).to include("ask_chips_#{email.id}") # the empty container still renders
+    expect(html).not_to include("Set a date")
+    expect(html).not_to include("Hold")
+  end
 end

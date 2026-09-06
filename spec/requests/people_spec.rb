@@ -651,10 +651,6 @@ RSpec.describe "People", type: :request do
     describe "Do lane" do
       before { allow(Features).to receive(:tasks?).and_return(true) }
 
-      before do
-        workspace.update!(entitlement_overrides: { "tasks" => { "allowed" => true } })
-      end
-
       it "renders a Do lane between Decide and Pay" do
         person, _contact = make_person(name: "Sofia", email: "sofia@x.example")
         thread = EmailThread.where(email_account_id: account.id).last

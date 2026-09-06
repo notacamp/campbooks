@@ -244,6 +244,15 @@ RSpec.describe EmailProcessJob, type: :job do
             .to have_enqueued_job(EmailAnalysisJob).with(email_message.id)
         end
 
+        # PR4: the analyzer's single read stages the asks now — the separate
+        # per-email task extraction job is no longer enqueued (it survives only for
+        # the backfill rake task).
+        it "no longer enqueues Tasks::EmailExtractionJob" do
+          stub_triage
+          expect { described_class.perform_now(email_message.id) }
+            .not_to have_enqueued_job(Tasks::EmailExtractionJob)
+        end
+
         it "does not enqueue it for our own outbound mail" do
           stub_triage
           email_message.update_columns(from_address: account.email_address)
