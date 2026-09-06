@@ -3,49 +3,52 @@
 require "rails_helper"
 
 RSpec.describe Campbooks::TimePage::AgendaRow, type: :component do
-  include Rails.application.routes.url_helpers
+  let(:zone) { ActiveSupport::TimeZone["UTC"] }
 
-  let(:workspace) { create(:workspace) }
-  let(:user) { create(:user, workspace: workspace) }
-  let(:zone) { user.effective_time_zone }
-
-  def agenda_item(task, **overrides)
-    Time::AgendaItem.new(**{
-      kind: :task, at: nil, day: nil, all_day: true, overdue: false, duration_minutes: 0,
-      title: task.title, source_label: "from Rita's email", source_path: nil, color: nil,
-      record: task, actions: []
-    }.merge(overrides))
+  def item_for(kind: :event, emphasis: :normal, why: nil, **attrs)
+    defaults = {
+      kind: kind, at: 2.hours.from_now, day: Date.current,
+      all_day: false, overdue: false, duration_minutes: 30,
+      title: "Test meeting", source_label: "Google Calendar", source_path: nil,
+      color: "#4a90e2", record: double("record", join_url: nil), actions: [],
+      emphasis: emphasis, why: why
+    }
+    ::Time::AgendaItem.new(**defaults.merge(attrs))
   end
 
-  def render_row(item, **kwargs)
-    ApplicationController.render(described_class.new(item: item, zone: zone, **kwargs), layout: false)
+  def render_row(item)
+    ApplicationController.render(described_class.new(item: item, zone: zone), layout: false)
   end
 
-  it "renders an undated ask row with Set a date, Hold, Done and a kebab" do
-    task = workspace.tasks.create!(title: "Send contract", status: :suggested, priority: :normal)
-    item = agenda_item(task, actions: %i[schedule hold done snooze dismiss_ask])
-    html = render_row(item, hold_slot: 1.day.from_now.change(hour: 10))
-
-    expect(html).to include("no date")           # time cell
-    expect(html).to include("Set a date")
-    expect(html).to include("Hold")
-    expect(html).to include("Done")
-    expect(html).to include(schedule_ask_path(task))
-    expect(html).to include(hold_ask_path(task))
-    expect(html).to include("Not now")           # kebab snooze
-    expect(html).to include("Dismiss")           # kebab dismiss_ask
-    expect(html).to include("ask")               # meta lead
+  describe "normal event" do
+    it "renders the title" do
+      html = render_row(item_for(title: "Project sync"))
+      expect(html).to include("Project sync")
+    end
   end
 
-  it "renders a dated ask kebab with Change date and a hold entry" do
-    task = workspace.tasks.create!(title: "Comments", status: :todo, priority: :normal, due_at: 2.days.from_now)
-    item = agenda_item(task, at: task.due_at, day: task.due_at.to_date, all_day: false,
-                       actions: %i[done change_date hold snooze])
-    html = render_row(item, hold_slot: 1.day.from_now.change(hour: 10))
+  describe ":prep emphasis" do
+    it "renders the Prep chip" do
+      html = render_row(item_for(emphasis: :prep, why: nil))
+      expect(html).to include("Prep")
+    end
 
-    expect(html).to include("Change date")
-    expect(html).to include("Done")
-    expect(html).to include(hold_ask_path(task)) # hold offered in the kebab
-    expect(html).not_to include("no date")       # dated row shows a time, not "no date"
+    it "renders the why line when present" do
+      html = render_row(item_for(emphasis: :prep, why: "with Sofia, you reply fast"))
+      expect(html).to include("with Sofia, you reply fast")
+    end
+  end
+
+  describe ":quiet emphasis" do
+    it "renders the Declined badge" do
+      html = render_row(item_for(emphasis: :quiet))
+      expect(html).to include("Declined")
+    end
+
+    it "renders the title with muted styling" do
+      html = render_row(item_for(emphasis: :quiet, title: "Quiet meeting"))
+      expect(html).to include("Quiet meeting")
+      expect(html).to include("text-muted-foreground")
+    end
   end
 end

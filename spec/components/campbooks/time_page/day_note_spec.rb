@@ -9,7 +9,7 @@ RSpec.describe Campbooks::TimePage::DayNote, type: :component do
   def note(**attrs)
     Time::DayNote::Result.new(**{
       date: Date.current, meetings_count: 0, deadlines_count: 0, first_deadline_title: nil,
-      focus: nil, late_obligation: nil, undated_count: 0
+      focus: nil, late_obligation: nil, prep_meeting: nil, undated_count: 0
     }.merge(attrs))
   end
 

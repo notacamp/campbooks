@@ -9,6 +9,10 @@ en:
       new_event: New
     agenda:
       untitled: Untitled
+      why:
+        with: "with %{name}, %{reason}"
+        open: "open: %{subject}, asked %{days} days ago"
+        open_detail: "%{subject} is still open, asked %{days} days ago"
       # Provenance shown after a row's title, e.g. "30 min · Google Calendar" or
       # "deadline · from Ana's email". Built by Time::Agenda.
       source:
@@ -38,6 +42,8 @@ en:
       agenda_row:
         all_day: all day
         overdue: overdue
+        prep: "Prep"
+        declined: "Declined"
         deadline: deadline
         ask: ask
         no_date: no date
@@ -88,6 +94,7 @@ en:
           one: One ask has no date yet.
           other: "%{count} asks have no date yet."
         focus: I held %{duration} %{when} for %{subject}.
+        prep: "The one worth preparing for is %{time} with %{name}: %{why}."
         minutes:
           one: "%{count} minute"
           other: "%{count} minutes"

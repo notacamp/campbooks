@@ -252,6 +252,31 @@ RSpec.describe Feed::Ranking do
       expect(c[:data]).not_to have_key("why")
     end
 
+    it "lifts a calendar event by its highest-weight guest (PR 3)" do
+      contact = weighted_contact(weight: 0.9)
+      calendar = create(:calendar, calendar_account: create(:calendar_account, workspace: workspace))
+      with_guest = create(:calendar_event, calendar: calendar, start_at: 1.hour.from_now, end_at: 2.hours.from_now,
+                          attendees: [ { "email" => contact.email, "rsvp_status" => "accepted" } ])
+      without = create(:calendar_event, calendar: calendar, start_at: 1.hour.from_now, end_at: 2.hours.from_now)
+
+      a = rank("calendar_event", candidate(with_guest, score: 60, sort_at: 1.hour.from_now))
+      b = rank("calendar_event", candidate(without, score: 60, sort_at: 1.hour.from_now))
+
+      expect(a[:score]).to eq(b[:score] + attention_boost(0.9))
+      expect(a[:data]["weight"]).to eq(0.9)
+    end
+
+    it "lifts a reminder by the sender of the email it came from (PR 3)" do
+      contact = weighted_contact(weight: 0.9)
+      reminder = create(:reminder, workspace: workspace, source: message(contact: contact))
+      plain = create(:reminder, workspace: workspace)
+
+      a = rank("reminder", candidate(reminder, score: 60, sort_at: 1.day.from_now))
+      b = rank("reminder", candidate(plain, score: 60, sort_at: 1.day.from_now))
+
+      expect(a[:score]).to eq(b[:score] + attention_boost(0.9))
+    end
+
     it "drops a stale why when the row no longer has a positive reason" do
       contact = weighted_contact(weight: 0.05,
                                  reasons: [ { "key" => "ignored", "params" => { "percent" => 80 } } ])
@@ -292,6 +317,27 @@ RSpec.describe Feed::Ranking do
       expect(c[:score]).to eq(60)
       expect(c[:data]).not_to have_key("weight")
       expect(c[:data]).not_to have_key("why")
+    end
+  end
+
+  describe "no-decay for late bills" do
+    it "does not decay late_payable even when sort_at is long past" do
+      doc = create(:document, :approved, workspace: workspace, document_type: :expense_invoice,
+                   amount_cents: 10_000, due_date: 30.days.ago)
+      c = rank("late_payable", candidate(doc, score: 90, sort_at: 30.days.ago, attention: true))
+      expect(c[:score]).to eq(90)
+    end
+
+    it "does not decay late_receivable even when sort_at is long past" do
+      doc = create(:document, :approved, :revenue_invoice, workspace: workspace,
+                   amount_cents: 10_000, due_date: 30.days.ago)
+      c = rank("late_receivable", candidate(doc, score: 90, sort_at: 30.days.ago, attention: true))
+      expect(c[:score]).to eq(90)
+    end
+
+    it "still decays follow_up as before" do
+      c = rank("follow_up", candidate(message, score: 80, sort_at: (14.days + 36.hours).ago))
+      expect(c[:score]).to be_within(2).of(40)
     end
   end
 

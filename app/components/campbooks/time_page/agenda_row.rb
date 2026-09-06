@@ -20,7 +20,7 @@ module Campbooks
       end
 
       def view_template
-        div(id: "agenda_#{@item.kind}_#{@item.record.id}",
+        div(id: row_id,
             class: "flex flex-col gap-1.5 border-b border-border py-3 last:border-b-0 " \
                    "sm:grid sm:grid-cols-[64px_minmax(0,1fr)_auto] sm:items-center sm:gap-3") do
           time_cell
@@ -30,6 +30,13 @@ module Campbooks
       end
 
       private
+
+      # A stable per-row anchor (agenda_task_<id>) for in-place highlights; nil for a
+      # record without an id (expanded occurrences, test doubles).
+      def row_id
+        record_id = @item.record.try(:id)
+        record_id ? "agenda_#{@item.kind}_#{record_id}" : nil
+      end
 
       def time_cell
         span(class: "font-mono text-xs tabular-nums text-muted-foreground") { time_text }
@@ -45,10 +52,22 @@ module Campbooks
       def body_cell
         div(class: "min-w-0") do
           dot
-          span(class: "text-sm font-semibold text-foreground") { @item.title }
+          title_span
           overdue_badge if @item.overdue
+          prep_chip if @item.prep?
+          declined_badge if @item.quiet?
           meta_suffix
+          prep_why_line if @item.prep? && @item.why.present?
         end
+      end
+
+      def title_span
+        title_class = if @item.quiet?
+          "text-sm font-medium text-muted-foreground"
+        else
+          "text-sm font-semibold text-foreground"
+        end
+        span(class: title_class) { @item.title }
       end
 
       # A 10px rounded square inline before the title, colour-coded by kind: the
@@ -56,16 +75,35 @@ module Campbooks
       # ring (a proposed focus block) or an ink outline (an ask).
       def dot
         base = "mr-2 inline-block h-2.5 w-2.5 shrink-0 rounded-[3px] align-[-1px]"
+        opacity = @item.quiet? ? " opacity-45" : ""
         case @item.kind
         when :event
-          span(class: base, style: "background-color: #{@item.color}")
+          span(class: "#{base}#{opacity}", style: "background-color: #{@item.color}")
         when :deadline
-          span(class: class_names(base, "bg-ember-gradient"))
+          span(class: class_names(base, "bg-ember-gradient") + opacity)
         when :focus
-          span(class: class_names(base, "border border-dashed border-muted-foreground"))
+          span(class: class_names(base, "border border-dashed border-muted-foreground") + opacity)
         else # :task
-          span(class: class_names(base, "border border-foreground/50"))
+          span(class: class_names(base, "border border-foreground/50") + opacity)
         end
+      end
+
+      # An Ember dot + "PREP" in small caps (DESIGN.md: a priority accent is a small
+      # Ember dot, never a colored block) — the mark from the approved prototype.
+      def prep_chip
+        span(class: "ml-2 inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-foreground",
+             data: { agenda_prep: true }) do
+          span(class: "inline-block h-1.5 w-1.5 rounded-full", style: "background-color: var(--ember-solid)")
+          plain t(".prep")
+        end
+      end
+
+      def declined_badge
+        span(class: "ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground") { t(".declined") }
+      end
+
+      def prep_why_line
+        div(class: "mt-0.5 text-[12px] text-foreground/70") { @item.why }
       end
 
       def meta_suffix

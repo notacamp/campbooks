@@ -21,6 +21,8 @@ class Money
     :id, :direction, :counterpart, :what, :amount, :due_on, :status,
     :settled_on, :settled_via, :source_email_message, :document, :reminder,
     :recurring, :cadence, :next_renewal_on, :due_estimated, :pay_url, :actions,
+    # Attention enrichment (set by Money::Ledger#enrich_obligations!):
+    :priority, :why, :counterpart_weight, :amount_ratio, :usual_delay_days, :attention_reason,
     keyword_init: true
   ) do
     def receivable? = direction == :receivable

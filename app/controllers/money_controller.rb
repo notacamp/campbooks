@@ -164,7 +164,7 @@ class MoneyController < ApplicationController
     remembered = Array(session[:money_sort]).map { |v| v.to_s.to_sym }
     return remembered if remembered.size == 2 && Money::Ledger::SORTS.include?(remembered[0]) && Money::Ledger::DIRS.include?(remembered[1])
 
-    [ :date, :desc ]
+    [ :priority, :desc ]
   end
 
   def set_obligation
