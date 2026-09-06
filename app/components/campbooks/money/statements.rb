@@ -2,10 +2,11 @@
 
 module Campbooks
   module Money
-    # The Statements section header and its month tabs. Each tab targets the
-    # `money_statement` turbo-frame that money/_statement_frame renders right
-    # after this component (one implementation of the frame, shared with the
-    # `money#statement` action). With no statements yet: the empty state.
+    # The Statements section header. The month pills and the paired ledger live
+    # together inside the `money_statement` turbo-frame that money/_statement_frame
+    # renders right after this component (one implementation, shared with the
+    # `money#statement` action), so a tab click moves the selection with the
+    # ledger. With no statements yet: the empty state.
     class Statements < Campbooks::Base
       def initialize(page:, **attrs)
         @page  = page
@@ -15,11 +16,7 @@ module Campbooks
       def view_template
         div(class: @attrs.delete(:class), **@attrs) do
           section_header
-          if @page.statements.empty?
-            empty_state
-          else
-            tab_bar
-          end
+          empty_state if @page.evidence.statements.empty?
         end
       end
 
@@ -33,40 +30,6 @@ module Campbooks
             plain " · #{bank}" if bank
           end
           span(class: "ml-auto text-[12px] text-muted-foreground") { t(".note") }
-        end
-      end
-
-      def tab_bar
-        nav(class: "flex flex-wrap gap-1.5", role: "tablist", aria_label: t(".title")) do
-          @page.statements.each { |stmt| tab_pill(stmt) }
-          if @page.more_statements?
-            a(href: helpers.money_statements_path, class: pill_classes(false), data: { turbo_frame: "_top" }) { t(".earlier") }
-          end
-        end
-      end
-
-      def tab_pill(stmt)
-        selected        = @page.selected_statement&.id == stmt.id
-        resolved, total = @page.statement_counts.fetch(stmt.id, [ 0, 0 ])
-        has_unresolved  = total.positive? && resolved < total
-
-        a(href: helpers.money_path(statement: stmt.id), class: pill_classes(selected), role: "tab",
-          aria_selected: selected.to_s, data: { turbo_frame: "money_statement" }) do
-          if has_unresolved
-            span(class: class_names("h-1.5 w-1.5 rounded-full", selected ? "bg-background" : "bg-ember-gradient shadow-ember-glow"),
-                 aria_hidden: "true")
-          end
-          plain @page.evidence.label_for(stmt)
-          span(class: class_names("tabular-nums", selected ? "opacity-70" : "opacity-60")) { plain "#{resolved}/#{total}" }
-        end
-      end
-
-      def pill_classes(selected)
-        base = "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium no-underline transition-colors"
-        if selected
-          class_names(base, "bg-foreground text-background")
-        else
-          class_names(base, "border border-border text-muted-foreground hover:bg-muted hover:text-foreground")
         end
       end
 

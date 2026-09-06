@@ -65,6 +65,9 @@ pt:
       invalid_reason: "Motivo inválido."
       gone: "Este item já não está aqui."
       undo: "Desfazer"
+      reconciling:
+        one: "A reconciliar um extrato. O Scout está a lê-lo."
+        other: "A reconciliar %{count} extratos. O Scout está a lê-los."
   components:
     money:
       read:
@@ -74,6 +77,7 @@ pt:
         add_one: "Adicione um"
         the_bank: "o banco"
         statement_html: "O extrato de %{label} do %{bank} está carregado: %{explained} de %{total} linhas têm o seu papel."
+        statement_no_bank_html: "O extrato de %{label} chegou: %{explained} de %{total} linhas têm o seu papel."
         needs_invoice_html_one: "Uma ainda precisa de fatura"
         needs_invoice_html: "%{count} ainda precisam de fatura"
         review_html_one: "uma correspondência quer ser revista"
@@ -87,6 +91,16 @@ pt:
           one: "Uma fatura de %{label} não está neste extrato."
           other: "%{count} faturas de %{label} não estão neste extrato."
         all_explained_html: "Cada linha tem o seu papel."
+        statements_pending_html:
+          one: "Tenho um extrato bancário do seu email que ainda não foi reconciliado. %{link}"
+          other: "Tenho %{count} extratos bancários do seu email que ainda não foram reconciliados. %{link}"
+        statements_pending_link:
+          one: "Reconcilio?"
+          other: "Reconcilio-os?"
+        focus_missing_html: "O extrato de %{month} ainda não chegou."
+        missing_all_html:
+          one: "Uma fatura de um mês reconciliado não está em nenhum extrato."
+          other: "%{count} faturas de meses reconciliados não estão em nenhum extrato."
         nth_instalment: "%{nth} prestação"
         loan_on_schedule_html: "A %{nth} do empréstimo saiu no dia %{day}, dentro do prazo; faltam %{remaining}."
         loan_seen_html: "A %{nth} do empréstimo saiu no dia %{day}; faltam %{remaining}."
@@ -99,6 +113,9 @@ pt:
         explained: "explicado"
         needs_invoice: "Precisam de fatura"
         not_on_a_statement: "Não está no extrato"
+        no_statement_yet: "Ainda sem extrato"
+        add_it: "Adicionar"
+        reconcile_it: "Reconciliar"
         payments:
           one: "%{count} pagamento"
           other: "%{count} pagamentos"
@@ -115,14 +132,30 @@ pt:
         ask_for_invoice: "Pedir fatura corrigida"
         overflow: "+%{count} mais no extrato"
         overflow_link: "Abrir o extrato"
+        reconcile_title:
+          one: "Um extrato bancário do seu email ainda não foi reconciliado"
+          other: "%{count} extratos bancários do seu email ainda não foram reconciliados"
+        and_more: "e mais %{count}"
+        pick_which: "Escolher"
+        reconcile_them:
+          one: "Reconciliar"
+          other: "Reconciliar todos"
+        add_statement_title: "O extrato de %{month} ainda não chegou"
+        add_statement_meta: "o mês a reconciliar"
+        add_statement: "Adicionar extrato"
       statements:
         title: "Extratos"
         note: "cada linha bancária e o papel que a explica"
         empty_title: "Ainda não há extratos bancários."
         empty_body: "Importe o seu primeiro extrato para começar a associar linhas a faturas."
         add_statement: "Adicionar extrato"
+      statement_tabs:
+        title: "Extratos"
         earlier: "Anteriores..."
-        all_lines: "Todas as %{count} linhas de %{label}"
+        no_statement: "%{month} · sem extrato"
+        no_statement_yet: "%{month} · ainda sem extrato"
+        gap: "%{from} a %{to} · %{count} meses sem extrato"
+        add_statement: "Adicionar extrato"
       unbanked:
         title: "Não está no extrato"
         note: "datado num mês já reconciliado, sem linha bancária"

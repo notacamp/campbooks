@@ -15,6 +15,7 @@ module Campbooks
         return unless @read.any_statements?
 
         div(class: class_names("flex flex-wrap items-start gap-6 sm:gap-8", @attrs.delete(:class)), **@attrs) do
+          focus_stat unless @read.focus_reconciled?
           meter_stat
           no_invoice_stat if @read.needs_invoice_count.positive?
           missing_stat if @read.missing_count.positive?
@@ -23,6 +24,19 @@ module Campbooks
       end
 
       private
+
+      # The month to reconcile, when its statement isn't in yet.
+      def focus_stat
+        pending = @read.pending_statement_count.positive?
+        a(href: pending ? "#money_needs" : helpers.new_reconciliation_path, class: "group flex flex-col no-underline transition-opacity hover:opacity-80",
+          data: (pending ? {} : { turbo_frame: "_top" })) do
+          div(class: "text-[11px] font-semibold uppercase tracking-widest text-muted-foreground") { plain @read.focus_label }
+          div(class: "mt-1.5 text-[16px] font-semibold text-muted-foreground") { t(".no_statement_yet") }
+          div(class: "mt-0.5 text-[12px] text-foreground underline decoration-border underline-offset-2") do
+            t(pending ? ".reconcile_it" : ".add_it")
+          end
+        end
+      end
 
       def meter_stat
         div(class: "min-w-[160px]") do

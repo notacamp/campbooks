@@ -29,6 +29,14 @@ class MoneyController < ApplicationController
     head :not_found
   end
 
+  # POST /money/statements/reconcile — every bank statement Scout already holds
+  # that nobody reconciled starts reconciling in the background.
+  def reconcile_statements
+    documents = Reconciliations::AutoStart.pending_for(Current.workspace).to_a
+    documents.each { |doc| Reconciliations::AutoStartJob.perform_later(doc.id, created_by_id: current_user.id) }
+    respond_action(t("money.actions.reconciling", count: documents.size))
+  end
+
   # GET /money/statements — the full bank-statement reconciliation list.
   def statements
     @pagy, @reconciliations = pagy(

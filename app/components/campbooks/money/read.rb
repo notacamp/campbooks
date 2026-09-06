@@ -44,20 +44,39 @@ module Campbooks
         parts.join(" ")
       end
 
+      # Nothing reconciled yet: the statements Scout is holding, or how to add one.
       def no_statements_sentence
+        return pending_statements_sentence if @read.pending_statement_count.positive?
+
         t(".no_statements_html", link: helpers.link_to(t(".add_one"), helpers.new_reconciliation_path,
                                                         class: "underline underline-offset-2"))
+      end
+
+      def pending_statements_sentence
+        n = @read.pending_statement_count
+        t(".statements_pending_html", count: n,
+          link: helpers.link_to(t(".statements_pending_link", count: n), "#money_needs", class: "underline underline-offset-2"))
       end
 
       def statement_parts # rubocop:disable Metrics/MethodLength
         parts = []
 
+        # The month to reconcile comes first: statements Scout already holds, or
+        # the month whose statement isn't in yet.
+        if @read.pending_statement_count.positive?
+          parts << pending_statements_sentence
+        elsif !@read.focus_reconciled?
+          parts << t(".focus_missing_html", month: @read.focus_label)
+        end
+
         if @read.statement
-          parts << t(".statement_html",
-                     label:     @read.statement_label,
-                     bank:      @read.bank_name.presence || t(".the_bank"),
-                     explained: bold(@read.lines_explained.to_s),
-                     total:     bold(@read.lines_total.to_s))
+          counts = { label: @read.statement_label, explained: bold(@read.lines_explained.to_s), total: bold(@read.lines_total.to_s) }
+          parts <<
+            if @read.bank_name.present?
+              t(".statement_html", bank: @read.bank_name, **counts)
+            else
+              t(".statement_no_bank_html", **counts)
+            end
         end
 
         invoice_clause = invoice_need_clause
@@ -75,7 +94,12 @@ module Campbooks
         end
 
         if @read.missing_count.positive? && @read.statement_label
-          parts << (@read.missing_count == 1 ? t(".missing_html_one", label: @read.statement_label) : t(".missing_html", count: @read.missing_count, label: @read.statement_label))
+          parts <<
+            if @read.missing_in_newest_count == @read.missing_count
+              @read.missing_count == 1 ? t(".missing_html_one", label: @read.statement_label) : t(".missing_html", count: @read.missing_count, label: @read.statement_label)
+            else
+              t(".missing_all_html", count: @read.missing_count)
+            end
         end
 
         if @read.lines_explained == @read.lines_total && @read.lines_total.positive? && @read.missing_count.zero?

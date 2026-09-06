@@ -17,7 +17,6 @@ class Money
   #   page.statement_counts   # { reconciliation_id => [resolved, total] } for the tabs
   class Page
     NEEDS_YOU_CAP = 8
-    TAB_LIMIT     = 6
 
     def self.for(workspace, user, today: Date.current, statement_id: nil)
       new(workspace, user, today: today, statement_id: statement_id)
@@ -33,7 +32,7 @@ class Money
       @company_nif  = workspace.company_nif.presence
       @groups_cache = {}
 
-      @evidence = Money::Evidence.for(workspace)
+      @evidence = Money::Evidence.for(workspace, today: today)
       @ledger   = Money::Ledger.for(workspace, user, today: today, evidence: @evidence)
       @read     = Money::Read.for(workspace, user,
                                   today:       today,
@@ -49,12 +48,9 @@ class Money
       @evidence.statements.first
     end
 
+    # Every reconciled statement on the month timeline (the pills), newest first.
     def statements
-      @statements ||= @evidence.statements.first(TAB_LIMIT)
-    end
-
-    def more_statements?
-      @evidence.statements.size > TAB_LIMIT
+      @statements ||= months.flat_map(&:statements).uniq
     end
 
     # The tab the user is looking at; falls back to the newest statement.
@@ -76,7 +72,7 @@ class Money
     # One pair of grouped counts for every tab (no per-tab queries).
     def statement_counts
       @statement_counts ||= begin
-        ids      = statements.map(&:id)
+        ids      = (statements + [ selected_statement ].compact).map(&:id).uniq
         totals   = BankTransaction.where(reconciliation_id: ids).group(:reconciliation_id).count
         resolved = BankTransaction.where(reconciliation_id: ids, status: BankTransaction::RESOLVED_STATUSES)
                                   .group(:reconciliation_id).count
@@ -93,6 +89,16 @@ class Money
     # tracked yet; a second loan is added by hand.
     def loan_suggestions
       @loan_suggestions ||= loans.empty? ? Loans::Spotter.new(@workspace).call : []
+    end
+
+    # The month timeline (newest first): the month to reconcile, then every month
+    # back to the first statement, each with the statements that cover it.
+    def months
+      @evidence.months
+    end
+
+    def pending_statement_documents
+      @read.pending_statement_documents
     end
 
     def needs_you
@@ -116,7 +122,21 @@ class Money
     end
 
     def all_needs_you
-      @all_needs_you ||= statement_needs_you + loan_needs_you
+      @all_needs_you ||= month_needs_you + statement_needs_you + loan_needs_you
+    end
+
+    # The month to reconcile, before the lines: statements Scout already holds
+    # that nobody reconciled, else the month whose statement isn't in yet. A
+    # workspace with no statements at all gets the empty state instead.
+    def month_needs_you
+      if @read.pending_statement_count.positive?
+        [ NeedsYouItem.new(kind: :reconcile_statements,
+                           payload: { documents: @read.pending_statement_documents, count: @read.pending_statement_count }) ]
+      elsif @read.any_statements? && !@read.focus_reconciled?
+        [ NeedsYouItem.new(kind: :add_statement, payload: { month: @read.focus_month, label: @read.focus_label }) ]
+      else
+        []
+      end
     end
 
     def statement_needs_you # rubocop:disable Metrics/MethodLength

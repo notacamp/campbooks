@@ -14,7 +14,7 @@
     <%= render Campbooks::Money::LoanCard.new(loan: loan, class: "mt-9") %>
   <% end %>
   <%= render Campbooks::Money::Statements.new(page: page, class: "mt-8") %>
-  <% if page.selected_statement %>
+  <% if page.evidence.any? %>
     <%= render "money/statement_frame", page: page %>
   <% end %>
   <%= render Campbooks::Money::Unbanked.new(

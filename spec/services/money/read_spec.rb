@@ -12,10 +12,51 @@ RSpec.describe Money::Read do
            period_end:   Date.new(2024, 1, 31))
   end
 
-  def build_read
-    ev  = Money::Evidence.for(workspace)
+  def build_read(today: self.today)
+    ev  = Money::Evidence.for(workspace, today: today)
     led = Money::Ledger.for(workspace, user, today: today, evidence: ev)
     described_class.for(workspace, user, today: today, evidence: ev, ledger: led)
+  end
+
+  describe "the month to reconcile" do
+    it "is the most recent completed month, reconciled when a statement covers it" do
+      r = build_read
+      expect(r.focus_month).to eq(Date.new(2024, 1, 1))
+      expect(r.focus_label).to eq("January")
+      expect(r.focus_reconciled?).to be true
+    end
+
+    it "moves on to the next month once it completes" do
+      r = build_read(today: Date.new(2024, 3, 15))
+      expect(r.focus_label).to eq("February")
+      expect(r.focus_reconciled?).to be false
+    end
+  end
+
+  describe "statements Scout is holding" do
+    it "counts bank statements nobody has reconciled" do
+      held = create(:document, :bank_statement, :approved, workspace: workspace)
+      done = create(:document, :bank_statement, :approved, workspace: workspace)
+      create(:reconciliation, workspace: workspace, statement_document: done, created_by: user)
+      create(:document, :bank_statement, :rejected, workspace: workspace)
+
+      r = build_read
+      expect(r.pending_statement_count).to eq(1)
+      expect(r.pending_statement_documents).to eq([ held ])
+    end
+  end
+
+  it "tells how many missing invoices belong to the newest statement's month" do
+    create(:reconciliation, :ready, :with_bank, workspace: workspace,
+           period_start: Date.new(2023, 12, 1), period_end: Date.new(2023, 12, 31))
+    create(:document, :approved, workspace: workspace, document_type: :expense_invoice,
+           amount_cents: 10_000, document_date: Date.new(2024, 1, 10))
+    create(:document, :approved, workspace: workspace, document_type: :expense_invoice,
+           amount_cents: 10_000, document_date: Date.new(2023, 12, 10))
+
+    r = build_read
+    expect(r.missing_count).to eq(2)
+    expect(r.missing_in_newest_count).to eq(1)
   end
 
   it "reports any_statements? true when a ready statement exists" do
@@ -25,7 +66,7 @@ RSpec.describe Money::Read do
   it "reports any_statements? false when no ready statement" do
     workspace2 = create(:workspace)
     user2 = create(:user, workspace: workspace2)
-    ev = Money::Evidence.for(workspace2)
+    ev = Money::Evidence.for(workspace2, today: today)
     led = Money::Ledger.for(workspace2, user2, today: today, evidence: ev)
     r = described_class.for(workspace2, user2, today: today, evidence: ev, ledger: led)
     expect(r.any_statements?).to be false

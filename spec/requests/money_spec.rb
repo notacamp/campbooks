@@ -76,6 +76,86 @@ RSpec.describe "Money", type: :request do
     end
   end
 
+  describe "the months" do
+    around { |ex| with_flags { ex.run } }
+    before { sign_in(user) }
+
+    let!(:dec_stmt) do
+      create(:reconciliation, :ready, :with_bank, workspace:,
+             period_start: Date.new(2023, 12, 1), period_end: Date.new(2023, 12, 31))
+    end
+
+    it "leads with the most recent month to reconcile and keeps every unreconciled month in view" do
+      travel_to(Date.new(2024, 4, 15)) { get money_path }
+      body = response.body
+
+      expect(body).to include("March · no statement yet")
+      expect(body).to include("February · no statement")
+      expect(body.index("March · no statement yet")).to be < body.index("February · no statement")
+      expect(body.index("February · no statement")).to be < body.index(%(statement=#{jan_stmt.id}))
+      expect(body).to match(/March(&#39;|')s statement isn(&#39;|')t in yet/)
+      expect(body).to include("Add a statement")
+    end
+
+    it "carries the year on months from another year" do
+      travel_to(Date.new(2025, 9, 6)) { get money_path }
+      expect(response.body).to include("January 2024")
+      expect(response.body).to include("August · no statement yet")
+    end
+
+    it "marks the clicked month active, in the page and in the frame" do
+      get money_path(statement: dec_stmt.id)
+      expect(response.body).to match(/statement=#{dec_stmt.id}"[^>]*aria-selected="true"/)
+      expect(response.body).to match(/statement=#{jan_stmt.id}"[^>]*aria-selected="false"/)
+
+      get money_statement_path(dec_stmt.id)
+      expect(response.body).to match(/statement=#{dec_stmt.id}"[^>]*aria-selected="true"/)
+      expect(response.body).to match(/statement=#{jan_stmt.id}"[^>]*aria-selected="false"/)
+    end
+
+    it "only counts an invoice as missing when its month is reconciled" do
+      create(:reconciliation, :ready, :with_bank, workspace:,
+             period_start: Date.new(2023, 9, 1), period_end: Date.new(2023, 9, 30))
+      expense(vendor_name: "Galp Frota", amount_cents: 8_860, document_date: Date.new(2023, 10, 12)) # the gap
+      expense(vendor_name: "Vodafone", amount_cents: 24_800, document_date: Date.new(2023, 12, 10))
+
+      travel_to(Date.new(2024, 2, 15)) { get money_path }
+      body = response.body
+      expect(body).to include("Vodafone")
+      expect(body).not_to include("Galp Frota")
+      expect(body).to match(/One invoice from a reconciled month isn(&#39;|')t on a statement/)
+    end
+  end
+
+  describe "statements Scout already holds" do
+    around { |ex| with_flags { ex.run } }
+    before { sign_in(user) }
+
+    it "offers to reconcile them, all at once or one by one" do
+      create(:document, :bank_statement, :approved, workspace:, bank_name: "Millennium BCP")
+      get money_path
+      body = response.body
+
+      expect(body).to include(reconcile_statements_money_path)
+      expect(body).to include("Pick which")
+      expect(body).to include(new_reconciliation_path)
+      expect(body).to match(/A bank statement from your email isn(&#39;|')t reconciled yet/)
+    end
+
+    it "starts one reconciliation per held statement in the background" do
+      create(:document, :bank_statement, :approved, workspace:)
+      create(:document, :bank_statement, :approved, workspace:)
+      done = create(:document, :bank_statement, :approved, workspace:)
+      create(:reconciliation, workspace:, statement_document: done, created_by: user)
+
+      expect { post reconcile_statements_money_path, as: :turbo_stream }
+        .to have_enqueued_job(Reconciliations::AutoStartJob).exactly(2).times
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Reconciling 2 statements")
+      expect(response.body).to include('target="money_content"')
+    end
+  end
+
   describe "GET /money/statement/:id" do
     around { |ex| with_flags { ex.run } }
     before { sign_in(user) }
