@@ -142,6 +142,9 @@ fr:
           other: "Tout réconcilier"
         add_statement_title: "Le relevé de %{month} n'est pas encore arrivé"
         add_statement_meta: "le mois à réconcilier"
+        statement_failed_title: "Impossible de lire %{label}"
+        statement_failed_untitled: "un relevé bancaire"
+        try_again: "Réessayer"
         add_statement: "Ajouter un relevé"
       statements:
         title: "Relevés"

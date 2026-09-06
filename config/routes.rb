@@ -193,6 +193,7 @@ Rails.application.routes.draw do
     member do
       post :confirm_all_suggestions
       post :export
+      post :retry_parse, path: "retry"
       get  :download
     end
     resources :bank_transactions, only: [],

@@ -264,6 +264,12 @@ module Ai
       parsed
     rescue Reconciliations::ParseError
       raise
+    rescue *Ai::Adapters::Base::TRANSIENT_ERRORS => e
+      # A rate limit, a 5xx or a timeout is the provider's problem, not the
+      # file's: let it reach the job's retry with backoff instead of telling
+      # the user the statement couldn't be read (prod 2026-09-06, Mistral 429).
+      Rails.logger.warn("[Ai::BankStatementParser] AI provider unavailable, will retry: #{e.class}: #{e.message}")
+      raise
     rescue => e
       Rails.logger.error("[Ai::BankStatementParser] AI call failed: #{e.class}: #{e.message}")
       raise Reconciliations::ParseError,

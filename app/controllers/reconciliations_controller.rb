@@ -13,7 +13,7 @@ class ReconciliationsController < ApplicationController
 
   before_action :require_authentication
   before_action :require_accounting_enabled
-  before_action :set_reconciliation, only: %i[show destroy confirm_all_suggestions export download]
+  before_action :set_reconciliation, only: %i[show destroy confirm_all_suggestions export download retry_parse]
   before_action :set_bank_statement_documents, only: %i[new create]
 
   def index
@@ -52,6 +52,15 @@ class ReconciliationsController < ApplicationController
 
     statement_document = resolve_or_create_statement_document
     return if statement_document.nil? # errors already handled
+
+    # Picking a statement that is already being reconciled opens that
+    # reconciliation instead of starting a second one: a double submit must
+    # not send the same file to the AI provider twice (prod 2026-09-06).
+    existing = statement_document.reconciliations_as_statement.where.not(status: :failed).order(:created_at).first
+    if existing
+      redirect_to existing, info: t(".already_in_progress")
+      return
+    end
 
     @reconciliation = Current.workspace.reconciliations.new(
       created_by:         current_user,
@@ -134,6 +143,22 @@ class ReconciliationsController < ApplicationController
     redirect_to money_statements_path, success: t(".destroyed")
   end
 
+  # POST /reconciliations/:id/retry — read a failed statement again (the AI
+  # provider was busy, or the file has since been fixed). surface=money sends
+  # you back to Money, where the failed row lives.
+  def retry_parse
+    return if require_entitlement!(:accounting, ignore_limit: true)
+
+    unless @reconciliation.failed?
+      redirect_to back_from_retry, info: t(".not_failed")
+      return
+    end
+
+    @reconciliation.update!(status: :pending, parse_error: nil)
+    Reconciliations::ParseJob.perform_later(@reconciliation.id)
+    redirect_to back_from_retry, success: t(".queued")
+  end
+
   # POST /reconciliations/:id/confirm_all_suggestions
   # Bulk-confirm all highest-confidence suggested matches across the reconciliation.
   def confirm_all_suggestions
@@ -207,6 +232,10 @@ class ReconciliationsController < ApplicationController
     @reconciliation = Current.workspace.reconciliations.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     head :not_found
+  end
+
+  def back_from_retry
+    params[:surface] == "money" ? money_path : reconciliation_path(@reconciliation)
   end
 
   # Finding 16: shared before_action so both :new and the :create error path

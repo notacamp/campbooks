@@ -142,6 +142,9 @@ pt:
           other: "Reconciliar todos"
         add_statement_title: "O extrato de %{month} ainda não chegou"
         add_statement_meta: "o mês a reconciliar"
+        statement_failed_title: "Não foi possível ler %{label}"
+        statement_failed_untitled: "um extrato bancário"
+        try_again: "Tentar de novo"
         add_statement: "Adicionar extrato"
       statements:
         title: "Extratos"

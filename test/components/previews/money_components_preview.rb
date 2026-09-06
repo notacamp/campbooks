@@ -188,6 +188,17 @@ class MoneyComponentsPreview < ViewComponent::Preview
     render Campbooks::Money::NeedsYou.new(items: [ item ], overflow: 0, statement: stub_statement("November 2025", "Millennium BCP"))
   end
 
+  # Needs-you section — a statement that couldn't be read (Try again).
+  # @label NeedsYou (statement failed)
+  def needs_you_statement_failed
+    recon = OpenStruct.new(id: 7, period_label: nil, created_at: Time.new(2026, 9, 6, 18, 17),
+                           parse_error: "Scout couldn't reach the AI provider after several tries (it was rate limiting us). The statement is fine. Try again in a few minutes.",
+                           statement_document: OpenStruct.new(display_title: "Extrato Millennium BCP · Agosto 2026"),
+                           model_name: Reconciliation.model_name, to_key: [ 7 ], to_param: "7")
+    item = Money::NeedsYouItem.new(kind: :statement_failed, payload: { reconciliation: recon })
+    render Campbooks::Money::NeedsYou.new(items: [ item ], overflow: 0, statement: stub_statement("July", "Millennium BCP"))
+  end
+
   # Needs-you section — the month to reconcile has no statement anywhere.
   # @label NeedsYou (add a statement)
   def needs_you_add_statement

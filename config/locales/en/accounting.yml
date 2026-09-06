@@ -32,6 +32,7 @@ en:
       no_ai_for_pdf: "PDF parsing requires an AI provider configured for document analysis. Please set one up in Settings → AI providers."
       pdf_unparseable: "Could not extract transactions from this PDF. The file may be scanned, encrypted, or in an unsupported format."
       pdf_ai_error: "AI parsing failed: %{message}"
+      provider_busy: "Scout couldn't reach the AI provider after several tries (it was rate limiting us). The statement is fine. Try again in a few minutes."
       unsupported_format: "Unsupported file format. Please upload a CSV or PDF bank statement."
       integrity_mismatch: "Balance check failed: expected closing balance %{expected} but statement shows %{actual}."
     bank_statement_parser:
@@ -62,6 +63,7 @@ en:
       upload_and_start: Upload and start reconciliation
     create:
       created: Statement imported — parsing transactions…
+      already_in_progress: "That statement is already being reconciled. Here it is."
       document_not_found: Document not found.
       file_upload_failed: File upload failed. Please try again.
       no_source: Please select or upload a bank statement.
@@ -156,6 +158,10 @@ en:
       nif_mismatch: "mismatch"
       cross_reconciliation_note: Also matched in another reconciliation
       file_missing: "[file missing from Campbooks]"
+    retry_parse:
+      queued: "Reading the statement again."
+      not_failed: "That statement doesn't need another try."
+    try_again: "Try again"
     destroy:
       destroyed: Reconciliation deleted.
     nif_banner:

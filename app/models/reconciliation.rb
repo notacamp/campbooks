@@ -52,6 +52,15 @@ class Reconciliation < ApplicationRecord
     "#{resolved_count}/#{total_transactions}"
   end
 
+  # True when the last parse failed because the AI provider was unavailable
+  # (rate limit, outage), not because of the file: the "re-export as CSV" hint
+  # would only mislead. The message is stored in the creator's locale.
+  def provider_failure?
+    return false if parse_error.blank?
+
+    I18n.available_locales.any? { |locale| parse_error == I18n.t("reconciliations.parse_job.provider_busy", locale: locale) }
+  end
+
   def period_label
     return nil if period_start.blank? && period_end.blank?
 

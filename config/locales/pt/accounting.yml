@@ -33,6 +33,7 @@ pt:
       no_ai_for_pdf: "A análise de PDF requer um fornecedor de IA configurado para análise de documentos. Configure um em Definições → Fornecedores de IA."
       pdf_unparseable: "Não foi possível extrair transações deste PDF. O ficheiro pode estar digitalizado, encriptado ou num formato não suportado."
       pdf_ai_error: "Falha na análise por IA: %{message}"
+      provider_busy: "O Scout não conseguiu chegar ao fornecedor de IA após várias tentativas (estava a limitar os nossos pedidos). O extrato está bem. Tente de novo daqui a alguns minutos."
       unsupported_format: "Formato de ficheiro não suportado. Por favor, carregue um extrato bancário em CSV ou PDF."
       integrity_mismatch: "Verificação de saldo falhou: saldo de fecho esperado %{expected} mas o extrato mostra %{actual}."
     bank_statement_parser:
@@ -63,6 +64,7 @@ pt:
       upload_and_start: Carregar e iniciar reconciliação
     create:
       created: Extrato importado — a analisar transações…
+      already_in_progress: "Esse extrato já está a ser reconciliado. Aqui está."
       document_not_found: Documento não encontrado.
       file_upload_failed: Falha no upload do ficheiro. Por favor, tente novamente.
       no_source: Por favor, selecione ou carregue um extrato bancário.
@@ -158,6 +160,10 @@ pt:
       nif_mismatch: "não corresponde"
       cross_reconciliation_note: Também associado noutro extrato
       file_missing: "[ficheiro em falta no Campbooks]"
+    retry_parse:
+      queued: "A ler o extrato de novo."
+      not_failed: "Esse extrato não precisa de nova tentativa."
+    try_again: "Tentar de novo"
     destroy:
       destroyed: Reconciliação eliminada.
     nif_banner:

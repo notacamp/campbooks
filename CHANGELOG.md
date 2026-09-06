@@ -16,6 +16,10 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Reading a PDF statement no longer fails for good when the AI provider rate-limits us: the job retries with a long backoff (statements now parse one at a time, so a backlog can't cause the burst), and only once the retries run out does the statement say so, with the provider named rather than the file. Failed statements carry a "Try again" button on the statement, on the statements list, and in Money's Needs-you, and picking a statement that is already being reconciled opens it instead of starting a second one.
+
 ## [0.40.0] - 2026-09-06
 
 ### Added
