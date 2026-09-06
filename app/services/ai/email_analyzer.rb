@@ -24,11 +24,88 @@ module Ai
         ai_provenance: Ai::Provenance.for_purpose(PURPOSE, legacy_model: MODEL),
         ai_analyzed_at: Time.current
       )
+
+      # Scout's single read also stages the asks it found — the work the separate
+      # Ai::TaskExtractor / Tasks::EmailExtractionJob used to do two minutes later.
+      # In its own rescue: the email fields are already saved, so a builder failure
+      # must never fail the analysis.
+      stage_asks(result["asks"])
     rescue => e
       Rails.logger.error("[EmailAnalyzer] Analysis failed for email #{@email.id}: #{e.message}")
     end
 
     private
+
+    # Enough headroom for the summary/priority/action prompt AND the structured asks
+    # in one call — the analyzer now does the work the separate task extractor used to.
+    MAX_TOKENS = 900
+
+    # Stage the asks Scout found straight into Task rows, exactly as
+    # Tasks::EmailExtractionJob used to — same builder, same thread fingerprint, same
+    # learning memory. Own rescue: the email fields are already persisted, so nothing
+    # here may raise into #analyze!. The hard vetoes are a belt (the analyzer only
+    # runs on human inbound mail, which the gate would admit anyway).
+    def stage_asks(raw_asks)
+      return unless Features.tasks?
+      return unless raw_asks.is_a?(Array)
+      return if Tasks::ExtractionGate.vetoed?(@email)
+
+      memory = Tasks::LearningMemory.for(workspace)
+      tasks = Tasks::Builder.call(
+        workspace: workspace,
+        source: @email,
+        raw_items: raw_asks,
+        anchor_tz: owner_zone,
+        fingerprint_source: @email.email_thread || @email,
+        learning_memory: memory
+      )
+
+      Feed::RefreshJob.enqueue_for_workspace(workspace) if tasks.any?
+    rescue => e
+      Rails.logger.error("[EmailAnalyzer] Ask staging failed for email #{@email.id}: #{e.message}")
+    end
+
+    def workspace
+      @workspace ||= Current.workspace || @email.email_account.workspace
+    end
+
+    # The inbox owner (the reader), for the contact context and the ask time zone.
+    def owner_user
+      return @owner_user if defined?(@owner_user)
+
+      @owner_user = Current.user || @email.email_account.email_account_users.find_by(owner: true)&.user
+    end
+
+    # The reader's zone, for resolving relative ask deadlines against the received date.
+    def owner_zone
+      owner_user&.effective_time_zone || Time.zone
+    end
+
+    def received_date
+      (@email.received_at || Time.current).to_date
+    end
+
+    # Cross-kind exclusion list (tasks, reminders, calendar) the model must not
+    # re-extract — the same list Tasks::EmailExtractionJob handed the extractor.
+    def known_commitments
+      @known_commitments ||= Commitments::Known.for(workspace: workspace, source: @email)
+    end
+
+    # Ask titles already tracked from this conversation (any status), so a reply
+    # restating an earlier ask does not mint a paraphrased duplicate. Mirrors
+    # Tasks::EmailExtractionJob#known_thread_titles.
+    def known_ask_titles
+      return @known_ask_titles if defined?(@known_ask_titles)
+
+      @known_ask_titles =
+        if @email.email_thread_id
+          Task.where(source_type: "EmailMessage",
+                     source_id: EmailMessage.where(email_thread_id: @email.email_thread_id).select(:id))
+              .order(created_at: :desc).limit(20).pluck(:title)
+        else
+          []
+        end
+    end
 
     def call_analyze
       body = sanitize_for_ai(@email.body.to_s)
@@ -39,7 +116,17 @@ module Ai
         Your email address: #{@email.email_account.email_address}
         Subject: #{@email.subject}
         Has attachments: #{@email.has_attachment?}
+        Received: #{received_date.iso8601}
+        Reader's time zone: #{owner_zone.name}
         </email_metadata>
+
+        <already_tracked_commitments>
+        #{known_commitments.join("\n")}
+        </already_tracked_commitments>
+
+        <already_tracked_asks>
+        #{known_ask_titles.map { |t| "- #{t}" }.join("\n")}
+        </already_tracked_asks>
 
         <email_content>
         #{body}
@@ -50,9 +137,9 @@ module Ai
 
       config = Ai::Configuration.for_any(%w[email_analysis email_classification])
       if config
-        call_adapter(config, user_message, 300)
+        call_adapter(config, user_message, MAX_TOKENS)
       else
-        call_claude(system_prompt, user_message, 300)
+        call_claude(system_prompt, user_message, MAX_TOKENS)
       end
     end
 
@@ -76,7 +163,6 @@ module Ai
     end
 
     def system_prompt
-      owner_user = Current.user || @email.email_account.email_account_users.find_by(owner: true)&.user
       contact_context = Contacts::ContactContextBuilder.new(@email.from_address, user: owner_user).context_for_prompt
       org_context = Current.workspace&.workspace_context
 
@@ -138,8 +224,34 @@ module Ai
 
         6. **Ask**: What the sender wants from you, as a short noun phrase that completes the sentence "They ask for …" — e.g. "your comments on slides 4 to 9 by Friday", "a signed copy of the NDA", "the June receipt". At most 12 words, no trailing period. Empty string when nothing is asked of you (FYIs, receipts, newsletters, CC-only).
 
+        7. **Asks**: Action items (asks) the reader must DO — a concrete action they are responsible for completing. This is separate from field 6: field 6 is a one-line noun phrase; this is the structured to-do list. Extract an ask when the message asks the reader to act, or the reader committed to act:
+           - an explicit request to the reader: "please send…", "can you review…", "could you confirm…", "we need you to…", "your approval/signature is required".
+           - a commitment the reader made: "I'll get back to you", "I will send the draft".
+           - a clear follow-up the reader owes (e.g. an unanswered question directed at them).
+
+           Do NOT extract:
+           - pure FYI / notifications with no action for the reader.
+           - actions owned by the SENDER or a third party, not the reader.
+           - calendar appointments or dated commitments the reader merely attends, receives, or observes (deliveries, renewals, subscription or auto-payments, trips, appointments, events) — those are calendar reminders, not asks. Extract an ask only when the reader must actively DO something to make progress.
+           - marketing or promotional calls-to-action ("buy now", "claim your offer").
+           - calls-to-action from automated systems: notification digests, code-review or CI bots, order/shipping/receipt notices, feedback or rating requests ("leave feedback", "rate your purchase"). An ask comes from a person (or a document) that expects THIS reader to act — not from a product nudging its users.
+           - account-security boilerplate: verification codes, sign-in alerts, password resets — including conditional instructions ("if this wasn't you, change your password").
+           - anything already covered by <already_tracked_commitments> or <already_tracked_asks> in the metadata above — the reader's existing asks, reminders, and calendar items. The same underlying commitment counts as covered even when worded differently or tracked as a different kind.
+
+           For each ask:
+           - title: a short imperative summary of the action (<= 80 chars), e.g. "Send the signed contract back to Acme".
+           - description: 1 to 2 sentences describing what the reader needs to do and the relevant context, written to stand alone without the email. Always provide this.
+           - due_date: an absolute YYYY-MM-DD date IF the message states a deadline for the action ("by Friday", "before the 15th"); otherwise null. Resolve relative dates against the Received date in the metadata, in the reader's time zone. An ask may legitimately have no due date — do not invent one.
+           - due_time: "HH:MM" (24h) if a specific time is given, else null.
+           - priority: one of low, normal, high, urgent — infer from urgency language ("ASAP", "urgent", "end of day" -> high/urgent; routine -> normal).
+           - confidence: 0.0–1.0 certainty this is a real action the reader must take. Reserve 0.9+ for an explicit, direct request or commitment involving the reader personally; score implied or inferred actions lower.
+           - justification: one sentence quoting the wording that signals the action.
+           - Write title and description in the language of the email.
+
+           Extract at most 3 asks; prefer the clearest, highest-value actions. Return an empty array if nothing qualifies.
+
         Respond with valid JSON only, using this schema:
-        {"summary": "string", "priority": "low"|"medium"|"high", "action_prompt": "string", "suggested_actions": [...], "questions": [...], "ask": "string"}
+        {"summary": "string", "priority": "low"|"medium"|"high", "action_prompt": "string", "suggested_actions": [...], "questions": [...], "ask": "string", "asks": [{"title": "imperative summary, <= 80 chars", "description": "1-2 sentence summary of the ask and its context", "due_date": "YYYY-MM-DD or null", "due_time": "HH:MM (24h) or null", "priority": "low|normal|high|urgent", "confidence": 0.0, "justification": "one sentence quoting the source wording"}]}
         #{Ai::Configuration.user_prompt_suffix(PURPOSE)}
       PROMPT
     end
