@@ -59,13 +59,20 @@ module Campbooks
 
       # The list-row wraps the <a> and the action cluster in a group div so the
       # cluster can be positioned absolutely without the <a> needing to be relative.
+      #
+      # A row whose "More" menu is open (or whose cluster holds focus) is lifted with
+      # z-20: every row is `relative`, so without it the LATER rows paint over the open
+      # dropdown (the cluster's backdrop-blur pill traps the menu's own z-50 in its
+      # stacking context) and the menu reads as transparent while the rows beneath it
+      # keep taking the hover and the clicks.
       def list_row
         # aria-selected is the keyboard selection (people_shortcuts_controller); the
         # open person's row is lit through `selected` on the link below.
         div(
           id: row_dom_id,
           data: { people_row: true },
-          class: "group relative rounded-xl aria-selected:bg-secondary aria-selected:ring-1 aria-selected:ring-border"
+          class: "group relative rounded-xl aria-selected:bg-secondary aria-selected:ring-1 aria-selected:ring-border " \
+                 "focus-within:z-20 has-[details[open]]:z-20"
         ) do
           a(href: href, title: reason_title,
             data: { turbo_frame: "people_detail", turbo_action: "advance", action: "click->email-mobile#showDetail" },

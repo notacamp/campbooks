@@ -106,6 +106,20 @@ RSpec.describe Campbooks::People::CounterpartRow, type: :component do
     expect(html).not_to include("data-people-done")
   end
 
+  it "lifts the row above its siblings while its More menu is open or its cluster holds focus" do
+    counterpart = People::Counterpart.new(
+      id: SecureRandom.uuid, kind: :person, name: "Sofia Martins", subtitle: "Brightloop",
+      avatar_email: "sofia@brightloop.example", avatar_initial: "S", last_activity: Time.current,
+      standing: People::Standing::Result.none, data: { "can_reply" => true, "contact_id" => SecureRandom.uuid }
+    )
+
+    html = render(described_class.new(counterpart: counterpart))
+
+    row = Nokogiri::HTML.fragment(html).at_css("[data-people-row]")
+    expect(row["class"]).to include("has-[details[open]]:z-20")
+    expect(row["class"]).to include("focus-within:z-20")
+  end
+
   it "the More menu carries data-controller=dropdown-close" do
     person = create(:person, name: "Sofia Martins")
     counterpart = People::Counterpart.new(kind: :person, record: person, name: "Sofia Martins",

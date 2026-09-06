@@ -16,6 +16,10 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+
+- People: the "…" menu on a list row painted underneath the rows below it, so the open menu looked transparent and the rows beneath it kept taking hovers and clicks. The row now rises above its siblings while its menu is open.
+
 ## [0.38.0] - 2026-09-06
 
 ### Changed
