@@ -209,6 +209,8 @@ Rails.application.routes.draw do
       post  :snooze    # "Not now" — a week's snooze
       patch :done      # mark the ask done
       post  :dismiss   # dismiss a suggested ask (→ cancelled)
+      post  :hand_off  # hand the ask to a teammate (Asks::HandOff)
+      post  :take_back # the assigner/admin reclaims a handed ask
     end
   end
 
@@ -820,6 +822,13 @@ Rails.application.routes.draw do
       # Tasks: list/read, create, update, and complete (status transitions publish
       # the same domain events as the web UI via Task#move_to_status!).
       resources :tasks, only: [ :index, :show, :create, :update ] do
+        member { patch :complete }
+      end
+
+      # Asks — the same records under the name the web UI now uses. A thin alias of
+      # /api/v1/tasks (same controller, scopes and payloads); the tasks paths stay
+      # until 1.0. One assignee = the ask is handed to that member.
+      resources :asks, only: [ :index, :show, :create, :update ], controller: "tasks" do
         member { patch :complete }
       end
 

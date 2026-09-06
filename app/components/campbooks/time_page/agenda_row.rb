@@ -12,11 +12,13 @@ module Campbooks
       # @param zone [ActiveSupport::TimeZone] for the HH:MM time column
       # @param move_slots [Array<Time>] the Move popover's alternatives (focus rows)
       # @param hold_slot [Time, nil] the slot "Hold" would take for an ask row
-      def initialize(item:, zone:, move_slots: [], hold_slot: nil)
+      # @param members [Array<User>] the workspace's other members (the "Hand to…" list)
+      def initialize(item:, zone:, move_slots: [], hold_slot: nil, members: [])
         @item = item
         @zone = zone
         @move_slots = Array(move_slots)
         @hold_slot = hold_slot
+        @members = Array(members)
       end
 
       def view_template
@@ -53,12 +55,27 @@ module Campbooks
         div(class: "min-w-0") do
           dot
           title_span
+          with_pill if @item.handed?
           overdue_badge if @item.overdue
           prep_chip if @item.prep?
           declined_badge if @item.quiet?
           meta_suffix
           prep_why_line if @item.prep? && @item.why.present?
         end
+      end
+
+      # "with Ana" after the title on the assigner's handed ask row.
+      def with_pill
+        name = user_first_name(@item.record.try(:handed_to))
+        return if name.blank?
+
+        span(class: "ml-1.5 rounded bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground") { t(".with", name: name) }
+      end
+
+      def user_first_name(user)
+        return "" unless user
+
+        user.name.to_s.split(/\s+/).first.presence || user.name.presence || user.email_address.to_s
       end
 
       def title_span
@@ -148,6 +165,7 @@ module Campbooks
           open_button        if @item.action?(:open_thread) || @item.action?(:open_document)
           schedule_popover   if @item.action?(:schedule)
           hold_button        if hold_as_button?
+          take_back_form     if @item.action?(:take_back)
           done_form(@item.record)      if @item.action?(:done)
           done_form(@item.record.task) if @item.action?(:done_ask)
           move_popover       if @item.action?(:move)
@@ -181,6 +199,13 @@ module Campbooks
       def keep_form
         post_form(helpers.keep_focus_block_path(@item.record)) do
           render(Campbooks::Button.new(variant: :primary, size: :xs, type: "submit")) { t(".keep") }
+        end
+      end
+
+      # The assigner reclaims a handed ask.
+      def take_back_form
+        post_form(helpers.take_back_ask_path(@item.record)) do
+          render(Campbooks::Button.new(variant: :outline, size: :xs, type: "submit")) { t(".take_it_back") }
         end
       end
 
@@ -275,7 +300,8 @@ module Campbooks
       # ── Kebab ──────────────────────────────────────────────────────────────────
       def kebab?
         @item.action?(:change_date) || hold_in_kebab? || @item.action?(:snooze) ||
-          @item.action?(:dismiss_ask) || @item.action?(:add_to_calendar) || @item.action?(:dismiss_focus)
+          @item.action?(:dismiss_ask) || @item.action?(:add_to_calendar) ||
+          @item.action?(:dismiss_focus) || hand_off?
       end
 
       def kebab
@@ -287,12 +313,51 @@ module Campbooks
           div(class: "absolute right-0 z-20 mt-1 w-52 rounded-lg border border-border bg-card p-1 shadow-lg") do
             change_date_item     if @item.action?(:change_date)
             hold_item            if hold_in_kebab?
+            hand_off_item        if hand_off?
             snooze_item          if @item.action?(:snooze)
             dismiss_ask_item     if @item.action?(:dismiss_ask)
             add_to_calendar_item if @item.action?(:add_to_calendar)
             dismiss_focus_item   if @item.action?(:dismiss_focus)
           end
         end
+      end
+
+      # "Hand to…" is offered on an un-handed ask row when the workspace has other
+      # members. A handed row shows Take it back instead (never Hand to…).
+      def hand_off?
+        @item.task? && @members.any? && !record_handed?
+      end
+
+      def record_handed?
+        return @record_handed if defined?(@record_handed)
+
+        @record_handed = @item.record.respond_to?(:handed?) ? @item.record.handed? : false
+      end
+
+      # A nested popover listing members, each a POST to hand_off_ask_path(user_id).
+      def hand_off_item
+        details(class: "relative", data: { controller: "dropdown-close" }) do
+          summary(class: "block w-full cursor-pointer list-none rounded-md px-2 py-1.5 text-left text-[13px] " \
+                         "text-foreground hover:bg-muted [&::-webkit-details-marker]:hidden") { t(".hand_to") }
+          div(class: "absolute right-0 z-20 mt-1 w-60 rounded-lg border border-border bg-card p-1 shadow-lg") do
+            p(class: "px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground") { t(".hand_to") }
+            @members.each { |member| hand_off_member_form(member) }
+          end
+        end
+      end
+
+      def hand_off_member_form(member)
+        post_form(helpers.hand_off_ask_path(@item.record), class: "block") do
+          input(type: "hidden", name: "user_id", value: member.id)
+          menu_submit(member_label(member))
+        end
+      end
+
+      # "Ana · ana@example.com" — first name, plus the email when it adds anything.
+      def member_label(member)
+        name = user_first_name(member)
+        email = member.email_address.to_s
+        email.present? && email != name ? "#{name} · #{email}" : name
       end
 
       # "Change date" — the same date menu, as a nested popover inside the kebab.

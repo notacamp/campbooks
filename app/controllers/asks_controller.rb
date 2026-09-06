@@ -56,7 +56,45 @@ class AsksController < ApplicationController
     respond_with_agenda(t(".dismissed"))
   end
 
+  # Hand the ask to another workspace member (never yourself). A missing/foreign/
+  # self target 404s (the app convention). Asks::HandOff reassigns, accepts, logs
+  # and notifies the assignee.
+  def hand_off
+    target = handoff_target
+    return head(:not_found) unless target
+
+    Asks::HandOff.call(@ask, to: target, by: current_user)
+    respond_with_agenda(t(".handed", name: first_name(target)))
+  end
+
+  # Take a handed ask back — only the user who handed it or a workspace admin. The
+  # assignment(s) drop, the event is logged, and the assignee's notice resolves.
+  def take_back
+    return head(:not_found) unless can_take_back?
+
+    @ask.task_assignments.destroy_all
+    Events.publish("task.taken_back", subject: @ask, actor: current_user, payload: { title: @ask.title })
+    Notification.where(notifiable: @ask).active.find_each(&:resolve!)
+    respond_with_agenda(t(".taken_back"))
+  end
+
   private
+
+  # A workspace member other than the current user, or nil (→ 404).
+  def handoff_target
+    current_user.workspace.users.where.not(id: current_user.id).find_by(id: params[:user_id])
+  end
+
+  # Take-back is the assigner's or an admin's call — not the assignee's.
+  def can_take_back?
+    @ask.handed_by == current_user || current_user.admin?
+  end
+
+  # First name for a toast/pill ("Handed to Ana."), falling back to the full name
+  # then the email so it never renders blank.
+  def first_name(user)
+    user.name.to_s.split(/\s+/).first.presence || user.name.presence || user.email_address
+  end
 
   # 404 (not 403) for an ask the user can't access — matches the app convention.
   def set_ask
@@ -91,7 +129,9 @@ class AsksController < ApplicationController
   # so the Now cards reconcile promptly.
   def respond_with_agenda(message)
     refresh_feed
-    if people_return?
+    if scout_return?
+      respond_with_scout(message)
+    elsif people_return?
       respond_with_stand_note(message)
     else
       load_time_agenda
@@ -140,6 +180,25 @@ class AsksController < ApplicationController
         format.html { redirect_back fallback_location: people_path, success: message }
       end
     end
+  end
+
+  # Respond to an ask action fired from a Scout answer card (return=scout): drop
+  # just that card (id "ask_card_<id>") and raise the toast. The Time agenda frame
+  # isn't on the Scout overlay, so there's nothing else to re-render.
+  def respond_with_scout(message)
+    respond_to do |format|
+      format.turbo_stream do
+        render turbo_stream: [
+          turbo_stream.remove("ask_card_#{@ask.id}"),
+          notify_stream(message)
+        ]
+      end
+      format.html { redirect_to time_path, success: message }
+    end
+  end
+
+  def scout_return?
+    params[:return] == "scout"
   end
 
   def respond_with_error(message)
