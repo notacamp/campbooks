@@ -106,6 +106,27 @@ class Task < ApplicationRecord
     where(workspace_id: user.workspace_id)
   }
 
+  # Whose ask it is, on the *personal* surfaces (Now / People / Time). In a
+  # multi-member workspace, accessible_to (workspace-wide) would card every
+  # undated ask on everyone's Now; for_user narrows to the asks this user owns:
+  #   - assigned to them (a teammate handed it over), OR
+  #   - unassigned AND from something they can see (a Document, a manual/nil
+  #     source, or an EmailMessage in a mailbox they can read).
+  # One SQL scope (mirrors the Reminder.accessible_to email leg; a NOT EXISTS on
+  # task_assignments for "unassigned"). accessible_to stays for the API/MCP and
+  # for acting on an ask by id. Fails closed for a nil user.
+  scope :for_user, ->(user) {
+    return none unless user
+
+    where(workspace_id: user.workspace_id).where(
+      "EXISTS (SELECT 1 FROM task_assignments ta WHERE ta.task_id = tasks.id AND ta.user_id = :uid) OR " \
+      "(NOT EXISTS (SELECT 1 FROM task_assignments ta WHERE ta.task_id = tasks.id) AND " \
+      "(tasks.source_type IS NULL OR tasks.source_type = 'Document' OR " \
+      "(tasks.source_type = 'EmailMessage' AND tasks.source_id IN (:email_ids))))",
+      uid: user.id, email_ids: EmailMessage.accessible_to(user).select(:id)
+    )
+  }
+
   after_create_commit :publish_created
   # Keep the home feed in sync when a feed-relevant facet changes (a new task —
   # AI suggestions surface on the feed for triage — a status move, or a due-date
@@ -134,6 +155,12 @@ class Task < ApplicationRecord
     Events.publish("task.status_changed", subject: self, actor: by,
                    payload: { title: title, from: previous, to: new_status })
     Events.publish("task.completed", subject: self, actor: by, payload: { title: title }) if done?
+
+    # A terminal ask has nothing left to do, so any live notification about it (a
+    # hand-off "someone handed you an ask" notice, an assignment) auto-resolves —
+    # it leaves the assignee's "Needs you" set and bell. resolve! broadcasts the
+    # dismissal so an open list/bell clears live.
+    resolve_notifications! if done? || cancelled?
 
     # Completing a recurring occurrence materializes the next one (Todoist-style).
     spawn_next_occurrence!(by: by) if done?
@@ -225,7 +252,31 @@ class Task < ApplicationRecord
     source if source_type == "EmailMessage"
   end
 
+  # ── Hand-off (the one team action) ──────────────────────────────────────────
+  # An ask is handed when it carries an assignment. Hand-off (Asks::HandOff)
+  # replaces the assignments with exactly one, so #handed_to is that single
+  # assignee and #handed_by is who handed it over.
+  def handed?
+    task_assignments.exists?
+  end
+
+  def handed_to
+    assignees.first
+  end
+
+  def handed_by
+    task_assignments.order(:created_at).first&.assigned_by
+  end
+
   private
+
+  # Resolve every active notification about this ask (across users who hold one)
+  # so a terminal ask stops nagging. See #move_to_status!.
+  def resolve_notifications!
+    Notification.where(notifiable: self).active.find_each(&:resolve!)
+  rescue StandardError => e
+    Rails.logger.warn("[Task##{id}] notification resolve failed: #{e.class}: #{e.message}")
+  end
 
   # A recurring task needs a due date to anchor the cadence — there's nothing to
   # repeat from otherwise. (Rule parseability is checked by HasRecurrence.)
