@@ -45,6 +45,7 @@ pt:
         payable: "a pagar"
       status:
         settled: "liquidado"
+        pending: "linha bancária em revisão"
         missing: "não está no extrato"
         unconfirmed: "sem extrato ainda"
     reminder_draft:

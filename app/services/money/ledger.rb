@@ -44,6 +44,11 @@ class Money
       obligations.select(&:unconfirmed?)
     end
 
+    # A bank line already points at these (suggested match or partial payment).
+    def pending
+      obligations.select(&:pending?)
+    end
+
     # Sections for the CSV export. Only includes non-empty sections.
     def sections
       [ [ :missing, missing ], [ :settled, settled ] ]
@@ -123,8 +128,7 @@ class Money
     end
 
     def obligation_actions(direction, status)
-      return [] if status == :settled
-      return [] if status == :unconfirmed
+      return [] unless status == :missing
 
       # :missing
       if direction == :payable

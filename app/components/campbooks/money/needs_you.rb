@@ -43,13 +43,14 @@ module Campbooks
 
       def row(item)
         div(**wrapper_attrs(item)) do
-          div(class: "flex items-start gap-3 rounded-xl px-4 py-3.5 transition-colors hover:bg-muted/50 sm:px-6") do
+          div(class: "flex flex-wrap items-start gap-3 rounded-xl px-4 py-3.5 transition-colors hover:bg-muted/50 sm:flex-nowrap sm:px-6") do
             span(class: "mt-[6px] h-2 w-2 shrink-0 rounded-full bg-ember-gradient shadow-ember-glow", aria_hidden: "true")
-            div(class: "min-w-0 flex-1") do
+            div(class: "min-w-0 flex-1 basis-[calc(100%-1.25rem)] sm:basis-auto") do
               div(class: "text-[14px] font-semibold leading-snug text-foreground") { plain item.title }
               meta_line(item) if item.meta.present?
             end
-            div(class: "flex shrink-0 flex-wrap items-center justify-end gap-2") { actions(item) }
+            # Phones: actions take their own line, aligned under the title.
+            div(class: "flex w-full flex-wrap items-center justify-end gap-2 pl-5 sm:w-auto sm:shrink-0 sm:pl-0") { actions(item) }
           end
         end
       end

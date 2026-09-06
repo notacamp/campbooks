@@ -45,11 +45,15 @@ class Money
 
     # Status for a document:
     #   :settled     if doc.settled?
+    #   :pending     a bank line already points at it (a suggested match waiting for
+    #                a look, or a confirmed partial payment): it has its line, so it is
+    #                never "missing"; Needs-you carries it instead
     #   :missing     if anchor is covered by latest_covered_on + GRACE_DAYS and
-    #                no confirmed bank match
+    #                no bank line points at it
     #   :unconfirmed otherwise (no statement yet, or statement does not reach the anchor)
     def status_for(doc)
       return :settled if doc.settled?
+      return :pending if pending_document_ids.include?(doc.id)
 
       anchor = anchor_for(doc)
       return :unconfirmed unless anchor && latest_covered_on
@@ -87,6 +91,18 @@ class Money
     end
 
     private
+
+    # Documents a bank line in this workspace already points at (suggested or
+    # confirmed, never rejected). One query, memoized for the request.
+    def pending_document_ids
+      @pending_document_ids ||= TransactionMatch
+                                  .where(status: %i[suggested confirmed])
+                                  .joins(:bank_transaction)
+                                  .where(bank_transactions: { workspace_id: @workspace.id })
+                                  .distinct
+                                  .pluck(:document_id)
+                                  .to_set
+    end
 
     def safe_date(value)
       value.respond_to?(:to_date) ? value.to_date : nil

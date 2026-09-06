@@ -45,6 +45,7 @@ es:
         payable: "por pagar"
       status:
         settled: "liquidado"
+        pending: "línea bancaria en revisión"
         missing: "no está en el extracto"
         unconfirmed: "sin extracto aún"
     reminder_draft:

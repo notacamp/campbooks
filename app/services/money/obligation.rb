@@ -8,7 +8,7 @@ class Money
   # It is a value object (NOT an ActiveRecord table) assembled by Money::Ledger.
   #
   #   direction  : :receivable (owed TO you) | :payable (you owe)
-  #   status     : :settled | :missing | :unconfirmed
+  #   status     : :settled | :pending | :missing | :unconfirmed
   #   amount     : a money-rails Money object
   #   actions    : the row affordances as symbols, decided by the ledger
   Obligation = Struct.new(
@@ -21,6 +21,7 @@ class Money
     def payable?     = direction == :payable
     def settled?     = status == :settled
     def missing?     = status == :missing
+    def pending?     = status == :pending
     def unconfirmed? = status == :unconfirmed
 
     def amount_cents = amount&.cents

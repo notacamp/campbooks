@@ -88,6 +88,34 @@ RSpec.describe Money::Evidence do
         d = doc(document_date: Date.new(2024, 1, 10), due_date: nil)
         expect(evidence.status_for(d)).to eq(:missing)
       end
+
+      it "returns :pending when a bank line already points at the document (suggested match)" do
+        d = doc(document_date: Date.new(2024, 1, 10), due_date: nil)
+        txn = create(:bank_transaction, reconciliation: Reconciliation.last, workspace: workspace,
+                     status: :suggested, amount_cents: -10_000, booked_on: Date.new(2024, 1, 12))
+        txn.transaction_matches.create!(document: d, status: :suggested, matched_by: :ai, confidence: 0.8,
+                                        match_reasons: {})
+        expect(evidence.status_for(d)).to eq(:pending)
+      end
+
+      it "returns :pending for a confirmed partial payment" do
+        d = doc(document_date: Date.new(2024, 1, 10), due_date: nil, amount_cents: 150_000)
+        txn = create(:bank_transaction, reconciliation: Reconciliation.last, workspace: workspace,
+                     status: :matched, amount_cents: -60_000, booked_on: Date.new(2024, 1, 12))
+        txn.transaction_matches.create!(document: d, status: :confirmed, matched_by: :manual, confidence: 1.0,
+                                        allocated_cents: 60_000, match_reasons: {})
+        expect(d.reload).not_to be_settled
+        expect(evidence.status_for(d)).to eq(:pending)
+      end
+
+      it "ignores a rejected match" do
+        d = doc(document_date: Date.new(2024, 1, 10), due_date: nil)
+        txn = create(:bank_transaction, reconciliation: Reconciliation.last, workspace: workspace,
+                     status: :unmatched, amount_cents: -10_000, booked_on: Date.new(2024, 1, 12))
+        txn.transaction_matches.create!(document: d, status: :rejected, matched_by: :ai, confidence: 0.5,
+                                        match_reasons: {})
+        expect(evidence.status_for(d)).to eq(:missing)
+      end
     end
 
     context "when there are non-ready reconciliations" do

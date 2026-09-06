@@ -49,7 +49,8 @@ module Campbooks
               end
             end
           end
-          div(class: "flex shrink-0 flex-wrap items-center justify-end gap-3") do
+          # Phones: the amount and the actions take their own line under the text.
+          div(class: "flex w-full flex-wrap items-center justify-between gap-3 sm:w-auto sm:shrink-0 sm:justify-end") do
             amount_cell(ob)
             action_row(ob)
           end

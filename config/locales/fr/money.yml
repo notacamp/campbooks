@@ -45,6 +45,7 @@ fr:
         payable: "à payer"
       status:
         settled: "réglé"
+        pending: "ligne bancaire en cours d'examen"
         missing: "n'est pas sur le relevé"
         unconfirmed: "pas encore de relevé"
     reminder_draft:

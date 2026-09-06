@@ -45,6 +45,7 @@ en:
         payable: "you owe"
       status:
         settled: "settled"
+        pending: "bank line under review"
         missing: "not on a statement"
         unconfirmed: "no statement yet"
     reminder_draft:
