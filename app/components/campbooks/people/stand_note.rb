@@ -27,6 +27,7 @@ module Campbooks
       def view_template
         render Campbooks::ScoutNote.new(message: note_message,
                                         time: t("people.conversation.where_things_stand"),
+                                        id: dom_id,
                                         **@attrs) do
           chip_row
           provenance_note
@@ -34,6 +35,13 @@ module Campbooks
       end
 
       private
+
+      # Stable DOM id for turbo_stream replace after ask actions.
+      def dom_id
+        type = @counterpart.is_a?(Person) ? "person" : "organization"
+        cid  = @counterpart.respond_to?(:id) ? @counterpart.id : @counterpart.counterpart_id rescue @counterpart.id
+        "stand_note_#{type}_#{cid}"
+      end
 
       def note_message
         name = counterpart_name
@@ -75,6 +83,8 @@ module Campbooks
           decide_chips(dk)
         elsif verb == :pay || verb == :chase
           money_chips
+        elsif verb == :do
+          do_chips
         elsif verb.nil? && dk.in?(%i[ask_ai ask_quote])
           no_verb_ask_chips
         else
@@ -123,6 +133,50 @@ module Campbooks
         [ tool_form_chip(:draft_reply, :primary) ]
       end
 
+      # Chips for the Do lane: an accepted ask the user owes someone.
+      def do_chips
+        ask = @standing.ask || {}
+        ask_id = ask["id"]
+        due_on = ask["due_on"].present? ? Date.parse(ask["due_on"]) : nil
+        held_at = ask["held_at"].presence
+        today = Date.current
+
+        chips = []
+
+        # Done chip — PATCH to done_ask_path
+        if ask_id
+          chips << ask_post_chip(:done, :primary_outline, path: helpers.done_ask_path(ask_id),
+                                 method: :patch, label_key: :done_ask)
+        end
+
+        # "Day on Time" link chip when dated
+        if due_on
+          chips << DateLinkChip.new(date: due_on, overdue: due_on < today,
+                                    url: helpers.time_path(date: due_on.iso8601),
+                                    label: I18n.l(due_on, format: :short))
+        end
+
+        # Hold time chip or held-slot chip
+        if held_at.present?
+          # Already held: show the slot as a muted chip (not a button)
+          time_label = begin
+            ::People::StandCopy.fmt_held(held_at)
+          rescue StandardError
+            held_at.to_s
+          end
+          chips << HeldSlotChip.new(label: t(".chips.held_slot", when: time_label))
+        elsif ask_id
+          # Not yet held: offer "Hold time"
+          chips << ask_post_chip(:hold_time, :primary_outline, path: helpers.hold_ask_path(ask_id),
+                                 method: :post, label_key: :hold_time, spark: true)
+        end
+
+        # Ask Scout
+        chips << ask_scout_chip if @standing.detail.present?
+
+        chips
+      end
+
       # ── Individual chip factories ────────────────────────────────────────────
 
       def tool_form_chip(tool, variant)
@@ -137,6 +191,14 @@ module Campbooks
         token = helpers.form_authenticity_token
         label = t("components.people.stand_note.chips.#{label_key || kind}")
         FormChip.new(url: url, token: token, label: label, variant: variant, hidden_fields: hidden)
+      end
+
+      # A chip that posts to an ask path with an optional spark.
+      def ask_post_chip(_kind, variant, path:, method: :post, label_key:, spark: false)
+        token = helpers.form_authenticity_token
+        label = t("components.people.stand_note.chips.#{label_key}")
+        AskFormChip.new(url: path, token: token, label: label, variant: variant,
+                        method: method, spark: spark, return_to_people: true)
       end
 
       def ask_scout_chip
@@ -182,6 +244,70 @@ module Campbooks
               input(type: :hidden, name: name, value: value)
             end
             render Campbooks::Button.new(type: :submit, variant: @variant, size: :sm) { plain @label }
+          end
+        end
+      end
+
+      # A chip that posts to an ask path (PATCH or POST) with a return=people flag.
+      class AskFormChip < Campbooks::Base
+        SPARK_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" class="h-[11px] w-[11px] shrink-0" aria-hidden="true"><path d="M12 5l1.7 5.6L19.5 12l-5.8 1.4L12 19l-1.7-5.6L4.5 12l5.8-1.4z"/></svg>'
+
+        def initialize(url:, token:, label:, variant: :primary, method: :post, spark: false, return_to_people: false)
+          @url              = url
+          @token            = token
+          @label            = label
+          @variant          = variant
+          @method           = method
+          @spark            = spark
+          @return_to_people = return_to_people
+        end
+
+        def view_template
+          form(action: @url, method: :post, class: "contents",
+               data: { turbo_stream: true }) do
+            input(type: :hidden, name: :authenticity_token, value: @token)
+            input(type: :hidden, name: "_method", value: @method.to_s.upcase) if @method != :post
+            input(type: :hidden, name: :return, value: "people") if @return_to_people
+            render Campbooks::Button.new(type: :submit, variant: @variant, size: :sm,
+                                          class: "gap-1.5") do
+              raw(safe(SPARK_SVG)) if @spark
+              plain @label
+            end
+          end
+        end
+      end
+
+      # A muted non-interactive chip showing when time is already held.
+      class HeldSlotChip < Campbooks::Base
+        def initialize(label:)
+          @label = label
+        end
+
+        def view_template
+          span(class: "inline-flex items-center rounded-full border border-border/50 px-2.5 py-1 " \
+                       "text-[11.5px] font-medium text-muted-foreground") do
+            plain @label
+          end
+        end
+      end
+
+      # A link chip showing a date with optional overdue coloring.
+      class DateLinkChip < Campbooks::Base
+        def initialize(date:, overdue:, url:, label:)
+          @date    = date
+          @overdue = overdue
+          @url     = url
+          @label   = label
+        end
+
+        def view_template
+          a(href: @url,
+            data: { turbo_frame: "_top" },
+            class: class_names(
+              "inline-flex items-center rounded-full border px-2.5 py-1 text-[11.5px] font-medium no-underline transition-colors hover:bg-secondary",
+              @overdue ? "border-red-400/50 text-red-600 dark:text-red-400" : "border-border text-foreground"
+            )) do
+            plain @label
           end
         end
       end

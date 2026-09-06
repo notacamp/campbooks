@@ -153,15 +153,25 @@ module Campbooks
 
       def right_meta
         if @counterpart.needs_you? && @variant == :lane
-          wait = standing.wait_days.to_i
-          urgent = wait >= 7
           div(class: "flex flex-shrink-0 items-center gap-0.5") do
             if has_attachment?
               span(class: "text-muted-foreground/60") { raw(safe(PAPERCLIP)) }
             end
-            span(class: class_names("text-[11.5px] font-semibold tabular-nums",
-                                    urgent ? "text-ember" : "text-muted-foreground")) do
-              t(".wait_days", count: wait)
+            # Do lane: show the due date; overdue in red. Other lanes: wait_days.
+            if standing.verb == :do && (ask = standing.ask) && ask["due_on"].present?
+              due = Date.parse(ask["due_on"]) rescue nil
+              overdue = due && due < Date.current
+              span(class: class_names("text-[11.5px] font-semibold tabular-nums",
+                                      overdue ? "text-ember" : "text-muted-foreground")) do
+                plain(due ? I18n.l(due, format: :short) : ask["due_on"])
+              end
+            else
+              wait = standing.wait_days.to_i
+              urgent = wait >= 7
+              span(class: class_names("text-[11.5px] font-semibold tabular-nums",
+                                      urgent ? "text-ember" : "text-muted-foreground")) do
+                t(".wait_days", count: wait)
+              end
             end
           end
         elsif (time = @counterpart.last_activity)

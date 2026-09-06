@@ -13,7 +13,7 @@
     <% end %>
   </div>
 <% else %>
-  <%# Verb lanes (Reply, Decide, Pay, Chase, Nudge) %>
+  <%# Verb lanes (Reply, Decide, Do, Pay, Chase, Nudge) — Do is fed by accepted open tasks %>
   <% @lanes.each do |lane| %>
     <% shown = lane[:counterparts].first(PeopleLayout::LANE_CAP) %>
     <% folded = lane[:counterparts].drop(PeopleLayout::LANE_CAP) %>

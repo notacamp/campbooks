@@ -81,19 +81,64 @@ class AsksController < ApplicationController
 
   # Reload the whole agenda (an ask action can move a row across days, retire it, or
   # spawn a focus row) and replace it in place, with a toast. HTML falls back to a
-  # redirect. The Task callbacks already refresh the feed; enqueue once more,
-  # best-effort, so the Now cards reconcile promptly.
+  # redirect.
+  #
+  # When params[:return] == "people" the request came from a StandNote chip on the
+  # People surface: the Time agenda frame does not exist there, so instead we
+  # re-render the StandNote for the person and replace it in place, with a toast.
+  #
+  # The Task callbacks already refresh the feed; enqueue once more, best-effort,
+  # so the Now cards reconcile promptly.
   def respond_with_agenda(message)
     refresh_feed
-    load_time_agenda
-    respond_to do |format|
-      format.turbo_stream do
-        render turbo_stream: [
-          turbo_stream.replace("time_agenda", render_to_string(agenda_list, layout: false)),
-          notify_stream(message)
-        ]
+    if people_return?
+      respond_with_stand_note(message)
+    else
+      load_time_agenda
+      respond_to do |format|
+        format.turbo_stream do
+          render turbo_stream: [
+            turbo_stream.replace("time_agenda", render_to_string(agenda_list, layout: false)),
+            notify_stream(message)
+          ]
+        end
+        format.html { redirect_to time_path, success: message }
       end
-      format.html { redirect_to time_path, success: message }
+    end
+  end
+
+  # Respond to an ask action that came from the People surface.
+  # Re-renders the StandNote by refreshing a single counterpart row.
+  def respond_with_stand_note(message)
+    person = @ask.source&.contact&.person
+    if person
+      People::Standings.refresh_counterpart!(current_user, person)
+      standing_row = PeopleStanding.for_user(current_user).find_by(counterpart: person)
+      standing = standing_row&.standing || People::Standing::Result.none
+
+      stand_note_html = ApplicationController.render(
+        Campbooks::People::StandNote.new(
+          standing: standing,
+          counterpart: person
+        ),
+        layout: false
+      )
+
+      note_dom_id = "stand_note_person_#{person.id}"
+      respond_to do |format|
+        format.turbo_stream do
+          render turbo_stream: [
+            turbo_stream.replace(note_dom_id, stand_note_html),
+            notify_stream(message)
+          ]
+        end
+        format.html { redirect_back fallback_location: people_path, success: message }
+      end
+    else
+      respond_to do |format|
+        format.turbo_stream { render turbo_stream: notify_stream(message) }
+        format.html { redirect_back fallback_location: people_path, success: message }
+      end
     end
   end
 
@@ -108,5 +153,9 @@ class AsksController < ApplicationController
     Feed::RefreshJob.enqueue_for_workspace(Current.workspace)
   rescue StandardError => e
     Rails.logger.warn("[AsksController] feed refresh failed: #{e.class}: #{e.message}")
+  end
+
+  def people_return?
+    params[:return] == "people"
   end
 end
