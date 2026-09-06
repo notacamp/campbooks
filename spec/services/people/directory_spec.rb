@@ -59,7 +59,7 @@ RSpec.describe People::Directory do
       org_item = instance_double(People::Attention::Item,
                                  verb: :chase, subject: "Invoice #1", wait_days: 14,
                                  detail: nil, detail_kind: nil, money: nil,
-                                 thread_id: nil, message: nil, attention: true,
+                                 thread_id: nil, message: nil, attention: true, ask: nil,
                                  feed_item: instance_double(FeedItem, id: SecureRandom.uuid, score: 80.0, sort_at: Time.current))
 
       attn = instance_double(People::Attention)
@@ -251,7 +251,7 @@ RSpec.describe People::Directory do
       org_item = instance_double(People::Attention::Item,
                                  verb: :chase, subject: "Invoice #1", wait_days: 14,
                                  detail: nil, detail_kind: nil, money: nil,
-                                 thread_id: nil, message: nil, attention: true,
+                                 thread_id: nil, message: nil, attention: true, ask: nil,
                                  feed_item: instance_double(FeedItem, id: SecureRandom.uuid, score: 80.0, sort_at: Time.current))
 
       attn = instance_double(People::Attention)
@@ -310,7 +310,7 @@ RSpec.describe People::Directory do
                                   message: msg, detail: nil, detail_kind: nil, money: nil,
                                   subject: "Thread Sofia",
                                   thread_id: thread.id, verb: :reply,
-                                  wait_days: 2, attention: true)
+                                  wait_days: 2, attention: true, ask: nil)
       attn = instance_double("People::Attention")
       allow(attn).to receive(:for).and_return(attn_item)
       allow(People::Attention).to receive(:new).and_return(attn)

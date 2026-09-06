@@ -298,7 +298,7 @@ module People
         data["contact_id"]     = contacts.max_by { |c| c.email_count.to_i }&.id
         data["snippet"]        = snippet_for(latest_inbound)
         data["can_reply"]      = msg_id.present? && acct_id && sendable_account_ids.include?(acct_id)
-        data["can_done"]       = item.present? && DONE_KINDS.include?(item.feed_item.kind)
+        data["can_done"]       = item.present? && item.feed_item.present? && DONE_KINDS.include?(item.feed_item.kind)
         data["tags"]           = row_tags(contacts, cp.standing.thread_id,
                                           sender_tags_by_contact, inbox_tags_by_thread)
 

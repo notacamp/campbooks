@@ -55,6 +55,18 @@ class Time::Agenda
         .map { |task| undated_item(task) }
   end
 
+  # Live, accepted-or-suggested asks with no due date, minus the ones Scout is
+  # already holding a focus block for (those show as their focus row instead).
+  # Newest first. These never enter #items — they carry day: nil.
+  def undated
+    return [] unless Features.tasks?
+
+    Task.accessible_to(@user).live.undated
+        .where.not(id: FocusBlock.held.where.not(task_id: nil).select(:task_id))
+        .order(created_at: :desc)
+        .map { |task| undated_item(task) }
+  end
+
   private
 
   # ── Events ────────────────────────────────────────────────────────────────

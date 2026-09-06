@@ -111,4 +111,41 @@ RSpec.describe "Asks", type: :request do
 
     expect(task.reload).not_to be_done
   end
+
+  describe "return=people response" do
+    let(:account) { create(:email_account, workspace: workspace, email_address: "me@biz.example") }
+    let(:person) { create(:person, workspace: workspace) }
+    let(:contact) do
+      create(:contact, workspace: workspace, email_account: account, person: person,
+             sender_kind: :person, sender_kind_source: "heuristic", email: "sofia@x.example")
+    end
+    let(:thread) { create(:email_thread, email_account: account) }
+    let(:source_msg) do
+      create(:email_message, email_account: account, contact: contact, email_thread: thread,
+             from_address: contact.email, to_address: account.email_address,
+             provider_folder_id: "INBOX", received_at: 3.days.ago)
+    end
+
+    before do
+      create(:email_account_user, user: user, email_account: account, can_read: true)
+      allow(Emails::InboxFolders).to receive(:ids_for).and_return(%w[INBOX])
+      sign_in(user)
+    end
+
+    it "replaces the stand note when return=people is sent (turbo_stream)" do
+      task = workspace.tasks.create!(title: "People return test", status: :todo,
+                                     priority: :normal, created_by: user, source: source_msg)
+      patch done_ask_path(task), params: { return: "people" }, headers: turbo
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("stand_note_person_#{person.id}")
+    end
+
+    it "falls back to redirect_back when return=people and turbo not present" do
+      task = workspace.tasks.create!(title: "People return HTML", status: :todo,
+                                     priority: :normal, created_by: user, source: source_msg)
+      patch done_ask_path(task), params: { return: "people" }
+      expect(response).to redirect_to(people_path)
+    end
+  end
 end

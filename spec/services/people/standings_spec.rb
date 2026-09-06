@@ -209,4 +209,42 @@ RSpec.describe People::Standings do
       expect(described_class.stale?(user, threshold: 10.minutes)).to be true
     end
   end
+
+  describe "Do lane — ask data round-trip" do
+    before { allow(Features).to receive(:tasks?).and_return(true) }
+
+    def make_task_for_person(name:, email:)
+      person, contact, thread = make_person(name: name, email: email)
+      msg = thread.email_messages.first
+      [ person, contact, thread, msg ]
+    end
+
+    it "stores data['ask'] and verb 'do' when an accepted ask has a person source" do
+      person, _contact, _thread, msg = make_task_for_person(name: "Sofia", email: "sofia@x.example")
+      due_date = Date.current + 5
+      task = workspace.tasks.create!(title: "Do the thing", status: :todo,
+                                     priority: :normal, created_by: user,
+                                     source: msg, due_at: Time.zone.local(due_date.year, due_date.month, due_date.day, 12))
+      described_class.refresh!(user)
+
+      row = PeopleStanding.for_user(user).find_by!(counterpart: person)
+      expect(row.verb).to eq("do")
+      expect(row.data["ask"]).to be_a(Hash)
+      expect(row.data["ask"]["id"]).to eq(task.id)
+      expect(row.data["ask"]["due_on"]).to eq(due_date.iso8601)
+    end
+
+    it "completing the ask then refreshing drops the person from the Do lane" do
+      person, _contact, _thread, msg = make_task_for_person(name: "Marta", email: "marta@x.example")
+      task = workspace.tasks.create!(title: "Deliver work", status: :todo,
+                                     priority: :normal, created_by: user, source: msg)
+      described_class.refresh!(user)
+      expect(PeopleStanding.for_user(user).find_by(counterpart: person)&.verb).to eq("do")
+
+      task.update!(status: :done)
+      described_class.refresh!(user)
+      row = PeopleStanding.for_user(user).find_by(counterpart: person)
+      expect(row&.verb).not_to eq("do")
+    end
+  end
 end

@@ -5,19 +5,43 @@ module People
   # for each active item in the "need you" kinds, which person or organization
   # is the counterpart, and what verb does the action map to?
   #
+  # Also picks up accepted open asks whose source email has a person counterpart
+  # and surfaces them as `:do` items (the Do lane — work you owe someone).
+  #
   # This is the bridge between Now (feed items) and People (persons and orgs).
   # One People::Attention instance per request / refresh cycle.
   #
   #   attention = People::Attention.new(user, now: Time.current)
   #   attention.for(person)   # => Item | nil
   #   attention.for(org)      # => Item | nil  (only money items reach orgs)
-  #   attention.participants(thread_id) # => [Person, ...]
   class Attention
     # The feed kinds that map to People attention verbs.
     KINDS = %w[reply_reminder reply_owed follow_up email_action late_receivable late_payable].freeze
 
     # A resolved attention item for one counterpart.
-    Item = Data.define(:feed_item, :verb, :wait_days, :subject, :detail, :detail_kind, :money, :thread_id, :message, :attention)
+    # `ask` carries { "id", "due_on", "held_at" } for :do items; nil otherwise.
+    # `score` is the feed item's score when present, else 70 for :do items.
+    # `sort_at` is the feed item's sort_at when present, else task due_at / created_at.
+    Item = Data.define(:feed_item, :verb, :wait_days, :subject, :detail, :detail_kind, :money, :thread_id, :message, :attention, :ask) do
+      def score
+        if feed_item
+          feed_item.score
+        elsif verb == :do
+          70
+        else
+          0
+        end
+      end
+
+      def sort_at
+        if feed_item
+          feed_item.sort_at || Time.at(0)
+        else
+          # For ask items: due_at or created_at as fallback
+          ask&.dig("due_on") ? Time.zone.parse(ask["due_on"]) : Time.at(0)
+        end
+      end
+    end
 
     def initialize(user, now: Time.current)
       @user = user
@@ -42,38 +66,94 @@ module People
     end
 
     def build_items_by_counterpart
+      result = Hash.new { |h, k| h[k] = [] }
+
+      # 1. Feed-item–based items (reply, nudge, decide, pay, chase)
       feed_items = load_feed_items
-      return {} if feed_items.empty?
+      unless feed_items.empty?
+        subjects = load_subjects(feed_items)
+        sources  = {}
 
-      subjects = load_subjects(feed_items)
-      sources  = {}
-      result   = Hash.new { |h, k| h[k] = [] }
+        feed_items.each do |fi|
+          subject = subjects[[ fi.subject_type, fi.subject_id ]]
+          next if subject.nil?
 
-      feed_items.each do |fi|
-        subject = subjects[[ fi.subject_type, fi.subject_id ]]
-        next if subject.nil?
+          source = sources[fi.kind] ||= build_source(fi.kind)
+          next unless source&.still_valid?(fi, subject)
 
-        source = sources[fi.kind] ||= build_source(fi.kind)
-        next unless source&.still_valid?(fi, subject)
+          counterpart = resolve_counterpart(fi, subject)
+          next if counterpart.nil?
 
-        counterpart = resolve_counterpart(fi, subject)
-        next if counterpart.nil?
+          item = build_item(fi, subject, counterpart)
+          next if item.nil?
 
-        item = build_item(fi, subject, counterpart)
-        next if item.nil?
+          key = counterpart_key(counterpart)
+          result[key] << item
+        end
+      end
 
-        key = counterpart_key(counterpart)
-        result[key] << item
+      # 2. Ask-based items (the Do lane) — accepted open asks with a person source
+      if Features.tasks?
+        ask_items = build_ask_items
+        ask_items.each do |item|
+          key = counterpart_key(item.message.contact.person)
+          result[key] << item
+        end
       end
 
       # Keep the best item per counterpart: highest score, then newest sort_at.
       result.transform_values do |group|
-        group.max_by { |i| [ i.feed_item.score, i.feed_item.sort_at || Time.at(0) ] }
+        group.max_by { |i| [ i.score, i.sort_at ] }
       end
     end
 
     def load_feed_items
       @user.feed_items.active.where(kind: KINDS).order(score: :desc).to_a
+    end
+
+    # Load accepted open asks whose source email has a person counterpart.
+    def build_ask_items
+      tasks = Task.accessible_to(@user)
+                  .live
+                  .where(status: Task::ACTIVE_STATUSES)
+                  .where(source_type: "EmailMessage")
+                  .includes(source: { contact: { person: :primary_organization } })
+      tasks = tasks.to_a.select { |t| t.source&.contact&.person.present? }
+      return [] if tasks.empty?
+
+      # Batch-load held focus blocks for all tasks in one query
+      task_ids = tasks.map(&:id)
+      held_blocks = FocusBlock.held.where(task_id: task_ids).index_by(&:task_id)
+
+      tasks.map { |task| build_ask_item(task, held_blocks[task.id]) }
+    end
+
+    def build_ask_item(task, held_block)
+      source_email = task.source
+      held_at = held_block&.start_at&.iso8601
+      due_on  = task.due_at&.in_time_zone(@user.effective_time_zone)&.to_date&.iso8601
+
+      ask_hash = {
+        "id"       => task.id,
+        "due_on"   => due_on,
+        "held_at"  => held_at
+      }
+
+      wait = [ ((@now - task.created_at) / 1.day).floor, 0 ].max
+
+      Item.new(
+        feed_item:   nil,
+        verb:        :do,
+        wait_days:   wait,
+        subject:     (source_email.email_thread&.display_subject.presence || source_email.subject).to_s.strip,
+        detail:      task.title,
+        detail_kind: :ask_do,
+        money:       nil,
+        thread_id:   source_email.email_thread_id,
+        message:     source_email,
+        attention:   true,
+        ask:         ask_hash
+      )
     end
 
     # Batch-load subjects grouped by type, with the associations People needs.
@@ -128,16 +208,17 @@ module People
       msg      = subject.is_a?(EmailMessage) ? subject : nil
 
       Item.new(
-        feed_item: fi,
-        verb: verb,
-        wait_days: wait,
-        subject: subj_str,
-        detail: detail,
+        feed_item:   fi,
+        verb:        verb,
+        wait_days:   wait,
+        subject:     subj_str,
+        detail:      detail,
         detail_kind: detail_kind,
-        money: money,
-        thread_id: thread,
-        message: msg,
-        attention: fi.attention
+        money:       money,
+        thread_id:   thread,
+        message:     msg,
+        attention:   fi.attention,
+        ask:         nil
       )
     end
 

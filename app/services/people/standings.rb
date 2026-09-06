@@ -154,7 +154,7 @@ module People
           subtitle:          cp.subtitle,
           avatar_email:      cp.avatar_email,
           avatar_initial:    cp.avatar_initial,
-          data:              build_data(cp, directory).merge(standing.money ? { "money" => standing.money } : {}),
+          data:              build_data(cp, directory).merge(standing.money ? { "money" => standing.money } : {}).merge(standing.ask ? { "ask" => standing.ask } : {}),
           refreshed_at:      now,
           updated_at:        now,
           created_at:        now

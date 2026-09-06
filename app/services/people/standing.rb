@@ -15,15 +15,15 @@ module People
   # sentence templates are gone - verbs and subjects now come from the feed.
   class Standing
     Result = Data.define(:detail, :detail_kind, :money, :needs_you, :thread_id, :overdue_days, :kind,
-                         :verb, :subject, :wait_days, :feed_item_id, :email_message_id) do
+                         :verb, :subject, :wait_days, :feed_item_id, :email_message_id, :ask) do
       def initialize(detail: nil, detail_kind: nil, money: nil, needs_you: false,
                      thread_id: nil, overdue_days: 0, kind: :none,
-                     verb: nil, subject: nil, wait_days: 0, feed_item_id: nil, email_message_id: nil)
+                     verb: nil, subject: nil, wait_days: 0, feed_item_id: nil, email_message_id: nil, ask: nil)
         super
       end
       def self.none = new(detail: nil)
       # Composed at render time in the current locale.
-      def text = People::StandCopy.line(self)
+      def text = People::StandCopy.line(self, zone: Current.user&.effective_time_zone || Time.zone)
       def present? = detail.present? || detail_kind == :money
     end
 
@@ -132,8 +132,9 @@ module People
         verb: item.verb,
         subject: item.subject,
         wait_days: item.wait_days,
-        feed_item_id: fi.id,
-        email_message_id: item.message&.id
+        feed_item_id: fi&.id,
+        email_message_id: item.message&.id,
+        ask: item.ask
       )
     end
 

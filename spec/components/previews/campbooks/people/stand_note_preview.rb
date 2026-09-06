@@ -69,6 +69,33 @@ module Campbooks
         )
       end
 
+      def do_dated_held
+        render Campbooks::People::StandNote.new(
+          standing: result(verb: :do, detail: "Comments on slides 4 to 9", detail_kind: :ask_do, needs_you: true,
+                           subject: "Q3 kickoff deck", wait_days: 2,
+                           ask: { "id" => FIXED_ID, "due_on" => 5.days.from_now.to_date.iso8601,
+                                  "held_at" => 1.day.from_now.change(hour: 10).iso8601 }),
+          counterpart: counterpart("Sofia")
+        )
+      end
+
+      def do_undated
+        render Campbooks::People::StandNote.new(
+          standing: result(verb: :do, detail: "Send the signed contract back", detail_kind: :ask_do, needs_you: true,
+                           subject: "MSA 2026", wait_days: 4, ask: { "id" => FIXED_ID, "due_on" => nil, "held_at" => nil }),
+          counterpart: counterpart("Rita")
+        )
+      end
+
+      def do_overdue
+        render Campbooks::People::StandNote.new(
+          standing: result(verb: :do, detail: "Reply about the notice period", detail_kind: :ask_do, needs_you: true,
+                           subject: "Notice period", wait_days: 6,
+                           ask: { "id" => FIXED_ID, "due_on" => 3.days.ago.to_date.iso8601, "held_at" => nil }),
+          counterpart: counterpart("Ines")
+        )
+      end
+
       def you_wrote_last
         render Campbooks::People::StandNote.new(
           standing: result(detail: "2026-08-28", detail_kind: :you_wrote_last),
@@ -105,13 +132,13 @@ module Campbooks
       end
 
       def result(verb: nil, detail: nil, detail_kind: nil, money: nil, needs_you: false,
-                 subject: nil, wait_days: 0, feed_item_id: nil, email_message_id: nil)
+                 subject: nil, wait_days: 0, feed_item_id: nil, email_message_id: nil, ask: nil)
         People::Standing::Result.new(
           verb: verb, detail: detail, detail_kind: detail_kind, money: money,
           needs_you: needs_you, thread_id: nil, overdue_days: wait_days,
           kind: needs_you ? :attention : :last_exchange,
           subject: subject, wait_days: wait_days,
-          feed_item_id: feed_item_id, email_message_id: email_message_id
+          feed_item_id: feed_item_id, email_message_id: email_message_id, ask: ask
         )
       end
 

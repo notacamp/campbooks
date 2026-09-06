@@ -54,8 +54,10 @@ module PeopleLayout
 
   # Group Need-you counterparts into ordered verb lanes.
   # Returns array of { verb:, label:, counterparts: [] }.
+  # Lane order: Reply · Decide · Do · Pay · Chase · Nudge
+  # (what you owe first — reply, action, work — then what they owe you).
   def build_lanes(need_you)
-    order = %i[reply decide pay chase nudge]
+    order = %i[reply decide do pay chase nudge]
     by_verb = need_you.group_by { |cp| cp.standing.verb }
 
     order.filter_map do |verb|

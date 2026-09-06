@@ -37,6 +37,9 @@ en:
           snooze: Snooze until tomorrow
           open_money: Open in Money
           mark_paid: Mark paid
+          done_ask: Done
+          hold_time: Hold time
+          held_slot: "held %{when}"
       search_bar:
         placeholder: Find a person or company…
         clear: Clear
@@ -150,6 +153,7 @@ en:
       lanes:
         reply: Reply
         decide: Decide
+        do: Do
         pay: Pay
         chase: Chase
         nudge: Nudge
@@ -184,6 +188,9 @@ en:
       waiting_for: "Waiting for %{what}"
       no_answer_since: "No answer since %{date}"
       you_wrote_last: "You wrote last, %{date}"
+      do: "%{ask}"
+      do_by: "%{ask} by %{date}"
+      held: "%{when} held."
       money_late:
         one: "%{amount} due %{date} · %{count} day late"
         other: "%{amount} due %{date} · %{count} days late"
@@ -222,6 +229,12 @@ en:
         fresh_quote: "%{name} wrote on %{date}: “%{quote}”"
         fresh_quote_undated: "%{name} wrote: “%{quote}”"
         draft_below: "Scout's draft is below."
+        do: "Open with %{name}: %{ask}. No date was set; %{name} is waiting on the work, not a reply."
+        do_by: "Open with %{name}: %{ask}, by %{date}. %{name} is waiting on the work, not a reply."
+        do_held: "%{when} is held for it."
+        do_overdue:
+          one: "Overdue with %{name}: %{ask}, due %{date}, %{count} day ago."
+          other: "Overdue with %{name}: %{ask}, due %{date}, %{count} days ago."
       you: You
       back: People
       menu: More

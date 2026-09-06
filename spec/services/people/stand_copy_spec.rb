@@ -5,7 +5,7 @@ require "rails_helper"
 RSpec.describe People::StandCopy do
   around { |e| I18n.with_locale(:en) { e.run } }
 
-  def result(detail_kind:, detail: nil, money: nil, verb: nil, subject: "Q3 deck", wait_days: 2)
+  def result(detail_kind:, detail: nil, money: nil, verb: nil, subject: "Q3 deck", wait_days: 2, ask: nil)
     People::Standing::Result.new(
       detail_kind: detail_kind,
       detail: detail,
@@ -18,7 +18,8 @@ RSpec.describe People::StandCopy do
       overdue_days: 0,
       kind: verb ? :attention : :last_exchange,
       feed_item_id: nil,
-      email_message_id: nil
+      email_message_id: nil,
+      ask: ask
     )
   end
 
@@ -163,6 +164,78 @@ RSpec.describe People::StandCopy do
       r = result(detail_kind: :ask_quote, verb: nil, detail: "When can we meet?", subject: "Intro")
       note = described_class.note(r, name: "Rui", date: Date.new(2026, 9, 2))
       expect(note).to include("When can we meet?")
+    end
+
+    # Do verb
+    context "verb :do" do
+      around { |e| travel_to(Time.zone.local(2026, 9, 10, 12, 0, 0)) { e.run } }
+
+      it "undated → do template with name and ask" do
+        r = result(detail_kind: :ask_do, verb: :do, detail: "Send the signed contract",
+                   ask: { "id" => 1, "due_on" => nil, "held_at" => nil })
+        note = described_class.note(r, name: "Marta")
+        expect(note).to include("Marta")
+        expect(note).to include("signed contract")
+        expect(note).not_to include("held")
+      end
+
+      it "dated (not overdue) → do_by template" do
+        r = result(detail_kind: :ask_do, verb: :do, detail: "Comments on slides",
+                   ask: { "id" => 2, "due_on" => "2026-09-15", "held_at" => nil })
+        note = described_class.note(r, name: "Sofia")
+        expect(note).to include("Sofia")
+        expect(note).to include("Comments on slides")
+      end
+
+      it "dated with held_at → appends do_held" do
+        r = result(detail_kind: :ask_do, verb: :do, detail: "Draft slides",
+                   ask: { "id" => 3, "due_on" => "2026-09-15",
+                          "held_at" => "2026-09-11T10:00:00Z" })
+        note = described_class.note(r, name: "Sofia")
+        expect(note).to include("held")
+      end
+
+      it "overdue → do_overdue template with count" do
+        r = result(detail_kind: :ask_do, verb: :do, detail: "Invoice reply",
+                   ask: { "id" => 4, "due_on" => "2026-09-08", "held_at" => nil })
+        note = described_class.note(r, name: "Ines")
+        expect(note).to include("Ines")
+        expect(note).to include("ago")
+      end
+
+      it "loads in all four locales without raising" do
+        %i[en pt es fr].each do |locale|
+          I18n.with_locale(locale) do
+            r = result(detail_kind: :ask_do, verb: :do, detail: "Work",
+                       ask: { "id" => 5, "due_on" => "2026-09-15", "held_at" => nil })
+            expect { described_class.note(r, name: "Name") }.not_to raise_error
+          end
+        end
+      end
+    end
+  end
+
+  # ── line for :ask_do ────────────────────────────────────────────────────────
+
+  describe ".line for :ask_do" do
+    it "undated → do: <ask>" do
+      r = result(detail_kind: :ask_do, verb: :do, detail: "Send the report",
+                 ask: { "id" => 1, "due_on" => nil, "held_at" => nil })
+      expect(described_class.line(r)).to include("Send the report")
+    end
+
+    it "dated → do_by: <ask> by <date>" do
+      r = result(detail_kind: :ask_do, verb: :do, detail: "Send the report",
+                 ask: { "id" => 1, "due_on" => "2026-09-15", "held_at" => nil })
+      line = described_class.line(r)
+      expect(line).to include("Send the report")
+    end
+
+    it "held → appends held suffix" do
+      r = result(detail_kind: :ask_do, verb: :do, detail: "Deck slides",
+                 ask: { "id" => 1, "due_on" => nil, "held_at" => "2026-09-11T10:00:00Z" })
+      line = described_class.line(r)
+      expect(line).to include("held")
     end
   end
 end
