@@ -3,37 +3,30 @@ en:
   money:
     statements:
       title: "Bank Statements"
+      all_lines: "All %{count} lines of %{label}"
     index:
       title: "Money"
-      subtitle: "What you're owed, what you owe, and what the bank says."
-      export: "Export %{quarter}"
-      add: "Add"
-      add_title: "Add documents"
-      close: "Close"
-      empty_title: "Nothing owed or due."
-      empty_body: "Invoices and bills you receive or send will show up here as Scout reads them."
+      subtitle: "What the bank says, matched to the paper behind it."
+      export_accountant: "Export for the accountant"
+      add_statement: "Add a statement"
     what:
       invoice_sent: "Invoice #%{number} you sent"
       invoice: "Invoice #%{number}"
-      recurring: "%{base} · subscription"
-      renewal: "Policy renewal · %{period}"
-      payment_due: "Payment due"
-    cadence:
-      monthly: "monthly"
-      yearly: "yearly"
     settled:
       line: "line %{number}"
-    status:
-      late:
-        one: "%{count} day late"
-        other: "%{count} days late"
-      due:
-        one: "in %{count} day"
-        other: "in %{count} days"
-      due_today: "due today"
-      decide: "Renews · decide"
-      paid: "Paid %{date}"
-      estimated: "est."
+    needs_you:
+      no_name: "Transfer, no name on the line"
+      no_invoice:
+        title: "No invoice for this payment"
+      review:
+        title: "Review this match"
+        likely: "likely"
+      partial:
+        title: "%{vendor} is only part paid"
+        meta: "%{paid} of %{total} · %{outstanding} still outstanding"
+      nif:
+        title: "Invoice needs a NIF"
+        flag: "NIF missing"
     export:
       filename: "money-%{quarter}"
       headers:
@@ -42,114 +35,94 @@ en:
         direction: "Direction"
         amount: "Amount"
         currency: "Currency"
-        due: "Due"
+        date: "Date"
         status: "Status"
         settled_on: "Settled on"
+        statement: "Statement"
         source: "Source"
       direction:
         receivable: "owed to you"
         payable: "you owe"
       status:
-        late: "late"
-        due: "due"
         settled: "settled"
-        decide: "decide"
+        pending: "bank line under review"
+        missing: "not on a statement"
+        unconfirmed: "no statement yet"
     reminder_draft:
       chase:
         subject: "Invoice #%{reference} · payment reminder"
         subject_generic: "Payment reminder"
         invoice_ref: "invoice #%{reference}"
         this_invoice: "this invoice"
-        body: "Hi %{counterpart}, I hope you're well. This is a friendly reminder that %{reference} for %{amount} was due on %{due} (%{days_ago}). If it's already on its way, thank you and please ignore this note — otherwise, could you let me know when to expect it? Thanks so much."
-      cancellation:
-        subject: "%{counterpart} · cancellation request"
-        body: "Hi, I'm writing about %{counterpart}, which is set to renew on %{date}. I'd like to cancel it before it renews. Could you tell me what you need from me to stop the renewal? Thank you for your help."
-      days_ago:
-        zero: "today"
-        one: "%{count} day ago"
-        other: "%{count} days ago"
+        body: "Hi %{counterpart}, I hope you're well. This is a friendly reminder that %{reference} for %{amount} isn't showing on our side yet. Could you let me know when to expect it? Thank you."
     actions:
       marked_paid: "Marked paid."
       marked_unpaid: "Marked unpaid."
-      reminder_created: "Reminder set for %{date}."
       reminder_opened: "Draft ready in the composer."
-      kept: "Renewal kept."
-      cancelled: "Cancellation draft ready in the composer."
-      gone: "That obligation is no longer here."
+      line_confirmed: "Match confirmed."
+      line_excluded: "Line set aside."
+      line_reset: "Reset."
+      line_not_found: "Match not found."
+      invalid_reason: "Invalid reason."
+      gone: "That item is no longer here."
       undo: "Undo"
-    why:
-      times_usual: "%{times}x their usual"
-      pays_on_time: "you pay them on time"
-      usually_late: "usually paid %{count} days late"
-      recurring: "Recurring"
-      service: "a service"
   components:
     money:
-      summary:
-        today: "today"
-        owed_html: "You're owed %{amount}."
-        owe_html:
-          one: "You owe %{amount}, one bill."
-          other: "You owe %{amount} across %{count} bills."
-        late_receivable_html: "%{name}'s invoice is %{overdue}, so I drafted a reminder."
-        late_payable_html: "%{name} is %{overdue}."
-        matters_html: "The one that matters is %{name}, %{amount}, %{overdue} — %{why}."
-        matters_plain_html: "The one that matters is %{name}, %{amount}, %{overdue}."
-        renewal_html: "A renewal (%{amount}) lands %{date}."
-        nothing_else: "Nothing else is due this month."
-        clear: "Nothing is owed or due right now."
-      timeline:
-        title: "Next %{days} days"
-        hint: "each bar is one obligation at its due date; the ledger below is the table view"
-        today: "Today"
-        owed: "Owed to you"
-        owe: "You owe"
-        open_amount: "%{amount} open"
-        none_open: "nothing open"
-        due: "due %{date}"
-        renews: "renews %{date}"
-        legend:
-          open: "open"
-          late: "late"
-          settled: "settled"
-        overflow:
-          older: "%{count} older"
-          later: "%{count} later"
-          older_axis: "‹ older"
-          later_axis: "later ›"
-          older_title: "%{count} overdue by more than three weeks · %{amount}. Open the ledger below."
-          later_title: "%{count} due beyond the next month · %{amount}. Open the ledger below."
-      ledger:
-        strip:
-          label: "Order"
-        sort:
-          label: "Sort"
-          by: "Sort by %{column}"
-          priority_desc: "Priority"
-          date_desc: "Newest first"
-          date_asc: "Oldest first"
-          amount_desc: "Largest amount first"
-          amount_asc: "Smallest amount first"
-          counterpart_asc: "Counterpart A–Z"
-          counterpart_desc: "Counterpart Z–A"
-        col:
-          counterpart: "Counterpart"
-          what: "What"
-          amount: "Amount"
-          due: "Due"
-          status: "Status"
-          source: "Source"
-          actions: "Actions"
-        section:
-          late: "Late"
-          due: "Due"
-          settled: "Settled"
+      read:
+        read_statement: "read %{label}'s statement"
+        no_statements_when: "no statements yet"
+        no_statements_html: "No bank statements yet. %{link} and I'll match every line to the paper behind it."
+        add_one: "Add one"
+        the_bank: "the bank"
+        statement_html: "%{label}'s %{bank} statement is in: %{explained} of %{total} lines have their paper."
+        needs_invoice_html_one: "One still needs an invoice"
+        needs_invoice_html: "%{count} still need an invoice"
+        review_html_one: "one match wants a look"
+        review_html: "%{count} matches want a look"
+        partial_html_one: "One invoice is only part paid."
+        partial_html:
+          one: "One invoice is only part paid."
+          other: "%{count} invoices are only part paid."
+        missing_html_one: "One invoice from %{label} isn't on this statement."
+        missing_html:
+          one: "One invoice from %{label} isn't on this statement."
+          other: "%{count} invoices from %{label} aren't on this statement."
+        all_explained_html: "Every line has its paper."
+      strip:
+        explained: "explained"
+        needs_invoice: "Need an invoice"
+        not_on_a_statement: "Not on a statement"
+        payments:
+          one: "%{count} payment"
+          other: "%{count} payments"
+        invoices:
+          one: "%{count} invoice"
+          other: "%{count} invoices"
+      needs_you:
+        title: "Needs you"
+        note: "lifted from the statement below"
+        resolve: "Resolve"
+        change: "Change"
+        confirm: "Confirm"
+        open_statement: "Open the statement"
+        ask_for_invoice: "Ask for a corrected invoice"
+        overflow: "+%{count} more on the statement"
+        overflow_link: "Open the statement"
+      statements:
+        title: "Statements"
+        note: "every bank line and the paper that explains it"
+        empty_title: "No bank statements yet."
+        empty_body: "Import your first statement to start matching lines to invoices."
+        add_statement: "Add a statement"
+        earlier: "Earlier..."
+        all_lines: "All %{count} lines of %{label}"
+      unbanked:
+        title: "Not on a statement"
+        note: "dated in a month you've reconciled, with no bank line"
+        all_on_statement: "Every invoice from your reconciled months is on a statement."
+        not_on_label: "not on %{label}'s statement"
+        you_sent: "you sent it"
         mark_paid: "Mark paid"
+        paid_elsewhere: "It's on the card"
         send_reminder: "Send reminder"
-        pay: "Pay"
-        remind_on: "Remind on %{date}"
-        keep: "Keep"
-        cancel: "Cancel it"
-        next_renews: "next renews %{date}"
-        source_email: "Open the source email"
-        source_document: "Open the document"
+        evidence_note: "An invoice is only listed here once a reconciled statement covers its date and shows no payment. Until then Money says nothing about it: no due dates, no \"late\", no totals you owe, because a due date passing isn't evidence of anything."

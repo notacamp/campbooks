@@ -48,24 +48,20 @@ fr:
           important: Important
           starred: Expéditeur favori
       late_payable_card:
-        owed: "Vous devez"
-        days_late:
-          one: "%{count} jour de retard"
-          other: "%{count} jours de retard"
-        headline: "Vous devez %{reference} à %{name}"
-        invoice_ref: "la facture #%{number}"
+        headline: "%{reference} de %{name} n'a pas encore de ligne bancaire"
+        not_on_statement: "Pas sur le relevé de %{label}"
+        not_on_a_statement: "Pas sur un relevé"
+        invoice_ref: "facture #%{number}"
         an_invoice: "une facture"
         mark_paid: "Marquer comme payé"
         open_money: "Ouvrir dans Finance"
         later: "Plus tard"
       late_receivable_card:
-        owed: "Dû par"
-        days_late:
-          one: "%{count} jour de retard"
-          other: "%{count} jours de retard"
-        headline: "%{name} n'a pas payé %{reference}"
-        invoice_ref: "la facture #%{number}"
-        an_invoice: "une facture"
+        headline: "%{reference} pour %{name} n'est pas sur le relevé"
+        not_on_statement: "Pas sur le relevé de %{label}"
+        not_on_a_statement: "Pas sur un relevé"
+        invoice_ref: "Facture #%{number}"
+        an_invoice: "Une facture"
         scout_note: "J'ai rédigé un rappel."
         send_reminder: "Envoyer le rappel"
         mark_paid: "Marquer comme payé"

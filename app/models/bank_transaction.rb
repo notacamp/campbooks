@@ -25,6 +25,10 @@ class BankTransaction < ApplicationRecord
   validates :description, presence: true
   validates :amount_cents, presence: true
 
+  # Statuses that count as "resolved" for the progress counter.
+  # The loan PR will append :explained here.
+  RESOLVED_STATUSES = %i[matched excluded requested].freeze
+
   scope :ordered, -> { order(position: :asc) }
 
   # ── Amount helpers ──────────────────────────────────────────────────────────

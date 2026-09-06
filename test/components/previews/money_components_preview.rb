@@ -1,100 +1,192 @@
 # frozen_string_literal: true
 
-# Previews for the Money surface's three components — the Scout read, the 30-day
-# timeline, and the ledger table — over an in-memory set of obligations mirroring
-# the approved mock (no DB, no seeded data). The fake ledger answers just what the
-# components read; the summary is the REAL Money::Summary wrapping it.
+# Previews for the Money surface's new evidence-based components.
+# Uses lightweight in-memory structs and stub objects to avoid DB queries.
+# NOTE: Statements preview is skipped because it requires persisted Reconciliation
+# records with bank transactions; use the seeds (demo workspace) to preview it live.
 class MoneyComponentsPreview < ViewComponent::Preview
-  # A light-Ember note: owed / owe / late / renewals, bold amounts, honest.
-  # @label Scout read
-  def scout_read
-    render Campbooks::Money::Summary.new(summary: build_summary, class: "max-w-[900px]")
+  # Scout read with a ready statement — needs_invoice + review clauses.
+  # @label Read (with statement)
+  def read_with_statement
+    read = stub_read(
+      any_statements?: true,
+      statement:       stub_statement("January", "Millennium BCP"),
+      statement_label: "January",
+      bank_name:       "Millennium BCP",
+      lines_total:     18,
+      lines_explained: 14,
+      review_count:    2,
+      needs_invoice_count: 3,
+      needs_invoice_cents: 48_600,
+      partial_count:   1,
+      nif_count:       0,
+      missing_count:   2,
+      missing_cents:   180_000,
+      missing_cents_by_currency: { "EUR" => 180_000 },
+      primary_currency: "EUR",
+      explained_pct:   78,
+      requested_count: 0
+    )
+    render Campbooks::Money::Read.new(read: read, class: "max-w-[700px]")
   end
 
-  # Two directions on one axis; late bars destructive + labelled, the overdue
-  # region shaded, bars linked to their ledger rows.
-  # @label Timeline
-  def timeline
-    render Campbooks::Money::Timeline.new(ledger: build_ledger, summary: build_summary, today: Date.current)
+  # Scout read with no statements yet.
+  # @label Read (no statements)
+  def read_no_statements
+    read = stub_read(any_statements?: false, statement: nil, statement_label: nil,
+                     bank_name: nil, lines_total: 0, lines_explained: 0,
+                     review_count: 0, needs_invoice_count: 0, needs_invoice_cents: 0,
+                     partial_count: 0, nif_count: 0, missing_count: 0,
+                     missing_cents: 0, missing_cents_by_currency: {}, primary_currency: "EUR",
+                     explained_pct: 0, requested_count: 0)
+    render Campbooks::Money::Read.new(read: read, class: "max-w-[700px]")
   end
 
-  # The overflow case: a deep backlog of old bills folds into one "older" marker
-  # per lane, and a far-future bill into a "later" marker, so the window stays
-  # legible no matter how many old bills there are.
-  # @label Timeline (backlog)
-  def timeline_with_backlog
-    today = Date.current
-    obligations = sample_obligations(today) + backlog_obligations(today)
-    ledger = FakeLedger.new(obligations, today)
-    render Campbooks::Money::Timeline.new(ledger: ledger, summary: Money::Summary.for(nil, nil, today: today, ledger: ledger), today: today)
+  # Scout read when every line is explained and nothing is missing.
+  # @label Read (all explained)
+  def read_all_explained
+    read = stub_read(
+      any_statements?: true,
+      statement:       stub_statement("August", "Novo Banco"),
+      statement_label: "August",
+      bank_name:       "Novo Banco",
+      lines_total:     22,
+      lines_explained: 22,
+      review_count:    0,
+      needs_invoice_count: 0,
+      needs_invoice_cents: 0,
+      partial_count:   0,
+      nif_count:       0,
+      missing_count:   0,
+      missing_cents:   0,
+      missing_cents_by_currency: {},
+      primary_currency: "EUR",
+      explained_pct:   100,
+      requested_count: 0
+    )
+    render Campbooks::Money::Read.new(read: read, class: "max-w-[700px]")
   end
 
-  # Late / Due / Settled, with status chips (icon + label) and per-row actions.
-  # @label Ledger table
-  def ledger
-    render Campbooks::Money::Ledger.new(ledger: build_ledger)
+  # Summary stats strip.
+  # @label Strip
+  def strip
+    read = stub_read(
+      any_statements?: true,
+      statement:       stub_statement("January", "Millennium BCP"),
+      statement_label: "January",
+      bank_name:       "Millennium BCP",
+      lines_total:     18,
+      lines_explained: 14,
+      review_count:    2,
+      needs_invoice_count: 3,
+      needs_invoice_cents: 48_600,
+      partial_count:   0,
+      nif_count:       0,
+      missing_count:   2,
+      missing_cents:   180_000,
+      missing_cents_by_currency: { "EUR" => 180_000 },
+      primary_currency: "EUR",
+      explained_pct:   78,
+      requested_count: 0
+    )
+    render Campbooks::Money::Strip.new(read: read)
+  end
+
+  # Needs-you section — no invoice kind (resolve chip).
+  # @label NeedsYou (no invoice)
+  def needs_you_no_invoice
+    txn = stub_txn(counterparty: "EDP Comercial", amount_cents: -9_640, booked_on: Date.new(2024, 1, 8))
+    item = Money::NeedsYouItem.new(
+      kind: :no_invoice, transaction: txn, match: nil, group: nil,
+      title: "No invoice for this payment",
+      meta: [ "EDP Comercial", "€96.40", "Jan 8, 2024" ],
+      actions: [ :resolve ]
+    )
+    render Campbooks::Money::NeedsYou.new(items: [ item ], overflow: 0, statement: stub_statement("January", "Millennium BCP"))
+  end
+
+  # Needs-you section — review kind (confirm/change buttons).
+  # @label NeedsYou (review)
+  def needs_you_review
+    txn = stub_txn(counterparty: "Vodafone PT", amount_cents: -24_800, booked_on: Date.new(2024, 1, 15))
+    doc = OpenStruct.new(invoice_number: "FT2024/0021", entity_display_name: "Vodafone PT")
+    match = OpenStruct.new(id: 42, confidence: 0.87, document: doc, suggested?: true)
+    item = Money::NeedsYouItem.new(
+      kind: :review, transaction: txn, match: match, group: nil,
+      title: "Review this match",
+      meta: [ "Vodafone PT", "€248.00", "Invoice #FT2024/0021", "87% likely" ],
+      actions: [ :change, :confirm ]
+    )
+    render Campbooks::Money::NeedsYou.new(items: [ item ], overflow: 0, statement: stub_statement("January", "Millennium BCP"))
+  end
+
+  # Needs-you section — partial kind.
+  # @label NeedsYou (partial)
+  def needs_you_partial
+    item = Money::NeedsYouItem.new(
+      kind: :partial, transaction: nil, match: nil, group: nil,
+      title: "Galp Frota is only part paid",
+      meta: [ "€600.00 of €1,500.00 · €900.00 still outstanding" ],
+      actions: [ :open_statement ]
+    )
+    render Campbooks::Money::NeedsYou.new(items: [ item ], overflow: 0, statement: stub_statement("January", "Millennium BCP"))
+  end
+
+  # Needs-you section — NIF kind (ask for corrected invoice).
+  # @label NeedsYou (nif)
+  def needs_you_nif
+    txn = stub_txn(counterparty: "Staples Portugal", amount_cents: -36_400, booked_on: Date.new(2024, 1, 20))
+    item = Money::NeedsYouItem.new(
+      kind: :nif, transaction: txn, match: nil, group: nil,
+      title: "Invoice needs a NIF",
+      meta: [ "Staples Portugal", "€364.00" ],
+      actions: [ :request_invoice ]
+    )
+    render Campbooks::Money::NeedsYou.new(items: [ item ], overflow: 2, statement: stub_statement("January", "Millennium BCP"))
+  end
+
+  # Unbanked list with two missing obligations.
+  # @label Unbanked (with rows)
+  def unbanked_with_rows
+    obligations = [
+      stub_obligation(:payable, "Galp Frota", "FT2024/0902", 8_860, Date.new(2024, 1, 22), "January"),
+      stub_obligation(:receivable, "Acme Consulting", "0234", 222_000, Date.new(2024, 1, 14), "January")
+    ]
+    evidence = OpenStruct.new(any?: true)
+    render Campbooks::Money::Unbanked.new(obligations: obligations, evidence: evidence)
+  end
+
+  # Unbanked empty state — all invoices accounted for.
+  # @label Unbanked (empty)
+  def unbanked_empty
+    evidence = OpenStruct.new(any?: true)
+    render Campbooks::Money::Unbanked.new(obligations: [], evidence: evidence)
   end
 
   private
 
-  FakeLedger = Struct.new(:obligations, :today) do
-    def late    = obligations.select(&:late?)
-    def due     = obligations.select { |o| o.due? || o.decide? }.sort_by(&:due_on)
-    def settled = obligations.select(&:settled?)
-    def sections = [ [ :late, late ], [ :due, due ], [ :settled, settled ] ].reject { |(_k, list)| list.empty? }
-    def open_obligations = obligations.select { |o| o.late? || o.due? }
-    def owed_to_you_by_currency = sum(:receivable)
-    def you_owe_by_currency = sum(:payable)
-    def range_start = today - 21
-    def range_end   = today + 30
-    def any? = obligations.any?
-
-    private
-
-    def sum(direction)
-      open_obligations.select { |o| o.direction == direction }
-                      .each_with_object(Hash.new(0)) { |o, acc| acc[o.currency] += o.amount_cents.to_i }
-    end
+  def stub_read(**attrs)
+    OpenStruct.new(**attrs)
   end
 
-  def build_ledger(today = Date.current)
-    FakeLedger.new(sample_obligations(today), today)
+  def stub_statement(label, bank)
+    OpenStruct.new(period_label: label, bank_name: bank, period_start: Date.new(2024, 1, 1), period_end: Date.new(2024, 1, 31), id: 0)
   end
 
-  def build_summary(today = Date.current)
-    Money::Summary.for(nil, nil, today: today, ledger: build_ledger(today))
+  def stub_txn(counterparty:, amount_cents:, booked_on:)
+    OpenStruct.new(id: rand(1_000_000), counterparty: counterparty,
+                   amount_cents: amount_cents, booked_on: booked_on,
+                   debit?: amount_cents.negative?,
+                   unmatched?: true, suggested?: false, matched?: false)
   end
 
-  def sample_obligations(today)
-    [
-      obligation("doc:brightloop", :receivable, "Brightloop", "Invoice #0231 you sent", 120_000, today - 12, :late, %i[mark_paid send_reminder]),
-      obligation("doc:cloudhost", :payable, "Cloudhost", "July invoice · subscription", 24_800, today - 20, :late, %i[mark_paid pay], recurring: true, pay_url: "https://pay.example.com/x"),
-      obligation("doc:staples", :payable, "Staples Portugal", "Order 4471", 36_400, today + 5, :due, %i[mark_paid pay], pay_url: "https://pay.example.com/y"),
-      obligation("doc:acme", :receivable, "Acme Consulting", "Invoice #0234 you sent", 222_000, today + 12, :due, %i[remind_on]),
-      obligation("rem:seguro", :payable, "Seguro Renovação", "Policy renewal · yearly", 41_200, today + 28, :decide, %i[keep cancel]),
-      obligation("doc:lumen", :receivable, "Lumen Studio", "Invoice #0233 you sent", 64_000, today - 2, :settled, [], settled_on: today - 2, settled_via: "Millennium BCP · line 14"),
-      obligation("doc:edp", :payable, "EDP", "August bill · subscription", 9_640, today - 6, :settled, [], settled_on: today - 6, settled_via: "Millennium BCP · line 9")
-    ]
-  end
-
-  # A deep backlog: ~40 old payable bills + one long-overdue receivable, plus a
-  # far-future payable — the case the on-axis clamp used to turn into a blur.
-  def backlog_obligations(today)
-    older = (1..40).map do |i|
-      obligation("doc:old#{i}", :payable, "Vendor #{i}", "Invoice ##{1000 + i}", 8_000 + i * 900, today - (30 + i * 25), :late, %i[mark_paid])
-    end
-    older << obligation("doc:oldrx", :receivable, "Old Client", "Invoice #0099 you sent", 22_800, today - 176, :late, %i[send_reminder])
-    later = obligation("doc:future", :payable, "Annual Hosting", "2027 renewal", 120_000, today + 75, :due, %i[mark_paid])
-    older + [ later ]
-  end
-
-  def obligation(id, direction, counterpart, what, cents, due, status, actions, recurring: false, pay_url: nil, settled_on: nil, settled_via: nil)
+  def stub_obligation(direction, counterpart, invoice_number, cents, anchor_on, label)
     Money::Obligation.new(
-      id: id, direction: direction, counterpart: counterpart, what: what,
-      amount: ::Money.new(cents, "EUR"), due_on: due, status: status,
-      settled_on: settled_on, settled_via: settled_via, source_email_message: nil,
-      document: nil, reminder: nil, recurring: recurring, cadence: nil,
-      next_renewal_on: nil, due_estimated: false, pay_url: pay_url, actions: actions
+      id: "doc:#{rand(100_000)}", direction: direction, counterpart: counterpart,
+      what: "Invoice ##{invoice_number}", amount: ::Money.new(cents, "EUR"),
+      anchor_on: anchor_on, status: :missing, settled_on: nil, settled_via: nil,
+      source_email_message: nil, document: nil, statement: nil,
+      statement_label: label, actions: direction == :payable ? %i[paid_elsewhere mark_paid] : %i[send_reminder mark_paid]
     )
   end
 end

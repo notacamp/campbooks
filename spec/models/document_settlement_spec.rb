@@ -298,4 +298,47 @@ RSpec.describe Document, type: :model do
       expect(match.errors[:allocated_cents]).to be_present
     end
   end
+
+  # ── mark_settled! source: param ─────────────────────────────────────────────
+
+  describe "#mark_settled! source validation" do
+    let(:doc) { make_doc(amount_cents: 10_000) }
+
+    it "accepts source: 'manual'" do
+      doc.mark_settled!(source: "manual")
+      expect(doc.reload.settled_source).to eq("manual")
+    end
+
+    it "accepts source: 'elsewhere'" do
+      doc.mark_settled!(source: "elsewhere")
+      expect(doc.reload.settled_source).to eq("elsewhere")
+    end
+
+    it "raises ArgumentError for an invalid source" do
+      expect { doc.mark_settled!(source: "bad") }.to raise_error(ArgumentError)
+    end
+  end
+
+  # ── settled_manual? ──────────────────────────────────────────────────────────
+
+  describe "#settled_manual?" do
+    let(:doc) { make_doc(amount_cents: 10_000) }
+
+    it "returns true for settled_source 'manual'" do
+      doc.mark_settled!(source: "manual")
+      expect(doc.reload).to be_settled_manual
+    end
+
+    it "returns true for settled_source 'elsewhere'" do
+      doc.mark_settled!(source: "elsewhere")
+      expect(doc.reload).to be_settled_manual
+    end
+
+    it "returns false for bank_match settlement" do
+      txn   = make_txn(amount_cents: -10_000, booked_on: Date.current, position: 99)
+      match = confirm_match!(txn, doc, allocated_cents: 10_000)
+      doc.reload
+      expect(doc).not_to be_settled_manual
+    end
+  end
 end

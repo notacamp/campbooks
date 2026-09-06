@@ -21,7 +21,7 @@
         <%= button_to t("reconciliations.bank_transactions.resolve_panel.attach"),
               manual_url,
               method: :post,
-              params: { document_id: doc.id },
+              params: { document_id: doc.id, surface: params[:surface].presence }.compact,
               class: "shrink-0 text-xs font-medium text-accent-600 hover:text-accent-700" %>
       </div>
     <% end %>

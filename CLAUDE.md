@@ -99,6 +99,18 @@ Every sender is a person or a **service** (machine/bulk mail — newsletters, re
 - **Mission Control**: Solid Queue dashboard at `/jobs`, gated to **admins** via `MissionControlController` (app session auth + admin check, wired through `config.mission_control.jobs.base_controller_class`; the engine's own HTTP basic auth is disabled)
 - **Gmail push (optional)**: `EmailWebhooksController#gmail_receive` (public; verifies `?token=` against `GMAIL_PUBSUB_TOKEN` → debounces bursts via Rails.cache → enqueues `EmailScanJob` delta for the account) + `Emails::WatchRenewalJob` (every 6 hours in production; calls `users.watch` on each active Google account and stores `push_watch_expires_at`). **Inert unless configured**: requires `GMAIL_PUBSUB_TOPIC` + `GMAIL_PUBSUB_TOKEN` + a public callback host (`APP_HOST` or mailer host); dev boxes and self-hosters without these fall back silently to the minute poll. `DISABLE_GMAIL_PUSH=1` force-disables. Mirrors the calendar push pattern (`CalendarWebhooksController` / `Calendars::WebhookRenewalJob`).
 
+## Money
+
+Evidence rule: a document is only "not on a statement" once a `ready` reconciliation covers its `anchor_date` (due_date || document_date) + 7 grace days (`Money::Evidence::GRACE_DAYS`) and shows no confirmed match. Until then Money says nothing: no due dates, no "late", no totals.
+
+Services: `Money::Evidence` (single source of truth, `app/services/money/evidence.rb`), `Money::Ledger` (documents only, evidence-driven status, settled lookback 45 days), `Money::Read` (pure data object for Scout note and strip), `Money::Page` (one builder for the whole surface -- both `MoneyController` and `Reconciliations::BankTransactionsController` read from it when `surface=money`).
+
+`Reconciliations::LineActions` (`app/services/reconciliations/line_actions.rb`): extracted mutations (`confirm!`, `reject!`, `exclude!`, `reset!`, `manual_match!`) called by both controllers with byte-identical behaviour.
+
+`surface=money` contract: when `params[:surface] == "money"`, `BankTransactionsController#render_workbench_streams` appends `turbo_stream.replace("money_content", partial: "money/content", locals: { page: Money::Page.for(...) })` so the Money surface refreshes after workbench actions.
+
+Loan slot: a `<%# loan slot %>` comment in `app/views/money/_content.html.erb` marks where the loan PR (branch `feat/money-loan`) renders its card.
+
 ## Calendar
 
 Two-way calendar sync that rides on the **same OAuth grant as the mailbox** — connecting a Google/Zoho email account requests calendar scopes too and auto-provisions its calendar. There is no separate calendar connect flow.

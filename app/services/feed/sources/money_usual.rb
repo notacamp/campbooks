@@ -10,7 +10,7 @@ module Feed
 
       # Float or nil — the doc's amount relative to the median amount in its group.
       def amount_ratio_for(doc)
-        key = Money::Recurrence.group_key(doc)
+        key = recurrence_group_key(doc)
         return nil unless key
 
         others = usual_amounts_by_key[key].to_a - [ doc.amount_cents ]
@@ -23,18 +23,28 @@ module Feed
       end
 
       # { group_key => [amount_cents, …] } across all workspace money docs, loaded in memory.
-      # Uses Money::Recurrence.group_key so the key is identical to what Recurrence uses.
       def usual_amounts_by_key
         @usual_amounts_by_key ||= begin
           Document.where(workspace_id: user.workspace_id)
                   .money_types
                   .each_with_object({}) do |doc, acc|
-            key = Money::Recurrence.group_key(doc)
+            key = recurrence_group_key(doc)
             next unless key && doc.amount_cents.present?
 
             (acc[key] ||= []) << doc.amount_cents
           end
         end
+      end
+
+      # Normalised counterpart + direction key, consistent across all money docs.
+      def recurrence_group_key(document)
+        direction = document.direction
+        return nil unless direction
+
+        name = document.entity_display_name.to_s.downcase.strip.gsub(/\s+/, " ")
+        return nil if name.empty?
+
+        [ name, direction ]
       end
 
       def sorted_median(array)

@@ -1,0 +1,20 @@
+<%# The selected statement's paired ledger inside the money_statement turbo-frame.
+    Rendered under the Statements tabs on the Money page and by money#statement
+    when a tab is clicked (the tab links target this frame). %>
+<%= turbo_frame_tag("money_statement", class: "block mt-4") do %>
+  <% if page.selected_statement %>
+    <%= render Campbooks::Accounting::GroupedLedger.new(
+      groups:         page.selected_groups,
+      reconciliation: page.selected_statement,
+      company_nif:    page.company_nif
+    ) %>
+    <div class="mt-3 text-right">
+      <%= link_to t("money.statements.all_lines",
+                    label:  page.evidence.label_for(page.selected_statement),
+                    count:  page.selected_statement.total_transactions),
+                  reconciliation_path(page.selected_statement),
+                  class: "text-[12.5px] text-muted-foreground underline underline-offset-2 hover:text-foreground",
+                  data: { turbo_frame: "_top" } %>
+    </div>
+  <% end %>
+<% end %>

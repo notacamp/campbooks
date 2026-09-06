@@ -16,6 +16,15 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- Money is now about the bank: Scout's read, a Needs-you list lifted from the newest statement, the paired ledger with month tabs, and "Not on a statement" for paper with no bank line. An invoice is only flagged once a reconciled statement covers its date and shows no payment.
+- Now cards for money read "Not on <Month>'s statement" instead of "You owe ... N days late"; they appear only with statement evidence.
+
+### Removed
+
+- The owed / you-owe totals, the 30-day timeline, due and late chips, "Remind on" and renewal Keep/Cancel from Money (renewals stay on Now and Time).
+
 ## [0.38.1] - 2026-09-06
 
 ### Fixed

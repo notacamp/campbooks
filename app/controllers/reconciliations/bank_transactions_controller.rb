@@ -149,23 +149,25 @@ module Reconciliations
       card_html    = render_card_html(@transaction)
       summary_html = render_summary_bar_html
 
-      render turbo_stream: [
+      streams = [
         turbo_stream.replace(dom_id(@transaction),        html: row_html),
         turbo_stream.replace(dom_id(@transaction, :card), html: card_html),
         # Remove stale resolve panel if open
         turbo_stream.remove("#{dom_id(@transaction)}_resolve_panel"),
         turbo_stream.remove("#{dom_id(@transaction, :card)}_resolve_panel"),
-        turbo_stream.replace("reconciliation_summary_bar", html: summary_html),
-        turbo_stream.update("compose_dock",
-                             partial: "email_compose/dock",
-                             locals:  dock_locals),
-        notify_stream(t(".opened_composer"))
+        turbo_stream.replace("reconciliation_summary_bar", html: summary_html)
       ]
+      streams << money_content_stream if money_surface?
+      streams << turbo_stream.update("compose_dock", partial: "email_compose/dock", locals: dock_locals)
+      streams << notify_stream(t(".opened_composer"))
+
+      render turbo_stream: streams
     end
 
     # GET /reconciliations/:reconciliation_id/bank_transactions/:id/resolve_panel
     # Also handles doc-search within the panel (params[:q] filters candidates).
     def resolve_panel
+      @surface              = params[:surface].presence
       @q                    = params[:q].to_s.strip
       @suggested_matches    = @transaction.transaction_matches.suggested
                                           .includes(:document)
@@ -254,10 +256,13 @@ module Reconciliations
     #   - replaces the table row (desktop)
     #   - replaces the card (mobile)
     #   - replaces the summary bar
+    #   - when surface=money, also replaces money_content
     #   - appends a toast notification (with optional undo link)
     def render_workbench_streams(notify:, undo_url: nil)
       @transaction.reload
       @transaction.transaction_matches.reload
+      # An undo fired from Money must come back to Money too.
+      undo_url = with_surface(undo_url) if undo_url.present? && money_surface?
 
       row_html     = render_row_html(@transaction)
       card_html    = render_card_html(@transaction)
@@ -280,15 +285,37 @@ module Reconciliations
           notify
         end
 
-      render turbo_stream: [
+      streams = [
         turbo_stream.replace(dom_id(@transaction),        html: row_html),
         turbo_stream.replace(dom_id(@transaction, :card), html: card_html),
         # Remove the stale resolve panel sibling row/div if still open
         turbo_stream.remove("#{dom_id(@transaction)}_resolve_panel"),
         turbo_stream.remove("#{dom_id(@transaction, :card)}_resolve_panel"),
-        turbo_stream.replace("reconciliation_summary_bar", html: summary_html),
-        notify_stream(toast_message)
+        turbo_stream.replace("reconciliation_summary_bar", html: summary_html)
       ]
+
+      # surface=money: also refresh the Money content region.
+      streams << money_content_stream if money_surface?
+      streams << notify_stream(toast_message)
+
+      render turbo_stream: streams
+    end
+
+    # The panel and the Needs-you rows carry surface=money when the action was
+    # taken from the Money page; the response then re-renders #money_content so
+    # Scout's read, the strip, Needs-you and the ledger stay honest.
+    def money_surface?
+      params[:surface] == "money"
+    end
+
+    def money_content_stream
+      page = Money::Page.for(Current.workspace, current_user, statement_id: @reconciliation.id)
+      turbo_stream.replace("money_content", partial: "money/content", locals: { page: page })
+    end
+
+    def with_surface(url)
+      separator = url.include?("?") ? "&" : "?"
+      "#{url}#{separator}surface=money"
     end
 
     def render_row_html(txn)
