@@ -283,12 +283,7 @@ fr:
           multi_doc:
             one: Une facture
             other: "Un virement solde %{count} factures."
-      reconciliations_rail:
-        title: Relevés bancaires
-        view_all: Voir tout
-        untitled: Relevé sans nom
-        progress: "%{resolved} sur %{total}"
-        open: Ouvrir →
+
     money:
       summary:
         late_receivable_html: "La facture de %{name} est %{overdue}, j'ai donc rédigé un rappel."

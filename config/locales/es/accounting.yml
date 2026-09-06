@@ -283,12 +283,7 @@ es:
           multi_doc:
             one: Una factura
             other: "Un pago liquida %{count} facturas."
-      reconciliations_rail:
-        title: Extractos bancarios
-        view_all: Ver todos
-        untitled: Extracto sin nombre
-        progress: "%{resolved} de %{total}"
-        open: Abrir →
+
     money:
       summary:
         late_receivable_html: "La factura de %{name} está %{overdue}, así que he redactado un recordatorio."

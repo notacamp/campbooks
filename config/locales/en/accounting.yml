@@ -283,9 +283,4 @@ en:
           multi_doc:
             one: One invoice
             other: "One payment clears %{count} invoices."
-      reconciliations_rail:
-        title: Bank statements
-        view_all: View all
-        untitled: Unnamed statement
-        progress: "%{resolved} of %{total}"
-        open: Open →
+

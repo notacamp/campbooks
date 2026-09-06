@@ -8,26 +8,39 @@ RSpec.describe Campbooks::Feed::LatePayableCard, type: :component do
   let(:document) do
     create(:document, :approved, workspace: workspace,
            vendor_name: "FastHost", invoice_number: "EX-042",
-           amount_cents: 89_900, currency: "EUR", due_date: Date.current - 10)
+           amount_cents: 89_900, currency: "EUR",
+           document_date: Date.new(2024, 1, 10))
   end
-  let(:item) do
+
+  def make_item(data = {})
     FeedItem.create!(
       user: user, workspace: workspace, kind: "late_payable", subject: document,
       dedupe_key: "late_payable:#{document.id}", sort_at: Time.current, attention: true,
-      data: { "days_late" => 10, "amount_cents" => 89_900, "currency" => "EUR",
-              "due_date" => (Date.current - 10).iso8601 }
+      data: {
+        "anchor_date" => Date.new(2024, 1, 10).iso8601,
+        "days_since" => 36, "statement_label" => "January",
+        "amount_cents" => 89_900, "currency" => "EUR"
+      }.merge(data)
     )
   end
 
-  def render_card
+  def render_card(item = make_item)
     ApplicationController.render(described_class.new(item: item, subject: document), layout: false)
   end
 
-  it "names the counterpart, the invoice, the amount and the lateness" do
+  it "names the counterpart and the invoice number in the headline" do
     html = render_card
-    expect(html).to include("FastHost").and include("invoice #EX-042")
-    expect(html).to include("You owe")
-    expect(html).to include("10 days late")
+    expect(html).to include("FastHost")
+    expect(html).to include("invoice #EX-042")
+  end
+
+  it "shows the statement eyebrow" do
+    html = render_card
+    expect(html).to include("January")
+  end
+
+  it "shows the amount" do
+    html = render_card
     expect(html).to include("€899.00")
   end
 
@@ -38,14 +51,30 @@ RSpec.describe Campbooks::Feed::LatePayableCard, type: :component do
     expect(html).to include("Later")
   end
 
+  it "does not contain forbidden language" do
+    html = render_card
+    expect(html).not_to include("You owe")
+    expect(html).not_to match(/\d+ days? late/i)
+    expect(html).not_to include("Owed")
+  end
+
   it "falls back to 'an invoice' when there is no invoice number" do
-    document.update!(metadata: document.metadata.except("invoice_number"))
+    document.update!(invoice_number: nil)
     expect(render_card).to include("an invoice")
   end
 
-  it "reads days_late from feed item data (not re-computed)" do
-    # item has days_late: 10; actual due_date is also 10 days ago, but we can
-    # trust the card renders the stored value, not a live calculation.
-    expect(render_card).to include("10 days late")
+  it "shows generic eyebrow when statement_label is absent" do
+    item = make_item("statement_label" => nil)
+    html = render_card(item)
+    expect(html).to include("Not on a statement")
+  end
+
+  it "gracefully falls back to old days_late data without crashing" do
+    old_item = FeedItem.create!(
+      user: user, workspace: workspace, kind: "late_payable", subject: document,
+      dedupe_key: "late_payable_old:#{document.id}", sort_at: Time.current, attention: true,
+      data: { "days_late" => 10, "amount_cents" => 89_900, "currency" => "EUR" }
+    )
+    expect { render_card(old_item) }.not_to raise_error
   end
 end
