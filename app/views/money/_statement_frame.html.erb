@@ -1,13 +1,17 @@
-<%# The selected statement's paired ledger inside the money_statement turbo-frame.
-    Rendered under the Statements tabs on the Money page and by money#statement
-    when a tab is clicked (the tab links target this frame). %>
-<%= turbo_frame_tag("money_statement", class: "block mt-4") do %>
+<%# The month pills and the selected statement's paired ledger, inside the
+    money_statement turbo-frame. Rendered under the Statements header on the Money
+    page and by money#statement when a pill is clicked (the pills target this
+    frame), so the selected pill and the ledger always move together. %>
+<%= turbo_frame_tag("money_statement", class: "block") do %>
+  <%= render Campbooks::Money::StatementTabs.new(page: page) %>
   <% if page.selected_statement %>
-    <%= render Campbooks::Accounting::GroupedLedger.new(
-      groups:         page.selected_groups,
-      reconciliation: page.selected_statement,
-      company_nif:    page.company_nif
-    ) %>
+    <div class="mt-4">
+      <%= render Campbooks::Accounting::GroupedLedger.new(
+        groups:         page.selected_groups,
+        reconciliation: page.selected_statement,
+        company_nif:    page.company_nif
+      ) %>
+    </div>
     <div class="mt-3 text-right">
       <%= link_to t("money.statements.all_lines",
                     label:  page.evidence.label_for(page.selected_statement),

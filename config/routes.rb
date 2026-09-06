@@ -92,6 +92,8 @@ Rails.application.routes.draw do
   get "money/statements", to: "money#statements", as: :money_statements
   get "money/export",     to: "money#export",     as: :money_export
   get "money/statement/:id", to: "money#statement", as: :money_statement
+  # Reconcile every bank statement Scout already holds (emailed or filed) in one go.
+  post "money/statements/reconcile", to: "money#reconcile_statements", as: :reconcile_statements_money
   scope "money/obligations/:id", constraints: { id: %r{[a-z]+:[^/]+} } do
     post   "chase",  to: "money#chase",    as: :money_obligation_chase
     post   "settle", to: "money#settle",   as: :money_obligation_settle

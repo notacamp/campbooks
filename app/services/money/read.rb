@@ -5,16 +5,19 @@ class Money
   # Built from an Evidence and Ledger that Money::Page has already constructed.
   #
   #   read = Money::Read.for(workspace, user, today:, evidence:, ledger:, groups:, loans:, suggestions:)
+  #   read.focus_month        # the month whose statement is due (a Date, day 1)
+  #   read.statement          # the newest reconciled statement (what Needs-you lifts from)
   #   read.lines_total        # integer
   #   read.explained_pct      # 0-100
   #   read.any_statements?    # boolean
   #   read.loan_state         # :none | :suggestion | :tracked | :on_schedule | :seen | :missed | :changed
   class Read
     ON_TIME_GRACE = 5 # days after expected_on an instalment still reads "on time"
+    PENDING_STATEMENTS_SHOWN = 12
 
     def self.for(workspace, user, today: Date.current, evidence: nil, ledger: nil, groups: nil,
                  loans: nil, suggestions: nil)
-      ev  = evidence || Money::Evidence.for(workspace)
+      ev  = evidence || Money::Evidence.for(workspace, today: today)
       led = ledger  || Money::Ledger.for(workspace, user, today: today, evidence: ev)
       new(workspace, user, today, ev, led, groups, loans, suggestions)
     end
@@ -30,7 +33,38 @@ class Money
       @suggestions     = suggestions
     end
 
-    # The newest ready statement, or nil.
+    attr_reader :evidence
+
+    # ── The month to reconcile ───────────────────────────────────────────────
+
+    def focus_month
+      @evidence.month_to_reconcile
+    end
+
+    def focus_label
+      @evidence.month_label(focus_month)
+    end
+
+    def focus_statements
+      @evidence.statements_covering(focus_month)
+    end
+
+    def focus_reconciled?
+      focus_statements.any?
+    end
+
+    # Bank statements Scout already holds (emailed, or uploaded to Paper) that
+    # nobody has reconciled yet.
+    def pending_statement_documents
+      @pending_statement_documents ||= Reconciliations::AutoStart.pending_for(@workspace).limit(PENDING_STATEMENTS_SHOWN).to_a
+    end
+
+    def pending_statement_count
+      @pending_statement_count ||= Reconciliations::AutoStart.pending_for(@workspace).count
+    end
+
+    # ── The newest reconciled statement ─────────────────────────────────────
+
     def statement
       @evidence.statements.first
     end
@@ -95,8 +129,15 @@ class Money
       @nif_count ||= statement&.nif_exception_count(@workspace.company_nif.presence) || 0
     end
 
+    # ── Paper with no bank line (all reconciled months) ─────────────────────
+
     def missing_count
       @missing_count ||= @ledger.missing.size
+    end
+
+    # How many of those belong to the newest statement's month.
+    def missing_in_newest_count
+      @missing_in_newest_count ||= statement ? @ledger.missing.count { |o| o.statement&.id == statement.id } : 0
     end
 
     def missing_cents

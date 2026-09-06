@@ -30,6 +30,10 @@ class DocumentProcessJob < ApplicationJob
 
     # Best-effort: Scout posts a link to the filed document into its email thread (opt-in).
     Files::ScoutThreadLinker.call(document) if document.ai_completed?
+
+    # A bank statement Scout just filed reconciles itself (Reconciliations::AutoStart
+    # decides whether it may; nobody should upload a statement the app already holds).
+    Reconciliations::AutoStartJob.perform_later(document.id) if document.ai_completed? && document.bank_statement? && Features.accounting?
   ensure
     Current.workspace = nil
   end

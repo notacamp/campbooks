@@ -65,6 +65,9 @@ fr:
       invalid_reason: "Motif invalide."
       gone: "Cet élément n'est plus disponible."
       undo: "Annuler"
+      reconciling:
+        one: "Réconciliation d'un relevé en cours. Scout le lit."
+        other: "Réconciliation de %{count} relevés en cours. Scout les lit."
   components:
     money:
       read:
@@ -74,6 +77,7 @@ fr:
         add_one: "Ajoutez-en un"
         the_bank: "la banque"
         statement_html: "Le relevé de %{label} de %{bank} est chargé : %{explained} sur %{total} lignes ont leur document."
+        statement_no_bank_html: "Le relevé de %{label} est arrivé : %{explained} lignes sur %{total} ont leur justificatif."
         needs_invoice_html_one: "Une nécessite encore une facture"
         needs_invoice_html: "%{count} nécessitent encore une facture"
         review_html_one: "une correspondance doit être vérifiée"
@@ -87,6 +91,16 @@ fr:
           one: "Une facture de %{label} n'est pas sur ce relevé."
           other: "%{count} factures de %{label} ne sont pas sur ce relevé."
         all_explained_html: "Chaque ligne a son document."
+        statements_pending_html:
+          one: "Je détiens un relevé bancaire reçu par e-mail qui n'est pas encore réconcilié. %{link}"
+          other: "Je détiens %{count} relevés bancaires reçus par e-mail qui ne sont pas encore réconciliés. %{link}"
+        statements_pending_link:
+          one: "Je le réconcilie ?"
+          other: "Je les réconcilie ?"
+        focus_missing_html: "Le relevé de %{month} n'est pas encore arrivé."
+        missing_all_html:
+          one: "Une facture d'un mois réconcilié n'est sur aucun relevé."
+          other: "%{count} factures de mois réconciliés ne sont sur aucun relevé."
         nth_instalment: "%{nth} échéance"
         loan_on_schedule_html: "La %{nth} du prêt est partie le %{day}, dans les temps ; il reste %{remaining}."
         loan_seen_html: "La %{nth} du prêt est partie le %{day} ; il reste %{remaining}."
@@ -99,6 +113,9 @@ fr:
         explained: "expliqué"
         needs_invoice: "Nécessitent une facture"
         not_on_a_statement: "Pas sur un relevé"
+        no_statement_yet: "Pas encore de relevé"
+        add_it: "L'ajouter"
+        reconcile_it: "Réconcilier"
         payments:
           one: "%{count} paiement"
           other: "%{count} paiements"
@@ -115,14 +132,30 @@ fr:
         ask_for_invoice: "Demander une facture corrigée"
         overflow: "+%{count} de plus sur le relevé"
         overflow_link: "Ouvrir le relevé"
+        reconcile_title:
+          one: "Un relevé bancaire reçu par e-mail n'est pas encore réconcilié"
+          other: "%{count} relevés bancaires reçus par e-mail ne sont pas encore réconciliés"
+        and_more: "et %{count} de plus"
+        pick_which: "Choisir"
+        reconcile_them:
+          one: "Réconcilier"
+          other: "Tout réconcilier"
+        add_statement_title: "Le relevé de %{month} n'est pas encore arrivé"
+        add_statement_meta: "le mois à réconcilier"
+        add_statement: "Ajouter un relevé"
       statements:
         title: "Relevés"
         note: "chaque ligne bancaire et le document qui l'explique"
         empty_title: "Pas encore de relevé bancaire."
         empty_body: "Importez votre premier relevé pour commencer à associer les lignes aux factures."
         add_statement: "Ajouter un relevé"
+      statement_tabs:
+        title: "Relevés"
         earlier: "Précédents..."
-        all_lines: "Toutes les %{count} lignes de %{label}"
+        no_statement: "%{month} · pas de relevé"
+        no_statement_yet: "%{month} · pas encore de relevé"
+        gap: "%{from} à %{to} · %{count} mois sans relevé"
+        add_statement: "Ajouter un relevé"
       unbanked:
         title: "Pas sur un relevé"
         note: "daté d'un mois réconcilié, sans ligne bancaire"

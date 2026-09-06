@@ -65,6 +65,9 @@ en:
       invalid_reason: "Invalid reason."
       gone: "That item is no longer here."
       undo: "Undo"
+      reconciling:
+        one: "Reconciling one statement. Scout is reading it now."
+        other: "Reconciling %{count} statements. Scout is reading them now."
   components:
     money:
       read:
@@ -74,6 +77,7 @@ en:
         add_one: "Add one"
         the_bank: "the bank"
         statement_html: "%{label}'s %{bank} statement is in: %{explained} of %{total} lines have their paper."
+        statement_no_bank_html: "%{label}'s statement is in: %{explained} of %{total} lines have their paper."
         needs_invoice_html_one: "One still needs an invoice"
         needs_invoice_html: "%{count} still need an invoice"
         review_html_one: "one match wants a look"
@@ -87,6 +91,16 @@ en:
           one: "One invoice from %{label} isn't on this statement."
           other: "%{count} invoices from %{label} aren't on this statement."
         all_explained_html: "Every line has its paper."
+        statements_pending_html:
+          one: "I'm holding a bank statement from your email that isn't reconciled yet. %{link}"
+          other: "I'm holding %{count} bank statements from your email that aren't reconciled yet. %{link}"
+        statements_pending_link:
+          one: "Reconcile it?"
+          other: "Reconcile them?"
+        focus_missing_html: "%{month}'s statement isn't in yet."
+        missing_all_html:
+          one: "One invoice from a reconciled month isn't on a statement."
+          other: "%{count} invoices from reconciled months aren't on a statement."
         nth_instalment: "%{nth} instalment"
         loan_on_schedule_html: "The loan's %{nth} went out on the %{day}, right on schedule; %{remaining} to go."
         loan_seen_html: "The loan's %{nth} went out on the %{day}; %{remaining} to go."
@@ -99,6 +113,9 @@ en:
         explained: "explained"
         needs_invoice: "Need an invoice"
         not_on_a_statement: "Not on a statement"
+        no_statement_yet: "No statement yet"
+        add_it: "Add it"
+        reconcile_it: "Reconcile it"
         payments:
           one: "%{count} payment"
           other: "%{count} payments"
@@ -115,14 +132,30 @@ en:
         ask_for_invoice: "Ask for a corrected invoice"
         overflow: "+%{count} more on the statement"
         overflow_link: "Open the statement"
+        reconcile_title:
+          one: "A bank statement from your email isn't reconciled yet"
+          other: "%{count} bank statements from your email aren't reconciled yet"
+        and_more: "and %{count} more"
+        pick_which: "Pick which"
+        reconcile_them:
+          one: "Reconcile it"
+          other: "Reconcile them"
+        add_statement_title: "%{month}'s statement isn't in yet"
+        add_statement_meta: "the month to reconcile"
+        add_statement: "Add a statement"
       statements:
         title: "Statements"
         note: "every bank line and the paper that explains it"
         empty_title: "No bank statements yet."
         empty_body: "Import your first statement to start matching lines to invoices."
         add_statement: "Add a statement"
+      statement_tabs:
+        title: "Statements"
         earlier: "Earlier..."
-        all_lines: "All %{count} lines of %{label}"
+        no_statement: "%{month} · no statement"
+        no_statement_yet: "%{month} · no statement yet"
+        gap: "%{from} to %{to} · %{count} months without a statement"
+        add_statement: "Add a statement"
       unbanked:
         title: "Not on a statement"
         note: "dated in a month you've reconciled, with no bank line"

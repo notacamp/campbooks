@@ -16,6 +16,19 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- Bank statements Scout already holds reconcile themselves: a statement that arrives by email (or is filed in Paper) becomes a reconciliation as soon as Scout files it, and Money's Needs-you lists the ones already sitting there with one click to reconcile them all, or "Pick which" to choose.
+
+### Changed
+
+- Money is organised by month: the most recent completed month leads, every month without a statement stays in view until it is reconciled (older gaps fold into one pill), and month names carry the year when they aren't from this year.
+
+### Fixed
+
+- "Not on a statement" only counts invoices dated inside a month a statement actually covers; an invoice from a month nobody reconciled is no longer reported missing because a newer statement exists.
+- Clicking a month in Money's statement tabs now marks that month active and moves the ledger with it.
+
 ## [0.39.0] - 2026-09-06
 
 ### Added

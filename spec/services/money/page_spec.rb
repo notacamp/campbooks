@@ -90,22 +90,44 @@ RSpec.describe Money::Page do
   end
 
   describe "#statements" do
-    it "returns up to 6 ready statements" do
+    it "returns every ready statement on the month timeline" do
       7.times do |i|
         create(:reconciliation, :ready, workspace: workspace,
                period_start: Date.new(2023, i + 1, 1),
                period_end:   Date.new(2023, i + 1, 28))
       end
-      expect(build_page.statements.size).to eq(6)
+      expect(build_page.statements.size).to eq(8)
+    end
+  end
+
+  describe "#months" do
+    it "runs from the month to reconcile back to the first statement, newest first" do
+      create(:reconciliation, :ready, workspace: workspace,
+             period_start: Date.new(2023, 11, 1), period_end: Date.new(2023, 11, 30))
+      expect(build_page.months.map(&:starts_on))
+        .to eq([ Date.new(2024, 1, 1), Date.new(2023, 12, 1), Date.new(2023, 11, 1) ])
+    end
+  end
+
+  describe "the month to reconcile in needs_you" do
+    it "leads with the month whose statement isn't in yet" do
+      page  = described_class.for(workspace, user, today: Date.new(2024, 3, 15))
+      first = page.needs_you.first
+      expect(first.kind).to eq(:add_statement)
+      expect(first.payload[:label]).to eq("February")
     end
 
-    it "reports more_statements? when there are more than 6" do
-      7.times do |i|
-        create(:reconciliation, :ready, workspace: workspace,
-               period_start: Date.new(2023, i + 1, 1),
-               period_end:   Date.new(2023, i + 1, 28))
-      end
-      expect(build_page.more_statements?).to be true
+    it "says nothing about it while the month to reconcile has its statement" do
+      expect(build_page.needs_you.map(&:kind)).not_to include(:add_statement)
+    end
+
+    it "leads with the statements Scout is holding when there are unreconciled ones" do
+      create(:document, :bank_statement, :approved, workspace: workspace)
+      page  = described_class.for(workspace, user, today: Date.new(2024, 3, 15))
+      first = page.needs_you.first
+      expect(first.kind).to eq(:reconcile_statements)
+      expect(first.payload[:count]).to eq(1)
+      expect(page.needs_you.map(&:kind)).not_to include(:add_statement)
     end
   end
 end

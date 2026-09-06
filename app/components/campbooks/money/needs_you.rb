@@ -51,9 +51,42 @@ module Campbooks
         when :loan_missed, :loan_changed
           render Campbooks::Money::LoanAlertRow.new(loan: item.payload[:loan], instalment: item.payload[:instalment],
                                                     kind: item.kind == :loan_missed ? :missed : :changed)
+        when :reconcile_statements
+          reconcile_statements_row(item.payload)
+        when :add_statement
+          add_statement_row(item.payload)
         else
           div(**wrapper_attrs(item)) do
             work_row(title: item.title, meta: item.meta) { actions(item) }
+          end
+        end
+      end
+
+      # Statements Scout already holds (emailed, filed) that nobody reconciled:
+      # one click reconciles them all in the background, or pick which.
+      def reconcile_statements_row(payload)
+        docs  = payload[:documents]
+        count = payload[:count]
+        meta  = docs.first(3).map { |d| "#{d.display_title} · #{l(d.created_at.to_date, format: :date)}" }
+        meta << t(".and_more", count: count - 3) if count > 3
+
+        div(class: WRAPPER_CLASSES) do
+          work_row(title: t(".reconcile_title", count: count), meta: meta) do
+            render Campbooks::Button.new(variant: :outline, size: :sm, href: helpers.new_reconciliation_path,
+                                         data: { turbo_frame: "_top" }) { t(".pick_which") }
+            post_form(helpers.reconcile_statements_money_path) do
+              render(Campbooks::Button.new(variant: :primary, size: :sm, type: "submit")) { t(".reconcile_them", count: count) }
+            end
+          end
+        end
+      end
+
+      # The month to reconcile has no statement yet, and Scout holds none.
+      def add_statement_row(payload)
+        div(class: WRAPPER_CLASSES) do
+          work_row(title: t(".add_statement_title", month: payload[:label]), meta: [ t(".add_statement_meta") ]) do
+            render Campbooks::Button.new(variant: :primary, size: :sm, href: helpers.new_reconciliation_path,
+                                         data: { turbo_frame: "_top" }) { t(".add_statement") }
           end
         end
       end
