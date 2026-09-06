@@ -16,6 +16,8 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.40.0] - 2026-09-06
+
 ### Added
 
 - Bank statements Scout already holds reconcile themselves: a statement that arrives by email (or is filed in Paper) becomes a reconciliation as soon as Scout files it, and Money's Needs-you lists the ones already sitting there with one click to reconcile them all, or "Pick which" to choose.
