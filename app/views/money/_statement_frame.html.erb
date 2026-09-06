@@ -1,5 +1,7 @@
-<%# Rendered inside the money_statement turbo-frame. %>
-<%= turbo_frame_tag("money_statement") do %>
+<%# The selected statement's paired ledger inside the money_statement turbo-frame.
+    Rendered under the Statements tabs on the Money page and by money#statement
+    when a tab is clicked (the tab links target this frame). %>
+<%= turbo_frame_tag("money_statement", class: "block mt-4") do %>
   <% if page.selected_statement %>
     <%= render Campbooks::Accounting::GroupedLedger.new(
       groups:         page.selected_groups,

@@ -59,9 +59,9 @@ RSpec.describe Campbooks::Feed::LateReceivableCard, type: :component do
     expect(html).not_to include("You owe")
   end
 
-  it "falls back to 'an invoice' when there is no invoice number" do
+  it "falls back to 'An invoice' when there is no invoice number" do
     document.update!(invoice_number: nil)
-    expect(render_card).to include("an invoice")
+    expect(render_card).to include("An invoice")
   end
 
   it "shows generic eyebrow when statement_label is absent" do

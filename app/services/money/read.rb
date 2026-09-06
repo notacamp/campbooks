@@ -104,6 +104,7 @@ class Money
     def primary_currency
       @primary_currency ||=
         @workspace.try(:default_currency).presence ||
+        @workspace.try(:currency).presence ||
         ::Money.default_currency.iso_code
     end
 

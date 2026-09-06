@@ -109,7 +109,7 @@ pt:
         overflow_link: "Abrir o extrato"
       statements:
         title: "Extratos"
-        note: ""
+        note: "cada linha bancária e o papel que a explica"
         empty_title: "Ainda não há extratos bancários."
         empty_body: "Importe o seu primeiro extrato para começar a associar linhas a faturas."
         add_statement: "Adicionar extrato"

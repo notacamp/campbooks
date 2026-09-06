@@ -109,7 +109,7 @@ fr:
         overflow_link: "Ouvrir le relevé"
       statements:
         title: "Relevés"
-        note: ""
+        note: "chaque ligne bancaire et le document qui l'explique"
         empty_title: "Pas encore de relevé bancaire."
         empty_body: "Importez votre premier relevé pour commencer à associer les lignes aux factures."
         add_statement: "Ajouter un relevé"

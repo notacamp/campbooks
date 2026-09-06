@@ -99,6 +99,9 @@ RSpec.describe "People::Actions", type: :request do
         "due_date" => 20.days.ago.to_date.iso8601, "invoice_number" => "FT2026/2756"
       ))
       DocumentEmailMessage.create!(document: doc, email_message: msg)
+      # Lateness requires evidence: a ready statement covering the due date (+7 grace days).
+      create(:reconciliation, :ready, workspace: workspace,
+             period_start: 50.days.ago.to_date, period_end: 5.days.ago.to_date)
       item = FeedItem.create!(user: user, workspace: workspace, subject: doc, kind: "late_payable",
                               score: 90.0, dedupe_key: "late_payable:#{doc.id}", sort_at: 20.days.ago,
                               attention: true,

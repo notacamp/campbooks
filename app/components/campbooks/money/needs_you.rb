@@ -2,8 +2,13 @@
 
 module Campbooks
   module Money
-    # "Needs you" section: flat rows, Ember dot at left, actions at right.
-    # Hidden when there are no items.
+    # "Needs you": the lines of the newest statement that want a decision, as flat
+    # rows (Ember dot, title, meta, right-aligned actions). Hidden when empty.
+    #
+    # A "No invoice" row carries the same transaction-resolve Stimulus contract as
+    # the reconciliation page, so Resolve opens the hunt panel in place: the row's
+    # root is a block wrapper (id = dom_id(txn)) around the flex row, and the panel
+    # the controller appends lands below the row inside that wrapper.
     class NeedsYou < Campbooks::Base
       def initialize(items:, overflow:, statement:, **attrs)
         @items     = items
@@ -29,105 +34,106 @@ module Campbooks
       def section_header
         div(class: "mb-1 flex flex-wrap items-baseline gap-2") do
           span(class: "text-[11px] font-bold uppercase tracking-widest text-muted-foreground") do
-            plain "#{t('.title')} "
-            span(class: "font-normal normal-case tracking-normal text-muted-foreground/70") { plain "· #{@items.size}" }
+            plain t(".title")
+            span(class: "ml-1.5 font-normal normal-case tracking-normal text-muted-foreground/70") { plain "· #{@items.size}" }
           end
-          if @statement
-            span(class: "ml-auto text-[12px] text-muted-foreground") { t(".note") }
-          end
+          span(class: "ml-auto text-[12px] text-muted-foreground") { t(".note") } if @statement
         end
       end
 
       def row(item)
-        root_attrs = row_attrs(item)
-        div(**root_attrs) do
-          # Ember dot
-          span(class: "mt-[3px] h-2 w-2 shrink-0 rounded-full bg-ember-gradient shadow-ember-glow")
-          div(class: "min-w-0 flex-1") do
-            div(class: "text-[14px] font-semibold text-foreground leading-snug") { plain item.title }
-            if item.meta.present?
-              div(class: "mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12.5px] text-muted-foreground") do
-                item.meta.each_with_index do |part, i|
-                  span(class: "opacity-40 mx-0.5") { plain "·" } if i.positive?
-                  plain part.to_s
-                end
-              end
+        div(**wrapper_attrs(item)) do
+          div(class: "flex items-start gap-3 rounded-xl px-4 py-3.5 transition-colors hover:bg-muted/50 sm:px-6") do
+            span(class: "mt-[6px] h-2 w-2 shrink-0 rounded-full bg-ember-gradient shadow-ember-glow", aria_hidden: "true")
+            div(class: "min-w-0 flex-1") do
+              div(class: "text-[14px] font-semibold leading-snug text-foreground") { plain item.title }
+              meta_line(item) if item.meta.present?
+            end
+            div(class: "flex shrink-0 flex-wrap items-center justify-end gap-2") { actions(item) }
+          end
+        end
+      end
+
+      def wrapper_attrs(item)
+        attrs = { class: "-mx-4 sm:-mx-6" }
+        return attrs unless item.kind == :no_invoice && item.transaction && @statement
+
+        txn = item.transaction
+        attrs[:id]   = helpers.dom_id(txn)
+        attrs[:data] = {
+          controller:                         "transaction-resolve",
+          transaction_resolve_url_value:      helpers.resolve_panel_reconciliation_bank_transaction_path(@statement, txn, surface: "money"),
+          transaction_resolve_frame_id_value: helpers.dom_id(txn, :resolve_frame)
+        }
+        attrs
+      end
+
+      def meta_line(item)
+        div(class: "mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12.5px] text-muted-foreground") do
+          item.meta.each_with_index do |part, i|
+            span(class: "mx-0.5 opacity-40", aria_hidden: "true") { plain "·" } if i.positive?
+            if part.to_s == t("money.needs_you.nif.flag")
+              span(class: "rounded border border-warning/40 px-1 text-[10px] font-bold text-warning") { plain "NIF" }
+            else
+              span { plain part.to_s }
             end
           end
-          div(class: "flex shrink-0 flex-wrap items-center gap-2") do
-            render_actions(item)
-          end
         end
       end
 
-      def row_attrs(item)
-        base = {
-          class: "-mx-4 flex items-start gap-3 px-4 py-3.5 rounded-xl transition-colors hover:bg-muted/50 sm:-mx-6 sm:px-6"
-        }
-
-        if item.kind == :no_invoice && item.transaction
-          txn = item.transaction
-          stmt = @statement
-          base[:id]   = helpers.dom_id(txn)
-          base[:data] = {
-            controller:                        "transaction-resolve",
-            transaction_resolve_url_value:      helpers.resolve_panel_reconciliation_bank_transaction_path(stmt, txn, surface: "money"),
-            transaction_resolve_frame_id_value: helpers.dom_id(txn, :resolve_frame)
-          }
-        end
-
-        base
-      end
-
-      def render_actions(item) # rubocop:disable Metrics/MethodLength
+      def actions(item)
         case item.kind
         when :no_invoice
-          if item.transaction && @statement
-            helpers.button_tag(t(".resolve"),
-                               class: "inline-flex h-[30px] items-center rounded-lg border border-border bg-background px-3 text-[12.5px] font-medium text-foreground hover:bg-secondary transition-colors",
-                               data: { action: "click->transaction-resolve#toggle" })
-          end
+          return unless item.transaction && @statement
+
+          button(type: "button", class: outline_classes, data: { action: "click->transaction-resolve#toggle" }) { t(".resolve") }
         when :review
-          if item.transaction && @statement
-            link_change = helpers.link_to(t(".change"),
-                                          helpers.reconciliation_path(@statement, anchor: helpers.dom_id(item.transaction)),
-                                          class: "inline-flex h-[30px] items-center rounded-lg border border-border px-3 text-[12.5px] font-medium text-muted-foreground hover:text-foreground no-underline transition-colors",
-                                          data: { turbo_frame: "_top" })
-            raw safe(link_change)
-            if item.match
-              helpers.button_to(t(".confirm"),
-                                helpers.confirm_line_money_path(item.transaction.id),
-                                params: { match_id: item.match.id },
-                                class: "inline-flex h-[30px] items-center rounded-lg bg-foreground px-3 text-[12.5px] font-medium text-background hover:opacity-80 transition-opacity cursor-pointer",
-                                method: :post)
+          return unless item.transaction && @statement
+
+          render Campbooks::Button.new(variant: :outline, size: :sm,
+                                       href: helpers.reconciliation_path(@statement, anchor: helpers.dom_id(item.transaction)),
+                                       data: { turbo_frame: "_top" }) { t(".change") }
+          if item.match
+            post_form(helpers.confirm_line_money_path(item.transaction.id), hidden: { match_id: item.match.id }) do
+              render(Campbooks::Button.new(variant: :primary, size: :sm, type: "submit")) { t(".confirm") }
             end
           end
         when :partial
-          if @statement
-            helpers.link_to(t(".open_statement"),
-                            helpers.reconciliation_path(@statement),
-                            class: "inline-flex h-[30px] items-center rounded-lg border border-border px-3 text-[12.5px] font-medium text-muted-foreground hover:text-foreground no-underline transition-colors",
-                            data: { turbo_frame: "_top" })
-          end
+          return unless @statement
+
+          render Campbooks::Button.new(variant: :outline, size: :sm, href: helpers.reconciliation_path(@statement),
+                                       data: { turbo_frame: "_top" }) { t(".open_statement") }
         when :nif
-          if item.transaction && @statement
-            helpers.button_to(t(".ask_for_invoice"),
-                              helpers.request_invoice_reconciliation_bank_transaction_path(@statement, item.transaction, surface: "money"),
-                              class: "inline-flex h-[30px] items-center rounded-lg border border-border px-3 text-[12.5px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer",
-                              method: :post)
+          return unless item.transaction && @statement
+
+          post_form(helpers.request_invoice_reconciliation_bank_transaction_path(@statement, item.transaction),
+                    hidden: { surface: "money" }) do
+            render(Campbooks::Button.new(variant: :outline, size: :sm, type: "submit")) { t(".ask_for_invoice") }
           end
         end
       end
 
       def overflow_note
+        return unless @statement
+
         div(class: "mt-2 text-[12.5px] text-muted-foreground") do
-          if @statement
-            plain t(".overflow", count: @overflow)
-            plain " "
-            plain helpers.link_to(t(".overflow_link"), helpers.reconciliation_path(@statement),
-                                  class: "underline underline-offset-2", data: { turbo_frame: "_top" })
-          end
+          plain t(".overflow", count: @overflow)
+          whitespace
+          a(href: helpers.reconciliation_path(@statement), class: "underline underline-offset-2 hover:text-foreground",
+            data: { turbo_frame: "_top" }) { t(".overflow_link") }
         end
+      end
+
+      def post_form(action, hidden: {})
+        form(action: action, method: :post, class: "inline-flex") do
+          input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
+          hidden.each { |name, value| input(type: "hidden", name: name.to_s, value: value.to_s) }
+          yield
+        end
+      end
+
+      def outline_classes
+        class_names(Campbooks::Button::BASE_CLASSES, Campbooks::Button::VARIANT_CLASSES[:outline], Campbooks::Button::SIZE_CLASSES[:sm])
       end
     end
   end

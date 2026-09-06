@@ -11,8 +11,8 @@ module Campbooks
           icon_circle
           div(class: "min-w-0 flex-1") do
             attention_kicker(margin: "mb-1.5")
-            div(class: "mt-1 text-sm font-semibold leading-snug text-foreground") { headline }
             div(class: "mt-0.5 text-[12.5px] text-muted-foreground") { eyebrow }
+            div(class: "mt-1 text-sm font-semibold leading-snug text-foreground") { headline }
             p(class: "mt-0.5 text-[13px] tabular-nums text-muted-foreground") { amount } if amount
             div(class: "mt-2.5 flex items-center justify-end gap-2") do
               dismiss_button(label: t(".later"), key: "x")

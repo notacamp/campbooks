@@ -232,4 +232,68 @@ RSpec.describe "Money", type: :request do
       end
     end
   end
+
+  describe "rendered actions" do
+    around { |ex| with_flags { ex.run } }
+    before { sign_in(user) }
+
+    it "renders Resolve, Change/Confirm, the statement frame and the unbanked actions as real controls" do
+      unmatched = create(:bank_transaction, reconciliation: jan_stmt, workspace:, status: :unmatched,
+                         amount_cents: -20_000, booked_on: Date.new(2024, 1, 28))
+      suggested = create(:bank_transaction, reconciliation: jan_stmt, workspace:, status: :suggested,
+                         amount_cents: -8_432, booked_on: Date.new(2024, 1, 14))
+      staples   = expense(vendor_name: "Staples", amount_cents: 8_432, invoice_number: "FT2024/0221",
+                          document_date: Date.new(2024, 1, 12))
+      match     = suggested.transaction_matches.create!(document: staples, status: :suggested,
+                                                        matched_by: :ai, confidence: 0.78, match_reasons: {})
+      missing   = expense(vendor_name: "Galp Frota", amount_cents: 8_860, document_date: Date.new(2024, 1, 22))
+
+      get money_path
+      body = response.body
+
+      # Needs you: the hunt opens in place, the confirm is a real POST form
+      expect(body).to include(resolve_panel_reconciliation_bank_transaction_path(jan_stmt, unmatched, surface: "money"))
+      expect(body).to include('data-action="click->transaction-resolve#toggle"')
+      expect(body).to include(confirm_line_money_path(suggested.id))
+      expect(body).to include(%(name="match_id" value="#{match.id}"))
+      expect(body).to include("78% likely")
+
+      # Statements: tabs target the frame, and the frame is really there
+      expect(body).to include('data-turbo-frame="money_statement"')
+      expect(body).to match(/<turbo-frame[^>]*id="money_statement"/)
+
+      # Not on a statement: settle forms for the missing receipt
+      expect(body).to include(money_obligation_settle_path("doc:#{missing.id}"))
+      expect(body).to include('name="source" value="elsewhere"')
+      expect(body).to include("Galp Frota")
+    end
+  end
+
+  describe "the hunt panel opened from Money" do
+    around { |ex| with_flags { ex.run } }
+    before { sign_in(user) }
+
+    it "carries surface=money into its forms and its actions refresh money_content" do
+      t = create(:bank_transaction, reconciliation: jan_stmt, workspace:, status: :unmatched,
+                 amount_cents: -20_000, booked_on: Date.new(2024, 1, 28))
+
+      get resolve_panel_reconciliation_bank_transaction_path(jan_stmt, t, surface: "money")
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include('name="surface"')
+
+      post exclude_reconciliation_bank_transaction_path(jan_stmt, t),
+           params: { reason: "bank_fee", surface: "money" }, as: :turbo_stream
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include('target="money_content"')
+      expect(response.body).to include("surface=money")
+      expect(t.reload.status).to eq("excluded")
+    end
+
+    it "leaves the workbench response alone without the surface param" do
+      t = create(:bank_transaction, reconciliation: jan_stmt, workspace:, status: :unmatched)
+      post exclude_reconciliation_bank_transaction_path(jan_stmt, t),
+           params: { reason: "bank_fee" }, as: :turbo_stream
+      expect(response.body).not_to include('target="money_content"')
+    end
+  end
 end

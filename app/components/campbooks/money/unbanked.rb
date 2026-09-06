@@ -2,8 +2,9 @@
 
 module Campbooks
   module Money
-    # "Not on a statement" section: invoices/receipts with no bank line on a
-    # reconciled statement. Hidden when there are no ready statements.
+    # "Not on a statement": invoices and receipts dated in a reconciled month that
+    # have no bank line to show for them. Hidden until at least one statement is
+    # reconciled; with statements but nothing missing it renders one quiet line.
     class Unbanked < Campbooks::Base
       def initialize(obligations:, evidence:, **attrs)
         @obligations = obligations
@@ -19,10 +20,8 @@ module Campbooks
           if @obligations.empty?
             p(class: "text-[13.5px] text-muted-foreground") { t(".all_on_statement") }
           else
-            @obligations.each { |ob| obligation_row(ob) }
-            p(class: "mt-5 text-[12px] text-muted-foreground/70 max-w-[62ch] leading-relaxed") do
-              raw safe(t(".evidence_note"))
-            end
+            div(class: "divide-y divide-border/50") { @obligations.each { |ob| obligation_row(ob) } }
+            p(class: "mt-5 max-w-[62ch] text-[12px] leading-relaxed text-muted-foreground/80") { t(".evidence_note") }
           end
         end
       end
@@ -32,27 +31,25 @@ module Campbooks
       def section_header
         div(class: "mb-1 flex flex-wrap items-baseline gap-2") do
           span(class: "text-[11px] font-bold uppercase tracking-widest text-muted-foreground") do
-            plain "#{t('.title')}"
-            span(class: "font-normal normal-case tracking-normal text-muted-foreground/70") do
-              plain " · #{@obligations.size}"
-            end
+            plain t(".title")
+            span(class: "ml-1.5 font-normal normal-case tracking-normal text-muted-foreground/70") { plain "· #{@obligations.size}" }
           end
           span(class: "ml-auto text-[12px] text-muted-foreground") { t(".note") }
         end
       end
 
       def obligation_row(ob)
-        div(class: "-mx-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 py-3.5 rounded-xl transition-colors hover:bg-muted/50 sm:-mx-6 sm:px-6") do
+        div(id: ob.dom_id, class: "-mx-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2 rounded-xl px-4 py-3.5 transition-colors hover:bg-muted/50 sm:-mx-6 sm:px-6") do
           div(class: "min-w-0 flex-1") do
             div(class: "text-[14px] font-semibold text-foreground") { plain ob.counterpart.to_s }
-            div(class: "mt-0.5 text-[12.5px] text-muted-foreground") do
+            div(class: "mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[12.5px] text-muted-foreground") do
               meta_parts(ob).each_with_index do |part, i|
-                span(class: "opacity-40 mx-0.5") { plain "·" } if i.positive?
-                plain part.to_s
+                span(class: "mx-0.5 opacity-40", aria_hidden: "true") { plain "·" } if i.positive?
+                span { plain part.to_s }
               end
             end
           end
-          div(class: "flex shrink-0 flex-col items-end gap-2") do
+          div(class: "flex shrink-0 flex-wrap items-center justify-end gap-3") do
             amount_cell(ob)
             action_row(ob)
           end
@@ -62,52 +59,40 @@ module Campbooks
       def meta_parts(ob)
         parts = []
         parts << ob.what.to_s if ob.what.present?
-        parts << I18n.l(ob.anchor_on, format: :date) if ob.anchor_on
-        stmt_label = ob.statement_label
-        parts << t(".not_on_label", label: stmt_label) if stmt_label
+        parts << l(ob.anchor_on, format: :date) if ob.anchor_on
+        parts << t(".not_on_label", label: ob.statement_label) if ob.statement_label
         parts << t(".you_sent") if ob.receivable?
         parts
       end
 
       def amount_cell(ob)
-        css = ob.receivable? ? "text-success font-semibold tabular-nums text-[14px]" : "font-semibold tabular-nums text-[14px] text-foreground"
-        span(class: css) do
-          plain ob.receivable? ? "+#{ob.amount&.format}" : (ob.amount&.format || "-")
-        end
+        css = class_names("text-[14px] font-semibold tabular-nums", ob.receivable? ? "text-success" : "text-foreground")
+        span(class: css) { plain "#{ob.receivable? ? '+' : ''}#{ob.amount&.format}" }
       end
 
       def action_row(ob)
         div(class: "flex flex-wrap gap-1.5") do
           if ob.payable?
-            paid_elsewhere_button(ob)
-            mark_paid_button(ob)
+            post_form(helpers.money_obligation_settle_path(ob.id), hidden: { source: "elsewhere" }) do
+              render(Campbooks::Button.new(variant: :outline, size: :sm, type: "submit")) { t(".paid_elsewhere") }
+            end
           elsif ob.receivable?
-            send_reminder_button(ob)
-            mark_paid_button(ob)
+            post_form(helpers.money_obligation_chase_path(ob.id)) do
+              render(Campbooks::Button.new(variant: :outline, size: :sm, type: "submit")) { t(".send_reminder") }
+            end
+          end
+          post_form(helpers.money_obligation_settle_path(ob.id)) do
+            render(Campbooks::Button.new(variant: :outline, size: :sm, type: "submit")) { t(".mark_paid") }
           end
         end
       end
 
-      def mark_paid_button(ob)
-        helpers.button_to(t(".mark_paid"),
-                          helpers.money_obligation_settle_path(ob.id),
-                          class: "inline-flex h-[28px] items-center rounded-lg border border-border px-2.5 text-[12px] font-medium text-muted-foreground hover:bg-muted transition-colors cursor-pointer",
-                          method: :post)
-      end
-
-      def paid_elsewhere_button(ob)
-        helpers.button_to(t(".paid_elsewhere"),
-                          helpers.money_obligation_settle_path(ob.id),
-                          params: { source: "elsewhere" },
-                          class: "inline-flex h-[28px] items-center rounded-lg bg-foreground px-2.5 text-[12px] font-medium text-background hover:opacity-80 transition-opacity cursor-pointer",
-                          method: :post)
-      end
-
-      def send_reminder_button(ob)
-        helpers.button_to(t(".send_reminder"),
-                          helpers.money_obligation_chase_path(ob.id),
-                          class: "inline-flex h-[28px] items-center rounded-lg bg-foreground px-2.5 text-[12px] font-medium text-background hover:opacity-80 transition-opacity cursor-pointer",
-                          method: :post)
+      def post_form(action, hidden: {})
+        form(action: action, method: :post, class: "inline-flex") do
+          input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
+          hidden.each { |name, value| input(type: "hidden", name: name.to_s, value: value.to_s) }
+          yield
+        end
       end
     end
   end

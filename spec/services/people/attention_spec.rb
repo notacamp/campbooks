@@ -16,6 +16,13 @@ RSpec.describe People::Attention do
 
   def attention = described_class.new(user, now: Time.current)
 
+  # Lateness requires evidence (Money::Evidence): a money card is only valid once a
+  # ready statement covers the invoice's anchor date plus the 7-day grace.
+  def cover_with_statement!(anchor)
+    create(:reconciliation, :ready, workspace: workspace,
+           period_start: anchor - 30, period_end: anchor + 10)
+  end
+
   # Create a feed item and return it with its person/org.
   def make_email_feed_item(kind:, score: 60.0, age_days: 5, person: nil, contact: nil, **msg_attrs)
     person  ||= create(:person, workspace: workspace)
@@ -44,6 +51,7 @@ RSpec.describe People::Attention do
     org    ||= person.primary_organization
     doc = create(:document, :approved, workspace: workspace,
                  amount_cents: 50_000, currency: "EUR", due_date: days_late.days.ago)
+    cover_with_statement!(days_late.days.ago.to_date)
     # Associate the doc with an email from the person.
     contact = create(:contact, workspace: workspace, email_account: account, person: person,
                      email: "#{person.name.parameterize}@x.example", sender_kind: :person,
@@ -58,8 +66,8 @@ RSpec.describe People::Attention do
       user: user, workspace: workspace, kind: kind, subject: doc,
       dedupe_key: "#{kind}:#{doc.id}", sort_at: days_late.days.ago.in_time_zone, score: score,
       attention: true,
-      data: { "days_late" => days_late, "amount_cents" => 50_000, "currency" => "EUR",
-              "due_date" => days_late.days.ago.to_date.iso8601 }
+      data: { "days_since" => days_late, "days_late" => days_late, "amount_cents" => 50_000,
+              "currency" => "EUR", "anchor_date" => days_late.days.ago.to_date.iso8601 }
     )
     [ fi, person, org, doc ]
   end
@@ -144,6 +152,7 @@ RSpec.describe People::Attention do
     person = create(:person, workspace: workspace)
     doc = create(:document, :approved, :revenue_invoice, workspace: workspace,
                  amount_cents: 50_000, currency: "EUR", due_date: 10.days.ago)
+    cover_with_statement!(10.days.ago.to_date)
     contact = create(:contact, workspace: workspace, email_account: account, person: person,
                      email: "#{person.name.parameterize}@x.example", sender_kind: :person,
                      sender_kind_source: "heuristic")
@@ -361,6 +370,7 @@ RSpec.describe People::Attention do
                    provider_folder_id: "INBOX", received_at: 5.days.ago)
       doc = create(:document, :approved, workspace: workspace,
                    amount_cents: 50_000, currency: "EUR", due_date: 10.days.ago)
+      cover_with_statement!(10.days.ago.to_date)
       doc.email_messages << msg
       FeedItem.create!(user: user, workspace: workspace, kind: "late_payable", subject: doc,
                        dedupe_key: "late_payable:#{doc.id}", sort_at: 10.days.ago,

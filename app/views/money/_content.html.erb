@@ -5,13 +5,16 @@
     <%= render Campbooks::Money::NeedsYou.new(
       items: page.needs_you,
       overflow: page.needs_you_overflow,
-      statement: page.selected_statement,
+      statement: page.newest_statement,
       id: "money_needs",
       class: "mt-8"
     ) %>
   <% end %>
   <%# loan slot: the loan PR renders its card here %>
   <%= render Campbooks::Money::Statements.new(page: page, class: "mt-8") %>
+  <% if page.selected_statement %>
+    <%= render "money/statement_frame", page: page %>
+  <% end %>
   <%= render Campbooks::Money::Unbanked.new(
     obligations: page.missing,
     evidence: page.evidence,

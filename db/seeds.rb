@@ -427,8 +427,9 @@ if admin_user && !Reconciliation.exists?(workspace: org)
 
   # ── Galp Frota fuel receipt (no bank line, so "Not on a statement" has a row)
   # Jan 22 anchor + 7 grace = Jan 29; period_end Jan 31 >= Jan 29 => Evidence :missing.
+  receipt_type = DocumentType.find_by(name: "receipt", workspace: org)
   _galp_doc = seed_document(org,
-    { document_type: :receipt, document_type_id: expense_type&.id,
+    { document_type: :receipt, document_type_id: receipt_type&.id,
       ai_status: :completed, review_status: :approved, source: :manual_upload,
       vendor_name: "Galp Frota", vendor_nif: "504940591",
       buyer_nif: company_nif, invoice_number: "FT2024/0902",

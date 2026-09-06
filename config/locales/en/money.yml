@@ -109,7 +109,7 @@ en:
         overflow_link: "Open the statement"
       statements:
         title: "Statements"
-        note: ""
+        note: "every bank line and the paper that explains it"
         empty_title: "No bank statements yet."
         empty_body: "Import your first statement to start matching lines to invoices."
         add_statement: "Add a statement"

@@ -2,8 +2,10 @@
 
 module Campbooks
   module Money
-    # The Statements section: pill tabs for the recent reconciliations, each
-    # loading the grouped ledger into the money_statement turbo frame.
+    # The Statements section header and its month tabs. Each tab targets the
+    # `money_statement` turbo-frame that money/_statement_frame renders right
+    # after this component (one implementation of the frame, shared with the
+    # `money#statement` action). With no statements yet: the empty state.
     class Statements < Campbooks::Base
       def initialize(page:, **attrs)
         @page  = page
@@ -14,15 +16,9 @@ module Campbooks
         div(class: @attrs.delete(:class), **@attrs) do
           section_header
           if @page.statements.empty?
-            render Campbooks::EmptyState.new(
-              title: t(".empty_title"),
-              body: t(".empty_body"),
-              action_label: t(".add_statement"),
-              action_href: helpers.new_reconciliation_path
-            )
+            empty_state
           else
             tab_bar
-            statement_frame
           end
         end
       end
@@ -41,72 +37,45 @@ module Campbooks
       end
 
       def tab_bar
-        nav(class: "flex flex-wrap gap-1.5", role: "tablist") do
-          @page.statements.each do |stmt|
-            tab_pill(stmt)
-          end
+        nav(class: "flex flex-wrap gap-1.5", role: "tablist", aria_label: t(".title")) do
+          @page.statements.each { |stmt| tab_pill(stmt) }
           if @page.more_statements?
-            a(href: helpers.money_statements_path,
-              class: "inline-flex h-8 items-center rounded-full border border-border px-3 text-[12.5px] font-medium text-muted-foreground hover:bg-muted transition-colors no-underline",
-              data: { turbo_frame: "_top" }) do
-              plain t(".earlier")
-            end
+            a(href: helpers.money_statements_path, class: pill_classes(false), data: { turbo_frame: "_top" }) { t(".earlier") }
           end
         end
       end
 
       def tab_pill(stmt)
-        selected = @page.selected_statement&.id == stmt.id
-        evidence = @page.evidence
-        label    = evidence.label_for(stmt)
-        resolved = stmt.instance_variable_get(:@resolved_count) || stmt.bank_transactions.where(status: BankTransaction::RESOLVED_STATUSES).count
-        total    = stmt.instance_variable_get(:@total_transactions) || stmt.bank_transactions.count
+        selected        = @page.selected_statement&.id == stmt.id
+        resolved, total = @page.statement_counts.fetch(stmt.id, [ 0, 0 ])
+        has_unresolved  = total.positive? && resolved < total
 
-        has_unresolved = total.positive? && resolved < total
-
-        css = if selected
-          "inline-flex h-8 items-center gap-1.5 rounded-full bg-foreground px-3 text-[12.5px] font-medium text-background no-underline"
-        else
-          "inline-flex h-8 items-center gap-1.5 rounded-full border border-border px-3 text-[12.5px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors no-underline"
-        end
-
-        a(href: helpers.money_path(statement: stmt.id),
-          class: css,
-          role: "tab",
-          aria: { selected: selected.to_s },
-          data: { turbo_frame: "money_statement" }) do
+        a(href: helpers.money_path(statement: stmt.id), class: pill_classes(selected), role: "tab",
+          aria_selected: selected.to_s, data: { turbo_frame: "money_statement" }) do
           if has_unresolved
-            span(class: "h-1.5 w-1.5 rounded-full bg-ember-gradient shadow-ember-glow")
+            span(class: class_names("h-1.5 w-1.5 rounded-full", selected ? "bg-background" : "bg-ember-gradient shadow-ember-glow"),
+                 aria_hidden: "true")
           end
-          plain label
-          span(class: selected ? "opacity-60" : "opacity-40") { plain " #{resolved}/#{total}" }
+          plain @page.evidence.label_for(stmt)
+          span(class: class_names("tabular-nums", selected ? "opacity-70" : "opacity-60")) { plain "#{resolved}/#{total}" }
         end
       end
 
-      def statement_frame
-        helpers.turbo_frame_tag("money_statement", class: "block mt-4") do
-          frame_content
+      def pill_classes(selected)
+        base = "inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-medium no-underline transition-colors"
+        if selected
+          class_names(base, "bg-foreground text-background")
+        else
+          class_names(base, "border border-border text-muted-foreground hover:bg-muted hover:text-foreground")
         end
       end
 
-      def frame_content
-        return unless @page.selected_statement
-
-        stmt = @page.selected_statement
-        evidence = @page.evidence
-        label = evidence.label_for(stmt)
-
-        render Campbooks::Accounting::GroupedLedger.new(
-          groups:         @page.selected_groups,
-          reconciliation: stmt,
-          company_nif:    @page.company_nif
-        )
-
-        div(class: "mt-3 text-right") do
-          a(href: helpers.reconciliation_path(stmt),
-            class: "text-[12.5px] text-muted-foreground underline underline-offset-2 hover:text-foreground",
-            data: { turbo_frame: "_top" }) do
-            plain t(".all_lines", label: label, count: stmt.total_transactions)
+      def empty_state
+        div(class: "rounded-2xl border border-border bg-card px-6 py-10 text-center") do
+          p(class: "text-[15px] font-semibold text-foreground") { t(".empty_title") }
+          p(class: "mx-auto mt-1.5 max-w-md text-sm text-muted-foreground") { t(".empty_body") }
+          div(class: "mt-4") do
+            render(Campbooks::Button.new(variant: :primary, size: :sm, href: helpers.new_reconciliation_path)) { t(".add_statement") }
           end
         end
       end
