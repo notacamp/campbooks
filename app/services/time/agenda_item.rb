@@ -26,20 +26,23 @@
 #                    :prep  → event with a weighted attendee, worth preparing for
 #                    :quiet → event the user has declined
 # - why              String or nil — the one-line reason shown under a :prep row
+# - handed           true for an ask the *viewer handed to a teammate* — it shows
+#                    on the assigner's Time with a "with <name>" pill and only
+#                    Take it back / Done (default false)
 #
 # Namespaced under Ruby's core Time (reopened via the compact Time::AgendaItem
 # form — never a bare `class Time`, which would clash class-vs-module).
 class Time::AgendaItem < Data.define(
   :kind, :at, :day, :all_day, :overdue, :duration_minutes,
   :title, :source_label, :source_path, :color, :record, :actions,
-  :emphasis, :why, :prep_name, :prep_detail
+  :emphasis, :why, :prep_name, :prep_detail, :handed
 )
   # prep_name / prep_detail: for a :prep row, the first name of the person worth
   # preparing for and the one clause the day note quotes ("Q3 deck is still open,
   # asked 2 days ago", else the learned reason) — kept apart from `why` so the
   # note can say "with Sofia: …" without repeating "with Sofia" inside.
-  def initialize(emphasis: :normal, why: nil, prep_name: nil, prep_detail: nil, **kwargs)
-    super(emphasis: emphasis, why: why, prep_name: prep_name, prep_detail: prep_detail, **kwargs)
+  def initialize(emphasis: :normal, why: nil, prep_name: nil, prep_detail: nil, handed: false, **kwargs)
+    super(emphasis: emphasis, why: why, prep_name: prep_name, prep_detail: prep_detail, handed: handed, **kwargs)
   end
 
   def event? = kind == :event
@@ -53,6 +56,9 @@ class Time::AgendaItem < Data.define(
 
   def prep?  = emphasis == :prep
   def quiet? = emphasis == :quiet
+
+  # An ask the viewer handed to a teammate (the assigner's row).
+  def handed? = handed == true
 
   # Sort key: within a day, all-day items come first, then by instant. Days
   # ascending. Overdue deadlines carry day == today, so they head today's list.

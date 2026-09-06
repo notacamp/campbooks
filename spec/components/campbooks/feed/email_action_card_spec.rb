@@ -7,7 +7,11 @@ RSpec.describe Campbooks::Feed::EmailActionCard, type: :component do
 
   let(:workspace) { create(:workspace) }
   let(:user) { create(:user, workspace: workspace) }
-  let(:account) { create(:email_account, workspace: workspace) }
+  let(:account) do
+    create(:email_account, workspace: workspace).tap do |acct|
+      create(:email_account_user, user: user, email_account: acct, can_read: true)
+    end
+  end
   let(:email) { create(:email_message, email_account: account, ai_action_prompt: "Reply by Friday") }
   let(:item) do
     FeedItem.create!(user: user, workspace: workspace, kind: "email_action", subject: email,

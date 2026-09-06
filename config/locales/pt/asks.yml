@@ -14,3 +14,7 @@ pt:
       done: Concluído.
     dismiss:
       dismissed: Dispensado.
+    hand_off:
+      handed: Entregue a %{name}.
+    take_back:
+      taken_back: Retomado.

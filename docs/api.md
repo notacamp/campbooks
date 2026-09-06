@@ -706,6 +706,13 @@ updated reminder.
 
 ## Tasks
 
+**Asks.** `/api/v1/asks` is an alias of `/api/v1/tasks` — same records, same
+payloads, same scopes (`tasks:read` / `tasks:write`). The web UI now calls them
+"asks"; the `tasks` paths stay until 1.0. Use whichever name you prefer.
+`assignee_ids` carries the ask's assignment: **one assignee means the ask is
+handed to that member** (the app's hand-off), so pass a single id to hand an ask
+over, or an empty array to take it back.
+
 Tasks are actionable items — created manually, via this API, or AI-extracted from
 emails and documents (extracted ones arrive in `suggested` status for triage).
 Scoped to the acting user's workspace.

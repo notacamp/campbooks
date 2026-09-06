@@ -13,9 +13,17 @@ module Scout
   #              calls back into `run`. This is the prompt-injection firewall:
   #              a jailbroken model can propose, but only a human click executes.
   class ToolRegistry
-    Tool = Data.define(:name, :description, :parameters, :autonomy, :runner) do
+    Tool = Data.define(:name, :description, :parameters, :autonomy, :runner, :cards) do
+      # `cards: true` marks a tool whose result carries a `cards` array the chat
+      # renders as tappable rows (only query_asks today) — Scout::Agent keeps those
+      # cards in the persisted step instead of collapsing them to "N items".
+      def initialize(cards: false, **kwargs)
+        super(cards: cards, **kwargs)
+      end
+
       def read? = autonomy == :read
       def confirm? = autonomy == :confirm
+      def cards? = cards == true
     end
 
     DATE = { "type" => "string", "description" => "ISO date YYYY-MM-DD" }.freeze
@@ -109,6 +117,21 @@ module Scout
             "limit" => { "type" => "integer", "minimum" => 1, "maximum" => 50 }
           ),
           runner: ->(args) { Tools::QueryContacts.call(args) }
+        ),
+        Tool.new(
+          name: "query_asks",
+          description: "The user's open asks (things people asked them to do, or they promised). " \
+                       "Use before answering what the user owes, what is due, or what has no date.",
+          autonomy: :read,
+          cards: true,
+          parameters: object_schema(
+            "status" => { "type" => "string", "enum" => %w[open suggested all] },
+            "undated" => { "type" => "boolean" },
+            "due_within_days" => { "type" => "integer", "minimum" => 0 },
+            "handed" => { "type" => "boolean", "description" => "asks the user handed to others" },
+            "limit" => { "type" => "integer", "minimum" => 1, "maximum" => 50 }
+          ),
+          runner: ->(args) { Tools::QueryAsks.call(args) }
         ),
         Tool.new(
           name: "generate_report",

@@ -123,6 +123,8 @@ es:
       title: Scout ha respondido
     subject_label:
       fallback: su bandeja de entrada
+    task_handed_off:
+      title: "%{actor_name} te entregó un encargo"
     task_assigned:
       title: "%{actor_name} le ha asignado una tarea"
     task_mention:

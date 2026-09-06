@@ -19,6 +19,8 @@ fr:
         scout_suggested: Suggéré par Scout
         task: Tâche
         held: réservé %{when}
+        handed_over: confié le %{when}
+        handed_by: de %{name}
         someone: quelqu'un
         google_calendar: Google Agenda
         zoho_calendar: Zoho Calendar
@@ -65,6 +67,9 @@ fr:
         pick: Choisir
         hold: Réserver du temps
         hold_at: Réserver %{when}
+        with: avec %{name}
+        take_it_back: Reprendre
+        hand_to: Confier à…
         not_now: Pas maintenant
         add_to_calendar: Ajouter à l'agenda
         dismiss: Ignorer

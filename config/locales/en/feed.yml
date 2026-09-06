@@ -123,6 +123,8 @@ en:
         due_today: due today
         friday: Friday
         from_email: from %{name}'s email
+        handed_by: from %{name}
+        hand_to: Hand to…
         hold: Hold
         hold_at: Hold %{when}
         next_week: Next week

@@ -164,4 +164,62 @@ RSpec.describe Task do
       expect(later.reload).to be_proposed
     end
   end
+
+  describe ".for_user" do
+    let(:other) { @ws.users.create!(name: "Otto", email_address: "otto-#{SecureRandom.hex(3)}@example.com", password: "password123") }
+
+    it "includes an ask assigned to the user, whatever its source" do
+      task = @ws.tasks.create!(title: "Assigned to me", status: :todo)
+      task.task_assignments.create!(user: @user, assigned_by: other)
+      expect(Task.for_user(@user)).to include(task)
+    end
+
+    it "includes an unassigned ask with no source or a Document source" do
+      nil_src = @ws.tasks.create!(title: "Manual", status: :todo)
+      doc = create(:document, workspace: @ws)
+      doc_src = @ws.tasks.create!(title: "From doc", status: :todo, source: doc)
+      expect(Task.for_user(@user)).to include(nil_src, doc_src)
+    end
+
+    it "includes an unassigned ask from an email the user can read" do
+      account = create(:email_account, workspace: @ws)
+      create(:email_account_user, user: @user, email_account: account, can_read: true)
+      email = create(:email_message, email_account: account)
+      task = @ws.tasks.create!(title: "From readable mail", status: :todo, source: email)
+      expect(Task.for_user(@user)).to include(task)
+    end
+
+    it "excludes an ask assigned to someone else (it is theirs)" do
+      task = @ws.tasks.create!(title: "Handed away", status: :todo)
+      task.task_assignments.create!(user: other, assigned_by: @user)
+      expect(Task.for_user(@user)).not_to include(task)
+      expect(Task.for_user(other)).to include(task)
+    end
+
+    it "excludes an unassigned ask from an email the user cannot read" do
+      account = create(:email_account, workspace: @ws) # no read grant for @user
+      email = create(:email_message, email_account: account)
+      task = @ws.tasks.create!(title: "From private mail", status: :todo, source: email)
+      expect(Task.for_user(@user)).not_to include(task)
+    end
+
+    it "returns none for a nil user" do
+      @ws.tasks.create!(title: "Anything", status: :todo)
+      expect(Task.for_user(nil)).to be_empty
+    end
+  end
+
+  describe "hand-off helpers" do
+    it "handed?/handed_to/handed_by reflect the single assignment" do
+      other = @ws.users.create!(name: "Ana", email_address: "ana-#{SecureRandom.hex(3)}@example.com", password: "password123")
+      task = @ws.tasks.create!(title: "Hand me", status: :todo)
+      expect(task.handed?).to be(false)
+
+      task.task_assignments.create!(user: other, assigned_by: @user)
+      task.reload
+      expect(task.handed?).to be(true)
+      expect(task.handed_to).to eq(other)
+      expect(task.handed_by).to eq(@user)
+    end
+  end
 end

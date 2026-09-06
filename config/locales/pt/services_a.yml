@@ -121,6 +121,8 @@ pt:
       title: O Scout respondeu
     subject_label:
       fallback: a sua caixa de entrada
+    task_handed_off:
+      title: "%{actor_name} entregou-lhe um pedido"
     task_assigned:
       title: "%{actor_name} atribuiu-lhe uma tarefa"
     task_mention:

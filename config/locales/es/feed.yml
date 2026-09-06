@@ -123,6 +123,8 @@ es:
         due_today: para hoy
         friday: Viernes
         from_email: del email de %{name}
+        handed_by: de %{name}
+        hand_to: Entregar a…
         hold: Reservar
         hold_at: Reservar %{when}
         next_week: Próxima semana

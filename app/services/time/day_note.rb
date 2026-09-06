@@ -48,7 +48,7 @@ class Time::DayNote
   def undated_count
     return 0 unless Features.tasks?
 
-    Task.accessible_to(@user).live.undated
+    Task.for_user(@user).live.undated
         .where.not(id: FocusBlock.held.where.not(task_id: nil).select(:task_id))
         .count
   end

@@ -1,0 +1,7 @@
+---
+en:
+  components:
+    scout:
+      ask_cards:
+        done: Done
+        open: Open

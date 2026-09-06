@@ -118,6 +118,30 @@ module Notifier
     Notification.resolve(notifiable: invitation, category: :system)
   end
 
+  # --- Ask handed to you (task / action required) ---
+  #
+  # A teammate handed you an ask. Action-required so it pins to your Now as a
+  # notice card (Feed::Sources::Notice) and buzzes the bell; it auto-resolves when
+  # the ask is done/cancelled (Task#move_to_status!) or taken back. Open goes to
+  # Time, where the ask now lives.
+  def task_handed_off(task, to:, by:)
+    return if to == by
+
+    I18n.with_locale(to.locale.presence || I18n.default_locale) do
+      Notification.notify(
+        user: to,
+        category: :task,
+        priority: :action_required,
+        title: I18n.t("notifier.task_handed_off.title", actor_name: by.name),
+        body: task.title.to_s.truncate(120),
+        link_url: "/time",
+        group_key: "task_handed_off/#{task.id}/#{to.id}",
+        notifiable: task,
+        respect_preferences: false
+      )
+    end
+  end
+
   # --- Task assigned to you (task / awaiting) ---
 
   def task_assigned(task, assignee:, assigned_by:)
@@ -130,7 +154,7 @@ module Notifier
         priority: :awaiting,
         title: I18n.t("notifier.task_assigned.title", actor_name: assigned_by.name),
         body: task.title.to_s.truncate(120),
-        link_url: "/tasks/#{task.id}",
+        link_url: "/time",
         group_key: "task_assigned/#{task.id}/#{assignee.id}",
         notifiable: task,
         respect_preferences: false
@@ -148,7 +172,7 @@ module Notifier
         priority: :awaiting,
         title: I18n.t("notifier.task_mention.title", actor_name: actor.name),
         body: task.title.to_s.truncate(120),
-        link_url: "/tasks/#{task.id}",
+        link_url: "/time",
         group_key: "task_mention/#{task.id}/#{mentioned_user.id}",
         notifiable: task,
         respect_preferences: false

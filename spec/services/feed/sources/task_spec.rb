@@ -14,7 +14,13 @@ RSpec.describe Feed::Sources::Task do
       password: "password123"
     )
   end
-  let(:account) { create(:email_account, workspace: workspace) }
+  # The reader can see this account's mail, so an unassigned ask sourced from it is
+  # theirs (Task.for_user's email leg).
+  let(:account) do
+    create(:email_account, workspace: workspace).tap do |acct|
+      create(:email_account_user, user: user, email_account: acct, can_read: true)
+    end
+  end
   let(:source) { described_class.new(user) }
 
   def make_task(**attrs)
@@ -131,6 +137,31 @@ RSpec.describe Feed::Sources::Task do
       task.update!(due_at: nil)
       task.archive!(by: nil)
       expect(source.still_valid?(active_item, task)).to be_falsey
+    end
+  end
+
+  describe "hand-off" do
+    let(:assignee) do
+      workspace.users.create!(name: "Bea", email_address: "bea-#{SecureRandom.hex(3)}@example.com", password: "password123")
+    end
+
+    it "cards the assignee, not the assigner" do
+      task = make_task(status: :todo, due_at: nil)
+      Asks::HandOff.call(task, to: assignee, by: user)
+
+      assigner_subjects = described_class.new(user).candidates.map { |c| c[:subject] }
+      assignee_subjects = described_class.new(assignee).candidates.map { |c| c[:subject] }
+
+      expect(assigner_subjects).not_to include(task)
+      expect(assignee_subjects).to include(task)
+    end
+
+    it "surfaces the assignee's hand-off notice as a Feed::Sources::Notice candidate" do
+      task = make_task(status: :todo)
+      Asks::HandOff.call(task, to: assignee, by: user)
+
+      notice_subjects = Feed::Sources::Notice.new(assignee).candidates.map { |c| c[:subject] }
+      expect(notice_subjects).to include(assignee.notifications.last)
     end
   end
 end

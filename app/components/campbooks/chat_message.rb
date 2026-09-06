@@ -38,6 +38,7 @@ module Campbooks
           header
           thinking_trace if from_ai?
           tool_steps if from_ai?
+          ask_cards if from_ai?
           body
           provenance_note
           draft_badge if @message.draft?
@@ -94,6 +95,26 @@ module Campbooks
           end
         end
       end
+    end
+
+    # Ask rows from a query_asks step (kind "ask" cards Scout::Agent kept in the
+    # step). Rendered under the tool trace so "what do I owe people?" shows tappable
+    # asks, not just prose.
+    def ask_cards
+      return unless @message.respond_to?(:steps) && @message.steps.present?
+
+      cards = Array(@message.steps).flat_map { |step| ask_cards_in(step) }
+      return if cards.empty?
+
+      render Campbooks::Scout::AskCards.new(cards: cards)
+    end
+
+    def ask_cards_in(step)
+      result = step.is_a?(Hash) ? step["result"] : nil
+      cards = result.is_a?(Hash) ? result["cards"] : nil
+      return [] unless cards.is_a?(Array)
+
+      cards.select { |card| card.is_a?(Hash) && card["kind"] == "ask" }
     end
 
     def step_label(step)

@@ -57,7 +57,11 @@ module Campbooks
       # from_email when there's a source email; else "Scout found it" for an AI ask
       # (unless the suggested lead already said so); else nothing.
       def provenance_segment
-        if subject.source_email
+        if subject.handed? && subject.handed_by
+          # Handed to me: lead with who handed it over, in place of the email sender.
+          dot_sep
+          span(class: "text-muted-foreground") { t(".handed_by", name: user_first_name(subject.handed_by)) }
+        elsif subject.source_email
           dot_sep
           span(class: "text-muted-foreground") { t(".from_email", name: Emails::SenderName.first_name(subject.source_email.from_address)) }
         elsif subject.ai_suggested? && framing != "suggested"
@@ -110,8 +114,58 @@ module Campbooks
       # ── Actions ────────────────────────────────────────────────────────────────
       def action_bar
         div(class: "mt-2.5 flex flex-wrap items-center justify-end gap-2") do
+          hand_off_kebab if hand_off?
           due_framing? ? due_actions : decision_actions
         end
+      end
+
+      # ── Hand to… ─────────────────────────────────────────────────────────────
+      # Offered on an un-handed ask when the workspace has other members. Posts
+      # straight to AsksController#hand_off (not the feed act endpoint) — same as the
+      # Time row's "Hand to…". The toast confirms; the card reconciles on the next
+      # feed refresh (the ask leaves your for_user set once it's someone else's).
+      def hand_off?
+        Current.user && subject.is_a?(::Task) && !subject.handed? && members.any?
+      end
+
+      def members
+        ws = Current.user&.workspace
+        @members ||= (ws ? ws.users.where.not(id: Current.user.id).order(:name).to_a : [])
+      end
+
+      def hand_off_kebab
+        details(class: "relative", data: { controller: "dropdown-close" }) do
+          summary(class: "inline-flex h-8 w-8 cursor-pointer list-none items-center justify-center rounded-lg " \
+                         "text-muted-foreground hover:bg-muted [&::-webkit-details-marker]:hidden",
+                  aria: { label: t(".hand_to") }) { raw safe(kebab_icon) }
+          div(class: "absolute right-0 z-20 mt-1 w-60 rounded-lg border border-border bg-card p-1 shadow-lg") do
+            p(class: "px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground") { t(".hand_to") }
+            members.each { |member| hand_off_member_form(member) }
+          end
+        end
+      end
+
+      def hand_off_member_form(member)
+        form(action: helpers.hand_off_ask_path(subject), method: :post, class: "block", data: { turbo_stream: true }) do
+          input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
+          input(type: "hidden", name: "user_id", value: member.id)
+          button(type: :submit,
+                 class: "block w-full rounded-md px-2 py-1.5 text-left text-[13px] text-foreground hover:bg-muted") { member_label(member) }
+        end
+      end
+
+      def member_label(member)
+        name = user_first_name(member)
+        email = member.email_address.to_s
+        email.present? && email != name ? "#{name} · #{email}" : name
+      end
+
+      def user_first_name(user)
+        user.name.to_s.split(/\s+/).first.presence || user.name.presence || user.email_address.to_s
+      end
+
+      def kebab_icon
+        %(<svg viewBox="0 0 24 24" fill="currentColor" class="h-4 w-4"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>)
       end
 
       # Due today / overdue: hide the card (the ask stays) · Open thread · Done.

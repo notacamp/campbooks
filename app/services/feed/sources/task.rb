@@ -40,7 +40,7 @@ module Feed
       # 1. Suggested asks (a first decision), minus the ones whose source email still
       #    has an active card — the ask rides that card, so a second one would double up.
       def suggestion_candidates
-        suggestions = ::Task.accessible_to(user).live.where(status: :suggested)
+        suggestions = ::Task.for_user(user).live.where(status: :suggested)
           .where(confidence: SUGGESTION_MIN_CONFIDENCE..)
           .where(created_at: (now - SUGGESTION_WINDOW)..)
           .includes(:source)
@@ -61,7 +61,7 @@ module Feed
       # 2 + 3. Accepted asks that need a decision: undated (needs a "when"), or due
       #        today / overdue (needs doing). Future-dated ones are Time-only.
       def active_candidates
-        base = ::Task.accessible_to(user).live.where(status: ::Task::ACTIVE_STATUSES).includes(:source)
+        base = ::Task.for_user(user).live.where(status: ::Task::ACTIVE_STATUSES).includes(:source)
 
         undated = base.where(due_at: nil).map do |task|
           {

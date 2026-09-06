@@ -71,7 +71,7 @@ class Time::FocusProposer
   # ACTIVE_STATUSES)` = accepted, awake, not archived.
   def eligible_tasks
     horizon = (@today + LOOKAHEAD).end_of_day
-    ::Task.accessible_to(@user).live.where(status: ::Task::ACTIVE_STATUSES).dated
+    ::Task.for_user(@user).live.where(status: ::Task::ACTIVE_STATUSES).dated
           .where(due_at: ::Time.current..horizon)
           .where.not(id: FocusBlock.where.not(task_id: nil).select(:task_id))
           .order(:due_at)

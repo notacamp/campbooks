@@ -50,6 +50,14 @@ fr:
       settings_zdrive: Intégration Zoho Drive
       workflows: Flux de travail
   scout:
+    ask_cards:
+      by: pour le %{date}
+      due_today: pour aujourd'hui
+      from: de %{name}
+      handed_to: confié à %{name}
+      held: réservé %{when}
+      no_date: sans date
+      overdue: en retard
     briefing:
       greeting:
         afternoon: Bon après-midi
@@ -86,6 +94,7 @@ fr:
         newsletters: Quelles newsletters puis-je archiver ?
         recent_invoices: Trouvez mes factures récentes
         week_summary: Résumez les e-mails de cette semaine
+        owe: Qu'est-ce que je dois aux gens ?
     status:
       generate_report: Calcul en cours…
       query_contacts: Vérification de vos contacts…

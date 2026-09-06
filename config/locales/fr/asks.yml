@@ -14,3 +14,7 @@ fr:
       done: Terminé.
     dismiss:
       dismissed: Ignoré.
+    hand_off:
+      handed: Confié à %{name}.
+    take_back:
+      taken_back: Repris.

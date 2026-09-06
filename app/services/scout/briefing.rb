@@ -82,12 +82,26 @@ module Scout
     end
 
     def suggestions
-      [
+      list = [
         I18n.t("scout.briefing.suggestions.attention_today"),
         I18n.t("scout.briefing.suggestions.recent_invoices"),
         I18n.t("scout.briefing.suggestions.newsletters"),
         I18n.t("scout.briefing.suggestions.week_summary")
       ]
+      list.unshift(I18n.t("scout.briefing.suggestions.owe")) if owe_suggestion?
+      list
+    end
+
+    # Lead with "What do I owe people?" when the user has any live ask, so the chip
+    # points straight at the new query_asks answer. Fail-safe (never breaks the
+    # briefing) and gated by the tasks readiness flag.
+    def owe_suggestion?
+      return false unless Features.tasks? && @user
+
+      Task.for_user(@user).live.exists?
+    rescue StandardError => e
+      Rails.logger.warn("[Scout::Briefing] owe suggestion check failed: #{e.message}")
+      false
     end
 
     def counts

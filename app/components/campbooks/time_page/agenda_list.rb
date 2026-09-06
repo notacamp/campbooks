@@ -9,13 +9,14 @@ module Campbooks
     # except today, which shows "Nothing scheduled." Wraps the #time_agenda
     # container so a focus/ask action can replace it in place.
     class AgendaList < Campbooks::Base
-      def initialize(items:, zone:, undated: [], move_slots: {}, hold_slots: {}, snoozed_threads: [], scheduled_emails: [], has_calendars: true)
+      def initialize(items:, zone:, undated: [], move_slots: {}, hold_slots: {}, snoozed_threads: [], scheduled_emails: [], members: [], has_calendars: true)
         @items = Array(items)
         @undated = Array(undated)
         @move_slots = move_slots || {}
         @hold_slots = hold_slots || {}
         @snoozed_threads = Array(snoozed_threads)
         @scheduled_emails = Array(scheduled_emails)
+        @members = Array(members)
         @zone = zone
         @has_calendars = has_calendars
       end
@@ -71,7 +72,8 @@ module Campbooks
         render Campbooks::TimePage::AgendaRow.new(
           item: item, zone: @zone,
           move_slots: item.focus? ? Array(@move_slots[item.record.id]) : [],
-          hold_slot: item.task? ? @hold_slots[item.record.id] : nil
+          hold_slot: item.task? ? @hold_slots[item.record.id] : nil,
+          members: @members
         )
       end
 
