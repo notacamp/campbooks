@@ -54,9 +54,6 @@ pt:
         invoice_ref: "fatura #%{reference}"
         this_invoice: "esta fatura"
         body: "Olá %{counterpart}, espero que esteja bem. Este é um lembrete amigável de que %{reference} no valor de %{amount} ainda não aparece do nosso lado. Poderia informar-me quando espera efetuar o pagamento? Obrigado."
-      cancellation:
-        subject: "%{counterpart} · pedido de cancelamento"
-        body: "Olá, escrevo sobre %{counterpart}, que está definido para renovar em %{date}. Gostaria de cancelar antes da renovação. Pode indicar-me o que preciso de fazer? Obrigado pela ajuda."
     actions:
       marked_paid: "Marcado como pago."
       marked_unpaid: "Marcado como não pago."

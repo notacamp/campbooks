@@ -284,7 +284,3 @@ pt:
             one: Uma fatura
             other: "Um pagamento liquida %{count} faturas."
 
-    money:
-      summary:
-        late_receivable_html: "A fatura de %{name} está %{overdue}, por isso redigi um lembrete."
-        late_payable_html: "%{name} está %{overdue}."

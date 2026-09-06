@@ -54,9 +54,6 @@ en:
         invoice_ref: "invoice #%{reference}"
         this_invoice: "this invoice"
         body: "Hi %{counterpart}, I hope you're well. This is a friendly reminder that %{reference} for %{amount} isn't showing on our side yet. Could you let me know when to expect it? Thank you."
-      cancellation:
-        subject: "%{counterpart} · cancellation request"
-        body: "Hi, I'm writing about %{counterpart}, which is set to renew on %{date}. I'd like to cancel it before it renews. Could you tell me what you need from me to stop the renewal? Thank you for your help."
     actions:
       marked_paid: "Marked paid."
       marked_unpaid: "Marked unpaid."

@@ -54,9 +54,6 @@ fr:
         invoice_ref: "facture #%{reference}"
         this_invoice: "cette facture"
         body: "Bonjour %{counterpart}, j'espère que vous allez bien. Ceci est un rappel amical que %{reference} d'un montant de %{amount} n'apparaît pas encore de notre côté. Pourriez-vous m'indiquer quand vous prévoyez de le régler ? Merci beaucoup."
-      cancellation:
-        subject: "%{counterpart} · demande de résiliation"
-        body: "Bonjour, je vous écris au sujet de %{counterpart}, dont le renouvellement est prévu le %{date}. Je souhaite le résilier avant ce renouvellement. Pourriez-vous m'indiquer ce dont vous avez besoin de ma part ? Je vous remercie."
     actions:
       marked_paid: "Marqué comme payé."
       marked_unpaid: "Marqué comme non payé."

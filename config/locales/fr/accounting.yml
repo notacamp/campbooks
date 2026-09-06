@@ -284,7 +284,3 @@ fr:
             one: Une facture
             other: "Un virement solde %{count} factures."
 
-    money:
-      summary:
-        late_receivable_html: "La facture de %{name} est %{overdue}, j'ai donc rédigé un rappel."
-        late_payable_html: "%{name} est %{overdue}."
