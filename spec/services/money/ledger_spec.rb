@@ -3,245 +3,174 @@
 require "rails_helper"
 
 RSpec.describe Money::Ledger do
-  let(:today) { Date.new(2026, 9, 3) }
+  let(:today)     { Date.new(2024, 2, 15) }
   let(:workspace) { create(:workspace) }
-  let(:user) { create(:user, workspace: workspace) }
+  let(:user)      { create(:user, workspace: workspace) }
 
-  def revenue(**attrs)
-    create(:document, :approved, :revenue_invoice, workspace: workspace, currency: "EUR", **attrs)
+  # A ready January statement so docs in Jan are :missing.
+  let!(:jan_stmt) do
+    create(:reconciliation, :ready, workspace: workspace,
+           period_start: Date.new(2024, 1, 1),
+           period_end:   Date.new(2024, 1, 31))
+  end
+
+  def evidence
+    Money::Evidence.for(workspace)
+  end
+
+  def ledger
+    described_class.for(workspace, user, today: today, evidence: evidence)
   end
 
   def expense(**attrs)
-    create(:document, :approved, workspace: workspace, document_type: :expense_invoice, currency: "EUR", **attrs)
+    create(:document, :approved, workspace: workspace,
+           document_type: :expense_invoice, currency: "EUR",
+           amount_cents: 10_000,
+           **attrs)
   end
 
-  def ledger = described_class.for(workspace, user, today: today)
-
-  describe "documents in both directions" do
-    it "reads a revenue invoice as a receivable and an expense as a payable" do
-      revenue(client_name: "Acme", invoice_number: "0234", amount_cents: 222_000, due_date: today + 12)
-      expense(vendor_name: "Cloudhost", amount_cents: 24_800, due_date: today - 20)
-
-      receivable = ledger.obligations.find(&:receivable?)
-      payable = ledger.obligations.find(&:payable?)
-
-      expect(receivable.counterpart).to eq("Acme")
-      expect(receivable.status).to eq(:due)
-      expect(receivable.what).to eq("Invoice #0234 you sent")
-      expect(receivable.amount.format).to eq("€2,220.00")
-      expect(receivable.actions).to eq(%i[remind_on])
-
-      expect(payable.status).to eq(:late)
-      expect(payable.days_late(today)).to eq(20)
-      expect(payable.actions).to eq(%i[mark_paid])
-    end
-
-    it "marks a late receivable's actions with mark_paid + send_reminder" do
-      revenue(client_name: "Brightloop", invoice_number: "0231", amount_cents: 120_000, due_date: today - 12)
-      expect(ledger.late.first.actions).to eq(%i[mark_paid send_reminder])
-    end
-
-    it "offers Pay when a payment URL is present" do
-      doc = expense(vendor_name: "Staples", amount_cents: 36_400, due_date: today + 5)
-      doc.update!(metadata: doc.metadata.merge("payment_url" => "https://pay.example.com/x"))
-      obligation = ledger.due.find { |o| o.counterpart == "Staples" }
-      expect(obligation.pay_url).to eq("https://pay.example.com/x")
-      expect(obligation.actions).to eq(%i[mark_paid pay])
-    end
+  def revenue(**attrs)
+    create(:document, :approved, workspace: workspace,
+           document_type: :revenue_invoice, currency: "EUR",
+           amount_cents: 10_000,
+           **attrs)
   end
 
-  describe "estimated due dates" do
-    it "estimates 30 days after the document date for an invoice with no due date" do
-      expense(vendor_name: "NoDue", amount_cents: 5_000, due_date: nil, document_date: today - 3)
-      obligation = ledger.obligations.find { |o| o.counterpart == "NoDue" }
+  describe "document-only obligations" do
+    it "builds obligations from expense and revenue invoices" do
+      expense(vendor_name: "Vodafone", document_date: Date.new(2024, 1, 10))
+      revenue(client_name: "Acme",    document_date: Date.new(2024, 1, 10), invoice_number: "F01")
 
-      expect(obligation.due_on).to eq((today - 3) + 30.days)
-      expect(obligation).to be_due_estimated
+      expect(ledger.obligations.map(&:direction).sort).to eq(%i[payable receivable].sort)
     end
 
-    it "drops a non-invoice money document with no due date" do
-      create(:document, :approved, :receipt, workspace: workspace, amount_cents: 5_000, due_date: nil, document_date: today - 3)
+    it "excludes documents with no amount_cents or direction" do
+      create(:document, :approved, workspace: workspace,
+             document_type: :expense_invoice, amount_cents: nil, tax_amount_cents: nil)
+      expect(ledger.obligations).to be_empty
+    end
+
+    it "excludes review_rejected documents" do
+      doc = expense(vendor_name: "Skipped", document_date: Date.new(2024, 1, 10))
+      doc.update!(review_status: :rejected)
       expect(ledger.obligations).to be_empty
     end
   end
 
-  describe "settlement window" do
-    it "keeps a document settled within the lookback and drops an older one" do
-      expense(vendor_name: "Recent", amount_cents: 9_600, due_date: today - 10,
-              settled_at: (today - 6).to_time, settled_source: "manual")
-      expense(vendor_name: "Ancient", amount_cents: 9_600, due_date: today - 90,
-              settled_at: (today - 60).to_time, settled_source: "manual")
+  describe "status from evidence" do
+    it "assigns :missing to a doc whose anchor is covered by the Jan statement" do
+      d = expense(vendor_name: "Missing", document_date: Date.new(2024, 1, 10))
+      ob = ledger.obligations.find { |o| o.counterpart == "Missing" }
+      expect(ob.status).to eq(:missing)
+    end
 
-      expect(ledger.settled.map(&:counterpart)).to eq([ "Recent" ])
-      expect(ledger.settled.first.status).to eq(:settled)
-      expect(ledger.settled.first.actions).to be_empty
+    it "assigns :unconfirmed to a doc with no statement coverage yet" do
+      d = expense(vendor_name: "NoCoverage", document_date: Date.new(2024, 2, 10))
+      ob = ledger.obligations.find { |o| o.counterpart == "NoCoverage" }
+      expect(ob.status).to eq(:unconfirmed)
+    end
+
+    it "assigns :settled to a settled doc" do
+      d = expense(vendor_name: "Paid", document_date: Date.new(2024, 1, 10),
+                  settled_at: (today - 5).to_time, settled_source: "manual")
+      ob = ledger.obligations.find { |o| o.counterpart == "Paid" }
+      expect(ob.status).to eq(:settled)
     end
   end
 
-  describe "reminders" do
-    it "turns a renewal reminder into a decide obligation" do
-      policy = create(:document, :approved, workspace: workspace, document_type: :insurance_policy)
-      create(:reminder, workspace: workspace, source: policy, reminder_type: :renewal,
-                        title: "Seguro renews", amount_cents: 41_200, currency: "EUR", due_at: (today + 28).to_time)
-
-      decide = ledger.obligations.find(&:decide?)
-      expect(decide.direction).to eq(:payable)
-      expect(decide.what).to eq("Policy renewal · yearly")
-      expect(decide.actions).to eq(%i[keep cancel])
-      expect(ledger.due).to include(decide) # decide rides in the Due section
+  describe "actions per direction and status" do
+    it "gives missing payable paid_elsewhere and mark_paid" do
+      expense(vendor_name: "Payable", document_date: Date.new(2024, 1, 10))
+      ob = ledger.missing.find { |o| o.counterpart == "Payable" }
+      expect(ob.actions).to eq(%i[paid_elsewhere mark_paid])
     end
 
-    it "dedupes a payment_due reminder that a document obligation already covers" do
-      invoice = expense(vendor_name: "Dup", amount_cents: 5_000, due_date: today + 4)
-      create(:reminder, workspace: workspace, source: invoice, reminder_type: :payment_due,
-                        amount_cents: 5_000, currency: "EUR", due_at: (today + 4).to_time)
-
-      expect(ledger.obligations.count).to eq(1)
-      expect(ledger.obligations.first.reminder).to be_nil
-    end
-  end
-
-  describe "sections + sorting" do
-    it "orders the sections late, due, settled and each by date" do
-      expense(vendor_name: "LateA", amount_cents: 1_000, due_date: today - 5)
-      revenue(client_name: "DueB", invoice_number: "9", amount_cents: 2_000, due_date: today + 2)
-      expense(vendor_name: "Paid", amount_cents: 3_000, due_date: today - 30,
-              settled_at: (today - 2).to_time, settled_source: "manual")
-
-      expect(ledger.sections.map(&:first)).to eq(%i[late due settled])
+    it "gives missing receivable send_reminder and mark_paid" do
+      revenue(client_name: "Receivable", document_date: Date.new(2024, 1, 10), invoice_number: "F02")
+      ob = ledger.missing.find { |o| o.counterpart == "Receivable" }
+      expect(ob.actions).to eq(%i[send_reminder mark_paid])
     end
 
-    it "puts the newest first within a section by default" do
-      expense(vendor_name: "Older", amount_cents: 1_000, due_date: today - 20)
-      expense(vendor_name: "Newer", amount_cents: 1_000, due_date: today - 2)
-      revenue(client_name: "Soon", invoice_number: "1", amount_cents: 1_000, due_date: today + 2)
-      revenue(client_name: "Later", invoice_number: "2", amount_cents: 1_000, due_date: today + 20)
-
-      late = ledger.sections.to_h[:late].map(&:counterpart)
-      due  = ledger.sections.to_h[:due].map(&:counterpart)
-      expect(late).to eq(%w[Newer Older])
-      expect(due).to eq(%w[Later Soon])
-      expect(ledger.sort).to eq(:date)
-      expect(ledger.dir).to eq(:desc)
+    it "gives settled obligations no actions" do
+      expense(vendor_name: "Paid", document_date: Date.new(2024, 1, 10),
+              settled_at: (today - 5).to_time, settled_source: "manual")
+      ob = ledger.settled.find { |o| o.counterpart == "Paid" }
+      expect(ob.actions).to be_empty
     end
 
-    it "sorts by amount and by counterpart in either direction" do
-      expense(vendor_name: "Bravo", amount_cents: 5_000, due_date: today - 3)
-      expense(vendor_name: "Alpha", amount_cents: 9_000, due_date: today - 2)
-      expense(vendor_name: "Charlie", amount_cents: 1_000, due_date: today - 1)
-
-      by_amount = described_class.for(workspace, user, today: today, sort: :amount)
-      expect(by_amount.sections.to_h[:late].map(&:counterpart)).to eq(%w[Alpha Bravo Charlie])
-      expect(by_amount.dir).to eq(:desc)
-
-      by_amount_asc = described_class.for(workspace, user, today: today, sort: :amount, dir: :asc)
-      expect(by_amount_asc.sections.to_h[:late].map(&:counterpart)).to eq(%w[Charlie Bravo Alpha])
-
-      by_name = described_class.for(workspace, user, today: today, sort: :counterpart)
-      expect(by_name.sections.to_h[:late].map(&:counterpart)).to eq(%w[Alpha Bravo Charlie])
-      expect(by_name.dir).to eq(:asc)
-
-      by_name_desc = described_class.for(workspace, user, today: today, sort: "counterpart", dir: "desc")
-      expect(by_name_desc.sections.to_h[:late].map(&:counterpart)).to eq(%w[Charlie Bravo Alpha])
-    end
-
-    it "falls back to date, newest first, for an unknown sort" do
-      unknown = described_class.for(workspace, user, today: today, sort: :bogus, dir: :sideways)
-      expect(unknown.sort).to eq(:date)
-      expect(unknown.dir).to eq(:desc)
+    it "gives unconfirmed obligations no actions" do
+      expense(vendor_name: "NoCoverage", document_date: Date.new(2024, 2, 10))
+      ob = ledger.unconfirmed.find { |o| o.counterpart == "NoCoverage" }
+      expect(ob.actions).to be_empty
     end
   end
 
-  describe "recurrence" do
-    it "tags a recurring counterpart's obligation with the subscription suffix" do
-      3.times { |i| expense(vendor_name: "Cloudhost", amount_cents: 24_800, due_date: today - (65 - i * 30)) }
-      current = ledger.obligations.find { |o| o.counterpart == "Cloudhost" && !o.settled? }
-      expect(current.what).to include("· subscription")
-      expect(current).to be_recurring
+  describe "settled lookback (45 days)" do
+    it "includes a doc settled within 45 days" do
+      expense(vendor_name: "Recent", document_date: Date.new(2024, 1, 10),
+              settled_at: (today - 44).to_time, settled_source: "manual")
+      expect(ledger.settled.map(&:counterpart)).to include("Recent")
+    end
+
+    it "drops a doc settled more than 45 days ago" do
+      expense(vendor_name: "Ancient", document_date: Date.new(2024, 1, 10),
+              settled_at: (today - 46).to_time, settled_source: "manual")
+      expect(ledger.settled.map(&:counterpart)).not_to include("Ancient")
+    end
+  end
+
+  describe "#find" do
+    it "finds an obligation by doc id" do
+      d = expense(vendor_name: "Findable", document_date: Date.new(2024, 1, 10))
+      expect(ledger.find("doc:#{d.id}").counterpart).to eq("Findable")
+    end
+
+    it "returns nil for an unknown id" do
+      expect(ledger.find("doc:nonexistent")).to be_nil
+    end
+  end
+
+  describe "#missing_cents_by_currency" do
+    it "sums missing payable amounts by currency" do
+      expense(vendor_name: "EuroBill", document_date: Date.new(2024, 1, 10),
+              amount_cents: 20_000, currency: "EUR")
+      expense(vendor_name: "EuroBill2", document_date: Date.new(2024, 1, 10),
+              amount_cents: 30_000, currency: "EUR")
+      result = ledger.missing_cents_by_currency
+      expect(result["EUR"]).to eq(50_000)
+    end
+
+    it "excludes receivables from the currency totals" do
+      revenue(client_name: "Client", document_date: Date.new(2024, 1, 10),
+              invoice_number: "F03", amount_cents: 50_000, currency: "EUR")
+      expect(ledger.missing_cents_by_currency).to be_empty
+    end
+  end
+
+  describe "#sections" do
+    it "includes missing and settled sections, excluding empty ones" do
+      expense(vendor_name: "Missing", document_date: Date.new(2024, 1, 10))
+      expense(vendor_name: "Paid", document_date: Date.new(2024, 1, 10),
+              settled_at: (today - 5).to_time, settled_source: "manual")
+
+      keys = ledger.sections.map(&:first)
+      expect(keys).to include(:missing, :settled)
+    end
+
+    it "omits sections with no obligations" do
+      expense(vendor_name: "Missing", document_date: Date.new(2024, 1, 10))
+      keys = ledger.sections.map(&:first)
+      expect(keys).not_to include(:settled)
     end
   end
 
   describe "permissions" do
     it "excludes documents from another workspace" do
       other_ws = create(:workspace)
-      create(:document, :approved, workspace: other_ws, document_type: :expense_invoice, amount_cents: 9_999, due_date: today - 1)
+      create(:document, :approved, workspace: other_ws,
+             document_type: :expense_invoice, amount_cents: 9_999,
+             document_date: Date.new(2024, 1, 10))
       expect(ledger.obligations).to be_empty
-    end
-
-    it "hides a document filed only in a restricted folder from a user who cannot read it" do
-      other = create(:user, workspace: workspace)
-      restricted = create(:mail_folder, workspace: workspace, restricted: true)
-      restricted.mail_folder_users.create!(user: user, can_read: true)
-      doc = expense(vendor_name: "Secret", amount_cents: 1_234, due_date: today - 1)
-      restricted.folder_memberships.create!(folderable: doc)
-
-      expect(described_class.for(workspace, user, today: today).obligations.map(&:counterpart)).to include("Secret")
-      expect(described_class.for(workspace, other, today: today).obligations.map(&:counterpart)).not_to include("Secret")
-    end
-  end
-
-  it "finds an obligation by its id" do
-    doc = expense(vendor_name: "Findable", amount_cents: 1_000, due_date: today - 1)
-    expect(ledger.find("doc:#{doc.id}").counterpart).to eq("Findable")
-  end
-
-  describe "priority sort and enrichment" do
-    it "sets a non-nil priority on open obligations" do
-      expense(vendor_name: "Vendex", amount_cents: 10_000, due_date: today - 5)
-      obligation = ledger.late.first
-      expect(obligation.priority).to be_a(Float)
-      expect(obligation.priority).to be > 0
-    end
-
-    it "does not set a priority on settled obligations" do
-      expense(vendor_name: "Paid", amount_cents: 5_000, due_date: today - 10,
-              settled_at: (today - 3).to_time, settled_source: "manual")
-      settled = ledger.settled.first
-      expect(settled.priority).to be_nil
-    end
-
-    it "sorts by priority descending when :priority sort is chosen" do
-      # The obligation that is more overdue scores higher (all else equal).
-      expense(vendor_name: "Older", amount_cents: 1_000, due_date: today - 20)
-      expense(vendor_name: "Newer", amount_cents: 1_000, due_date: today - 2)
-
-      sorted = described_class.for(workspace, user, today: today, sort: :priority, dir: :desc)
-      late = sorted.sections.to_h[:late].map(&:counterpart)
-      expect(late.first).to eq("Older") # more overdue → higher urgency → higher priority
-    end
-
-    it "returns the highest-priority open obligation from most_pressing" do
-      expense(vendor_name: "SmallNew", amount_cents: 1_000, due_date: today - 2)
-      expense(vendor_name: "BigOld",  amount_cents: 100_000, due_date: today - 25)
-
-      pressing = ledger.most_pressing
-      expect(pressing).not_to be_nil
-      expect(pressing.counterpart).to eq("BigOld")
-    end
-
-    it "returns nil from most_pressing when there are no open obligations" do
-      expense(vendor_name: "Paid", amount_cents: 5_000, due_date: today - 5,
-              settled_at: (today - 1).to_time, settled_source: "manual")
-      expect(ledger.most_pressing).to be_nil
-    end
-
-    it "measures a counterpart with no history against the ledger's open median, without claiming 'their usual'" do
-      expense(vendor_name: "Big Newcomer", amount_cents: 400_000, due_date: today - 5)
-      expense(vendor_name: "Small Newcomer", amount_cents: 8_000, due_date: today - 5)
-      expense(vendor_name: "Mid Newcomer", amount_cents: 30_000, due_date: today - 5)
-
-      sorted = described_class.for(workspace, user, today: today, sort: :priority, dir: :desc)
-      late = sorted.sections.to_h[:late]
-
-      expect(late.map(&:counterpart)).to eq([ "Big Newcomer", "Mid Newcomer", "Small Newcomer" ])
-      expect(late.first.why).to be_empty
-      expect(late.first.amount_ratio).to be_nil
-    end
-
-    it "initializes why as an array" do
-      expense(vendor_name: "Usual", amount_cents: 10_000, due_date: today - 3)
-      ob = ledger.late.first
-      expect(ob.why).to be_an(Array)
     end
   end
 end

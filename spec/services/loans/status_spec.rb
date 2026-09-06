@@ -54,4 +54,24 @@ RSpec.describe Loans::Status, type: :service do
       expect(inst4.reload.status).to eq("paid")
     end
   end
+
+  describe "amounts" do
+    it "derives a rate reset from the paid sequence and carries the latest amount forward" do
+      one, two = loan.instalments.where(number: [ 1, 2 ]).order(:number).to_a
+      one.update_columns(status: LoanInstalment.statuses[:paid], amount_cents: 76_800)
+      two.update_columns(status: LoanInstalment.statuses[:paid], amount_cents: 78_000)
+
+      described_class.refresh!(loan)
+
+      expect(one.reload.previous_amount_cents).to be_nil
+      expect(two.reload.previous_amount_cents).to eq(76_800)
+      expect(loan.reload.instalment_cents).to eq(78_000)
+      expect(loan.instalments.where(status: %i[expected missed]).pluck(:amount_cents).uniq).to eq([ 78_000 ])
+    end
+
+    it "leaves the amounts alone when nothing was paid yet" do
+      described_class.refresh!(loan)
+      expect(loan.reload.instalment_cents).to eq(78_000)
+    end
+  end
 end

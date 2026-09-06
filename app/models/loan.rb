@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
-# A workspace-scoped standing explanation for a recurring bank debit that follows
-# a fixed payment schedule (mortgage, business loan, car finance, leasing, etc.).
+# A workspace-scoped standing explanation for a recurring bank debit on a fixed
+# schedule (a business loan, a mortgage, car finance, leasing).
 #
 # Once tracked, the reconciler links each instalment to the bank line that paid it:
 # the line reads "Loan · instalment N of T" on the statement, and Money shows what's
-# paid, what's to go, the next instalment, and anything odd (a missing instalment, an
-# amount change after a rate reset).
+# paid, what's to go, the next instalment, and anything odd (a missing instalment,
+# an amount change after a rate reset). Loans::Status keeps the derived state honest.
 class Loan < ApplicationRecord
   belongs_to :workspace
   belongs_to :created_by, class_name: "User"
@@ -14,17 +14,18 @@ class Loan < ApplicationRecord
 
   enum :status, { active: 0, closed: 1 }
 
-  validates :lender,             presence: true
-  validates :principal_cents,    numericality: { greater_than: 0 }
-  validates :instalment_cents,   numericality: { greater_than: 0 }
-  validates :term_months,        numericality: { greater_than: 0, only_integer: true }
+  validates :lender,              presence: true
+  validates :principal_cents,     numericality: { greater_than: 0 }
+  validates :instalment_cents,    numericality: { greater_than: 0 }
+  validates :term_months,         numericality: { greater_than: 0, only_integer: true }
   validates :first_instalment_on, presence: true
-  validates :currency,           format: { with: /\A[A-Z]{3}\z/, message: "must be a 3-letter code" }
+  validates :currency,            format: { with: /\A[A-Z]{3}\z/, message: "must be a 3-letter code" }
 
   scope :active_loans, -> { where(status: :active) }
 
-  # ── Computed helpers ──────────────────────────────────────────────────────────
+  # ── What the statements prove ────────────────────────────────────────────────
 
+  # Paid on a statement, or dated before the first statement (assumed paid).
   def paid_instalments
     instalments.where(status: %i[paid unverified])
   end
@@ -45,30 +46,54 @@ class Loan < ApplicationRecord
     remaining_instalments.count
   end
 
+  # What is left to pay at the current instalment (honest without a rate).
   def remaining_cents
     remaining_count * instalment_cents
+  end
+
+  def missed_instalments
+    instalments.where(status: :missed).order(:expected_on)
   end
 
   def next_expected
     instalments.where(status: :expected).order(:expected_on).first
   end
 
+  # The next expected instalment already due by `date` (its statement isn't in yet).
+  def expected_due_by(date)
+    ins = next_expected
+    ins if ins && ins.expected_on <= date
+  end
+
+  # The latest instalment found on a statement.
   def last_seen
-    instalments.where(status: %i[paid unverified]).where.not(bank_transaction_id: nil)
-               .order(expected_on: :desc).first
+    instalments.where(status: :paid).where.not(bank_transaction_id: nil).order(expected_on: :desc).first
+  end
+
+  # The latest statement-proven instalments, newest first.
+  def recent_paid(limit = 3)
+    instalments.where(status: :paid).where.not(bank_transaction_id: nil)
+               .includes(bank_transaction: :reconciliation)
+               .order(expected_on: :desc).limit(limit)
   end
 
   def ends_on
     instalments.maximum(:expected_on)
   end
 
-  # Returns the earliest paid instalment that has `previous_amount_cents` set AND
-  # whose amount_cents equals the current `instalment_cents` — i.e. the point where
-  # the rate reset landed at the current value.
+  # The most recent instalment whose amount stepped from the one before it
+  # (Loans::Status sets previous_amount_cents); nil when the amount never changed.
   def amount_changed_at
-    instalments.where.not(previous_amount_cents: nil)
-               .where(amount_cents: instalment_cents, status: %i[paid unverified])
-               .order(:expected_on).first
+    instalments.where(status: :paid).where.not(previous_amount_cents: nil).order(expected_on: :desc).first
+  end
+
+  # The amount change the user hasn't waved through yet.
+  def unacknowledged_change
+    changed = amount_changed_at
+    return nil unless changed
+    return changed if change_acknowledged_at.nil?
+
+    changed if change_acknowledged_at < changed.expected_on.in_time_zone
   end
 
   def progress_pct
@@ -77,7 +102,7 @@ class Loan < ApplicationRecord
     ((paid_count.to_f / term_months) * 100).round
   end
 
-  # The lender name or token used for counterparty matching.
+  # What the statement calls the lender, for matching.
   def effective_counterparty
     source_counterparty.presence || lender
   end

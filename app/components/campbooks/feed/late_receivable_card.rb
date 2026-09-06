@@ -2,21 +2,16 @@
 
 module Campbooks
   module Feed
-    # A late receivable on Now: an invoice you sent that hasn't been paid, with the
-    # reminder already drafted. "Send reminder" opens the compose Dock prefilled (the
-    # Money chase path); "Mark paid" settles it; "Later" hides the card. `subject` is
-    # a Document (a revenue invoice). Attention styling — this one wants a decision.
+    # A revenue invoice not on a reconciled statement. Shows once Money::Evidence
+    # has confirmed that a ready statement covers its date and shows no payment.
+    # "Send reminder" opens the compose Dock prefilled; "Mark paid" settles it.
     class LateReceivableCard < Campbooks::Feed::Base
       def view_template
         div(class: "-mx-3 flex items-start gap-3 rounded-2xl px-3 py-3 transition-colors duration-150 hover:bg-muted/50") do
           icon_circle
           div(class: "min-w-0 flex-1") do
             attention_kicker(margin: "mb-1.5")
-            div(class: "flex flex-wrap items-center gap-x-1.5 text-[12.5px]") do
-              span(class: "font-medium text-foreground") { t(".owed") }
-              span(class: "text-muted-foreground/50") { "·" }
-              span(class: "font-medium text-warning") { t(".days_late", count: days_late) }
-            end
+            div(class: "mt-0.5 text-[12.5px] text-muted-foreground") { eyebrow }
             div(class: "mt-1 text-sm font-semibold leading-snug text-foreground") { headline }
             p(class: "mt-0.5 text-[13px] tabular-nums text-muted-foreground") { amount } if amount
             render Campbooks::ScoutNote.new(message: t(".scout_note"), compact: true, class: "mt-1.5")
@@ -35,6 +30,11 @@ module Campbooks
         t(".headline", name: subject.entity_display_name, reference: reference)
       end
 
+      def eyebrow
+        label = item.data["statement_label"].presence
+        label ? t(".not_on_statement", label: label) : t(".not_on_a_statement")
+      end
+
       def reference
         subject.invoice_number.present? ? t(".invoice_ref", number: subject.invoice_number) : t(".an_invoice")
       end
@@ -43,18 +43,11 @@ module Campbooks
         cents = item.data["amount_cents"] || subject.amount_cents
         return nil if cents.blank?
 
-        # ::Money — the money-rails class; a bare Money here resolves to Campbooks::Money.
+        # ::Money — the money-rails class; bare Money here would resolve to Campbooks::Money.
         ::Money.new(cents, subject.currency).format
       end
 
-      def days_late
-        item.data["days_late"] || [ (Date.current - subject.due_date.to_date).to_i, 0 ].max
-      rescue StandardError
-        0
-      end
-
-      # A POST that opens the compose Dock with the chase draft (a turbo_stream that
-      # updates #compose_dock) — the card stays until the invoice is actually paid.
+      # A POST that opens the compose Dock with the chase draft.
       def send_reminder_button
         action_form(helpers.money_obligation_chase_path("doc:#{subject.id}")) do
           render Campbooks::Button.new(

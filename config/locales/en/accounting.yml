@@ -119,7 +119,7 @@ en:
       exclude:
         excluded: "Marked as excluded: %{reason}"
         invalid_reason: Invalid exclusion reason.
-        excluded_as_loan_no_match: "Set aside as a loan instalment. %{link} to explain these automatically."
+        excluded_as_loan_no_match_html: "Set aside as a loan instalment. %{link} to explain these automatically."
         excluded_as_loan_no_match_link: Track the loan in Money
       reset:
         reset: Match cleared
@@ -292,9 +292,4 @@ en:
           multi_doc:
             one: One invoice
             other: "One payment clears %{count} invoices."
-      reconciliations_rail:
-        title: Bank statements
-        view_all: View all
-        untitled: Unnamed statement
-        progress: "%{resolved} of %{total}"
-        open: Open →
+

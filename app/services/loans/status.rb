@@ -1,56 +1,86 @@
 # frozen_string_literal: true
 
 module Loans
-  # Refreshes the status of non-paid instalments based on statement coverage.
+  # Re-derives what the statements prove about a loan. Two passes:
   #
-  # Rules (per instalment with status expected or missed):
-  #   unverified — expected_on < earliest_covered_on (before your statements)
-  #   missed     — expected_on + 12 days <= latest_covered_on AND not linked
-  #   expected   — everything else
+  # 1. Amounts. Walking the bank-proven (paid) instalments in date order, an
+  #    instalment whose amount differs from the previous one by 0.5% or more records
+  #    that previous amount (a rate reset). The latest paid amount becomes the loan's
+  #    current instalment and the amount of every instalment still to come. Deriving
+  #    this from the sequence, rather than at link time, keeps it right no matter
+  #    which statement was reconciled first.
+  #
+  # 2. Statuses, for instalments that are not paid:
+  #      unverified  expected_on is before the earliest reconciled statement
+  #                  (before your statements; assumed paid)
+  #      missed      a reconciled statement covers expected_on + 12 days (the
+  #                  latest plausible booking) and no bank line was found
+  #      expected    everything else, including months with no statement yet
   #
   # Call after every Loans::Matcher run and after create/update.
   class Status
-    # @param loan [Loan]
-    # @param earliest_covered_on [Date, nil]   min period_start across ready reconciliations
-    # @param latest_covered_on   [Date, nil]   max period_end across ready reconciliations
+    RATE_STEP  = 0.005 # 0.5%
+    GRACE_DAYS = 12
+
     def self.refresh!(loan, earliest_covered_on: nil, latest_covered_on: nil)
-      new(loan, earliest_covered_on: earliest_covered_on,
-                latest_covered_on:   latest_covered_on).call
+      new(loan, earliest_covered_on: earliest_covered_on, latest_covered_on: latest_covered_on).call
     end
 
     def initialize(loan, earliest_covered_on: nil, latest_covered_on: nil)
       @loan = loan
-      @earliest, @latest = resolve_coverage(earliest_covered_on, latest_covered_on)
+      @periods = ready_periods
+      @earliest = earliest_covered_on || @periods.map(&:first).min
+      @latest   = latest_covered_on   || @periods.map(&:last).max
     end
 
     def call
-      unpaid = @loan.instalments.where(status: %i[expected missed]).to_a
-      return if unpaid.empty?
-
-      unpaid.each do |ins|
-        new_status = determine_status(ins)
-        ins.update_columns(status: LoanInstalment.statuses[new_status]) if ins.status != new_status.to_s
-      end
+      sync_amounts!
+      refresh_statuses!
     end
 
     private
 
-    def resolve_coverage(earliest, latest)
-      return [ earliest, latest ] if earliest.present? || latest.present?
+    def sync_amounts!
+      paid = @loan.instalments.where(status: :paid).order(:expected_on).to_a
+      previous = nil
 
-      recs = @loan.workspace.reconciliations.where(status: :ready)
-                  .where.not(period_start: nil).where.not(period_end: nil)
-      return [ nil, nil ] if recs.empty?
+      paid.each do |ins|
+        step = previous && (ins.amount_cents - previous).abs.to_f / previous >= RATE_STEP ? previous : nil
+        ins.update_columns(previous_amount_cents: step) if ins.previous_amount_cents != step
+        previous = ins.amount_cents
+      end
 
-      [ recs.minimum(:period_start), recs.maximum(:period_end) ]
+      return if previous.nil? || previous == @loan.instalment_cents
+
+      @loan.update_columns(instalment_cents: previous)
+      @loan.instalments.where(status: %i[expected missed]).update_all(amount_cents: previous)
     end
 
-    def determine_status(instalment)
+    def refresh_statuses!
+      @loan.instalments.where(status: %i[expected missed unverified]).find_each do |ins|
+        new_status = status_for(ins)
+        ins.update_columns(status: LoanInstalment.statuses[new_status]) if ins.status != new_status.to_s
+      end
+    end
+
+    # [[period_start, period_end], …] of the workspace's reconciled statements.
+    def ready_periods
+      @loan.workspace.reconciliations.where(status: :ready)
+           .where.not(period_start: nil).where.not(period_end: nil)
+           .pluck(:period_start, :period_end)
+    end
+
+    def covered?(date)
+      @periods.any? { |from, to| from <= date && date <= to } ||
+        (@earliest.present? && @latest.present? && @periods.empty? && @earliest <= date && date <= @latest)
+    end
+
+    def status_for(instalment)
       date = instalment.expected_on
 
       if @earliest.present? && date < @earliest
         :unverified
-      elsif @latest.present? && (date + 12.days) <= @latest
+      elsif covered?(date + GRACE_DAYS.days)
         :missed
       else
         :expected

@@ -2,34 +2,41 @@
 
 require "csv"
 
-# The Money surface: what you're owed, what you owe, and what the bank settled, on
-# one 30-day timeline. It reads Money::Ledger over the accounting substrate; the
-# row/card actions delegate to the canonical mutations (Document#mark_settled!,
-# Reminders::Confirm, a manual Reminder, the compose Dock) and re-render the page's
-# derived state (Scout's read, the timeline, the ledger) so totals and sections
-# stay honest after every action.
-#
-# Money exists only where accounting does — gated by the same accounting flag +
-# entitlement as the reconciliation page.
+# The Money surface: bank reconciliation answered to the paper behind it.
+# Scout's read, a Needs-you list, the paired statement ledger, and the
+# "Not on a statement" list of documents with no bank line. Gated by the
+# accounting flag and entitlement.
 class MoneyController < ApplicationController
   before_action :require_accounting_enabled
   before_action :require_accounting_entitlement
-  before_action :set_obligation, only: %i[remind chase settle unsettle decide]
+  before_action :set_obligation, only: %i[chase settle unsettle]
 
   def index
-    build_ledger
+    @page = Money::Page.for(Current.workspace, current_user,
+                            today:        Date.current,
+                            statement_id: params[:statement])
   end
 
-  # GET /money/statements — the full bank-statement reconciliation list. This is
-  # the primary entry point for reconciliation work; /accounting redirects here.
+  # GET /money/statement/:id — renders ONLY the money_statement turbo-frame content
+  # for that reconciliation. 404 when the id belongs to another workspace.
+  def statement
+    recon = Current.workspace.reconciliations.ready.find_by!(id: params[:id])
+    @page = Money::Page.for(Current.workspace, current_user,
+                            today:        Date.current,
+                            statement_id: recon.id)
+    render partial: "money/statement_frame", locals: { page: @page }, layout: false
+  rescue ActiveRecord::RecordNotFound
+    head :not_found
+  end
+
+  # GET /money/statements — the full bank-statement reconciliation list.
   def statements
     @pagy, @reconciliations = pagy(
       Current.workspace.reconciliations.recent.includes(:statement_document),
       limit: 25
     )
 
-    # Batch-load transaction counts to avoid N+1 queries for the progress bars.
-    rids = @reconciliations.map(&:id)
+    rids        = @reconciliations.map(&:id)
     tx_totals   = BankTransaction.where(reconciliation_id: rids)
                                  .group(:reconciliation_id).count
     tx_resolved = BankTransaction.where(reconciliation_id: rids,
@@ -47,9 +54,7 @@ class MoneyController < ApplicationController
     end
   end
 
-  # A CSV of the ledger for your accountant (counterpart, what, direction, amount,
-  # currency, due, status, settled_on, source). If a reconciliation for the quarter
-  # is already exported, hand over that richer ZIP instead.
+  # GET /money/export — CSV of the ledger for your accountant.
   def export
     if (recon = ready_reconciliation_for_quarter)
       redirect_to download_reconciliation_path(recon) and return
@@ -61,59 +66,78 @@ class MoneyController < ApplicationController
               type: "text/csv"
   end
 
-  # "Remind on <date>" — a due receivable you want to chase later. Sets a user-made
-  # payment_due reminder for the day after it falls due. No email.
-  def remind
-    due = @obligation.due_on || Date.current
-    reminder = Reminder.create!(
-      workspace: Current.workspace, source: @obligation.document,
-      reminder_type: :payment_due, status: :pending,
-      title: I18n.t("money.reminder_draft.chase.subject_generic"),
-      amount_cents: @obligation.amount_cents, currency: @obligation.currency,
-      due_at: (due + 1.day).in_time_zone, all_day: true,
-      extracted_data: { "origin" => "money_manual" }
-    )
-    respond_action(t("money.actions.reminder_created", date: l(reminder.due_at.to_date, format: :day_month)))
-  end
-
-  # "Send reminder" (a late receivable) — open the compose Dock with the chase draft
-  # prefilled. Also serves a renewal's "Cancel it" cancellation draft (choice=cancel
-  # routes here after dismissing). Nothing is sent; the draft is the user's to edit.
+  # POST /money/obligations/:id/chase — open the compose Dock with a chase draft.
+  # Only for missing receivables.
   def chase
+    return respond_gone unless @obligation&.missing?
+    return respond_gone unless @obligation.receivable?
+
     draft = Money::ReminderDraft.chase(@obligation)
     open_dock(draft, t("money.actions.reminder_opened"))
   end
 
-  # "Mark paid" — a manual settlement (the bank match, when it lands, still wins).
+  # POST /money/obligations/:id/settle — manual settlement.
   def settle
-    return respond_gone unless @obligation.document
+    return respond_gone unless @obligation&.document
 
-    @obligation.document.mark_settled!
+    source = params[:source].to_s.presence || "manual"
+    @obligation.document.mark_settled!(source: source)
     respond_action(nil, undo: undo_toast(t("money.actions.marked_paid"),
-                                          endpoint: money_obligation_settle_path(@obligation.id), method: :delete))
+                                          endpoint: money_obligation_settle_path(@obligation.id),
+                                          method: :delete))
   end
 
+  # DELETE /money/obligations/:id/settle — undo.
   def unsettle
-    return respond_gone unless @obligation.document
+    return respond_gone unless @obligation&.document
 
     @obligation.document.mark_unsettled!
     respond_action(t("money.actions.marked_unpaid"))
   end
 
-  # A renewal decision. Keep → confirm the reminder (a calendar event). Cancel it →
-  # dismiss the reminder AND open a cancellation draft in the Dock.
-  def decide
-    return respond_gone unless @obligation.reminder
+  # POST /money/lines/:id/confirm — confirm a suggested match from Money.
+  def confirm_line
+    txn = workspace_transaction
+    return unless txn
 
-    if params[:choice] == "cancel"
-      @obligation.reminder.dismissed!
-      Events.publish("reminder.dismissed", subject: @obligation.reminder,
-                                            payload: { "title" => @obligation.reminder.title })
-      open_dock(Money::ReminderDraft.cancellation(@obligation), t("money.actions.cancelled"))
-    else
-      Reminders::Confirm.call(@obligation.reminder, user: current_user)
-      respond_action(t("money.actions.kept"))
+    begin
+      Reconciliations::LineActions.new(txn).confirm!(params[:match_id])
+      respond_action(t("money.actions.line_confirmed"),
+                     undo: undo_line_toast(txn, t("money.actions.line_confirmed")))
+    rescue ActiveRecord::RecordNotFound
+      respond_action(t("money.actions.line_not_found"), severity: :error)
     end
+  end
+
+  # POST /money/lines/:id/set_aside — exclude a transaction from Money.
+  def set_aside_line
+    txn = workspace_transaction
+    return unless txn
+
+    reason = params[:reason].to_s.strip
+    unless Reconciliations::BankTransactionsController::VALID_EXCLUSION_REASONS.include?(reason)
+      respond_to do |format|
+        format.turbo_stream do
+          render turbo_stream: notify_stream(t("money.actions.invalid_reason"), severity: :error),
+                 status: :unprocessable_entity
+        end
+        format.any { head :unprocessable_entity }
+      end
+      return
+    end
+
+    Reconciliations::LineActions.new(txn).exclude!(reason)
+    respond_action(t("money.actions.line_excluded"),
+                   undo: undo_line_toast(txn, t("money.actions.line_excluded")))
+  end
+
+  # POST /money/lines/:id/reset — undo a line action.
+  def reset_line
+    txn = workspace_transaction
+    return unless txn
+
+    Reconciliations::LineActions.new(txn).reset!
+    respond_action(t("money.actions.line_reset"))
   end
 
   private
@@ -122,74 +146,38 @@ class MoneyController < ApplicationController
     require_entitlement!(:accounting)
   end
 
-  def build_ledger
-    @today = Date.current
-    @horizon = params[:range] == "90d" ? 90.days : 30.days
-    sort, dir = ledger_sort
-    @ledger = Money::Ledger.for(Current.workspace, current_user, today: @today, horizon: @horizon, sort: sort, dir: dir)
-    @summary = Money::Summary.for(Current.workspace, current_user, today: @today, ledger: @ledger)
-    @quarter_label = quarter_label
-    # Surface recent bank statement reconciliations so Money is the entry point
-    # for statement work. Limit to 6 most recent ready/matching ones.
-    @recent_reconciliations = Current.workspace.reconciliations.recent
-                                     .includes(:statement_document)
-                                     .limit(6)
-    # Pre-populate memoised counts to avoid N+1 on progress bars.
-    rids = @recent_reconciliations.map(&:id)
-    tx_totals   = BankTransaction.where(reconciliation_id: rids).group(:reconciliation_id).count
-    tx_resolved = BankTransaction.where(reconciliation_id: rids,
-                                        status: BankTransaction::RESOLVED_STATUSES)
-                                 .group(:reconciliation_id).count
-    @recent_reconciliations.each do |r|
-      r.instance_variable_set(:@total_transactions, tx_totals.fetch(r.id, 0))
-      r.instance_variable_set(:@resolved_count,     tx_resolved.fetch(r.id, 0))
-    end
-
-    # TODO(money-evidence): move into Money::Page / Money::Read when feat/money-evidence merges
-    @loans            = Current.workspace.loans.active_loans
-                               .includes(instalments: :bank_transaction)
-                               .order(:created_at)
-    @loan_suggestions = Loans::Spotter.new(Current.workspace).call
-  rescue => e
-    # Loan data is additive — if it fails, Money still renders.
-    Rails.logger.warn("[MoneyController] loan data load failed: #{e.class}: #{e.message}")
-    @loans            = []
-    @loan_suggestions = []
-  end
-
-  # The ledger's order: ?sort=&dir= (the column links), ?order=date_desc (the
-  # phone's select), else what this session last chose, else newest first. The
-  # choice is kept in the session so a row action re-renders in the same order.
-  def ledger_sort
-    sort, dir = params[:order].to_s.split("_", 2) if params[:order].present?
-    sort = params[:sort] if params[:sort].present?
-    dir  = params[:dir]  if params[:dir].present?
-
-    if Money::Ledger::SORTS.include?(sort.to_s.to_sym)
-      sort = sort.to_s.to_sym
-      dir  = Money::Ledger::DIRS.include?(dir.to_s.to_sym) ? dir.to_s.to_sym : Money::Ledger.default_dir(sort)
-      session[:money_sort] = [ sort.to_s, dir.to_s ]
-      return [ sort, dir ]
-    end
-
-    remembered = Array(session[:money_sort]).map { |v| v.to_s.to_sym }
-    return remembered if remembered.size == 2 && Money::Ledger::SORTS.include?(remembered[0]) && Money::Ledger::DIRS.include?(remembered[1])
-
-    [ :priority, :desc ]
+  def build_page(statement_id: params[:statement])
+    Money::Page.for(Current.workspace, current_user,
+                    today:        Date.current,
+                    statement_id: statement_id)
   end
 
   def set_obligation
-    ledger = Money::Ledger.for(Current.workspace, current_user, today: Date.current, horizon: 90.days)
+    @page = build_page
+    evidence = @page.evidence
+    ledger   = @page.ledger
     @obligation = ledger.find(params[:id])
     respond_gone unless @obligation
   end
 
-  # Perform a mutation, then re-render the whole money region (Scout read + timeline
-  # + ledger) so every derived figure stays correct, and raise a toast.
-  def respond_action(message, undo: nil, extra: [])
-    build_ledger
-    streams = [ turbo_stream.replace("money_content", partial: "money/content") ]
-    streams << (undo || notify_stream(message)) if undo || message.present?
+  def workspace_transaction
+    txn = BankTransaction.joins(:reconciliation)
+                         .where(reconciliations: { workspace_id: Current.workspace.id })
+                         .find_by(id: params[:id])
+    unless txn
+      respond_to do |format|
+        format.turbo_stream { render turbo_stream: notify_stream(t("money.actions.gone"), severity: :warning), status: :not_found }
+        format.any { head :not_found }
+      end
+    end
+    txn
+  end
+
+  # Re-render the money_content region and raise a toast.
+  def respond_action(message, undo: nil, extra: [], severity: :success, statement_id: nil)
+    page = build_page(statement_id: statement_id || params[:statement])
+    streams = [ turbo_stream.replace("money_content", partial: "money/content", locals: { page: page }) ]
+    streams << (undo || notify_stream(message, severity: severity)) if undo || message.present?
     streams += Array(extra)
 
     respond_to do |format|
@@ -202,32 +190,29 @@ class MoneyController < ApplicationController
     to = chase_recipient(@obligation)
     dock = turbo_stream.update("compose_dock", partial: "email_compose/dock",
                                                locals: EmailCompose::DockLocals.blank(
-                                                 user: current_user, to: to, subject: draft.subject, body: draft.body
+                                                 user: current_user, to: to,
+                                                 subject: draft.subject, body: draft.body
                                                ))
-    # Cancelling a renewal also dismisses it, so refresh the ledger region too.
-    if params[:choice] == "cancel"
-      respond_action(message, extra: [ dock ])
-    else
-      respond_to do |format|
-        format.turbo_stream { render turbo_stream: [ dock, notify_stream(message) ] }
-        format.any { redirect_to money_path }
-      end
+    respond_to do |format|
+      format.turbo_stream { render turbo_stream: [ dock, notify_stream(message) ] }
+      format.any { redirect_to money_path }
     end
   end
 
   def respond_gone
     respond_to do |format|
-      format.turbo_stream { render turbo_stream: notify_stream(t("money.actions.gone"), severity: :warning), status: :not_found }
+      format.turbo_stream do
+        render turbo_stream: notify_stream(t("money.actions.gone"), severity: :warning),
+               status: :not_found
+      end
       format.any { head :not_found }
     end
   end
 
-  # Best-effort recipient for a chase/cancellation: the source email's contact, else
-  # a workspace contact whose name matches the counterpart. Blank is fine — the Dock
-  # is editable, and Money never sends on its own.
   def chase_recipient(obligation)
     contact = obligation.source_email_message&.contact
-    contact ||= Current.workspace.contacts.where("lower(name) = ?", obligation.counterpart.to_s.downcase).first
+    contact ||= Current.workspace.contacts
+                       .where("lower(name) = ?", obligation.counterpart.to_s.downcase).first
     contact&.email.to_s
   end
 
@@ -243,24 +228,31 @@ class MoneyController < ApplicationController
     )
   end
 
+  def undo_line_toast(txn, message)
+    undo_toast(message,
+               endpoint: reset_line_money_path(txn.id),
+               method: :post)
+  end
+
   def ledger_csv(obligations)
-    headers = %i[counterpart what direction amount currency due status settled_on source]
+    headers = %i[counterpart what direction amount currency date status settled_on statement source]
     CSV.generate do |csv|
       csv << headers.map { |h| t("money.export.headers.#{h}") }
       obligations.each do |o|
         csv << [
-          o.counterpart, o.what, t("money.export.direction.#{o.direction}"),
-          o.amount&.amount&.to_s("F"), o.currency, o.due_on&.iso8601,
-          t("money.export.status.#{o.status}"), o.settled_on&.iso8601, csv_source(o)
+          o.counterpart,
+          o.what,
+          t("money.export.direction.#{o.direction}"),
+          o.amount&.amount&.to_s("F"),
+          o.currency,
+          o.anchor_on&.iso8601,
+          t("money.export.status.#{o.status}"),
+          o.settled_on&.iso8601,
+          o.statement_label,
+          o.document ? "document:#{o.document.id}" : nil
         ]
       end
     end
-  end
-
-  def csv_source(obligation)
-    return obligation.settled_via if obligation.settled_via.present?
-
-    obligation.document ? "document:#{obligation.document.id}" : "reminder:#{obligation.reminder&.id}"
   end
 
   def quarter_label(date = Date.current)
@@ -268,7 +260,7 @@ class MoneyController < ApplicationController
   end
 
   def ready_reconciliation_for_quarter
-    q = (Date.current.month - 1) / 3
+    q     = (Date.current.month - 1) / 3
     range = Date.current.beginning_of_year.advance(months: q * 3).all_quarter
     Current.workspace.reconciliations.where(status: :ready)
            .where("period_start <= ? AND period_end >= ?", range.end, range.begin)

@@ -85,26 +85,28 @@ Rails.application.routes.draw do
   # (bucket), status, page.
   get "paper", to: "paper#index", as: :paper
   # Money — obligations surface: what you're owed, what you owe, and what the bank
-  # settled, on one 30-day timeline. Built on the accounting substrate; gated by
-  # the accounting gate/entitlement. An obligation id is "doc:<uuid>" or
-  # "rem:<uuid>", so :id carries a colon.
-  get "money", to: "money#index", as: :money
+  # Money: bank reconciliation answered to the paper behind it.
+  # Scout's read, Needs-you, the paired statement ledger, and "Not on a statement".
+  # Obligation id format: "doc:<uuid>" (so :id carries a colon).
+  get "money",            to: "money#index",      as: :money
   get "money/statements", to: "money#statements", as: :money_statements
-  get "money/export", to: "money#export", as: :money_export
-
-  # Loan tracking — lives under the Money surface.
-  scope "money" do
-    post   "loans/dismiss",  to: "loans#dismiss",  as: :dismiss_money_loan
-    resources :loans, as: :money_loans,
-              path: "loans",
-              only: %i[create update destroy show]
-  end
+  get "money/export",     to: "money#export",     as: :money_export
+  get "money/statement/:id", to: "money#statement", as: :money_statement
   scope "money/obligations/:id", constraints: { id: %r{[a-z]+:[^/]+} } do
-    post   "remind", to: "money#remind",   as: :money_obligation_remind
     post   "chase",  to: "money#chase",    as: :money_obligation_chase
     post   "settle", to: "money#settle",   as: :money_obligation_settle
     delete "settle", to: "money#unsettle"
-    post   "decide", to: "money#decide",   as: :money_obligation_decide
+  end
+  scope "money/lines/:id" do
+    post "confirm",   to: "money#confirm_line",   as: :confirm_line_money
+    post "set_aside", to: "money#set_aside_line", as: :set_aside_line_money
+    post "reset",     to: "money#reset_line",     as: :reset_line_money
+  end
+  # Tracked loans live under Money: Scout spots one, you confirm the terms, every
+  # instalment is matched to its bank line.
+  scope "money" do
+    post "loans/dismiss", to: "loans#dismiss", as: :dismiss_money_loan
+    resources :loans, as: :money_loans, path: "loans", only: %i[create update destroy show]
   end
 
   # The Time surface: one agenda interleaving calendar events, deadlines Scout found

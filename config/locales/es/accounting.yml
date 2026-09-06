@@ -120,6 +120,8 @@ es:
       exclude:
         excluded: "Marcado como excluido: %{reason}"
         invalid_reason: Motivo de exclusión no válido.
+        excluded_as_loan_no_match_html: "Apartado como cuota de préstamo. %{link} para explicarlas automáticamente."
+        excluded_as_loan_no_match_link: Sigue el préstamo en Dinero
       reset:
         reset: Asociación eliminada
       manual_match:
@@ -181,6 +183,9 @@ es:
         requested:
           one: solicitado
           other: solicitados
+        explained:
+          one: explicada por el préstamo
+          other: explicadas por el préstamo
         nif_exceptions_title: Transacciones con problemas de NIF
         nif_exceptions:
           one: problema de NIF
@@ -288,13 +293,4 @@ es:
           multi_doc:
             one: Una factura
             other: "Un pago liquida %{count} facturas."
-      reconciliations_rail:
-        title: Extractos bancarios
-        view_all: Ver todos
-        untitled: Extracto sin nombre
-        progress: "%{resolved} de %{total}"
-        open: Abrir →
-    money:
-      summary:
-        late_receivable_html: "La factura de %{name} está %{overdue}, así que he redactado un recordatorio."
-        late_payable_html: "%{name} está %{overdue}."
+

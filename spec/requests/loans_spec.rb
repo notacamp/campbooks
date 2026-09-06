@@ -103,6 +103,26 @@ RSpec.describe "Loans", type: :request do
         expect(loan.instalments.where(status: :paid).count).to eq(3)
       end
     end
+
+    it "waves an amount change through without touching the schedule" do
+      with_flags do
+        sign_in(user)
+        expect(Loans::Schedule).not_to receive(:rebuild!)
+        patch money_loan_path(loan), params: { loan: { change_acknowledged_at: Time.current.iso8601 } }, as: :turbo_stream
+        expect(response).to have_http_status(:ok)
+        expect(loan.reload.change_acknowledged_at).to be_present
+        expect(response.body).to include("Noted.")
+      end
+    end
+
+    it "parses European and English amount formats" do
+      with_flags do
+        sign_in(user)
+        patch money_loan_path(loan), params: { loan: { principal: "46.800,00", instalment: "1.234" } }, as: :turbo_stream
+        expect(loan.reload.principal_cents).to eq(4_680_000)
+        expect(loan.instalment_cents).to eq(123_400)
+      end
+    end
   end
 
   describe "DELETE /money/loans/:id (destroy)" do

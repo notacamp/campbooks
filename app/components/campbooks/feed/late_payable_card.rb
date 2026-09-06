@@ -2,20 +2,16 @@
 
 module Campbooks
   module Feed
-    # A past-due expense invoice on Now: money you owe that has not been paid.
-    # "Mark paid" settles it; "Open in Money" takes you to the full Money surface
-    # where you can view the document and manage payment. Attention styling.
+    # An expense invoice not on a reconciled statement. Shows once Money::Evidence
+    # has confirmed that a ready statement covers its date and shows no payment.
+    # "Mark paid" settles it; "Open in Money" takes you to the full Money surface.
     class LatePayableCard < Campbooks::Feed::Base
       def view_template
         div(class: "-mx-3 flex items-start gap-3 rounded-2xl px-3 py-3 transition-colors duration-150 hover:bg-muted/50") do
           icon_circle
           div(class: "min-w-0 flex-1") do
             attention_kicker(margin: "mb-1.5")
-            div(class: "flex flex-wrap items-center gap-x-1.5 text-[12.5px]") do
-              span(class: "font-medium text-foreground") { t(".owed") }
-              span(class: "text-muted-foreground/50") { "·" }
-              span(class: "font-medium text-warning") { t(".days_late", count: days_late) }
-            end
+            div(class: "mt-0.5 text-[12.5px] text-muted-foreground") { eyebrow }
             div(class: "mt-1 text-sm font-semibold leading-snug text-foreground") { headline }
             p(class: "mt-0.5 text-[13px] tabular-nums text-muted-foreground") { amount } if amount
             div(class: "mt-2.5 flex items-center justify-end gap-2") do
@@ -33,6 +29,11 @@ module Campbooks
         t(".headline", name: subject.entity_display_name, reference: reference)
       end
 
+      def eyebrow
+        label = item.data["statement_label"].presence
+        label ? t(".not_on_statement", label: label) : t(".not_on_a_statement")
+      end
+
       def reference
         subject.invoice_number.present? ? t(".invoice_ref", number: subject.invoice_number) : t(".an_invoice")
       end
@@ -42,12 +43,6 @@ module Campbooks
         return nil if cents.blank?
 
         ::Money.new(cents, subject.currency).format
-      end
-
-      def days_late
-        item.data["days_late"] || [ (Date.current - subject.due_date.to_date).to_i, 0 ].max
-      rescue StandardError
-        0
       end
 
       def open_money_button

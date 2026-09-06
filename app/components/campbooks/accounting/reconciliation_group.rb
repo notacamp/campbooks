@@ -228,9 +228,9 @@ module Campbooks
                   t(".explained_chip",
                     number: ins.number,
                     total:  ins.loan.term_months)
-                else
+        else
                   t(".explained_label")
-                end
+        end
 
         anchor_target = ins ? helpers.money_path(anchor: "money_loan") : "#"
 

@@ -282,5 +282,4 @@ RSpec.describe Reconciliations::Groups, type: :service do
       expect(explained_group.loan_instalment).to eq(inst)
     end
   end
-
 end

@@ -120,6 +120,8 @@ fr:
       exclude:
         excluded: "Marqué comme exclu : %{reason}"
         invalid_reason: Motif d'exclusion invalide.
+        excluded_as_loan_no_match_html: "Mis de côté comme échéance de prêt. %{link} pour les expliquer automatiquement."
+        excluded_as_loan_no_match_link: Suivez le prêt dans Finances
       reset:
         reset: Association supprimée
       manual_match:
@@ -181,6 +183,9 @@ fr:
         requested:
           one: demandé
           other: demandés
+        explained:
+          one: expliquée par le prêt
+          other: expliquées par le prêt
         nif_exceptions_title: Transactions avec problèmes de NIF
         nif_exceptions:
           one: problème de NIF
@@ -288,13 +293,4 @@ fr:
           multi_doc:
             one: Une facture
             other: "Un virement solde %{count} factures."
-      reconciliations_rail:
-        title: Relevés bancaires
-        view_all: Voir tout
-        untitled: Relevé sans nom
-        progress: "%{resolved} sur %{total}"
-        open: Ouvrir →
-    money:
-      summary:
-        late_receivable_html: "La facture de %{name} est %{overdue}, j'ai donc rédigé un rappel."
-        late_payable_html: "%{name} est %{overdue}."
+

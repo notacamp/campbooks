@@ -1,38 +1,26 @@
 <div id="money_content" class="mt-4">
-  <% if @ledger.any? %>
-    <%= render Campbooks::Money::Summary.new(summary: @summary, class: "mt-1 max-w-[900px]") %>
-    <%= render Campbooks::Money::Timeline.new(ledger: @ledger, summary: @summary, today: @today, class: "mt-6") %>
-    <%= render Campbooks::Money::Ledger.new(ledger: @ledger, class: "mt-6") %>
-  <% else %>
-    <div class="mt-10 rounded-2xl border border-border bg-card px-6 py-12 text-center">
-      <p class="text-[15px] font-semibold text-foreground"><%= t("money.index.empty_title") %></p>
-      <p class="mx-auto mt-1.5 max-w-md text-sm text-muted-foreground"><%= t("money.index.empty_body") %></p>
-      <%= link_to t("money.statements.title"), money_statements_path,
-            class: "mt-4 inline-block text-sm font-medium text-foreground underline underline-offset-4" %>
-    </div>
+  <%= render Campbooks::Money::Read.new(read: page.read, class: "mt-1 max-w-[900px]") %>
+  <%= render Campbooks::Money::Strip.new(read: page.read, class: "mt-5") %>
+  <% if page.needs_you.any? %>
+    <%= render Campbooks::Money::NeedsYou.new(
+      items: page.needs_you,
+      overflow: page.needs_you_overflow,
+      statement: page.newest_statement,
+      id: "money_needs",
+      class: "mt-8"
+    ) %>
   <% end %>
-
-  <%# loan slot — renders tracked loans and the suggestion row %>
-  <%# TODO(money-evidence): move into Money::Page / Money::Read when feat/money-evidence merges %>
-  <% if defined?(@loans) && @loans&.any? %>
-    <% @loans.each do |loan| %>
-      <%= render Campbooks::Money::LoanCard.new(loan: loan) %>
-      <%# Standalone LoanStat (before PR A's Strip merges) %>
-    <% end %>
+  <% page.loans.each do |loan| %>
+    <%= render Campbooks::Money::LoanCard.new(loan: loan, class: "mt-9") %>
   <% end %>
-
-  <% if defined?(@loan_suggestions) && @loan_suggestions&.any? %>
-    <div class="mt-6 space-y-1">
-      <% @loan_suggestions.each do |suggestion| %>
-        <%= render Campbooks::Money::LoanSuggestionRow.new(suggestion: suggestion) %>
-      <% end %>
-    </div>
+  <%= render Campbooks::Money::Statements.new(page: page, class: "mt-8") %>
+  <% if page.selected_statement %>
+    <%= render "money/statement_frame", page: page %>
   <% end %>
-
-  <%# ── Bank statements section ─────────────────────────────────────────────
-      Lists recent reconciliations so Money is the entry point for bank
-      statement work (the standalone /accounting nav will be retired later). %>
-  <% if @recent_reconciliations&.any? %>
-    <%= render Campbooks::Accounting::ReconciliationsRail.new(reconciliations: @recent_reconciliations) %>
-  <% end %>
+  <%= render Campbooks::Money::Unbanked.new(
+    obligations: page.missing,
+    evidence: page.evidence,
+    id: "money_unbanked",
+    class: "mt-8"
+  ) %>
 </div>

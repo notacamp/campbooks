@@ -237,7 +237,7 @@ module People
       when "reply_reminder", "reply_owed", "follow_up"
         fi.data["age_days"].to_i
       when "late_payable", "late_receivable"
-        fi.data["days_late"].to_i
+        (fi.data["days_since"] || fi.data["days_late"]).to_i
       when "email_action"
         msg = subject.is_a?(EmailMessage) ? subject : nil
         msg&.received_at ? [ ((@now - msg.received_at) / 1.day).floor, 0 ].max : 0

@@ -108,26 +108,31 @@ RSpec.describe Loans::Matcher, type: :service do
     end
   end
 
-  describe "rate reset" do
-    it "updates instalment_cents when paid amount differs by >= 0.5%" do
-      loan = make_loan(lender: "BCP", source_counterparty: "BCP",
+  describe "rate reset (derived by Loans::Status from the paid sequence)" do
+    it "adopts the latest paid amount as the current instalment and for the instalments to come" do
+      loan = make_loan(lender: "BCP", source_counterparty: "BCP", term_months: 3,
                        instalment_cents: 78_000, first_instalment_on: Date.new(2024, 1, 5))
-      txn = make_txn(description: "PREST 1/60", counterparty: "BCP",
-                     amount_cents: -79_000, booked_on: Date.new(2024, 1, 5)) # 1.28% > 0.5%
+      make_txn(description: "PREST 1/60", counterparty: "BCP",
+               amount_cents: -79_000, booked_on: Date.new(2024, 1, 5)) # 1.28% > 0.5%
 
       described_class.new(reconciliation).call
       expect(loan.reload.instalment_cents).to eq(79_000)
+      expect(loan.instalments.where(status: :expected).pluck(:amount_cents).uniq).to eq([ 79_000 ])
     end
 
-    it "sets previous_amount_cents on the paid instalment" do
-      loan = make_loan(lender: "BCP", source_counterparty: "BCP",
+    it "records the previous amount on the instalment where the step happened, whatever order the statements came in" do
+      loan = make_loan(lender: "BCP", source_counterparty: "BCP", term_months: 3,
                        instalment_cents: 78_000, first_instalment_on: Date.new(2024, 1, 5))
-      txn = make_txn(description: "PREST 1/60", counterparty: "BCP",
-                     amount_cents: -79_000, booked_on: Date.new(2024, 1, 5))
+      make_txn(description: "PREST 2/60", counterparty: "BCP",
+               amount_cents: -79_000, booked_on: Date.new(2024, 2, 5))
+      described_class.new(reconciliation).call # February reconciled first
+      make_txn(description: "PREST 1/60", counterparty: "BCP",
+               amount_cents: -78_000, booked_on: Date.new(2024, 1, 5))
+      described_class.new(reconciliation).call # then January
 
-      described_class.new(reconciliation).call
-      inst = loan.instalments.find_by!(number: 1)
-      expect(inst.previous_amount_cents).to eq(78_000)
+      expect(loan.instalments.find_by!(number: 1).previous_amount_cents).to be_nil
+      expect(loan.instalments.find_by!(number: 2).previous_amount_cents).to eq(78_000)
+      expect(loan.reload.instalment_cents).to eq(79_000)
     end
   end
 

@@ -63,6 +63,29 @@ RSpec.describe Loans::Spotter, type: :service do
     end
   end
 
+  describe "what is not a loan" do
+    it "ignores small monthly bank fees, even from a bank" do
+      make_monthly_txns(recon, count: 4, description: "COMISSAO MANUTENCAO CONTA",
+                               counterparty: "MILLENNIUM BCP", amount_cents: -350)
+      expect(described_class.new(workspace).call).to be_empty
+    end
+
+    it "ignores lines set aside for a specific reason" do
+      txns = make_monthly_txns(recon, count: 4, description: "VENCIMENTOS",
+                                      counterparty: "BANCO BPI", amount_cents: -486_000)
+      txns.each { |t| t.update_columns(status: BankTransaction.statuses[:excluded], exclusion_reason: "salary") }
+      expect(described_class.new(workspace).call).to be_empty
+    end
+
+    it "guesses the lender with the bank's casing made readable" do
+      make_monthly_txns(recon, count: 4, description: "PREST EMPRESTIMO",
+                               counterparty: "MILLENNIUM BCP", amount_cents: -78_000)
+      suggestion = described_class.new(workspace).call.first
+      expect(suggestion.lender_guess).to eq("Millennium BCP")
+      expect(suggestion.source_counterparty).to eq("MILLENNIUM BCP")
+    end
+  end
+
   describe "cadence check" do
     it "rejects a group whose gaps are outside 25-35 days" do
       # Every 10 days — not monthly

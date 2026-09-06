@@ -25,9 +25,12 @@ module Campbooks
 
       def initialize(transaction:, reconciliation:, suggested_matches: [],
                      candidate_documents: [], company_nif: nil,
-                     near_miss_candidates: [], skim_documents: [])
+                     near_miss_candidates: [], skim_documents: [], surface: nil)
         @transaction          = transaction
         @reconciliation       = reconciliation
+        # "money": the panel was opened from the Money page; every action carries
+        # surface=money so the controller also refreshes #money_content.
+        @surface              = surface.presence
         @suggested_matches    = Array(suggested_matches)
         @candidate_documents  = Array(candidate_documents)
         @company_nif          = company_nif
@@ -111,14 +114,14 @@ module Campbooks
               t(".use_this_match"),
               confirm_url,
               method: :post,
-              params: { match_id: match.id },
+              params: { match_id: match.id }.merge(surface_params),
               class: button_classes(:primary)
             )
             raw helpers.button_to(
               t(".not_this_one"),
               reject_url,
               method: :post,
-              params: { match_id: match.id },
+              params: { match_id: match.id }.merge(surface_params),
               class: button_classes(:ghost)
             )
           end
@@ -167,7 +170,7 @@ module Campbooks
               t(".attach"),
               manual_url,
               method: :post,
-              params: { document_id: doc.id },
+              params: { document_id: doc.id }.merge(surface_params),
               class:  "shrink-0 text-xs font-semibold text-accent-600 hover:text-accent-700 mt-0.5 cursor-pointer"
             )
           end
@@ -289,7 +292,7 @@ module Campbooks
             t(".attach"),
             manual_url,
             method: :post,
-            params: { document_id: doc.id },
+            params: { document_id: doc.id }.merge(surface_params),
             class:  "shrink-0 mt-0.5 text-xs font-semibold text-accent-600 hover:text-accent-700 cursor-pointer"
           )
         end
@@ -316,6 +319,7 @@ module Campbooks
                  class: "mt-3") do
               input(type: "hidden", name: "authenticity_token",
                     value: helpers.form_authenticity_token)
+              surface_input
               label(class: "inline-flex items-center gap-1.5 #{button_classes(:outline, size: :sm)} cursor-pointer") do
                 plain t(".upload_cta")
                 input(type: "file", name: "file", accept: "application/pdf,image/*",
@@ -345,6 +349,7 @@ module Campbooks
           # browser to treat the subsequent exclude <form> as nested (and drop it).
           form(action: search_url, method: :get, class: "mb-2",
                data: { controller: "list-search", turbo_frame: frame_id }) do
+            surface_input
             div(class: "relative") do
               input(type: "text", name: "q",
                     placeholder: t(".search_placeholder"),
@@ -383,7 +388,7 @@ module Campbooks
             t(".attach"),
             manual_url,
             method: :post,
-            params: { document_id: doc.id },
+            params: { document_id: doc.id }.merge(surface_params),
             class: "shrink-0 text-xs font-medium text-accent-600 hover:text-accent-700"
           )
         end
@@ -412,6 +417,7 @@ module Campbooks
           form(action: exclude_url, method: :post, class: "flex gap-2 items-end") do
             input(type: "hidden", name: "authenticity_token",
                   value: helpers.form_authenticity_token)
+            surface_input
             div(class: "flex-1") do
               select(name: "reason",
                      class: "block w-full rounded-lg border-border bg-card text-sm px-3 py-2") do
@@ -467,6 +473,7 @@ module Campbooks
             form(action: request_url, method: :post, class: "space-y-2") do
               input(type: "hidden", name: "authenticity_token",
                     value: helpers.form_authenticity_token)
+              surface_input
 
               # To field (editable prefill guess)
               div do
@@ -579,6 +586,16 @@ module Campbooks
           end
           h3(class: "text-sm font-semibold text-foreground") { title }
         end
+      end
+
+      # Extra params every panel action carries when opened from Money, so the
+      # controller's response also refreshes #money_content.
+      def surface_params
+        @surface ? { surface: @surface } : {}
+      end
+
+      def surface_input
+        input(type: "hidden", name: "surface", value: @surface) if @surface
       end
 
       # Fix 13c: derive button CSS from Campbooks::Button constants so the resolve

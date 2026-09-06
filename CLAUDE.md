@@ -99,6 +99,18 @@ Every sender is a person or a **service** (machine/bulk mail — newsletters, re
 - **Mission Control**: Solid Queue dashboard at `/jobs`, gated to **admins** via `MissionControlController` (app session auth + admin check, wired through `config.mission_control.jobs.base_controller_class`; the engine's own HTTP basic auth is disabled)
 - **Gmail push (optional)**: `EmailWebhooksController#gmail_receive` (public; verifies `?token=` against `GMAIL_PUBSUB_TOKEN` → debounces bursts via Rails.cache → enqueues `EmailScanJob` delta for the account) + `Emails::WatchRenewalJob` (every 6 hours in production; calls `users.watch` on each active Google account and stores `push_watch_expires_at`). **Inert unless configured**: requires `GMAIL_PUBSUB_TOPIC` + `GMAIL_PUBSUB_TOKEN` + a public callback host (`APP_HOST` or mailer host); dev boxes and self-hosters without these fall back silently to the minute poll. `DISABLE_GMAIL_PUSH=1` force-disables. Mirrors the calendar push pattern (`CalendarWebhooksController` / `Calendars::WebhookRenewalJob`).
 
+## Money
+
+Evidence rule: a document is only "not on a statement" once a `ready` reconciliation covers its `anchor_date` (due_date || document_date) + 7 grace days (`Money::Evidence::GRACE_DAYS`) and shows no confirmed match. Until then Money says nothing: no due dates, no "late", no totals.
+
+Services: `Money::Evidence` (single source of truth, `app/services/money/evidence.rb`), `Money::Ledger` (documents only, evidence-driven status, settled lookback 45 days), `Money::Read` (pure data object for Scout note and strip), `Money::Page` (one builder for the whole surface -- both `MoneyController` and `Reconciliations::BankTransactionsController` read from it when `surface=money`).
+
+`Reconciliations::LineActions` (`app/services/reconciliations/line_actions.rb`): extracted mutations (`confirm!`, `reject!`, `exclude!`, `reset!`, `manual_match!`) called by both controllers with byte-identical behaviour.
+
+`surface=money` contract: when `params[:surface] == "money"`, `BankTransactionsController#render_workbench_streams` appends `turbo_stream.replace("money_content", partial: "money/content", locals: { page: Money::Page.for(...) })` so the Money surface refreshes after workbench actions.
+
+**The loan** (`Loan` → `LoanInstalment`, one row per month of the term; `app/services/loans/`): a standing explanation with a schedule. `Loans::Matcher` runs as a pre-pass in `Reconciliations::MatchJob` (keyword or lender-token evidence, amount within 3%, ±12-day window then catch-up) and sets the line to `BankTransaction` status `explained: 5` (append-only; part of `RESOLVED_STATUSES`). `Loans::Status.refresh!` then derives everything from the statements: rate resets from the chronological sequence of paid amounts (`previous_amount_cents`, the loan's current `instalment_cents`, the amounts still to come) and `unverified` (before the first statement) / `missed` (a reconciled statement reaches expected_on + 12 days with no line) / `expected`. `Loans::Backfill` claims past instalments when a loan is created; `Loans::Spotter` proposes an untracked loan from monthly bank-ish debits with no invoice (never bank fees: minimum €50, dismissable via `workspace.settings["dismissed_loan_suggestions"]`). `LoansController` under `/money/loans`; components `LoanCard`, `LoanSuggestionRow`, `LoanAlertRow`, `LoanForm`, `LoanStat` (checkbox-peer disclosures, no JS); the reconciliation surface renders `:explained` groups as "Loan · instalment N of T", and the hunt panel's "Loan instalment" reason links a line by hand.
+
 ## Calendar
 
 Two-way calendar sync that rides on the **same OAuth grant as the mailbox** — connecting a Google/Zoho email account requests calendar scopes too and auto-provisions its calendar. There is no separate calendar connect flow.
@@ -187,22 +199,3 @@ Deployment, secrets, and ops are private — see **"🔒 PUBLIC REPO — KEEP IT
 at the top of this file and the private `campbooks-cloud` repo. Self-hosting
 instructions are in [`docs/self-hosting.md`](docs/self-hosting.md).
 
-## Money
-
-The Money surface (`/money`, `MoneyController`) shows obligations, reconciliations, and the bank loan. It is gated by the accounting flag + entitlement.
-
-**Loan tracking** (`app/models/loan.rb`, `app/models/loan_instalment.rb`):
-- `Loan` belongs to a workspace and has many `LoanInstalment` records (one per month of the term). Enum `{active:0, closed:1}`. Key helpers: `paid_instalments`, `paid_count`, `paid_cents`, `remaining_cents`, `next_expected`, `last_seen`, `ends_on`, `progress_pct`, `effective_counterparty`.
-- `LoanInstalment` links to a `BankTransaction` (optional). Enum `{expected:0, paid:1, missed:2, unverified:3}`. When destroyed or unlinked, resets the bank transaction back to `unmatched`.
-- `BankTransaction` gains `explained: 5` status (append-only, never reorder). `RESOLVED_STATUSES = %i[matched excluded requested explained]`. `has_one :loan_instalment`. `#explained_by_loan?`.
-
-**Services** (`app/services/loans/`):
-- `Loans::Schedule.build!(loan)` / `rebuild!(loan)` -- creates or regenerates the monthly instalment schedule using `Date#>>` for month arithmetic; `rebuild!` preserves paid/unverified rows.
-- `Loans::Matcher.new(reconciliation).call` -- pre-pass that runs BEFORE `Reconciliations::Matcher` in `MatchJob`. Matches statement debits to expected instalments (keyword + lender-token matching, within 3% amount, +/-12 day window then catch-up). Sets matched lines to `explained`; detects rate resets.
-- `Loans::Backfill.call(loan)` -- runs Matcher over the 36 most recent ready reconciliations so a newly created loan immediately claims its past instalments.
-- `Loans::Status.refresh!(loan)` -- marks instalments `unverified` (before first statement), `missed` (statement covered but no match), or `expected` based on workspace reconciliation coverage.
-- `Loans::Spotter.new(workspace).call` -- spots potential loan candidates from recent reconciliation debits (monthly cadence 25-35 days, keyword/BANKISH patterns, amount grouping); returns up to 2 `Suggestion` structs. Dismissed suggestions stored in `workspace.settings["dismissed_loan_suggestions"]`.
-
-**Components** (`app/components/campbooks/money/`): `LoanCard`, `LoanSuggestionRow`, `LoanForm`, `LoanAlertRow`, `LoanStat` -- all in `test/components/previews/`.
-
-**Reconciliation surface**: `:explained` group kind in `Reconciliations::Groups`; `ReconciliationGroup` renders an ink-filled circle with a bank glyph and a chip linking to Money; `SummaryBar` shows "N explained by the loan"; workbench row/card partials render the explained chip with an Undo/Reset button.
