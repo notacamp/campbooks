@@ -151,6 +151,9 @@ fr:
         on_time: "dans les délais"
         statement: "relevé"
         statement_not_in: "relevé pas encore disponible"
+        awaiting_others:
+          one: "1 antérieure attend son relevé"
+          other: "%{count} antérieures attendent leur relevé"
         of: "sur"
         since_was: "depuis %{since}, était %{was}"
         from_statements: "Des relevés"

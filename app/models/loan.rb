@@ -55,14 +55,15 @@ class Loan < ApplicationRecord
     instalments.where(status: :missed).order(:expected_on)
   end
 
-  def next_expected
-    instalments.where(status: :expected).order(:expected_on).first
+  # The next instalment still to come (today or later).
+  def next_expected(today = Date.current)
+    instalments.where(status: :expected).where("expected_on >= ?", today).order(:expected_on).first
   end
 
-  # The next expected instalment already due by `date` (its statement isn't in yet).
-  def expected_due_by(date)
-    ins = next_expected
-    ins if ins && ins.expected_on <= date
+  # Instalments whose date has passed with no statement covering them yet: they
+  # are neither proven paid nor missed. Newest last.
+  def awaiting_statement(today = Date.current)
+    instalments.where(status: :expected).where("expected_on < ?", today).order(:expected_on)
   end
 
   # The latest instalment found on a statement.

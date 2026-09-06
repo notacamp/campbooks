@@ -97,8 +97,8 @@ class MoneyLoanComponentsPreview < ViewComponent::Preview
     def remaining_count       = remaining_instalments.size
     def remaining_cents       = remaining_count * instalment_cents
     def missed_instalments    = instalments.select(&:missed?).sort_by(&:expected_on)
-    def next_expected         = instalments.select(&:expected?).min_by(&:expected_on)
-    def expected_due_by(date) = (ins = next_expected) && ins.expected_on <= date ? ins : nil
+    def next_expected(today = Date.current) = instalments.select { |i| i.expected? && i.expected_on >= today }.min_by(&:expected_on)
+    def awaiting_statement(today = Date.current) = instalments.select { |i| i.expected? && i.expected_on < today }.sort_by(&:expected_on)
     def last_seen             = instalments.select { |i| i.paid? && i.bank_transaction }.max_by(&:expected_on)
     def recent_paid(limit = 3) = instalments.select { |i| i.paid? && i.bank_transaction }.sort_by(&:expected_on).reverse.first(limit)
     def ends_on               = instalments.map(&:expected_on).max

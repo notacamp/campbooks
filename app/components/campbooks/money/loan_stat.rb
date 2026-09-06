@@ -2,10 +2,9 @@
 
 module Campbooks
   module Money
-    # Compact strip statistic for a single tracked loan.
-    # Shows "Loan · N of T paid · €X to go · next D Mon".
+    # The loan's stat in the Money strip: "Loan · 18 of 60 paid · €32,760 to go · next 5 Oct".
+    # Reads only Loan's public helpers so the Lookbook preview can pass a stub.
     #
-    # Used as a standalone before PR A's Strip/Read are merged.
     # @param loan [Loan]
     class LoanStat < Campbooks::Base
       def initialize(loan:)
@@ -13,17 +12,16 @@ module Campbooks
       end
 
       def view_template
-        div(class: "flex flex-col gap-0.5") do
-          span(class: "text-[11px] font-bold tracking-widest uppercase text-muted-foreground") { plain t(".label") }
-          span(class: "text-[15px] font-semibold tabular-nums") do
+        a(href: "#money_loan", class: "group flex flex-col no-underline transition-opacity hover:opacity-80") do
+          div(class: "text-[11px] font-semibold uppercase tracking-widest text-muted-foreground") { t(".label") }
+          div(class: "mt-1.5 text-[16px] font-semibold tabular-nums text-foreground") do
             plain t(".paid_of", paid: @loan.paid_count, total: @loan.term_months)
           end
-          span(class: "text-[12px] text-muted-foreground mt-0.5") do
+          div(class: "mt-0.5 text-[12px] text-muted-foreground") do
+            nxt   = @loan.next_expected
             parts = []
-            parts << t(".to_go", amount: format_cents(@loan.remaining_cents, @loan.currency)) if @loan.remaining_cents > 0
-            if (nxt = @loan.next_expected)
-              parts << t(".next", date: I18n.l(nxt.expected_on, format: :day_month_short))
-            end
+            parts << t(".to_go", amount: amount(@loan.remaining_cents)) if @loan.remaining_cents.positive?
+            parts << t(".next", date: l(nxt.expected_on, format: :day_month_short)) if nxt
             plain parts.join(" · ")
           end
         end
@@ -31,10 +29,8 @@ module Campbooks
 
       private
 
-      def format_cents(cents, currency)
-        symbol = { "EUR" => "€", "USD" => "$", "GBP" => "£" }.fetch(currency.to_s.upcase, currency)
-        whole = cents % 100 == 0
-        whole ? "#{symbol}#{cents / 100}" : "#{symbol}#{sprintf("%.2f", cents / 100.0)}"
+      def amount(cents)
+        ::Money.new(cents, @loan.currency.presence || "EUR").format(no_cents_if_whole: true)
       end
     end
   end

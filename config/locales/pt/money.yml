@@ -151,6 +151,9 @@ pt:
         on_time: "dentro do prazo"
         statement: "extrato"
         statement_not_in: "extrato ainda não disponível"
+        awaiting_others:
+          one: "1 anterior aguarda extrato"
+          other: "%{count} anteriores aguardam extrato"
         of: "de"
         since_was: "desde %{since}, era %{was}"
         from_statements: "Dos extratos"

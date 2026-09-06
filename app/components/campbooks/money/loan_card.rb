@@ -65,40 +65,44 @@ module Campbooks
 
       def tick_strip
         instalments = @loan.instalments.to_a.sort_by(&:number)
-        next_up     = @loan.next_expected
         columns     = [ @loan.term_months, TICK_COLUMNS ].min
 
         div(role: "img", aria_label: tick_aria_label(instalments), class: "mt-3.5 grid max-w-lg gap-0.5",
             style: "grid-template-columns: repeat(#{columns}, minmax(0, 1fr))") do
           instalments.each do |ins|
-            span(class: tick_class(ins, next_up), title: t(".instalment_n", n: ins.number, total: @loan.term_months))
+            span(class: tick_class(ins), title: t(".instalment_n", n: ins.number, total: @loan.term_months))
           end
         end
       end
 
-      def tick_class(ins, next_up)
+      # paid = ink (a warning ring where the amount stepped); before your statements
+      # = softer ink; awaiting a statement = a dashed outline; missed = warning; to
+      # come = subtle.
+      def tick_class(ins)
         base = "h-2.5 rounded-sm"
         case ins.status.to_s
         when "paid"       then ins.previous_amount_cents.present? ? "#{base} bg-foreground ring-2 ring-inset ring-warning" : "#{base} bg-foreground"
         when "unverified" then "#{base} bg-foreground/60"
         when "missed"     then "#{base} bg-warning"
-        else next_up && ins.number == next_up.number ? "#{base} border-[1.5px] border-foreground" : "#{base} bg-subtle"
+        else ins.expected_on < Date.current ? "#{base} border-[1.5px] border-dashed border-foreground/50" : "#{base} bg-subtle"
         end
       end
 
       def tick_aria_label(instalments)
-        paid   = instalments.count { |i| i.paid? || i.unverified? }
-        missed = instalments.count(&:missed?)
-        t(".tick_aria", total: @loan.term_months, paid: paid, expected: [ instalments.count(&:expected?), 1 ].min,
-                        remaining: @loan.term_months - paid - missed)
+        paid     = instalments.count { |i| i.paid? || i.unverified? }
+        missed   = instalments.count(&:missed?)
+        awaiting = instalments.count { |i| i.expected? && i.expected_on < Date.current }
+        t(".tick_aria", total: @loan.term_months, paid: paid, expected: awaiting,
+                        remaining: @loan.term_months - paid - missed - awaiting)
       end
 
       def tick_legend
+        instalments = @loan.instalments.to_a
         div(class: "mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground") do
           legend_item("bg-foreground", t(".legend_paid"))
-          legend_item("border-[1.5px] border-foreground", t(".legend_expected"))
+          legend_item("border-[1.5px] border-dashed border-foreground/50", t(".legend_expected")) if instalments.any? { |i| i.expected? && i.expected_on < Date.current }
           legend_item("bg-subtle", t(".legend_to_come"))
-          legend_item("bg-warning", t(".legend_missed")) if @loan.instalments.to_a.any?(&:missed?)
+          legend_item("bg-warning", t(".legend_missed")) if instalments.any?(&:missed?)
         end
       end
 
@@ -153,14 +157,20 @@ module Campbooks
         end
       end
 
+      # The latest instalment whose date has passed with no statement to prove it,
+      # and how many earlier ones are in the same position.
       def expected_row
-        ins = @loan.expected_due_by(Date.current)
+        awaiting = @loan.awaiting_statement.to_a
+        ins = awaiting.last
         return unless ins
 
         kv_row(t(".kv_expected")) do
           plain "#{l(ins.expected_on, format: :day_month_short)} · #{amount(ins.amount_cents)}"
           whitespace
-          span(class: "text-[12px] font-normal text-muted-foreground") { t(".statement_not_in") }
+          span(class: "text-[12px] font-normal text-muted-foreground") do
+            plain t(".statement_not_in")
+            plain " · #{t('.awaiting_others', count: awaiting.size - 1)}" if awaiting.size > 1
+          end
         end
       end
 
@@ -200,15 +210,15 @@ module Campbooks
 
       # ── From the statements ──────────────────────────────────────────────────
       def statement_log
-        recent = @loan.recent_paid(3).to_a
-        nxt    = @loan.next_expected
-        return if recent.empty? && nxt.nil?
+        recent   = @loan.recent_paid(3).to_a
+        awaiting = @loan.awaiting_statement.to_a.last
+        return if recent.empty? && awaiting.nil?
 
         div(class: "mt-4 border-t border-border/50 pt-4") do
           span(class: "mb-2 block text-[11px] font-bold uppercase tracking-widest text-muted-foreground") { t(".from_statements") }
-          log_row(nxt.expected_on, amount(nxt.amount_cents), pending: true) do
-            plain t(".expected_statement_not_in", month: l(nxt.expected_on, format: :month_name))
-          end if nxt
+          log_row(awaiting.expected_on, amount(awaiting.amount_cents), pending: true) do
+            plain t(".expected_statement_not_in", month: l(awaiting.expected_on, format: :month_name))
+          end if awaiting
           recent.each do |ins|
             txn = ins.bank_transaction
             log_row(ins.expected_on, "−#{amount(ins.amount_cents)}") do

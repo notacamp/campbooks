@@ -151,6 +151,9 @@ es:
         on_time: "a tiempo"
         statement: "extracto"
         statement_not_in: "extracto aún no disponible"
+        awaiting_others:
+          one: "1 anterior espera su extracto"
+          other: "%{count} anteriores esperan su extracto"
         of: "de"
         since_was: "desde %{since}, era %{was}"
         from_statements: "De los extractos"

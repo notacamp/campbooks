@@ -80,10 +80,17 @@ RSpec.describe Loan, type: :model do
   end
 
   describe "#next_expected" do
-    it "returns the earliest expected instalment" do
-      loan = build_loan(term_months: 3)
+    it "returns the earliest expected instalment still to come" do
+      loan = build_loan(term_months: 3, first_instalment_on: Date.current + 10)
       Loans::Schedule.build!(loan)
       expect(loan.next_expected.number).to eq(1)
+    end
+
+    it "skips past-dated instalments no statement has covered yet (they await their statement)" do
+      loan = build_loan(term_months: 3, first_instalment_on: Date.current - 40)
+      Loans::Schedule.build!(loan)
+      expect(loan.next_expected.number).to eq(3)
+      expect(loan.awaiting_statement.map(&:number)).to eq([ 1, 2 ])
     end
   end
 

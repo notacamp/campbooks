@@ -151,6 +151,9 @@ en:
         on_time: "on time"
         statement: "statement"
         statement_not_in: "statement not in yet"
+        awaiting_others:
+          one: "1 earlier one awaits its statement"
+          other: "%{count} earlier ones await their statements"
         of: "of"
         since_was: "since %{since}, was %{was}"
         from_statements: "From the statements"
