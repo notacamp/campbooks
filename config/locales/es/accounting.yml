@@ -33,6 +33,7 @@ es:
       no_ai_for_pdf: "El análisis de PDF requiere un proveedor de IA configurado para el análisis de documentos. Configure uno en Ajustes → Proveedores de IA."
       pdf_unparseable: "No se pudieron extraer transacciones de este PDF. El archivo puede estar escaneado, cifrado o en un formato no compatible."
       pdf_ai_error: "Error en el análisis de IA: %{message}"
+      provider_busy: "Scout no pudo contactar con el proveedor de IA tras varios intentos (estaba limitando nuestras peticiones). El extracto está bien. Inténtalo de nuevo en unos minutos."
       unsupported_format: "Formato de archivo no compatible. Por favor, suba un extracto bancario en CSV o PDF."
       integrity_mismatch: "Error en la verificación de saldo: se esperaba saldo de cierre %{expected} pero el extracto muestra %{actual}."
     bank_statement_parser:
@@ -63,6 +64,7 @@ es:
       upload_and_start: Subir e iniciar conciliación
     create:
       created: Extracto importado — analizando transacciones…
+      already_in_progress: "Ese extracto ya se está conciliando. Aquí está."
       document_not_found: Documento no encontrado.
       file_upload_failed: Error al subir el archivo. Por favor, inténtelo de nuevo.
       no_source: Por favor, seleccione o suba un extracto bancario.
@@ -157,6 +159,10 @@ es:
       nif_mismatch: "no coincide"
       cross_reconciliation_note: También asociado en otro extracto
       file_missing: "[archivo no disponible en Campbooks]"
+    retry_parse:
+      queued: "Leyendo el extracto de nuevo."
+      not_failed: "Ese extracto no necesita otro intento."
+    try_again: "Intentar de nuevo"
     destroy:
       destroyed: Conciliación eliminada.
     nif_banner:

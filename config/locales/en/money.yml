@@ -142,6 +142,9 @@ en:
           other: "Reconcile them"
         add_statement_title: "%{month}'s statement isn't in yet"
         add_statement_meta: "the month to reconcile"
+        statement_failed_title: "%{label} couldn't be read"
+        statement_failed_untitled: "A bank statement"
+        try_again: "Try again"
         add_statement: "Add a statement"
       statements:
         title: "Statements"

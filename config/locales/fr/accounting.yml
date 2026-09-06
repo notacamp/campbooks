@@ -33,6 +33,7 @@ fr:
       no_ai_for_pdf: "L'analyse des PDF nécessite un fournisseur IA configuré pour l'analyse de documents. Configurez-en un dans Paramètres → Fournisseurs IA."
       pdf_unparseable: "Impossible d'extraire les transactions de ce PDF. Le fichier est peut-être numérisé, chiffré ou dans un format non pris en charge."
       pdf_ai_error: "Échec de l'analyse IA : %{message}"
+      provider_busy: "Scout n'a pas pu joindre le fournisseur d'IA après plusieurs tentatives (il limitait nos requêtes). Le relevé est en bon état. Réessayez dans quelques minutes."
       unsupported_format: "Format de fichier non pris en charge. Veuillez télécharger un relevé bancaire au format CSV ou PDF."
       integrity_mismatch: "Échec de la vérification du solde : solde de clôture attendu %{expected} mais le relevé affiche %{actual}."
     bank_statement_parser:
@@ -63,6 +64,7 @@ fr:
       upload_and_start: Télécharger et démarrer le rapprochement
     create:
       created: Relevé importé — analyse des transactions en cours…
+      already_in_progress: "Ce relevé est déjà en cours de réconciliation. Le voici."
       document_not_found: Document introuvable.
       file_upload_failed: Échec du téléchargement du fichier. Veuillez réessayer.
       no_source: Veuillez sélectionner ou télécharger un relevé bancaire.
@@ -157,6 +159,10 @@ fr:
       nif_mismatch: "non concordant"
       cross_reconciliation_note: Également associé dans un autre relevé
       file_missing: "[fichier absent dans Campbooks]"
+    retry_parse:
+      queued: "Nouvelle lecture du relevé en cours."
+      not_failed: "Ce relevé n'a pas besoin d'une nouvelle tentative."
+    try_again: "Réessayer"
     destroy:
       destroyed: Rapprochement supprimé.
     nif_banner:

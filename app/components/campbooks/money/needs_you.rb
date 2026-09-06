@@ -55,6 +55,8 @@ module Campbooks
           reconcile_statements_row(item.payload)
         when :add_statement
           add_statement_row(item.payload)
+        when :statement_failed
+          statement_failed_row(item.payload[:reconciliation])
         else
           div(**wrapper_attrs(item)) do
             work_row(title: item.title, meta: item.meta) { actions(item) }
@@ -76,6 +78,22 @@ module Campbooks
                                          data: { turbo_frame: "_top" }) { t(".pick_which") }
             post_form(helpers.reconcile_statements_money_path) do
               render(Campbooks::Button.new(variant: :primary, size: :sm, type: "submit")) { t(".reconcile_them", count: count) }
+            end
+          end
+        end
+      end
+
+      # A statement that couldn't be read: open it, or read it again.
+      def statement_failed_row(recon)
+        label = recon.period_label.presence || recon.statement_document&.display_title.presence || t(".statement_failed_untitled")
+        meta  = [ recon.parse_error.to_s.truncate(110).presence, l(recon.created_at.to_date, format: :date) ].compact
+
+        div(class: WRAPPER_CLASSES) do
+          work_row(title: t(".statement_failed_title", label: label), meta: meta) do
+            render Campbooks::Button.new(variant: :outline, size: :sm, href: helpers.reconciliation_path(recon),
+                                         data: { turbo_frame: "_top" }) { t(".open_statement") }
+            post_form(helpers.retry_parse_reconciliation_path(recon), hidden: { surface: "money" }) do
+              render(Campbooks::Button.new(variant: :primary, size: :sm, type: "submit")) { t(".try_again") }
             end
           end
         end

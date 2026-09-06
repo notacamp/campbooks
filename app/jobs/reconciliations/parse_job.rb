@@ -6,10 +6,24 @@ module Reconciliations
   #
   # Error handling:
   # - Reconciliations::ParseError → status :failed + parse_error, no re-raise
+  # - AI provider hiccups (rate limit, 5xx, timeout) → the statement stays
+  #   :parsing and the job retries with a long backoff; only when the retries
+  #   run out is it marked :failed, with a message that blames the provider
   # - Other StandardError          → status :failed then re-raise so retry_on fires
+  #
+  # Parses run one at a time: a backlog of statements ("Reconcile them") must
+  # never burst the AI provider into rate-limiting us.
   class ParseJob < ApplicationJob
     queue_as :default
+    limits_concurrency to: 1, key: "reconciliations_parse", duration: 20.minutes
+
+    TRANSIENT_ATTEMPTS = 8 # polynomial backoff: ~3s, 18s, 83s, 4m, 10m, 22m, 40m
+
     retry_on StandardError, wait: :polynomially_longer, attempts: 3
+    # Declared last so it is matched first (rescue_from handlers run newest-first).
+    retry_on(*Ai::Adapters::Base::TRANSIENT_ERRORS, wait: :polynomially_longer, attempts: TRANSIENT_ATTEMPTS) do |job, error|
+      job.provider_gave_up!(error)
+    end
 
     # Registry of content-type → parser class.
     #
@@ -82,6 +96,14 @@ module Reconciliations
       # Do not re-raise — ParseError is a user-fixable data problem, not an
       # infrastructure error.  retry_on would only hammer the same bad file.
 
+    rescue *Ai::Adapters::Base::TRANSIENT_ERRORS => e
+      # The statement is fine; the provider isn't. Leave it :parsing and let
+      # retry_on bring the job back with backoff (provider_gave_up! runs when
+      # the attempts are spent).
+      Rails.logger.warn("[Reconciliations::ParseJob] AI provider unavailable for #{reconciliation_id} " \
+                        "(attempt #{executions}): #{e.class}: #{e.message.first(200)}")
+      raise
+
     rescue StandardError => e
       @reconciliation&.update_columns(
         status:      Reconciliation.statuses[:failed],
@@ -91,6 +113,26 @@ module Reconciliations
       broadcast_update!
       raise # let retry_on fire
 
+    ensure
+      Current.workspace = nil
+    end
+
+    # The retries are spent: now it is a failure the user should hear about,
+    # worded as what it is (the provider was busy), with "Try again" behind it.
+    def provider_gave_up!(error)
+      @reconciliation = Reconciliation.find_by(id: arguments.first)
+      return unless @reconciliation
+
+      Current.workspace = @reconciliation.workspace
+      Rails.logger.error("[Reconciliations::ParseJob] giving up on #{@reconciliation.id} after #{executions} attempts: " \
+                         "#{error.class}: #{error.message.first(200)}")
+      @reconciliation.update_columns(
+        status:      Reconciliation.statuses[:failed],
+        parse_error: I18n.t("reconciliations.parse_job.provider_busy"),
+        updated_at:  Time.current
+      )
+      broadcast_update!
+      Notifier.reconciliation_parse_failed(@reconciliation)
     ensure
       Current.workspace = nil
     end

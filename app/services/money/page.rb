@@ -122,7 +122,16 @@ class Money
     end
 
     def all_needs_you
-      @all_needs_you ||= month_needs_you + statement_needs_you + loan_needs_you
+      @all_needs_you ||= failed_statement_needs_you + month_needs_you + statement_needs_you + loan_needs_you
+    end
+
+    # Statements that couldn't be read (the AI provider was busy, or the file
+    # is bad): one row each with "Try again", so recovery is a click, not
+    # delete-and-add-again.
+    def failed_statement_needs_you
+      @workspace.reconciliations.where(status: :failed).includes(:statement_document).order(created_at: :desc).map do |recon|
+        NeedsYouItem.new(kind: :statement_failed, payload: { reconciliation: recon })
+      end
     end
 
     # The month to reconcile, before the lines: statements Scout already holds
