@@ -30,6 +30,10 @@ module Campbooks
       ICON_STAR_FILLED = '<path fill="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>'
       ICON_MORE    = '<path stroke-linecap="round" stroke-linejoin="round" d="M5 12h.01M12 12h.01M19 12h.01"/>'
 
+      # One More-menu item: label on the left, the shortcut keycap (when the People
+      # shortcuts controller binds one) on the right.
+      MENU_ITEM = "flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-[13px] text-foreground hover:bg-secondary"
+
       ACTION_BTN = "inline-flex h-[28px] w-[28px] items-center justify-center rounded-lg text-muted-foreground " \
                    "hover:bg-secondary hover:text-foreground transition-colors"
 
@@ -340,29 +344,42 @@ module Campbooks
                    data: { turbo_stream: true }) do
                 input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
                 button(type: "submit",
-                       class: "w-full px-4 py-2 text-left text-[13px] hover:bg-secondary",
+                       class: MENU_ITEM,
+                       aria: { keyshortcuts: "e" },
                        data: { people_archive: true }) do
-                  plain(t(".actions.archive"))
+                  span { plain(t(".actions.archive")) }
+                  menu_key("E")
                 end
               end
             end
             if (contact_id = data["contact_id"])
               # Details — navigate to this person's page with ?details=1 so the sheet opens.
               a(href: helpers.person_page_path(@counterpart.id, details: 1), data: { turbo_frame: "_top" },
-                class: "block px-4 py-2 text-[13px] no-underline hover:bg-secondary") do
-                plain(t(".actions.details"))
+                aria: { keyshortcuts: "i" },
+                class: class_names(MENU_ITEM, "no-underline")) do
+                span { plain(t(".actions.details")) }
+                menu_key("I")
               end
               # Block sender (POST set_state, like the conversation kebab)
               form(action: helpers.set_state_contact_path(contact_id, state: :block),
                    method: "post", class: "block w-full", data: { turbo: false }) do
                 input(type: "hidden", name: "authenticity_token", value: helpers.form_authenticity_token)
-                button(type: "submit", class: "w-full px-4 py-2 text-left text-[13px] hover:bg-secondary") do
-                  plain(t(".actions.block"))
+                button(type: "submit", class: MENU_ITEM) do
+                  span { plain(t(".actions.block")) }
                 end
               end
             end
           end
         end
+      end
+
+      # The keycap on a More-menu item, mirroring the feed cards' key chips: the
+      # letter people_shortcuts_controller listens for, so the menu teaches its own
+      # shortcuts. Decorative for screen readers (aria-keyshortcuts carries it).
+      def menu_key(symbol)
+        kbd(aria: { hidden: "true" },
+            class: "inline-flex h-4 min-w-4 flex-shrink-0 items-center justify-center rounded px-1 " \
+                   "font-mono text-[10px] font-semibold leading-none bg-foreground/10 text-muted-foreground") { symbol }
       end
 
       def action_icon(inner_path)

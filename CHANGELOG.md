@@ -19,6 +19,7 @@ major, minor, or patch change here.
 ### Fixed
 
 - People: the "…" menu on a list row painted underneath the rows below it, so the open menu looked transparent and the rows beneath it kept taking hovers and clicks. The row now rises above its siblings while its menu is open.
+- People: the "…" menu items on a list row now show their keyboard shortcuts next to the label (`E` archive the thread, `I` show or hide details), in the same keycap style as the row hints.
 
 ## [0.38.0] - 2026-09-06
 

@@ -120,6 +120,23 @@ RSpec.describe Campbooks::People::CounterpartRow, type: :component do
     expect(row["class"]).to include("focus-within:z-20")
   end
 
+  it "shows the shortcut keycaps on the More menu items that have one" do
+    person = create(:person, name: "Sofia Martins")
+    counterpart = People::Counterpart.new(kind: :person, record: person, name: "Sofia Martins",
+                                          subtitle: "Brightloop", avatar_email: "sofia@brightloop.example",
+                                          avatar_initial: nil, last_activity: Time.current,
+                                          standing: standing(needs_you: true, verb: :reply, subject: "Q3 deck"),
+                                          data: { "can_reply" => true, "contact_id" => SecureRandom.uuid, "email_message_id" => nil })
+    html = render(described_class.new(counterpart: counterpart))
+
+    menu = Nokogiri::HTML.fragment(html).at_css("details")
+    keys = menu.css("kbd").map(&:text)
+    expect(keys).to include("I")
+    details_link = menu.at_css("a[aria-keyshortcuts='i']")
+    expect(details_link).to be_present
+    expect(menu.to_html).to include("Block sender")
+  end
+
   it "the More menu carries data-controller=dropdown-close" do
     person = create(:person, name: "Sofia Martins")
     counterpart = People::Counterpart.new(kind: :person, record: person, name: "Sofia Martins",
