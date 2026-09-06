@@ -47,7 +47,7 @@ RSpec.describe Reminders::EmailExtractionJob do
     expect(Ai::ReminderExtractor).to receive(:new).with(
       hash_including(
         known_commitments: [ "- [task] Do something — due 2026-07-30" ],
-        tasks_active: (Features.tasks? && email.email_account.workspace.entitlements.feature?(:tasks))
+        tasks_active: Features.tasks?
       )
     ).and_return(double(extract: []))
 

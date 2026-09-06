@@ -5,7 +5,7 @@ require "rails_helper"
 RSpec.describe "Asks", type: :request do
   around { |ex| travel_to(Time.utc(2026, 9, 7, 8, 0, 0)) { ex.run } } # Monday
 
-  let(:workspace) { create(:workspace, entitlement_overrides: { "tasks" => { "allowed" => true } }) }
+  let(:workspace) { create(:workspace) } # default (free) plan — asks need no entitlement
   let(:user) { create(:user, workspace: workspace) }
   let(:turbo) { { "Accept" => "text/vnd.turbo-stream.html" } }
 
@@ -15,7 +15,7 @@ RSpec.describe "Asks", type: :request do
     workspace.tasks.create!({ title: "Countersign Acme", status: :todo, priority: :normal }.merge(attrs))
   end
 
-  context "signed in, tasks enabled and entitled" do
+  context "signed in, tasks enabled" do
     before { sign_in(user) }
 
     it "hold holds Scout's slot and re-renders the agenda" do
@@ -101,15 +101,16 @@ RSpec.describe "Asks", type: :request do
     expect(task.reload).not_to be_done
   end
 
-  it "blocks a mutating action when the workspace is not entitled to tasks" do
-    ws = create(:workspace) # default plan: tasks not allowed
-    gated_user = create(:user, workspace: ws)
-    task = ws.tasks.create!(title: "Gated", status: :todo, priority: :normal)
-    sign_in(gated_user)
+  it "allows a mutating action on any plan — asks are no longer entitlement-gated" do
+    ws = create(:workspace) # default (free) plan; no tasks entitlement any more
+    plan_user = create(:user, workspace: ws)
+    task = ws.tasks.create!(title: "Core", status: :todo, priority: :normal)
+    sign_in(plan_user)
 
     patch done_ask_path(task), headers: turbo
 
-    expect(task.reload).not_to be_done
+    expect(response).to have_http_status(:ok)
+    expect(task.reload).to be_done
   end
 
   describe "return=people response" do

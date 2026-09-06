@@ -79,10 +79,6 @@ plans:
       type: flag
       allowed: false        # scheduled sending + calendar visibility — paid feature
       enabled: true
-    tasks:
-      type: flag
-      allowed: false        # task management — paid feature
-      enabled: true
     digests:
       type: flag
       allowed: false        # scheduled digests — paid feature
@@ -156,10 +152,6 @@ plans:
       allowed: true
       enabled: true
     email_scheduling:
-      type: flag
-      allowed: true
-      enabled: true
-    tasks:
       type: flag
       allowed: true
       enabled: true
@@ -238,10 +230,6 @@ plans:
       type: flag
       allowed: true
       enabled: true
-    tasks:
-      type: flag
-      allowed: true
-      enabled: true
     digests:
       type: flag
       allowed: true
@@ -314,10 +302,6 @@ plans:
       allowed: true
       enabled: true
     email_scheduling:
-      type: flag
-      allowed: true
-      enabled: true
-    tasks:
       type: flag
       allowed: true
       enabled: true

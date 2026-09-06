@@ -45,8 +45,11 @@ module Campbooks
       end
 
       # The most recent live ask sourced from any message in this email's thread.
+      # Gated by the readiness flag: with ENABLE_TASKS=0 the ask chips never ride the
+      # email card (asks are hidden everywhere the flag is off).
       def live_ask
         return @live_ask if defined?(@live_ask)
+        return @live_ask = nil unless Features.tasks?
 
         ids = @email.email_thread_id ? EmailMessage.where(email_thread_id: @email.email_thread_id).pluck(:id) : [ @email.id ]
         @live_ask = ::Task.for_user(@user).live

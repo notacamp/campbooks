@@ -42,7 +42,7 @@ module Reminders
         workspace:          workspace,
         learning_memory:    memory,
         known_commitments:  known,
-        tasks_active:       Features.tasks? && workspace.entitlements.feature?(:tasks)
+        tasks_active:       Features.tasks?
       ).extract
 
       reminders = Reminders::Builder.call(

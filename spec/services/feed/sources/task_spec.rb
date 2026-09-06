@@ -164,4 +164,24 @@ RSpec.describe Feed::Sources::Task do
       expect(notice_subjects).to include(assignee.notifications.last)
     end
   end
+
+  # Asks are gated by the readiness flag on the Now feed too (PR4): ENABLE_TASKS=0
+  # produces no ask cards, and already-materialized ones are filtered out on read.
+  describe "the readiness flag" do
+    it "produces no candidates when Features.tasks? is off" do
+      make_task(status: :suggested, ai_suggested: true, confidence: 0.9)
+      make_task(status: :todo, due_at: nil)
+
+      allow(Features).to receive(:tasks?).and_return(false)
+      expect(source.candidates).to be_empty
+    end
+
+    it "still_valid? is false when Features.tasks? is off" do
+      task = make_task(status: :todo, due_at: nil)
+      item = FeedItem.new(kind: "task", dedupe_key: "task:#{task.id}", data: { "framing" => "undated" })
+
+      allow(Features).to receive(:tasks?).and_return(false)
+      expect(source.still_valid?(item, task)).to be(false)
+    end
+  end
 end

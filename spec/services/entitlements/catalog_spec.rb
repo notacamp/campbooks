@@ -11,6 +11,10 @@ RSpec.describe Entitlements::Catalog do
     expect(catalog.feature_keys).to include(:email_accounts, :workflows, :managed_ai, :scout, :ai_model_access)
   end
 
+  it "no longer carries the tasks entitlement — asks are core, not a paid feature" do
+    expect(catalog.feature_keys).not_to include(:tasks)
+  end
+
   it "builds a non-empty spec set for each plan" do
     catalog.plan_names.each do |name|
       expect(catalog.plan(name)).not_to be_empty, "plan #{name} is empty"

@@ -21,11 +21,19 @@ module Feed
 
       def self.key = "task"
 
+      # Asks are gated by the readiness flag everywhere they surface (Time::Agenda,
+      # Time::FocusProposer, People::Attention); the Now feed is no exception. With
+      # ENABLE_TASKS=0 no ask card is produced, and any already-materialized one is
+      # filtered out on read (still_valid? below) — so turning asks off hides them
+      # immediately, not only after the next regeneration.
       def candidates
+        return [] unless Features.tasks?
+
         suggestion_candidates + active_candidates
       end
 
       def still_valid?(item, task)
+        return false unless Features.tasks?
         return false if task.nil? || task.archived? || task.snoozed?
 
         if suggestion_item?(item)

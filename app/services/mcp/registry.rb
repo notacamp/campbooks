@@ -124,8 +124,7 @@ module Mcp
           }
         end
 
-        if scope_granted?("tasks:read") && Features.tasks? &&
-            Current.workspace.entitlements.feature?(:tasks)
+        if scope_granted?("tasks:read") && Features.tasks?
           tasks = Task.accessible_to(Current.user)
           result[:tasks] = {
             active_count: tasks.active.count,
@@ -201,7 +200,7 @@ module Mcp
         feat_keys = %i[workflows tasks email_board microsoft email_templates document_templates]
         features_hash = feat_keys.each_with_object({}) { |k, h| h[k] = Features.public_send(:"#{k}?") }
 
-        ent_keys = %i[email_accounts tasks email_scheduling email_templates workflows]
+        ent_keys = %i[email_accounts email_scheduling email_templates workflows]
         entitlements_hash = ent_keys.each_with_object({}) do |k, h|
           h[k.to_s] = resolver.allow?(k).to_s
         end
@@ -1393,7 +1392,6 @@ module Mcp
           limit: limit_property
         })
       ) do |args|
-        ensure_entitled!(:tasks)
         scope = Task.accessible_to(Current.user).includes(:assignees, :tags)
         scope = args["include_archived"] ? scope : scope.not_archived
         scope = scope.where(status: args["status"]) if args["status"].present? && Task.statuses.key?(args["status"])
@@ -1410,7 +1408,6 @@ module Mcp
         enabled: -> { Features.tasks? },
         input_schema: id_schema("The task id")
       ) do |args|
-        ensure_entitled!(:tasks)
         require_arg(args, "id")
         task = Task.accessible_to(Current.user).find(args["id"])
         { task: Api::V1::TaskSerializer.new(task, detail: true).as_json }
@@ -1435,7 +1432,6 @@ module Mcp
           required: %w[title]
         )
       ) do |args|
-        ensure_entitled!(:tasks)
         require_arg(args, "title")
         status = Task.statuses.key?(args["status"].to_s) ? args["status"] : "todo"
         task = Current.workspace.tasks.new(
@@ -1468,7 +1464,6 @@ module Mcp
           required: %w[id]
         )
       ) do |args|
-        ensure_entitled!(:tasks)
         require_arg(args, "id")
         task = Task.accessible_to(Current.user).find(args["id"])
         permitted = args.slice("title", "description", "due_at", "all_day", "priority")
@@ -1492,7 +1487,6 @@ module Mcp
         enabled: -> { Features.tasks? },
         input_schema: id_schema("The task id")
       ) do |args|
-        ensure_entitled!(:tasks)
         require_arg(args, "id")
         task = Task.accessible_to(Current.user).find(args["id"])
         task.move_to_status!(:done, by: Current.user)
@@ -1514,7 +1508,6 @@ module Mcp
           required: %w[email_id]
         )
       ) do |args|
-        ensure_entitled!(:tasks)
         require_arg(args, "email_id")
         msg = EmailMessage.accessible_to(Current.user).find(args["email_id"])
         result = EmailActions.run("create_task_from_email", email_message: msg,
