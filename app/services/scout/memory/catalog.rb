@@ -24,6 +24,7 @@ module Scout
         Sources::Replies,
         Sources::Prompts,
         Sources::Workflows,
+        Sources::Attention,
         Sources::Defaults
       ].freeze
 

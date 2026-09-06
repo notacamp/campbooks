@@ -6,6 +6,7 @@ en:
       stack: Stack
       replies: Replies
       streams: Streams
+      people: People
       style: Style
       automations: Automations
     origins:
@@ -14,6 +15,7 @@ en:
       learned_skim: Learned from how you skim
       learned_style: Learned from your sent mail
       learned_labels: Learned from your labels
+      learned_attention: "Learned from what you do"
       learned_corrections:
         one: Learned from %{count} correction
         other: Learned from %{count} corrections
@@ -73,6 +75,11 @@ en:
         default: "For %{purpose}, Scout uses the built-in guidance."
       defaults:
         review: Every document I read waits for your review before it's filed for good.
+      attention:
+        taught_important: "**%{name}** matters to you."
+        taught_unimportant: "**%{name}** doesn't need your attention."
+        learned: "**%{name}** matters to you: %{reason}."
+        learned_low: "I keep **%{name}** out of the way: %{reason}."
       workflows:
         sentence: "When %{trigger}, %{actions}."
         and: and

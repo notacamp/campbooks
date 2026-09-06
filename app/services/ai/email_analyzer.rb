@@ -76,7 +76,8 @@ module Ai
     end
 
     def system_prompt
-      contact_context = Contacts::ContactContextBuilder.new(@email.from_address).context_for_prompt
+      owner_user = Current.user || @email.email_account.email_account_users.find_by(owner: true)&.user
+      contact_context = Contacts::ContactContextBuilder.new(@email.from_address, user: owner_user).context_for_prompt
       org_context = Current.workspace&.workspace_context
 
       <<~PROMPT

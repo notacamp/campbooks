@@ -18,6 +18,7 @@ major, minor, or patch change here.
 
 ### Changed
 
+- Scout's read of a new email now knows how much the sender matters to you, so its priority and suggested action follow your habits, not just the email's wording.
 - **Settings open as an overlay** over the page you are on (⌘, or the account menu); Esc puts you back exactly where you were, and deep links to `/settings/...` still work. Every settings page now sits under one of six groups (You, Scout, Inbox, Paper, Connections, Workspace) with a find box, so Members, Security, Notifications, Data & privacy, System health, templates, AI guidance and every inbox panel are one click away again.
 - People: the Scout line on each row and the "where things stand" note now say what is actually open with that person — what they asked (Scout's read, or their own words quoted from the message), what you are still waiting for, or the overdue amount — instead of the contact's profile bio or a sentence that repeated the row. Both are composed in your language at render time. Latest rows that need you carry their verb (Reply, Nudge, Decide, Pay, Chase).
 - Now and People rank on the same learned attention weight (who you answer and how fast, who you meet, whose bills you settle, whose mail you archive unread or dismiss) instead of fixed star and label boosts; dismissing a card now lowers that sender, not the whole kind. Workspaces with no history yet rank exactly as before.
@@ -25,6 +26,7 @@ major, minor, or patch change here.
 
 ### Added
 
+- You can now tell Scout who matters: **More important** / **Less important** on a person's details rail, a People facet in Scout's memory that lists who Scout has learned matters (confirm or correct each), and plain sentences like "Sofia is important" or "newsletters from X don't matter" in Teach Scout.
 - **A first-class account menu.** The avatar now opens a small identity panel: who you are, your workspace, Settings, an Appearance control (light, dark, or match the system), keyboard shortcuts, and sign out. It opens beside the rail on desktop and as a bottom sheet on phones.
 - Scout now learns how much each person and organization matters to you — from who you answer and how fast, who you meet, whose bills you settle, and whose mail you archive unread or dismiss — as a per-user attention weight refreshed in the background (the base every place will rank on; nothing changes on screen yet).
 - Now cards and People rows now say why they rank first — "You usually answer Sofia within 3 hours", "You met twice recently" — and the People details rail explains every person's place, including the reasons that lower it.

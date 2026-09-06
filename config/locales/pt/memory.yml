@@ -6,6 +6,7 @@ pt:
       stack: Pilha
       replies: Respostas
       streams: Fluxos
+      people: Pessoas
       style: Estilo
       automations: Automações
     origins:
@@ -14,6 +15,7 @@ pt:
       learned_skim: Aprendido com a tua triagem
       learned_style: Aprendido do teu correio enviado
       learned_labels: Aprendido com as tuas etiquetas
+      learned_attention: "Aprendido com o que fazes"
       learned_corrections:
         one: Aprendido com %{count} correção
         other: Aprendido com %{count} correções
@@ -73,6 +75,11 @@ pt:
         default: "Para %{purpose}, o Scout usa a orientação predefinida."
       defaults:
         review: Todos os documentos que leio aguardam a tua revisão antes de serem arquivados definitivamente.
+      attention:
+        taught_important: "**%{name}** é importante para ti."
+        taught_unimportant: "**%{name}** não precisa da tua atenção."
+        learned: "**%{name}** é importante para ti: %{reason}."
+        learned_low: "Mantenho **%{name}** fora do caminho: %{reason}."
       workflows:
         sentence: "Quando %{trigger}, %{actions}."
         and: e

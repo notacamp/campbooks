@@ -52,4 +52,14 @@ RSpec.describe Attention::Reason do
         .to raise_error(I18n::MissingTranslationData)
     end
   end
+
+  describe "#clause" do
+    it "drops the leading capital so the reason reads mid-sentence" do
+      expect(described_class.new(key: "replies_fast", params: { hours: 3 }).clause).to eq("you usually answer within 3 hours")
+    end
+
+    it "keeps Scout's own name capitalized" do
+      expect(described_class.new(key: "vip").clause).to start_with("Scout reads them")
+    end
+  end
 end
