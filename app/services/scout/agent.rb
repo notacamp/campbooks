@@ -100,7 +100,7 @@ module Scout
       else
         emit(:tool, call.name)
         body = ToolRegistry.run(call.name, call.arguments)
-        @steps << { "tool" => call.name, "args" => call.arguments, "result" => summarize(body) }
+        @steps << { "tool" => call.name, "args" => call.arguments, "result" => summarize(body, tool) }
       end
       { tool_call_id: call.id, content: body.to_json }
     end
@@ -172,10 +172,23 @@ module Scout
     end
 
     # Keep tool results small when persisted as a step (the full payload already
-    # went to the model); store counts/keys, not whole record dumps.
-    def summarize(body)
+    # went to the model); store counts/keys, not whole record dumps. A cards-tool
+    # (query_asks) keeps its `cards` array (capped) so the chat can render the ask
+    # rows — every other array still collapses to "N items".
+    def summarize(body, tool = nil)
       return body unless body.is_a?(Hash)
-      body.transform_values { |v| v.is_a?(Array) ? "#{v.size} items" : v }
+
+      keep_cards = tool&.cards?
+      body.each_with_object({}) do |(key, value), out|
+        out[key] =
+          if keep_cards && key.to_s == "cards" && value.is_a?(Array)
+            value.first(10)
+          elsif value.is_a?(Array)
+            "#{value.size} items"
+          else
+            value
+          end
+      end
     end
 
     def emit(type, label)
