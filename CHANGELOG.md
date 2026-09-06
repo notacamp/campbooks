@@ -37,6 +37,7 @@ major, minor, or patch change here.
 - Scout holds focus time for accepted dated **asks** the same way it already does for deadlines, and an ask's held slot shows on its Time row ("held Thu 10:00").
 - People: the note's actions match the situation — Draft reply / Done / Snooze, Draft follow-up / Let it go, Ask Scout (opens Scout with the suggestion), Open in Money / Mark paid.
 - Scout's full read of an email (summary, priority, suggested action and the new "ask") now runs for inbound mail from people — it was defined but never scheduled — so the Reply and Decide lanes fill in and the Now feed's email cards appear again.
+- **The People Do lane.** When you accepted an ask from someone, they move into a new Do lane in People (between Decide and Pay: Reply, Decide, **Do**, Pay, Chase, Nudge). The row note says what you owe and when, the right cell shows the due date (red if overdue), and the "where things stand" note on their page carries Done, Hold time, a jump to Time, and Ask Scout. Done and Hold from that note update the note in place — the Time agenda frame is not needed there.
 
 ### Removed
 
