@@ -85,6 +85,22 @@ class AgentChatReplyJob < ApplicationJob
     end
   rescue ActiveRecord::RecordNotFound
     Rails.logger.warn("[AgentChatReplyJob] Message #{agent_message_id} not found, skipping")
+  rescue Ai::Budget::Exceeded => e
+    Rails.logger.warn("[AgentChatReplyJob] #{e.message}")
+    if thread && message
+      locale = thread.user.locale.presence || I18n.default_locale
+      I18n.with_locale(locale) do
+        ai_message = thread.agent_messages.create!(
+          content: I18n.t("jobs.agent_chat_reply.budget_exceeded"),
+          author_type: :ai,
+          ai_suggested_actions: [],
+          reply_status: :replied,
+          user: thread.user
+        )
+        broadcast_reply(thread, ai_message)
+        message.replied!
+      end
+    end
   rescue => e
     Rails.logger.error("[AgentChatReplyJob] Error (attempt #{executions}): #{e.message}")
     # Let retry_on handle earlier attempts; on the final one, tell the user

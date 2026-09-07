@@ -82,6 +82,21 @@ class EmailChatReplyJob < ApplicationJob
     )
   rescue ActiveRecord::RecordNotFound
     Rails.logger.warn("[EmailChatReplyJob] Message #{agent_message_id} not found, skipping")
+  rescue Ai::Budget::Exceeded => e
+    Rails.logger.warn("[EmailChatReplyJob] #{e.message}")
+    if agent_thread && message
+      locale = agent_thread.user.locale.presence || I18n.default_locale
+      I18n.with_locale(locale) do
+        reply = agent_thread.agent_messages.create!(
+          content: I18n.t("jobs.email_chat_reply.budget_exceeded"),
+          author_type: :ai,
+          ai_suggested_actions: [],
+          user: agent_thread.user
+        )
+        message.update_column(:reply_status, :replied)
+        broadcast_reply(reply, [])
+      end
+    end
   rescue => e
     Rails.logger.error("[EmailChatReplyJob] Error: #{e.message}")
     AgentMessage.where(id: agent_message_id).update_all(reply_status: :pending)

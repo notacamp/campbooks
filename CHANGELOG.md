@@ -22,6 +22,7 @@ major, minor, or patch change here.
 - Interactive Scout and compose chat jobs (`AgentChatReplyJob`, `ComposeChatReplyJob`, `EmailChatReplyJob`, `AiSetupChatReplyJob`) now use `limits_concurrency to: 3, key: "interactive_chat"` so a burst of chat requests cannot open unbounded parallel provider connections.
 - Bulk "Process with AI" fan-out is capped at 200 messages per request (`Tools::BulkProcessAi::MAX_BULK_AI`). The UI reports how many were processed and how many were skipped when the cap is hit.
 - Scout replies with a friendly "I'm handling a lot of requests" message instead of calling the provider when a workspace exceeds 20 Scout messages per minute.
+- Per-workspace daily managed-AI call budget guard (`Ai::Budget` + `Ai::BudgetMiddleware`): a cache-backed counter caps the number of AI calls a single managed-cloud workspace can make per day (`AI_DAILY_CALL_CEILING`, default 10 000), with an optional tighter probation cap for brand-new workspaces (`AI_PROBATION_DAILY_CAP`, off by default). Self-hosted installs and BYO-key workspaces are never affected. Background jobs are discarded (not retried) when the cap is hit; Scout and compose chat post a friendly "You've reached today's AI limit" message instead.
 
 ### Fixed
 

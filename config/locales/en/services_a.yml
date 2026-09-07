@@ -73,7 +73,12 @@ en:
         one: Uploaded 1 attachment to Google Drive
         other: Uploaded %{count} attachments to Google Drive
   jobs:
+    agent_chat_reply:
+      budget_exceeded: You've reached today's AI limit for this workspace. Scout
+        will be back tomorrow — feel free to pick up where you left off then.
     ai_setup_chat_reply:
+      budget_exceeded: You've reached today's AI limit for this workspace. Try again
+        tomorrow.
       error_generic: Scout couldn't generate suggestions just now. Please try again.
       error_no_ai_config: Scout needs a text AI provider before it can help here.
         Set one up, then try again.
@@ -83,10 +88,14 @@ en:
       proposal_intro: Here's what I'd suggest for your %{kind}. Pick the ones you
         want and apply them — you can tweak any of them first.
     compose_chat_reply:
+      budget_exceeded: You've reached today's AI limit for this workspace. Try again
+        tomorrow.
       error: I'm sorry, I ran into an issue processing your request. Could you try
         again?
     email_chat_reply:
       auto_action_failures_prefix: 'However, I couldn''t complete these actions:'
+      budget_exceeded: You've reached today's AI limit for this workspace. Try again
+        tomorrow.
       conversation_archived: This conversation has been archived.
     email_process:
       auto_replied_notice: I see you replied to this thread yourself. I've marked

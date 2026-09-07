@@ -74,7 +74,12 @@ es:
         one: 1 archivo adjunto subido a Google Drive
         other: "%{count} archivos adjuntos subidos a Google Drive"
   jobs:
+    agent_chat_reply:
+      budget_exceeded: Ha alcanzado el límite diario de IA para este espacio de trabajo.
+        Scout estará disponible mañana — puede retomar la conversación entonces.
     ai_setup_chat_reply:
+      budget_exceeded: Ha alcanzado el límite diario de IA para este espacio de trabajo.
+        Inténtelo de nuevo mañana.
       error_generic: Scout no ha podido generar sugerencias en este momento. Inténtelo
         de nuevo.
       error_no_ai_config: Scout necesita un proveedor de IA de texto antes de poder
@@ -85,10 +90,14 @@ es:
       proposal_intro: Esto es lo que sugeriría para su %{kind}. Elija las que quiera
         y aplíquelas — puede ajustar cualquiera de ellas primero.
     compose_chat_reply:
+      budget_exceeded: Ha alcanzado el límite diario de IA para este espacio de trabajo.
+        Inténtelo de nuevo mañana.
       error: Lo siento, he tenido un problema al procesar su solicitud. ¿Podría intentarlo
         de nuevo?
     email_chat_reply:
       auto_action_failures_prefix: 'Sin embargo, no he podido completar estas acciones:'
+      budget_exceeded: Ha alcanzado el límite diario de IA para este espacio de trabajo.
+        Inténtelo de nuevo mañana.
       conversation_archived: Esta conversación ha sido archivada.
     email_process:
       auto_replied_notice: Veo que ha respondido usted mismo a esta conversación.

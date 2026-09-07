@@ -64,6 +64,11 @@ class AiSetupChatReplyJob < ApplicationJob
     end
   rescue ActiveRecord::RecordNotFound
     Rails.logger.warn("[AiSetupChatReplyJob] message #{agent_message_id} not found, skipping")
+  rescue Ai::Budget::Exceeded => e
+    Rails.logger.warn("[AiSetupChatReplyJob] #{e.message}")
+    I18n.with_locale(thread&.user&.locale.presence || I18n.default_locale) do
+      broadcast_error(thread, I18n.t("jobs.ai_setup_chat_reply.budget_exceeded"))
+    end if thread
   rescue => e
     Rails.logger.error("[AiSetupChatReplyJob] error (attempt #{executions}): #{e.message}")
     raise if executions < 2

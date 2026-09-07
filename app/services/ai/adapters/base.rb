@@ -88,6 +88,10 @@ module Ai
           # CircuitBreakerMiddleware is outermost so it can fail-fast background
           # callers before SystemHealth logging or any network I/O occurs.
           f.use Ai::CircuitBreakerMiddleware, provider: provider_name
+          # BudgetMiddleware sits after the circuit breaker — the breaker's fast-path
+          # runs first (no network I/O), then the budget check enforces the daily cap
+          # for managed-AI workspaces (self-hosted and BYO workspaces skip it).
+          f.use Ai::BudgetMiddleware
           f.use SystemHealth::FaradayMiddleware, service: system_health_service
           f.request :json
           f.response :raise_error
