@@ -23,6 +23,11 @@ major, minor, or patch change here.
 - Bulk "Process with AI" fan-out is capped at 200 messages per request (`Tools::BulkProcessAi::MAX_BULK_AI`). The UI reports how many were processed and how many were skipped when the cap is hit.
 - Scout replies with a friendly "I'm handling a lot of requests" message instead of calling the provider when a workspace exceeds 20 Scout messages per minute.
 
+### Fixed
+
+- `Ai::CircuitBreaker::BackgroundBlocked` now inherits from `Exception` instead of `StandardError`, so it propagates past the pervasive service-level `rescue => e … nil` clauses in the background AI services (`Ai::ContactAnalyzer`, `Ai::EmailClassifier`, `Ai::ReminderExtractor`, `EmbeddingService`, etc.) and reaches the job's retry handler — previously these services would silently swallow the blocked call and return `nil`, causing downstream logic to misinterpret a transient breaker-open as a real analysis failure.
+- `ApplicationJob` now declares `retry_on Ai::CircuitBreaker::BackgroundBlocked` with polynomial backoff (6 attempts, spanning well past the breaker's 120-second window), so every background AI job re-queues cleanly instead of dying on a transient 429 storm.
+
 ## [0.40.1] - 2026-09-06
 
 ### Fixed

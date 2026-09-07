@@ -53,7 +53,18 @@ module Ai
     # Raised by check! when the breaker is open and the caller is background.
     # Handled by the job layer: jobs declare retry_on this error with backoff
     # so they re-queue without hammering the provider.
-    class BackgroundBlocked < StandardError
+    #
+    # IMPORTANT: inherits from Exception, NOT StandardError.
+    # Background AI services (Ai::ContactAnalyzer, Ai::EmailClassifier,
+    # Ai::ReminderExtractor, EmbeddingService, etc.) wrap their adapter call in
+    # `rescue => e … nil`, which only catches StandardError descendants. Inheriting
+    # from Exception makes BackgroundBlocked propagate PAST those service-level
+    # rescue clauses, all the way up to the job's retry_on handler in ApplicationJob,
+    # which re-queues the job cleanly instead of silently swallowing the blocked call.
+    # Explicit `rescue Ai::CircuitBreaker::BackgroundBlocked` in
+    # CircuitBreakerMiddleware (and anywhere else) still catches it — explicit-class
+    # rescue works for any Exception subclass, not just StandardError.
+    class BackgroundBlocked < Exception  # rubocop:disable Lint/InheritException
       def initialize(provider)
         super("AI circuit breaker OPEN for #{provider} — background call blocked; job will re-queue with backoff")
       end
