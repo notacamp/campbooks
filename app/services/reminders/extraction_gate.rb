@@ -3,11 +3,13 @@ module Reminders
   # call. The point is cost: most mail has no dated commitment, so we skip those
   # without spending a model call.
   #
-  # Deliberately does NOT skip on List-Unsubscribe — delivery/shipping/appointment
-  # notices (exactly the transactional mail we want) usually carry it. Only clear
-  # junk is dropped outright; everything else must mention a date or a reminder
-  # keyword. The LLM + confidence floor reject the marketing that slips through.
-  # Tunable — lean permissive (the product goal is "everything with a date").
+  # Machine / automated senders (no-reply@, Auto-Submitted header) and explicit
+  # bulk-traffic headers (List-Unsubscribe per RFC 2369; Precedence: bulk/list/junk
+  # per RFC 2076) are skipped outright — they cannot carry a person-to-person
+  # dated commitment. Everything that passes the sender/header check must also
+  # mention a date or a reminder keyword; the LLM + confidence floor catch the
+  # residual noise. Tunable — lean permissive (the product goal is "everything
+  # with a date").
   class ExtractionGate
     KEYWORDS = /\b(?:due|payable|payment|invoice|bill|deliver(?:y|ed|ies)?|arriv(?:e|es|al|ing)|
                   ship(?:s|ped|ment|ping)?|tracking|dispatch(?:ed)?|renew(?:s|al|als|ing)?|
@@ -28,7 +30,7 @@ module Reminders
     end
 
     def email_allows?(email)
-      return false if junk?(email)
+      return false if machine_or_bulk?(email)
 
       text = [ email.subject, email.try(:ai_summary), strip(email.body) ].compact.join(" ")
       relevant?(text)
@@ -40,9 +42,12 @@ module Reminders
 
     private
 
-    # Only clear junk; "bulk"/"list" still pass so transactional notices get through.
-    def junk?(email)
-      email.try(:header_precedence).to_s.strip.downcase == "junk"
+    # Machine senders (Auto-Submitted, no-reply@ variants), List-Unsubscribe, and
+    # Precedence: bulk/list/junk are all hard-blocked. These signals mean the email
+    # is automated or bulk traffic that cannot carry a personal dated commitment.
+    def machine_or_bulk?(email)
+      Emails::Categorizer.machine_sender?(email) ||
+        Emails::Categorizer.bulk_headers?(email)
     end
 
     def strip(body)

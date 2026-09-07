@@ -183,8 +183,16 @@ class EmailMessage < ApplicationRecord
 
   # Only fields that feed the embedded text trigger a full re-index (re-chunk +
   # re-embed). Filter-only fields are handled by #refresh_search_filter_data.
+  #
+  # Bulk / machine senders (newsletters, bots, mailing lists) are additionally
+  # skipped: their volume churns the vector store without improving recall for
+  # the person-to-person mail users actually search. The gate uses only ingest-
+  # time signals (headers + sender local-part) that are already on the row, so
+  # it fires correctly even before the triage category has been derived.
   def searchable_fields_changed?
-    saved_change_to_subject? || saved_change_to_body? || saved_change_to_ai_summary?
+    return false unless saved_change_to_subject? || saved_change_to_body? || saved_change_to_ai_summary?
+
+    Emails::BulkMailGate.analyze?(self)
   end
 
   # Folder/read/category/attachment don't change the text we embed, so a full

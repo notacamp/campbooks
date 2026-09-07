@@ -16,6 +16,12 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Changed
+
+- Mail that lives in Spam, Junk, or Trash folders is ingested and kept visible but now skips all AI processing (triage, embedding, contact profiling, reminder extraction). The provider has already decided it is unwanted; spending LLM calls on it manufactured ghost tasks and wasted budget.
+- Newsletters, notification bots, and mailing-list traffic (detected via `List-Unsubscribe`, `Precedence: bulk/list/junk`, `Auto-Submitted`, or `no-reply@`-style senders) skip triage embedding and LLM tag-picking; they are still sorted into inbox groups via the rules-based bucket tag. Search embedding is also skipped for these senders so bulk mail does not churn the vector store.
+- `Reminders::ExtractionGate` now blocks machine senders (`Auto-Submitted`, `no-reply@` variants) and bulk-traffic headers (`List-Unsubscribe`, `Precedence: bulk/list/junk`) in addition to the previous junk-only check, so the reminder-extraction LLM is never called on automated mail.
+
 ## [0.40.1] - 2026-09-06
 
 ### Fixed
