@@ -122,4 +122,63 @@ RSpec.describe Scout::Agent do
     expect(persisted["cards"]).to all(include("kind" => "ask"))
     expect(persisted["asks"]).to eq("3 items")
   end
+
+  # ── Per-workspace rate limit ───────────────────────────────────────────────────
+
+  describe "workspace rate limit" do
+    # Use a real in-memory cache so counter writes/reads hold within each example.
+    around do |example|
+      original = Rails.cache
+      Rails.cache = ActiveSupport::Cache::MemoryStore.new
+      example.run
+    ensure
+      Rails.cache = original
+    end
+
+    it "returns a friendly reply without calling the AI when rate limit is exceeded" do
+      stub_const("Scout::Agent::WORKSPACE_RATE_LIMIT", 1)
+      adapter, = fake_adapter([ Ai::ChatResult.new(text: "answer") ])
+      allow(Ai::Configuration).to receive(:for).and_return(config_for(adapter))
+
+      # First message consumes the budget (count reaches 1, limit is 1; not exceeded on first)
+      described_class.new(thread).run("first message")
+
+      # Second message: count becomes 2, 2 > 1 — rate limited
+      result = described_class.new(thread).run("second message")
+
+      expect(result).not_to be_nil
+      expect(result.reply).to include("lot of requests")
+    end
+
+    it "keeps different workspaces' rate limits independent" do
+      stub_const("Scout::Agent::WORKSPACE_RATE_LIMIT", 1)
+      other_user = create(:user)
+      other_thread = create(:agent_thread, user: other_user, workspace: other_user.workspace, purpose: :global)
+      adapter, = fake_adapter([ Ai::ChatResult.new(text: "a"), Ai::ChatResult.new(text: "b") ])
+      allow(Ai::Configuration).to receive(:for).and_return(config_for(adapter))
+
+      # Exhaust workspace 1's budget (first call hits count=1 which is not > 1, so runs)
+      described_class.new(thread).run("hi")
+
+      # Now workspace 1 is exhausted (second call would be count=2 > 1)
+      # But workspace 2 should still get through on its first call
+      Current.acting_user = other_user
+      Current.workspace = other_user.workspace
+      result = described_class.new(other_thread).run("hi")
+
+      # workspace 2's first call is count=1, NOT rate-limited
+      expect(result&.reply).to eq("b")
+    end
+
+    it "is resilient to cache errors — fails open rather than blocking" do
+      adapter, = fake_adapter([ Ai::ChatResult.new(text: "ok") ])
+      allow(Ai::Configuration).to receive(:for).and_return(config_for(adapter))
+      allow(Rails.cache).to receive(:read).and_raise(StandardError, "cache down")
+      allow(Rails.cache).to receive(:write).and_raise(StandardError, "cache down")
+
+      # Should not raise and should not return a rate-limit reply
+      result = described_class.new(thread).run("what's up?")
+      expect(result&.reply).to eq("ok")
+    end
+  end
 end

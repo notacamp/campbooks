@@ -120,6 +120,7 @@ es:
         ai_processing_html:
           one: IA procesando %{count} correo
           other: IA procesando %{count} correos
+        ai_processing_capped_html: "IA procesando los primeros %{count} de %{total} correos (límite: %{max})"
         archived:
           one: Archivado %{count} correo
           other: Archivados %{count} correos
@@ -152,6 +153,7 @@ es:
         processing_ai:
           one: Procesando %{count} correo con IA
           other: Procesando %{count} correos con IA
+        processing_ai_capped: "Procesando los primeros %{count} de %{total} correos con IA (límite: %{max})"
         scout_html: Enviado(s) %{count} correo(s) a Scout
         sent_to_scout: Enviado(s) %{count} correo(s) a Scout
         snoozed:

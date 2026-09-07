@@ -1,6 +1,8 @@
 class ComposeChatReplyJob < ApplicationJob
   queue_as :default
   retry_on StandardError, wait: :polynomially_longer, attempts: 2
+  # Cap concurrent compose-chat jobs to prevent unbounded parallel provider calls.
+  limits_concurrency to: 3, key: "interactive_chat"
 
   def perform(agent_message_id)
     message = AgentMessage.find(agent_message_id)
@@ -18,7 +20,8 @@ class ComposeChatReplyJob < ApplicationJob
       return
     end
 
-    result = Ai::ComposeChatService.new(thread).reply_to(message)
+    # Mark as interactive so the circuit breaker never blocks compose drafting.
+    result = Ai::CircuitBreaker.as_interactive { Ai::ComposeChatService.new(thread).reply_to(message) }
 
     if result.blank? || result[:reply].blank?
       I18n.with_locale(thread.user.locale.presence || I18n.default_locale) do
@@ -46,6 +49,21 @@ class ComposeChatReplyJob < ApplicationJob
     broadcast_update(thread, result ? (result[:auto_actions] || []) : [])
   rescue ActiveRecord::RecordNotFound
     Rails.logger.warn("[ComposeChatReplyJob] Message #{agent_message_id} not found, skipping")
+  rescue Ai::Budget::Exceeded => e
+    Rails.logger.warn("[ComposeChatReplyJob] #{e.message}")
+    if thread
+      locale = thread.user.locale.presence || I18n.default_locale
+      I18n.with_locale(locale) do
+        thread.agent_messages.create!(
+          content: I18n.t("jobs.compose_chat_reply.budget_exceeded"),
+          author_type: :ai,
+          ai_suggested_actions: [],
+          reply_status: :replied,
+          user: thread.user
+        )
+      end
+      broadcast_update(thread, [])
+    end
   rescue => e
     Rails.logger.error("[ComposeChatReplyJob] Error (attempt #{executions}): #{e.message}")
     raise if executions < 2

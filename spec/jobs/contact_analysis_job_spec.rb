@@ -128,6 +128,70 @@ RSpec.describe ContactAnalysisJob, type: :job do
     expect(described_class.concurrency_key).to be_present
   end
 
+  # ── analysis_attempts tracking ──────────────────────────────────────────────
+
+  context "analysis_attempts counting" do
+    let(:unanalyzed_contact) do
+      integration_ws.contacts.create!(
+        email: "attempts#{SecureRandom.hex(4)}@example.com",
+        email_count: 6,
+        analysis_attempts: 0
+      )
+    end
+
+    before do
+      5.times do |i|
+        EmailAccount.where(workspace: integration_ws).first.email_messages.create!(
+          provider_message_id: "m-attempts-#{SecureRandom.hex(6)}", contact: unanalyzed_contact,
+          subject: "Msg #{i}", body: "Body #{i}.",
+          received_at: i.hours.ago
+        )
+      end
+    end
+
+    it "resets analysis_attempts to 0 on success" do
+      unanalyzed_contact.update_column(:analysis_attempts, 2)
+
+      with_fake_text_adapter(FAKE_ANALYSIS) do
+        described_class.perform_now(unanalyzed_contact.id)
+      end
+
+      expect(unanalyzed_contact.reload.analysis_attempts).to eq(0)
+    end
+
+    it "increments analysis_attempts when analyzer returns nil (non-transient failure)" do
+      fake = Object.new
+      # The analyzer returns nil (parse error, empty result, etc.) — not a re-raise.
+      fake.define_singleton_method(:chat) { |**| "not valid json {{{" }
+      original = AiAdapter.instance_method(:adapter_instance)
+      AiAdapter.send(:define_method, :adapter_instance) { fake }
+      original_key = ENV.delete("ANTHROPIC_API_KEY")
+
+      described_class.perform_now(unanalyzed_contact.id)
+
+      expect(unanalyzed_contact.reload.analysis_attempts).to eq(1)
+    ensure
+      AiAdapter.send(:define_method, :adapter_instance, original)
+      ENV["ANTHROPIC_API_KEY"] = original_key if original_key
+    end
+
+    it "does not increment analysis_attempts when provider is not configured" do
+      allow(Ai::ProviderSetup).to receive(:configured?).and_return(false)
+
+      described_class.perform_now(unanalyzed_contact.id)
+
+      expect(unanalyzed_contact.reload.analysis_attempts).to eq(0)
+    end
+
+    it "does not increment analysis_attempts for a contact that was already recently analyzed" do
+      unanalyzed_contact.update_columns(analyzed_at: 1.day.ago, analysis_attempts: 1)
+
+      described_class.perform_now(unanalyzed_contact.id)
+
+      expect(unanalyzed_contact.reload.analysis_attempts).to eq(1)
+    end
+  end
+
   it "a rate-limited attempt is retried with backoff instead of losing the contact" do
     fake = Object.new
     fake.define_singleton_method(:chat) { |**| raise Faraday::TooManyRequestsError, "429" }

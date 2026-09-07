@@ -50,6 +50,7 @@ fr:
       settings_zdrive: Intégration Zoho Drive
       workflows: Flux de travail
   scout:
+    rate_limited: "Je traite beaucoup de demandes en ce moment. Veuillez patienter un instant et réessayer."
     ask_cards:
       by: pour le %{date}
       due_today: pour aujourd'hui

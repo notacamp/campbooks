@@ -154,6 +154,15 @@ existing adapters if you later unset `AI_MANAGED_ENDPOINT`.
 
 When neither variable is set, all behaviour is unchanged: AI calls go directly to
 the provider (Mistral, OpenAI, etc.) using the keys above.
+On self-hosted installs the keys above are the operator's own, so no per-workspace
+AI budget limits apply (they never did). The following variables are for
+**hosted/managed** deployments only and are no-ops on self-hosted:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `AI_DAILY_CALL_CEILING` | `10000` | Hard daily cap (number of AI calls) per managed-cloud workspace. Raises if hit; resets at midnight UTC. Set very high so normal use never trips it; lower in sandboxes to test the path. |
+| `AI_PROBATION_DAYS` | `7` | How many days after signup a new workspace is in "probation" for the tighter cap below. |
+| `AI_PROBATION_DAILY_CAP` | _(unset — disabled)_ | If set, new workspaces in probation are limited to this many AI calls per day instead of the full ceiling. Leave unset (the default) to disable probation entirely. |
 
 ### IMAP — any other mail provider
 

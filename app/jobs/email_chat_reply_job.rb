@@ -1,6 +1,8 @@
 class EmailChatReplyJob < ApplicationJob
   queue_as :default
   retry_on StandardError, wait: :polynomially_longer, attempts: 2
+  # Cap concurrent email-thread Scout sessions — mirrors the global chat cap.
+  limits_concurrency to: 3, key: "interactive_chat"
 
   def perform(agent_message_id)
     message = AgentMessage.find(agent_message_id)
@@ -25,7 +27,8 @@ class EmailChatReplyJob < ApplicationJob
     # Skip if AI already replied after this message
     return if agent_thread.agent_messages.where(author_type: :ai).where("created_at > ?", message.created_at).exists?
 
-    result = Ai::ChatService.reply_to(message)
+    # Mark as interactive so the circuit breaker never blocks email-thread replies.
+    result = Ai::CircuitBreaker.as_interactive { Ai::ChatService.reply_to(message) }
     if result.blank? || result[:reply].blank?
       # The AI call failed or came back empty (e.g. provider auth/network error).
       # Don't leave the typing dots spinning forever — mark it failed and swap in
@@ -79,6 +82,21 @@ class EmailChatReplyJob < ApplicationJob
     )
   rescue ActiveRecord::RecordNotFound
     Rails.logger.warn("[EmailChatReplyJob] Message #{agent_message_id} not found, skipping")
+  rescue Ai::Budget::Exceeded => e
+    Rails.logger.warn("[EmailChatReplyJob] #{e.message}")
+    if agent_thread && message
+      locale = agent_thread.user.locale.presence || I18n.default_locale
+      I18n.with_locale(locale) do
+        reply = agent_thread.agent_messages.create!(
+          content: I18n.t("jobs.email_chat_reply.budget_exceeded"),
+          author_type: :ai,
+          ai_suggested_actions: [],
+          user: agent_thread.user
+        )
+        message.update_column(:reply_status, :replied)
+        broadcast_reply(reply, [])
+      end
+    end
   rescue => e
     Rails.logger.error("[EmailChatReplyJob] Error: #{e.message}")
     AgentMessage.where(id: agent_message_id).update_all(reply_status: :pending)

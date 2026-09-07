@@ -4,6 +4,8 @@
 class AiSetupChatReplyJob < ApplicationJob
   queue_as :default
   retry_on StandardError, wait: :polynomially_longer, attempts: 2
+  # Cap concurrent setup-chat jobs alongside the other interactive chat jobs.
+  limits_concurrency to: 3, key: "interactive_chat"
 
   def perform(agent_message_id, kind)
     message = AgentMessage.find(agent_message_id)
@@ -32,7 +34,10 @@ class AiSetupChatReplyJob < ApplicationJob
       { role: m.from_user? ? "user" : "assistant", content: m.content }
     end
 
-    result = Ai::OnboardingAssistant.new(thread.workspace).conversational_turn(history: history, kind: kind)
+    # Mark as interactive so the circuit breaker never blocks setup chat.
+    result = Ai::CircuitBreaker.as_interactive do
+      Ai::OnboardingAssistant.new(thread.workspace).conversational_turn(history: history, kind: kind)
+    end
 
     I18n.with_locale(thread.user.locale.presence || I18n.default_locale) do
       case result[:type]
@@ -59,6 +64,11 @@ class AiSetupChatReplyJob < ApplicationJob
     end
   rescue ActiveRecord::RecordNotFound
     Rails.logger.warn("[AiSetupChatReplyJob] message #{agent_message_id} not found, skipping")
+  rescue Ai::Budget::Exceeded => e
+    Rails.logger.warn("[AiSetupChatReplyJob] #{e.message}")
+    I18n.with_locale(thread&.user&.locale.presence || I18n.default_locale) do
+      broadcast_error(thread, I18n.t("jobs.ai_setup_chat_reply.budget_exceeded"))
+    end if thread
   rescue => e
     Rails.logger.error("[AiSetupChatReplyJob] error (attempt #{executions}): #{e.message}")
     raise if executions < 2

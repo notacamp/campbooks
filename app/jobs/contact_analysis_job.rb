@@ -5,7 +5,13 @@ class ContactAnalysisJob < ApplicationJob
   # them propagate (Ai::Adapters::Base::TRANSIENT_ERRORS), and this spaces the
   # attempts out instead of losing the contact until the next catch-up pass.
   # Declared after the StandardError handler so it wins for these classes.
-  retry_on(*Ai::Adapters::Base::TRANSIENT_ERRORS, wait: :polynomially_longer, attempts: 5)
+  # When retries are exhausted, the block increments analysis_attempts so the
+  # catch-up sweep stops re-enqueuing the contact (see Contacts::PendingAnalysisCatchUp).
+  retry_on(*Ai::Adapters::Base::TRANSIENT_ERRORS, wait: :polynomially_longer, attempts: 5) do |job, error|
+    contact_id = job.arguments.first
+    Rails.logger.warn("[ContactAnalysisJob] Retries exhausted for contact #{contact_id}: #{error.message}")
+    Contact.where(id: contact_id).update_all("analysis_attempts = analysis_attempts + 1")
+  end
 
   # The whole backlog of a freshly-connected mailbox funnels through here (the
   # catch-up enqueues up to 100 per workspace per pass). Unthrottled, that's
@@ -20,6 +26,7 @@ class ContactAnalysisJob < ApplicationJob
 
     # Until a text provider is set up → don't analyse. Applies to auto and
     # user-triggered runs (this analysis is automatic, not a chat the user invoked).
+    # This is not a contact failure — don't count against analysis_attempts.
     return unless Ai::ProviderSetup.configured?(contact.workspace, :text)
 
     # AI model resolution (Ai::Configuration.for) reads Current.workspace. Jobs run
@@ -31,6 +38,16 @@ class ContactAnalysisJob < ApplicationJob
     Current.workspace = contact.workspace
 
     Ai::ContactAnalyzer.new(contact, user_prompt: prompt).analyze!(force: force)
+
+    contact.reload
+    if contact.analyzed_at.present?
+      # Success — clear the failure counter so a later re-analysis is allowed.
+      contact.update_column(:analysis_attempts, 0) if contact.analysis_attempts > 0
+    else
+      # Analyzer returned nil (genuine failure, not a transient error or missing
+      # provider — those two paths return early above or re-raise). Count it.
+      Contact.where(id: contact_id).update_all("analysis_attempts = analysis_attempts + 1")
+    end
   rescue ActiveRecord::RecordNotFound
     Rails.logger.warn("[ContactAnalysisJob] Contact #{contact_id} not found, skipping")
   rescue => e

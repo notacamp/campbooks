@@ -74,7 +74,13 @@ fr:
         one: 1 pièce jointe importée dans Google Drive
         other: "%{count} pièces jointes importées dans Google Drive"
   jobs:
+    agent_chat_reply:
+      budget_exceeded: Vous avez atteint la limite quotidienne d'IA pour cet espace
+        de travail. Scout sera de retour demain — vous pourrez reprendre la conversation
+        à ce moment-là.
     ai_setup_chat_reply:
+      budget_exceeded: Vous avez atteint la limite quotidienne d'IA pour cet espace
+        de travail. Réessayez demain.
       error_generic: Scout n'a pas pu générer de suggestions pour le moment. Veuillez
         réessayer.
       error_no_ai_config: Scout a besoin d'un fournisseur d'IA de texte avant de pouvoir
@@ -85,11 +91,15 @@ fr:
       proposal_intro: Voici ce que je suggèrerais pour vos %{kind}. Choisissez ceux
         que vous souhaitez et appliquez-les — vous pouvez les modifier au préalable.
     compose_chat_reply:
+      budget_exceeded: Vous avez atteint la limite quotidienne d'IA pour cet espace
+        de travail. Réessayez demain.
       error: Je suis désolé, j'ai rencontré un problème lors du traitement de votre
         demande. Pourriez-vous réessayer ?
     email_chat_reply:
       auto_action_failures_prefix: 'Cependant, je n''ai pas pu effectuer ces actions
         :'
+      budget_exceeded: Vous avez atteint la limite quotidienne d'IA pour cet espace
+        de travail. Réessayez demain.
       conversation_archived: Cette conversation a été archivée.
     email_process:
       auto_replied_notice: Je vois que vous avez répondu vous-même à cette conversation.

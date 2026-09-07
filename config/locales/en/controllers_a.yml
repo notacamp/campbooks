@@ -115,6 +115,7 @@ en:
         ai_processing_html:
           one: AI processing %{count} email
           other: AI processing %{count} email(s)
+        ai_processing_capped_html: "AI processing first %{count} of %{total} emails (limit: %{max})"
         archived:
           one: Archived %{count} email
           other: Archived %{count} email(s)
@@ -147,6 +148,7 @@ en:
         processing_ai:
           one: Processing %{count} email with AI
           other: Processing %{count} email(s) with AI
+        processing_ai_capped: "Processing first %{count} of %{total} emails with AI (limit: %{max})"
         scout_html: Sent %{count} email(s) to Scout
         sent_to_scout: Sent %{count} email(s) to Scout
         snoozed:
