@@ -104,6 +104,10 @@ major, minor, or patch change here.
 - People: an organization in the Pay or Chase lane no longer says "Nothing needs you here right now" on its page.
 - Late bills on Now no longer fade with age — a bill 20 days late ranks at least as high as one 2 days late.
 
+### Fixed
+
+- Contact analysis catch-up no longer loops forever: service/machine-sender contacts are excluded from the background sweep (they would be vetoed by the analysis gate anyway), contacts that have failed analysis three or more times are skipped until a manual forced re-analysis, and web-triggered sweeps are debounced to at most once per ten minutes per workspace. A `analysis_attempts` counter on each contact tracks failures so the sweep can exclude them.
+
 ### Security
 
 - Bumped `rubyzip` 3.2.2 → 3.6.0 to close CVE-2026-85396, a High-severity path-traversal vulnerability in pre-3.4.0 rubyzip.
