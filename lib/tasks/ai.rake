@@ -1,15 +1,18 @@
 namespace :ai do
-  desc "Re-point managed (Campbooks AI) text adapters to the current EU default (Mistral) and normalize stale models. Idempotent."
+  desc "Re-point managed (Campbooks AI) text adapters to the current EU default (Mistral), " \
+       "normalize stale models, and sync the AI gateway endpoint (AI_MANAGED_ENDPOINT) " \
+       "onto existing adapters. Idempotent — re-running is safe when nothing changes."
   task repoint_managed_text: :environment do
     target = Ai::Platform::MANAGED_TEXT_PROVIDER
     moved = Ai::ManagedTextRepointer.run
 
     if moved.empty?
-      puts "Nothing to do — all managed text adapters are on #{target} with valid models."
+      puts "Nothing to do — all managed text adapters are on #{target} with valid models and the correct endpoint."
     else
       moved.each do |m|
         change = m[:from] == m[:to] ? "model fix" : "#{m[:from]} -> #{m[:to]}"
-        puts "  workspace #{m[:workspace_id]}: managed text #{change} (#{m[:models_fixed]} model(s) normalized)"
+        endpoint_note = m[:endpoint_changed] ? " (endpoint updated)" : ""
+        puts "  workspace #{m[:workspace_id]}: managed text #{change} (#{m[:models_fixed]} model(s) normalized)#{endpoint_note}"
       end
       puts "Updated #{moved.size} managed text adapter(s) for #{target}."
     end

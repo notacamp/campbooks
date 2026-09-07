@@ -16,6 +16,10 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- Operators can route all managed AI calls through an OpenAI-compatible AI gateway (e.g. a self-hosted LiteLLM) for central budget control, provider fallback, and spend analytics. Set `AI_MANAGED_ENDPOINT` to the gateway's chat-completions URL and optionally `AI_MANAGED_GATEWAY_KEY` for the virtual key the gateway expects. New workspaces pick the gateway up automatically; existing ones are re-pointed by running `rake ai:repoint_managed_text`. When neither variable is set, behaviour is unchanged — calls go directly to the provider.
+
 ## [0.40.1] - 2026-09-06
 
 ### Fixed

@@ -27,9 +27,15 @@ class AiAdapter < ApplicationRecord
 
   def adapter_instance
     key = api_key.presence
-    # Managed ("Campbooks AI") and self-hosted both fall back to the platform/operator
-    # env key; managed never stores its own, so it always resolves from env here.
-    key ||= ENV[PROVIDER_ENV_KEYS[provider]] if managed? || self_hosted?
+    if managed?
+      # When an AI gateway is configured, prefer its virtual key over the raw
+      # provider key — the gateway holds the real credentials.
+      key ||= ENV[Ai::Platform::MANAGED_GATEWAY_KEY_ENV_KEY].presence
+      # Fall back to the provider's own platform env key (direct-to-provider path).
+      key ||= ENV[PROVIDER_ENV_KEYS[provider]]
+    elsif self_hosted?
+      key ||= ENV[PROVIDER_ENV_KEYS[provider]]
+    end
     Ai::Adapters::Base.for(provider, api_key: key, endpoint_url: endpoint_url)
   end
 
@@ -43,11 +49,16 @@ class AiAdapter < ApplicationRecord
   # Would adapter_instance actually have a key to call with? Gates whether this
   # adapter counts as "configured" — a managed adapter whose platform env key has
   # gone missing is not usable, so background jobs stop instead of 401-ing.
+  # When an AI gateway is configured, the gateway virtual key counts as a valid
+  # credential in addition to the raw provider key.
   def usable?
     return false if managed? && self_hosted? # never a valid combination
-    return ENV[PROVIDER_ENV_KEYS[provider]].present? if managed?
-
-    api_key.present? || (self_hosted? && ENV[PROVIDER_ENV_KEYS[provider]].present?)
+    if managed?
+      ENV[Ai::Platform::MANAGED_GATEWAY_KEY_ENV_KEY].present? ||
+        ENV[PROVIDER_ENV_KEYS[provider]].present?
+    else
+      api_key.present? || (self_hosted? && ENV[PROVIDER_ENV_KEYS[provider]].present?)
+    end
   end
 
   def in_use?

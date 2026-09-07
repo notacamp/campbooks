@@ -129,6 +129,32 @@ own in **Settings → AI** (stored encrypted per workspace).
 - For attachment/document analysis and the best search: set **`OPENAI_API_KEY`**.
 - With no embeddings provider (OpenAI or Gemini), search falls back to keyword matching.
 
+#### AI gateway (optional — central budget control, provider fallback)
+
+If you run a self-hosted AI gateway such as [LiteLLM](https://github.com/BerriAI/litellm)
+you can route all managed AI calls through it instead of directly to the provider.
+This lets you enforce spending budgets, add provider fallback, and collect usage
+analytics in one place.
+
+| Variable | Notes |
+|---|---|
+| `AI_MANAGED_ENDPOINT` | Base URL of the gateway's OpenAI-compatible chat endpoint. Example: `https://ai-gateway.example.com/v1/chat/completions` |
+| `AI_MANAGED_GATEWAY_KEY` | Virtual/API key the gateway expects instead of the raw provider key. Optional — leave unset if your gateway does not require one, or forwards the raw key itself. |
+
+When `AI_MANAGED_ENDPOINT` is set every newly-provisioned managed AI adapter stores
+that URL and calls it instead of the default provider endpoint. To re-point
+**existing** managed adapters (ones provisioned before you set the variable), run:
+
+```bash
+docker compose exec worker bin/rails ai:repoint_managed_text
+```
+
+That task is idempotent and safe to re-run. It also clears the stored endpoint from
+existing adapters if you later unset `AI_MANAGED_ENDPOINT`.
+
+When neither variable is set, all behaviour is unchanged: AI calls go directly to
+the provider (Mistral, OpenAI, etc.) using the keys above.
+
 ### IMAP — any other mail provider
 
 No registration or ENV needed: **Settings → Accounts → IMAP** connects any
