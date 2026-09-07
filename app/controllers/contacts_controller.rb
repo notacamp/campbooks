@@ -14,7 +14,9 @@ class ContactsController < ApplicationController
     # Self-heal: enqueue analysis for any contact with enough history that was never
     # analyzed (e.g. mail ingested before a text-AI provider was configured), so the
     # directory — and Person#organization behind it — fills in over repeat visits.
-    Contacts::PendingAnalysisCatchUp.run(Current.workspace)
+    # Debounced: at most one sweep per workspace per ~10 min from web requests to
+    # avoid enqueueing a storm of jobs on every page load.
+    Contacts::PendingAnalysisCatchUp.run(Current.workspace, debounce: true)
 
     @searching = params[:q].present?
     contacts = Current.workspace.contacts
