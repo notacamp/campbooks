@@ -101,6 +101,11 @@ module Emails
     # unattended / automated mailbox can never carry a personal ask.
     def self.machine_sender?(email) = new(email).machine_sender?
 
+    # Class-level signal for pipelines that need to check RFC bulk-traffic headers
+    # without running a full categorization pass. Mirrors .machine_sender?.
+    # Returns true when List-Unsubscribe or Precedence: bulk/list/junk is set.
+    def self.bulk_headers?(email) = new(email, provider_hints: false).bulk_headers?
+
     def call
       # Once L0 ingest capture lands, provider-supplied signals win outright.
       header = header_category
@@ -159,6 +164,10 @@ module Emails
         from_localpart.match?(NOREPLY_LOCALPART)
     end
 
+    # Whether the email carries explicit RFC bulk-traffic headers: List-Unsubscribe
+    # (RFC 2369) or Precedence: bulk/list/junk (RFC 2076). Public — see .bulk_headers?.
+    def bulk_headers? = list_unsubscribe? || precedence_bulk?
+
     private
 
     attr_reader :email
@@ -216,11 +225,6 @@ module Emails
     # --- bulk / automated signals captured from headers at ingest -------------
     # Empty on legacy mail and on providers that don't surface a given header, so
     # they simply contribute nothing there and the local-part rules still apply.
-
-    # List-Unsubscribe (RFC 2369) is the canonical "this is a mailing list" marker;
-    # Precedence: bulk/list/junk (RFC 2076) says the same. Either means list
-    # traffic — never a 1:1 human.
-    def bulk_headers? = list_unsubscribe? || precedence_bulk?
 
     def list_unsubscribe? = !header(:header_list_unsubscribe).empty?
 

@@ -339,6 +339,146 @@ RSpec.describe EmailProcessJob, type: :job do
       end
     end
 
+    # Spam / Junk / Trash folder gate — the provider already decided this mail is
+    # unwanted, so no AI should fire even with a provider configured.
+    context "when the email is in the Spam folder" do
+      let(:spam_folder_id) { "spam_folder_provider_id" }
+      let!(:spam_folder) do
+        create(:email_folder, email_account: account, name: "Spam", provider_folder_id: spam_folder_id)
+      end
+      let(:email_message) do
+        create(:email_message,
+          email_account: account,
+          email_scan_log: scan_log,
+          status: :fetched,
+          has_attachment: false,
+          provider_folder_id: spam_folder_id)
+      end
+
+      before { allow(Ai::ProviderSetup).to receive(:configured?).and_return(true) }
+
+      it "stays ingested and readable but runs none of the AI pipeline" do
+        expect(Emails::Triage).not_to receive(:new)
+        expect(Contacts::Identifier).not_to receive(:new)
+
+        expect { described_class.perform_now(email_message.id) }
+          .not_to have_enqueued_job(Reminders::EmailExtractionJob)
+
+        email_message.reload
+        expect(email_message.status).to eq("processed")
+        expect(email_message.email_thread).to be_present
+        expect(email_message.tags).to be_empty
+      end
+    end
+
+    context "when the email is in the Trash folder" do
+      let(:trash_folder_id) { "trash_folder_provider_id" }
+      let!(:trash_folder) do
+        create(:email_folder, email_account: account, name: "Trash", provider_folder_id: trash_folder_id)
+      end
+      let(:email_message) do
+        create(:email_message,
+          email_account: account,
+          email_scan_log: scan_log,
+          status: :fetched,
+          has_attachment: false,
+          provider_folder_id: trash_folder_id)
+      end
+
+      before { allow(Ai::ProviderSetup).to receive(:configured?).and_return(true) }
+
+      it "skips all AI (same as Spam)" do
+        expect(Emails::Triage).not_to receive(:new)
+
+        expect { described_class.perform_now(email_message.id) }
+          .not_to have_enqueued_job(Reminders::EmailExtractionJob)
+
+        expect(email_message.reload.status).to eq("processed")
+      end
+    end
+
+    # Bulk / machine-sender gate — newsletters and notification bots skip the
+    # high-cost triage+embedding path even with a provider configured.
+    context "when the email is from a machine/bulk sender" do
+      before { allow(Ai::ProviderSetup).to receive(:configured?).and_return(true) }
+
+      context "no-reply sender" do
+        let(:email_message) do
+          create(:email_message,
+            email_account: account,
+            email_scan_log: scan_log,
+            status: :fetched,
+            has_attachment: false,
+            from_address: "no-reply@stripe.com",
+            subject: "Your receipt",
+            body: "Here is your receipt.")
+        end
+
+        it "skips triage (Emails::Triage is not called)" do
+          expect(Emails::Triage).not_to receive(:new)
+          described_class.perform_now(email_message.id)
+        end
+
+        it "still marks the message processed and threads it" do
+          described_class.perform_now(email_message.id)
+          email_message.reload
+          expect(email_message.status).to eq("processed")
+          expect(email_message.email_thread).to be_present
+        end
+      end
+
+      context "List-Unsubscribe sender (newsletter)" do
+        let(:email_message) do
+          create(:email_message,
+            email_account: account,
+            email_scan_log: scan_log,
+            status: :fetched,
+            has_attachment: false,
+            from_address: "news@brand.com",
+            header_list_unsubscribe: "<mailto:unsub@brand.com>",
+            subject: "Big sale this weekend")
+        end
+
+        it "skips triage" do
+          expect(Emails::Triage).not_to receive(:new)
+          described_class.perform_now(email_message.id)
+        end
+
+        it "skips reminder extraction" do
+          expect { described_class.perform_now(email_message.id) }
+            .not_to have_enqueued_job(Reminders::EmailExtractionJob)
+        end
+      end
+    end
+
+    # A genuine person-to-person email must flow through the full pipeline
+    # even when bulk signals appear on OTHER emails in the test run.
+    context "when the email is from a real person with no bulk signals" do
+      before { allow(Ai::ProviderSetup).to receive(:configured?).and_return(true) }
+
+      let(:email_message) do
+        create(:email_message,
+          email_account: account,
+          email_scan_log: scan_log,
+          status: :fetched,
+          has_attachment: false,
+          from_address: "alice@lawfirm.com",
+          subject: "Invoice #42 due Monday")
+      end
+
+      it "calls Emails::Triage (not skipped as bulk)" do
+        triage_double = instance_double(Emails::Triage, call: Emails::Triage::Decision.new(
+          category: :personal, confidence: 0.4, tag: nil, source: :llm
+        ))
+        allow(Emails::Triage).to receive(:new).and_return(triage_double)
+        allow(Ai::EmailClassifier).to receive(:new).and_return(double(classify!: nil))
+
+        described_class.perform_now(email_message.id)
+
+        expect(Emails::Triage).to have_received(:new)
+      end
+    end
+
     # -----------------------------------------------------------------------
     # EmailRules hook
     # -----------------------------------------------------------------------

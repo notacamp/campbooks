@@ -183,8 +183,16 @@ class EmailMessage < ApplicationRecord
 
   # Only fields that feed the embedded text trigger a full re-index (re-chunk +
   # re-embed). Filter-only fields are handled by #refresh_search_filter_data.
+  #
+  # Spam/Junk/Trash-foldered mail also skips search embedding — the provider
+  # already decided it is unwanted, so there is no point paying to make it
+  # searchable. Non-spam bulk mail (newsletters, receipts) IS kept searchable so
+  # users can still find it; only the expensive LLM classification and reminder
+  # extraction are skipped for bulk senders (Emails::BulkMailGate, in EmailProcessJob).
   def searchable_fields_changed?
-    saved_change_to_subject? || saved_change_to_body? || saved_change_to_ai_summary?
+    return false unless saved_change_to_subject? || saved_change_to_body? || saved_change_to_ai_summary?
+
+    !Emails::FolderGate.skip_ai?(self)
   end
 
   # Folder/read/category/attachment don't change the text we embed, so a full

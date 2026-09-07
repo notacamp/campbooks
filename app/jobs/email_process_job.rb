@@ -55,6 +55,15 @@ class EmailProcessJob < ApplicationJob
       return
     end
 
+    # Mail that lives in a Spam, Junk, or Trash folder was already sorted by the
+    # provider as unwanted. Keep it ingested and visible (so the user can review
+    # their spam folder), but run NO AI — triage, embedding, contact profiling,
+    # reminders, and workflow triggers are all skipped for provider-confirmed junk.
+    if Emails::FolderGate.skip_ai?(email)
+      finalize_without_analysis(email, was_already_processed)
+      return
+    end
+
     if email.has_attachment? && email.files.blank? && email.provider_folder_id.present?
       process_attachments(email, mail_client)
     end
@@ -71,7 +80,13 @@ class EmailProcessJob < ApplicationJob
     # before the user opts into AI. (Interactive AI still works via #available?.)
     text_ai_available = Ai::ProviderSetup.configured?(email.email_account.workspace, :text)
 
-    if text_ai_available && email.tags.empty?
+    # Bulk / machine-sender gate: newsletters, notification bots, and mailing-list
+    # traffic (detected via List-Unsubscribe / Precedence headers or a no-reply@
+    # sender) skip the embedding + LLM triage entirely. The tag stays empty and
+    # the bucket tag added below still fires, so the message is still sorted into
+    # an inbox group — just without the AI overhead. Real person-to-person mail
+    # always passes (conservative: missing or ambiguous signals let it through).
+    if text_ai_available && email.tags.empty? && Emails::BulkMailGate.analyze?(email)
       begin
         decision = Emails::Triage.new(email).call
         email.update!(category: decision.category, category_confidence: decision.confidence)
@@ -191,9 +206,12 @@ class EmailProcessJob < ApplicationJob
     end
 
     # Best-effort: extract calendar-worthy reminders from this email (gated to skip
-    # bulk/dateless mail). Runs once, mirroring the WorkflowTriggerJob guard.
-    # Needs a text model, so it's skipped when no AI provider is configured.
-    Reminders::EmailExtractionJob.perform_later(email.id) if text_ai_available && !was_already_processed
+    # bulk/dateless mail). Machine and bulk senders are skipped at the enqueue
+    # level (not just inside the job) to avoid spending even a queue slot on
+    # newsletters and notification bots. Runs once per ingest; needs a text model.
+    if text_ai_available && !was_already_processed && Emails::BulkMailGate.analyze?(email)
+      Reminders::EmailExtractionJob.perform_later(email.id)
+    end
 
     # Asks (action items the reader must do) are no longer mined by a separate
     # per-email job: Ai::EmailAnalyzer (enqueued above as EmailAnalysisJob) stages
