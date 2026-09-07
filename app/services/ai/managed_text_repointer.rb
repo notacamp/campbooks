@@ -4,14 +4,21 @@ module Ai
   # setups already use it; this moves workspaces that opted into managed AI under the
   # old default (DeepSeek / China) so their email + chat content stops leaving the EU.
   #
+  # Also syncs the AI gateway endpoint (AI_MANAGED_ENDPOINT) onto all existing managed
+  # text adapters so they pick up a newly-configured (or removed) gateway without
+  # having to re-provision each workspace. Setting the ENV and running this task once
+  # is enough; new managed workspaces pick the gateway up via apply_managed.
+  #
   # Data-only (no schema migration). Run via `rake ai:repoint_managed_text` once
-  # MISTRAL_API_KEY is set in the platform env. Re-running is a no-op.
+  # MISTRAL_API_KEY (or AI_MANAGED_GATEWAY_KEY) is set in the platform env.
+  # Re-running is a no-op when nothing has changed.
   class ManagedTextRepointer
     def self.run
-      target = Platform::MANAGED_TEXT_PROVIDER
-      model  = AiConfiguration::DEFAULT_MODEL[target]
-      valid  = AiConfiguration::MODELS[target] || []
-      moved  = []
+      target           = Platform::MANAGED_TEXT_PROVIDER
+      model            = AiConfiguration::DEFAULT_MODEL[target]
+      valid            = AiConfiguration::MODELS[target] || []
+      gateway_endpoint = Platform.managed_gateway_endpoint
+      moved            = []
 
       Workspace.find_each do |workspace|
         adapter = workspace.ai_adapters.find_by(
@@ -19,9 +26,13 @@ module Ai
         )
         next unless adapter
 
-        from = adapter.provider
-        repointed = adapter.provider != target
-        adapter.update!(provider: target) if repointed
+        from         = adapter.provider
+        repointed    = adapter.provider != target
+        endpoint_changed = adapter.endpoint_url != gateway_endpoint
+
+        if repointed || endpoint_changed
+          adapter.update!(provider: target, endpoint_url: gateway_endpoint)
+        end
 
         # Managed adapters use the platform-chosen model. Reset any text purpose whose
         # stored model isn't valid for the target provider — whether left on the old
@@ -33,7 +44,10 @@ module Ai
                          .where.not(model: valid)
                          .update_all(model: model, updated_at: Time.current)
 
-        moved << { workspace_id: workspace.id, from: from, to: target, models_fixed: fixed } if repointed || fixed.positive?
+        if repointed || endpoint_changed || fixed.positive?
+          moved << { workspace_id: workspace.id, from: from, to: target,
+                     models_fixed: fixed, endpoint_changed: endpoint_changed }
+        end
       end
 
       moved

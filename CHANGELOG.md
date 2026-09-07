@@ -18,6 +18,7 @@ major, minor, or patch change here.
 
 ### Added
 
+- Operators can route all managed AI calls through an OpenAI-compatible AI gateway (e.g. a self-hosted LiteLLM) for central budget control, provider fallback, and spend analytics. Set `AI_MANAGED_ENDPOINT` to the gateway's chat-completions URL and optionally `AI_MANAGED_GATEWAY_KEY` for the virtual key the gateway expects. New workspaces pick the gateway up automatically; existing ones are re-pointed by running `rake ai:repoint_managed_text`. When neither variable is set, behaviour is unchanged — calls go directly to the provider.
 - AI circuit breaker: a cache-backed (`Rails.cache`) breaker opens after 5 provider 429 responses in 60 seconds and fast-fails background/bulk AI jobs (they re-queue with backoff) while always letting compose and Scout chat through. Trips per provider (Mistral, OpenAI, Anthropic, …); auto-resets after 2 minutes. The `Ai::CircuitBreaker.open?(provider:)` method is a seam for future token-budget checks.
 - Interactive Scout and compose chat jobs (`AgentChatReplyJob`, `ComposeChatReplyJob`, `EmailChatReplyJob`, `AiSetupChatReplyJob`) now use `limits_concurrency to: 3, key: "interactive_chat"` so a burst of chat requests cannot open unbounded parallel provider connections.
 - Bulk "Process with AI" fan-out is capped at 200 messages per request (`Tools::BulkProcessAi::MAX_BULK_AI`). The UI reports how many were processed and how many were skipped when the cap is hit.

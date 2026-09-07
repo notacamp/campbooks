@@ -111,15 +111,24 @@ module Ai
     # key). Mirrors apply_text/apply_documents and is idempotent — re-running re-enables
     # and re-points without spawning duplicates. Cloud only: on self-hosted the
     # operator's own env keys already serve every workspace, so managed has no meaning.
+    #
+    # When AI_MANAGED_ENDPOINT is set the gateway URL is persisted on the adapter rows
+    # so all subsequent calls route through the gateway without further reconfiguration.
     def apply_managed
       raise "managed AI is unavailable on self-hosted installations" if Rails.application.config.self_hosted
 
-      text = upsert_managed_adapter(MANAGED_TEXT_ADAPTER_NAME, provider: Ai::Platform::MANAGED_TEXT_PROVIDER)
+      gateway_endpoint = Ai::Platform.managed_gateway_endpoint
+
+      text = upsert_managed_adapter(MANAGED_TEXT_ADAPTER_NAME,
+                                    provider: Ai::Platform::MANAGED_TEXT_PROVIDER,
+                                    endpoint_url: gateway_endpoint)
       assign_purposes(text, AiConfiguration::TEXT_PURPOSES)
 
       # Managed document analysis runs on Mistral (EU), same as text.
       if Ai::Platform.documents_available? && @workspace.region_allows?(Ai::Platform::MANAGED_DOC_PROVIDER)
-        docs = upsert_managed_adapter(MANAGED_VISION_ADAPTER_NAME, provider: Ai::Platform::MANAGED_DOC_PROVIDER)
+        docs = upsert_managed_adapter(MANAGED_VISION_ADAPTER_NAME,
+                                      provider: Ai::Platform::MANAGED_DOC_PROVIDER,
+                                      endpoint_url: gateway_endpoint)
         assign_purposes(docs, AiConfiguration::DOCUMENT_PURPOSES)
       end
 
@@ -223,12 +232,17 @@ module Ai
 
     # Like upsert_role_adapter, but flags the adapter managed and never stores a key —
     # adapter_instance resolves it from the platform env at call time.
-    def upsert_managed_adapter(name, provider:)
+    #
+    # When an AI_MANAGED_ENDPOINT gateway is configured, its URL is stored on the adapter
+    # row so every adapter_instance call routes through the gateway automatically.
+    # Passing endpoint_url: nil clears any previously stored gateway URL (direct-to-provider).
+    def upsert_managed_adapter(name, provider:, endpoint_url: nil)
       adapter = @workspace.ai_adapters.find_or_initialize_by(name: name)
       adapter.provider = provider
       adapter.managed = true
       adapter.enabled = true
       adapter.api_key = nil
+      adapter.endpoint_url = endpoint_url
       adapter.save!
       adapter
     end
