@@ -1,6 +1,10 @@
 class AgentChatReplyJob < ApplicationJob
   queue_as :default
   retry_on StandardError, wait: :polynomially_longer, attempts: 2
+  # Cap concurrent interactive Scout sessions so a burst of chat requests cannot
+  # open unbounded parallel provider connections. 3 concurrent global-chat jobs
+  # is enough for interactive feel without blowing the provider rate limit.
+  limits_concurrency to: 3, key: "interactive_chat"
 
   def perform(agent_message_id)
     message = AgentMessage.find(agent_message_id)
@@ -95,17 +99,21 @@ class AgentChatReplyJob < ApplicationJob
   # their existing services. Returns a uniform hash (always includes :thinking
   # and :steps; un-migrated paths simply leave them nil/empty).
   def compute_reply(thread, message, on_status)
-    return Ai::ChatService.reply_to(message, on_status: on_status) unless thread.global?
+    # Mark this call as interactive so the AI circuit breaker never blocks it,
+    # even when a background 429 storm has opened the breaker for this provider.
+    Ai::CircuitBreaker.as_interactive do
+      next Ai::ChatService.reply_to(message, on_status: on_status) unless thread.global?
 
-    on_event = ->(type, label) { broadcast_typing_status(thread, agent_status(type, label)) }
-    result = Scout::Agent.new(thread, on_event: on_event).run(message.content)
-    return nil unless result
+      on_event = ->(type, label) { broadcast_typing_status(thread, agent_status(type, label)) }
+      result = Scout::Agent.new(thread, on_event: on_event).run(message.content)
+      next nil unless result
 
-    {
-      reply: result.reply, thinking: result.thinking, steps: result.steps,
-      suggested_actions: result.suggested_actions, prompts: result.prompts,
-      provenance: result.provenance, auto_actions: []
-    }
+      {
+        reply: result.reply, thinking: result.thinking, steps: result.steps,
+        suggested_actions: result.suggested_actions, prompts: result.prompts,
+        provenance: result.provenance, auto_actions: []
+      }
+    end
   end
 
   # Map an agent event to a human typing-indicator label.

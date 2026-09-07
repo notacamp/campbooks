@@ -4,6 +4,8 @@
 class AiSetupChatReplyJob < ApplicationJob
   queue_as :default
   retry_on StandardError, wait: :polynomially_longer, attempts: 2
+  # Cap concurrent setup-chat jobs alongside the other interactive chat jobs.
+  limits_concurrency to: 3, key: "interactive_chat"
 
   def perform(agent_message_id, kind)
     message = AgentMessage.find(agent_message_id)
@@ -32,7 +34,10 @@ class AiSetupChatReplyJob < ApplicationJob
       { role: m.from_user? ? "user" : "assistant", content: m.content }
     end
 
-    result = Ai::OnboardingAssistant.new(thread.workspace).conversational_turn(history: history, kind: kind)
+    # Mark as interactive so the circuit breaker never blocks setup chat.
+    result = Ai::CircuitBreaker.as_interactive do
+      Ai::OnboardingAssistant.new(thread.workspace).conversational_turn(history: history, kind: kind)
+    end
 
     I18n.with_locale(thread.user.locale.presence || I18n.default_locale) do
       case result[:type]

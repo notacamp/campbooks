@@ -16,6 +16,13 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- AI circuit breaker: a cache-backed (`Rails.cache`) breaker opens after 5 provider 429 responses in 60 seconds and fast-fails background/bulk AI jobs (they re-queue with backoff) while always letting compose and Scout chat through. Trips per provider (Mistral, OpenAI, Anthropic, …); auto-resets after 2 minutes. The `Ai::CircuitBreaker.open?(provider:)` method is a seam for future token-budget checks.
+- Interactive Scout and compose chat jobs (`AgentChatReplyJob`, `ComposeChatReplyJob`, `EmailChatReplyJob`, `AiSetupChatReplyJob`) now use `limits_concurrency to: 3, key: "interactive_chat"` so a burst of chat requests cannot open unbounded parallel provider connections.
+- Bulk "Process with AI" fan-out is capped at 200 messages per request (`Tools::BulkProcessAi::MAX_BULK_AI`). The UI reports how many were processed and how many were skipped when the cap is hit.
+- Scout replies with a friendly "I'm handling a lot of requests" message instead of calling the provider when a workspace exceeds 20 Scout messages per minute.
+
 ## [0.40.1] - 2026-09-06
 
 ### Fixed

@@ -132,7 +132,13 @@ class EmailMessages::BulkController < ApplicationController
       toast = { message: t(".deleted", count: result[:count]), variant: :success }
       streams.concat(thread_list_refresh)
     when "process_ai"
-      toast = { message: t(".processing_ai", count: result[:count]), variant: :success }
+      if result[:capped]
+        toast = { message: t(".processing_ai_capped", count: result[:count],
+                             total: result[:total_count], max: Tools::BulkProcessAi::MAX_BULK_AI),
+                  variant: :warning }
+      else
+        toast = { message: t(".processing_ai", count: result[:count]), variant: :success }
+      end
     when "scout_chat"
       toast = { message: t(".sent_to_scout", count: result[:message_count]), variant: :success }
       streams << notify_stream("<a href='#{scout_thread_path(result[:thread_id])}' class='underline'>#{t('.open_scout_chat')}</a>".html_safe, severity: :info)
@@ -197,7 +203,13 @@ class EmailMessages::BulkController < ApplicationController
       verb = result[:action] == "remove" ? t(".tag_verb_removed") : t(".tag_verb_added")
       t(".tagged_html", verb: verb, tag_name: result[:tag_name])
     when "delete" then t(".deleted_html", count: result[:count])
-    when "process_ai" then t(".ai_processing_html", count: result[:count])
+    when "process_ai"
+      if result[:capped]
+        t(".ai_processing_capped_html", count: result[:count],
+          total: result[:total_count], max: Tools::BulkProcessAi::MAX_BULK_AI)
+      else
+        t(".ai_processing_html", count: result[:count])
+      end
     when "scout_chat" then t(".scout_html", count: result[:message_count])
     when "snooze" then t(".snoozed_html", count: result[:snoozed_count])
     else t(".done")

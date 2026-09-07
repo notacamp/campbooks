@@ -19,6 +19,12 @@ module Scout
     HISTORY = 30                  # max prior turns considered before the char budget trims
     HISTORY_CHAR_BUDGET = 24_000  # ~6k tokens of recent history (older turns dropped)
 
+    # Per-workspace rate limit: maximum Scout messages processed per 60-second window.
+    # Prevents a single workspace (or a malicious client) from flooding Scout with
+    # simultaneous requests and exhausting the provider's rate budget.
+    WORKSPACE_RATE_LIMIT = 20   # messages per workspace per minute
+    RATE_LIMIT_WINDOW    = 60   # seconds
+
     Result = Data.define(:reply, :thinking, :steps, :suggested_actions, :prompts, :provenance, :usage)
 
     def initialize(thread, on_event: nil)
@@ -31,6 +37,11 @@ module Scout
     end
 
     def run(user_text)
+      # Per-workspace rate limit: return a calm "slow down" reply rather than
+      # calling the provider when this workspace is firing too many Scout messages
+      # per minute — a denial-of-wallet guard for both self-hosted and cloud.
+      return rate_limit_result if workspace_rate_limited?
+
       config = Ai::Configuration.for(PURPOSE)
       return nil unless config
       return legacy_fallback(user_text) unless config[:adapter].supports_tools?
@@ -195,6 +206,43 @@ module Scout
       @on_event&.call(type, label)
     rescue => e
       Rails.logger.warn("[Scout::Agent] event callback failed: #{e.message}")
+    end
+
+    # ── Rate limiting ──────────────────────────────────────────────────────────
+
+    # Returns true when this workspace has exceeded WORKSPACE_RATE_LIMIT Scout
+    # messages within the current RATE_LIMIT_WINDOW. Increments the counter on
+    # each call so the window is per-invocation, not per-success.
+    def workspace_rate_limited?
+      workspace_id = @thread.workspace_id
+      return false unless workspace_id
+
+      bucket = Time.current.to_i / RATE_LIMIT_WINDOW
+      key = "scout:rl:#{workspace_id}:#{bucket}"
+
+      count = Rails.cache.read(key).to_i + 1
+      Rails.cache.write(key, count, expires_in: (RATE_LIMIT_WINDOW * 2).seconds)
+
+      exceeded = count > WORKSPACE_RATE_LIMIT
+      if exceeded
+        Rails.logger.warn(
+          "[Scout::Agent] workspace #{workspace_id} rate-limited " \
+          "(#{count} messages in #{RATE_LIMIT_WINDOW}s window)"
+        )
+      end
+      exceeded
+    rescue StandardError => e
+      Rails.logger.warn("[Scout::Agent] rate limit check failed (non-critical): #{e.message}")
+      false # fail open — prefer letting the call through over false positives
+    end
+
+    # Builds a friendly rate-limit Result without calling the AI provider.
+    def rate_limit_result
+      reply = I18n.t("scout.rate_limited")
+      Result.new(
+        reply: reply, thinking: nil, steps: [], suggested_actions: [], prompts: [],
+        provenance: {}, usage: {}
+      )
     end
 
     # Workspaces whose model can't do native tool calling keep the previous

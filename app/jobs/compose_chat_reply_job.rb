@@ -1,6 +1,8 @@
 class ComposeChatReplyJob < ApplicationJob
   queue_as :default
   retry_on StandardError, wait: :polynomially_longer, attempts: 2
+  # Cap concurrent compose-chat jobs to prevent unbounded parallel provider calls.
+  limits_concurrency to: 3, key: "interactive_chat"
 
   def perform(agent_message_id)
     message = AgentMessage.find(agent_message_id)
@@ -18,7 +20,8 @@ class ComposeChatReplyJob < ApplicationJob
       return
     end
 
-    result = Ai::ComposeChatService.new(thread).reply_to(message)
+    # Mark as interactive so the circuit breaker never blocks compose drafting.
+    result = Ai::CircuitBreaker.as_interactive { Ai::ComposeChatService.new(thread).reply_to(message) }
 
     if result.blank? || result[:reply].blank?
       I18n.with_locale(thread.user.locale.presence || I18n.default_locale) do

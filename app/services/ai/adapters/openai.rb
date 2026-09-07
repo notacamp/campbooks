@@ -37,6 +37,11 @@ module Ai
         @endpoint_url.to_s.include?("deepseek") ? "ai_deepseek" : super
       end
 
+      # Match system_health_service so the circuit breaker key is consistent.
+      def provider_name
+        @endpoint_url.to_s.include?("deepseek") ? "deepseek" : super
+      end
+
       def supports_tools? = true
 
       def supports_thinking?(model)

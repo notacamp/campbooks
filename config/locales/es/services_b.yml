@@ -50,6 +50,7 @@ es:
       settings_zdrive: Integración con Zoho Drive
       workflows: Flujos de trabajo
   scout:
+    rate_limited: "Hay demasiadas solicitudes en este momento. Por favor, espera un momento y vuelve a intentarlo."
     ask_cards:
       by: para el %{date}
       due_today: para hoy
