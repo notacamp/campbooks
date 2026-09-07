@@ -118,6 +118,7 @@ fr:
         ai_processing_html:
           one: 'IA : %{count} e-mail en cours'
           other: 'IA : %{count} e-mails en cours'
+        ai_processing_capped_html: "IA : %{count} des %{total} e-mails en cours (limite : %{max})"
         archived:
           one: "%{count} e-mail archivé"
           other: "%{count} e-mails archivés"
@@ -150,6 +151,7 @@ fr:
         processing_ai:
           one: "%{count} e-mail en cours de traitement par l'IA"
           other: "%{count} e-mails en cours de traitement par l'IA"
+        processing_ai_capped: "Traitement des premiers %{count} sur %{total} e-mails par l'IA (limite : %{max})"
         scout_html: "%{count} e-mail(s) envoyé(s) à Scout"
         sent_to_scout: "%{count} e-mail(s) envoyé(s) à Scout"
         snoozed:

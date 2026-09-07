@@ -118,6 +118,7 @@ pt:
         ai_processing_html:
           one: IA a processar %{count} e-mail
           other: IA a processar %{count} e-mails
+        ai_processing_capped_html: "IA a processar os primeiros %{count} de %{total} e-mails (limite: %{max})"
         archived:
           one: Arquivado %{count} e-mail
           other: Arquivados %{count} e-mails
@@ -150,6 +151,7 @@ pt:
         processing_ai:
           one: A processar %{count} e-mail com IA
           other: A processar %{count} e-mails com IA
+        processing_ai_capped: "A processar os primeiros %{count} de %{total} e-mails com IA (limite: %{max})"
         scout_html: "%{count} e-mail(s) enviado(s) para o Scout"
         sent_to_scout: "%{count} e-mail(s) enviado(s) para o Scout"
         snoozed:

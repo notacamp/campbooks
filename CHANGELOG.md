@@ -16,6 +16,18 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+
+- AI circuit breaker: a cache-backed (`Rails.cache`) breaker opens after 5 provider 429 responses in 60 seconds and fast-fails background/bulk AI jobs (they re-queue with backoff) while always letting compose and Scout chat through. Trips per provider (Mistral, OpenAI, Anthropic, …); auto-resets after 2 minutes. The `Ai::CircuitBreaker.open?(provider:)` method is a seam for future token-budget checks.
+- Interactive Scout and compose chat jobs (`AgentChatReplyJob`, `ComposeChatReplyJob`, `EmailChatReplyJob`, `AiSetupChatReplyJob`) now use `limits_concurrency to: 3, key: "interactive_chat"` so a burst of chat requests cannot open unbounded parallel provider connections.
+- Bulk "Process with AI" fan-out is capped at 200 messages per request (`Tools::BulkProcessAi::MAX_BULK_AI`). The UI reports how many were processed and how many were skipped when the cap is hit.
+- Scout replies with a friendly "I'm handling a lot of requests" message instead of calling the provider when a workspace exceeds 20 Scout messages per minute.
+- Per-workspace daily managed-AI call budget guard (`Ai::Budget` + `Ai::BudgetMiddleware`): a cache-backed counter caps the number of AI calls a single managed-cloud workspace can make per day (`AI_DAILY_CALL_CEILING`, default 10 000), with an optional tighter probation cap for brand-new workspaces (`AI_PROBATION_DAILY_CAP`, off by default). Self-hosted installs and BYO-key workspaces are never affected. Background jobs are discarded (not retried) when the cap is hit; Scout and compose chat post a friendly "You've reached today's AI limit" message instead.
+
+### Fixed
+
+- `Ai::CircuitBreaker::BackgroundBlocked` now inherits from `Exception` instead of `StandardError`, so it propagates past the pervasive service-level `rescue => e … nil` clauses in the background AI services (`Ai::ContactAnalyzer`, `Ai::EmailClassifier`, `Ai::ReminderExtractor`, `EmbeddingService`, etc.) and reaches the job's retry handler — previously these services would silently swallow the blocked call and return `nil`, causing downstream logic to misinterpret a transient breaker-open as a real analysis failure.
+- `ApplicationJob` now declares `retry_on Ai::CircuitBreaker::BackgroundBlocked` with polynomial backoff (6 attempts, spanning well past the breaker's 120-second window), so every background AI job re-queues cleanly instead of dying on a transient 429 storm.
 ### Changed
 
 - Mail that lives in Spam, Junk, or Trash folders is ingested and kept visible but now skips all AI processing (triage, embedding, contact profiling, reminder extraction). The provider has already decided it is unwanted; spending LLM calls on it manufactured ghost tasks and wasted budget.
