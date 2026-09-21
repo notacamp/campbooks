@@ -16,6 +16,9 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+- SPA **Inbox settings** page: manage tags, email rules, signatures, document types, tag groups, and sender filtering (allowed/blocked/starred + inbox filter strategy) — as tabbed sections.
+
 ## [0.42.0] - 2026-09-21
 
 ### Added
