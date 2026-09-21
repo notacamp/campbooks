@@ -43,7 +43,7 @@ module Api
             entry.can_send   = true
             entry.can_manage = true
           end
-          render_data(Api::App::Email::AccountSerializer.new(@account, user: current_user).as_json, status: :created)
+          render_data(::Api::App::Email::AccountSerializer.new(@account, user: current_user).as_json, status: :created)
         end
 
         # PATCH /api/app/imap_accounts/:id
@@ -58,7 +58,7 @@ module Api
           verify_credentials || return
 
           @account.save!
-          render_data(Api::App::Email::AccountSerializer.new(@account, user: current_user).as_json)
+          render_data(::Api::App::Email::AccountSerializer.new(@account, user: current_user).as_json)
         end
 
         private
@@ -75,9 +75,25 @@ module Api
           )
         end
 
+        # Live-verify credentials via the mail client. Returns true on success;
+        # renders a structured error and returns false on failure so the action bails.
         def verify_credentials
+          ::Imap::HostGuard.validate!(@account.imap_host)
           @account.mail_client.verify!
           true
+        rescue ::Imap::HostGuard::BlockedError => e
+          render_error("blocked_host", e.message, status: :unprocessable_entity)
+          false
+        rescue AuthenticationError
+          render_error("authentication_failed",
+                       "Could not sign in — check your email address and password.",
+                       status: :unprocessable_entity)
+          false
+        rescue IOError, Errno::ECONNREFUSED => e
+          render_error("connection_failed",
+                       "Could not reach the IMAP server: #{e.message}",
+                       status: :unprocessable_entity)
+          false
         rescue => e
           render_error("imap_verification_failed", e.message, status: :unprocessable_entity)
           false

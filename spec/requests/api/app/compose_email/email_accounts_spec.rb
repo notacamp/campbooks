@@ -67,13 +67,13 @@ RSpec.describe "API app email accounts", type: :request do
       expect(EmailAccountRemovalJob).to have_received(:perform_later).with(account.id)
     end
 
-    it "returns 403 when non-owner tries to disconnect" do
+    it "returns 404 when non-owner tries to disconnect (404-not-403 rule)" do
       reader = create(:user, workspace: workspace)
       create(:email_account_user, user: reader, email_account: account, can_read: true,
                                   can_manage: true, owner: false)
 
       delete "/api/app/email_accounts/#{account.id}", headers: api_app_headers(reader)
-      expect(response).to have_http_status(:forbidden)
+      expect(response).to have_http_status(:not_found)
     end
   end
 

@@ -26,6 +26,8 @@ class Oauth::ZohoController < ApplicationController
     Rails.logger.error("[Oauth::ZohoController] Params: code=#{params[:code].present?}, state=#{params[:state]}, error=#{params[:error]}")
     if native_oauth?
       redirect_to_native(flow: oauth_state["flow"], status: "error")
+    elsif spa_account_link_flow?
+      redirect_to spa_callback_error_url("connect_failed"), allow_other_host: true
     else
       target = case @oauth_flow
       when "sign_in" then new_session_path

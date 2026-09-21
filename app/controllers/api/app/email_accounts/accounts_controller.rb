@@ -33,9 +33,9 @@ module Api
 
         # DELETE /api/app/email_accounts/:id
         def destroy
-          unless @account.owned_by?(current_user)
-            return render_error("forbidden", "Only the account owner can disconnect it.", status: :forbidden)
-          end
+          # 404-not-403 rule: don't reveal to a sharee that they lack permission.
+          # Raise NotFound so it looks identical to a missing account.
+          raise ::ActiveRecord::RecordNotFound unless @account.owned_by?(current_user)
 
           ::Events.publish("email_account.disconnected",
                            subject: @account,

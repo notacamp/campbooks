@@ -18,6 +18,8 @@ module EmailAccountCapGuard
 
     if native_oauth?
       redirect_to_native(flow: "connect", status: "limit_reached")
+    elsif spa_account_link_flow?
+      redirect_to spa_callback_error_url("cap_reached"), allow_other_host: true
     else
       redirect_to account_link_failure_path,
                   error: t("entitlements.blocked.email_accounts_cap",
