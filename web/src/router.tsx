@@ -11,7 +11,7 @@
  *   /login          → unauthenticated, no shell (LoginPage)
  *   /               → redirects to /today (or /login if no token)
  *   /_auth/*        → protected layout (AppShell + beforeLoad token check)
- *     /today, /inbox, /books, /calendar
+ *     /today, /inbox, /books, /calendar, /settings
  */
 import { createRootRoute, createRoute, createRouter, redirect } from "@tanstack/react-router";
 import { RootLayout } from "./routes/root-layout";
@@ -23,6 +23,7 @@ import { buildInboxRoutes } from "./routes/inbox";
 import { buildTodayRoutes } from "./routes/today";
 import { buildBooksRoutes } from "./routes/books";
 import { buildCalendarRoutes } from "./routes/calendar";
+import { buildSettingsRoutes } from "./routes/settings";
 
 // ── Root route ────────────────────────────────────────────────────────────────
 // Renders RootLayout (ThemeProvider + Outlet) around every child via <Outlet />.
@@ -56,6 +57,7 @@ const routeTree = rootRoute.addChildren([
     ...buildInboxRoutes(authRoute),
     ...buildBooksRoutes(authRoute),
     ...buildCalendarRoutes(authRoute),
+    ...buildSettingsRoutes(authRoute),
   ]),
 ]);
 
