@@ -221,10 +221,12 @@ const handledLine = (h: HandledCounts): string => {
   return parts.join(" · ");
 };
 
-/** True when the browser prefers reduced motion. Safe for SSR. */
-const prefersReducedMotion = (): boolean =>
-  typeof window !== "undefined" &&
-  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+/**
+ * How long a resolved item shows its "Done · Undo" strip before it collapses —
+ * i.e. the undo window. Kept under the route's post-success cache reconcile
+ * (UNDO_RECONCILE_MS = 5000) so the strip is gone before the list reconciles.
+ */
+const UNDO_WINDOW_MS = 4000;
 
 // ── Item card ─────────────────────────────────────────────────────────────────
 
@@ -415,17 +417,21 @@ export const TodayView = forwardRef<HTMLElement, TodayViewProps>(
         });
 
         // Collapse the card once the mutation has actually succeeded — unless
-        // the user hit Undo while it was in flight.
+        // the user hit Undo while it was in flight. The "Done · Undo" strip
+        // stays for UNDO_WINDOW_MS, which is the undo window: a functional
+        // affordance, so it holds regardless of reduced-motion (the collapse
+        // ANIMATION is CSS-gated on prefers-reduced-motion). Kept comfortably
+        // under the route's post-success reconcile (UNDO_RECONCILE_MS = 5s) so
+        // the strip is already gone before the cache reconciles.
         const startCollapse = (): void => {
           if (undoneRef.current.has(itemId)) {
             undoneRef.current.delete(itemId);
             return;
           }
-          const delay = prefersReducedMotion() ? 0 : 900;
           timersRef.current[itemId] = setTimeout(() => {
             setGoneIds((prev) => new Set([...prev, itemId]));
             delete timersRef.current[itemId];
-          }, delay);
+          }, UNDO_WINDOW_MS);
         };
 
         // The mutation failed: restore the card and surface a quiet inline note

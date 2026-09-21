@@ -22,8 +22,8 @@ namespace :api do
     # ── Settings namespace ────────────────────────────────────────────────────
     # All controllers here are Api::App::Settings::* (path: settings/*)
     namespace :settings, module: "settings" do
-      resource :workspace, only: %i[show update]
-      resource :plan, only: :show
+      resource :workspace, only: %i[show update], controller: "workspace"
+      resource :plan, only: :show, controller: "plan"
 
       resources :members, only: %i[index update]
 
@@ -35,7 +35,7 @@ namespace :api do
       end
 
       # ── AI settings ──────────────────────────────────────────────────────
-      resource :ai, only: :show do
+      resource :ai, only: :show, controller: "ai" do
         post :switch_mode
         patch :embeddings
       end
@@ -44,12 +44,12 @@ namespace :api do
 
       resources :ai_prompts, only: %i[index show update], param: :purpose
 
-      resource :data_privacy, only: %i[show update]
+      resource :data_privacy, only: %i[show update], controller: "data_privacy"
 
       # ── Integrations ──────────────────────────────────────────────────────
       namespace :integrations do
         get "/", to: "index#show", as: :overview
-        resource :notion, only: %i[show update] do
+        resource :notion, only: %i[show update], controller: "notion" do
           delete "workspaces/:id", action: :destroy, as: :workspace
         end
         resource :calendars, only: :show
@@ -57,7 +57,7 @@ namespace :api do
       end
 
       # ── Scout memory ────────────────────────────────────────────────────
-      resource :memory, only: :show do
+      resource :memory, only: :show, controller: "memory" do
         post :teach
         resources :entries, only: %i[destroy] do
           member { post :confirm }
@@ -94,7 +94,7 @@ namespace :api do
 
       resources :tag_groups, only: %i[index create update destroy]
 
-      resource :filtering, only: %i[show update] do
+      resource :filtering, only: %i[show update], controller: "filtering" do
         post :set_sender
       end
     end

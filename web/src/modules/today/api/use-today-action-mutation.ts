@@ -1,164 +1,99 @@
 /**
- * modules/today/api — action mutations for the Today surface.
+ * modules/today/api — data-driven action mutations for the Today surface.
  *
- * useTodayActionMutation:
- *   Dispatches the forward action to the correct e1 endpoint based on
- *   the item's source ("people" | "time" | "money").
- *   - people → POST /api/app/people/:ref_id/action { kind }
- *   - time (task) → POST /api/app/asks/:ref_id/done|snooze
- *   - time (deadline/reminder) → POST /api/app/reminders/:ref_id/confirm
- *                                 DELETE /api/app/reminders/:ref_id
- *   - money → navigational only (view/add_statement/reconcile); logged no-op.
+ * e1's serializer makes every action self-describing:
+ *   { kind, label, primary, endpoint, method, body?, undo?: { endpoint, method, body? } }
+ * So we fire `action.endpoint`/`method`/`body` directly (no source-based dispatch),
+ * and on Undo fire `action.undo`. Navigational actions (no endpoint — e.g. money
+ * "review") are handled by the route (it opens the surface), not here.
  *
- *   No optimistic cache removal — TodayView owns the visual collapse + undo
- *   strip, so stripping needs_you would hide it. onSuccess invalidates ["today"]
- *   to re-sync (the server did the action). The mutation promise rejects on a
- *   non-2xx so the view can roll its collapse back (see routes/today.tsx).
- *
- * useTodayUndoMutation:
- *   Inverse of people actions (archive → unarchive, done → undo_done,
- *   snooze → unsnooze) using the undo_kind + undo_params returned by the
- *   people actions endpoint.
- *   For time/money items there is no server-side undo; settling ["today"]
- *   is the restore (the aggregator re-queries on each request).
+ * No optimistic cache mutation: TodayView owns the collapse/undo strip, so
+ * removing the item from needs_you would hide it. onSuccess invalidates ["today"]
+ * to re-sync; the mutation promise rejects on a non-2xx so the view rolls back.
  */
-
 import {
   useMutation,
   useQueryClient,
   type UseMutationResult,
 } from "@tanstack/react-query";
 import { apiClient } from "~/lib/api";
-import { logger } from "~/lib/logger";
-import type { NeedsYouItem } from "~/modules/today/components";
+import type { TodayAction } from "~/modules/today/components";
 import { todayKeys } from "./index";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── A self-describing call (a forward action or its inverse) ────────────────────
 
-export interface TodayActionVars {
-  itemId: string;
-  actionKey: string;
-  item: NeedsYouItem;
+export interface ActionCall {
+  endpoint: string;
+  method: string;
+  body?: Record<string, unknown> | null;
 }
 
-/** The relevant fields from the people-action server response. */
-export interface TodayActionResult {
-  undoKind?: string;
-  undoParams?: Record<string, unknown>;
+/**
+ * The runtime shape of a Today action: b4's view-facing `TodayAction`
+ * ({kind,label,primary}) plus the dispatch hints e1's serializer adds. The
+ * view doesn't declare these (it only needs the label), so we extend it here.
+ */
+export interface TodayActionHints extends TodayAction {
+  endpoint?: string;
+  method?: string;
+  body?: Record<string, unknown> | null;
+  undo?: ActionCall | null;
 }
 
-export interface TodayUndoVars {
-  ref_id: string | number;
-  undoKind: string;
-  undoParams?: Record<string, unknown>;
-}
+const fireCall = async ({ endpoint, method, body }: ActionCall): Promise<void> => {
+  // e1's hint endpoints are absolute (they already include /api/app); apiClient
+  // re-prepends /api/app, so strip the redundant prefix to avoid /api/app/api/app.
+  // (A relative endpoint has no prefix to strip, so this is safe either way.)
+  const path = endpoint.replace(/^\/api\/app/, "");
+  await apiClient(path, {
+    method: method.toUpperCase(),
+    ...(body != null ? { body } : {}),
+  });
+};
 
-// ── People action response shape ──────────────────────────────────────────────
-
-interface PeopleActionResponse {
-  row: unknown;
-  undo_kind?: string;
-  undo_params?: Record<string, unknown>;
-  message?: string;
-}
+// After a successful action, TodayView owns the optimistic collapse + the undo
+// window, keeping the actioned item in the cache so Undo can restore it. We
+// reconcile the cache only AFTER that window closes — refetching sooner would
+// remove the item and yank the in-place "Undo" strip mid-window. Keep this
+// comfortably longer than TodayView's undo window.
+const UNDO_RECONCILE_MS = 5000;
 
 // ── useTodayActionMutation ────────────────────────────────────────────────────
 
 export const useTodayActionMutation = (): UseMutationResult<
-  TodayActionResult,
+  void,
   Error,
-  TodayActionVars
+  ActionCall
 > => {
   const queryClient = useQueryClient();
 
-  return useMutation<TodayActionResult, Error, TodayActionVars>({
-    mutationFn: async ({ item, actionKey }) => {
-      const { source, ref_id } = item;
-
-      if (source === "people") {
-        // POST /api/app/people/:ref_id/action { kind }
-        const resp = await apiClient<PeopleActionResponse>(
-          `/people/${ref_id}/action`,
-          { method: "POST", body: { kind: actionKey } },
-        );
-        return {
-          undoKind: resp.undo_kind,
-          undoParams: resp.undo_params,
-        };
-      }
-
-      if (source === "time") {
-        const isTask = item.id.startsWith("time_task_");
-        const isDeadline = item.id.startsWith("time_deadline_");
-
-        if (isTask) {
-          if (actionKey === "done") {
-            await apiClient(`/asks/${ref_id}/done`, { method: "POST" });
-          } else if (actionKey === "snooze") {
-            await apiClient(`/asks/${ref_id}/snooze`, { method: "POST" });
-          } else {
-            logger.info(
-              `[today] unhandled task action: ${actionKey} for item ${item.id}`,
-            );
-          }
-        } else if (isDeadline) {
-          if (actionKey === "confirm") {
-            await apiClient(`/reminders/${ref_id}/confirm`, { method: "POST" });
-          } else if (actionKey === "dismiss") {
-            await apiClient(`/reminders/${ref_id}`, { method: "DELETE" });
-          } else {
-            logger.info(
-              `[today] unhandled deadline action: ${actionKey} for item ${item.id}`,
-            );
-          }
-        } else {
-          logger.info(
-            `[today] unknown time item type for action: ${actionKey} — id=${item.id}`,
-          );
-        }
-        return {};
-      }
-
-      // source === "money" — actions (view, add_statement, reconcile) are navigational.
-      // TODO(actions): confirm route with e1 — money Today actions are navigational
-      logger.info(
-        `[today] money action (navigational, no-op): ${actionKey} item=${item.id}`,
-      );
-      return {};
-    },
-
-    // No optimistic cache mutation: TodayView owns the collapse/undo strip and
-    // the resolved→gone lifecycle. Removing the item from needs_you here would
-    // hide that strip. On success the server performed the action, so refetch
-    // to re-sync; on failure the promise rejects and the view rolls back.
+  return useMutation<void, Error, ActionCall>({
+    mutationFn: fireCall,
+    // Don't refetch immediately: TodayView keeps the actioned item in the cache
+    // for its in-place undo window, and an immediate refetch would remove it and
+    // yank the "Undo" strip mid-window. Reconcile only after the window closes
+    // (so the item also doesn't reappear on remount). On failure the promise
+    // rejects and TodayView rolls its own collapse back.
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: todayKeys.all });
+      setTimeout(() => {
+        void queryClient.invalidateQueries({ queryKey: todayKeys.all });
+      }, UNDO_RECONCILE_MS);
     },
   });
 };
 
 // ── useTodayUndoMutation ──────────────────────────────────────────────────────
 
-/**
- * Calls the inverse people action (unarchive / undo_done / unsnooze) and
- * re-syncs the Today cache. For time/money items — which have no server-side
- * undo endpoint — invalidating Today is sufficient (the aggregator re-runs).
- */
+/** Fires an action's inverse (`action.undo`) and re-syncs Today. */
 export const useTodayUndoMutation = (): UseMutationResult<
   void,
   Error,
-  TodayUndoVars
+  ActionCall
 > => {
   const queryClient = useQueryClient();
 
-  return useMutation<void, Error, TodayUndoVars>({
-    mutationFn: async ({ ref_id, undoKind, undoParams }) => {
-      await apiClient(`/people/${ref_id}/action`, {
-        method: "POST",
-        body: { kind: undoKind, ...undoParams },
-      });
-    },
-
+  return useMutation<void, Error, ActionCall>({
+    mutationFn: fireCall,
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: todayKeys.all });
     },

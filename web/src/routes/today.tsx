@@ -15,7 +15,7 @@
  * Mirrors the Inbox pattern (useQuery → states → view).
  */
 import { type FC, useState, useCallback, useRef } from "react";
-import { createRoute } from "@tanstack/react-router";
+import { createRoute, useNavigate } from "@tanstack/react-router";
 import type { AnyRoute } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { RotateCcw } from "lucide-react";
@@ -27,7 +27,8 @@ import { useTodayQuery, todayKeys } from "~/modules/today/api";
 import {
   useTodayActionMutation,
   useTodayUndoMutation,
-  type TodayActionResult,
+  type ActionCall,
+  type TodayActionHints,
 } from "~/modules/today/api/use-today-action-mutation";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -115,60 +116,63 @@ const TodaySkeleton: FC = () => (
   </div>
 );
 
-// ── Undo info per item ─────────────────────────────────────────────────────────
-
-interface UndoEntry {
-  ref_id: string | number;
-  undoKind: string;
-  undoParams?: Record<string, unknown>;
-}
-
 // ── TodayPage ─────────────────────────────────────────────────────────────────
 
 export const TodayPage: FC = () => {
   const { data, isFetching, isError, error, refetch } = useTodayQuery();
   const [skimOpen, setSkimOpen] = useState(false);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const actionMutation = useTodayActionMutation();
   const undoMutation = useTodayUndoMutation();
 
-  // Map of itemId → undo info (populated on successful people actions).
-  const undoMapRef = useRef<Map<string, UndoEntry>>(new Map());
+  // Map of itemId → the action's undo call (stashed on a successful action).
+  const undoMapRef = useRef<Map<string, ActionCall>>(new Map());
 
   const handleAction = useCallback(
     (itemId: string, actionKey: string): Promise<void> => {
       const item = data?.needs_you.find((i) => i.id === itemId);
       if (!item) return Promise.resolve();
+      const action = item.actions.find((a) => a.kind === actionKey) as
+        | TodayActionHints
+        | undefined;
 
-      // Return the mutation promise so TodayView can await it: it resolves on
-      // success (the view runs its collapse) and REJECTS on a non-2xx (the view
-      // rolls its collapse back). No optimistic cache change — the view owns undo.
+      // Navigational action (no endpoint — e.g. money "review") → open the surface.
+      if (!action?.endpoint) {
+        const dest =
+          item.source === "money"
+            ? "/books"
+            : item.source === "time"
+              ? "/calendar"
+              : "/inbox";
+        void navigate({ to: dest });
+        return Promise.resolve();
+      }
+
+      // Fire the self-describing call. Return the promise so TodayView can await
+      // it (resolve → collapse, reject → rollback). Stash the undo for onUndo.
       return actionMutation
-        .mutateAsync({ itemId, actionKey, item })
-        .then((result: TodayActionResult) => {
-          // Store undo info for people items so handleUndo can call the inverse.
-          if (result.undoKind && item.source === "people") {
-            undoMapRef.current.set(itemId, {
-              ref_id: item.ref_id,
-              undoKind: result.undoKind,
-              undoParams: result.undoParams,
-            });
-          }
+        .mutateAsync({
+          endpoint: action.endpoint,
+          method: action.method ?? "POST",
+          body: action.body ?? null,
+        })
+        .then(() => {
+          if (action.undo) undoMapRef.current.set(itemId, action.undo);
         });
     },
-    [data, actionMutation],
+    [data, actionMutation, navigate],
   );
 
   const handleUndo = useCallback(
     (itemId: string): void => {
-      const entry = undoMapRef.current.get(itemId);
-      if (entry) {
+      const undo = undoMapRef.current.get(itemId);
+      if (undo) {
         undoMapRef.current.delete(itemId);
-        undoMutation.mutate(entry);
+        undoMutation.mutate(undo);
       } else {
-        // No undo endpoint for time/money — refetch so the aggregator can
-        // restore the item if the action was not yet permanent.
+        // No inverse for this action (e.g. "paid" is one-way) — refetch.
         void queryClient.invalidateQueries({ queryKey: todayKeys.all });
       }
     },

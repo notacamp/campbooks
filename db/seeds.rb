@@ -637,7 +637,10 @@ unless org.settings["rich_demo_seeded_v1"]
   # correctly and archive/snooze actions can persistently move it out.
   def seed_demo_message(account:, thread:, contact:, from:, to:, subject:, received_at:,
                         body: nil, ai_action_prompt: nil, ai_priority: nil)
-    mid = Digest::SHA1.hexdigest("#{thread.id}:#{from}:#{received_at.to_i}")
+    # Stable identity across re-seeds: use fixed parts only (NOT received_at,
+    # which is relative — "3.days.ago" changes every run, minting a new message
+    # each time and cascading to duplicate reminders keyed on the message).
+    mid = Digest::SHA1.hexdigest("#{thread.id}:#{from}:#{to}:#{subject}")
     msg = EmailMessage.find_or_create_by!(email_account: account, provider_message_id: mid) do |m|
       m.email_thread = thread
       m.contact = contact
