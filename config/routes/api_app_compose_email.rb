@@ -72,7 +72,11 @@ namespace :api do
     # ── OAuth authorize URL (returns URL; does NOT redirect) ─────────────────
     # The SPA/Capacitor opens this URL in the system browser. See
     # api-migration/compose-email.md § Open questions for the connect flow.
-    namespace :oauth do
+    #
+    # Note: `scope :oauth` (not `namespace`) so the URL path is /api/app/oauth/
+    # but the module prefix stays api/app/ — resolves to
+    # Api::App::EmailAccounts::OauthController, not Api::App::Oauth::*.
+    scope :oauth do
       get :authorize_url, to: "email_accounts/oauth#authorize_url"
     end
 

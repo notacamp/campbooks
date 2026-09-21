@@ -22,6 +22,8 @@ class Oauth::GoogleMailController < ApplicationController
     Rails.logger.error("[Oauth::GoogleMailController] OAuth callback failed: #{e.message}")
     if native_oauth?
       redirect_to_native(flow: oauth_state["flow"], status: "error")
+    elsif spa_account_link_flow?
+      redirect_to spa_callback_error_url("connect_failed"), allow_other_host: true
     else
       redirect_to oauth_failure_redirect, error: t(".auth_failed")
     end

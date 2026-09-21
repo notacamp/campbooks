@@ -41,21 +41,29 @@ module OauthNativeHandoff
         %w[account_link add_sign_in].include?(oauth_state["flow"])
     end
 
-    # Flows allowed to run without a session cookie: sign-in (no user yet) and a
-    # native authenticated flow (identity rides in the signed state instead).
+    # An authenticated account-link flow from the React SPA: the identity rides in
+    # the HMAC-signed state (no session cookie crosses into the OAuth auth window).
+    # Only fires on a valid, verified state with spa: true.
+    def spa_account_link_flow?
+      oauth_state["verified"] && oauth_state["spa"] &&
+        oauth_state["flow"] == "account_link"
+    end
+
+    # Flows allowed to run without a session cookie: sign-in (no user yet), a
+    # native authenticated flow, or a SPA account-link flow.
     def unauthenticated_oauth_flow?
-      sign_in_flow? || native_authenticated_flow?
+      sign_in_flow? || native_authenticated_flow? || spa_account_link_flow?
     end
 
     def native_oauth?
       oauth_state["native"]
     end
 
-    # For a native account-link, authenticate from the verified state so the
-    # existing handlers (which read Current.user / Current.workspace) are unchanged.
-    # Workspace is derived from the user — never trusted from the wire.
+    # For a native or SPA account-link, authenticate from the verified state so
+    # the existing handlers (which read Current.user / Current.workspace) work
+    # unchanged. Workspace is derived from the user — never trusted from the wire.
     def assume_native_identity
-      return unless native_authenticated_flow?
+      return unless native_authenticated_flow? || spa_account_link_flow?
 
       Current.acting_user = User.find(oauth_state["user_id"])
       Current.workspace   = Current.acting_user.workspace
@@ -97,10 +105,13 @@ module OauthNativeHandoff
       end
     end
 
-    # Finish an account-link: native pops back into the app; web redirects as before.
+    # Finish an account-link: native pops back into the app; SPA redirects to the
+    # return_to URL embedded in the signed state; web redirects as before.
     def complete_oauth_account_link(success_message)
       if native_oauth?
         redirect_to_native(flow: "connect", status: "success")
+      elsif spa_account_link_flow?
+        redirect_to spa_callback_url(status: "success"), allow_other_host: true
       else
         return_to = session.delete(:onboarding_return_to)
         redirect_to (return_to || email_messages_path(inbox_settings: "accounts")), success: success_message
@@ -150,5 +161,36 @@ module OauthNativeHandoff
     # session intercepts this scheme and hands the URL back to the app.
     def redirect_to_native(**params)
       redirect_to "#{NATIVE_SCHEME}://oauth?#{params.compact.to_query}", allow_other_host: true
+    end
+
+    # ── SPA OAuth helpers ────────────────────────────────────────────────────
+
+    # Root URL of the React SPA frontend. Reads APP_FRONTEND_URL (set in
+    # production); falls back to localhost:3100 for local development.
+    def spa_frontend_url(path = "/")
+      root = ENV.fetch("APP_FRONTEND_URL", "http://localhost:3100").chomp("/")
+      path.start_with?("/") ? "#{root}#{path}" : "#{root}/#{path}"
+    end
+
+    # Build the SPA redirect URL after a successful or failed OAuth account-link.
+    # `return_to` from the signed state is trusted (signature already verified)
+    # but we still validate the origin to prevent an open-redirect if the state
+    # key is misused via a cross-site leak (belt-and-suspenders).
+    def spa_callback_url(**extra_params)
+      raw = oauth_state["return_to"].to_s.strip
+      frontend_root = spa_frontend_url("/")
+
+      base = if raw.present? && (raw.start_with?(frontend_root) || raw.start_with?("/"))
+        raw.start_with?("/") ? spa_frontend_url(raw) : raw
+      else
+        spa_frontend_url("/settings/mailboxes")
+      end
+
+      extra_params.any? ? "#{base}#{base.include?("?") ? "&" : "?"}#{extra_params.to_query}" : base
+    end
+
+    # Convenience: SPA redirect URL for callback errors.
+    def spa_callback_error_url(reason)
+      spa_callback_url(error: reason)
     end
 end
