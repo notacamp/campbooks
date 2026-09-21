@@ -16,6 +16,9 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+- SPA settings pages: **AI** (managed vs bring-your-own processing mode, embedding model, provider adapters, per-purpose prompt customization) and **Scout's memory** (the learned-behaviour catalog with facet filters, teach, and confirm/remove).
+
 ## [0.42.0] - 2026-09-21
 
 ### Added
