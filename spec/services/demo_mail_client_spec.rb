@@ -57,6 +57,10 @@ RSpec.describe EmailAccount, "#mail_client" do
 
   it "does not return a DemoMailClient for a real account" do
     account = build(:email_account, provider: :zoho, refresh_token: "1000.realtoken")
+    # Stub the provider client so this doesn't depend on ZOHO_CLIENT_ID being set
+    # (the real client ENV.fetches its credentials at init — unset in CI). We only
+    # need to assert the demo? gate routes a real account away from DemoMailClient.
+    allow(Zoho::OauthClient).to receive(:new).and_return(instance_double(Zoho::OauthClient))
     expect(account.mail_client).not_to be_a(DemoMailClient)
   end
 end
