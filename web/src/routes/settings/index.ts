@@ -38,7 +38,8 @@ import { InboxSettingsPage } from "./InboxSettingsPage";
 import { IntegrationsPage } from "./IntegrationsPage";
 import { NotificationsPage } from "./NotificationsPage";
 import { PlanPage } from "./PlanPage";
-import { MailboxesPage } from "./MailboxesPage";
+// Mailboxes is a full feature module (OAuth connect + IMAP), not a stub page.
+import { MailboxesPage } from "~/modules/settings/mailboxes";
 
 // ── Route builder ─────────────────────────────────────────────────────────────
 
@@ -125,6 +126,13 @@ export const buildSettingsRoutes = (parent: AnyRoute): AnyRoute[] => {
     getParentRoute: () => layout,
     path: "mailboxes",
     component: MailboxesPage,
+    // The OAuth callback bridges back to /settings/mailboxes?connected=<provider>
+    // (or ?error=<reason>); the page reads these to show a result banner.
+    validateSearch: (search: Record<string, unknown>) => ({
+      connected:
+        typeof search.connected === "string" ? search.connected : undefined,
+      error: typeof search.error === "string" ? search.error : undefined,
+    }),
   });
 
   return [
