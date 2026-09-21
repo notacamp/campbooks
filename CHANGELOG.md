@@ -17,6 +17,7 @@ major, minor, or patch change here.
 ## [Unreleased]
 
 ### Added
+- SPA settings pages: **AI** (managed vs bring-your-own processing mode, embedding model, provider adapters, per-purpose prompt customization) and **Scout's memory** (the learned-behaviour catalog with facet filters, teach, and confirm/remove).
 - SPA settings pages: **Plan** (usage + entitlements), **Notifications** (in-app notification center + per-tag/document-type in-app/email preferences + waiting-on-replies digest), **Members** (roles + invitations), and **Integrations** (Google Drive / Notion / Zoho / Calendars status + Connections CRUD).
 
 ### Fixed
