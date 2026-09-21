@@ -16,9 +16,12 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-09-21
+
 ### Added
 - First-party JSON API (`/api/app`) backing a new decoupled React SPA: screen-shaped, session-bearer-authed endpoints for every surface (Today, People/Inbox, Money, Time, Paper/Files, Calendar, Scout, Settings), a per-user realtime channel, and a rich demo seed with a `demo:reset` task. Additive — the existing Hotwire UI is unchanged.
 - Connect a mailbox from the SPA (Settings → Mailboxes): an OAuth "add mailbox" flow for Google/Zoho/Microsoft, bridged to the existing provider callbacks via a signed, TTL-bound state (no new redirect URIs), plus IMAP connect with host-guard validation.
+- Settings in the SPA: a `/settings` surface with a left sub-nav — Account, Workspace, and Data & privacy fully editable (more sections to come), reachable from a Settings entry in the sidebar footer and by clicking your profile.
 
 ## [0.41.0] - 2026-09-07
 
