@@ -16,6 +16,9 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+- Settings → Mailboxes now renders the real connect UI (Google/Zoho/Microsoft + IMAP); the `/settings/mailboxes` route was wired to a placeholder in 0.42.0.
+
 ## [0.42.0] - 2026-09-21
 
 ### Added
