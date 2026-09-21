@@ -15,6 +15,9 @@ es:
     settled:
       line: "línea %{number}"
     needs_you:
+      add_statement:
+        title: "El extracto de %{month} aún no ha llegado"
+        meta: "el mes por conciliar"
       no_name: "Transferencia, sin nombre en la línea"
       no_invoice:
         title: "Ninguna factura para este pago"

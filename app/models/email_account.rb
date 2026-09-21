@@ -9,6 +9,12 @@ class EmailAccount < ApplicationRecord
   # Harmonized OKLCH family (see app/assets/tailwind/application.css tones).
   COLORS = %w[#595dec #0584da #00a8a8 #2ea55c #dca81c #e76e08 #de3b3d #d44996].freeze
 
+  # Sentinel refresh_token written by db/seeds.rb for the demo workspace account.
+  # When present the account is treated as a local demo: provider calls are
+  # replaced by DemoMailClient so inbox-move actions (archive/snooze/…) work
+  # without any real OAuth credentials.
+  DEMO_TOKEN = "DEMO_SEED_PLACEHOLDER"
+
   enum :provider, { zoho: 0, google: 1, microsoft: 2, imap: 3 }, default: :zoho
 
   has_many :email_threads, dependent: :destroy
@@ -111,7 +117,15 @@ class EmailAccount < ApplicationRecord
     display_name.strip.first.to_s.upcase
   end
 
+  # True when this is the seeded demo account (no real OAuth credentials).
+  # All provider-network operations must be skipped for demo accounts.
+  def demo?
+    refresh_token == DEMO_TOKEN
+  end
+
   def mail_client
+    return DemoMailClient.new if demo?
+
     case provider.to_sym
     when :google then Google::MailClient.new(self)
     when :microsoft then Microsoft::MailClient.new(self)

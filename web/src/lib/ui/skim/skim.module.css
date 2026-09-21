@@ -1,0 +1,285 @@
+/*
+ * Skim — a focused one-card-at-a-time lens.
+ *
+ * Ported from the `.rx-skim` / `.sk-*` rules in the approved prototype
+ * (rx-style.css). All colour comes from `var(--cb-*)` tokens or
+ * `color-mix(in oklch, var(--cb-*) ...)`. No raw hex, no oklch() literals.
+ *
+ * Naming: camelCase for CSS Modules interop (styles.outR etc.).
+ */
+
+/* ── Overlay backdrop ─────────────────────────────────────────────────────── */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in oklch, var(--cb-bg) 84%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+}
+
+/* ── Top bar: progress + count + close ────────────────────────────────────── */
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px clamp(20px, 4vw, 44px) 6px;
+}
+
+.count {
+  font-size: 12.5px;
+  color: var(--cb-t3);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  min-width: 44px;
+}
+
+.progress {
+  flex: 1;
+  display: flex;
+  gap: 5px;
+}
+
+.seg {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--cb-line-2);
+  overflow: hidden;
+}
+
+.segDone {
+  background: var(--cb-accent);
+}
+
+/* Partially-filled current segment */
+.segCur::after {
+  content: "";
+  display: block;
+  height: 100%;
+  width: 45%;
+  border-radius: 2px;
+  background: var(--cb-accent);
+}
+
+.closeBtn {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--cb-r1);
+  background: transparent;
+  color: var(--cb-t3);
+  cursor: pointer;
+  transition: background var(--cb-dur) var(--cb-ease), color var(--cb-dur) var(--cb-ease);
+  flex: none;
+}
+
+.closeBtn:hover {
+  background: var(--cb-hover);
+  color: var(--cb-t1);
+}
+
+.closeBtn:focus-visible {
+  outline: 2px solid var(--cb-accent);
+  outline-offset: 2px;
+}
+
+/* ── Stage: card display area ─────────────────────────────────────────────── */
+
+.stage {
+  flex: 1;
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 8px clamp(16px, 4vw, 44px) clamp(20px, 4vw, 40px);
+  min-height: 0;
+}
+
+/* ── Card ─────────────────────────────────────────────────────────────────── */
+
+.card {
+  position: absolute;
+  width: min(560px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--cb-line-2) transparent;
+  background: var(--cb-s1);
+  border-radius: var(--cb-r4);
+  box-shadow:
+    var(--cb-shadow-pop),
+    inset 0 0 0 1px var(--cb-line-2),
+    inset 0 1px 0 var(--cb-hl);
+  padding: clamp(20px, 3vw, 28px);
+  display: grid;
+  gap: 15px;
+  transition: transform 0.4s var(--cb-ease), opacity 0.35s;
+}
+
+/* Fly-out directions */
+.outR {
+  transform: translateX(118%) rotate(7deg);
+  opacity: 0;
+}
+
+.outL {
+  transform: translateX(-118%) rotate(-7deg);
+  opacity: 0;
+}
+
+.outD {
+  transform: translateY(44px) scale(0.96);
+  opacity: 0;
+}
+
+/* Enter animation (applied once on mount) */
+.enter {
+  animation: skIn 0.45s var(--cb-ease);
+}
+
+@keyframes skIn {
+  from {
+    transform: translateY(26px) scale(0.975);
+    opacity: 0;
+  }
+}
+
+/* ── Card sections ────────────────────────────────────────────────────────── */
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.whoText {
+  flex: 1;
+  min-width: 0;
+}
+
+.whoTitle {
+  font-family: var(--cb-font-display);
+  font-weight: 650;
+  font-size: 1.3rem;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.whoSub {
+  font-size: 13px;
+  color: var(--cb-t3);
+  margin-top: 1px;
+}
+
+.pill {
+  margin-left: auto;
+  flex: none;
+}
+
+.read {
+  font-size: 15.5px;
+  line-height: 1.55;
+  color: var(--cb-t1);
+}
+
+/* Scout's draft preview block */
+.draft {
+  padding: 14px 16px;
+  border-radius: var(--cb-r3);
+  background: color-mix(in oklch, var(--cb-accent) 8%, var(--cb-s3));
+  box-shadow: inset 0 0 0 1px var(--cb-line);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--cb-t2);
+}
+
+.draftLabel {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cb-accent-hi);
+  margin-bottom: 6px;
+}
+
+/* Action buttons row */
+.acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.keyHint {
+  opacity: 0.55;
+  font-size: 11px;
+  margin-left: 6px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Keyboard hint below buttons */
+.hint {
+  font-size: 12px;
+  color: var(--cb-t4);
+  text-align: center;
+  margin-top: -4px;
+}
+
+/* ── Cleared / end state ──────────────────────────────────────────────────── */
+
+.end {
+  display: grid;
+  text-align: center;
+  gap: 12px;
+  justify-items: center;
+  animation: skIn 0.45s var(--cb-ease);
+}
+
+.endTitle {
+  font-family: var(--cb-font-display);
+  font-size: 1.9rem;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.endSub {
+  color: var(--cb-t2);
+  max-width: 30ch;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* ── Reduced motion ───────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none !important;
+    /* Only fade, no movement */
+    transition: opacity 0.12s !important;
+  }
+
+  .outR,
+  .outL,
+  .outD {
+    /* Cancel the transform on all three fly-out classes */
+    transform: none !important;
+  }
+
+  .enter {
+    animation: none !important;
+  }
+
+  .end {
+    animation: none !important;
+  }
+}

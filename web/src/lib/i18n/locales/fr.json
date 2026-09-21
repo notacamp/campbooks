@@ -1,0 +1,18 @@
+{
+  "common.loading": "Chargement…",
+  "common.error": "Une erreur est survenue",
+  "common.retry": "Réessayer",
+  "common.cancel": "Annuler",
+  "common.save": "Enregistrer",
+  "common.done": "Terminé",
+  "auth.signIn.title": "Se connecter à Campbooks",
+  "auth.signIn.notSignedIn": "Non connecté",
+  "auth.signIn.signInRequired": "Connectez-vous pour continuer",
+  "now.feed.title": "Maintenant",
+  "people.inbox.title": "Personnes",
+  "paper.documents.title": "Documents",
+  "money.ledger.title": "Argent",
+  "time.agenda.title": "Temps",
+  "scout.overlay.title": "Scout",
+  "settings.account.title": "Paramètres"
+}

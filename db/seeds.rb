@@ -352,6 +352,22 @@ end
 puts "AI adapters: #{org.ai_adapters.count}, assignments: #{org.ai_configurations.count}"
 
 # ── Accounting Demo Data ─────────────────────────────────────
+# Helper: build a Document with its file attached before save (bypasses the
+# on: :create validation). Defined at TOP LEVEL — not inside the accounting block
+# below — so it stays defined on an idempotent re-seed, when that block short-
+# circuits ("reconciliation already seeded"). The rich-demo section calls it too,
+# so a nested def would leave it undefined on any already-seeded database.
+def seed_document(workspace, attrs, filename:, content:, content_type:)
+  doc = workspace.documents.build(attrs)
+  doc.original_file.attach(
+    io: StringIO.new(content),
+    filename: filename,
+    content_type: content_type
+  )
+  doc.save!
+  doc
+end
+
 puts "Seeding accounting demo data..."
 
 admin_user = User.find_by(email_address: "admin@example.com")
@@ -361,18 +377,6 @@ if admin_user && !Reconciliation.exists?(workspace: org)
   revenue_type  = DocumentType.find_by(name: "revenue_invoice",  workspace: org)
   statement_type = DocumentType.find_by(name: "bank_statement",  workspace: org)
   company_nif   = org.company_nif || "123456789"
-
-  # Helper: build a Document with file attached before save (bypasses on: :create validation)
-  def seed_document(workspace, attrs, filename:, content:, content_type:)
-    doc = workspace.documents.build(attrs)
-    doc.original_file.attach(
-      io: StringIO.new(content),
-      filename: filename,
-      content_type: content_type
-    )
-    doc.save!
-    doc
-  end
 
   # ── Invoice documents (expense)
   vodafone_doc = seed_document(org,
@@ -589,6 +593,388 @@ if admin_user && !Reconciliation.exists?(workspace: org)
   puts "Accounting: reconciliation seeded (#{recon.id})"
 else
   puts "Accounting: reconciliation already seeded — skipping"
+end
+
+# ── Rich Demo: People, Calendar, Tasks, Reminders ─────────────────────────────
+# Guard on a completion MARKER set only at the very end (not on the first person),
+# so a run that crashes mid-block self-heals on the next `db:seed` instead of
+# skipping forever — every step below is idempotent (find_or_create / guarded).
+unless org.settings["rich_demo_seeded_v1"]
+  puts "Rich demo: seeding people, calendar events, tasks, reminders..."
+
+  # Helper: create a Person + linked Contact. Returns [person, contact].
+  def seed_demo_person(workspace:, account:, name:, org_name:, email:, relationship: nil)
+    person = Person.find_or_create_by!(workspace: workspace, name: name) do |p|
+      p.organization = org_name
+      p.relationship_type = relationship
+    end
+    contact = Contact.find_or_create_by!(workspace: workspace, email: email) do |c|
+      c.name = name
+      c.organization = org_name
+      c.email_account = account
+      c.person = person
+      c.sender_kind = :person
+      c.sender_kind_source = "seed"
+      c.list_status = :allowed
+    end
+    [ person, contact ]
+  end
+
+  # Helper: create an EmailThread on the demo account. Returns the thread.
+  def seed_demo_thread(account:, key:, subject:, last_inbound_at: nil,
+                       last_outbound_at: nil, follow_up_at: nil)
+    EmailThread.find_or_create_by!(email_account: account, provider_thread_id: key) do |t|
+      t.subject = subject
+      t.last_inbound_at = last_inbound_at
+      t.last_outbound_at = last_outbound_at
+      t.follow_up_at = follow_up_at
+      t.follow_up_expected = follow_up_at.present?
+    end
+  end
+
+  # Helper: create an EmailMessage. provider_message_id is a SHA1 of thread+from+time.
+  # Every demo message starts in the demo inbox folder so inbox-filtering works
+  # correctly and archive/snooze actions can persistently move it out.
+  def seed_demo_message(account:, thread:, contact:, from:, to:, subject:, received_at:,
+                        body: nil, ai_action_prompt: nil, ai_priority: nil)
+    mid = Digest::SHA1.hexdigest("#{thread.id}:#{from}:#{received_at.to_i}")
+    msg = EmailMessage.find_or_create_by!(email_account: account, provider_message_id: mid) do |m|
+      m.email_thread = thread
+      m.contact = contact
+      m.from_address = from
+      m.to_address = to
+      m.subject = subject
+      m.received_at = received_at
+      m.body = body || "Demo email body."
+      m.status = :processed
+      m.read = false
+      m.provider_folder_id = DemoMailClient::INBOX_FOLDER_ID
+      m.ai_action_prompt = ai_action_prompt if ai_action_prompt.present?
+      m.ai_priority = ai_priority if ai_priority.present?
+    end
+    # Idempotent backfill: existing demo messages seeded before this change
+    # have no provider_folder_id; set them to the demo inbox so the inbox filter
+    # includes them without touching messages already moved by archive/snooze.
+    msg.update_columns(provider_folder_id: DemoMailClient::INBOX_FOLDER_ID) if msg.provider_folder_id.blank?
+    msg
+  end
+
+  # Helper: create a FeedItem. key is stored in dedupe_key (unique per user).
+  def seed_demo_fi(user:, workspace:, kind:, subject:, key:, sort_at:, score:,
+                   attention:, data: {})
+    FeedItem.find_or_create_by!(user: user, dedupe_key: key) do |fi|
+      fi.workspace = workspace
+      fi.kind = kind
+      fi.subject = subject
+      fi.sort_at = sort_at
+      fi.score = score
+      fi.attention = attention
+      fi.data = data
+    end
+  end
+
+  # ── Demo email account ────────────────────────────────────────────────────────
+  demo_account = EmailAccount.find_or_create_by!(email_address: "hello@example.com") do |a|
+    a.provider = :zoho
+    a.refresh_token = "DEMO_SEED_PLACEHOLDER"
+    a.workspace = org
+  end
+  EmailAccountUser.find_or_create_by!(email_account: demo_account, user: admin_user) do |eau|
+    eau.can_read = true
+    eau.owner = true
+  end
+
+  # ── Demo calendar account ─────────────────────────────────────────────────────
+  demo_cal_account = CalendarAccount.find_or_create_by!(
+    email_address: "hello@example.com", provider: :zoho
+  ) do |ca|
+    ca.refresh_token = "DEMO_SEED_PLACEHOLDER"
+    ca.workspace = org
+  end
+  CalendarAccountUser.find_or_create_by!(calendar_account: demo_cal_account, user: admin_user) do |cau|
+    cau.can_read = true
+  end
+  demo_calendar = Calendar.find_or_create_by!(
+    calendar_account: demo_cal_account, provider_calendar_id: "demo-primary"
+  ) do |cal|
+    cal.name = "Demo Calendar"
+    cal.syncing = true
+    cal.is_primary = true
+  end
+
+  demo_inbox_email = demo_account.email_address
+
+  # ── Person 1: Sofia Carvalho — reply verb ─────────────────────────────────────
+  _sofia, sofia_contact = seed_demo_person(
+    workspace: org, account: demo_account,
+    name: "Sofia Carvalho", org_name: "Nexia Consulting",
+    email: "sofia.carvalho@nexia.example.com", relationship: "client"
+  )
+  sofia_thread = seed_demo_thread(
+    account: demo_account, key: "demo-sofia-q3",
+    subject: "Proposta de colaboração Q3",
+    last_inbound_at: 3.days.ago
+  )
+  sofia_m = seed_demo_message(
+    account: demo_account, thread: sofia_thread, contact: sofia_contact,
+    from: sofia_contact.email, to: demo_inbox_email,
+    subject: "Proposta de colaboração Q3",
+    received_at: 3.days.ago,
+    body: "Olá,\n\nGostaria de discutir uma proposta de colaboração para o Q3.\n\n" \
+          "Pode confirmar disponibilidade?\n\nCumprimentos,\nSofia Carvalho"
+  )
+  sofia_contact.update_columns(email_count: 1, last_email_at: 3.days.ago)
+  seed_demo_fi(
+    user: admin_user, workspace: org, kind: "reply_owed", subject: sofia_m,
+    key: "reply_owed:#{sofia_m.id}", sort_at: 3.days.ago, score: 40, attention: true,
+    data: { "reason" => "no_reply", "since" => 3.days.ago.iso8601, "age_days" => 3 }
+  )
+
+  # ── Person 2: Miguel Ferreira — reply verb ────────────────────────────────────
+  _miguel, miguel_contact = seed_demo_person(
+    workspace: org, account: demo_account,
+    name: "Miguel Ferreira", org_name: "Abreu Advogados",
+    email: "miguel.ferreira@abreu.example.com", relationship: "partner"
+  )
+  miguel_thread = seed_demo_thread(
+    account: demo_account, key: "demo-miguel-advogados",
+    subject: "Reunião de análise contratual",
+    last_inbound_at: 4.days.ago
+  )
+  miguel_m = seed_demo_message(
+    account: demo_account, thread: miguel_thread, contact: miguel_contact,
+    from: miguel_contact.email, to: demo_inbox_email,
+    subject: "Reunião de análise contratual",
+    received_at: 4.days.ago,
+    body: "Bom dia,\n\nPrecisamos agendar uma reunião para rever o contrato.\n\n" \
+          "Quando tem disponibilidade?\n\nAtenciosamente,\nMiguel Ferreira"
+  )
+  miguel_contact.update_columns(email_count: 1, last_email_at: 4.days.ago)
+  seed_demo_fi(
+    user: admin_user, workspace: org, kind: "reply_owed", subject: miguel_m,
+    key: "reply_owed:#{miguel_m.id}", sort_at: 4.days.ago, score: 45, attention: true,
+    data: { "reason" => "no_reply", "since" => 4.days.ago.iso8601, "age_days" => 4 }
+  )
+
+  # ── Person 3: Ana Rodrigues — decide verb ─────────────────────────────────────
+  _ana, ana_contact = seed_demo_person(
+    workspace: org, account: demo_account,
+    name: "Ana Rodrigues", org_name: "Azevedo & Associados",
+    email: "ana.rodrigues@azevedo.example.com", relationship: "partner"
+  )
+  ana_thread = seed_demo_thread(
+    account: demo_account, key: "demo-ana-parceria",
+    subject: "Proposta de parceria estratégica",
+    last_inbound_at: 2.days.ago
+  )
+  ana_m = seed_demo_message(
+    account: demo_account, thread: ana_thread, contact: ana_contact,
+    from: ana_contact.email, to: demo_inbox_email,
+    subject: "Proposta de parceria estratégica",
+    received_at: 2.days.ago,
+    body: "Exmo. Sr.,\n\nEsperamos a sua decisão relativamente à proposta de parceria " \
+          "antes de sexta-feira.\n\nCom os melhores cumprimentos,\nAna Rodrigues",
+    ai_action_prompt: "Decide whether to accept the partnership proposal by Friday",
+    ai_priority: :high
+  )
+  ana_contact.update_columns(email_count: 1, last_email_at: 2.days.ago)
+  seed_demo_fi(
+    user: admin_user, workspace: org, kind: "email_action", subject: ana_m,
+    key: "email_action:#{ana_m.id}", sort_at: 2.days.ago, score: 85, attention: true,
+    data: { "prompt" => "Decide whether to accept the partnership proposal by Friday" }
+  )
+
+  # ── Person 4: Carlos Mendes — nudge/follow_up verb ───────────────────────────
+  _carlos, carlos_contact = seed_demo_person(
+    workspace: org, account: demo_account,
+    name: "Carlos Mendes", org_name: "Mendes Escritório Lda.",
+    email: "carlos.mendes@mendes.example.com", relationship: "client"
+  )
+  carlos_thread = seed_demo_thread(
+    account: demo_account, key: "demo-carlos-orcamento",
+    subject: "Orçamento para serviços de gestão",
+    last_inbound_at: 10.days.ago, last_outbound_at: 7.days.ago,
+    follow_up_at: 7.days.ago
+  )
+  carlos_m_in = seed_demo_message(
+    account: demo_account, thread: carlos_thread, contact: carlos_contact,
+    from: carlos_contact.email, to: demo_inbox_email,
+    subject: "Orçamento para serviços de gestão",
+    received_at: 10.days.ago,
+    body: "Bom dia,\n\nSeguem os detalhes para o orçamento solicitado.\n\n" \
+          "Cumprimentos,\nCarlos Mendes"
+  )
+  seed_demo_message(
+    account: demo_account, thread: carlos_thread, contact: carlos_contact,
+    from: demo_inbox_email, to: carlos_contact.email,
+    subject: "Re: Orçamento para serviços de gestão",
+    received_at: 7.days.ago,
+    body: "Caro Carlos,\n\nObrigado pelo contacto. Enviei o orçamento em anexo.\n\n" \
+          "Atenciosamente"
+  )
+  carlos_contact.update_columns(email_count: 1, last_email_at: 10.days.ago)
+  seed_demo_fi(
+    user: admin_user, workspace: org, kind: "follow_up", subject: carlos_m_in,
+    key: "follow_up:#{carlos_thread.id}", sort_at: 7.days.ago, score: 68, attention: true,
+    data: { "age_days" => 7, "since" => 7.days.ago.iso8601 }
+  )
+
+  # ── Person 5: Beatriz Santos — pay/late_payable verb ─────────────────────────
+  _beatriz, beatriz_contact = seed_demo_person(
+    workspace: org, account: demo_account,
+    name: "Beatriz Santos", org_name: "TechPaper Lda.",
+    email: "beatriz.santos@techpaper.example.com", relationship: "vendor"
+  )
+  beatriz_thread = seed_demo_thread(
+    account: demo_account, key: "demo-beatriz-fatura",
+    subject: "Fatura FT2024/0118 - TechPaper Lda.",
+    last_inbound_at: 60.days.ago
+  )
+  beatriz_m = seed_demo_message(
+    account: demo_account, thread: beatriz_thread, contact: beatriz_contact,
+    from: beatriz_contact.email, to: demo_inbox_email,
+    subject: "Fatura FT2024/0118 - TechPaper Lda.",
+    received_at: 60.days.ago,
+    body: "Exmo. Sr.,\n\nSegue em anexo a fatura FT2024/0118 referente a " \
+          "serviços prestados em Janeiro de 2024.\n\nCumprimentos,\nBeatriz Santos"
+  )
+  beatriz_contact.update_columns(email_count: 1, last_email_at: 60.days.ago)
+  beatriz_doc_scope = Document.where(workspace: org)
+                              .where("metadata->>'invoice_number' = ?", "FT2024/0118")
+  beatriz_doc = if beatriz_doc_scope.exists?
+    beatriz_doc_scope.first!
+  else
+    expense_type_b = DocumentType.find_by(name: "expense_invoice", workspace: org)
+    seed_document(org,
+      { document_type: :expense_invoice, document_type_id: expense_type_b&.id,
+        ai_status: :completed, review_status: :approved, source: :manual_upload,
+        vendor_name: "TechPaper Lda.", vendor_nif: "514823690",
+        invoice_number: "FT2024/0118",
+        amount_cents: 32_400, tax_amount_cents: 6_252, tax_rate: 23.0,
+        document_date: Date.new(2024, 1, 10), currency: "EUR" },
+      filename: "techpaper_jan2024.pdf",
+      content: "TechPaper Lda. - Fatura FT2024/0118",
+      content_type: "application/pdf")
+  end
+  DocumentEmailMessage.find_or_create_by!(document: beatriz_doc, email_message: beatriz_m)
+  seed_demo_fi(
+    user: admin_user, workspace: org, kind: "late_payable", subject: beatriz_doc,
+    key: "late_payable:#{beatriz_doc.id}",
+    sort_at: Date.new(2024, 1, 10).in_time_zone,
+    score: 89, attention: true,
+    data: {
+      "anchor_date" => "2024-01-10", "days_since" => 253,
+      "amount_cents" => 32_400, "currency" => "EUR", "amount_ratio" => 1.0
+    }
+  )
+
+  # ── Person 6: Ricardo Alves — no verb (shows in People latest) ───────────────
+  _ricardo, ricardo_contact = seed_demo_person(
+    workspace: org, account: demo_account,
+    name: "Ricardo Alves", org_name: "Alves Gestão",
+    email: "ricardo.alves@alves.example.com", relationship: "client"
+  )
+  ricardo_thread = seed_demo_thread(
+    account: demo_account, key: "demo-ricardo-portfolio",
+    subject: "Actualização do portfolio de gestão",
+    last_inbound_at: 1.day.ago
+  )
+  ricardo_m = seed_demo_message(
+    account: demo_account, thread: ricardo_thread, contact: ricardo_contact,
+    from: ricardo_contact.email, to: demo_inbox_email,
+    subject: "Actualização do portfolio de gestão",
+    received_at: 1.day.ago,
+    body: "Bom dia,\n\nEnvio a actualização do portfolio de gestão para o último " \
+          "trimestre.\n\nAtenciosamente,\nRicardo Alves"
+  )
+  ricardo_contact.update_columns(email_count: 1, last_email_at: 1.day.ago)
+
+  # ── Calendar Events ───────────────────────────────────────────────────────────
+  today = Date.current
+  [
+    {
+      provider_event_id: "demo-sprint-review",
+      title: "Team Sprint Review",
+      start_at: (today + 1).in_time_zone.change(hour: 10),
+      end_at: (today + 1).in_time_zone.change(hour: 11)
+    },
+    {
+      provider_event_id: "demo-client-review-nexia",
+      title: "Client Review: Nexia Consulting",
+      start_at: (today + 3).in_time_zone.change(hour: 14, min: 30),
+      end_at: (today + 3).in_time_zone.change(hour: 15, min: 30)
+    },
+    {
+      provider_event_id: "demo-quarterly-planning",
+      title: "Quarterly Planning Session",
+      start_at: (today + 6).in_time_zone.change(hour: 9),
+      end_at: (today + 6).in_time_zone.change(hour: 12)
+    }
+  ].each do |ev|
+    CalendarEvent.find_or_create_by!(
+      calendar: demo_calendar, provider_event_id: ev[:provider_event_id]
+    ) do |e|
+      e.title = ev[:title]
+      e.start_at = ev[:start_at]
+      e.end_at = ev[:end_at]
+      e.status = :confirmed
+    end
+  end
+
+  # ── Reminders ─────────────────────────────────────────────────────────────────
+  Reminder.find_or_create_by!(workspace: org, source: ana_m, reminder_type: :payment_due) do |r|
+    r.title = "Pagamento IVA trimestral"
+    r.due_at = (today + 5).in_time_zone.change(hour: 17)
+    r.status = :pending
+    r.confidence = 0.9
+  end
+  Reminder.find_or_create_by!(workspace: org, source: miguel_m, reminder_type: :renewal) do |r|
+    r.title = "Renovação apólice seguro frota"
+    r.due_at = (today + 9).in_time_zone.change(hour: 9)
+    r.status = :pending
+    r.confidence = 0.9
+  end
+
+  # ── Tasks ─────────────────────────────────────────────────────────────────────
+  [
+    {
+      title: "Responder à proposta de parceria Azevedo",
+      due_at: 3.days.ago, status: :todo, priority: :high
+    },
+    {
+      title: "Enviar orçamento revisto para Nexia",
+      due_at: 2.days.from_now, status: :todo, priority: :normal
+    },
+    {
+      title: "Agendar reunião com o contabilista",
+      due_at: nil, status: :todo, priority: :normal
+    }
+  ].each do |t|
+    Task.find_or_create_by!(workspace: org, title: t[:title]) do |task|
+      task.status = t[:status]
+      task.priority = t[:priority]
+      task.due_at = t[:due_at]
+      task.created_by = admin_user
+    end
+  end
+
+  # ── FocusBlock ────────────────────────────────────────────────────────────────
+  tomorrow_start = (today + 1).in_time_zone.change(hour: 9)
+  FocusBlock.find_or_create_by!(workspace: org, user: admin_user, start_at: tomorrow_start) do |fb|
+    fb.title = "Deep work — relatórios Q3"
+    fb.end_at = (today + 1).in_time_zone.change(hour: 11)
+    fb.status = :kept
+  end
+
+  # ── Rebuild People directory standings ────────────────────────────────────────
+  People::Standings.refresh!(admin_user)
+
+  # Mark complete only now that every step succeeded — the guard above reads this.
+  org.settings["rich_demo_seeded_v1"] = true
+  org.save!
+  puts "Rich demo: seeded 6 people, 3 calendar events, 2 reminders, 3 tasks, 1 focus block"
+else
+  puts "Rich demo: already seeded — skipping"
 end
 
 puts "Done!"

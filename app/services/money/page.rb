@@ -142,7 +142,10 @@ class Money
         [ NeedsYouItem.new(kind: :reconcile_statements,
                            payload: { documents: @read.pending_statement_documents, count: @read.pending_statement_count }) ]
       elsif @read.any_statements? && !@read.focus_reconciled?
-        [ NeedsYouItem.new(kind: :add_statement, payload: { month: @read.focus_month, label: @read.focus_label }) ]
+        [ NeedsYouItem.new(kind: :add_statement,
+                           title: I18n.t("money.needs_you.add_statement.title", month: @read.focus_label),
+                           meta: [ I18n.t("money.needs_you.add_statement.meta") ],
+                           payload: { month: @read.focus_month, label: @read.focus_label }) ]
       else
         []
       end

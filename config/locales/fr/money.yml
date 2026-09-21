@@ -15,6 +15,9 @@ fr:
     settled:
       line: "ligne %{number}"
     needs_you:
+      add_statement:
+        title: "Le relevé de %{month} n'est pas encore arrivé"
+        meta: "le mois à réconcilier"
       no_name: "Virement, sans nom sur la ligne"
       no_invoice:
         title: "Aucune facture pour ce paiement"

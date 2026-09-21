@@ -15,6 +15,9 @@ en:
     settled:
       line: "line %{number}"
     needs_you:
+      add_statement:
+        title: "%{month}'s statement isn't in yet"
+        meta: "the month to reconcile"
       no_name: "Transfer, no name on the line"
       no_invoice:
         title: "No invoice for this payment"

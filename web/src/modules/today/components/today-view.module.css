@@ -1,0 +1,323 @@
+/*
+ * today-view.module.css
+ *
+ * Ported from rx-style.css (.work / .item / .uprow / .handled / .allclear /
+ * .rx-brief / .rx-sech). All colours via var(--cb-*) tokens — no raw hex,
+ * no oklch() literals.
+ */
+
+/* ── Greeting + brief ───────────────────────────────────────────────────────── */
+
+.kick {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cb-t3);
+  margin: 0;
+}
+
+.heading {
+  font-family: var(--cb-font-display);
+  font-weight: 700;
+  font-size: clamp(1.9rem, 4vw, 2.6rem);
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  margin: 6px 0 0;
+}
+
+.brief {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+  margin-top: 16px;
+}
+
+.briefVisor {
+  margin-top: 2px;
+}
+
+.briefText {
+  font-size: 15.5px;
+  line-height: 1.55;
+  color: var(--cb-t2);
+  max-width: 60ch;
+  margin: 0;
+}
+
+.briefText strong,
+.briefText b {
+  color: var(--cb-t1);
+  font-weight: 600;
+}
+
+/* ── Section header ─────────────────────────────────────────────────────────── */
+
+.sech {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 30px 0 12px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cb-t3);
+}
+
+.sechCount {
+  color: var(--cb-t3);
+  font-weight: 650;
+}
+
+.sechLine {
+  flex: 1;
+  height: 1px;
+  background: var(--cb-line);
+}
+
+/* ── Worklist ────────────────────────────────────────────────────────────────── */
+
+.work {
+  display: grid;
+  gap: 8px;
+}
+
+.item {
+  display: grid;
+  grid-template-rows: 1fr;
+  border-radius: var(--cb-r3);
+  background: var(--cb-s1);
+  box-shadow: inset 0 0 0 1px var(--cb-line), inset 0 1px 0 var(--cb-hl);
+  overflow: hidden;
+  transition:
+    grid-template-rows 0.4s var(--cb-ease),
+    opacity 0.3s,
+    margin-bottom 0.4s var(--cb-ease);
+}
+
+.itemGone {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  margin-bottom: -8px;
+}
+
+.itemIn {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Content row: avatar | who+read | side-pill */
+.itemRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 13px;
+  align-items: start;
+  padding: 15px 16px;
+}
+
+.who {
+  min-width: 0;
+}
+
+.whoTitle {
+  font-weight: 650;
+  font-size: 14.5px;
+  color: var(--cb-t1);
+  margin: 0;
+}
+
+.whoTitleOverdue {
+  color: var(--cb-danger);
+}
+
+.whoSub {
+  font-size: 13px;
+  color: var(--cb-t3);
+  margin: 1px 0 0;
+}
+
+.read {
+  margin-top: 9px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--cb-t1);
+  margin-bottom: 0;
+}
+
+.readDraft {
+  color: var(--cb-t3);
+}
+
+.side {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  padding-top: 1px;
+}
+
+/* Action row: offset to align with title (after 36px avatar + 13px gap = 49px) */
+.acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin: 12px 16px 16px 49px;
+}
+
+/* Inline "the action failed and was rolled back" note, shown beside the
+   buttons after a rejected mutation. Quiet, danger-tinted, auto-clears. */
+.actFailed {
+  font-size: 12px;
+  color: var(--cb-danger);
+}
+
+/* ── Done strip ─────────────────────────────────────────────────────────────── */
+
+.doneStrip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--cb-t2);
+}
+
+.doneGlyph {
+  width: 20px;
+  height: 20px;
+  border-radius: 99px;
+  background: var(--cb-accent);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.doneGlyphMark {
+  display: block;
+  width: 6px;
+  height: 3px;
+  border-left: 1.8px solid var(--cb-bg);
+  border-bottom: 1.8px solid var(--cb-bg);
+  rotate: -45deg;
+  translate: 0 -1px;
+}
+
+.doneLabel {
+  flex: 1;
+}
+
+/* ── All-clear ──────────────────────────────────────────────────────────────── */
+
+.allClear {
+  padding: 26px;
+  border-radius: var(--cb-r4);
+  background: var(--cb-s1);
+  box-shadow: inset 0 0 0 1px var(--cb-line);
+  text-align: center;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.allClearTitle {
+  font-family: var(--cb-font-display);
+  font-size: 1.5rem;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+  color: var(--cb-t1);
+  margin: 0;
+}
+
+.allClearSub {
+  color: var(--cb-t2);
+  font-size: 14px;
+  max-width: 38ch;
+  margin: 0;
+}
+
+/* ── Coming up ──────────────────────────────────────────────────────────────── */
+
+.up {
+  display: grid;
+  gap: 6px;
+}
+
+.upRow {
+  display: grid;
+  grid-template-columns: 96px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 14px;
+  border-radius: var(--cb-r2);
+  background: var(--cb-s1);
+  box-shadow: inset 0 0 0 1px var(--cb-line);
+}
+
+.when {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--cb-t2);
+}
+
+.whenSoon {
+  color: var(--cb-now-text);
+}
+
+.what {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--cb-t1);
+  min-width: 0;
+}
+
+.whatSub {
+  display: block;
+  color: var(--cb-t3);
+  font-size: 12.5px;
+  font-weight: 400;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Handled ─────────────────────────────────────────────────────────────────── */
+
+.handled {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: var(--cb-r3);
+  background: color-mix(in oklch, var(--cb-accent) 7%, var(--cb-s1));
+  box-shadow: inset 0 0 0 1px var(--cb-line);
+  font-size: 13.5px;
+  color: var(--cb-t2);
+}
+
+.handledVisor {
+  margin-right: 3px;
+}
+
+.handledCount {
+  color: var(--cb-t1);
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.handledFine {
+  width: 100%;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--cb-t3);
+}
+
+/* ── Reduced-motion overrides ───────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .item {
+    transition-duration: 0.01ms !important;
+  }
+}
