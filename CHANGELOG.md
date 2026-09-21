@@ -16,6 +16,9 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+- First-party JSON API (`/api/app`) backing a new decoupled React SPA: screen-shaped, session-bearer-authed endpoints for every surface (Today, People/Inbox, Money, Time, Paper/Files, Calendar, Scout, Settings), a per-user realtime channel, and a rich demo seed with a `demo:reset` task. Additive — the existing Hotwire UI is unchanged.
+
 ## [0.41.0] - 2026-09-07
 
 ### Added
