@@ -49,3 +49,6 @@
 # Ignore Docker-related files
 /.dockerignore
 /Dockerfile*
+
+# Local agent worktrees + session context (never part of the image)
+.claude/

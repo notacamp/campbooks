@@ -19,6 +19,9 @@ major, minor, or patch change here.
 ### Added
 - SPA settings pages: **Plan** (usage + entitlements), **Notifications** (in-app notification center + per-tag/document-type in-app/email preferences + waiting-on-replies digest), **Members** (roles + invitations), and **Integrations** (Google Drive / Notion / Zoho / Calendars status + Connections CRUD).
 
+### Fixed
+- Settings → Mailboxes now renders the real connect UI (Google/Zoho/Microsoft + IMAP); the `/settings/mailboxes` route was wired to a placeholder in 0.42.0.
+
 ## [0.42.0] - 2026-09-21
 
 ### Added
