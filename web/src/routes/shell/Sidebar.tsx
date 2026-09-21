@@ -4,14 +4,14 @@
  * Contains:
  *   - Workspace mark: wordmark + Visor
  *   - Four nav items: Today, Inbox, Books, Calendar
- *   - Footer: Scout status ("· Mistral, EU") + current user (Avatar + name)
+ *   - Footer: Settings link + Scout status ("· Mistral, EU") + current user (→ /settings/account)
  *
  * Below 680px the sidebar is hidden and replaced by a bottom tab bar
  * rendered by AppShell (this component only renders at ≥ 680px).
  */
 import { type FC, useCallback } from "react";
-import { Clock, Inbox, BookOpen, Calendar, LogOut } from "lucide-react";
-import { useNavigate } from "@tanstack/react-router";
+import { Clock, Inbox, BookOpen, Calendar, Settings, LogOut } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Visor, Avatar } from "~/lib/ui";
 import { useMe, clearToken } from "~/lib/api";
@@ -65,6 +65,9 @@ export const Sidebar: FC = () => {
 
       {/* Footer */}
       <div className="border-t border-line p-2 flex flex-col gap-1">
+        {/* Settings — meta, not a place, so it sits in the footer above Scout status */}
+        <NavItem to="/settings" label="Settings" Icon={Settings} />
+
         {/* Scout AI status */}
         <div className="flex items-center gap-1.5 px-3 py-1.5">
           <Visor size={14} state="watching" aria-hidden />
@@ -73,7 +76,11 @@ export const Sidebar: FC = () => {
 
         {/* Current user */}
         {me?.user && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-cb-1 hover:bg-surface-1 transition-colors duration-[--cb-dur] cursor-default">
+          <Link
+            to="/settings/account"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-cb-1 hover:bg-surface-1 transition-colors duration-[--cb-dur]"
+            aria-label="Account settings"
+          >
             <Avatar
               initials={(me.user.name ?? "?").slice(0, 2)}
               email={me.user.email}
@@ -82,7 +89,7 @@ export const Sidebar: FC = () => {
               aria-hidden="true"
             />
             <span className="text-[12px] text-t2 truncate">{me.user.name ?? ""}</span>
-          </div>
+          </Link>
         )}
 
         {/* Sign out */}
