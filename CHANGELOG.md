@@ -16,6 +16,9 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+- SPA settings pages: **Plan** (usage + entitlements), **Notifications** (in-app notification center + per-tag/document-type in-app/email preferences + waiting-on-replies digest), **Members** (roles + invitations), and **Integrations** (Google Drive / Notion / Zoho / Calendars status + Connections CRUD).
+
 ## [0.42.0] - 2026-09-21
 
 ### Added
