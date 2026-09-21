@@ -41,21 +41,22 @@ export interface ModuleConfig {
 
 // ── Module imports (add here as modules are built) ────────────────────────────
 import { moduleConfig as inbox } from "~/modules/inbox";
+import { moduleConfig as settings } from "~/modules/settings";
 //   import { moduleConfig as now }      from "~/modules/now";
 //   import { moduleConfig as people }   from "~/modules/people";
 //   import { moduleConfig as paper }    from "~/modules/paper";
 //   import { moduleConfig as money }    from "~/modules/money";
 //   import { moduleConfig as time }     from "~/modules/time";
 //   import { moduleConfig as scout }    from "~/modules/scout";
-//   import { moduleConfig as settings } from "~/modules/settings";
 //   import { moduleConfig as auth }     from "~/modules/auth";
 
 // ── Composition root ──────────────────────────────────────────────────────────
 
 const modules: ModuleConfig[] = [
   inbox,
+  settings,
   // Module configs spread here as modules land:
-  // now, people, paper, money, time, scout, settings, auth,
+  // now, people, paper, money, time, scout, auth,
 ];
 
 /**
