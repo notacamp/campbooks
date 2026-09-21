@@ -12,6 +12,11 @@ class User < ApplicationRecord
   # redeems it at SessionsController#native to start a real cookie session.
   generates_token_for :native_session, expires_in: 15.minutes
 
+  # Short-lived, cookieless marker for the /api/app MFA step: password verified,
+  # awaiting a second factor. The SPA carries it between POST /api/app/session and
+  # the challenge submit (see Api::App::SessionsController, api-migration/00-auth.md).
+  generates_token_for :api_mfa_challenge, expires_in: 10.minutes
+
   has_many :sessions, dependent: :destroy
   has_many :reviewed_documents, class_name: "Document", foreign_key: :reviewed_by_id
   has_many :created_tasks, class_name: "Task", foreign_key: :created_by_id, dependent: :nullify

@@ -1,0 +1,26 @@
+# Logs
+*.log
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dev-dist/
+
+# Caches
+.vite/
+*.tsbuildinfo
+
+# Test artifacts
+coverage/
+playwright-report/
+test-results/
+
+# Capacitor native projects (generated; added later)
+ios/App/Pods/
+android/.gradle/
+
+# OS / editor
+.DS_Store
+*.local

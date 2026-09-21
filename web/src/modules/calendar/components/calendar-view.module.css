@@ -1,0 +1,203 @@
+/*
+ * calendar-view.module.css
+ *
+ * Ported from .cal-agenda / .cal-day / .cal-ev / .cal-block in the approved
+ * prototype (rx-style.css). All colour via var(--cb-*) design tokens.
+ * No raw hex, no raw oklch() literals.
+ */
+
+/* ── Root container ─────────────────────────────────────────────────────────── */
+
+.agenda {
+  display: grid;
+  gap: 4px;
+}
+
+/* ── Empty state ────────────────────────────────────────────────────────────── */
+
+.empty {
+  padding: 32px 20px;
+  font-size: 14px;
+  color: var(--cb-t3);
+  text-align: center;
+}
+
+/* ── Day section ────────────────────────────────────────────────────────────── */
+
+.day {
+  margin-top: 18px;
+}
+
+.day:first-child {
+  margin-top: 0;
+}
+
+/* ── Day header ─────────────────────────────────────────────────────────────── */
+
+.dayHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin-bottom: 6px;
+}
+
+.dayHeading {
+  font-family: var(--cb-font-display);
+  font-weight: 650;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  color: var(--cb-t1);
+  margin: 0;
+}
+
+.daySub {
+  font-size: 12.5px;
+  color: var(--cb-t3);
+}
+
+/* ── Day note (Scout's brief for the day) ──────────────────────────────────── */
+
+.dayNote {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 9px 13px;
+  margin-bottom: 8px;
+  border-radius: var(--cb-r2);
+  background: color-mix(in oklch, var(--cb-accent) 7%, var(--cb-s1));
+  box-shadow: inset 0 0 0 1px var(--cb-line);
+}
+
+.dayNoteText {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--cb-t2);
+  margin: 0;
+  padding-top: 1px; /* optical alignment with Visor */
+}
+
+/* ── Day items list ─────────────────────────────────────────────────────────── */
+
+.dayItems {
+  display: grid;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Agenda row (time + block) ─────────────────────────────────────────────── */
+
+.row {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 4px 0;
+}
+
+/* ── Time column ────────────────────────────────────────────────────────────── */
+
+.time {
+  font-size: 12.5px;
+  color: var(--cb-t3);
+  font-variant-numeric: tabular-nums;
+  padding-top: 9px;
+  text-align: right;
+}
+
+/* ── Block card ─────────────────────────────────────────────────────────────── */
+
+/*
+ * --cal-ev-color: resolved inline from tickColor(item).
+ * For events, this is the provider hex (e.g. Google Calendar colour) set as a
+ * CSS custom property — API data, not a design-system literal.
+ * For deadlines/focus/task, it is a var(--cb-*) token reference.
+ *
+ * The ::before pseudo uses this value to render the left-edge colour tick.
+ */
+.block {
+  position: relative;
+  padding: 9px 13px 9px 20px;
+  border-radius: var(--cb-r2);
+  background: var(--cb-s1);
+  box-shadow: inset 0 0 0 1px var(--cb-line), inset 0 1px 0 var(--cb-hl);
+  font-weight: 550;
+  font-size: 13.5px;
+  color: var(--cb-t1);
+  line-height: 1.4;
+  min-width: 0;
+  transition: box-shadow var(--cb-dur) var(--cb-ease);
+}
+
+/* Colour tick */
+.block::before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--cal-ev-color, var(--cb-t3));
+}
+
+/* ── Focus block variant: hollow/outlined (kept / held slot) ───────────────── */
+
+.blockFocus {
+  background: transparent;
+  /* The box-shadow uses color-mix() with the API-provided color token. */
+  box-shadow: inset 0 0 0 1.5px
+    color-mix(in oklch, var(--cal-ev-color, var(--cb-line)) 40%, var(--cb-line));
+}
+
+.blockFocus::before {
+  opacity: 0.6;
+}
+
+/* ── Overdue state ──────────────────────────────────────────────────────────── */
+
+.blockOverdue .blockTitle {
+  color: var(--cb-now-text);
+}
+
+/* ── Block text layers ──────────────────────────────────────────────────────── */
+
+.blockTitle {
+  display: block;
+}
+
+.blockSub {
+  display: block;
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--cb-t3);
+  margin-top: 2px;
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .block {
+    transition: none !important;
+  }
+}
+
+/* ── Narrow viewports (≤ 480px) ─────────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .row {
+    grid-template-columns: 64px 1fr;
+    gap: 8px;
+  }
+
+  .time {
+    font-size: 11.5px;
+    padding-top: 8px;
+  }
+
+  .block {
+    font-size: 13px;
+  }
+}

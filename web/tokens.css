@@ -1,0 +1,214 @@
+/* ============================================================================
+   Campbooks design tokens — "Linear register"
+   The single source of truth for colour, elevation, radius and type in the
+   React app (/web). Approved 2026-09-20. See web/DESIGN.md for the rules.
+
+   Structure:
+     :root            -> LIGHT theme values (shadcn convention)
+     .dark            -> DARK theme values (the app's DEFAULT — see DESIGN.md)
+     @theme inline    -> exposes tokens to Tailwind v4 as utilities
+   All colour is OKLCH. Never add a raw hex in a component; add a token here.
+   ============================================================================ */
+
+:root {
+  color-scheme: light;
+
+  /* — layered neutral surfaces (cool-tinted, hue 264) — */
+  --cb-bg:  oklch(0.990 0.002 264);   /* app ground            */
+  --cb-s1:  oklch(1     0     0  );    /* raised: cards, rows   */
+  --cb-s2:  oklch(1     0     0  );    /* overlay: menus, dialog*/
+  --cb-s3:  oklch(0.975 0.003 264);   /* inset: inputs, wells  */
+  --cb-hover: oklch(0.20 0.03 264 / 0.04);
+  --cb-sel:   oklch(0.20 0.03 264 / 0.06);
+  --cb-line:  oklch(0.20 0.03 264 / 0.10);  /* hairline          */
+  --cb-line-2:oklch(0.20 0.03 264 / 0.16);  /* stronger edge     */
+  --cb-hl:    oklch(1 0 0 / 0.80);          /* top-edge highlight*/
+
+  /* — text: four opacities of one near-ink — */
+  --cb-t1: oklch(0.250 0.010 264);   /* primary               */
+  --cb-t2: oklch(0.450 0.012 264);   /* secondary / body      */
+  --cb-t3: oklch(0.580 0.012 264);   /* tertiary / meta       */
+  --cb-t4: oklch(0.700 0.010 264);   /* quaternary / disabled */
+
+  /* — one cool interaction accent (select / focus / link) — */
+  --cb-accent:    oklch(0.520 0.170 264);
+  --cb-accent-hi: oklch(0.460 0.180 264);
+  --cb-accent-tint: oklch(0.520 0.170 264 / 0.10);
+  --cb-on-accent: oklch(0.990 0 0);
+
+  --cb-danger: oklch(0.530 0.200 22);
+  --cb-danger-tint: oklch(0.530 0.200 22 / 0.09);
+
+  /* — five signal hues (MEANING ONLY — dots & labels, never fills). Constant across themes. — */
+  --cb-now:    oklch(0.700 0.210 42);
+  --cb-people: oklch(0.620 0.190 258);
+  --cb-paper:  oklch(0.830 0.160 92);
+  --cb-money:  oklch(0.700 0.170 158);
+  --cb-time:   oklch(0.640 0.200 302);
+  /* readable signal text on the app ground */
+  --cb-now-text:    oklch(0.540 0.190 40);
+  --cb-people-text: oklch(0.500 0.200 258);
+  --cb-paper-text:  oklch(0.500 0.110 85);
+  --cb-money-text:  oklch(0.470 0.130 155);
+  --cb-time-text:   oklch(0.500 0.200 305);
+  /* money meter steps (CVD-validated, see DESIGN.md) */
+  --cb-m-matched:   oklch(0.620 0.170 155);
+  --cb-m-explained: oklch(0.600 0.120 245);
+  --cb-m-needs:     oklch(0.680 0.200 42);
+
+  /* — radius / elevation / motion — */
+  --cb-r1: 6px; --cb-r2: 8px; --cb-r3: 12px; --cb-r4: 16px;
+  --cb-shadow-pop: 0 12px 32px -10px oklch(0.30 0.05 264 / 0.22),
+                   0 2px 8px -3px oklch(0.30 0.05 264 / 0.14);
+  --cb-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --cb-dur: 140ms;
+
+  /* — type (theme-independent). Funnel is self-hosted (SIL OFL, no CDN) by the
+       scaffold session; these stacks fall back gracefully until then. — */
+  --cb-font: "Funnel Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --cb-font-display: "Funnel Display", "Funnel Sans", ui-sans-serif, system-ui, sans-serif;
+
+  /* — shadcn/ui variable bridge (so shadcn components inherit the system) — */
+  --radius: 0.5rem;
+  --background: var(--cb-bg);
+  --foreground: var(--cb-t1);
+  --card: var(--cb-s1);
+  --card-foreground: var(--cb-t1);
+  --popover: var(--cb-s2);
+  --popover-foreground: var(--cb-t1);
+  --primary: var(--cb-accent);
+  --primary-foreground: var(--cb-on-accent);
+  --secondary: var(--cb-s3);
+  --secondary-foreground: var(--cb-t1);
+  --muted: var(--cb-s3);
+  --muted-foreground: var(--cb-t3);
+  --accent: var(--cb-s3);              /* shadcn --accent = hover surface, NOT the brand accent */
+  --accent-foreground: var(--cb-t1);
+  --destructive: var(--cb-danger);
+  --destructive-foreground: var(--cb-on-accent);
+  --border: oklch(0.900 0.006 264);     /* solid equivalent of --cb-line on ground */
+  --input: oklch(0.900 0.006 264);
+  --ring: var(--cb-accent);
+}
+
+.dark {
+  color-scheme: dark;
+
+  --cb-bg:  oklch(0.155 0.007 264);
+  --cb-s1:  oklch(0.205 0.009 264 / 0.66);   /* glass: translucent so the ambient ground shows through */
+  --cb-s2:  oklch(0.240 0.010 264 / 0.80);   /* overlays a touch more opaque for legibility */
+  --cb-s3:  oklch(0.170 0.007 264);
+  --cb-hover: oklch(1 0 0 / 0.04);
+  --cb-sel:   oklch(1 0 0 / 0.07);
+  --cb-line:  oklch(1 0 0 / 0.07);
+  --cb-line-2:oklch(1 0 0 / 0.12);
+  --cb-hl:    oklch(1 0 0 / 0.055);
+
+  --cb-t1: oklch(0.975 0.003 264);
+  --cb-t2: oklch(0.730 0.008 264);
+  --cb-t3: oklch(0.570 0.010 264);
+  --cb-t4: oklch(0.460 0.010 264);
+
+  --cb-accent:    oklch(0.640 0.150 264);
+  --cb-accent-hi: oklch(0.700 0.150 264);
+  --cb-accent-tint: oklch(0.640 0.150 264 / 0.16);
+  --cb-on-accent: oklch(0.990 0.005 264);
+  --cb-danger: oklch(0.620 0.200 22);
+  --cb-danger-tint: oklch(0.620 0.200 22 / 0.16);
+
+  /* signals: same hues, lifted a touch for the dark ground */
+  --cb-now-text:    oklch(0.800 0.160 52);
+  --cb-people-text: oklch(0.780 0.130 255);
+  --cb-paper-text:  oklch(0.880 0.150 95);
+  --cb-money-text:  oklch(0.820 0.170 155);
+  --cb-time-text:   oklch(0.800 0.140 305);
+  --cb-m-matched:   oklch(0.660 0.170 158);
+  --cb-m-explained: oklch(0.620 0.120 245);
+  --cb-m-needs:     oklch(0.665 0.190 45);
+
+  --cb-shadow-pop: 0 10px 30px -8px oklch(0 0 0 / 0.60),
+                   0 2px 8px -2px oklch(0 0 0 / 0.50);
+
+  --background: var(--cb-bg);
+  --foreground: var(--cb-t1);
+  --card: var(--cb-s1);
+  --card-foreground: var(--cb-t1);
+  --popover: var(--cb-s2);
+  --popover-foreground: var(--cb-t1);
+  --primary: var(--cb-accent);
+  --primary-foreground: var(--cb-on-accent);
+  --secondary: var(--cb-s2);
+  --secondary-foreground: var(--cb-t1);
+  --muted: var(--cb-s3);
+  --muted-foreground: var(--cb-t3);
+  --accent: var(--cb-s2);
+  --accent-foreground: var(--cb-t1);
+  --destructive: var(--cb-danger);
+  --destructive-foreground: var(--cb-on-accent);
+  --border: oklch(1 0 0 / 0.09);
+  --input: oklch(1 0 0 / 0.12);
+  --ring: var(--cb-accent);
+}
+
+/* Expose the Campbooks tokens to Tailwind v4 utilities.
+   e.g. bg-surface-1, text-t2, border-line, text-signal-people, ring-accent */
+@theme inline {
+  --color-ground: var(--cb-bg);
+  --color-surface-1: var(--cb-s1);
+  --color-surface-2: var(--cb-s2);
+  --color-surface-3: var(--cb-s3);
+  --color-line: var(--cb-line);
+  --color-line-2: var(--cb-line-2);
+  --color-t1: var(--cb-t1);
+  --color-t2: var(--cb-t2);
+  --color-t3: var(--cb-t3);
+  --color-t4: var(--cb-t4);
+  --color-accent-cb: var(--cb-accent);
+  --color-accent-tint: var(--cb-accent-tint);
+  --color-danger: var(--cb-danger);
+
+  --color-signal-now: var(--cb-now);
+  --color-signal-people: var(--cb-people);
+  --color-signal-paper: var(--cb-paper);
+  --color-signal-money: var(--cb-money);
+  --color-signal-time: var(--cb-time);
+  --color-now-text: var(--cb-now-text);
+  --color-people-text: var(--cb-people-text);
+  --color-paper-text: var(--cb-paper-text);
+  --color-money-text: var(--cb-money-text);
+  --color-time-text: var(--cb-time-text);
+
+  --radius-cb-1: var(--cb-r1);
+  --radius-cb-2: var(--cb-r2);
+  --radius-cb-3: var(--cb-r3);
+  --radius-cb-4: var(--cb-r4);
+  --ease-cb: var(--cb-ease);
+  --font-sans: var(--cb-font);
+  --font-display: var(--cb-font-display);
+}
+
+/* Elevation is a hairline + a top highlight, never a drop shadow (inline).
+   Real shadows are reserved for overlays. Use these two helpers. */
+.cb-raised { box-shadow: inset 0 0 0 1px var(--cb-line), inset 0 1px 0 var(--cb-hl); }
+.cb-overlay { box-shadow: var(--cb-shadow-pop), inset 0 0 0 1px var(--cb-line-2), inset 0 1px 0 var(--cb-hl); }
+
+/* Ambient gradient ground — a subtle place-neutral glow layered over the solid
+   ground so the app reads atmospheric/glassy, not flat. Applied to the app-root
+   `bg-ground` (and available as `.cb-app-ground`). Fixed to the viewport. */
+.bg-ground, .cb-app-ground {
+  background-image:
+    radial-gradient(72rem 46rem at 3% -12%, oklch(0.60 0.14 264 / 0.09), transparent 60%),
+    radial-gradient(58rem 46rem at 100% 112%, oklch(0.66 0.15 300 / 0.06), transparent 58%);
+  background-attachment: fixed;
+}
+.cb-app-ground { background-color: var(--cb-bg); }
+.dark .bg-ground, .dark .cb-app-ground {
+  background-image:
+    radial-gradient(74rem 48rem at 2% -12%, oklch(0.62 0.17 264 / 0.30), transparent 60%),
+    radial-gradient(60rem 48rem at 100% 112%, oklch(0.60 0.17 300 / 0.18), transparent 58%),
+    radial-gradient(48rem 40rem at 62% 40%, oklch(0.66 0.15 200 / 0.07), transparent 62%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --cb-dur: 0.01ms; }
+}

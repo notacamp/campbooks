@@ -32,6 +32,10 @@
 
 # Ignore assets.
 /node_modules/
+# The decoupled React SPA (web/) is built and served separately (static assets
+# behind Caddy), never baked into the Rails image — keep its workspace (and its
+# own node_modules) out of the build context.
+/web/
 /app/assets/builds/*
 !/app/assets/builds/.keep
 /public/assets

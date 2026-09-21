@@ -1,0 +1,127 @@
+/*
+ * Visor — brand symbol + Scout's face.
+ * Ported from shared-visor.css (proposal). Theme-independent: always
+ * dark glass, never tied to light/dark theme tokens.
+ *
+ * CSS custom property --visor-s drives every proportional measurement.
+ * It is set by the React component via an inline style, defaulting to 24px.
+ */
+
+.visor {
+  --visor-s: 24px; /* overridden by React via style prop */
+  display: inline-grid;
+  grid-auto-flow: column;
+  align-content: center;
+  justify-content: center;
+  gap: calc(var(--visor-s) * 0.15);
+  width: var(--visor-s);
+  height: calc(var(--visor-s) * 0.6);
+  border-radius: calc(var(--visor-s) * 0.2);
+  flex: none;
+  vertical-align: middle;
+  /* Dark glass gradient — constant across light + dark themes */
+  background: linear-gradient(
+    180deg,
+    oklch(0.38 0.03 275),
+    oklch(0.26 0.026 275)
+  );
+  box-shadow:
+    inset 0 max(1px, calc(var(--visor-s) * 0.022)) 0 oklch(1 0 0 / 0.22),
+    0 0 0 max(1px, calc(var(--visor-s) * 0.012)) oklch(1 0 0 / 0.1),
+    0 calc(var(--visor-s) * 0.05) calc(var(--visor-s) * 0.16)
+      calc(var(--visor-s) * -0.06) oklch(0 0 0 / 0.5);
+}
+
+/* ── Eyes ─────────────────────────────────────────────────────────────── */
+
+.eye {
+  display: block;
+  width: calc(var(--visor-s) * 0.155);
+  height: calc(var(--visor-s) * 0.33);
+  border-radius: 999px;
+  background: oklch(1 0 0); /* white, via oklch — never a hex literal */
+  box-shadow: 0 0 calc(var(--visor-s) * 0.13) oklch(1 0 0 / 0.5);
+  translate: var(--gx, 0px) var(--gy, 0px);
+  transition:
+    translate 0.3s var(--cb-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+    height 0.3s var(--cb-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+    width 0.3s var(--cb-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+    border-radius 0.3s var(--cb-ease, cubic-bezier(0.16, 1, 0.3, 1)),
+    opacity 0.3s;
+  animation: visorBlink 5.6s infinite;
+}
+
+/* Watching (idle): periodic blink */
+@keyframes visorBlink {
+  0%,
+  92.5%,
+  100% {
+    scale: 1 1;
+  }
+  96% {
+    scale: 1 0.08;
+  }
+}
+
+/* Reading: squinted + horizontal scan */
+.reading .eye {
+  height: calc(var(--visor-s) * 0.25);
+  animation: visorScan 1.25s ease-in-out infinite;
+}
+@keyframes visorScan {
+  0%,
+  100% {
+    translate: calc(var(--visor-s) * -0.075) 0;
+  }
+  50% {
+    translate: calc(var(--visor-s) * 0.075) 0;
+  }
+}
+
+/* Thinking: wide + pulsing opacity */
+.thinking .eye {
+  height: calc(var(--visor-s) * 0.11);
+  width: calc(var(--visor-s) * 0.19);
+  animation: visorThink 1.5s ease-in-out infinite;
+}
+@keyframes visorThink {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Found: tall wide eyes, no animation */
+.found .eye {
+  height: calc(var(--visor-s) * 0.41);
+  width: calc(var(--visor-s) * 0.18);
+  animation: none;
+}
+
+/* Happy: wide flat arc (mouth shape), no animation */
+.happy .eye {
+  height: calc(var(--visor-s) * 0.17);
+  width: calc(var(--visor-s) * 0.21);
+  border-radius: 999px 999px 0 0 / 190% 190% 0 0;
+  animation: none;
+}
+
+/* Asleep: narrow slit, dim, no glow */
+.asleep .eye {
+  height: calc(var(--visor-s) * 0.05);
+  width: calc(var(--visor-s) * 0.2);
+  opacity: 0.62;
+  box-shadow: none;
+  animation: none;
+}
+
+/* Reduced motion: kill every animation and gaze transition */
+@media (prefers-reduced-motion: reduce) {
+  .eye {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -858,6 +858,26 @@ Rails.application.routes.draw do
     post "mcp", to: "mcp#create"
   end
 
+  # ── First-party app API (/api/app) ──────────────────────────────────────────
+  # Backs the React SPA + Capacitor app. Session-bearer auth (Api::App::Base
+  # Controller — resolves `Authorization: Bearer <Session#api_token>`). Screen-
+  # shaped and unversioned; reuses the same services as the web. Routes are split
+  # per migration surface into config/routes/api_app_*.rb so each surface owns its
+  # own routes file with no shared-file contention. See api-migration/README.md.
+  draw(:api_app_foundation)
+  draw(:api_app_auth)
+  draw(:api_app_people_now)
+  draw(:api_app_time_money)
+  draw(:api_app_paper_files)
+  draw(:api_app_compose_email)
+  draw(:api_app_scout)
+  draw(:api_app_calendar)
+  draw(:api_app_settings)
+  # Today — the assistant-first cross-surface "needs you" worklist (locked core-UX
+  # model). A thin READ-ONLY aggregator over People::Attention + Money needs-you +
+  # Time asks; item actions route back to the existing People/Money/Time endpoints.
+  draw(:api_app_today)
+
   namespace :oauth do
     get "zoho/callback", to: "zoho#callback"
     get "google/connect", to: "google#connect"
