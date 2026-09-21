@@ -24,14 +24,21 @@ module Api
 
         private
 
+        # Expose the sentence as `plain` (for text/search) plus `spans`
+        # ([{text, bold}] runs) so the client can render bold emphasis with its
+        # own escaping (<b> per run) — never as HTML. There is deliberately NO
+        # `html` field: Scout::Memory::Sentence has no real/sanitized HTML, and
+        # its text embeds user-derived values (tag names, taught text), so a
+        # dangerouslySetInnerHTML-style consumer would be an XSS sink.
         def sentence_data
           s = @entry.sentence
-          return s.to_s unless s.respond_to?(:plain)
 
-          {
-            plain: s.plain,
-            html: s.respond_to?(:html) ? s.html : s.plain
-          }
+          if s.respond_to?(:spans)
+            { plain: s.plain, spans: s.spans }
+          else
+            text = s.to_s
+            { plain: text, spans: [ { text: text, bold: false } ] }
+          end
         end
       end
     end
