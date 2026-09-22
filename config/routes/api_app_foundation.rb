@@ -16,7 +16,15 @@ namespace :api do
 
     # POST /api/app/oauth/native/exchange — swap the one-time :native_session
     # token minted by OauthNativeHandoff for a real session bearer (Capacitor /
-    # SPA deep-link handoff).
+    # SPA deep-link handoff; also the SPA social sign-in return).
     post "oauth/native/exchange", to: "sessions#native_exchange"
+
+    # SPA "Sign in with <provider>" (both UNAUTHENTICATED — pre-session):
+    #   GET /api/app/oauth/providers     — enabled sign-in providers (button list)
+    #   GET /api/app/oauth/sign_in_url    — the provider authorize URL to open
+    # Callback resolves via the existing /oauth/* controllers (OauthNativeHandoff#
+    # spa_sign_in_flow?) → return_to?token=… → the client exchanges it above.
+    get "oauth/providers", to: "oauth/sign_in#providers"
+    get "oauth/sign_in_url", to: "oauth/sign_in#sign_in_url"
   end
 end

@@ -49,6 +49,23 @@ module OauthNativeHandoff
         oauth_state["flow"] == "account_link"
     end
 
+    # A sign-in flow from the React SPA. No user exists yet, so (unlike the
+    # account-link flows) identity comes from the OAuth resolution, not the state.
+    # Only fires on a verified (HMAC-valid, unexpired) state with spa: true.
+    def spa_sign_in_flow?
+      oauth_state["verified"] && oauth_state["spa"] &&
+        oauth_state["flow"] == "sign_in"
+    end
+
+    # Whether an unmatched identity may self-serve-create a workspace on this
+    # sign-in. The SPA respects signup_mode (blocks on beta_code cloud); web +
+    # native keep their existing create-on-first-sign-in behaviour.
+    def sign_in_allow_create?
+      return true unless spa_sign_in_flow?
+
+      public_signup_allowed?
+    end
+
     # Flows allowed to run without a session cookie: sign-in (no user yet), a
     # native authenticated flow, or a SPA account-link flow.
     def unauthenticated_oauth_flow?
@@ -77,7 +94,15 @@ module OauthNativeHandoff
       return handle_oauth_block(result) if result.blocked?
 
       user = result.user
-      if native_oauth?
+      if spa_sign_in_flow?
+        # SPA sign-in: hand a one-time :native_session token to the SPA return_to;
+        # the client swaps it for a bearer via POST /api/app/oauth/native/exchange
+        # (no bearer ever on the URL). Provider-MFA only — the same documented
+        # exception as native, since the one-time-token handoff carries no app
+        # second factor. See mfa_oauth_bypass_spec.
+        redirect_to spa_callback_url(token: user.generate_token_for(:native_session)),
+                    allow_other_host: true
+      elsif native_oauth?
         # Native sign-in is the documented exception: it stays provider-MFA only
         # (an in-webview challenge is a separate effort, and the handoff already
         # requires the installed app + a one-time token). See mfa_oauth_bypass_spec.
@@ -99,6 +124,10 @@ module OauthNativeHandoff
     def handle_oauth_block(result)
       if native_oauth?
         redirect_to_native(flow: "signin", status: "error")
+      elsif spa_sign_in_flow?
+        # SPA sign-in blocked (unknown email on a gated cloud, email already owns
+        # an account, etc.) → bounce to the SPA with the reason; no session minted.
+        redirect_to spa_callback_url(error: result.reason), allow_other_host: true
       else
         message = t("auth.oauth_sign_in.blocked.#{result.reason}", provider: oauth_provider.to_s.titleize)
         redirect_to new_session_path, flash: { result.severity => message }

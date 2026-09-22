@@ -26,11 +26,17 @@ module Auth
 
     # provider: :google/:microsoft/:zoho · uid: stable provider account id ·
     # email: address from discovery · name: display name (optional).
-    def initialize(provider:, uid:, email:, name: nil)
+    #
+    # allow_create: when false, an unmatched identity BLOCKS (:signup_closed)
+    # instead of self-serve-creating a workspace — so a caller can make social
+    # sign-in respect signup_mode (e.g. the SPA on beta_code cloud). Defaults
+    # true, preserving the existing web/native "create on first sign-in" behavior.
+    def initialize(provider:, uid:, email:, name: nil, allow_create: true)
       @provider = provider.to_s
       @uid      = uid.to_s.presence
       @email    = email.to_s.strip.downcase.presence
       @name     = name.to_s.strip.presence
+      @allow_create = allow_create
       @attempts = 0
     end
 
@@ -51,6 +57,11 @@ module Auth
         owner = account.email_account_users.exists?(owner: true)
         return block(owner ? :mailbox_has_owner : :mailbox_no_owner, :warning)
       end
+
+      # Signup gate: a caller that doesn't allow self-serve creation (SPA on
+      # beta_code cloud) blocks an unmatched identity instead of founding a
+      # workspace. Existing callers (web/native) pass allow_create: true → unchanged.
+      return block(:signup_closed, :warning) unless @allow_create
 
       create_account
     rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid

@@ -153,4 +153,27 @@ RSpec.describe Auth::OauthSignIn do
       expect(result).to be_signed_in
     end
   end
+
+  describe "allow_create gate (lets a caller respect signup_mode)" do
+    it "creates a workspace by default (allow_create defaults true — existing web/native)" do
+      expect { @result = call }.to change(Workspace, :count).by(1)
+      expect(@result).to be_signed_in
+    end
+
+    it "blocks (:signup_closed) instead of creating when allow_create: false" do
+      expect { @result = call(allow_create: false) }.not_to change(User, :count)
+      expect(@result).to be_blocked
+      expect(@result.reason).to eq(:signup_closed)
+    end
+
+    it "still signs in an EXISTING identity even when allow_create: false" do
+      user = create(:user)
+      create(:identity, user: user, provider: "google", uid: "g-existing", email: "existing@corp.com")
+
+      result = call(uid: "g-existing", email: "existing@corp.com", allow_create: false)
+
+      expect(result).to be_signed_in
+      expect(result.user).to eq(user)
+    end
+  end
 end
