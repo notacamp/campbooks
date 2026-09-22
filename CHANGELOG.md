@@ -16,6 +16,11 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.43.2] - 2026-09-22
+
+### Fixed
+- "Sign in with Google" now signs you into your existing account and links Google as a sign-in method automatically, **when Google has verified you control that email address**. Previously any account that had a password (or was seeded) but no linked social identity hit a dead-end — the provider round-trip succeeded but the app refused with a generic "we couldn't complete sign-in". Linking on a provider-verified email is as safe as the email-based password reset the app already allows (controlling the email is required for both). The account-takeover guard is unchanged for everything else: a merely *claimed* (provider-unverified) email still blocks, a connected mailbox address that isn't a login never signs in, accounts pending deletion stay blocked, and an account with **2FA enabled is never auto-linked** (that would let the app's OAuth token handoff skip the second factor — link it deliberately via Settings → Security instead). Auto-links are recorded in the audit log. Google is the first provider wired for this (it asserts `verified_email`); Zoho/Microsoft sign-in still link via Settings → Security.
+
 ## [0.43.1] - 2026-09-22
 
 ### Fixed

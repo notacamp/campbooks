@@ -56,6 +56,9 @@ class Oauth::MicrosoftController < ApplicationController
         uid: identity[:account_id],
         email: identity[:email],
         name: identity[:name],
+        # email_verified intentionally omitted (defaults false): Microsoft Graph
+        # exposes no reliable verified-email assertion, so a Microsoft sign-in must
+        # never auto-link into an existing account (see Auth::OauthSignIn Case B).
         allow_create: sign_in_allow_create?
       )
     )

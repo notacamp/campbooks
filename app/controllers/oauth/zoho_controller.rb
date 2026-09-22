@@ -59,6 +59,9 @@ class Oauth::ZohoController < ApplicationController
         uid: identity[:account_id],
         email: identity[:email],
         name: identity[:name],
+        # email_verified intentionally omitted (defaults false): Zoho's account API
+        # exposes no reliable verified-email assertion, so a Zoho sign-in must never
+        # auto-link into an existing account (see Auth::OauthSignIn Case B).
         allow_create: sign_in_allow_create?
       )
     )

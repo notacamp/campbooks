@@ -17,7 +17,11 @@ module Google
       {
         email: data["email"],
         name: data["name"] || data["email"].split("@").first,
-        account_id: data["id"]
+        account_id: data["id"],
+        # Google asserts whether it has verified the user controls this address
+        # (v2 userinfo: "verified_email"; OIDC: "email_verified"). Used to allow
+        # linking to an existing account on sign-in (Auth::OauthSignIn).
+        email_verified: data["verified_email"] == true || data["email_verified"] == true
       }
     rescue JSON::ParserError => e
       Rails.logger.error("[Google::AccountDiscovery] JSON parse failed: #{e.message}")
