@@ -18,6 +18,12 @@ major, minor, or patch change here.
 
 ### Added
 - Social sign-in from the SPA login page: "Sign in with Google/Zoho" (Microsoft when enabled) via two unauthenticated endpoints (`GET /api/app/oauth/providers`, `GET /api/app/oauth/sign_in_url`) that reuse the existing provider callbacks through a signed, TTL-bound state (no new redirect URIs). The callback hands the SPA a one-time token to exchange for a session bearer. On managed cloud (closed beta), the SPA path signs in existing users only and never bypasses the invite gate — brand-new account creation still goes through the gated registration flow; self-hosted `open` signup is unaffected.
+- SPA **Inbox settings** page: manage tags, email rules, signatures, document types, tag groups, and sender filtering (allowed/blocked/starred + inbox filter strategy) — as tabbed sections.
+- SPA settings pages: **AI** (managed vs bring-your-own processing mode, embedding model, provider adapters, per-purpose prompt customization) and **Scout's memory** (the learned-behaviour catalog with facet filters, teach, and confirm/remove).
+- SPA settings pages: **Plan** (usage + entitlements), **Notifications** (in-app notification center + per-tag/document-type in-app/email preferences + waiting-on-replies digest), **Members** (roles + invitations), and **Integrations** (Google Drive / Notion / Zoho / Calendars status + Connections CRUD).
+
+### Fixed
+- Settings → Mailboxes now renders the real connect UI (Google/Zoho/Microsoft + IMAP); the `/settings/mailboxes` route was wired to a placeholder in 0.42.0.
 
 ## [0.42.0] - 2026-09-21
 
