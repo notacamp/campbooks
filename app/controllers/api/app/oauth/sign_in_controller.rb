@@ -89,9 +89,22 @@ module Api
           end
         end
 
+        # Prefers APP_FRONTEND_URL; when unset the SPA is served same-origin with
+        # this API (prod + self-hosted, behind the reverse proxy), so derive the
+        # origin from the request. Local dev runs the SPA on its own port, so fall
+        # back to :3100 only when the request itself is to localhost. Mirrors
+        # OauthNativeHandoff#spa_frontend_url (the callback side).
         def spa_frontend_url(path = "/")
-          root = ENV.fetch("APP_FRONTEND_URL", "http://localhost:3100").chomp("/")
+          root = spa_frontend_root
           path.start_with?("/") ? "#{root}#{path}" : "#{root}/#{path}"
+        end
+
+        def spa_frontend_root
+          configured = ENV["APP_FRONTEND_URL"].presence
+          return configured.chomp("/") if configured
+
+          base = request.base_url
+          base.match?(/localhost|127\.0\.0\.1/) ? "http://localhost:3100" : base
         end
       end
     end
