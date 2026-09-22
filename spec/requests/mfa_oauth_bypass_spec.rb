@@ -22,9 +22,10 @@ RSpec.describe "MFA on non-password sign-in", type: :request do
   end
 
   it "challenges web OAuth sign-in when 2FA is on" do
-    # OAuth signs a user in only through a LINKED identity (Auth::OauthSignIn);
-    # an unlinked email match blocks instead. Link it so this exercises the real
-    # sign-in path, where the MFA gate must still fire.
+    # OAuth signs a user in through a LINKED identity, or auto-links a
+    # provider-VERIFIED email to an account WITHOUT 2FA (Auth::OauthSignIn); an
+    # unverified email match, or any match on a 2FA account, blocks instead. Link
+    # it so this exercises the real sign-in path, where the MFA gate must fire.
     create(:identity, user: user, provider: "zoho", uid: "acct-1")
     allow_any_instance_of(Zoho::OauthClient).to receive(:exchange_code).and_return("access_token" => "tok")
     allow_any_instance_of(Zoho::AccountDiscovery).to receive(:discover_identity)

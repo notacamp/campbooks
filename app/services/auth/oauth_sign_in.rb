@@ -3,16 +3,28 @@ module Auth
   # the single source of truth shared by all three OAuth sign-in controllers.
   #
   # The cardinal rule: a sign-in only ever lands on a user who has an *explicit*
-  # Identity for this (provider, uid). Matching by email NEVER signs anyone in —
-  # otherwise anyone controlling a provider account with a victim's address (or a
-  # shared mailbox) could walk into the victim's account. Email matches instead
-  # BLOCK with guidance toward the authenticated "add a sign-in method" flow.
+  # Identity for this (provider, uid) — OR whose own login email the provider has
+  # cryptographically verified this person controls. A merely *claimed* (provider-
+  # unverified) email, or a shared mailbox, NEVER signs anyone in — otherwise
+  # anyone asserting a victim's address could walk into their account.
+  #
+  # Why provider-verified email → auto-link is safe: it is strictly equivalent to
+  # the email-based password reset we already trust. To get a provider token that
+  # says email_verified for address X you must control X's provider account; and
+  # whoever controls X can already reset the password of the account whose login
+  # is X. So linking on a verified email grants nothing a determined holder of X
+  # couldn't already obtain — while turning the old dead-end into "Sign in with
+  # Google just works". A connected *mailbox* (Case C) is deliberately NOT enough:
+  # a mailbox can be shared or reassigned, so its OAuth must not confer full
+  # account access to whoever currently holds it.
   #
   # Resolution order:
-  #   A. Identity(provider, uid) exists      → SIGN IN (unless deletion pending)
-  #   B. a User has this login email         → BLOCK :existing_account
+  #   A. Identity(provider, uid) exists       → SIGN IN (unless deletion pending)
+  #   B. a User has this login email          → LINK + SIGN IN if the provider
+  #                                             verified the email, else BLOCK
+  #                                             :existing_account
   #   C. a mailbox is connected at this email → BLOCK :mailbox_has_owner/_no_owner
-  #   D. nothing matches                     → CREATE user + fresh workspace + Identity
+  #   D. nothing matches                      → CREATE user + fresh workspace + Identity
   class OauthSignIn
     # Outcome of a resolution. The controller turns this into a session (sign_in)
     # or a redirect-with-flash (block); `reason` keys the i18n guidance message and
@@ -31,12 +43,18 @@ module Auth
     # instead of self-serve-creating a workspace — so a caller can make social
     # sign-in respect signup_mode (e.g. the SPA on beta_code cloud). Defaults
     # true, preserving the existing web/native "create on first sign-in" behavior.
-    def initialize(provider:, uid:, email:, name: nil, allow_create: true)
+    #
+    # email_verified: whether the PROVIDER asserts it verified the user controls
+    # this email (Google userinfo verified_email / OIDC email_verified). Only a
+    # verified email may auto-link to an existing account (Case B); it defaults
+    # false, so any caller that can't vouch for the provider keeps the old block.
+    def initialize(provider:, uid:, email:, name: nil, allow_create: true, email_verified: false)
       @provider = provider.to_s
       @uid      = uid.to_s.presence
       @email    = email.to_s.strip.downcase.presence
       @name     = name.to_s.strip.presence
       @allow_create = allow_create
+      @email_verified = email_verified == true
       @attempts = 0
     end
 
@@ -51,7 +69,21 @@ module Auth
         return resolve_identity(identity)
       end
 
-      return block(:existing_account, :warning) if User.exists?(email_address: @email)
+      if (user = User.find_by(email_address: @email))
+        # The account's own login email. A provider-verified email is proof of
+        # control (≡ the email password-reset the app already trusts) → link this
+        # identity and sign in. A merely claimed email stays a block toward the
+        # authenticated "add a sign-in method" flow.
+        #
+        # BUT never auto-link into an account with app 2FA enabled: linking a new
+        # identity would let the SPA/native one-time-token handoff (which is
+        # provider-MFA only, by design) skip that 2FA on this AND every later
+        # sign-in. A 2FA user must link deliberately via Settings → Security,
+        # which clears 2FA first. Non-2FA accounts auto-link (nothing to bypass).
+        return link_and_sign_in(user) if @email_verified && !user.mfa_enabled?
+
+        return block(:existing_account, :warning)
+      end
 
       if (account = connected_mailbox)
         owner = account.email_account_users.exists?(owner: true)
@@ -79,6 +111,20 @@ module Auth
       return block(:deletion_requested, :error) if user.deletion_requested_at.present?
 
       identity.update!(email: @email) if identity.email != @email
+      sign_in(user)
+    end
+
+    # Case B with a provider-verified email: attach this (provider, uid) to the
+    # matching account and sign in. Next time it resolves via Case A. The unique
+    # (provider, uid) index + the caller's retry make a concurrent link idempotent.
+    def link_and_sign_in(user)
+      return block(:deletion_requested, :error) if user.deletion_requested_at.present?
+
+      Identity.create!(user: user, provider: @provider, uid: @uid, email: @email)
+      # Security-relevant: record that a sign-in method was attached automatically
+      # (mirrors the explicit Settings → Security "add sign-in method" audit event),
+      # so the account owner has a forensic marker in their audit log.
+      AuditEvent.log("sign_in_method_added", user: user, provider: @provider, auto_linked: true)
       sign_in(user)
     end
 

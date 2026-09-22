@@ -66,6 +66,70 @@ RSpec.describe Auth::OauthSignIn do
     end
   end
 
+  describe "B (verified) — a provider-verified email auto-links to the existing account" do
+    it "links the identity and signs in when the provider verified the email" do
+      user = create(:user, email_address: "owner@example.com")
+
+      expect { @result = call(email: "owner@example.com", uid: "g-new", email_verified: true) }
+        .to change { user.identities.count }.by(1)
+
+      expect(@result).to be_signed_in
+      expect(@result.user).to eq(user)
+      expect(user.identities.sole).to have_attributes(provider: "google", uid: "g-new", email: "owner@example.com")
+    end
+
+    it "still BLOCKS (:existing_account) when the email is NOT provider-verified" do
+      create(:user, email_address: "owner@example.com")
+      result = call(email: "owner@example.com", uid: "g-new", email_verified: false)
+      expect(result).to be_blocked
+      expect(result.reason).to eq(:existing_account)
+    end
+
+    it "defaults to blocking when email_verified is omitted (safe default)" do
+      create(:user, email_address: "owner@example.com")
+      expect(call(email: "owner@example.com", uid: "g-new").reason).to eq(:existing_account)
+    end
+
+    it "does NOT link or sign in a user pending deletion, even with a verified email" do
+      user = create(:user, email_address: "gone@example.com", deletion_requested_at: Time.current)
+      result = call(email: "gone@example.com", uid: "g-new", email_verified: true)
+      expect(result).to be_blocked
+      expect(result.reason).to eq(:deletion_requested)
+      expect(user.identities).to be_empty
+    end
+
+    it "a verified email that is only a connected MAILBOX (no user) still does not sign in" do
+      # Case C is deliberately NOT bypassed by verification: a mailbox is not a login.
+      account = create(:email_account, email_address: "mailbox@acme.com")
+      create(:email_account_user, :owner, email_account: account)
+
+      result = call(email: "mailbox@acme.com", uid: "z-1", email_verified: true)
+      expect(result).to be_blocked
+      expect(result.reason).to eq(:mailbox_has_owner)
+    end
+
+    it "does NOT auto-link into an account with app 2FA enabled — blocks (:existing_account)" do
+      # Linking a new identity would let the SPA/native (provider-MFA only) handoff
+      # skip this account's app 2FA, so a verified email must NOT auto-link here.
+      user = create(:user, email_address: "mfa@example.com", totp_enabled_at: Time.current)
+
+      result = call(email: "mfa@example.com", uid: "g-new", email_verified: true)
+
+      expect(result).to be_blocked
+      expect(result.reason).to eq(:existing_account)
+      expect(user.reload.identities).to be_empty
+    end
+
+    it "records a 'sign_in_method_added' audit event when it auto-links" do
+      user = create(:user, email_address: "owner@example.com")
+
+      expect(AuditEvent).to receive(:log)
+        .with("sign_in_method_added", hash_including(user: user, provider: "google", auto_linked: true))
+
+      call(email: "owner@example.com", uid: "g-new", email_verified: true)
+    end
+  end
+
   describe "C — the email is a connected mailbox (no user, no identity)" do
     it "blocks (:mailbox_has_owner) when the mailbox has an owner" do
       account = create(:email_account, email_address: "team@acme.com")
