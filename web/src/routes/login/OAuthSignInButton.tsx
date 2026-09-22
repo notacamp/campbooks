@@ -7,7 +7,7 @@
  *
  * Design-layer component — raw HTML and Tailwind tokens are intentional here.
  */
-import { type FC, useCallback, useState } from "react";
+import { type FC, useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { useOAuthSignInUrlQuery } from "~/lib/api";
@@ -45,18 +45,18 @@ export const OAuthSignInButton: FC<OAuthSignInButtonProps> = ({ provider }) => {
     enabled,
   });
 
-  // As soon as the URL arrives, navigate immediately.
-  if (data?.authorize_url && enabled) {
-    window.location.href = data.authorize_url;
-  }
+  // Redirect once the authorize URL arrives. A side effect belongs in an effect,
+  // not the render body (which must stay pure) — a bare `window.location.href =`
+  // in render re-fires on every render and misbehaves under StrictMode.
+  useEffect(() => {
+    if (enabled && data?.authorize_url) {
+      window.location.href = data.authorize_url;
+    }
+  }, [enabled, data]);
 
   const handleClick = useCallback(() => {
-    if (data?.authorize_url) {
-      window.location.href = data.authorize_url;
-      return;
-    }
     setEnabled(true);
-  }, [data]);
+  }, []);
 
   return (
     <button
