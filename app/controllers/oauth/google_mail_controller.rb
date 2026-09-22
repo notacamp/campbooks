@@ -48,7 +48,8 @@ class Oauth::GoogleMailController < ApplicationController
         provider: oauth_provider,
         uid: identity[:account_id],
         email: identity[:email],
-        name: identity[:name]
+        name: identity[:name],
+        allow_create: sign_in_allow_create?
       )
     )
   end

@@ -16,6 +16,9 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Added
+- Social sign-in from the SPA login page: "Sign in with Google/Zoho" (Microsoft when enabled) via two unauthenticated endpoints (`GET /api/app/oauth/providers`, `GET /api/app/oauth/sign_in_url`) that reuse the existing provider callbacks through a signed, TTL-bound state (no new redirect URIs). The callback hands the SPA a one-time token to exchange for a session bearer. On managed cloud (closed beta), the SPA path signs in existing users only and never bypasses the invite gate — brand-new account creation still goes through the gated registration flow; self-hosted `open` signup is unaffected.
+
 ## [0.42.0] - 2026-09-21
 
 ### Added
