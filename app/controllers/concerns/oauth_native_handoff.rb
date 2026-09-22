@@ -194,11 +194,23 @@ module OauthNativeHandoff
 
     # ── SPA OAuth helpers ────────────────────────────────────────────────────
 
-    # Root URL of the React SPA frontend. Reads APP_FRONTEND_URL (set in
-    # production); falls back to localhost:3100 for local development.
+    # Root URL of the React SPA frontend. Prefers APP_FRONTEND_URL; when unset,
+    # the SPA is served SAME-ORIGIN with this API (prod + self-hosted, behind the
+    # reverse proxy), so derive the origin from the current request rather than
+    # assuming a port. Local dev runs the SPA on its own port, so fall back to
+    # :3100 only when the request itself is to localhost. This keeps social
+    # sign-in + mailbox connect working on self-hosted installs with zero config.
     def spa_frontend_url(path = "/")
-      root = ENV.fetch("APP_FRONTEND_URL", "http://localhost:3100").chomp("/")
+      root = spa_frontend_root
       path.start_with?("/") ? "#{root}#{path}" : "#{root}/#{path}"
+    end
+
+    def spa_frontend_root
+      configured = ENV["APP_FRONTEND_URL"].presence
+      return configured.chomp("/") if configured
+
+      base = request.base_url
+      base.match?(/localhost|127\.0\.0\.1/) ? "http://localhost:3100" : base
     end
 
     # Build the SPA redirect URL after a successful or failed OAuth account-link.

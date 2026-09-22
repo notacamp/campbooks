@@ -16,6 +16,11 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+## [0.43.1] - 2026-09-22
+
+### Fixed
+- SPA social sign-in and mailbox connect now work in production and on self-hosted installs without setting `APP_FRONTEND_URL`. The post-OAuth redirect previously defaulted to `http://localhost:3100` when that variable was unset, sending the sign-in/connect handoff to a dead local URL for real users. It now derives the SPA origin from the request (the SPA is served same-origin with the API behind the reverse proxy), falling back to `localhost:3100` only for local development. Set `APP_FRONTEND_URL` explicitly only when the SPA is hosted on a different origin than the API.
+
 ## [0.43.0] - 2026-09-22
 
 ### Added
