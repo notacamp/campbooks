@@ -12,7 +12,7 @@ Tauri. This page is the map; the *why* lives in `docs/adr/`.
                     │  /api/v1/* resource server: JWT + scopes      │
   Tauri desktop ────┤  /openapi.json                                │
   Tauri iOS/Android │                                               │
-  (token in OS      │  modules: system · conversations · schedule …│
+  (token in OS      │  modules: system · conversations · schedule … │
    keychain, Rust)  └───────┬──────────────┬─────────────┬──────────┘
                             │              │             │
   External client ──OAuth──►│  Postgres    │  IdP        │  AI providers
