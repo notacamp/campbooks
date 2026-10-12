@@ -162,20 +162,28 @@ struct CustomClaims {
 }
 
 impl Claims {
-    /// `None` when the token names no subject at all, or names two different
-    /// workspaces.
+    /// `None` when the token names no subject at all, or a client token names
+    /// two different workspaces.
     fn into_principal(self) -> Option<Principal> {
-        let custom = self.custom.and_then(|custom| custom.workspace_id);
-        let workspace = match (self.workspace_id, custom) {
-            (Some(root), Some(custom)) if root != custom => return None,
-            (root, custom) => root.or(custom),
-        };
         let azp = self.azp.filter(|azp| !azp.is_empty());
         let sub = self.sub.filter(|sub| !sub.is_empty());
         let kind = match (&sub, &azp) {
             (Some(sub), Some(azp)) if sub == azp => PrincipalKind::Client,
             (Some(_), _) => PrincipalKind::User,
             (None, _) => PrincipalKind::Client,
+        };
+        // Only a client's workspace comes from its token: an admin sets a
+        // client's claims. A user's custom claims can come from attributes the
+        // user may edit, so a user's workspaces always come from membership.
+        let workspace = match kind {
+            PrincipalKind::User => None,
+            PrincipalKind::Client => {
+                let custom = self.custom.and_then(|custom| custom.workspace_id);
+                match (self.workspace_id, custom) {
+                    (Some(root), Some(custom)) if root != custom => return None,
+                    (root, custom) => root.or(custom),
+                }
+            }
         };
         let subject = sub.or_else(|| azp.clone())?;
         let scopes: BTreeSet<Scope> = self
@@ -270,6 +278,18 @@ mod tests {
             "azp": "c", "workspace_id": "w1", "custom": { "workspace_id": "w2" }
         }));
         assert!(conflicting.into_principal().is_none());
+    }
+
+    #[test]
+    fn users_never_get_a_workspace_from_their_token() {
+        let user = claims(serde_json::json!({
+            "sub": "user-1", "azp": "campbooks-web",
+            "workspace_id": "w1", "custom": { "workspace_id": "w2" }
+        }))
+        .into_principal()
+        .unwrap();
+        assert_eq!(user.kind, PrincipalKind::User);
+        assert_eq!(user.workspace, None);
     }
 
     #[test]

@@ -108,18 +108,25 @@ fields:
 - `kind`: user or client;
 - `client_id`: `azp`;
 - `scopes`: from the space-separated `scope` claim;
-- `workspace`: from a `workspace_id` claim at the token root or under `custom`.
+- `workspace`: for client tokens only, from a `workspace_id` claim at the token
+  root or under `custom`. A user's token never sets it, because a user's
+  custom claims may come from attributes the user can edit; a user's
+  workspaces come from membership.
 
-A token with neither `sub` nor `azp`, or with two different workspace ids,
-SHALL be refused as invalid.
+A token with neither `sub` nor `azp`, or a client token with two different
+workspace ids, SHALL be refused as invalid.
 
 #### Scenario: Client credentials token
 - **WHEN** a valid token has no `sub` and `azp` = `acme-sync`
 - **THEN** the principal's subject and client id are `acme-sync` and its kind is client
 
-#### Scenario: Workspace claim
-- **WHEN** a valid token carries `workspace_id` at its root, or under `custom`
+#### Scenario: Workspace claim on a client token
+- **WHEN** a valid client token carries `workspace_id` at its root, or under `custom`
 - **THEN** the principal's workspace is that value
+
+#### Scenario: Workspace claim on a user token
+- **WHEN** a valid user token carries a `workspace_id` claim
+- **THEN** the principal has no workspace
 
 ### Requirement: Scope per endpoint
 Every protected endpoint SHALL require exactly one scope from the catalogue.

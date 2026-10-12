@@ -209,13 +209,20 @@ async fn client_credentials_token_uses_azp_as_subject() {
 async fn workspace_claim_at_root_or_under_custom() {
     let idp = TestIdp::start().await;
     let app = app(verifier(&idp).0);
+    let client_claims = || {
+        let mut claims = idp.claims("test:read");
+        let fields = claims.as_object_mut().unwrap();
+        fields.remove("sub");
+        fields.insert("azp".into(), json!("acme-sync"));
+        claims
+    };
 
-    let mut root = idp.claims("test:read");
+    let mut root = client_claims();
     root["workspace_id"] = json!("ws-root");
     let reply = call_with(&app, &idp.token(&root)).await;
     assert_eq!(reply.json["workspace"], "ws-root");
 
-    let mut custom = idp.claims("test:read");
+    let mut custom = client_claims();
     custom["custom"] = json!({ "workspace_id": "ws-custom" });
     let reply = call_with(&app, &idp.token(&custom)).await;
     assert_eq!(reply.json["workspace"], "ws-custom");
@@ -225,6 +232,18 @@ async fn workspace_claim_at_root_or_under_custom() {
     call_with(&app, &idp.token(&conflicting))
         .await
         .assert_invalid();
+}
+
+#[tokio::test]
+async fn user_tokens_never_carry_a_workspace() {
+    let idp = TestIdp::start().await;
+    let app = app(verifier(&idp).0);
+    let mut claims = idp.claims("test:read");
+    claims["workspace_id"] = json!("ws-chosen-by-user");
+    let reply = call_with(&app, &idp.token(&claims)).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.json);
+    assert_eq!(reply.json["kind"], "User");
+    assert!(reply.json["workspace"].is_null(), "{}", reply.json);
 }
 
 // --- 401: no or bad token -----------------------------------------------------
