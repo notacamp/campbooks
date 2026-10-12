@@ -6,8 +6,8 @@ import { lazyBackend } from "./lazy-backend";
 // Keys must exist in the typed resources (src/app/i18next.d.ts); values are test data.
 const shell = {
   en: { loading: "Loading" },
-  pt: { loading: "A carregar" },
-  es: { loading: "Cargando" },
+  "pt-PT": { loading: "A carregar" },
+  "es-ES": { loading: "Cargando" },
   fr: { loading: "Chargement" },
 };
 
@@ -17,7 +17,17 @@ describe("detectLocale", () => {
   });
 
   it("ignores an unsupported saved choice and uses the browser language", () => {
-    expect(detectLocale("de", ["pt-PT", "en"])).toBe("pt");
+    expect(detectLocale("de", ["pt-PT", "en"])).toBe("pt-PT");
+  });
+
+  it("serves the closest regional variant we ship", () => {
+    expect(detectLocale(null, ["pt-BR"])).toBe("pt-PT");
+    expect(detectLocale(null, ["es-MX"])).toBe("es-ES");
+    expect(detectLocale(null, ["pt"])).toBe("pt-PT");
+  });
+
+  it("ignores a bare primary subtag saved as a choice", () => {
+    expect(detectLocale("pt", ["fr-FR"])).toBe("fr");
   });
 
   it("falls back to English", () => {
@@ -28,13 +38,13 @@ describe("detectLocale", () => {
 describe("loadersFromGlob", () => {
   const loaders = loadersFromGlob({
     "../modules/mail/i18n/en.json": () => Promise.resolve({ inbox: "Inbox" }),
-    "../modules/mail/i18n/pt.json": () => Promise.resolve({ inbox: "Caixa de entrada" }),
+    "../modules/mail/i18n/pt-PT.json": () => Promise.resolve({ inbox: "Caixa de entrada" }),
     "../modules/mail/README.md": () => Promise.resolve({}),
   });
 
   it("groups files by namespace and locale", async () => {
     expect(Object.keys(loaders)).toStrictEqual(["mail"]);
-    await expect(loaders["mail"]?.("pt")).resolves.toStrictEqual({ inbox: "Caixa de entrada" });
+    await expect(loaders["mail"]?.("pt-PT")).resolves.toStrictEqual({ inbox: "Caixa de entrada" });
   });
 
   it("rejects a locale the namespace does not ship", async () => {
@@ -72,13 +82,13 @@ describe("createI18n", () => {
   it("serves the shell synchronously and loads module namespaces on demand", async () => {
     let loads = 0;
     const i18n = createI18n({
-      locale: "pt",
+      locale: "pt-PT",
       shell,
       loaders: {
         system: (locale) => {
           loads += 1;
           return Promise.resolve({
-            title: locale === "pt" ? "Estado do sistema" : "System status",
+            title: locale === "pt-PT" ? "Estado do sistema" : "System status",
           });
         },
       },

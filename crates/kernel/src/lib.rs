@@ -13,7 +13,7 @@ pub mod events;
 pub mod ids;
 pub mod module;
 pub mod state;
-#[cfg(feature = "test-util")]
+#[cfg(any(test, feature = "test-util"))]
 pub mod testing;
 
 pub use config::Config;

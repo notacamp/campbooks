@@ -250,6 +250,142 @@ pub fn check_versions(version_file: &str, crates: &[Crate]) -> Vec<String> {
         .collect()
 }
 
+/// HTTP methods an OpenAPI path item may hold operations under.
+const OPERATION_METHODS: [&str; 8] = [
+    "get", "put", "post", "delete", "options", "head", "patch", "trace",
+];
+
+/// Every operation of the generated OpenAPI document states its security
+/// explicitly: either public (`security(())`, i.e. `[{}]`), or the `bearer`
+/// scheme with exactly the scope from the catalogue that its `Scoped<S>`
+/// extractor requires. Nothing is left to a document-wide default.
+pub fn check_operation_security(
+    spec: &serde_json::Value,
+    scheme: &str,
+    catalogue: &BTreeSet<String>,
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    let Some(paths) = spec.get("paths").and_then(serde_json::Value::as_object) else {
+        return violations;
+    };
+    for (path, item) in paths {
+        for method in OPERATION_METHODS {
+            let Some(operation) = item.get(method) else {
+                continue;
+            };
+            let name = format!("{} {path}", method.to_uppercase());
+            match operation
+                .get("security")
+                .and_then(serde_json::Value::as_array)
+            {
+                None => violations.push(format!(
+                    "OpenAPI operation `{name}` declares no `security`: require a scope with \
+                     `security((\"{scheme}\" = [\"<module>:<action>\"]))` and the \
+                     `Scoped<S>` extractor, or mark it public with `security(())`"
+                )),
+                Some(requirements) => {
+                    violations.extend(check_requirements(&name, requirements, scheme, catalogue));
+                }
+            }
+        }
+    }
+    violations
+}
+
+fn check_requirements(
+    operation: &str,
+    requirements: &[serde_json::Value],
+    scheme: &str,
+    catalogue: &BTreeSet<String>,
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    for requirement in requirements {
+        let Some(requirement) = requirement.as_object() else {
+            violations.push(format!(
+                "OpenAPI operation `{operation}`: malformed security requirement"
+            ));
+            continue;
+        };
+        for (name, scopes) in requirement {
+            if name != scheme {
+                violations.push(format!(
+                    "OpenAPI operation `{operation}` uses security scheme `{name}`; only \
+                     `{scheme}` exists"
+                ));
+                continue;
+            }
+            let scopes: Vec<&str> = scopes
+                .as_array()
+                .map(|list| list.iter().filter_map(serde_json::Value::as_str).collect())
+                .unwrap_or_default();
+            if scopes.is_empty() {
+                violations.push(format!(
+                    "OpenAPI operation `{operation}` requires a `{scheme}` token but no scope; \
+                     every protected endpoint requires one"
+                ));
+            }
+            for scope in scopes {
+                if !catalogue.contains(scope) {
+                    violations.push(format!(
+                        "OpenAPI operation `{operation}` requires scope `{scope}`, which no \
+                         module declares (see `campbooks-server scopes`)"
+                    ));
+                }
+            }
+        }
+    }
+    violations
+}
+
+/// A scope as a module declares it.
+#[derive(Debug, Clone)]
+pub struct DeclaredScope {
+    /// The declaring module.
+    pub module: String,
+    /// Wire name.
+    pub name: String,
+    /// What granting it allows.
+    pub description: String,
+}
+
+static SCOPE_NAME: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^([a-z][a-z0-9_]*):([a-z][a-z0-9_]*)$")
+        .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+});
+
+/// Scope names are `<module>:<action>` (lower-case), named after the module
+/// that declares them, unique, and described.
+pub fn check_scopes(scopes: &[DeclaredScope]) -> Vec<String> {
+    let mut violations = Vec::new();
+    let mut seen: BTreeMap<&str, &str> = BTreeMap::new();
+    for scope in scopes {
+        match SCOPE_NAME.captures(&scope.name) {
+            None => violations.push(format!(
+                "scope `{}` (module `{}`) must be `<module>:<action>`, lower-case",
+                scope.name, scope.module
+            )),
+            Some(caps) if caps.get(1).map(|m| m.as_str()) != Some(scope.module.as_str()) => {
+                violations.push(format!(
+                    "scope `{}` is declared by module `{}`; a module declares only \
+                     `{}:<action>` scopes",
+                    scope.name, scope.module, scope.module
+                ));
+            }
+            Some(_) => {}
+        }
+        if scope.description.trim().is_empty() {
+            violations.push(format!("scope `{}` needs a description", scope.name));
+        }
+        if let Some(other) = seen.insert(&scope.name, &scope.module) {
+            violations.push(format!(
+                "scope `{}` is declared twice (modules `{other}` and `{}`)",
+                scope.name, scope.module
+            ));
+        }
+    }
+    violations
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -400,6 +536,88 @@ mod tests {
         let crates = healthy();
         assert!(check_versions("0.1.0\n", &crates).is_empty());
         assert_eq!(check_versions("0.2.0", &crates).len(), crates.len());
+    }
+
+    fn catalogue() -> BTreeSet<String> {
+        ["mail:read".to_owned()].into()
+    }
+
+    #[test]
+    fn explicit_security_passes() {
+        let spec = serde_json::json!({ "paths": {
+            "/api/v1/system/health": { "get": { "security": [{}] } },
+            "/api/v1/mail/threads": {
+                "get": { "security": [{ "bearer": ["mail:read"] }] },
+                "parameters": [],
+            },
+        }});
+        assert!(check_operation_security(&spec, "bearer", &catalogue()).is_empty());
+        let public_by_empty_list =
+            serde_json::json!({ "paths": { "/x": { "get": { "security": [] } } } });
+        assert!(check_operation_security(&public_by_empty_list, "bearer", &catalogue()).is_empty());
+    }
+
+    #[test]
+    fn operation_without_security_fails() {
+        let spec = serde_json::json!({ "paths": {
+            "/api/v1/mail/threads": { "get": {}, "post": { "security": [{}] } },
+        }});
+        let v = check_operation_security(&spec, "bearer", &catalogue());
+        assert_eq!(v.len(), 1, "{v:?}");
+        assert!(v[0].contains("`GET /api/v1/mail/threads` declares no `security`"));
+    }
+
+    #[test]
+    fn scoped_security_must_name_a_known_scope_of_the_bearer_scheme() {
+        let spec = serde_json::json!({ "paths": { "/x": {
+            "get": { "security": [{ "bearer": [] }] },
+            "put": { "security": [{ "bearer": ["mail:write"] }] },
+            "post": { "security": [{ "apiKey": ["mail:read"] }] },
+            "delete": { "security": ["bearer"] },
+        }}});
+        let v = check_operation_security(&spec, "bearer", &catalogue());
+        assert_eq!(v.len(), 4, "{v:#?}");
+        assert!(v.iter().any(|m| m.contains("but no scope")));
+        assert!(
+            v.iter()
+                .any(|m| m.contains("`mail:write`, which no module declares"))
+        );
+        assert!(v.iter().any(|m| m.contains("scheme `apiKey`")));
+        assert!(v.iter().any(|m| m.contains("malformed")));
+    }
+
+    fn scope(module: &str, name: &str) -> DeclaredScope {
+        DeclaredScope {
+            module: module.into(),
+            name: name.into(),
+            description: "Does things.".into(),
+        }
+    }
+
+    #[test]
+    fn scopes_are_module_prefixed_unique_and_described() {
+        assert!(
+            check_scopes(&[
+                scope("system", "system:read"),
+                scope("mail_sync", "mail_sync:run")
+            ])
+            .is_empty()
+        );
+
+        let mut undescribed = scope("mail", "mail:send");
+        undescribed.description = " ".into();
+        let v = check_scopes(&[
+            scope("mail", "calendar:read"),
+            scope("mail", "Mail:Read"),
+            scope("mail", "mail"),
+            undescribed,
+            scope("mail", "mail:read"),
+            scope("mail", "mail:read"),
+        ]);
+        assert_eq!(v.len(), 5, "{v:#?}");
+        assert!(v[0].contains("declared by module `mail`"));
+        assert!(v.iter().any(|m| m.contains("needs a description")));
+        assert!(v.iter().any(|m| m.contains("declared twice")));
     }
 
     #[test]

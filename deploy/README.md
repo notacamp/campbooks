@@ -7,7 +7,11 @@
 3. Check it: `curl http://localhost:8080/api/v1/system/health` should return `{"status":"ok","database":"ok"}`.
 4. Optional local AI: `docker compose --profile ai up -d`, then pull the models once:
    `docker compose exec ollama ollama pull qwen3:8b` (TEI downloads `BAAI/bge-m3` itself).
-5. Upgrades: `docker compose pull && docker compose up -d`; migrations run on startup
+5. Sign-in: the identity provider (Rauthy) starts with everything else, and the
+   API trusts its access tokens out of the box (issuer derived from
+   `CAMPBOOKS_IDP_URL`). See "Identity provider" below; to use another IdP,
+   edit the two `CAMPBOOKS_AUTH__*` lines of the `server` service in `compose.yaml`.
+6. Upgrades: `docker compose pull && docker compose up -d`; migrations run on startup
    (the server's and the identity provider's).
 
 CPU inference works but is slow. For the `decide` and `complete` roles, use a GPU

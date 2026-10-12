@@ -12,7 +12,7 @@ Tauri. This page is the map; the *why* lives in `docs/adr/`.
                     │  /api/v1/* resource server: JWT + scopes      │
   Tauri desktop ────┤  /openapi.json                                │
   Tauri iOS/Android │                                               │
-  (token in OS      │  modules: system · mail · calendar · …        │
+  (token in OS      │  modules: system · conversations · schedule … │
    keychain, Rust)  └───────┬──────────────┬─────────────┬──────────┘
                             │              │             │
   External client ──OAuth──►│  Postgres    │  IdP        │  AI providers
@@ -30,8 +30,9 @@ crates/
   kernel/                  campbooks-kernel — config, errors (problem+json), db pool,
                            auth extractors, ids, clock, event bus, Module trait.
                            Depends on NO internal crate.
-  ai/                      campbooks-ai — role-based AI gateway (decide/embed/complete/vision)
-                           over the OpenAI-compatible protocol. Depends on kernel only.
+  ai/                      campbooks-ai — role-based AI gateway: decide (typed decision
+                           model, ADR 0009), embed/complete/vision (OpenAI-compatible
+                           protocol). Depends on kernel only.
   server/                  campbooks-server — the binary. Loads config, runs migrations,
                            composes modules into one router, serves OpenAPI and,
                            when CAMPBOOKS_WEB_DIR is set, the built web client.
@@ -85,6 +86,21 @@ keys or joins). A read that needs data from two modules is composed in the
 client, or by subscribing to the other module's events and keeping a local
 projection.
 
+### Endpoints and auth
+
+The API is an OAuth 2.1 resource server (ADR 0004). A module declares its
+scopes once (`<module>:<action>`, a `kernel::auth::ScopeName` type) and
+lists them in `Module.scopes`. Every handler either requires one with the
+`Scoped<S>` extractor and documents it with
+`security(("bearer" = ["<scope>"]))`, or is explicitly public with
+`security(())`. The extractor validates the bearer JWT against the IdP
+configured by `CAMPBOOKS_AUTH__*` and yields the `Principal` (subject, kind,
+client id, scopes, workspace). Bad tokens get 401, and missing scopes get 403.
+Whether the principal may see a given record is the module's decision, and a
+read it may not see answers 404. `campbooks-server scopes` prints the
+catalogue the IdP mirrors. Module tests sign their own tokens with
+`kernel::testing::TestIdp`.
+
 ### Cross-module communication
 
 1. **Events (default).** A module publishes typed domain events on the kernel
@@ -113,10 +129,10 @@ one origin and port. Until the BFF lands, `/bff/api/*` is an interim
 passthrough to the same API routes with no session or credentials of its own
 (`openspec/changes/serve-web-client/`).
 
-## Extensibility (future)
+## Domains and scaling
 
-The long-term direction to evaluate is a **platform**: user-defined models
-(custom record types and fields), workflow automation over any model, and a
-dashboard builder — with mail, calendar, tasks, files and accounting as
-built-in modules on the same primitives. It is deliberately *not* built
-yet; the domain-mapping task decides whether and how.
+The module list, each module's language, how they talk and the order they
+ship in are in [`domain-map.md`](domain-map.md). How the system scales — one
+binary in `api`/`worker`/`sync` roles, connectors producing change streams,
+projections from the event log, blobs in object storage, and the platform
+seams every module declares — is in ADRs 0008, 0010 and 0011.

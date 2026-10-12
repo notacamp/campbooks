@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Campbooks API",
-    "description": "The Campbooks HTTP API. Errors are RFC 9457 `application/problem+json`.",
+    "description": "The Campbooks HTTP API. Errors are RFC 9457 `application/problem+json`. Operations require an OAuth 2.1 bearer token with the scope they list (401 without a valid token, 403 without the scope) unless they are public.",
     "license": {
       "name": "Sustainable Use License",
       "identifier": "LicenseRef-Sustainable-Use"
@@ -38,7 +38,10 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {}
+        ]
       }
     },
     "/api/v1/system/version": {
@@ -59,7 +62,10 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {}
+        ]
       }
     }
   },
@@ -143,6 +149,14 @@
             "example": "0.1.0"
           }
         }
+      }
+    },
+    "securitySchemes": {
+      "bearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `system:read`: Read operational status."
       }
     }
   },

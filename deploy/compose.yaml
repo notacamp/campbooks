@@ -15,6 +15,10 @@ services:
     environment:
       # Built from POSTGRES_PASSWORD so the two never drift apart.
       CAMPBOOKS_DATABASE_URL: postgres://campbooks:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/campbooks
+      # Trust the bundled IdP's access tokens (ADR 0004). To use another IdP,
+      # change these two lines (and drop the idp services).
+      CAMPBOOKS_AUTH__ISSUER: ${CAMPBOOKS_IDP_URL:-http://localhost:8081}/auth/v1/
+      CAMPBOOKS_AUTH__JWKS_URL: http://idp:8080/auth/v1/oidc/certs
     # Web app and API on one port (the image sets CAMPBOOKS_WEB_DIR).
     ports:
       - "${CAMPBOOKS_PORT:-8080}:8080"

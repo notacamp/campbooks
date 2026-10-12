@@ -18,6 +18,7 @@
     "api:generate": "pnpm -r run api:generate",
     "api:check": "pnpm -r run api:check",
     "record": "pnpm --filter @campbooks/app run record",
+    "i18n:check": "pnpm -r run i18n:check",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

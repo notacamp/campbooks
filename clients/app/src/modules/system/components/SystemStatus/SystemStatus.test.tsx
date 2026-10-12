@@ -59,7 +59,7 @@ describe("SystemStatus", () => {
   it("renders in the user's language", async () => {
     stubApi({});
 
-    renderWithProviders(<SystemStatus />, "pt");
+    renderWithProviders(<SystemStatus />, "pt-PT");
 
     expect(await screen.findByRole("heading", { name: "Estado do sistema" })).toBeVisible();
   });

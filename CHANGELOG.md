@@ -23,3 +23,16 @@ All notable changes to Campbooks Next are documented here. The format follows
   registered automatically. Read the first admin password with
   `docker compose run --rm idp-init cat /app/data/campbooks/initial-admin-password`;
   see `deploy/README.md`. Sign-in is not wired into the app yet.
+- The API is now an OAuth 2.1 resource server. It validates JWT access tokens
+  from your identity provider (signature against its JWKS, issuer, audience,
+  expiry) and can require a scope on each endpoint. Rejected tokens get a 401,
+  and valid tokens without the scope get a 403, both as problem+json with a
+  `WWW-Authenticate` challenge. Self-hosters configure it with the new
+  `CAMPBOOKS_AUTH__ISSUER`, `CAMPBOOKS_AUTH__AUDIENCE` (default
+  `campbooks-api`), `CAMPBOOKS_AUTH__JWKS_URL` (discovered when unset) and
+  `CAMPBOOKS_AUTH__LEEWAY_SECONDS` (default 60) settings. Without an issuer,
+  scoped endpoints answer 401 `auth_not_configured`. Health and version stay
+  public.
+- `campbooks-server scopes` prints the API's scope catalogue as JSON, and the
+  OpenAPI document declares a `bearer` security scheme and states every
+  operation's security.
