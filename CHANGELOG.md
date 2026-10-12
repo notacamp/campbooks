@@ -57,6 +57,17 @@ All notable changes to Campbooks Next are documented here. The format follows
   `CAMPBOOKS_JOBS__SHUTDOWN_GRACE_SECONDS` (8),
   `CAMPBOOKS_JOBS__RETRY_BASE_MS` (1000) and
   `CAMPBOOKS_JOBS__RETRY_MAX_SECONDS` (3600).
+- Storage for message bodies, attachments and files, outside Postgres. Each
+  file is stored once per workspace however many messages carry it, checked
+  against its SHA-256 on the way in and out, and deleted by an hourly sweep
+  once nothing uses it and `CAMPBOOKS_BLOBS__SWEEP_GRACE_HOURS` (default 24)
+  have passed. By default files go to the new `blobs-data` volume
+  (`CAMPBOOKS_BLOBS__PATH`, `/data/blobs`); set
+  `CAMPBOOKS_BLOBS__BACKEND=s3` and `CAMPBOOKS_BLOBS__S3__*` to use any
+  S3-compatible bucket instead. Files over `CAMPBOOKS_BLOBS__MAX_OBJECT_BYTES`
+  (default 50 MiB) are refused. The server checks the store on startup and
+  will not start if it cannot reach it. Back up `blobs-data` (or the bucket)
+  together with Postgres; see `deploy/README.md`.
 
 ### Changed
 - The image's default command is now `all` instead of `serve` (same

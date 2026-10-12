@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO kernel.blob_refs (workspace_id, hash, owner_type, owner_id)\n            VALUES ($1, $2, $3, $4)\n            ON CONFLICT DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "86481301bd1472941140275f91cbc8a575522bf75199feb6ed76bee89172eddb"
+}

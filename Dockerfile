@@ -59,6 +59,8 @@ COPY migrations migrations
 COPY crates crates
 COPY xtask xtask
 RUN cargo build --release --locked --package campbooks-server --bin campbooks-server
+# The blob directory, created here because the runtime image has no shell.
+RUN mkdir -p /out/blobs
 
 # --- runtime: distroless, non-root, no shell ----------------------------------
 FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
@@ -71,9 +73,13 @@ LABEL org.opencontainers.image.title="campbooks-server" \
 ENV GIT_SHA=${GIT_SHA} \
     CAMPBOOKS_BIND_ADDR=0.0.0.0:8080 \
     CAMPBOOKS_LOG_FORMAT=json \
-    CAMPBOOKS_WEB_DIR=/app/web
+    CAMPBOOKS_WEB_DIR=/app/web \
+    CAMPBOOKS_BLOBS__PATH=/data/blobs
 COPY --from=builder /src/target/release/campbooks-server /app/campbooks-server
 COPY --from=web /src/clients/app/dist /app/web
+# Owned by `nonroot` (65532), so a fresh named volume mounted here inherits a
+# directory the server can write.
+COPY --from=builder --chown=65532:65532 /out/blobs /data/blobs
 USER nonroot:nonroot
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \

@@ -11,6 +11,7 @@ use serde_json::Value;
 use super::{Job, JobContext, JobError, PruneJobs};
 use crate::{
     Module,
+    blobs::{SWEEP_EVERY, SweepBlobs},
     events::{DomainEvent, Event, EventHandler, EventId},
 };
 
@@ -242,7 +243,9 @@ impl Registry {
     /// module and unique; queues lower-case snake case; attempts at least
     /// one; schedules at least a second apart.
     pub fn build(modules: &[Module]) -> Result<Self, RegistryError> {
-        let kernel = Background::new().schedule::<PruneJobs>(PRUNE_EVERY);
+        let kernel = Background::new()
+            .schedule::<PruneJobs>(PRUNE_EVERY)
+            .schedule::<SweepBlobs>(SWEEP_EVERY);
         let owners = std::iter::once((KERNEL_OWNER, &kernel))
             .chain(modules.iter().map(|m| (m.name, &m.background)));
 
@@ -418,7 +421,8 @@ fn check_owned_name(owner: &str, name: &str) -> Result<(), String> {
     }
 }
 
-fn is_dotted(name: &str) -> bool {
+/// `<snake>.<snake>`: a module-qualified name.
+pub(crate) fn is_dotted(name: &str) -> bool {
     name.split_once('.')
         .is_some_and(|(a, b)| is_snake(a) && is_snake(b))
 }
