@@ -57,6 +57,23 @@ All notable changes to Campbooks Next are documented here. The format follows
   `CAMPBOOKS_JOBS__SHUTDOWN_GRACE_SECONDS` (8),
   `CAMPBOOKS_JOBS__RETRY_BASE_MS` (1000) and
   `CAMPBOOKS_JOBS__RETRY_MAX_SECONDS` (3600).
+- The AI gateway's `decide` role is now typed (ADR 0009): modules ask
+  `choice`, `score` and yes/no questions about an item and get answers with a
+  probability per option and a confidence, which they must clear before
+  acting. It is served by Laya, an open-weight decision model, or by any
+  instruct model through the OpenAI-compatible API. New settings:
+  `CAMPBOOKS_AI__DECIDE__PROTOCOL` (`laya` or `openai`, default `openai`, so
+  existing `decide` settings keep working), `CAMPBOOKS_AI__DECIDE__LOGPROBS`
+  (default `true`; set it to `false` for servers that reject the parameter)
+  and `CAMPBOOKS_AI__DECIDE__CALIBRATION__<TYPE>[_<OPTIONS>]` temperatures
+  (default 1.0). An empty `CAMPBOOKS_AI__<ROLE>__API_KEY` now means no key.
+- Self-hosting: `docker compose --profile ai` now also runs `laya`, the
+  default `decide` model (Laya multilingual, Apache-2.0, CPU-friendly). It is
+  built locally from `deploy/laya`, downloads its checkpoint (about 680 MB)
+  into the new `laya-models` volume on first start, is reachable only on the
+  compose network, and refuses to start until you set
+  `CAMPBOOKS_AI__DECIDE__API_KEY` in `.env` (`openssl rand -hex 32`).
+  `.env.example` now points `decide` at it; see `deploy/README.md`.
 
 ### Changed
 - The image's default command is now `all` instead of `serve` (same
