@@ -119,6 +119,9 @@ jobs:
       - name: Generated API types are current
         if: always()
         run: pnpm api:check
+      - name: Translations at parity (en, pt, es, fr)
+        if: always()
+        run: pnpm i18n:check
       - name: Tests + coverage
         if: always()
         run: pnpm test
