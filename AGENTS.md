@@ -74,10 +74,12 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
 
 ## Internationalization (enforced)
 
-Campbooks ships in **English, Portuguese (pt-PT), Spanish and French**. Every
-string a user can see exists in all four before it ships.
+Campbooks ships in **English, European Portuguese, Spanish from Spain and
+French** — locale tags `en`, `pt-PT`, `es-ES`, `fr`. Always the full tag:
+a bare `pt` means Brazilian Portuguese to `Intl`/CLDR (dates, numbers,
+plurals). Every string a user can see exists in all four before it ships.
 
-- **Our UI:** every `i18n/` namespace has `en`, `pt`, `es` and `fr` files with
+- **Our UI:** every `i18n/` namespace has `en`, `pt-PT`, `es-ES` and `fr` files with
   exactly the same keys and no empty values. *(CI: `pnpm i18n:check`.)*
 - **Our server:** messages a user reads (problem+json `title`/`detail`,
   emails, notifications) are rendered in the recipient's locale, from
