@@ -73,6 +73,89 @@ pub struct Config {
     /// How the API validates OAuth access tokens (`CAMPBOOKS_AUTH__*`).
     #[serde(default)]
     pub auth: AuthConfig,
+
+    /// The background job worker (`CAMPBOOKS_JOBS__*`).
+    #[serde(default)]
+    pub jobs: JobsConfig,
+}
+
+/// Background job worker settings (`CAMPBOOKS_JOBS__*`, ADR 0012).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default)]
+pub struct JobsConfig {
+    /// Jobs one worker process runs at the same time
+    /// (`CAMPBOOKS_JOBS__CONCURRENCY`). Each running job may hold a database
+    /// connection, so keep `CAMPBOOKS_DATABASE_MAX_CONNECTIONS` above it.
+    pub concurrency: usize,
+    /// Jobs of one workspace that may run at once in one queue, across all
+    /// workers (`CAMPBOOKS_JOBS__PER_WORKSPACE`). Keeps one busy workspace
+    /// from starving the others.
+    pub per_workspace: u32,
+    /// How often an idle worker looks for work when no enqueue notification
+    /// arrives (`CAMPBOOKS_JOBS__POLL_INTERVAL_MS`). Enqueues wake workers
+    /// at once through `LISTEN/NOTIFY`; the poll is the safety net.
+    pub poll_interval_ms: u64,
+    /// How long a claimed job is reserved for its worker
+    /// (`CAMPBOOKS_JOBS__LEASE_SECONDS`). The worker renews it every third of
+    /// that while the job runs; a job whose lease runs out (its worker died)
+    /// is handed to another worker.
+    pub lease_seconds: u64,
+    /// How long succeeded jobs are kept before the hourly prune deletes them
+    /// (`CAMPBOOKS_JOBS__RETENTION_HOURS`). Failed jobs are kept for
+    /// inspection, and the event log is never pruned.
+    pub retention_hours: u64,
+    /// How long a stopping worker waits for running jobs to finish before it
+    /// hands them back to the queue (`CAMPBOOKS_JOBS__SHUTDOWN_GRACE_SECONDS`).
+    /// Keep it below the container stop timeout (10 s by default).
+    pub shutdown_grace_seconds: u64,
+    /// First retry delay in milliseconds (`CAMPBOOKS_JOBS__RETRY_BASE_MS`);
+    /// it doubles with every attempt, with jitter.
+    pub retry_base_ms: u64,
+    /// Longest retry delay in seconds (`CAMPBOOKS_JOBS__RETRY_MAX_SECONDS`).
+    pub retry_max_seconds: u64,
+}
+
+impl Default for JobsConfig {
+    fn default() -> Self {
+        Self {
+            concurrency: 4,
+            per_workspace: 2,
+            poll_interval_ms: 5_000,
+            lease_seconds: 60,
+            retention_hours: 168,
+            shutdown_grace_seconds: 8,
+            retry_base_ms: 1_000,
+            retry_max_seconds: 3_600,
+        }
+    }
+}
+
+impl JobsConfig {
+    /// Startup check: every value is in a range the worker can run with. The
+    /// message names the offending setting.
+    pub fn check(&self) -> Result<(), String> {
+        let checks = [
+            ("CONCURRENCY", self.concurrency >= 1, "at least 1"),
+            ("PER_WORKSPACE", self.per_workspace >= 1, "at least 1"),
+            (
+                "POLL_INTERVAL_MS",
+                self.poll_interval_ms >= 10,
+                "at least 10",
+            ),
+            ("LEASE_SECONDS", self.lease_seconds >= 3, "at least 3"),
+            ("RETENTION_HOURS", self.retention_hours >= 1, "at least 1"),
+            ("RETRY_BASE_MS", self.retry_base_ms >= 1, "at least 1"),
+            (
+                "RETRY_MAX_SECONDS",
+                self.retry_max_seconds.saturating_mul(1_000) >= self.retry_base_ms,
+                "at least RETRY_BASE_MS",
+            ),
+        ];
+        match checks.iter().find(|(_, ok, _)| !ok) {
+            Some((name, _, rule)) => Err(format!("CAMPBOOKS_JOBS__{name} must be {rule}")),
+            None => Ok(()),
+        }
+    }
 }
 
 /// Access-token validation settings (`CAMPBOOKS_AUTH__*`). The API is an
@@ -237,6 +320,8 @@ mod tests {
         assert_eq!(config.auth.issuer(), None);
         assert_eq!(config.auth.audience, "campbooks-api");
         assert_eq!(config.auth.leeway_seconds, 60);
+        assert_eq!(config.jobs, JobsConfig::default());
+        assert!(config.jobs.check().is_ok());
         assert_eq!(
             config.database_url.expose_secret(),
             "postgres://u:p@db.example.com/campbooks"
@@ -285,6 +370,42 @@ mod tests {
         assert_eq!(config.auth.audience, "my-api");
         assert_eq!(config.auth.leeway_seconds, 5);
         assert!(config.auth.check().is_ok());
+    }
+
+    #[test]
+    fn parses_jobs_section() {
+        let figment =
+            figment(&[("database_url", "postgres://localhost/x")]).merge(Serialized::default(
+                "jobs",
+                serde_json::json!({ "concurrency": 16, "poll_interval_ms": 250 }),
+            ));
+        let jobs = Config::from_figment(&figment).unwrap().jobs;
+        assert_eq!(jobs.concurrency, 16);
+        assert_eq!(jobs.poll_interval_ms, 250);
+        assert_eq!(jobs.lease_seconds, JobsConfig::default().lease_seconds);
+    }
+
+    #[test]
+    fn jobs_check_names_the_bad_setting() {
+        let zero = JobsConfig {
+            concurrency: 0,
+            ..JobsConfig::default()
+        };
+        assert!(
+            zero.check()
+                .unwrap_err()
+                .contains("CAMPBOOKS_JOBS__CONCURRENCY")
+        );
+        let short_lease = JobsConfig {
+            lease_seconds: 1,
+            ..JobsConfig::default()
+        };
+        assert!(
+            short_lease
+                .check()
+                .unwrap_err()
+                .contains("CAMPBOOKS_JOBS__LEASE_SECONDS")
+        );
     }
 
     #[test]

@@ -39,7 +39,8 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
   and tests. No horizontal `controllers/`/`services/`/`repositories/` layers.
 - **Modules don't import modules.** A module crate may depend on
   `campbooks-kernel` and `campbooks-ai` only. Cross-module needs go through
-  domain events on the kernel event bus, or an explicit allowlist entry in
+  domain events on the kernel's durable event bus (published in the same
+  transaction as the change, ADR 0012), or an explicit allowlist entry in
   `architecture.toml` (reviewed like an ADR). *(CI: `cargo xtask arch`.)*
 - **Kernel knows no domain.** `campbooks-kernel` depends on no internal crate;
   `campbooks-ai` depends only on the kernel; only `campbooks-server` composes
@@ -47,7 +48,16 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
 - **Each module owns a Postgres schema** named after it. Migrations live in
   `migrations/` named `<timestamp>_<module>__<description>.sql` and touch only
   that module's schema. No cross-schema joins or foreign keys — reference other
-  modules by ID. *(CI: `cargo xtask arch` checks migration names.)*
+  modules by ID. The kernel's infrastructure (event log, job queue) lives in
+  schema `kernel`, migrated by `<timestamp>_kernel__<description>.sql`; modules
+  never touch it. *(CI: `cargo xtask arch` checks migration names and the
+  schemas each migration touches.)*
+- **Background work is declared, named and owned.** Jobs, event handlers and
+  schedules are registered in the module's `Module.background`, named
+  `<module>.<name>`; events are `DomainEvent`s named `<module>.<event>` with
+  an explicit `VERSION`. Job payloads hold ids, never secrets or message
+  bodies, and `JobError` messages never carry secrets. *(Startup and
+  `cargo xtask arch` reject misnamed or duplicate registrations.)*
 - **Every HTTP endpoint is in the OpenAPI document** (`utoipa`), which is
   generated to `openapi/openapi.json` and committed. *(CI: `cargo xtask openapi --check`.)*
 - **Errors are RFC 9457 problem+json** via `kernel::Error`. Permission failures

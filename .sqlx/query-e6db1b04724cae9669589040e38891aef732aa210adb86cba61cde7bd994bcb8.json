@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE kernel.jobs\n               SET state = 'pending',\n                   attempts = greatest(attempts - 1, 0),\n                   run_at = now(),\n                   locked_by = NULL,\n                   locked_until = NULL,\n                   updated_at = now()\n             WHERE id = ANY($1) AND state = 'running' AND locked_by = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e6db1b04724cae9669589040e38891aef732aa210adb86cba61cde7bd994bcb8"
+}

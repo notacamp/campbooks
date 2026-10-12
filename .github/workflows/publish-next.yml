@@ -7,8 +7,9 @@ name: Publish next
 #   `campbooks-next-staging` to the private cloud repo, which pulls the tag.
 #
 # Tags stay in the `next*` namespace until cutover so they never collide with
-# the Rails releases (`X.Y.Z`, `latest`) published from `main`. Versioned
-# releases of next are a separate workflow (tracked in the cloud repo).
+# the Rails releases (`X.Y.Z`, `latest`) published from `main`. The build,
+# scan and attestation live in `image.yml`; versioned releases of next are
+# `release-next.yml`.
 
 on:
   workflow_run:
@@ -28,109 +29,42 @@ env:
   REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
-  build:
+  plan:
     # workflow_run fires for PR runs too; only publish green pushes to next.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'push')
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
-    permissions:
-      contents: read
-      packages: write
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          - { platform: linux/amd64, runner: ubuntu-latest, pair: linux-amd64 }
-          - { platform: linux/arm64, runner: ubuntu-24.04-arm, pair: linux-arm64 }
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          # Build exactly the commit CI approved, not whatever next is now.
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-      - id: sha
-        run: echo "short=$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - id: build
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          platforms: ${{ matrix.platform }}
-          build-args: GIT_SHA=${{ steps.sha.outputs.short }}
-          labels: |
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ steps.sha.outputs.short }}
-            org.opencontainers.image.licenses=LicenseRef-Sustainable-Use
-          cache-from: type=registry,ref=${{ env.REGISTRY_IMAGE }}:buildcache-next-${{ matrix.pair }}
-          cache-to: type=registry,ref=${{ env.REGISTRY_IMAGE }}:buildcache-next-${{ matrix.pair }},mode=max
-          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
-      - name: Export digest
-        env:
-          DIGEST: ${{ steps.build.outputs.digest }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/digests"
-          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
-      - uses: actions/upload-artifact@v7
-        with:
-          name: digests-${{ matrix.pair }}
-          path: ${{ runner.temp }}/digests/*
-          if-no-files-found: error
-          retention-days: 1
-
-  publish:
-    needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
+    outputs:
+      ref: ${{ steps.ref.outputs.ref }}
+      sha_tag: ${{ steps.ref.outputs.sha_tag }}
+    steps:
+      - id: ref
+        env:
+          # Build exactly the commit CI approved, not whatever next is now.
+          REF: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=next-${REF:0:12}" >> "$GITHUB_OUTPUT"
+
+  image:
+    needs: plan
+    uses: ./.github/workflows/image.yml
+    with:
+      ref: ${{ needs.plan.outputs.ref }}
+      tags: |
+        ${{ needs.plan.outputs.sha_tag }}
+        next
     permissions:
       contents: read
       packages: write
-    outputs:
-      tag: ${{ steps.tags.outputs.sha_tag }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-      - id: tags
-        run: echo "sha_tag=next-$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
-      - uses: actions/download-artifact@v8
-        with:
-          path: ${{ runner.temp }}/digests
-          pattern: digests-*
-          merge-multiple: true
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Create the multi-arch manifest
-        working-directory: ${{ runner.temp }}/digests
-        env:
-          SHA_TAG: ${{ steps.tags.outputs.sha_tag }}
-        run: |
-          # shellcheck disable=SC2046
-          docker buildx imagetools create \
-            -t "$REGISTRY_IMAGE:$SHA_TAG" -t "$REGISTRY_IMAGE:next" \
-            $(printf "$REGISTRY_IMAGE@sha256:%s " *)
-          docker buildx imagetools inspect "$REGISTRY_IMAGE:$SHA_TAG"
-      - name: Trivy (HIGH/CRITICAL, fixable)
-        # Pinned by SHA: this action's tags have been tampered with before.
-        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
-        with:
-          image-ref: ${{ env.REGISTRY_IMAGE }}:${{ steps.tags.outputs.sha_tag }}
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: "1"
+      id-token: write
+      attestations: write
 
   deploy-staging:
-    needs: publish
+    needs: [plan, image]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -140,7 +74,7 @@ jobs:
         # `gh workflow run deploy-next-staging.yml -R <owner>/campbooks-cloud -f tag=<tag>`.
         env:
           DISPATCH_TOKEN: ${{ secrets.CAMPBOOKS_CLOUD_DISPATCH_TOKEN }}
-          TAG: ${{ needs.publish.outputs.tag }}
+          TAG: ${{ needs.plan.outputs.sha_tag }}
           OWNER: ${{ github.repository_owner }}
         run: |
           if [ -z "$DISPATCH_TOKEN" ]; then

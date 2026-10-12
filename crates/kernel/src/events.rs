@@ -1,132 +1,264 @@
-//! Typed, in-process domain event bus.
+//! Durable domain events (ADR 0012).
 //!
-//! Modules never call each other; they publish events here and subscribe to
-//! the ones they care about. Each event type gets its own broadcast channel,
-//! created on first use. Delivery is best-effort and in-memory today (a slow
-//! subscriber that falls more than the channel capacity behind sees
-//! `RecvError::Lagged`); a durable transport via the job queue comes later
-//! behind the same API.
+//! Modules never call each other; they publish events and subscribe to the
+//! ones they care about. Publishing writes the event to the retained log
+//! `kernel.events` **in the caller's transaction**, together with one job per
+//! registered consumer (fan-out at publish time). If the transaction rolls
+//! back, neither the event nor its deliveries exist; once it commits, every
+//! consumer runs it at least once, through the job queue, even across
+//! restarts.
+//!
+//! ```ignore
+//! // The publishing module declares the event…
+//! #[derive(Serialize, Deserialize)]
+//! pub struct MessageReceived { pub workspace: String, pub message: MessageId }
+//! impl DomainEvent for MessageReceived {
+//!     const NAME: &'static str = "mail.message_received";
+//!     const VERSION: u16 = 1;
+//!     fn workspace(&self) -> Option<&str> { Some(&self.workspace) }
+//! }
+//! // …and publishes it with its data change.
+//! let mut tx = state.db.begin().await?;
+//! /* insert the message */
+//! state.events.publish(&mut tx, &MessageReceived { .. }).await?;
+//! tx.commit().await?;
+//!
+//! // A consumer in another module handles it.
+//! struct TrackSender;
+//! impl EventHandler for TrackSender {
+//!     type Event = MessageReceived;
+//!     const NAME: &'static str = "parties.track_sender";
+//!     const QUEUE: &'static str = "events";
+//!     async fn handle(ctx: &mut JobContext, event: Event<MessageReceived>) -> Result<(), JobError> { … }
+//! }
+//! // Module { background: Background::new().on_event::<TrackSender>(), … }
+//! ```
 
-use std::{
-    any::{Any, TypeId},
-    collections::HashMap,
-    sync::{Arc, Mutex, PoisonError},
-};
+use std::{future::Future, sync::Arc};
 
-use serde::Serialize;
-use tokio::sync::broadcast;
+use chrono::{DateTime, Utc};
+use serde::{Serialize, de::DeserializeOwned};
+use sqlx::{PgPool, Postgres, Transaction};
+
+use crate::jobs::{self, JobContext, JobError, Registry};
+
+crate::define_id!(
+    /// A published domain event, in `kernel.events`.
+    EventId
+);
 
 /// A fact a module announces to the rest of the system.
 ///
-/// `NAME` is the stable, dotted wire name (`"mail.message_received"`), used
-/// for logs today and for the durable queue later. Never rename it.
-pub trait DomainEvent: Serialize + Clone + Send + 'static {
+/// `NAME` is the stable, dotted wire name (`"mail.message_received"`) stored
+/// in the event log; never rename it. `VERSION` is the payload's schema
+/// version, stored with every event: bump it when the payload changes
+/// incompatibly so handlers can tell old events (from a replay) from new ones.
+pub trait DomainEvent: Serialize + DeserializeOwned + Send + Sync + 'static {
     /// Stable wire name, `<module>.<event>`.
     const NAME: &'static str;
+    /// Payload schema version, starting at 1. Deliberately has no default.
+    const VERSION: u16;
+
+    /// The workspace this event belongs to, or `None` for instance-wide
+    /// events. Its deliveries run with that workspace set
+    /// (`campbooks.workspace_id`) and count towards its fair share.
+    fn workspace(&self) -> Option<&str>;
 }
 
-/// Default number of events buffered per event type.
-pub const DEFAULT_CAPACITY: usize = 1024;
+/// A published event as a handler receives it.
+#[derive(Debug, Clone)]
+pub struct Event<E> {
+    /// The event's id in the log; stable across retries and replays, so a
+    /// handler can use it as an idempotency key.
+    pub id: EventId,
+    /// The schema version it was published with (equal to `E::VERSION`).
+    pub version: u16,
+    /// The workspace it belongs to.
+    pub workspace: Option<String>,
+    /// When it was published.
+    pub occurred_at: DateTime<Utc>,
+    /// The event itself.
+    pub payload: E,
+}
 
-/// The event bus. Cheap to clone; clones share channels.
-#[derive(Clone)]
+/// A consumer of one event type, registered in a module's
+/// [`Background`](crate::jobs::Background) with `.on_event::<H>()`.
+///
+/// Each delivery is a job of kind [`NAME`](Self::NAME): retried with backoff,
+/// leased, fair across workspaces. Delivery is at least once; work done
+/// through [`JobContext::tx`] commits atomically with the delivery being
+/// marked done, so database-only handlers take effect exactly once.
+pub trait EventHandler: Send + Sync + 'static {
+    /// The event this handler consumes.
+    type Event: DomainEvent;
+    /// Stable consumer name, `<module>.<handler>`; the job kind of its
+    /// deliveries and the name `campbooks-server events replay` takes.
+    const NAME: &'static str;
+    /// The queue its deliveries run on.
+    const QUEUE: &'static str;
+    /// Attempts before a delivery is marked failed (dead).
+    const MAX_ATTEMPTS: u32 = jobs::DEFAULT_MAX_ATTEMPTS;
+
+    /// Handle one event.
+    fn handle(
+        ctx: &mut JobContext,
+        event: Event<Self::Event>,
+    ) -> impl Future<Output = Result<(), JobError>> + Send;
+}
+
+/// Where a replay starts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReplayFrom {
+    /// Every event in the log.
+    Beginning,
+    /// Events published at or after this instant.
+    Time(DateTime<Utc>),
+    /// This event and every later one (event ids are time-ordered, UUID version 7).
+    Event(EventId),
+}
+
+/// The durable event bus: publishes events and their deliveries. Cheap to
+/// clone; clones share the [`Registry`] of consumers.
+#[derive(Clone, Default)]
 pub struct EventBus {
-    capacity: usize,
-    channels: Arc<Mutex<HashMap<TypeId, Box<dyn Any + Send + Sync>>>>,
-}
-
-impl Default for EventBus {
-    fn default() -> Self {
-        Self::new(DEFAULT_CAPACITY)
-    }
+    registry: Arc<Registry>,
 }
 
 impl std::fmt::Debug for EventBus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EventBus")
-            .field("capacity", &self.capacity)
-            .finish_non_exhaustive()
+            .field("registry", &self.registry)
+            .finish()
     }
 }
 
 impl EventBus {
-    /// A bus buffering up to `capacity` events per event type.
-    pub fn new(capacity: usize) -> Self {
-        Self {
-            capacity: capacity.max(1),
-            channels: Arc::default(),
-        }
+    /// A bus delivering to the consumers in `registry`.
+    pub fn new(registry: Arc<Registry>) -> Self {
+        Self { registry }
     }
 
-    /// Publish an event to every current subscriber of its type. Returns how
-    /// many subscribers received it (0 when nobody listens, which is fine).
-    pub fn publish<E: DomainEvent>(&self, event: E) -> usize {
-        let sent = self.sender::<E>().send(event).unwrap_or(0);
+    /// The consumers (and jobs and schedules) this bus knows.
+    pub fn registry(&self) -> &Arc<Registry> {
+        &self.registry
+    }
+
+    /// Append `event` to the log and enqueue one delivery per registered
+    /// consumer, inside `tx`. Nothing is visible until `tx` commits, and
+    /// nothing remains if it rolls back.
+    pub async fn publish<E: DomainEvent>(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        event: &E,
+    ) -> Result<EventId, sqlx::Error> {
+        let payload = serde_json::to_value(event).map_err(|e| sqlx::Error::Encode(e.into()))?;
+        let consumers = self.registry.consumers_of(E::NAME);
+        let kinds: Vec<&str> = consumers.iter().map(|c| c.name).collect();
+        let queues: Vec<&str> = consumers.iter().map(|c| c.queue).collect();
+        let max_attempts: Vec<i32> = consumers
+            .iter()
+            .map(|c| jobs::attempts_to_db(c.max_attempts))
+            .collect();
+
+        let id = sqlx::query_scalar!(
+            r#"
+            WITH event AS (
+                INSERT INTO kernel.events (name, version, workspace_id, payload)
+                VALUES ($1, $2, $3, $4)
+                RETURNING id, workspace_id
+            ), deliveries AS (
+                INSERT INTO kernel.jobs
+                    (queue, kind, payload, workspace_id, event_id, unique_key, max_attempts)
+                SELECT c.queue, c.kind, '{}'::jsonb, event.workspace_id, event.id,
+                       event.id::text, c.max_attempts
+                  FROM event,
+                       unnest($5::text[], $6::text[], $7::int[]) AS c(kind, queue, max_attempts)
+            )
+            SELECT id AS "id!: EventId" FROM event
+            "#,
+            E::NAME,
+            i32::from(E::VERSION),
+            event.workspace(),
+            payload,
+            &kinds as &[&str],
+            &queues as &[&str],
+            &max_attempts,
+        )
+        .fetch_one(&mut **tx)
+        .await?;
+
+        let mut notified: Vec<&str> = queues.clone();
+        notified.sort_unstable();
+        notified.dedup();
+        for queue in notified {
+            jobs::notify(tx, queue).await?;
+        }
         tracing::debug!(
             event = E::NAME,
-            subscribers = sent,
+            event_id = %id,
+            consumers = kinds.len(),
             "domain event published"
         );
-        sent
+        Ok(id)
     }
 
-    /// Subscribe to every event of type `E` published from now on.
-    pub fn subscribe<E: DomainEvent>(&self) -> broadcast::Receiver<E> {
-        self.sender::<E>().subscribe()
-    }
-
-    fn sender<E: DomainEvent>(&self) -> broadcast::Sender<E> {
-        let mut channels = self.channels.lock().unwrap_or_else(PoisonError::into_inner);
-        let entry = channels
-            .entry(TypeId::of::<E>())
-            .or_insert_with(|| Box::new(broadcast::Sender::<E>::new(self.capacity)));
-        match entry.downcast_ref::<broadcast::Sender<E>>() {
-            Some(sender) => sender.clone(),
-            // Unreachable: the map is keyed by the TypeId of `E`.
-            None => broadcast::Sender::new(self.capacity),
-        }
+    /// Re-enqueue deliveries of the logged events of `consumer`'s event type
+    /// to that consumer, from `from` on. Events that already have an
+    /// unfinished delivery to it are skipped. Returns how many were enqueued.
+    pub async fn replay(
+        &self,
+        db: &PgPool,
+        consumer: &str,
+        from: ReplayFrom,
+    ) -> Result<u64, ReplayError> {
+        let info = self
+            .registry
+            .consumer(consumer)
+            .ok_or_else(|| ReplayError::UnknownConsumer(consumer.to_owned()))?;
+        let (since_time, since_id) = match from {
+            ReplayFrom::Beginning => (None, None),
+            ReplayFrom::Time(at) => (Some(at), None),
+            ReplayFrom::Event(id) => (None, Some(id)),
+        };
+        let mut tx = db.begin().await?;
+        let enqueued = sqlx::query!(
+            r#"
+            INSERT INTO kernel.jobs
+                (queue, kind, payload, workspace_id, event_id, unique_key, max_attempts)
+            SELECT $1, $2, '{}'::jsonb, e.workspace_id, e.id, e.id::text, $3
+              FROM kernel.events e
+             WHERE e.name = $4
+               AND ($5::timestamptz IS NULL OR e.occurred_at >= $5)
+               AND ($6::uuid IS NULL OR e.id >= $6)
+             ORDER BY e.id
+            ON CONFLICT (kind, unique_key)
+                WHERE unique_key IS NOT NULL AND state IN ('pending', 'running')
+                DO NOTHING
+            "#,
+            info.queue,
+            info.name,
+            jobs::attempts_to_db(info.max_attempts),
+            info.event,
+            since_time,
+            since_id as Option<EventId>,
+        )
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+        jobs::notify(&mut tx, info.queue).await?;
+        tx.commit().await?;
+        tracing::info!(consumer, enqueued, "events replayed");
+        Ok(enqueued)
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[derive(Debug, Clone, PartialEq, Serialize)]
-    struct Pinged {
-        n: u32,
-    }
-    impl DomainEvent for Pinged {
-        const NAME: &'static str = "test.pinged";
-    }
-
-    #[derive(Debug, Clone, PartialEq, Serialize)]
-    struct Ponged;
-    impl DomainEvent for Ponged {
-        const NAME: &'static str = "test.ponged";
-    }
-
-    #[tokio::test]
-    async fn subscribers_receive_their_type_only() {
-        let bus = EventBus::default();
-        let mut ping_rx = bus.subscribe::<Pinged>();
-        let mut pong_rx = bus.subscribe::<Ponged>();
-
-        assert_eq!(bus.publish(Pinged { n: 1 }), 1);
-        assert_eq!(ping_rx.recv().await.unwrap(), Pinged { n: 1 });
-        assert!(pong_rx.try_recv().is_err());
-    }
-
-    #[tokio::test]
-    async fn clones_share_channels() {
-        let bus = EventBus::default();
-        let mut rx = bus.clone().subscribe::<Pinged>();
-        bus.publish(Pinged { n: 7 });
-        assert_eq!(rx.recv().await.unwrap().n, 7);
-    }
-
-    #[test]
-    fn publishing_without_subscribers_is_ok() {
-        assert_eq!(EventBus::default().publish(Ponged), 0);
-    }
+/// A replay could not run.
+#[derive(Debug, thiserror::Error)]
+pub enum ReplayError {
+    /// No module registers a consumer by that name.
+    #[error("no event handler is registered as `{0}`")]
+    UnknownConsumer(String),
+    /// The database refused.
+    #[error(transparent)]
+    Database(#[from] sqlx::Error),
 }

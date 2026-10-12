@@ -79,4 +79,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD ["/app/campbooks-server", "healthcheck"]
 ENTRYPOINT ["/app/campbooks-server"]
-CMD ["serve"]
+CMD ["all"]

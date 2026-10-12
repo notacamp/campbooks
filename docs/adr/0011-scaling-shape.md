@@ -1,6 +1,6 @@
 # 0011 — One binary in three roles; projections from an event log; blobs outside Postgres
 
-**Status:** Proposed · 2026-10-12
+**Status:** Accepted · 2026-10-13
 
 ## Context
 The same code must run as a single container for a self-hoster and scale out

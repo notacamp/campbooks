@@ -1,6 +1,6 @@
 [package]
 name = "campbooks-kernel"
-description = "Campbooks kernel: config, errors, state, ids, clock, events, module contract. Knows no domain."
+description = "Campbooks kernel: config, errors, state, ids, clock, durable events and jobs, module contract. Knows no domain."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
