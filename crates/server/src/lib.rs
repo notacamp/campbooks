@@ -7,7 +7,7 @@
 
 pub mod web;
 
-use std::time::Duration;
+use std::{fmt::Write as _, time::Duration};
 
 use axum::{
     Json, Router,
@@ -15,7 +15,7 @@ use axum::{
     http::{HeaderName, HeaderValue, Request, StatusCode, header},
     routing::get,
 };
-use campbooks_kernel::{AppState, Error, Module, Problem};
+use campbooks_kernel::{AppState, Error, Module, Problem, auth::ScopeInfo};
 use tower::ServiceBuilder;
 use tower_http::{
     compression::CompressionLayer,
@@ -24,7 +24,10 @@ use tower_http::{
     timeout::TimeoutLayer,
     trace::{DefaultOnResponse, TraceLayer},
 };
-use utoipa::OpenApi as _;
+use utoipa::{
+    OpenApi as _,
+    openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
+};
 use utoipa_axum::router::OpenApiRouter;
 
 /// Longest a request may take before the server answers 503.
@@ -46,16 +49,56 @@ pub const SECURITY_HEADERS: [(HeaderName, &str); 3] = [
     (header::X_FRAME_OPTIONS, "DENY"),
 ];
 
+/// Name of the OpenAPI security scheme every scoped operation references:
+/// `security(("bearer" = ["<scope>"]))`.
+pub const SECURITY_SCHEME: &str = "bearer";
+
 /// Every module, in mount order.
 pub fn modules() -> Vec<Module> {
     vec![campbooks_system::module()]
+}
+
+/// Every OAuth scope the API knows, sorted by name: what
+/// `campbooks-server scopes` prints and the identity provider mirrors.
+pub fn scope_catalogue() -> Vec<ScopeInfo> {
+    let mut scopes: Vec<ScopeInfo> = modules()
+        .iter()
+        .flat_map(|module| module.scopes.iter().copied())
+        .collect();
+    scopes.sort_unstable();
+    scopes
+}
+
+/// The `bearer` security scheme, listing the scope catalogue.
+fn security_scheme() -> SecurityScheme {
+    let scopes = scope_catalogue()
+        .iter()
+        .fold(String::new(), |mut list, scope| {
+            // Writing to a `String` cannot fail.
+            let _ = write!(list, "\n- `{}`: {}", scope.name, scope.description);
+            list
+        });
+    let description = format!(
+        "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, \
+         the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the \
+         scope it requires; operations with an empty requirement are public. Scopes:\n{scopes}"
+    );
+    SecurityScheme::Http(
+        HttpBuilder::new()
+            .scheme(HttpAuthScheme::Bearer)
+            .bearer_format("JWT")
+            .description(Some(description))
+            .build(),
+    )
 }
 
 #[derive(utoipa::OpenApi)]
 #[openapi(
     info(
         title = "Campbooks API",
-        description = "The Campbooks HTTP API. Errors are RFC 9457 `application/problem+json`.",
+        description = "The Campbooks HTTP API. Errors are RFC 9457 `application/problem+json`. \
+            Operations require an OAuth 2.1 bearer token with the scope they list \
+            (401 without a valid token, 403 without the scope) unless they are public.",
         license(name = "Sustainable Use License", identifier = "LicenseRef-Sustainable-Use"),
     ),
     components(schemas(Problem)),
@@ -66,6 +109,9 @@ struct ApiDoc;
 fn api() -> OpenApiRouter<AppState> {
     let mut doc = ApiDoc::openapi();
     env!("CARGO_PKG_VERSION").clone_into(&mut doc.info.version);
+    doc.components
+        .get_or_insert_with(Default::default)
+        .add_security_scheme(SECURITY_SCHEME, security_scheme());
     modules()
         .into_iter()
         .fold(OpenApiRouter::with_openapi(doc), |api, module| {
@@ -173,6 +219,97 @@ mod tests {
             "system_version"
         );
         assert!(spec["components"]["schemas"]["Problem"].is_object());
+    }
+
+    #[test]
+    fn openapi_declares_the_bearer_scheme() {
+        let spec = serde_json::to_value(openapi()).unwrap();
+        let scheme = &spec["components"]["securitySchemes"][SECURITY_SCHEME];
+        assert_eq!(scheme["type"], "http");
+        assert_eq!(scheme["scheme"], "bearer");
+        assert_eq!(scheme["bearerFormat"], "JWT");
+        let description = scheme["description"].as_str().unwrap();
+        assert!(description.contains("CAMPBOOKS_AUTH__ISSUER"));
+        for scope in scope_catalogue() {
+            assert!(description.contains(scope.name), "{}", scope.name);
+        }
+    }
+
+    #[test]
+    fn health_and_version_are_explicitly_public() {
+        let spec = serde_json::to_value(openapi()).unwrap();
+        for path in ["/api/v1/system/health", "/api/v1/system/version"] {
+            assert_eq!(
+                spec["paths"][path]["get"]["security"],
+                serde_json::json!([{}]),
+                "{path}"
+            );
+        }
+    }
+
+    #[test]
+    fn scope_catalogue_is_sorted_unique_and_owned_by_modules() {
+        let catalogue = scope_catalogue();
+        assert!(catalogue.iter().any(|s| s.name == "system:read"));
+        let names: Vec<_> = catalogue.iter().map(|s| s.name).collect();
+        let mut unique = names.clone();
+        unique.dedup();
+        assert_eq!(names, unique, "sorted and unique");
+        for module in modules() {
+            for scope in module.scopes {
+                assert!(
+                    scope.name.starts_with(&format!("{}:", module.name)),
+                    "{} declares {}",
+                    module.name,
+                    scope.name
+                );
+            }
+        }
+    }
+
+    /// Guards the pairing of `security(("bearer" = [..]))` in the OpenAPI doc
+    /// with the `Scoped<S>` extractor in the handler: an operation documented
+    /// as scoped must actually refuse a request without a token.
+    #[tokio::test]
+    async fn secured_operations_reject_anonymous_requests() {
+        let spec = serde_json::to_value(openapi()).unwrap();
+        let app = app();
+        for (path, item) in spec["paths"].as_object().unwrap() {
+            for (method, operation) in item.as_object().unwrap() {
+                let secured = operation["security"]
+                    .as_array()
+                    .is_some_and(|reqs| reqs.iter().all(|r| r.get(SECURITY_SCHEME).is_some()));
+                if !secured {
+                    continue;
+                }
+                let uri = path_with_dummy_params(path);
+                let request = Request::builder()
+                    .method(method.to_uppercase().as_str())
+                    .uri(&uri)
+                    .body(Body::empty())
+                    .unwrap();
+                let response = testing::send(&app, request).await;
+                assert_eq!(
+                    response.status,
+                    StatusCode::UNAUTHORIZED,
+                    "{method} {path} is documented as scoped but answered without a token"
+                );
+            }
+        }
+    }
+
+    /// `/a/{id}/b` → `/a/00000000-0000-0000-0000-000000000000/b`.
+    fn path_with_dummy_params(path: &str) -> String {
+        path.split('/')
+            .map(|segment| {
+                if segment.starts_with('{') {
+                    "00000000-0000-0000-0000-000000000000"
+                } else {
+                    segment
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("/")
     }
 
     #[test]

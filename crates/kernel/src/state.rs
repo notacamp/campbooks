@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use sqlx::PgPool;
 
-use crate::{config::Config, events::EventBus};
+use crate::{auth::TokenVerifier, config::Config, events::EventBus};
 
 /// What every handler can reach. Cheap to clone.
 #[derive(Debug, Clone)]
@@ -15,13 +15,16 @@ pub struct AppState {
     pub config: Arc<Config>,
     /// In-process domain event bus.
     pub events: EventBus,
+    /// Validates access tokens for [`Scoped`](crate::auth::Scoped) handlers.
+    pub auth: TokenVerifier,
 }
 
 impl AppState {
-    /// State with a fresh event bus.
+    /// State with a fresh event bus and a token verifier for `config.auth`.
     pub fn new(db: PgPool, config: Config) -> Self {
         Self {
             db,
+            auth: TokenVerifier::new(&config.auth),
             config: Arc::new(config),
             events: EventBus::default(),
         }

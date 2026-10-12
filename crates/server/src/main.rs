@@ -39,6 +39,9 @@ enum Command {
     Serve,
     /// Print the OpenAPI document as JSON.
     Openapi,
+    /// Print the OAuth scope catalogue as JSON (`[{name, description}]`), for
+    /// the identity provider's bootstrap to mirror.
+    Scopes,
     /// Exit 0 if the local server reports healthy, 1 otherwise. For container
     /// health checks (the runtime image has no shell or curl).
     Healthcheck {
@@ -52,18 +55,19 @@ enum Command {
 fn main() -> ExitCode {
     match Cli::parse().command.unwrap_or(Command::Serve) {
         Command::Serve => serve(),
-        Command::Openapi => print_openapi(),
+        Command::Openapi => print_json(&campbooks_server::openapi(), "OpenAPI document"),
+        Command::Scopes => print_json(&campbooks_server::scope_catalogue(), "scope catalogue"),
         Command::Healthcheck { port } => healthcheck(port.unwrap_or_else(port_from_env)),
     }
 }
 
-fn print_openapi() -> ExitCode {
-    let result = serde_json::to_string_pretty(&campbooks_server::openapi())
+fn print_json(value: &impl serde::Serialize, what: &str) -> ExitCode {
+    let result = serde_json::to_string_pretty(value)
         .map_err(std::io::Error::other)
         .and_then(|json| writeln!(std::io::stdout(), "{json}"));
     match result {
         Ok(()) => ExitCode::SUCCESS,
-        Err(e) => fail(&format!("could not print OpenAPI document: {e}")),
+        Err(e) => fail(&format!("could not print the {what}: {e}")),
     }
 }
 
@@ -91,6 +95,21 @@ fn serve() -> ExitCode {
 }
 
 async fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
+    config.auth.check()?;
+    if let Some(issuer) = config.auth.issuer() {
+        tracing::info!(
+            issuer,
+            audience = %config.auth.audience,
+            jwks_url = config.auth.jwks_url().unwrap_or("<discovered>"),
+            "validating access tokens"
+        );
+    } else {
+        tracing::warn!(
+            "CAMPBOOKS_AUTH__ISSUER unset: no identity provider, so every endpoint that \
+             requires a scope answers 401 auth_not_configured"
+        );
+    }
+
     if let Some(dir) = campbooks_server::web::configured_dir(&config) {
         campbooks_server::web::check_dir(dir)?;
         tracing::info!(dir = %dir.display(), "serving the web client");

@@ -29,7 +29,8 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Check crate dependency directions, migration names and versions.
+    /// Check crate dependency directions, migration names, versions, scope
+    /// names and that every OpenAPI operation declares its security.
     Arch,
     /// Write openapi/openapi.json from the server's routes.
     Openapi {
@@ -81,14 +82,34 @@ fn run_arch(root: &Path) -> Result<String> {
     violations.extend(arch::check_migrations(&migrations, &modules));
     violations.extend(arch::check_versions(&version, &crates));
 
+    let scopes: Vec<arch::DeclaredScope> = campbooks_server::modules()
+        .iter()
+        .flat_map(|module| {
+            module.scopes.iter().map(|scope| arch::DeclaredScope {
+                module: module.name.to_owned(),
+                name: scope.name.to_owned(),
+                description: scope.description.to_owned(),
+            })
+        })
+        .collect();
+    violations.extend(arch::check_scopes(&scopes));
+    let catalogue: BTreeSet<String> = scopes.iter().map(|s| s.name.clone()).collect();
+    let spec = serde_json::to_value(campbooks_server::openapi())
+        .context("serializing the OpenAPI document")?;
+    let operations =
+        arch::check_operation_security(&spec, campbooks_server::SECURITY_SCHEME, &catalogue);
+    violations.extend(operations);
+
     if violations.is_empty() {
         let modules: Vec<_> = modules.iter().map(String::as_str).collect();
         return Ok(format!(
-            "architecture OK: {} crates, {} module(s) [{}], {} migration(s)",
+            "architecture OK: {} crates, {} module(s) [{}], {} migration(s), {} scope(s), \
+             every operation declares its security",
             crates.len(),
             modules.len(),
             modules.join(", "),
-            migrations.len()
+            migrations.len(),
+            scopes.len()
         ));
     }
     let list: Vec<String> = violations.iter().map(|v| format!("  - {v}")).collect();

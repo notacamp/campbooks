@@ -65,9 +65,15 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
   Native (Tauri) clients keep tokens in the OS keychain on the Rust side; the
   webview calls the API via Tauri commands. See ADR 0004.
 - The API is an OAuth 2.1 resource server: validate the JWT (issuer, audience,
-  expiry, JWKS) and check a scope on every handler. *(Handler extractor
-  `kernel::auth::Scoped<S>`; an endpoint without one fails `cargo xtask arch`
-  once auth lands.)*
+  expiry, JWKS) and check a scope on every handler. A scope is declared once
+  as a `kernel::auth::ScopeName` type named `<module>:<action>` and listed in
+  the module's `Module.scopes`. A handler requires it with the
+  `kernel::auth::Scoped<S>` extractor and declares
+  `security(("bearer" = ["<scope>"]))` in its `#[utoipa::path]`. A public
+  endpoint says so with `security(())`. *(CI: `cargo xtask arch` fails on an
+  operation with no explicit `security`, an unknown scope, or a misnamed
+  scope; a server test checks that every scoped operation refuses anonymous
+  calls.)*
 - No `unsafe` (`#![forbid(unsafe_code)]` in every crate, workspace lint).
 - Untrusted HTML (email bodies) is rendered only in a sandboxed iframe with a
   strict CSP; never `dangerouslySetInnerHTML` outside `lib/ui/safe-html`.
