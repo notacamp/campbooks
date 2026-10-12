@@ -7,6 +7,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Versioned releases of Next: bumping `VERSION` (with a rolled changelog
+  section) on `next` publishes `ghcr.io/notacamp/campbooks:next-vX.Y.Z` and
+  `:next-vX.Y` (amd64 + arm64, Trivy-scanned, with provenance and SBOM
+  attestations), tags `next-vX.Y.Z` and creates a GitHub prerelease. See
+  CONTRIBUTING.md → Releases.
 - Foundation for the rewrite: Rust API skeleton (kernel, AI gateway, `system`
   module with health and version), one React/TypeScript client with a Tauri 2
   shell, OpenSpec workflow, architecture decision records, CI quality and
