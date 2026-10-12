@@ -62,7 +62,10 @@ jobs:
         run: cargo nextest run --workspace --no-tests=warn && cargo test --workspace --doc
       - name: sqlx offline cache is current
         if: always()
-        run: cargo sqlx prepare --workspace --check -- --all-targets
+        # Online check needs the schema the queries were prepared against.
+        run: |
+          cargo sqlx migrate run --source migrations
+          cargo sqlx prepare --workspace --check -- --all-targets
         env: { SQLX_OFFLINE: "false" }
       - name: Unused dependencies
         if: always()
