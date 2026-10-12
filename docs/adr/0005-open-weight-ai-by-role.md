@@ -1,6 +1,6 @@
 # 0005 — Open-weight AI only, addressed by role, fully user-configurable
 
-**Status:** Accepted · 2026-10-12
+**Status:** Accepted · 2026-10-12 · `decide` amended by [0009](0009-decide-role-typed-decision-model.md)
 
 ## Context
 AI is the core of the product (sorting, extraction, drafting, search). We
