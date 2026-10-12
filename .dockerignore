@@ -28,6 +28,6 @@ Dockerfile
 **/*.tsbuildinfo
 **/.vite
 clients/app/src-tauri
-clients/app/recordings
+clients/app/recordings/out
 clients/app/test-results
 clients/app/playwright-report
