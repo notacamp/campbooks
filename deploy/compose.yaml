@@ -1,9 +1,8 @@
 # Campbooks for self-hosters.
 #
 #   cp .env.example .env        # then edit it
-#   docker compose up -d        # server + postgres
+#   docker compose up -d        # server, postgres, identity provider
 #   docker compose --profile ai up -d     # + local open-weight models
-#   docker compose --profile auth up -d   # + identity provider (see below)
 #
 # See README.md in this directory.
 name: campbooks
@@ -16,6 +15,10 @@ services:
     environment:
       # Built from POSTGRES_PASSWORD so the two never drift apart.
       CAMPBOOKS_DATABASE_URL: postgres://campbooks:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/campbooks
+      # Trust the bundled IdP's access tokens (ADR 0004). To use another IdP,
+      # change these two lines (and drop the idp services).
+      CAMPBOOKS_AUTH__ISSUER: ${CAMPBOOKS_IDP_URL:-http://localhost:8081}/auth/v1/
+      CAMPBOOKS_AUTH__JWKS_URL: http://idp:8080/auth/v1/oidc/certs
     # Web app and API on one port (the image sets CAMPBOOKS_WEB_DIR).
     ports:
       - "${CAMPBOOKS_PORT:-8080}:8080"
@@ -39,24 +42,62 @@ services:
       timeout: 5s
       retries: 20
 
-  # --- Identity provider (OIDC) -------------------------------------------------
-  # TODO(ADR 0004 / IdP spike): Rauthy is the candidate IdP, but the API does
-  # not validate tokens yet and Rauthy has no safe env-only config: it needs a
-  # `config.toml` with generated secrets. Until the spike settles this, the
-  # service is opt-in. Generate a config once with
-  #   docker run -it --rm -v ./rauthy:/app/data ghcr.io/sebadob/rauthy:0.37.1 \
-  #     generate-config -o data/config.toml
-  # (see https://sebadob.github.io/rauthy/getting_started/docker.html), then
-  # start it with `--profile auth`.
-  idp:
-    profiles: ["auth"]
-    image: ghcr.io/sebadob/rauthy:0.37.1
-    restart: unless-stopped
+  # --- Identity provider (OIDC / OAuth 2.1) -------------------------------------
+  # Rauthy (ADR 0004). Three services, no manual steps:
+  #   idp-init       one-shot: generates secrets on first boot, writes config
+  #   idp            the IdP itself; issuer = ${CAMPBOOKS_IDP_URL}/auth/v1/
+  #   idp-provision  one-shot: registers Campbooks' scopes and clients
+  # Admin UI: ${CAMPBOOKS_IDP_URL}/auth/v1/admin — see README.md for first login.
+  idp-init:
+    image: busybox:1.37.0-musl
+    restart: "no"
+    command: ["sh", "/idp/init.sh"]
+    environment:
+      CAMPBOOKS_IDP_URL: ${CAMPBOOKS_IDP_URL:-http://localhost:8081}
+      CAMPBOOKS_IDP_ADMIN_EMAIL: ${CAMPBOOKS_IDP_ADMIN_EMAIL:-admin@localhost}
+      CAMPBOOKS_IDP_TRUSTED_PROXIES: ${CAMPBOOKS_IDP_TRUSTED_PROXIES:-}
     volumes:
-      - ./rauthy/config.toml:/app/config.toml:ro
-      - rauthy-data:/app/data
+      - ./idp:/idp:ro
+      - idp-data:/app/data
+
+  idp:
+    image: ghcr.io/sebadob/rauthy:0.36.2
+    restart: unless-stopped
+    # Rauthy needs a few seconds for a clean shutdown; a force-kill costs a WAL
+    # integrity check on the next start.
+    stop_grace_period: 30s
+    command: ["serve", "--config-file", "/app/data/config.toml", "--secrets-file", "/app/data/secrets.toml"]
+    # Rauthy reads its config from the volume (written by idp-init). Optional
+    # outgoing mail (password resets, invitations): add SMTP_URL, SMTP_USERNAME,
+    # SMTP_PASSWORD and SMTP_FROM under `environment:` here.
+    volumes:
+      - idp-data:/app/data
     ports:
-      - "${RAUTHY_PORT:-8443}:8443"
+      - "${CAMPBOOKS_IDP_PORT:-8081}:8080"
+    depends_on:
+      idp-init:
+        condition: service_completed_successfully
+    healthcheck:
+      # The image is distroless; idp-init drops a static busybox into the volume.
+      test: ["CMD", "/app/data/bin/busybox", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/auth/v1/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+  idp-provision:
+    image: curlimages/curl:8.22.0
+    restart: "no"
+    user: "10001:10001"
+    entrypoint: ["sh", "/idp/provision.sh"]
+    environment:
+      CAMPBOOKS_PUBLIC_URL: ${CAMPBOOKS_PUBLIC_URL:-http://localhost:8080}
+    volumes:
+      - ./idp:/idp:ro
+      - idp-data:/app/data
+    depends_on:
+      idp:
+        condition: service_healthy
 
   # --- Local AI (open-weight models) --------------------------------------------
   # CPU inference works but is slow; see README.md.
@@ -85,6 +126,6 @@ services:
 
 volumes:
   postgres-data:
-  rauthy-data:
+  idp-data:
   ollama-data:
   embeddings-data:
