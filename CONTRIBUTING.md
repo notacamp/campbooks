@@ -28,8 +28,8 @@ The rules are in [`AGENTS.md`](AGENTS.md); this is the walkthrough.
 8. **UI changes:** verify at 375px and desktop, and **attach a screen recording**
    (see below). CI fails a UI PR without one.
 9. **Any text a user sees** ships in English, Portuguese, Spanish and French
-   with the same keys (CI runs `pnpm i18n:check`). Drafted a translation with
-   a machine? Say so in the PR; a fluent speaker reviews it before release.
+   with the same keys (CI runs `pnpm i18n:check`): European Portuguese,
+   Spanish from Spain, full diacritics. Machine drafts are fine.
    Full rule, including third-party screens: AGENTS.md → Internationalization.
 
 ## Screen recordings

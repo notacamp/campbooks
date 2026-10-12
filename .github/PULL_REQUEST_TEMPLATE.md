@@ -9,7 +9,7 @@ Refs notacamp/campbooks-cloud#<!-- issue --> · OpenSpec change: `openspec/chang
 - [ ] Gates green locally (see AGENTS.md → Code quality)
 - [ ] OpenAPI + client types regenerated (if the API changed)
 - [ ] CHANGELOG `[Unreleased]` updated (feat/fix)
-- [ ] User-facing text in en, pt, es and fr (`pnpm i18n:check`); machine-drafted locales named here with their reviewer
+- [ ] User-facing text in en, pt (pt-PT), es and fr, with full diacritics (`pnpm i18n:check`)
 - [ ] UI verified at 375px and desktop (if UI) — recording below, demo data only
 
 ## Recording

@@ -89,12 +89,12 @@ string a user can see exists in all four before it ships.
   may only become a default once it covers all four languages; when it
   doesn't, contributing the missing translations upstream is part of adopting
   it, tracked as an issue that blocks shipping that component to users.
-- **Translation quality:** proper diacritics and natural phrasing, never
-  ASCII-flattened text. Machine-drafted translations are allowed as drafts
-  but must be reviewed by a fluent speaker before a release; say in the PR
-  which locales were drafted and who reviewed them. Upstream contributions
-  follow the upstream project's own policy (Rauthy, for example, accepts only
-  human-reviewed translations).
+- **Translation quality:** machine-drafted translations are fine and need no
+  separate human review, but they must read naturally, carry full diacritics
+  (never ASCII-flattened text) and use the right variant: European
+  Portuguese (utilizador, palavra-passe, ecrã, ficheiro) and Spanish from
+  Spain. When contributing upstream, follow that project's policy and say
+  plainly how the translations were produced.
 
 
 - **Open-weight models only** in the shipped catalog. Every AI call goes through
