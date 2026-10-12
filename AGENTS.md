@@ -72,7 +72,32 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
 - Untrusted HTML (email bodies) is rendered only in a sandboxed iframe with a
   strict CSP; never `dangerouslySetInnerHTML` outside `lib/ui/safe-html`.
 
-## AI rules
+## Internationalization (enforced)
+
+Campbooks ships in **English, European Portuguese, Spanish from Spain and
+French** — locale tags `en`, `pt-PT`, `es-ES`, `fr`. Always the full tag:
+a bare `pt` means Brazilian Portuguese to `Intl`/CLDR (dates, numbers,
+plurals). Every string a user can see exists in all four before it ships.
+
+- **Our UI:** every `i18n/` namespace has `en`, `pt-PT`, `es-ES` and `fr` files with
+  exactly the same keys and no empty values. *(CI: `pnpm i18n:check`.)*
+- **Our server:** messages a user reads (problem+json `title`/`detail`,
+  emails, notifications) are rendered in the recipient's locale, from
+  catalogues held to the same parity. *(Lands with the i18n foundation issue;
+  until then, no user-facing server text.)*
+- **Other people's screens we put in front of users** — the identity
+  provider's login, sign-up, account pages and emails, and any future
+  component that renders UI or mail to end users — count as ours. A component
+  may only become a default once it covers all four languages; when it
+  doesn't, contributing the missing translations upstream is part of adopting
+  it, tracked as an issue that blocks shipping that component to users.
+- **Translation quality:** machine-drafted translations are fine and need no
+  separate human review, but they must read naturally, carry full diacritics
+  (never ASCII-flattened text) and use the right variant: European
+  Portuguese (utilizador, palavra-passe, ecrã, ficheiro) and Spanish from
+  Spain. When contributing upstream, follow that project's policy and say
+  plainly how the translations were produced.
+
 
 - **Open-weight models only** in the shipped catalog. Every AI call goes through
   `campbooks-ai` by **role** (`decide`, `embed`, `complete`, optional

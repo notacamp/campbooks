@@ -16,7 +16,7 @@ export function renderWithProviders(ui: ReactNode, locale: Locale = "en"): Rende
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const i18n = createI18n({
     locale,
-    shell: { en, pt: en, es: en, fr: en },
+    shell: { en, "pt-PT": en, "es-ES": en, fr: en },
     loaders: loadersFromGlob(moduleMessages),
   });
   return render(

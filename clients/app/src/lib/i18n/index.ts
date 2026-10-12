@@ -32,6 +32,8 @@ export function createI18n({ locale, shell, loaders }: I18nSetup): i18n {
       lng: locale,
       fallbackLng: DEFAULT_LOCALE,
       supportedLngs: SUPPORTED_LOCALES,
+      // Locales are full tags (`pt-PT`); never fall back to a bare `pt`.
+      load: "currentOnly",
       ns: [SHELL_NAMESPACE],
       defaultNS: SHELL_NAMESPACE,
       resources: Object.fromEntries(
