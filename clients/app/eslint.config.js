@@ -18,6 +18,7 @@ export default tseslint.config(
       "dist/",
       "coverage/",
       "src-tauri/",
+      "recordings/out/",
       // Generated from openapi/openapi.json (`pnpm api:generate`); never hand-edited.
       "src/lib/api/schema.gen.ts",
       // Intentionally boundary-violating sources for the dependency-cruiser test.
@@ -120,7 +121,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["*.config.{js,ts}", "*.cjs", "test/**/*.ts"],
+    files: ["*.config.{js,ts}", "*.cjs", "test/**/*.ts", "scripts/**/*.ts", "recordings/**/*.ts"],
     languageOptions: { globals: globals.node },
   },
   {

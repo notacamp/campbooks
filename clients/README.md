@@ -35,6 +35,34 @@ code flow, ADR 0004) is served by `campbooks-server` and lands in a later task.
 
 Without a running API the home page shows a "can't reach the API" state instead of crashing.
 
+## Screen recordings for PRs
+
+UI pull requests include a screen recording at 375px and desktop width.
+
+```sh
+pnpm --dir clients --filter @campbooks/app exec playwright install chromium   # once
+pnpm --dir clients dev                                # the UI on http://localhost:5173
+pnpm --dir clients record home                        # [--base-url http://localhost:5173]
+```
+
+This writes `app/recordings/out/<scenario>-375.webm` and `<scenario>-desktop.webm`
+(gitignored). Maintainers upload with `upload-media <file>`; contributors drag the files into
+the PR's "## Recording" section.
+
+A scenario is `app/recordings/scenarios/<name>.ts` exporting a default async function that
+drives Playwright's `Page`; use `pause(ms)` from `../context.ts` to linger on key states:
+
+```ts
+import { pause, type ScenarioContext } from "../context.ts";
+
+export default async function home({ page }: ScenarioContext): Promise<void> {
+  await page.goto("/");
+  await pause(1500);
+}
+```
+
+Recordings must show demo data only, never a real person's mail or documents.
+
 ## Desktop development
 
 ```sh

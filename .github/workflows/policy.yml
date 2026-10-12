@@ -1,12 +1,12 @@
 name: Policy
 
 # Gates on the PR's process and the repo's hygiene rather than its runtime
-# behaviour: PR title, changelog, specs, secrets. Each step runs `if: always()`
+# behaviour: PR title, changelog, UI recording, specs, secrets. Each step runs `if: always()`
 # so one failure never hides another.
 
 on:
   pull_request:
-    types: [opened, edited, synchronize, reopened]
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
   push:
     branches: [next]
 
@@ -46,6 +46,32 @@ jobs:
               fi ;;
             *) echo "Not a feat/ or fix/ branch — no changelog entry required." ;;
           esac
+
+      - name: UI PRs include a screen recording
+        # A PR that changes the client UI must show it working: a `## Recording`
+        # section with at least one video/GIF link (375px + desktop, demo data
+        # only). Maintainers: `upload-media`. Contributors: drag the file into
+        # the PR body (GitHub hosts it). Genuinely non-visual UI-code changes:
+        # a maintainer applies the `no-recording` label.
+        if: >-
+          always() && github.event_name == 'pull_request' &&
+          !contains(github.event.pull_request.labels.*.name, 'no-recording')
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          ui=$(git diff --name-only "$BASE_SHA"...HEAD -- clients/app/src clients/app/index.html \
+                 | grep -vE '\.(test|spec)\.[jt]sx?$|/schema\.gen\.ts$' || true)
+          if [ -z "$ui" ]; then echo "No client UI changes — no recording required."; exit 0; fi
+          echo "UI files changed:"; echo "$ui" | sed 's/^/  /'
+          section=$(printf '%s\n' "$BODY" | awk '/^##[[:space:]]+Recording/{on=1; next} /^##[[:space:]]/{on=0} on')
+          media='https://[^ )"]+\.(mp4|webm|mov|gif)([?#][^ )"]*)?|https://github\.com/user-attachments/assets/[A-Za-z0-9-]+'
+          if printf '%s' "$section" | grep -qE "$media"; then
+            echo "Recording found."
+          else
+            echo "::error::This PR changes UI but its body has no '## Recording' section with a video/GIF link (375px + desktop, demo data only). See CONTRIBUTING.md → Screen recordings."
+            exit 1
+          fi
 
       - name: OpenSpec specs and changes are valid
         if: always()
