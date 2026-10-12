@@ -1,6 +1,6 @@
 # 0012 — Our own Postgres job queue; events fan out to jobs at publish time
 
-**Status:** Proposed · 2026-10-12
+**Status:** Accepted · 2026-10-12
 
 ## Context
 ADR 0011 asks for a durable queue and outbox in Postgres (issue #19): domain
