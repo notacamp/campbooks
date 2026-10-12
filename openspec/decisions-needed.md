@@ -4,16 +4,6 @@ Open questions that need a human. One heading per decision, each with the
 options and a recommended answer. Remove an entry once it is decided and
 recorded (ADR, spec or issue).
 
-## Domain map and system shape (ADR 0008, 0010, 0011)
-
-`docs/domain-map.md` proposes the module list, their language and the
-milestone order; ADR 0008 (typed core with platform seams, platform modules
-last), ADR 0010 (connectors and change streams) and ADR 0011 (one binary in
-three roles, event-log projections, blobs in object storage, row-level
-security, client change feed) are **Proposed**.
-**Recommended:** accept all three and the map as written; per-module epics
-are opened once they are accepted.
-
 ## Default `complete` model (drafting, summaries, chat)
 
 The `decide` role is settled (Laya, ADR 0009). The default open-weight model

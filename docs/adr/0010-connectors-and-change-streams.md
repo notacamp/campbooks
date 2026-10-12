@@ -1,6 +1,6 @@
 # 0010 — Every outside source is a connector producing a change stream
 
-**Status:** Proposed · 2026-10-12
+**Status:** Accepted · 2026-10-13
 
 ## Context
 Campbooks reads and writes several providers per capability: mail (Gmail,
