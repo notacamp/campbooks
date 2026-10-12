@@ -1,0 +1,51 @@
+# cargo-deny: advisories, licenses, bans and sources for the Rust workspace.
+# https://embarkstudios.github.io/cargo-deny/
+# The Tauri shell under clients/ is its own workspace and is checked separately.
+
+[graph]
+all-features = true
+
+[output]
+feature-depth = 1
+
+[advisories]
+# Vulnerability and unsoundness advisories always fail (cargo-deny default).
+yanked = "deny"
+ignore = []
+
+[licenses]
+confidence-threshold = 0.9
+# Only licences something in the graph actually needs; add more with a reason.
+allow = [
+    "MIT",                 # most of the ecosystem (often as MIT OR Apache-2.0)
+    "Apache-2.0",          # rustls, aws-lc-rs, tokio-adjacent crates without an MIT option
+    "BSD-3-Clause",        # aws-lc-sys (AND-combined), brotli/compression stack, subtle
+    "ISC",                 # aws-lc-sys/aws-lc-rs (AWS-LC crypto, via rustls), untrusted
+    "Unicode-3.0",         # ICU data/normalisation crates (via url -> idna)
+    "Zlib",                # foldhash (via hashbrown <- sqlx-core)
+    "CDLA-Permissive-2.0", # Mozilla CA root data: webpki-roots (sqlx), webpki-root-certs (reqwest)
+]
+exceptions = []
+
+[licenses.private]
+# All workspace crates are `publish = false` under LicenseRef-Sustainable-Use;
+# they are ours and need no allow-list entry.
+ignore = true
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+highlight = "all"
+deny = [
+    # rustls everywhere: no OpenSSL / platform TLS stacks.
+    { crate = "openssl", reason = "use rustls" },
+    { crate = "openssl-sys", reason = "use rustls" },
+    { crate = "native-tls", reason = "use rustls" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

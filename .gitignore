@@ -1,0 +1,15 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+!deploy/.env.example
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store

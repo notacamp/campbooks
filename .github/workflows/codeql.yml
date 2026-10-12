@@ -1,0 +1,65 @@
+name: CodeQL
+
+# Static security analysis (SAST). Free for this public repo.
+#
+# While `next` is the default branch, GitHub runs scheduled workflows ONLY from
+# here — so the weekly scan of the Rails app on `main` lives here too
+# (`legacy` job) until cutover. Delete it then.
+
+on:
+  push:
+    branches: [next]
+  pull_request:
+    branches: [next]
+  schedule:
+    - cron: "23 4 * * 1" # Mondays 04:23 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [rust, javascript-typescript, actions]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
+
+  legacy:
+    if: github.event_name == 'schedule'
+    name: legacy main (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ruby, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v6
+        with: { ref: main }
+      - id: head
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /legacy/language:${{ matrix.language }}
+          ref: refs/heads/main
+          sha: ${{ steps.head.outputs.sha }}

@@ -1,0 +1,9 @@
+{
+  "appName": "Campbooks",
+  "loading": "A carregar…",
+  "notFound": {
+    "title": "Página não encontrada",
+    "body": "Esta página não existe ou foi movida.",
+    "home": "Ir para a página inicial"
+  }
+}

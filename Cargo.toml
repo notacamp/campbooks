@@ -1,0 +1,89 @@
+[workspace]
+resolver = "3"
+# `crates/*` would also match the `crates/modules` directory (which has no
+# manifest), so the platform crates are listed explicitly; modules use a glob.
+members = ["crates/kernel", "crates/ai", "crates/server", "crates/modules/*", "xtask"]
+exclude = ["clients"]
+
+[workspace.package]
+# Must equal the `VERSION` file at the repo root (checked by `cargo xtask arch`).
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "LicenseRef-Sustainable-Use"
+repository = "https://github.com/notacamp/campbooks"
+publish = false
+
+[workspace.dependencies]
+# Internal crates
+campbooks-kernel = { path = "crates/kernel" }
+campbooks-ai = { path = "crates/ai" }
+campbooks-server = { path = "crates/server" }
+campbooks-system = { path = "crates/modules/system" }
+
+# HTTP / async
+axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "json", "query", "tokio", "tower-log", "tracing", "matched-path"] }
+tokio = { version = "1.53.2", features = ["macros", "rt-multi-thread", "signal", "net", "sync", "time"] }
+tower = { version = "0.5.3", features = ["util"] }
+tower-http = { version = "0.7.1", features = ["trace", "request-id", "timeout", "compression-gzip", "compression-br", "util"] }
+http-body-util = "0.1.5"
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "http2", "json", "charset"] }
+url = { version = "2.5.8", features = ["serde"] }
+
+# OpenAPI
+utoipa = { version = "6.0.0", features = ["axum_extras", "uuid", "chrono", "url"] }
+utoipa-axum = "0.3.0"
+
+# Database
+sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls-aws-lc-rs", "postgres", "macros", "migrate", "uuid", "chrono", "json"] }
+
+# Serialization / config
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+figment = { version = "0.10.19", features = ["env"] }
+toml = "1.1.8"
+
+# Errors, observability, misc
+thiserror = "2.0.21"
+anyhow = "1.0.104"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json", "fmt"] }
+uuid = { version = "1.28.0", features = ["v7", "serde"] }
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "serde", "std"] }
+secrecy = { version = "0.10.3", features = ["serde"] }
+clap = { version = "4.6.7", features = ["derive", "env"] }
+
+# Tooling (xtask)
+cargo_metadata = "0.23.1"
+regex = "1.13.1"
+
+# Tests
+wiremock = "0.6.5"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+dbg_macro = "deny"
+todo = "deny"
+print_stdout = "deny"
+print_stderr = "deny"
+# Allowed pedantic lints:
+# - `module_name_repetitions`: vertical slices name types after their feature
+#   (`health::HealthResponse`); the repetition is what makes them greppable.
+module_name_repetitions = "allow"
+# - `missing_errors_doc`: every fallible fn returns `kernel::Error` or a crate
+#   `Error` enum whose variants are themselves documented.
+missing_errors_doc = "allow"
+# - `must_use_candidate`: fires on nearly every constructor/getter; `#[must_use]`
+#   is added where ignoring the value is a real bug, not as decoration.
+must_use_candidate = "allow"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

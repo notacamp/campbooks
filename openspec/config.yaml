@@ -1,0 +1,41 @@
+schema: spec-driven
+
+# Shown to the AI for every OpenSpec artifact. Keep it short; AGENTS.md is the
+# authority and wins on any conflict.
+context: |
+  Product: Campbooks — an AI-native assistant for email, calendar, tasks, files
+  and accounting, for young professionals and small-business owners. Open
+  source (Sustainable Use License), self-hostable with docker compose, also
+  offered as a hosted cloud.
+  Stack: Rust API (axum, sqlx/Postgres+pgvector, utoipa OpenAPI) as a modular
+  monolith of vertical-slice module crates; one React/TypeScript UI shipped to
+  web, desktop and mobile through Tauri 2; OAuth 2.1/OIDC via a dedicated IdP,
+  API is a resource server; AI only through open-weight models by role
+  (decide, embed, complete, vision) over the OpenAI-compatible protocol.
+  Rules: read AGENTS.md and docs/architecture.md before writing anything.
+  Domains (baseline specs live in openspec/specs/<domain>/, 1:1 with
+  crates/modules/<domain> and clients/app/src/modules/<domain>). The legacy
+  Rails app is reference only — specs are written fresh, never ported.
+
+rules:
+  proposal:
+    - Name the module(s) touched and the tracking issue URL.
+    - Include a Non-goals section.
+    - If the change adds a module or a cross-module dependency, say so and
+      reference the ADR or architecture.toml entry it needs.
+  design:
+    - Describe data ownership (which module's Postgres schema) and any events
+      published or consumed.
+    - For any endpoint, state the OAuth scope it requires.
+    - For any AI use, state the role (decide/embed/complete/vision), the
+      fallback when the role is not configured, and how the user can undo it.
+  tasks:
+    - Keep each task small enough for one focused session.
+    - Last tasks are always: OpenAPI regenerated, client types regenerated,
+      CHANGELOG updated, gates green, UI verified at 375px and desktop (if UI).
+
+operations:
+  apply:
+    guidance:
+      - Implement inside the owning module's features/<feature>/ slice.
+      - Run the gates listed in AGENTS.md before marking the change done.

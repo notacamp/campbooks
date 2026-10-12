@@ -1,0 +1,9 @@
+{
+  "appName": "Campbooks",
+  "loading": "Loading…",
+  "notFound": {
+    "title": "Page not found",
+    "body": "This page doesn't exist or was moved.",
+    "home": "Go to the home page"
+  }
+}

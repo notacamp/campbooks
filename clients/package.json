@@ -1,0 +1,29 @@
+{
+  "name": "@campbooks/clients",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.3.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @campbooks/app run dev",
+    "tauri": "pnpm --filter @campbooks/app run tauri",
+    "build": "pnpm -r run build",
+    "lint": "pnpm -r run lint",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
+    "deps:check": "pnpm -r run deps:check",
+    "deadcode": "knip",
+    "api:generate": "pnpm -r run api:generate",
+    "api:check": "pnpm -r run api:check",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "knip": "6.39.0",
+    "prettier": "3.9.9",
+    "prettier-plugin-tailwindcss": "0.8.1",
+    "typescript": "6.0.3"
+  }
+}

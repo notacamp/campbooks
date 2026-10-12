@@ -1,0 +1,8 @@
+# Tests may unwrap/expect: a panic there is a failed assertion, not a production crash.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-print-in-tests = true
+
+# Project vocabulary that `clippy::doc_markdown` would otherwise want in backticks.
+# ".." keeps clippy's built-in list.
+doc-valid-idents = ["OpenAPI", "OpenAI", "IdP", "UUIDv7", "PostgreSQL", "OAuth", "JWKS", ".."]

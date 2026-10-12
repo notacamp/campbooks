@@ -1,0 +1,11 @@
+{
+  "title": "System status",
+  "apiVersion": "API version",
+  "apiHealth": "API health",
+  "checking": "Checking…",
+  "unknown": "Unknown",
+  "unreachable": "Unreachable",
+  "versionWithCommit": "{{version}} ({{commit}})",
+  "healthDetail": "Service {{status}}, database {{database}}",
+  "errorHint": "Can’t reach the Campbooks API right now. Check that the server is running, then reload."
+}

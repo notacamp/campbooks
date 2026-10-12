@@ -1,0 +1,11 @@
+{
+  "title": "Estado do sistema",
+  "apiVersion": "Versão da API",
+  "apiHealth": "Estado da API",
+  "checking": "A verificar…",
+  "unknown": "Desconhecida",
+  "unreachable": "Inacessível",
+  "versionWithCommit": "{{version}} ({{commit}})",
+  "healthDetail": "Serviço {{status}}, base de dados {{database}}",
+  "errorHint": "Não é possível contactar a API do Campbooks neste momento. Verifique se o servidor está a correr e recarregue a página."
+}

@@ -1,0 +1,41 @@
+# Dependency updates. Grouped minor/patch, monthly, so the queue stays reviewable.
+# Security updates are separate (Dependabot security alerts) and arrive at once.
+#
+# While `next` is the default branch, Dependabot reads ONLY this file — so the
+# Rails app on `main` is kept fed from here via `target-branch: main` until cutover.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule: { interval: monthly }
+    groups: { rust: { update-types: [minor, patch] } }
+    open-pull-requests-limit: 5
+  - package-ecosystem: cargo
+    directory: "/clients/app/src-tauri"
+    schedule: { interval: monthly }
+    groups: { tauri-rust: { update-types: [minor, patch] } }
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: "/clients"
+    schedule: { interval: monthly }
+    groups: { clients: { update-types: [minor, patch] } }
+    open-pull-requests-limit: 5
+  - package-ecosystem: docker
+    directory: "/"
+    schedule: { interval: monthly }
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule: { interval: monthly }
+    groups: { actions: { update-types: [minor, patch] } }
+
+  # --- Rails app on `main` (until cutover) ---
+  - package-ecosystem: bundler
+    directory: "/"
+    target-branch: main
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 10
+  - package-ecosystem: github-actions
+    directory: "/"
+    target-branch: main
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 10

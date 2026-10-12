@@ -1,0 +1,89 @@
+# Campbooks for self-hosters.
+#
+#   cp .env.example .env        # then edit it
+#   docker compose up -d        # server + postgres
+#   docker compose --profile ai up -d     # + local open-weight models
+#   docker compose --profile auth up -d   # + identity provider (see below)
+#
+# See README.md in this directory.
+name: campbooks
+
+services:
+  server:
+    image: ghcr.io/notacamp/campbooks:next
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Built from POSTGRES_PASSWORD so the two never drift apart.
+      CAMPBOOKS_DATABASE_URL: postgres://campbooks:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/campbooks
+    ports:
+      - "${CAMPBOOKS_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # The image's HEALTHCHECK runs `campbooks-server healthcheck`.
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: campbooks
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: campbooks
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campbooks -d campbooks"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # --- Identity provider (OIDC) -------------------------------------------------
+  # TODO(ADR 0004 / IdP spike): Rauthy is the candidate IdP, but the API does
+  # not validate tokens yet and Rauthy has no safe env-only config: it needs a
+  # `config.toml` with generated secrets. Until the spike settles this, the
+  # service is opt-in. Generate a config once with
+  #   docker run -it --rm -v ./rauthy:/app/data ghcr.io/sebadob/rauthy:0.37.1 \
+  #     generate-config -o data/config.toml
+  # (see https://sebadob.github.io/rauthy/getting_started/docker.html), then
+  # start it with `--profile auth`.
+  idp:
+    profiles: ["auth"]
+    image: ghcr.io/sebadob/rauthy:0.37.1
+    restart: unless-stopped
+    volumes:
+      - ./rauthy/config.toml:/app/config.toml:ro
+      - rauthy-data:/app/data
+    ports:
+      - "${RAUTHY_PORT:-8443}:8443"
+
+  # --- Local AI (open-weight models) --------------------------------------------
+  # CPU inference works but is slow; see README.md.
+  ollama:
+    profiles: ["ai"]
+    image: ollama/ollama:0.40.3
+    restart: unless-stopped
+    volumes:
+      - ollama-data:/root/.ollama
+    # GPU (NVIDIA): uncomment and install the NVIDIA Container Toolkit.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
+
+  embeddings:
+    profiles: ["ai"]
+    # The CPU build of TEI is published for linux/amd64 only. On arm64 hosts,
+    # drop this service and point the embed role at Ollama (`bge-m3`) instead.
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9.4
+    platform: linux/amd64
+    restart: unless-stopped
+    command: ["--model-id", "BAAI/bge-m3"]
+    volumes:
+      - embeddings-data:/data
+
+volumes:
+  postgres-data:
+  rauthy-data:
+  ollama-data:
+  embeddings-data:

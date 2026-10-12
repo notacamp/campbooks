@@ -1,0 +1,6 @@
+# Stable options only, so `cargo fmt --check` behaves the same on every toolchain.
+edition = "2024"
+style_edition = "2024"
+max_width = 100
+use_field_init_shorthand = true
+use_try_shorthand = true

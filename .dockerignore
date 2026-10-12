@@ -1,0 +1,22 @@
+# Keep the build context to what the Rust build needs.
+.git
+.github
+.claude
+.cargo/registry
+target
+**/target
+clients
+**/node_modules
+docs
+openspec
+deploy
+openapi
+*.md
+!README.md
+.env
+.env.*
+**/*.rs.bk
+.DS_Store
+compose*.yaml
+Dockerfile
+.dockerignore

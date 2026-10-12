@@ -1,0 +1,15 @@
+# Module dependency allowlist, read by `cargo xtask arch`.
+#
+# By default a module crate (crates/modules/<name>) may depend only on
+# `campbooks-kernel` and `campbooks-ai`. Cross-module needs go through domain
+# events on the kernel event bus. When a module truly needs another module's
+# API, add an entry — it is reviewed like an ADR:
+#
+#   [[allow]]
+#   from = "mail"          # the depending module (directory name)
+#   to = "calendar"        # the module it may depend on
+#   reason = "Why events are not enough, and the ADR/issue that approved it."
+#
+# Every entry must name existing modules and give a non-empty reason.
+
+# (No entries yet.)

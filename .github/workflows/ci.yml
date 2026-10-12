@@ -1,0 +1,177 @@
+name: CI
+
+# Every deterministic code gate (ADR 0007). Job names are short because the
+# workflow name is the section on a PR: `CI / rust`, `CI / clients`, …
+# A job name is a required-check interface — renaming one means updating the
+# branch ruleset in the same change.
+
+on:
+  pull_request:
+  push:
+    branches: [next]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  SQLX_OFFLINE: "true"
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: campbooks
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/campbooks
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions-rust-lang/setup-rust-toolchain@v2 # reads rust-toolchain.toml
+        with: { cache: false }
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with: { tool: "cargo-nextest,cargo-machete,sqlx-cli" }
+      - name: Format
+        if: always()
+        run: cargo fmt --all --check
+      - name: Clippy
+        if: always()
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Architecture (module boundaries, migration names)
+        if: always()
+        run: cargo xtask arch
+      - name: OpenAPI drift
+        if: always()
+        run: cargo xtask openapi --check
+      - name: Tests
+        if: always()
+        run: cargo nextest run --workspace --no-tests=warn && cargo test --workspace --doc
+      - name: sqlx offline cache is current
+        if: always()
+        run: cargo sqlx prepare --workspace --check -- --all-targets
+        env: { SQLX_OFFLINE: "false" }
+      - name: Unused dependencies
+        if: always()
+        run: cargo machete
+
+  deny:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          arguments: --all-features
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: clients/app/src-tauri/Cargo.toml
+          arguments: --config clients/app/src-tauri/deny.toml
+          command: check advisories bans sources
+
+  clients:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run: { working-directory: clients }
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with: { package_json_file: clients/package.json }
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: clients/.nvmrc
+          cache: pnpm
+          cache-dependency-path: clients/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Lint
+        if: always()
+        run: pnpm lint
+      - name: Format
+        if: always()
+        run: pnpm format:check
+      - name: Typecheck
+        if: always()
+        run: pnpm typecheck
+      - name: Module boundaries
+        if: always()
+        run: pnpm deps:check
+      - name: Dead code
+        if: always()
+        run: pnpm deadcode
+      - name: Generated API types are current
+        if: always()
+        run: pnpm api:check
+      - name: Tests + coverage
+        if: always()
+        run: pnpm test
+      - name: Build
+        if: always()
+        run: pnpm build
+      - name: Audit (prod deps)
+        if: always()
+        run: pnpm audit --prod
+
+  tauri:
+    # The native shell is its own Cargo workspace so GUI system libraries never
+    # enter the server build; it still gets fmt + clippy on every PR.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run: { working-directory: clients/app/src-tauri }
+    steps:
+      - uses: actions/checkout@v6
+      - name: System libraries for Tauri (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with: { cache: false, components: "rustfmt,clippy" }
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: clients/app/src-tauri }
+      - name: Frontend dist placeholder (tauri::generate_context! needs it)
+        run: mkdir -p ../dist && touch ../dist/index.html
+      - name: Format
+        if: always()
+        run: cargo fmt --all --check
+      - name: Clippy
+        if: always()
+        run: cargo clippy --all-targets -- -D warnings
+
+  image:
+    # Builds the release image exactly as published and scans it. Not pushed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: campbooks:ci
+          build-args: GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Trivy (HIGH/CRITICAL, fixable)
+        # Pinned by SHA: this action's tags have been tampered with before.
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: campbooks:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"

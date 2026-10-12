@@ -1,0 +1,155 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Campbooks API",
+    "description": "The Campbooks HTTP API. Errors are RFC 9457 `application/problem+json`.",
+    "license": {
+      "name": "Sustainable Use License",
+      "identifier": "LicenseRef-Sustainable-Use"
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/v1/system/health": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Report instance health.",
+        "operationId": "system_health",
+        "responses": {
+          "200": {
+            "description": "The instance and its database are up.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is unreachable.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/system/version": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Report the server version.",
+        "operationId": "system_version",
+        "responses": {
+          "200": {
+            "description": "The running build.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "description": "The instance is healthy.",
+        "required": [
+          "status",
+          "database"
+        ],
+        "properties": {
+          "database": {
+            "type": "string",
+            "description": "Database status; always `ok` in a 200 response.",
+            "example": "ok"
+          },
+          "status": {
+            "type": "string",
+            "description": "Overall status; always `ok` in a 200 response.",
+            "example": "ok"
+          }
+        }
+      },
+      "Problem": {
+        "type": "object",
+        "description": "RFC 9457 problem details.",
+        "required": [
+          "type",
+          "title",
+          "status"
+        ],
+        "properties": {
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Human-readable explanation specific to this occurrence."
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "description": "HTTP status code.",
+            "minimum": 0
+          },
+          "title": {
+            "type": "string",
+            "description": "Short, human-readable summary of the problem type."
+          },
+          "type": {
+            "type": "string",
+            "description": "URI identifying the problem type; `about:blank` when the HTTP status\nsays it all."
+          }
+        },
+        "example": {
+          "status": 404,
+          "title": "Not Found",
+          "type": "about:blank"
+        }
+      },
+      "VersionResponse": {
+        "type": "object",
+        "description": "The running build.",
+        "required": [
+          "version"
+        ],
+        "properties": {
+          "commit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Git commit the build came from, when known (`GIT_SHA` at runtime).",
+            "example": "3f2c1e0"
+          },
+          "version": {
+            "type": "string",
+            "description": "Semantic version of the server.",
+            "example": "0.1.0"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "system",
+      "description": "Instance health and version."
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+# cargo-deny for the native shell. Advisories, bans and sources only: the GUI
+# dependency tree (GTK/WebKit/Windows bindings) is licensed and duplicated in
+# ways the server's strict policy (../../../deny.toml) need not accept.
+
+[graph]
+all-features = true
+
+[advisories]
+yanked = "deny"
+ignore = [
+  # proc-macro-error is unmaintained (no vulnerability). It arrives only via
+  # gtk-rs 0.18 (glib-macros) → muda → tauri on Linux; nothing to upgrade to
+  # until Tauri moves to gtk4-rs. Re-check when bumping tauri.
+  { id = "RUSTSEC-2024-0370", reason = "transitive via tauri's gtk-rs 0.18 on Linux; unmaintained, not vulnerable" },
+]
+
+[bans]
+multiple-versions = "allow"
+deny = [
+  { name = "openssl", reason = "rustls only" },
+  { name = "openssl-sys", reason = "rustls only" },
+  { name = "native-tls", reason = "rustls only" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

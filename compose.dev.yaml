@@ -1,0 +1,26 @@
+# Local development database only. The API runs on the host with `cargo run`.
+#
+#   docker compose -f compose.dev.yaml up -d
+#   export DATABASE_URL=postgres://postgres:postgres@localhost:55432/campbooks
+#   export CAMPBOOKS_DATABASE_URL=$DATABASE_URL
+name: campbooks-dev
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres # local dev only
+      POSTGRES_DB: campbooks
+    ports:
+      - "55432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d campbooks"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
