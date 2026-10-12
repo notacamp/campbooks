@@ -5,11 +5,14 @@
 
 #![forbid(unsafe_code)]
 
+pub mod web;
+
 use std::time::Duration;
 
 use axum::{
     Json, Router,
-    http::{HeaderName, Request, StatusCode},
+    extract::Request as AxumRequest,
+    http::{HeaderName, HeaderValue, Request, StatusCode, header},
     routing::get,
 };
 use campbooks_kernel::{AppState, Error, Module, Problem};
@@ -17,6 +20,7 @@ use tower::ServiceBuilder;
 use tower_http::{
     compression::CompressionLayer,
     request_id::{MakeRequestUuid, PropagateRequestIdLayer, RequestId, SetRequestIdLayer},
+    set_header::SetResponseHeaderLayer,
     timeout::TimeoutLayer,
     trace::{DefaultOnResponse, TraceLayer},
 };
@@ -31,6 +35,16 @@ pub const OPENAPI_PATH: &str = "/openapi.json";
 
 /// Header carrying the request id, generated when the client sends none.
 pub const REQUEST_ID_HEADER: &str = "x-request-id";
+
+/// Prefix the web client sends API calls under (same origin, ADR 0004).
+pub const BFF_PREFIX: &str = "/bff";
+
+/// Security headers set on every response, API and web client alike.
+pub const SECURITY_HEADERS: [(HeaderName, &str); 3] = [
+    (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+    (header::REFERRER_POLICY, "strict-origin-when-cross-origin"),
+    (header::X_FRAME_OPTIONS, "DENY"),
+];
 
 /// Every module, in mount order.
 pub fn modules() -> Vec<Module> {
@@ -64,49 +78,73 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
     api().into_openapi()
 }
 
-/// The full HTTP application: module routes, `/openapi.json`, a problem+json
-/// 404 fallback, and the middleware stack (request id, tracing, timeout,
-/// compression).
+/// The full HTTP application: module routes, `/openapi.json`, the interim
+/// `/bff/api/*` passthrough, the web client (when `CAMPBOOKS_WEB_DIR` is set)
+/// or else a problem+json 404 fallback, and the middleware stack (security
+/// headers, request id, tracing, timeout, compression).
 pub fn router(state: AppState) -> Router {
     let (routes, spec) = api().split_for_parts();
     let spec = std::sync::Arc::new(spec);
     let request_id = HeaderName::from_static(REQUEST_ID_HEADER);
+    let web_client = web::configured_dir(&state.config).map(web::WebClient::new);
 
-    routes
+    // INTERIM, NO AUTH SEMANTICS. Until the BFF of ADR 0004 exists (session
+    // cookie, OIDC code flow, token attachment — tracked in
+    // https://github.com/notacamp/campbooks-cloud/issues/16), `/bff/api/*` is
+    // the very same module routes with `/bff` stripped. It adds no session and
+    // no credentials, so it can never do more than calling `/api/*` directly.
+    // Its own fallback keeps `/bff/*` misses problem+json 404s. The Vite dev
+    // proxy mirrors this rewrite.
+    let bff_passthrough = routes.clone().fallback(|| async { Error::NotFound });
+
+    let routes = routes
         .route(
             OPENAPI_PATH,
             get(move || async move { Json(spec.as_ref().clone()) }),
         )
-        .fallback(|| async { Error::NotFound })
-        .with_state(state)
-        .layer(
-            ServiceBuilder::new()
-                .layer(SetRequestIdLayer::new(request_id.clone(), MakeRequestUuid))
-                .layer(
-                    TraceLayer::new_for_http()
-                        .make_span_with(|request: &Request<_>| {
-                            let id = request
-                                .extensions()
-                                .get::<RequestId>()
-                                .and_then(|id| id.header_value().to_str().ok())
-                                .unwrap_or_default();
-                            tracing::info_span!(
-                                "http",
-                                method = %request.method(),
-                                uri = %request.uri(),
-                                request_id = %id,
-                            )
-                        })
-                        // One INFO line per request (status + latency).
-                        .on_response(DefaultOnResponse::new().level(tracing::Level::INFO)),
-                )
-                .layer(PropagateRequestIdLayer::new(request_id))
-                .layer(TimeoutLayer::with_status_code(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    REQUEST_TIMEOUT,
-                ))
-                .layer(CompressionLayer::new()),
-        )
+        .nest(BFF_PREFIX, bff_passthrough);
+    let routes = match web_client {
+        Some(client) => {
+            routes.fallback(move |request: AxumRequest| client.clone().respond(request))
+        }
+        None => routes.fallback(|| async { Error::NotFound }),
+    };
+
+    let [nosniff, referrer, frame] = SECURITY_HEADERS.map(|(name, value)| {
+        SetResponseHeaderLayer::overriding(name, HeaderValue::from_static(value))
+    });
+
+    routes.with_state(state).layer(
+        ServiceBuilder::new()
+            .layer(nosniff)
+            .layer(referrer)
+            .layer(frame)
+            .layer(SetRequestIdLayer::new(request_id.clone(), MakeRequestUuid))
+            .layer(
+                TraceLayer::new_for_http()
+                    .make_span_with(|request: &Request<_>| {
+                        let id = request
+                            .extensions()
+                            .get::<RequestId>()
+                            .and_then(|id| id.header_value().to_str().ok())
+                            .unwrap_or_default();
+                        tracing::info_span!(
+                            "http",
+                            method = %request.method(),
+                            uri = %request.uri(),
+                            request_id = %id,
+                        )
+                    })
+                    // One INFO line per request (status + latency).
+                    .on_response(DefaultOnResponse::new().level(tracing::Level::INFO)),
+            )
+            .layer(PropagateRequestIdLayer::new(request_id))
+            .layer(TimeoutLayer::with_status_code(
+                StatusCode::SERVICE_UNAVAILABLE,
+                REQUEST_TIMEOUT,
+            ))
+            .layer(CompressionLayer::new()),
+    )
 }
 
 #[cfg(test)]
@@ -177,5 +215,201 @@ mod tests {
             .unwrap();
         let response = app().oneshot(request).await.unwrap();
         assert!(!response.headers()[REQUEST_ID_HEADER].is_empty());
+    }
+
+    // --- web client and interim BFF passthrough --------------------------------
+
+    const INDEX: &str = "<!doctype html><title>Campbooks</title>";
+    const ASSET: &str = "console.log('campbooks');";
+
+    /// A built web client in a fresh temporary directory, removed on drop.
+    struct WebDir(std::path::PathBuf);
+
+    impl WebDir {
+        fn new() -> Self {
+            static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let dir =
+                std::env::temp_dir().join(format!("campbooks-web-test-{}-{n}", std::process::id()));
+            std::fs::create_dir_all(dir.join("assets")).unwrap();
+            std::fs::write(dir.join("index.html"), INDEX).unwrap();
+            std::fs::write(dir.join("assets/x.js"), ASSET).unwrap();
+            Self(dir)
+        }
+    }
+
+    impl Drop for WebDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn web_app(dir: &WebDir) -> Router {
+        let mut config = testing::config("postgres://test@localhost/test");
+        config.web_dir = Some(dir.0.clone());
+        router(AppState::new(testing::unreachable_pool(), config))
+    }
+
+    struct Raw {
+        status: StatusCode,
+        headers: axum::http::HeaderMap,
+        body: String,
+    }
+
+    async fn fetch(app: &Router, uri: &str, accept: Option<&str>) -> Raw {
+        let mut request = Request::get(uri);
+        if let Some(accept) = accept {
+            request = request.header(header::ACCEPT, accept);
+        }
+        let response = app
+            .clone()
+            .oneshot(request.body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        let status = response.status();
+        let headers = response.headers().clone();
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        Raw {
+            status,
+            headers,
+            body: String::from_utf8(bytes.to_vec()).unwrap(),
+        }
+    }
+
+    const HTML: Option<&str> = Some("text/html,application/xhtml+xml,*/*;q=0.8");
+
+    fn header<'a>(raw: &'a Raw, name: &header::HeaderName) -> Option<&'a str> {
+        raw.headers.get(name).and_then(|v| v.to_str().ok())
+    }
+
+    fn assert_problem_404(raw: &Raw) {
+        assert_eq!(raw.status, StatusCode::NOT_FOUND, "{}", raw.body);
+        assert_eq!(
+            header(raw, &header::CONTENT_TYPE),
+            Some("application/problem+json")
+        );
+    }
+
+    fn assert_index(raw: &Raw) {
+        assert_eq!(raw.status, StatusCode::OK);
+        assert_eq!(raw.body, INDEX);
+        assert!(
+            header(raw, &header::CONTENT_TYPE)
+                .unwrap()
+                .starts_with("text/html")
+        );
+        assert_eq!(
+            header(raw, &header::CACHE_CONTROL),
+            Some(web::CACHE_REVALIDATE)
+        );
+        assert_eq!(
+            header(raw, &header::CONTENT_SECURITY_POLICY),
+            Some(web::CONTENT_SECURITY_POLICY)
+        );
+    }
+
+    #[tokio::test]
+    async fn serves_index_at_root() {
+        let dir = WebDir::new();
+        assert!(web::check_dir(&dir.0).is_ok());
+        assert_index(&fetch(&web_app(&dir), "/", None).await);
+    }
+
+    #[tokio::test]
+    async fn deep_links_fall_back_to_index() {
+        let dir = WebDir::new();
+        assert_index(&fetch(&web_app(&dir), "/some/route", HTML).await);
+    }
+
+    #[tokio::test]
+    async fn non_navigation_misses_are_404() {
+        let dir = WebDir::new();
+        let app = web_app(&dir);
+        assert_problem_404(&fetch(&app, "/favicon.ico", Some("image/*")).await);
+        assert_problem_404(&fetch(&app, "/some/route", Some("*/*")).await);
+        let post = app
+            .clone()
+            .oneshot(
+                Request::post("/some/route")
+                    .header(header::ACCEPT, "text/html")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(post.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn hashed_assets_are_immutable() {
+        let dir = WebDir::new();
+        let raw = fetch(&web_app(&dir), "/assets/x.js", None).await;
+        assert_eq!(raw.status, StatusCode::OK);
+        assert_eq!(raw.body, ASSET);
+        assert_eq!(
+            header(&raw, &header::CACHE_CONTROL),
+            Some(web::CACHE_IMMUTABLE)
+        );
+        assert_eq!(header(&raw, &header::CONTENT_SECURITY_POLICY), None);
+    }
+
+    #[tokio::test]
+    async fn missing_assets_are_404_not_index() {
+        let dir = WebDir::new();
+        assert_problem_404(&fetch(&web_app(&dir), "/assets/missing.js", HTML).await);
+    }
+
+    #[tokio::test]
+    async fn api_paths_never_fall_back_to_index() {
+        let dir = WebDir::new();
+        let app = web_app(&dir);
+        for uri in [
+            "/api/v1/nope",
+            "/api",
+            "/bff/nope",
+            "/bff/api/v1/nope",
+            "/bff/openapi.json",
+        ] {
+            assert_problem_404(&fetch(&app, uri, HTML).await);
+        }
+        let spec = fetch(&app, OPENAPI_PATH, HTML).await;
+        assert_eq!(spec.status, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn bff_passthrough_mirrors_the_api() {
+        for app in [app(), web_app(&WebDir::new())] {
+            let direct = fetch(&app, "/api/v1/system/version", None).await;
+            let via_bff = fetch(&app, "/bff/api/v1/system/version", None).await;
+            assert_eq!(direct.status, StatusCode::OK);
+            assert_eq!(via_bff.status, direct.status);
+            assert_eq!(via_bff.body, direct.body);
+            assert_problem_404(&fetch(&app, "/bff/api/v1/nope", None).await);
+        }
+    }
+
+    #[tokio::test]
+    async fn security_headers_on_every_response() {
+        let dir = WebDir::new();
+        let web = web_app(&dir);
+        for raw in [
+            fetch(&app(), "/api/v1/system/version", None).await,
+            fetch(&app(), "/api/v1/nope", None).await,
+            fetch(&web, "/", HTML).await,
+            fetch(&web, "/assets/x.js", None).await,
+        ] {
+            for (name, value) in &SECURITY_HEADERS {
+                assert_eq!(header(&raw, name), Some(*value), "{name}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn without_web_dir_root_is_problem_404() {
+        let raw = fetch(&app(), "/", HTML).await;
+        assert_problem_404(&raw);
+        assert_eq!(header(&raw, &header::CONTENT_SECURITY_POLICY), None);
     }
 }

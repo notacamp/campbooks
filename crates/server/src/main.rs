@@ -91,6 +91,13 @@ fn serve() -> ExitCode {
 }
 
 async fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
+    if let Some(dir) = campbooks_server::web::configured_dir(&config) {
+        campbooks_server::web::check_dir(dir)?;
+        tracing::info!(dir = %dir.display(), "serving the web client");
+    } else {
+        tracing::info!("CAMPBOOKS_WEB_DIR unset: serving the API only");
+    }
+
     let db = PgPoolOptions::new()
         .max_connections(config.database_max_connections)
         .acquire_timeout(DB_ACQUIRE_TIMEOUT)

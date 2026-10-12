@@ -16,6 +16,7 @@ services:
     environment:
       # Built from POSTGRES_PASSWORD so the two never drift apart.
       CAMPBOOKS_DATABASE_URL: postgres://campbooks:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/campbooks
+    # Web app and API on one port (the image sets CAMPBOOKS_WEB_DIR).
     ports:
       - "${CAMPBOOKS_PORT:-8080}:8080"
     depends_on:

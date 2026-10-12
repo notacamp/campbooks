@@ -7,7 +7,8 @@ Tauri. This page is the map; the *why* lives in `docs/adr/`.
 ```
                     ┌─────────────────────────────────────────────┐
   Web browser ──────┤ campbooks-server  (axum)                     │
-  (cookie only)     │  /bff/*   session + OIDC code flow (ADR 0004) │
+  (cookie only)     │  /*       built web client + SPA fallback     │
+                    │  /bff/*   session + OIDC code flow (ADR 0004) │
                     │  /api/v1/* resource server: JWT + scopes      │
   Tauri desktop ────┤  /openapi.json                                │
   Tauri iOS/Android │                                               │
@@ -32,7 +33,8 @@ crates/
   ai/                      campbooks-ai — role-based AI gateway (decide/embed/complete/vision)
                            over the OpenAI-compatible protocol. Depends on kernel only.
   server/                  campbooks-server — the binary. Loads config, runs migrations,
-                           composes modules into one router, serves OpenAPI.
+                           composes modules into one router, serves OpenAPI and,
+                           when CAMPBOOKS_WEB_DIR is set, the built web client.
   modules/
     system/                campbooks-system — health, version. The reference slice:
                            copy its shape for every new module.
@@ -104,6 +106,12 @@ One React/TypeScript UI, three delivery targets (ADR 0003):
 
 `src/lib/api` hides the difference behind one typed client generated from
 `openapi/openapi.json`, so modules never know which target they run on.
+
+The web target is served by `campbooks-server` itself (ADR 0006): the release
+image builds `clients/app` and sets `CAMPBOOKS_WEB_DIR`, so UI and API share
+one origin and port. Until the BFF lands, `/bff/api/*` is an interim
+passthrough to the same API routes with no session or credentials of its own
+(`openspec/changes/serve-web-client/`).
 
 ## Extensibility (future)
 

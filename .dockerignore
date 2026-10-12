@@ -1,12 +1,11 @@
-# Keep the build context to what the Rust build needs.
+# Keep the build context to what the image build needs: the Rust workspace
+# (crates, xtask, migrations, .sqlx) and the web client sources (clients/).
 .git
 .github
 .claude
 .cargo/registry
 target
 **/target
-clients
-**/node_modules
 docs
 openspec
 deploy
@@ -20,3 +19,15 @@ openapi
 compose*.yaml
 Dockerfile
 .dockerignore
+
+# Web client: sources only. Dependencies are installed and the bundle is built
+# inside the image; native (Tauri) build output and local artefacts stay out.
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+**/.vite
+clients/app/src-tauri
+clients/app/recordings
+clients/app/test-results
+clients/app/playwright-report
