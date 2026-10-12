@@ -31,8 +31,8 @@ rules:
       fallback when the role is not configured, and how the user can undo it.
   tasks:
     - Keep each task small enough for one focused session.
-    - Last tasks are always: OpenAPI regenerated, client types regenerated,
-      CHANGELOG updated, gates green, UI verified at 375px and desktop (if UI).
+    - "Last tasks are always: OpenAPI regenerated, client types regenerated,
+      CHANGELOG updated, gates green, UI verified at 375px and desktop (if UI)."
 
 operations:
   apply:

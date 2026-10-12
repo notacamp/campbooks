@@ -5,7 +5,7 @@
 //! Other crates extract their own sections from [`env_source`] so there is one
 //! convention for the whole server.
 
-use std::net::SocketAddr;
+use std::{net::SocketAddr, path::PathBuf};
 
 use figment::{Figment, providers::Env};
 use secrecy::SecretString;
@@ -63,6 +63,12 @@ pub struct Config {
     /// Log output format.
     #[serde(default)]
     pub log_format: LogFormat,
+
+    /// Directory holding the built web client (`CAMPBOOKS_WEB_DIR`). When
+    /// set, the server serves it next to the API; unset (or empty) means
+    /// API-only.
+    #[serde(default)]
+    pub web_dir: Option<PathBuf>,
 }
 
 impl Config {
@@ -131,6 +137,7 @@ mod tests {
         assert!(config.run_migrations);
         assert_eq!(config.log_format, LogFormat::Json);
         assert_eq!(config.database_max_connections, 10);
+        assert_eq!(config.web_dir, None);
         assert_eq!(
             config.database_url.expose_secret(),
             "postgres://u:p@db.example.com/campbooks"
@@ -149,10 +156,12 @@ mod tests {
             ("database_url", "postgres://localhost/x"),
             ("bind_addr", "127.0.0.1:9000"),
             ("log_format", "pretty"),
+            ("web_dir", "/app/web"),
         ]))
         .unwrap();
         assert_eq!(config.bind_addr.port(), 9000);
         assert_eq!(config.log_format, LogFormat::Pretty);
+        assert_eq!(config.web_dir, Some(PathBuf::from("/app/web")));
     }
 
     #[test]

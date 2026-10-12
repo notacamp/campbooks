@@ -25,6 +25,7 @@ pub fn config(database_url: &str) -> Config {
         public_url: "http://localhost:8080".to_owned(),
         run_migrations: false,
         log_format: LogFormat::Pretty,
+        web_dir: None,
     }
 }
 

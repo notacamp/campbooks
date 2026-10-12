@@ -1,7 +1,9 @@
 # Self-hosting Campbooks
 
 1. `cp .env.example .env` and set at least `POSTGRES_PASSWORD` and `CAMPBOOKS_PUBLIC_URL`.
-2. `docker compose up -d` starts the API server and Postgres (with pgvector) on port 8080.
+2. `docker compose up -d` starts the server and Postgres (with pgvector) on port 8080.
+   The server answers both the web app (open `http://localhost:8080/`) and the API
+   (`/api/v1/...`) on that one port.
 3. Check it: `curl http://localhost:8080/api/v1/system/health` should return `{"status":"ok","database":"ok"}`.
 4. Optional local AI: `docker compose --profile ai up -d`, then pull the models once:
    `docker compose exec ollama ollama pull qwen3:8b` (TEI downloads `BAAI/bge-m3` itself).
