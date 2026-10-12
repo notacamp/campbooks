@@ -1,0 +1,109 @@
+.heading {
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  line-height: var(--leading-tight);
+}
+
+.heading[data-size="hero"] {
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-display);
+}
+
+.heading[data-size="page"] {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-display);
+}
+
+.heading[data-size="title"] {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.heading[data-size="pane"] {
+  font-family: var(--font-sans);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.heading[data-size="section"] {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-none);
+  color: var(--text-secondary);
+}
+
+.text {
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+}
+
+.text[data-tone="primary"] {
+  color: var(--text-primary);
+}
+
+.text[data-tone="secondary"] {
+  color: var(--text-secondary);
+}
+
+.text[data-tone="tertiary"] {
+  color: var(--text-tertiary);
+}
+
+.text[data-tone="danger"] {
+  color: var(--danger);
+}
+
+.text[data-tone="accent"] {
+  color: var(--accent-text);
+}
+
+.text[data-size="xs"] {
+  font-size: var(--text-xs);
+}
+
+.text[data-size="sm"] {
+  font-size: var(--text-sm);
+}
+
+.text[data-size="lg"] {
+  font-size: var(--text-lg);
+}
+
+.text[data-weight="medium"] {
+  font-weight: var(--weight-medium);
+}
+
+.text[data-weight="semibold"] {
+  font-weight: var(--weight-semibold);
+}
+
+.text[data-numeric] {
+  font-variant-numeric: tabular-nums;
+}
+
+.text[data-caps] {
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-none);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.text[data-truncate] {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: var(--border-width);
+  height: var(--border-width);
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

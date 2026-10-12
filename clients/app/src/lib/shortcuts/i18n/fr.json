@@ -1,0 +1,48 @@
+{
+  "nav": {
+    "home": "Accueil",
+    "inbox": "Boîte de réception",
+    "schedule": "Agenda",
+    "tasks": "Tâches",
+    "documents": "Documents",
+    "money": "Argent"
+  },
+  "list": {
+    "next": "Élément suivant",
+    "previous": "Élément précédent",
+    "open": "Ouvrir"
+  },
+  "item": {
+    "reply": "Répondre",
+    "done": "Terminé",
+    "later": "Plus tard",
+    "hold": "Réserver du temps",
+    "paid": "Marquer comme payé",
+    "choice1": "Premier choix",
+    "choice2": "Second choix"
+  },
+  "compose": {
+    "draft": "Le rédiger pour moi",
+    "send": "Envoyer"
+  },
+  "command": {
+    "open": "Rechercher ou demander"
+  },
+  "undo": "Annuler",
+  "workspace": {
+    "switch": "Changer d’espace de travail"
+  },
+  "sheet": {
+    "open": "Raccourcis clavier"
+  },
+  "overlay": {
+    "close": "Fermer"
+  },
+  "groups": {
+    "navigation": "Aller à",
+    "general": "Général",
+    "list": "Listes",
+    "item": "Élément sélectionné",
+    "compose": "Rédaction"
+  }
+}

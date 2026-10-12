@@ -6,5 +6,13 @@
     "types": ["node"],
     "allowImportingTsExtensions": true
   },
-  "include": ["vite.config.ts", "vitest.config.ts", "test/architecture", "scripts", "recordings"]
+  "include": [
+    "vite.config.ts",
+    "vitest.config.ts",
+    "vitest.storybook.config.ts",
+    ".storybook/main.ts",
+    "test/architecture",
+    "scripts",
+    "recordings"
+  ]
 }

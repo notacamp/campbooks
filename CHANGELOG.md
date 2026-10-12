@@ -7,6 +7,20 @@ All notable changes to Campbooks Next are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Design system for the new app: light, dark and system themes; three
+  workspace accents (business in ink, personal in terracotta, forest) and a
+  compact density, remembered on each device and applied before the page
+  first paints; Funnel Sans and Funnel Display, self-hosted; and the shared
+  components the new screens are built from (buttons, keyboard hints,
+  avatars, signals, the assistant's visor and note, toasts with undo, empty
+  and loading states, queue rows, conversation rows, navigation, tab bar).
+- Keyboard shortcuts everywhere, shown on the buttons and rows they trigger:
+  G then a letter to move between places, J/K/Enter in lists, E, L, R, H on
+  the selected item, Z to undo, ? for the full list, and ⌘K (Ctrl+K) to search
+  every command. Shortcuts never fire while you type in a field.
+- Storybook for the design system (`pnpm --dir clients storybook`), with the
+  approved Home, Inbox, phone, states and themes screens on demo data, checked
+  for accessibility in light and dark on every pull request.
 - Foundation for the rewrite: Rust API skeleton (kernel, AI gateway, `system`
   module with health and version), one React/TypeScript client with a Tauri 2
   shell, OpenSpec workflow, architecture decision records, CI quality and

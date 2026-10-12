@@ -56,4 +56,26 @@ describe("dependency-cruiser boundaries", () => {
       to: "src/modules/alpha/index.ts",
     });
   });
+
+  it("flags a module reaching past lib/ui's index", async () => {
+    expect(await violations()).toContainEqual({
+      rule: "ui-public-surface",
+      from: "src/modules/gamma/index.ts",
+      to: "src/lib/ui/components/thing.ts",
+    });
+  });
+
+  it("allows lib/ui through its index", async () => {
+    expect(await violations()).not.toContainEqual(
+      expect.objectContaining({ from: "src/modules/gamma/index.ts", to: "src/lib/ui/index.ts" }),
+    );
+  });
+
+  it("flags a module importing a stylesheet", async () => {
+    expect(await violations()).toContainEqual({
+      rule: "modules-have-no-stylesheets",
+      from: "src/modules/gamma/index.ts",
+      to: "src/modules/gamma/gamma.css",
+    });
+  });
 });

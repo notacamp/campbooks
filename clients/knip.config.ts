@@ -13,9 +13,17 @@ const config: KnipConfig = {
     app: {
       // Knip finds the `record` script on its own; every
       // scenario is loaded by name at runtime, so none is imported statically.
-      entry: ["recordings/scenarios/*.ts"],
+      entry: [
+        "recordings/scenarios/*.ts",
+        // Library surfaces modules build on: every export is public API,
+        // used or not yet (AGENTS.md → UI).
+        "src/lib/ui/index.ts",
+        "src/lib/shortcuts/index.ts",
+      ],
       project: [
         "src/**/*.{ts,tsx,css}",
+        "stories/**/*.{ts,tsx,css}",
+        ".storybook/**/*.{ts,tsx}",
         "test/**/*.{ts,tsx}",
         "scripts/**/*.ts",
         "recordings/**/*.ts",

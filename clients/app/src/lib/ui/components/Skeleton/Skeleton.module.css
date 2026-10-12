@@ -1,0 +1,54 @@
+.skeleton {
+  display: block;
+  width: var(--skeleton-width);
+  height: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--surface-hover),
+    var(--surface-selected),
+    var(--surface-hover)
+  );
+  background-size: 200% 100%;
+  animation: skeleton var(--duration-shimmer) linear infinite;
+}
+
+.skeleton[data-shape="avatar"] {
+  width: var(--size-avatar-md);
+  height: var(--size-avatar-md);
+  border-radius: var(--radius-full);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1-5) var(--space-3);
+  align-items: center;
+  padding: var(--row-pad-y) var(--row-pad-x);
+}
+
+.row > :first-child {
+  grid-row: span 2;
+}
+
+@keyframes skeleton {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}

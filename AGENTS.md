@@ -114,6 +114,44 @@ plurals). Every string a user can see exists in all four before it ships.
 - AI output that changes user data is a **proposal** the user can undo, never a
   silent mutation.
 
+## UI (enforced)
+
+The design system is `clients/app/src/lib/ui` (tokens, themes, components)
+plus `lib/shortcuts` (the keyboard shortcut registry). How it works, how to
+add a token or theme a workspace: `docs/design-system.md`.
+
+- **Tokens only.** Colour, size, duration and easing values live in
+  `lib/ui/tokens/`. Component CSS (one CSS Module per component) reads tokens
+  with `var()`. *(CI: stylelint in `pnpm lint` rejects hex/named colours,
+  colour functions, `light-dark()`, `cubic-bezier()`, units other than
+  `%`/`fr`/`deg`, and literal z-index, font and opacity values outside
+  `lib/ui/tokens/`.)*
+- **Tailwind is mapped to semantic tokens only**; its default palette and
+  scales are wiped. *(CI: ESLint rejects arbitrary values like `p-[13px]`,
+  palette classes like `bg-blue-500` and static `duration-*`/`z-*` classes in
+  `className` and `cx()`.)*
+- **Modules compose `lib/ui`; they don't style.** In `src/modules/**`,
+  Tailwind is for layout only (flex, grid, gap, padding, width) and there are
+  no `style` props or stylesheets. A pattern that needs visual styling becomes
+  a `lib/ui` component first. *(CI: ESLint layout-only and no-style rules;
+  dependency-cruiser `modules-have-no-stylesheets`.)*
+- **One door.** Modules and the app shell import UI only from
+  `~/lib/ui` (its `index.ts`). *(CI: dependency-cruiser `ui-public-surface`.)*
+- **Every component has a story and a test**, with every variant and state.
+  Stories run as tests with axe, in light and in dark; a violation fails.
+  *(CI: `pnpm test-storybook`.)*
+- **Accessible by construction:** native buttons and links, state in ARIA
+  (`aria-current`, `aria-pressed`, `aria-expanded`), focus ring from tokens,
+  dialogs that trap focus and close on Escape, WCAG AA contrast in both
+  themes, motion off under `prefers-reduced-motion`.
+- **Keyboard first, and visible.** Every action that has a shortcut shows
+  it, from the registry (`shortcut` prop / `KbdHint`), never hand-typed keys.
+  New shortcuts are defined in the registry with a namespaced label; the
+  conflict check must pass. *(CI: `registry.test.ts`.)*
+- **Light and dark are equal; no blue default.** The default accent is ink
+  (no hue); themes change only tokens.
+- **UI copy:** sentence case, plain words, no em dashes, in all four locales.
+
 ## Code quality (all binary pass/fail in CI)
 
 - Rust: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`

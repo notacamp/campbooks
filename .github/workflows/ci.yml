@@ -88,7 +88,7 @@ jobs:
 
   clients:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     defaults:
       run: { working-directory: clients }
     steps:
@@ -128,6 +128,12 @@ jobs:
       - name: Build
         if: always()
         run: pnpm build
+      - name: Chromium for story tests
+        if: always()
+        run: pnpm --filter @campbooks/app exec playwright install --with-deps chromium
+      - name: Storybook stories (render, interactions, axe in light and dark)
+        if: always()
+        run: pnpm test-storybook
       - name: Audit (prod deps)
         if: always()
         run: pnpm audit --prod
