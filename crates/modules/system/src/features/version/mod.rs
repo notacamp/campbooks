@@ -32,6 +32,8 @@ impl VersionResponse {
     path = "/api/v1/system/version",
     operation_id = "system_version",
     tag = "system",
+    // Public: probes and support tools call it without a token.
+    security(()),
     responses(
         (status = OK, description = "The running build.", body = VersionResponse),
     )

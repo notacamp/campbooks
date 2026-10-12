@@ -4,7 +4,9 @@
 //! module. `lib.rs` only assembles [`module`]; each use case lives in its own
 //! folder under `features/`, owning its handler, request/response types,
 //! queries and tests. Routes are declared with `utoipa-axum` so they are in
-//! the OpenAPI document by construction.
+//! the OpenAPI document by construction, and each one states its security:
+//! a scope from [`scopes`] (`security(("bearer" = ["system:read"]))` plus the
+//! `Scoped<SystemRead>` extractor), or explicitly public (`security(())`).
 
 #![forbid(unsafe_code)]
 
@@ -12,6 +14,7 @@ use campbooks_kernel::Module;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 mod features;
+pub mod scopes;
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "system";
@@ -20,6 +23,7 @@ pub const NAME: &str = "system";
 pub fn module() -> Module {
     Module {
         name: NAME,
+        scopes: scopes::ALL,
         router: OpenApiRouter::new()
             .routes(routes!(features::health::handler))
             .routes(routes!(features::version::handler)),

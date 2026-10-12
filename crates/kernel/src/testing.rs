@@ -1,6 +1,10 @@
 //! Helpers for module tests. Enabled by the `test-util` feature; modules add
 //! `campbooks-kernel = { workspace = true, features = ["test-util"] }` under
-//! `[dev-dependencies]`.
+//! `[dev-dependencies]`. Scoped endpoints are tested against a [`TestIdp`].
+
+mod idp;
+
+pub use idp::TestIdp;
 
 use std::time::Duration;
 
@@ -14,9 +18,13 @@ use secrecy::SecretString;
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use tower::ServiceExt;
 
-use crate::{AppState, Config, Module, config::LogFormat};
+use crate::{
+    AppState, Config, Module,
+    config::{AuthConfig, LogFormat},
+};
 
-/// A config pointing at `database_url`, everything else default.
+/// A config pointing at `database_url`, everything else default (no
+/// identity provider: scoped endpoints answer 401 `auth_not_configured`).
 pub fn config(database_url: &str) -> Config {
     Config {
         database_url: SecretString::from(database_url),
@@ -26,6 +34,7 @@ pub fn config(database_url: &str) -> Config {
         run_migrations: false,
         log_format: LogFormat::Pretty,
         web_dir: None,
+        auth: AuthConfig::default(),
     }
 }
 

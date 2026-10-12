@@ -3,6 +3,9 @@
 //!
 //! Permission failures on *reads* must use [`Error::NotFound`], not
 //! [`Error::Forbidden`], so a caller cannot probe for records it may not see.
+//! [`Error::Unauthorized`] and [`Error::InsufficientScope`] are about the
+//! access token itself (RFC 6750) and come from the
+//! [`Scoped`](crate::auth::Scoped) extractor, never from resource checks.
 
 use axum::{
     Json,
@@ -11,6 +14,8 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use crate::auth::AuthFailure;
 
 /// Media type of problem details (RFC 9457 §3).
 pub const PROBLEM_JSON: &str = "application/problem+json";
@@ -24,9 +29,15 @@ pub enum Error {
     /// The request is malformed; the message is shown to the client.
     #[error("{0}")]
     BadRequest(String),
-    /// No valid credentials were presented.
-    #[error("unauthorized")]
-    Unauthorized,
+    /// No valid access token was presented. The reason's code is the
+    /// problem `detail`, and the response carries a `WWW-Authenticate:
+    /// Bearer` challenge (RFC 6750 §3).
+    #[error("unauthorized: {}", .0.code())]
+    Unauthorized(AuthFailure),
+    /// The access token is valid but lacks the scope the endpoint requires
+    /// (RFC 6750 `insufficient_scope`); carries that scope's name.
+    #[error("insufficient scope: {0}")]
+    InsufficientScope(&'static str),
     /// Credentials are valid but lack permission for this *action*.
     #[error("forbidden")]
     Forbidden,
@@ -55,8 +66,8 @@ impl Error {
         match self {
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::BadRequest(_) => StatusCode::BAD_REQUEST,
-            Self::Unauthorized => StatusCode::UNAUTHORIZED,
-            Self::Forbidden => StatusCode::FORBIDDEN,
+            Self::Unauthorized(_) => StatusCode::UNAUTHORIZED,
+            Self::InsufficientScope(_) | Self::Forbidden => StatusCode::FORBIDDEN,
             Self::Conflict(_) => StatusCode::CONFLICT,
             Self::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -69,9 +80,22 @@ impl Error {
             Self::BadRequest(msg) | Self::Conflict(msg) | Self::Unavailable(msg) => {
                 Some(msg.clone())
             }
-            Self::NotFound | Self::Unauthorized | Self::Forbidden | Self::Internal(_) => None,
+            Self::Unauthorized(failure) => Some(failure.code().to_owned()),
+            Self::InsufficientScope(_) => Some("insufficient_scope".to_owned()),
+            Self::NotFound | Self::Forbidden | Self::Internal(_) => None,
         };
         Problem::new(self.status(), detail)
+    }
+
+    /// The `WWW-Authenticate` challenge for token failures (RFC 6750 §3).
+    pub fn www_authenticate(&self) -> Option<String> {
+        match self {
+            Self::Unauthorized(failure) => Some(failure.challenge().to_owned()),
+            Self::InsufficientScope(scope) => Some(format!(
+                "Bearer error=\"insufficient_scope\", scope=\"{scope}\""
+            )),
+            _ => None,
+        }
     }
 }
 
@@ -89,7 +113,16 @@ impl IntoResponse for Error {
         if let Self::Internal(source) = &self {
             tracing::error!(error = %source, source_debug = ?source, "internal error");
         }
-        self.to_problem().into_response()
+        let challenge = self
+            .www_authenticate()
+            .and_then(|value| HeaderValue::from_str(&value).ok());
+        let mut response = self.to_problem().into_response();
+        if let Some(challenge) = challenge {
+            response
+                .headers_mut()
+                .insert(header::WWW_AUTHENTICATE, challenge);
+        }
+        response
     }
 }
 
@@ -180,6 +213,49 @@ mod tests {
         assert!(!body.to_string().contains("hunter2"));
     }
 
+    #[tokio::test]
+    async fn invalid_token_is_401_with_challenge() {
+        let response = Error::Unauthorized(AuthFailure::InvalidToken).into_response();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            response.headers()[header::WWW_AUTHENTICATE],
+            r#"Bearer error="invalid_token""#
+        );
+        let (_, content_type, body) = render(Error::Unauthorized(AuthFailure::InvalidToken)).await;
+        assert_eq!(content_type, PROBLEM_JSON);
+        assert_eq!(body["detail"], "invalid_token");
+    }
+
+    #[tokio::test]
+    async fn missing_token_challenge_has_no_error_code() {
+        let response = Error::Unauthorized(AuthFailure::MissingToken).into_response();
+        assert_eq!(response.headers()[header::WWW_AUTHENTICATE], "Bearer");
+    }
+
+    #[tokio::test]
+    async fn insufficient_scope_is_403_naming_the_scope() {
+        let response = Error::InsufficientScope("mail:read").into_response();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        assert_eq!(
+            response.headers()[header::WWW_AUTHENTICATE],
+            r#"Bearer error="insufficient_scope", scope="mail:read""#
+        );
+        let (_, _, body) = render(Error::InsufficientScope("mail:read")).await;
+        assert_eq!(body["detail"], "insufficient_scope");
+    }
+
+    #[tokio::test]
+    async fn other_errors_have_no_challenge() {
+        for err in [Error::NotFound, Error::Forbidden] {
+            assert!(
+                err.into_response()
+                    .headers()
+                    .get(header::WWW_AUTHENTICATE)
+                    .is_none()
+            );
+        }
+    }
+
     #[test]
     fn row_not_found_maps_to_not_found() {
         assert!(matches!(
@@ -190,7 +266,10 @@ mod tests {
 
     #[test]
     fn statuses() {
-        assert_eq!(Error::Unauthorized.status(), StatusCode::UNAUTHORIZED);
+        assert_eq!(
+            Error::Unauthorized(AuthFailure::NotConfigured).status(),
+            StatusCode::UNAUTHORIZED
+        );
         assert_eq!(Error::Forbidden.status(), StatusCode::FORBIDDEN);
         assert_eq!(
             Error::Conflict(String::new()).status(),

@@ -40,6 +40,8 @@ impl HealthResponse {
     path = "/api/v1/system/health",
     operation_id = "system_health",
     tag = "system",
+    // Public: probes and support tools call it without a token.
+    security(()),
     responses(
         (status = OK, description = "The instance and its database are up.", body = HealthResponse),
         (status = SERVICE_UNAVAILABLE, description = "The database is unreachable.",

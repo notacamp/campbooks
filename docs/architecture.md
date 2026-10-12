@@ -86,6 +86,21 @@ keys or joins). A read that needs data from two modules is composed in the
 client, or by subscribing to the other module's events and keeping a local
 projection.
 
+### Endpoints and auth
+
+The API is an OAuth 2.1 resource server (ADR 0004). A module declares its
+scopes once (`<module>:<action>`, a `kernel::auth::ScopeName` type) and
+lists them in `Module.scopes`. Every handler either requires one with the
+`Scoped<S>` extractor and documents it with
+`security(("bearer" = ["<scope>"]))`, or is explicitly public with
+`security(())`. The extractor validates the bearer JWT against the IdP
+configured by `CAMPBOOKS_AUTH__*` and yields the `Principal` (subject, kind,
+client id, scopes, workspace). Bad tokens get 401, and missing scopes get 403.
+Whether the principal may see a given record is the module's decision, and a
+read it may not see answers 404. `campbooks-server scopes` prints the
+catalogue the IdP mirrors. Module tests sign their own tokens with
+`kernel::testing::TestIdp`.
+
 ### Cross-module communication
 
 1. **Events (default).** A module publishes typed domain events on the kernel

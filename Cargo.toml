@@ -51,6 +51,9 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json", "fm
 uuid = { version = "1.28.0", features = ["v7", "serde"] }
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "serde", "std"] }
 secrecy = { version = "0.10.3", features = ["serde"] }
+# JWT access-token validation. aws-lc-rs is the crypto backend rustls already
+# uses; no PEM support needed (keys come from the IdP's JWKS).
+jsonwebtoken = { version = "11.1.0", default-features = false, features = ["aws_lc_rs"] }
 clap = { version = "4.6.7", features = ["derive", "env"] }
 
 # Tooling (xtask)
@@ -59,6 +62,11 @@ regex = "1.13.1"
 
 # Tests
 wiremock = "0.6.5"
+# Ed25519 keys for the test identity provider (`campbooks_kernel::testing::TestIdp`);
+# already in the graph as the rustls / jsonwebtoken crypto backend.
+aws-lc-rs = "1.18.1"
+# Hand-crafting forged JWTs in auth tests; already in the graph via jsonwebtoken.
+base64 = "0.22.1"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
