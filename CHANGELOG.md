@@ -17,3 +17,9 @@ All notable changes to Campbooks Next are documented here. The format follows
   every response carries security headers (a strict CSP on pages).
 - Interim `/bff/api/*` passthrough to the API so the web app works from the
   image before the session-based BFF lands. It adds no credentials.
+- Self-hosting: `docker compose up` now also starts the identity provider
+  (Rauthy) on port 8081, with no setup. Its secrets are generated on first boot
+  into the new `idp-data` volume, and Campbooks' scopes and sign-in clients are
+  registered automatically. Read the first admin password with
+  `docker compose run --rm idp-init cat /app/data/campbooks/initial-admin-password`;
+  see `deploy/README.md`. Sign-in is not wired into the app yet.
