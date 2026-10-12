@@ -25,7 +25,24 @@ The rules are in [`AGENTS.md`](AGENTS.md); this is the walkthrough.
    anything user-visible (`feat/` and `fix/` branches are checked).
 7. **Open a PR into `next`.** Title = Conventional Commit (it becomes the
    squash commit). Commits must be **signed** (SSH or GPG).
-8. **UI changes:** verify at 375px and desktop; screenshots use demo data only.
+8. **UI changes:** verify at 375px and desktop, and **attach a screen recording**
+   (see below). CI fails a UI PR without one.
+
+## Screen recordings
+
+Every PR that changes the client UI shows the change working, at 375px and on
+desktop, in a `## Recording` section of the PR body.
+
+1. Start the app (`pnpm --dir clients dev`) with **demo data only** — never a
+   real inbox, real documents or anyone's face.
+2. Write or reuse a scenario in `clients/app/recordings/scenarios/` and run
+   `pnpm --dir clients record <scenario>`; it writes a 375px and a desktop video.
+3. Attach them: drag the files into the PR description (GitHub hosts them).
+   Maintainers use the `upload-media` helper, which prints ready-to-paste
+   markdown with an inline preview.
+
+A change under `clients/app/src` that is genuinely invisible (a refactor with
+no visual effect) can be exempted by a maintainer with the `no-recording` label.
 
 ## Releases
 

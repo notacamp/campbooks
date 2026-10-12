@@ -4,3 +4,4 @@ coverage/
 *.tsbuildinfo
 *.local
 .vite/
+app/recordings/out/

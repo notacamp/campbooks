@@ -104,5 +104,10 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
 - Update `CHANGELOG.md` `[Unreleased]` for user-visible changes.
 - UI work: get a visual prototype approved before implementing it, then verify
   at **375px and desktop** before calling it done.
+- **UI PRs carry a screen recording** (375px + desktop) of the change working,
+  in a `## Recording` section of the PR body — `pnpm --dir clients record <scenario>`,
+  then upload (maintainers: `upload-media`; contributors: drag into the PR).
+  Demo data only. *(CI: Policy → recording check; `no-recording` label for
+  non-visual changes, maintainers only.)*
 - Never delete user data without explicit confirmation; never send email to a
   real person from a dev or test environment.
