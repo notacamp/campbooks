@@ -14,6 +14,14 @@
    `.env.example`. Without an issuer, endpoints that require a scope answer 401
    `auth_not_configured`; health and version stay public.
 6. Upgrades: `docker compose pull && docker compose up -d`; migrations run on startup.
+7. Background work (maintenance today; mail sync and the AI pass as they land) runs inside the same
+   container: the image runs `campbooks-server all`, the API plus the job
+   worker. Jobs live in Postgres, so nothing is lost on restart. To run the
+   worker separately, add a second service with the same image and env and
+   `command: ["worker"]` (and `healthcheck: { disable: true }`: the health
+   check probes the API, which a worker does not serve), and give the first
+   one `command: ["api"]`. Worker settings are the `CAMPBOOKS_JOBS__*` block
+   of `.env.example`.
 
 CPU inference works but is slow. For the `decide` and `complete` roles, use a GPU
 host or a hosted provider serving open-weight models (set its URL in `.env`).

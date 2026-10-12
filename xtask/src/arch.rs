@@ -195,16 +195,27 @@ pub fn check_allowlist(allow: &[Allow], modules: &BTreeSet<String>) -> Vec<Strin
     violations
 }
 
+/// The Postgres schema of the kernel's own infrastructure (event log, job
+/// queue). Its migrations are `<ts>_kernel__<desc>.sql`; no module may be
+/// named after it.
+pub const KERNEL_SCHEMA: &str = "kernel";
+
 static MIGRATION_NAME: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(\d{14})_([a-z0-9_]+?)__([a-z0-9_]+)\.sql$")
         .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
 });
 
-/// Migration files are `<14-digit timestamp>_<module>__<description>.sql`,
-/// name an existing module, and have unique timestamps.
+/// Migration files are `<14-digit timestamp>_<owner>__<description>.sql`,
+/// where the owner is an existing module or the kernel, and have unique
+/// timestamps. No module may take the kernel's name.
 pub fn check_migrations(file_names: &[String], modules: &BTreeSet<String>) -> Vec<String> {
     let mut violations = Vec::new();
     let mut versions: BTreeMap<&str, &str> = BTreeMap::new();
+    if modules.contains(KERNEL_SCHEMA) {
+        violations.push(format!(
+            "crates/modules/{KERNEL_SCHEMA}: `{KERNEL_SCHEMA}` is reserved for the kernel's schema"
+        ));
+    }
 
     for name in file_names {
         let Some(caps) = MIGRATION_NAME.captures(name) else {
@@ -218,10 +229,10 @@ pub fn check_migrations(file_names: &[String], modules: &BTreeSet<String>) -> Ve
             caps.get(1).map_or("", |m| m.as_str()),
             caps.get(2).map_or("", |m| m.as_str()),
         );
-        if !modules.contains(module) {
+        if module != KERNEL_SCHEMA && !modules.contains(module) {
             let known: Vec<_> = modules.iter().map(String::as_str).collect();
             violations.push(format!(
-                "migrations/{name}: `{module}` is not a module (known: {})",
+                "migrations/{name}: `{module}` is not a module or `{KERNEL_SCHEMA}` (known: {})",
                 known.join(", ")
             ));
         }
@@ -232,6 +243,86 @@ pub fn check_migrations(file_names: &[String], modules: &BTreeSet<String>) -> Ve
         }
     }
     violations
+}
+
+static SQL_NOISE: LazyLock<Regex> = LazyLock::new(|| {
+    // Comments, string literals and dollar-quoted bodies' delimiters are not
+    // schema references.
+    Regex::new(r"(?s)--[^\n]*|/\*.*?\*/|'(?:[^']|'')*'")
+        .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+});
+
+static SCHEMA_STATEMENT: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"\b(?:create|alter|drop)\s+schema\s+(?:if\s+(?:not\s+)?exists\s+)?([a-z_][a-z0-9_]*)",
+    )
+    .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+});
+
+static QUALIFIED_NAME: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\b([a-z_][a-z0-9_]*)\s*\.\s*[a-z_]")
+        .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+});
+
+/// Each migration touches only its owner's schema: it creates, alters or
+/// drops no other schema, never qualifies a name with another module's (or
+/// the kernel's) schema, and never changes `search_path`. `files` are
+/// `(file name, SQL)`; files with a malformed name are reported by
+/// [`check_migrations`] and skipped here.
+pub fn check_migration_schemas(
+    files: &[(String, String)],
+    modules: &BTreeSet<String>,
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    for (name, sql) in files {
+        let Some(owner) = MIGRATION_NAME
+            .captures(name)
+            .and_then(|caps| caps.get(2))
+            .map(|m| m.as_str())
+        else {
+            continue;
+        };
+        let sql = SQL_NOISE
+            .replace_all(sql, " ")
+            .to_lowercase()
+            .replace('"', "");
+        let mut touched = BTreeSet::new();
+        for caps in SCHEMA_STATEMENT.captures_iter(&sql) {
+            let schema = caps.get(1).map_or("", |m| m.as_str());
+            if schema != owner {
+                touched.insert(schema.to_owned());
+            }
+        }
+        for caps in QUALIFIED_NAME.captures_iter(&sql) {
+            let schema = caps.get(1).map_or("", |m| m.as_str());
+            let known = schema == KERNEL_SCHEMA || modules.contains(schema);
+            if known && schema != owner {
+                touched.insert(schema.to_owned());
+            }
+        }
+        for schema in touched {
+            violations.push(format!(
+                "migrations/{name}: touches schema `{schema}`; a migration of `{owner}` may \
+                 touch only the `{owner}` schema (reference other modules by ID)"
+            ));
+        }
+        if sql.contains("search_path") {
+            violations.push(format!(
+                "migrations/{name}: must not change `search_path`; qualify names with `{owner}.`"
+            ));
+        }
+    }
+    violations
+}
+
+/// Background registrations (job kinds, event handlers, schedules) are
+/// named `<module>.<name>` of the declaring module and unique. `errors` is
+/// what building the registry reported.
+pub fn check_background(errors: &[String]) -> Vec<String> {
+    errors
+        .iter()
+        .map(|e| format!("background registration: {e}"))
+        .collect()
 }
 
 /// Every workspace crate carries the version in the `VERSION` file.
@@ -527,8 +618,73 @@ mod tests {
         .map(String::from);
         let v = check_migrations(&names, &modules);
         assert_eq!(v.len(), 6, "{v:#?}");
-        assert!(v[0].contains("`billing` is not a module"));
+        assert!(v[0].contains("`billing` is not a module or `kernel`"));
         assert!(v.iter().any(|m| m.contains("already used")));
+    }
+
+    #[test]
+    fn kernel_owns_its_migrations_and_its_name() {
+        let modules: BTreeSet<String> = ["system"].map(String::from).into();
+        let names = ["20261012100000_kernel__events_and_jobs.sql".to_owned()];
+        assert!(check_migrations(&names, &modules).is_empty());
+
+        let clash: BTreeSet<String> = ["kernel"].map(String::from).into();
+        let v = check_migrations(&[], &clash);
+        assert_eq!(v.len(), 1, "{v:?}");
+        assert!(v[0].contains("reserved"));
+    }
+
+    fn sql(name: &str, body: &str) -> (String, String) {
+        (name.to_owned(), body.to_owned())
+    }
+
+    #[test]
+    fn migrations_touch_only_their_owner_schema() {
+        let modules: BTreeSet<String> = ["system", "mail"].map(String::from).into();
+        let ok = [
+            sql(
+                "20261012000000_system__init.sql",
+                "-- kernel.jobs is not ours\nCREATE SCHEMA IF NOT EXISTS system;\n\
+                 CREATE TABLE system.instance (id uuid, note text DEFAULT 'mail.x');\n\
+                 SELECT i.id FROM system.instance i;",
+            ),
+            sql(
+                "20261012100000_kernel__init.sql",
+                "CREATE SCHEMA kernel; CREATE TABLE kernel.jobs (id uuid DEFAULT kernel.uuid_v7());\n\
+                 /* system.instance */ SELECT j.id FROM kernel.jobs j;",
+            ),
+        ];
+        assert!(check_migration_schemas(&ok, &modules).is_empty());
+
+        let bad = [
+            sql(
+                "20261012000001_mail__init.sql",
+                "CREATE TABLE mail.m (id uuid DEFAULT kernel.uuid_v7());\n\
+                 INSERT INTO \"system\".instance VALUES (gen_random_uuid());",
+            ),
+            sql("20261012000002_mail__more.sql", "CREATE SCHEMA billing;"),
+            sql(
+                "20261012000003_kernel__oops.sql",
+                "ALTER TABLE mail.m ADD COLUMN x int; SET search_path = mail;",
+            ),
+        ];
+        let v = check_migration_schemas(&bad, &modules);
+        assert_eq!(v.len(), 5, "{v:#?}");
+        assert!(v[0].contains("touches schema `kernel`"));
+        assert!(v[1].contains("touches schema `system`"));
+        assert!(v[2].contains("touches schema `billing`"));
+        assert!(v[3].contains("touches schema `mail`"));
+        assert!(v[4].contains("search_path"));
+    }
+
+    #[test]
+    fn background_errors_are_violations() {
+        assert!(check_background(&[]).is_empty());
+        let v = check_background(&["job `x`: must be `mail.<name>`".to_owned()]);
+        assert_eq!(
+            v,
+            ["background registration: job `x`: must be `mail.<name>`"]
+        );
     }
 
     #[test]

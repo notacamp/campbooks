@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE kernel.jobs\n               SET state = CASE WHEN $4 OR attempts >= max_attempts THEN 'failed' ELSE 'pending' END,\n                   finished_at = CASE WHEN $4 OR attempts >= max_attempts THEN now() END,\n                   run_at = CASE\n                       WHEN $4 OR attempts >= max_attempts THEN run_at\n                       WHEN $5::float8 IS NOT NULL THEN now() + make_interval(secs => $5)\n                       ELSE now() + make_interval(secs =>\n                           least($7::float8, $6::float8 * power(2.0::float8, (attempts - 1)::float8))\n                           * (0.5 + random() * 0.5))\n                   END,\n                   last_error = $8,\n                   locked_by = NULL,\n                   locked_until = NULL,\n                   updated_at = now()\n             WHERE id = $1 AND state = 'running' AND locked_by = $2 AND attempts = $3\n            RETURNING state, run_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.jobs",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "run_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "kernel.jobs",
+            "name": "run_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int4",
+        "Bool",
+        "Float8",
+        "Float8",
+        "Float8",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "266a4530ef67912eef1214d459e250dab98848e1560919736df17285b62844b2"
+}

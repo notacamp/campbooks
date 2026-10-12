@@ -11,6 +11,7 @@ pub mod config;
 pub mod error;
 pub mod events;
 pub mod ids;
+pub mod jobs;
 pub mod module;
 pub mod state;
 #[cfg(any(test, feature = "test-util"))]
@@ -18,6 +19,7 @@ pub mod testing;
 
 pub use config::Config;
 pub use error::{Error, Problem, Result};
-pub use events::{DomainEvent, EventBus};
+pub use events::{DomainEvent, Event, EventBus, EventHandler};
+pub use jobs::{Background, Job, JobContext, JobError};
 pub use module::Module;
 pub use state::AppState;

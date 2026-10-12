@@ -9,10 +9,18 @@ use std::{
     time::Duration,
 };
 
-use campbooks_kernel::{AppState, Config, config::LogFormat};
+use std::sync::Arc;
+
+use campbooks_kernel::{
+    AppState, Config,
+    config::LogFormat,
+    events::{EventId, ReplayFrom},
+    jobs::Worker,
+};
 use clap::{Parser, Subcommand};
 use secrecy::ExposeSecret;
-use sqlx::postgres::PgPoolOptions;
+use sqlx::{PgPool, postgres::PgPoolOptions};
+use tokio::{sync::watch, task::JoinSet};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 /// Port used when `CAMPBOOKS_BIND_ADDR` is unset or unparsable.
@@ -26,7 +34,7 @@ const HEALTHCHECK_TIMEOUT: Duration = Duration::from_secs(5);
 #[command(
     name = "campbooks-server",
     version,
-    about = "The Campbooks API server."
+    about = "The Campbooks server: HTTP API, job worker and tools."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -35,8 +43,22 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Run the HTTP server (the default).
+    /// Run the HTTP API and the job worker in one process (the default, and
+    /// what the image runs).
+    All,
+    /// Run only the HTTP API (scale it on requests).
+    Api,
+    /// Run only the job worker: event deliveries, background jobs and
+    /// schedules (scale it on queue depth).
+    Worker,
+    /// Same as `all`; kept for deployments that still run `serve`.
+    #[command(hide = true)]
     Serve,
+    /// Work with the domain event log.
+    Events {
+        #[command(subcommand)]
+        command: EventsCommand,
+    },
     /// Print the OpenAPI document as JSON.
     Openapi,
     /// Print the OAuth scope catalogue as JSON (`[{name, description}]`), for
@@ -52,9 +74,47 @@ enum Command {
     },
 }
 
+#[derive(Debug, Subcommand)]
+enum EventsCommand {
+    /// Deliver logged events to one consumer again, e.g. after fixing its
+    /// handler or to rebuild a projection. Events that already have an
+    /// unfinished delivery to it are skipped.
+    Replay {
+        /// The consumer's name (`<module>.<handler>`).
+        consumer: String,
+        /// Replay from this instant (RFC 3339, e.g. `2026-10-01T00:00:00Z`)
+        /// or from this event id (inclusive). Default: the whole log.
+        #[arg(long)]
+        since: Option<String>,
+    },
+}
+
+/// Which parts of the server a process runs (ADR 0011).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Role {
+    All,
+    Api,
+    Worker,
+}
+
+impl Role {
+    fn api(self) -> bool {
+        matches!(self, Self::All | Self::Api)
+    }
+
+    fn worker(self) -> bool {
+        matches!(self, Self::All | Self::Worker)
+    }
+}
+
 fn main() -> ExitCode {
-    match Cli::parse().command.unwrap_or(Command::Serve) {
-        Command::Serve => serve(),
+    match Cli::parse().command.unwrap_or(Command::All) {
+        Command::All | Command::Serve => serve(Role::All),
+        Command::Api => serve(Role::Api),
+        Command::Worker => serve(Role::Worker),
+        Command::Events {
+            command: EventsCommand::Replay { consumer, since },
+        } => replay(&consumer, since.as_deref()),
         Command::Openapi => print_json(&campbooks_server::openapi(), "OpenAPI document"),
         Command::Scopes => print_json(&campbooks_server::scope_catalogue(), "scope catalogue"),
         Command::Healthcheck { port } => healthcheck(port.unwrap_or_else(port_from_env)),
@@ -71,21 +131,18 @@ fn print_json(value: &impl serde::Serialize, what: &str) -> ExitCode {
     }
 }
 
-fn serve() -> ExitCode {
+fn serve(role: Role) -> ExitCode {
     let config = match Config::from_env() {
         Ok(config) => config,
         Err(e) => return fail(&e.to_string()),
     };
     init_tracing(config.log_format);
 
-    let runtime = match tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-    {
+    let runtime = match runtime() {
         Ok(runtime) => runtime,
-        Err(e) => return fail(&format!("could not start async runtime: {e}")),
+        Err(e) => return fail(&e),
     };
-    match runtime.block_on(run(config)) {
+    match runtime.block_on(run(config, role)) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             tracing::error!(error = %e, "server failed");
@@ -94,7 +151,152 @@ fn serve() -> ExitCode {
     }
 }
 
-async fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
+fn runtime() -> Result<tokio::runtime::Runtime, String> {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| format!("could not start async runtime: {e}"))
+}
+
+async fn run(config: Config, role: Role) -> Result<(), Box<dyn std::error::Error>> {
+    if role.api() {
+        check_api_config(&config)?;
+    }
+    if role.worker() {
+        config.jobs.check()?;
+    }
+    let registry = campbooks_server::registry()?;
+    let db = connect(&config).await?;
+    if config.run_migrations {
+        sqlx::migrate!("../../migrations")
+            .run(&db)
+            .await
+            .map_err(|e| format!("migrations failed: {e}"))?;
+        tracing::info!("migrations applied");
+    }
+
+    let bind_addr = config.bind_addr;
+    let state = AppState::new(db.clone(), config).with_registry(registry);
+    // Flipped to `true` on Ctrl-C/SIGTERM, or when one part stops, so the
+    // other parts stop too.
+    let stop = Arc::new(watch::channel(false).0);
+    let mut parts: JoinSet<Result<(), String>> = JoinSet::new();
+
+    if role.api() {
+        let app = campbooks_server::router(state.clone());
+        let listener = tokio::net::TcpListener::bind(bind_addr)
+            .await
+            .map_err(|e| format!("could not bind {bind_addr}: {e}"))?;
+        tracing::info!(addr = %bind_addr, version = env!("CARGO_PKG_VERSION"), "campbooks-server listening");
+        let stopped = stopped(&stop);
+        parts.spawn(async move {
+            axum::serve(listener, app)
+                .with_graceful_shutdown(stopped)
+                .await
+                .map_err(|e| format!("http server failed: {e}"))
+        });
+    }
+    if role.worker() {
+        let worker = Worker::new(state);
+        let stopped = stopped(&stop);
+        parts.spawn(async move {
+            worker.run(stopped).await;
+            Ok(())
+        });
+    }
+
+    let signal = Arc::clone(&stop);
+    tokio::spawn(async move {
+        shutdown_signal().await;
+        signal.send_replace(true);
+    });
+
+    let mut result = Ok(());
+    while let Some(part) = parts.join_next().await {
+        if let Err(e) = part.map_err(|e| e.to_string()).and_then(|ended| ended) {
+            tracing::error!(error = %e, "stopping");
+            result = Err(e);
+        }
+        stop.send_replace(true);
+    }
+    db.close().await;
+    result?;
+    tracing::info!("shut down cleanly");
+    Ok(())
+}
+
+/// Resolves once `stop` is flipped.
+fn stopped(stop: &watch::Sender<bool>) -> impl Future<Output = ()> + Send + 'static {
+    let mut stop = stop.subscribe();
+    async move {
+        let _ = stop.wait_for(|stopped| *stopped).await;
+    }
+}
+
+async fn connect(config: &Config) -> Result<PgPool, String> {
+    PgPoolOptions::new()
+        .max_connections(config.database_max_connections)
+        .acquire_timeout(DB_ACQUIRE_TIMEOUT)
+        .connect(config.database_url.expose_secret())
+        .await
+        .map_err(|e| format!("could not connect to the database: {e}"))
+}
+
+/// `events replay <consumer> [--since …]`.
+fn replay(consumer: &str, since: Option<&str>) -> ExitCode {
+    let from = match parse_since(since) {
+        Ok(from) => from,
+        Err(e) => return fail(&e),
+    };
+    let config = match Config::from_env() {
+        Ok(config) => config,
+        Err(e) => return fail(&e.to_string()),
+    };
+    let registry = match campbooks_server::registry() {
+        Ok(registry) => registry,
+        Err(e) => return fail(&e.to_string()),
+    };
+    let runtime = match runtime() {
+        Ok(runtime) => runtime,
+        Err(e) => return fail(&e),
+    };
+    let replayed = runtime.block_on(async {
+        let db = connect(&config).await?;
+        let state = AppState::new(db.clone(), config).with_registry(registry);
+        let replayed = state
+            .events
+            .replay(&db, consumer, from)
+            .await
+            .map_err(|e| e.to_string());
+        db.close().await;
+        replayed
+    });
+    match replayed {
+        Ok(count) => {
+            let _ = writeln!(
+                std::io::stdout(),
+                "enqueued {count} delivery(ies) to `{consumer}`; a worker runs them"
+            );
+            ExitCode::SUCCESS
+        }
+        Err(e) => fail(&e),
+    }
+}
+
+/// `--since`: an event id or an RFC 3339 instant.
+fn parse_since(since: Option<&str>) -> Result<ReplayFrom, String> {
+    let Some(since) = since else {
+        return Ok(ReplayFrom::Beginning);
+    };
+    if let Ok(id) = since.parse::<EventId>() {
+        return Ok(ReplayFrom::Event(id));
+    }
+    chrono::DateTime::parse_from_rfc3339(since)
+        .map(|at| ReplayFrom::Time(at.to_utc()))
+        .map_err(|_| format!("--since {since}: expected an event id or an RFC 3339 time"))
+}
+
+fn check_api_config(config: &Config) -> Result<(), String> {
     config.auth.check()?;
     if let Some(issuer) = config.auth.issuer() {
         tracing::info!(
@@ -110,41 +312,12 @@ async fn run(config: Config) -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    if let Some(dir) = campbooks_server::web::configured_dir(&config) {
+    if let Some(dir) = campbooks_server::web::configured_dir(config) {
         campbooks_server::web::check_dir(dir)?;
         tracing::info!(dir = %dir.display(), "serving the web client");
     } else {
         tracing::info!("CAMPBOOKS_WEB_DIR unset: serving the API only");
     }
-
-    let db = PgPoolOptions::new()
-        .max_connections(config.database_max_connections)
-        .acquire_timeout(DB_ACQUIRE_TIMEOUT)
-        .connect(config.database_url.expose_secret())
-        .await
-        .map_err(|e| format!("could not connect to the database: {e}"))?;
-
-    if config.run_migrations {
-        sqlx::migrate!("../../migrations")
-            .run(&db)
-            .await
-            .map_err(|e| format!("migrations failed: {e}"))?;
-        tracing::info!("migrations applied");
-    }
-
-    let bind_addr = config.bind_addr;
-    let state = AppState::new(db.clone(), config);
-    let app = campbooks_server::router(state);
-    let listener = tokio::net::TcpListener::bind(bind_addr)
-        .await
-        .map_err(|e| format!("could not bind {bind_addr}: {e}"))?;
-    tracing::info!(addr = %bind_addr, version = env!("CARGO_PKG_VERSION"), "campbooks-server listening");
-
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
-    db.close().await;
-    tracing::info!("shut down cleanly");
     Ok(())
 }
 
@@ -188,7 +361,7 @@ async fn shutdown_signal() {
         () = ctrl_c => {},
         () = terminate => {},
     }
-    tracing::info!("shutdown signal received, draining connections");
+    tracing::info!("shutdown signal received, draining connections and jobs");
 }
 
 fn port_from_env() -> u16 {
@@ -226,4 +399,35 @@ fn fail(message: &str) -> ExitCode {
     // Best effort: if stderr is gone there is nowhere left to report to.
     let _ = writeln!(std::io::stderr(), "campbooks-server: {message}");
     ExitCode::FAILURE
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn since_accepts_an_event_id_or_a_time() {
+        assert_eq!(parse_since(None), Ok(ReplayFrom::Beginning));
+        let id = EventId::new();
+        assert_eq!(
+            parse_since(Some(&id.to_string())),
+            Ok(ReplayFrom::Event(id))
+        );
+        let Ok(ReplayFrom::Time(at)) = parse_since(Some("2026-10-01T12:00:00+02:00")) else {
+            panic!("an RFC 3339 time parses");
+        };
+        assert_eq!(at.to_rfc3339(), "2026-10-01T10:00:00+00:00");
+        assert!(
+            parse_since(Some("yesterday"))
+                .unwrap_err()
+                .contains("--since")
+        );
+    }
+
+    #[test]
+    fn roles() {
+        assert!(Role::All.api() && Role::All.worker());
+        assert!(Role::Api.api() && !Role::Api.worker());
+        assert!(!Role::Worker.api() && Role::Worker.worker());
+    }
 }

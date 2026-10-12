@@ -30,3 +30,30 @@ All notable changes to Campbooks Next are documented here. The format follows
 - `campbooks-server scopes` prints the API's scope catalogue as JSON, and the
   OpenAPI document declares a `bearer` security scheme and states every
   operation's security.
+- Durable background work. Domain events are written to a retained event log
+  in the same database transaction as the change they describe, and each
+  module that subscribes gets its own delivery job, so nothing is lost on a
+  restart. Jobs are retried with backoff, shared fairly between workspaces,
+  handed to another worker if theirs dies, and failed jobs are kept for
+  inspection. Everything lives in your Postgres (schema `kernel`); there is
+  no broker to run.
+- `campbooks-server` runs in roles: `all` (the API and the job worker in one
+  process, the default and what the image runs), `api` and `worker`, so
+  larger installs can scale the worker separately. `serve` still works as an
+  alias of `all`.
+- `campbooks-server events replay <consumer> [--since <time or event id>]`
+  delivers logged events to one consumer again.
+- New optional settings for the worker: `CAMPBOOKS_JOBS__CONCURRENCY`
+  (default 4 jobs at once per process), `CAMPBOOKS_JOBS__PER_WORKSPACE`
+  (2), `CAMPBOOKS_JOBS__POLL_INTERVAL_MS` (5000; new jobs also wake workers
+  at once), `CAMPBOOKS_JOBS__LEASE_SECONDS` (60),
+  `CAMPBOOKS_JOBS__RETENTION_HOURS` (168, how long succeeded jobs are kept),
+  `CAMPBOOKS_JOBS__SHUTDOWN_GRACE_SECONDS` (8),
+  `CAMPBOOKS_JOBS__RETRY_BASE_MS` (1000) and
+  `CAMPBOOKS_JOBS__RETRY_MAX_SECONDS` (3600).
+
+### Changed
+- The image's default command is now `all` instead of `serve` (same
+  behaviour plus the job worker). Each job the worker runs may hold a
+  database connection: keep `CAMPBOOKS_DATABASE_MAX_CONNECTIONS` (default 10)
+  above `CAMPBOOKS_JOBS__CONCURRENCY`.

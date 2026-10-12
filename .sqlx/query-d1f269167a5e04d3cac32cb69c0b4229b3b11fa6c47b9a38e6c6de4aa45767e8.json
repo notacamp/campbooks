@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO kernel.schedules (name, last_tick)\n            VALUES ($1, floor(extract(epoch FROM now())::float8 / $2::float8)::bigint)\n            ON CONFLICT (name) DO UPDATE\n               SET last_tick = excluded.last_tick, updated_at = now()\n             WHERE kernel.schedules.last_tick < excluded.last_tick\n            RETURNING last_tick\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "last_tick",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "kernel.schedules",
+            "name": "last_tick"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d1f269167a5e04d3cac32cb69c0b4229b3b11fa6c47b9a38e6c6de4aa45767e8"
+}
