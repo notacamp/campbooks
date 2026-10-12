@@ -1,6 +1,6 @@
 # 0008 — Typed core now, platform later, seams from day one
 
-**Status:** Proposed · 2026-10-12
+**Status:** Accepted · 2026-10-13
 
 ## Context
 Campbooks could be built two ways:
