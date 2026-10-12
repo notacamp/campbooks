@@ -1,6 +1,6 @@
 [package]
 name = "campbooks-server"
-description = "Campbooks API server: loads config, runs migrations, composes modules, serves OpenAPI."
+description = "Campbooks server: loads config, runs migrations, composes modules, serves the API and OpenAPI, runs the job worker."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,6 +16,7 @@ path = "src/main.rs"
 axum.workspace = true
 campbooks-kernel.workspace = true
 campbooks-system.workspace = true
+chrono.workspace = true
 clap.workspace = true
 secrecy.workspace = true
 serde.workspace = true

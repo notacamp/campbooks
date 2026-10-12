@@ -1,7 +1,8 @@
 //! `campbooks-server` — composes the modules into one HTTP API.
 //!
 //! This is the only crate that knows the full list of modules. Adding a module
-//! means adding one line to [`modules`].
+//! means adding one line to [`modules`]. Their background work (jobs, event
+//! handlers, schedules) is collected by [`registry`].
 
 #![forbid(unsafe_code)]
 
@@ -15,7 +16,11 @@ use axum::{
     http::{HeaderName, HeaderValue, Request, StatusCode, header},
     routing::get,
 };
-use campbooks_kernel::{AppState, Error, Module, Problem, auth::ScopeInfo};
+use campbooks_kernel::{
+    AppState, Error, Module, Problem,
+    auth::ScopeInfo,
+    jobs::{Registry, RegistryError},
+};
 use tower::ServiceBuilder;
 use tower_http::{
     compression::CompressionLayer,
@@ -56,6 +61,13 @@ pub const SECURITY_SCHEME: &str = "bearer";
 /// Every module, in mount order.
 pub fn modules() -> Vec<Module> {
     vec![campbooks_system::module()]
+}
+
+/// Every job kind, event handler and schedule of every module, plus the
+/// kernel's maintenance. Fails when a registration breaks a naming rule or
+/// is duplicated (also checked by `cargo xtask arch`).
+pub fn registry() -> Result<Registry, RegistryError> {
+    Registry::build(&modules())
 }
 
 /// Every OAuth scope the API knows, sorted by name: what
@@ -310,6 +322,12 @@ mod tests {
             })
             .collect::<Vec<_>>()
             .join("/")
+    }
+
+    #[test]
+    fn registry_builds() {
+        let registry = registry().unwrap();
+        assert!(registry.kind_names().contains(&"kernel.prune_jobs"));
     }
 
     #[test]

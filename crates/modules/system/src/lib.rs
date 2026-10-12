@@ -10,7 +10,7 @@
 
 #![forbid(unsafe_code)]
 
-use campbooks_kernel::Module;
+use campbooks_kernel::{Background, Module};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 mod features;
@@ -27,6 +27,7 @@ pub fn module() -> Module {
         router: OpenApiRouter::new()
             .routes(routes!(features::health::handler))
             .routes(routes!(features::version::handler)),
+        background: Background::new(),
     }
 }
 

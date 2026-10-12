@@ -20,7 +20,7 @@ use tower::ServiceExt;
 
 use crate::{
     AppState, Config, Module,
-    config::{AuthConfig, LogFormat},
+    config::{AuthConfig, JobsConfig, LogFormat},
 };
 
 /// A config pointing at `database_url`, everything else default (no
@@ -35,6 +35,7 @@ pub fn config(database_url: &str) -> Config {
         log_format: LogFormat::Pretty,
         web_dir: None,
         auth: AuthConfig::default(),
+        jobs: JobsConfig::default(),
     }
 }
 

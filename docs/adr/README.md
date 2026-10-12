@@ -16,5 +16,6 @@ it superseded. Disagree? Write a new ADR that supersedes the old one.
 | [0009](0009-decide-role-typed-decision-model.md) | The `decide` role is a typed decision model (Laya) | Accepted |
 | [0010](0010-connectors-and-change-streams.md) | Every outside source is a connector producing a change stream | Accepted |
 | [0011](0011-scaling-shape.md) | One binary in three roles; projections from an event log; blobs outside Postgres | Accepted |
+| [0012](0012-postgres-job-queue.md) | Our own Postgres job queue; events fan out to jobs at publish time | Accepted |
 
 Template: Context → Decision → Consequences → Alternatives considered.

@@ -29,8 +29,9 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Check crate dependency directions, migration names, versions, scope
-    /// names and that every OpenAPI operation declares its security.
+    /// Check crate dependency directions, migration names and the schemas
+    /// they touch, versions, scope and background-work names, and that every
+    /// OpenAPI operation declares its security.
     Arch,
     /// Write openapi/openapi.json from the server's routes.
     Openapi {
@@ -74,12 +75,32 @@ fn run_arch(root: &Path) -> Result<String> {
     .context("parsing architecture.toml")?;
 
     let migrations = migration_file_names(&root.join("migrations"))?;
+    let migration_sql = migrations
+        .iter()
+        .filter(|name| {
+            Path::new(name)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("sql"))
+        })
+        .map(|name| {
+            let path = root.join("migrations").join(name);
+            fs::read_to_string(&path)
+                .with_context(|| format!("reading {}", path.display()))
+                .map(|sql| (name.clone(), sql))
+        })
+        .collect::<Result<Vec<_>>>()?;
     let version = fs::read_to_string(root.join("VERSION")).context("reading VERSION")?;
 
     let mut violations = Vec::new();
     violations.extend(arch::check_allowlist(&arch_file.allow, &modules));
     violations.extend(arch::check_dependencies(&crates, &arch_file.allow));
     violations.extend(arch::check_migrations(&migrations, &modules));
+    violations.extend(arch::check_migration_schemas(&migration_sql, &modules));
+    let background = campbooks_server::registry()
+        .err()
+        .map(|e| e.0)
+        .unwrap_or_default();
+    violations.extend(arch::check_background(&background));
     violations.extend(arch::check_versions(&version, &crates));
 
     let scopes: Vec<arch::DeclaredScope> = campbooks_server::modules()

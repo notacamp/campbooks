@@ -28,18 +28,21 @@ Cargo.toml                 workspace (kernel, ai, server, crates/modules/*, xtas
 architecture.toml          module dependency allowlist, read by `cargo xtask arch`
 crates/
   kernel/                  campbooks-kernel — config, errors (problem+json), db pool,
-                           auth extractors, ids, clock, event bus, Module trait.
+                           auth extractors, ids, clock, durable event bus and job
+                           queue (schema `kernel`), Module trait.
                            Depends on NO internal crate.
   ai/                      campbooks-ai — role-based AI gateway: decide (typed decision
                            model, ADR 0009), embed/complete/vision (OpenAI-compatible
                            protocol). Depends on kernel only.
   server/                  campbooks-server — the binary. Loads config, runs migrations,
-                           composes modules into one router, serves OpenAPI and,
-                           when CAMPBOOKS_WEB_DIR is set, the built web client.
+                           composes modules into one router and one job registry,
+                           serves OpenAPI and, when CAMPBOOKS_WEB_DIR is set, the
+                           built web client; runs as `all`, `api` or `worker`.
   modules/
     system/                campbooks-system — health, version. The reference slice:
                            copy its shape for every new module.
-migrations/                <ts>_<module>__<desc>.sql, one Postgres schema per module
+migrations/                <ts>_<module>__<desc>.sql, one Postgres schema per module;
+                           <ts>_kernel__<desc>.sql for the kernel's `kernel` schema
 openapi/openapi.json       generated, committed; the contract for every client
 xtask/                     `cargo xtask arch | openapi [--check]`
 clients/                   pnpm workspace
@@ -60,7 +63,7 @@ A module is a Rust crate that hands the server one value:
 
 ```rust
 // crates/modules/<domain>/src/lib.rs
-pub fn module() -> campbooks_kernel::Module { … }   // name, router, OpenAPI, event handlers
+pub fn module() -> campbooks_kernel::Module { … }   // name, scopes, router, background work
 ```
 
 Inside it, code is sliced **by use case**, not by layer:
@@ -82,7 +85,10 @@ through the kernel (types, events) — `cargo xtask arch` enforces it.
 
 Every module owns a Postgres schema of its own name and touches nothing else.
 Other modules' records are referenced by ID only (no cross-schema foreign
-keys or joins). A read that needs data from two modules is composed in the
+keys or joins). The one schema that belongs to no module is `kernel`: the
+event log and the job queue (ADR 0012), written only through the kernel's
+API. `cargo xtask arch` checks that each migration touches only its owner's
+schema. A read that needs data from two modules is composed in the
 client, or by subscribing to the other module's events and keeping a local
 projection.
 
@@ -103,12 +109,52 @@ catalogue the IdP mirrors. Module tests sign their own tokens with
 
 ### Cross-module communication
 
-1. **Events (default).** A module publishes typed domain events on the kernel
-   event bus (in-process today; durable via the job queue later). Others
-   subscribe.
+1. **Events (default).** A module declares its events as `DomainEvent` types
+   (`NAME` = `<module>.<event>`, an explicit schema `VERSION`, the
+   `workspace` they belong to) and publishes them **in the transaction that
+   makes the change**: `state.events.publish(&mut tx, &event)`. That writes
+   the event to the retained log `kernel.events` and one job per registered
+   consumer to `kernel.jobs` (fan-out at publish time), so an event exists
+   exactly when its change does, and every consumer runs it at least once,
+   even across restarts. A consumer is an `EventHandler` type named
+   `<module>.<handler>`, registered in the module's `background`
+   (`Background::new().on_event::<H>()`). Its database work goes through
+   `ctx.tx()`, which carries the workspace (`campbooks.workspace_id`) and
+   commits together with the delivery being marked done. To rebuild a
+   projection, `campbooks-server events replay <consumer> --since …`
+   re-delivers logged events.
 2. **Allowlisted dependency (exception).** If a module truly needs another's
    API, add `[[allow]] from = "x" to = "y" reason = "…"` to
    `architecture.toml`. Reviewed like an ADR.
+
+### Background work
+
+Anything that should not run inside a request — provider sync, the AI pass,
+projections, maintenance — is a `Job` type (`NAME` = `<module>.<job>`, a
+`QUEUE`, `MAX_ATTEMPTS`) registered with `.job::<J>()` and enqueued in a
+transaction with `jobs::enqueue(&mut tx, &job, options)`. Options give it a
+workspace, a delay, a priority, a `unique_key` (at most one unfinished job per
+key) or an `ordering_key` (jobs sharing it run one at a time, in order).
+Recurring work is `.schedule::<J>(every)`; each tick runs once however many
+workers run. A handler returns `JobError::Retry` (backoff with jitter) or
+`JobError::Fatal` (marked failed and kept for inspection). Workers claim jobs
+fairly across workspaces, lease them while they run, and reclaim jobs whose
+worker died. The design and its trade-offs are ADR 0012.
+
+### Process roles
+
+One binary, `campbooks-server`, runs as:
+
+| Command | Runs | Use |
+| --- | --- | --- |
+| `all` (default) | API + job worker | self-hosting, development; what the image runs |
+| `api` | HTTP API, BFF, web client | scale on requests |
+| `worker` | event deliveries, jobs, schedules | scale on queue depth |
+
+Any number of `api` and `worker` processes share one database. The worker is
+tuned with `CAMPBOOKS_JOBS__*` (concurrency, per-workspace limit, poll
+interval, lease, retention, shutdown grace, retry backoff). A third role,
+`sync`, arrives with the connectors (ADR 0011).
 
 ## Clients
 
@@ -135,4 +181,4 @@ The module list, each module's language, how they talk and the order they
 ship in are in [`domain-map.md`](domain-map.md). How the system scales — one
 binary in `api`/`worker`/`sync` roles, connectors producing change streams,
 projections from the event log, blobs in object storage, and the platform
-seams every module declares — is in ADRs 0008, 0010 and 0011.
+seams every module declares — is in ADRs 0008, 0010, 0011 and 0012.
