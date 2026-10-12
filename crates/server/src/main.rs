@@ -64,6 +64,11 @@ enum Command {
     /// Print the OAuth scope catalogue as JSON (`[{name, description}]`), for
     /// the identity provider's bootstrap to mirror.
     Scopes,
+    /// Print the declarations catalogue as JSON: every module's record types,
+    /// actions (scope, mutates, undo, shortcut, label key, schemas) and
+    /// events. Clients generate their shortcut registry and command menu
+    /// from it.
+    Declarations,
     /// Exit 0 if the local server reports healthy, 1 otherwise. For container
     /// health checks (the runtime image has no shell or curl).
     Healthcheck {
@@ -117,6 +122,10 @@ fn main() -> ExitCode {
         } => replay(&consumer, since.as_deref()),
         Command::Openapi => print_json(&campbooks_server::openapi(), "OpenAPI document"),
         Command::Scopes => print_json(&campbooks_server::scope_catalogue(), "scope catalogue"),
+        Command::Declarations => match campbooks_server::catalogue() {
+            Ok(catalogue) => print_json(&catalogue, "declarations catalogue"),
+            Err(e) => fail(&e.to_string()),
+        },
         Command::Healthcheck { port } => healthcheck(port.unwrap_or_else(port_from_env)),
     }
 }
@@ -166,6 +175,7 @@ async fn run(config: Config, role: Role) -> Result<(), Box<dyn std::error::Error
         config.jobs.check()?;
     }
     let registry = campbooks_server::registry()?;
+    campbooks_server::catalogue()?;
     let db = connect(&config).await?;
     if config.run_migrations {
         sqlx::migrate!("../../migrations")

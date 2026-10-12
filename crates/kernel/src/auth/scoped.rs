@@ -47,20 +47,39 @@ where
     type Rejection = Error;
 
     async fn from_request_parts(parts: &mut Parts, state: &St) -> Result<Self, Self::Rejection> {
-        let verifier = TokenVerifier::from_ref(state);
-        if !verifier.is_configured() {
-            return Err(Error::Unauthorized(AuthFailure::NotConfigured));
-        }
-        let token = bearer_token(&parts.headers)?;
-        let principal = verifier.verify(token).await?;
-        if !principal.has_scope(S::NAME) {
-            return Err(Error::InsufficientScope(S::NAME));
-        }
+        let principal = authorize(&parts.headers, &TokenVerifier::from_ref(state), S::NAME).await?;
         Ok(Self {
             principal,
             scope: PhantomData,
         })
     }
+}
+
+/// What [`Scoped<S>`] does, for a scope known only at run time (the action
+/// registry's generated endpoints): authenticate the request's bearer token
+/// and require `scope`, with the same 401/403 answers.
+pub(crate) async fn authorize(
+    headers: &HeaderMap,
+    verifier: &TokenVerifier,
+    scope: &'static str,
+) -> Result<Principal, Error> {
+    let principal = authenticate(headers, verifier).await?;
+    if !principal.has_scope(scope) {
+        return Err(Error::InsufficientScope(scope));
+    }
+    Ok(principal)
+}
+
+/// The principal of the request's valid bearer token, whatever its scopes.
+pub(crate) async fn authenticate(
+    headers: &HeaderMap,
+    verifier: &TokenVerifier,
+) -> Result<Principal, Error> {
+    if !verifier.is_configured() {
+        return Err(Error::Unauthorized(AuthFailure::NotConfigured));
+    }
+    let token = bearer_token(headers)?;
+    verifier.verify(token).await
 }
 
 /// The token of the request's single `Authorization: Bearer <token>` header.

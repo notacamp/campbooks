@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO kernel.idempotency_keys\n            (principal, key, action, workspace_id, request_hash, expires_at)\n        VALUES ($1, $2, $3, $4, sha256(convert_to($5, 'UTF8')),\n                now() + make_interval(secs => $6))\n        ON CONFLICT (principal, key) DO NOTHING\n        RETURNING true AS \"claimed!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "claimed!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "bd00fa4425c2a34104730892f6961b6bba59caf1263abd26653ba9fb7ddcca11"
+}

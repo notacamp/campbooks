@@ -2,7 +2,9 @@
 //!
 //! This is the only crate that knows the full list of modules. Adding a module
 //! means adding one line to [`modules`]. Their background work (jobs, event
-//! handlers, schedules) is collected by [`registry`].
+//! handlers, schedules) is collected by [`registry`]; their declarations
+//! (record types, actions, events) by [`catalogue`], and each declared action
+//! gets a generated endpoint under `/api/v1/actions/`.
 
 #![forbid(unsafe_code)]
 
@@ -19,6 +21,7 @@ use axum::{
 use campbooks_kernel::{
     AppState, Error, Module, Problem,
     auth::ScopeInfo,
+    declare::{self, Catalogue, DeclarationError},
     jobs::{Registry, RegistryError},
 };
 use tower::ServiceBuilder;
@@ -56,7 +59,7 @@ pub const SECURITY_HEADERS: [(HeaderName, &str); 3] = [
 
 /// Name of the OpenAPI security scheme every scoped operation references:
 /// `security(("bearer" = ["<scope>"]))`.
-pub const SECURITY_SCHEME: &str = "bearer";
+pub const SECURITY_SCHEME: &str = campbooks_kernel::auth::SECURITY_SCHEME;
 
 /// Every module, in mount order.
 pub fn modules() -> Vec<Module> {
@@ -68,6 +71,14 @@ pub fn modules() -> Vec<Module> {
 /// is duplicated (also checked by `cargo xtask arch`).
 pub fn registry() -> Result<Registry, RegistryError> {
     Registry::build(&modules())
+}
+
+/// Every record type, action and event of every module: what
+/// `campbooks-server declarations` prints (committed as
+/// `openapi/declarations.json`). Fails when a declaration breaks a naming or
+/// consistency rule (also checked by `cargo xtask arch`).
+pub fn catalogue() -> Result<Catalogue, DeclarationError> {
+    Catalogue::build(&modules())
 }
 
 /// Every OAuth scope the API knows, sorted by name: what
@@ -124,14 +135,21 @@ fn api() -> OpenApiRouter<AppState> {
     doc.components
         .get_or_insert_with(Default::default)
         .add_security_scheme(SECURITY_SCHEME, security_scheme());
-    modules()
+    let modules = modules();
+    let actions = declare::http::routes(
+        modules
+            .iter()
+            .flat_map(|module| module.declarations.actions()),
+    );
+    modules
         .into_iter()
         .fold(OpenApiRouter::with_openapi(doc), |api, module| {
             api.merge(module.router)
         })
+        .merge(actions)
 }
 
-/// The OpenAPI document for every module's routes.
+/// The OpenAPI document for every module's routes and declared actions.
 pub fn openapi() -> utoipa::openapi::OpenApi {
     api().into_openapi()
 }
@@ -231,6 +249,59 @@ mod tests {
             "system_version"
         );
         assert!(spec["components"]["schemas"]["Problem"].is_object());
+    }
+
+    #[test]
+    fn openapi_lists_every_declared_action() {
+        let spec = serde_json::to_value(openapi()).unwrap();
+        let catalogue = catalogue().unwrap();
+        assert!(catalogue.actions.iter().any(|a| a.name == "system.whoami"));
+        for action in &catalogue.actions {
+            let operation = &spec["paths"][&action.path]["post"];
+            assert_eq!(
+                operation["operationId"], action.operation_id,
+                "{}",
+                action.name
+            );
+            assert_eq!(
+                operation["security"],
+                serde_json::json!([{ SECURITY_SCHEME: [action.scope] }]),
+                "{}",
+                action.name
+            );
+            for schema in [&action.input, &action.output] {
+                let name = serde_json::to_value(schema).unwrap()["$ref"]
+                    .as_str()
+                    .unwrap()
+                    .trim_start_matches("#/components/schemas/")
+                    .to_owned();
+                assert!(spec["components"]["schemas"][&name].is_object(), "{name}");
+            }
+        }
+    }
+
+    #[test]
+    fn operation_ids_are_unique() {
+        let spec = serde_json::to_value(openapi()).unwrap();
+        let mut ids: Vec<&str> = spec["paths"]
+            .as_object()
+            .unwrap()
+            .values()
+            .flat_map(|item| item.as_object().unwrap().values())
+            .filter_map(|operation| operation["operationId"].as_str())
+            .collect();
+        let count = ids.len();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), count);
+    }
+
+    #[test]
+    fn catalogue_builds_and_names_are_module_prefixed() {
+        let catalogue = catalogue().unwrap();
+        for action in &catalogue.actions {
+            assert!(action.name.starts_with(&format!("{}.", action.module)));
+        }
     }
 
     #[test]

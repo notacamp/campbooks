@@ -11,7 +11,9 @@ use serde_json::Value;
 use super::{Job, JobContext, JobError, PruneJobs};
 use crate::{
     Module,
+    declare::PruneActions,
     events::{DomainEvent, Event, EventHandler, EventId},
+    names::{check_owned_name, is_dotted, is_snake},
 };
 
 pub(crate) type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -233,7 +235,8 @@ pub struct RegistryError(pub Vec<String>);
 /// Owner name of the kernel's own background work.
 pub const KERNEL_OWNER: &str = "kernel";
 
-/// How often the kernel prunes succeeded jobs.
+/// How often the kernel prunes succeeded jobs, expired idempotency keys and
+/// expired undo tokens.
 pub const PRUNE_EVERY: Duration = Duration::from_hours(1);
 
 impl Registry {
@@ -242,7 +245,9 @@ impl Registry {
     /// module and unique; queues lower-case snake case; attempts at least
     /// one; schedules at least a second apart.
     pub fn build(modules: &[Module]) -> Result<Self, RegistryError> {
-        let kernel = Background::new().schedule::<PruneJobs>(PRUNE_EVERY);
+        let kernel = Background::new()
+            .schedule::<PruneJobs>(PRUNE_EVERY)
+            .schedule::<PruneActions>(PRUNE_EVERY);
         let owners = std::iter::once((KERNEL_OWNER, &kernel))
             .chain(modules.iter().map(|m| (m.name, &m.background)));
 
@@ -407,24 +412,4 @@ impl Registry {
     pub(crate) fn schedules(&self) -> &[ScheduleInfo] {
         &self.schedules
     }
-}
-
-fn check_owned_name(owner: &str, name: &str) -> Result<(), String> {
-    match name.split_once('.') {
-        Some((prefix, rest)) if prefix == owner && is_snake(rest) => Ok(()),
-        _ => Err(format!(
-            "must be `{owner}.<name>` (lower-case snake case), named after its module"
-        )),
-    }
-}
-
-fn is_dotted(name: &str) -> bool {
-    name.split_once('.')
-        .is_some_and(|(a, b)| is_snake(a) && is_snake(b))
-}
-
-fn is_snake(s: &str) -> bool {
-    s.starts_with(|c: char| c.is_ascii_lowercase())
-        && s.chars()
-            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }

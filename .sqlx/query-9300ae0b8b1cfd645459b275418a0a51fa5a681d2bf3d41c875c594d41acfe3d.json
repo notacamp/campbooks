@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE kernel.idempotency_keys SET response = $3 WHERE principal = $1 AND key = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9300ae0b8b1cfd645459b275418a0a51fa5a681d2bf3d41c875c594d41acfe3d"
+}

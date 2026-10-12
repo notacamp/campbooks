@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM kernel.idempotency_keys\n                  WHERE (principal, key) IN (\n                      SELECT principal, key FROM kernel.idempotency_keys\n                       WHERE expires_at <= now() LIMIT $1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "587877f9ce9c8399aa2a32fcccc9e1ac25b379ebf8ca576f89154499ff40b2d5"
+}

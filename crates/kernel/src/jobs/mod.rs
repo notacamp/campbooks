@@ -130,9 +130,10 @@ impl From<sqlx::Error> for JobError {
 impl From<crate::Error> for JobError {
     fn from(err: crate::Error) -> Self {
         match err {
-            crate::Error::NotFound | crate::Error::BadRequest(_) | crate::Error::Forbidden => {
-                Self::fatal(err.to_string())
-            }
+            crate::Error::NotFound
+            | crate::Error::BadRequest(_)
+            | crate::Error::Unprocessable(_)
+            | crate::Error::Forbidden => Self::fatal(err.to_string()),
             other => Self::retry(other.to_string()),
         }
     }

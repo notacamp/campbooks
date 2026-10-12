@@ -58,6 +58,19 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
   an explicit `VERSION`. Job payloads hold ids, never secrets or message
   bodies, and `JobError` messages never carry secrets. *(Startup and
   `cargo xtask arch` reject misnamed or duplicate registrations.)*
+- **Modules declare what they have** (ADR 0008). What a caller can *do* is an
+  **action**, declared in the module's `Module.declarations` with the
+  kernel's `Action` builder: named `<module>.<verb>`, with a scope, typed
+  input and output (`ToSchema`), whether it mutates, optional undo and an
+  optional default shortcut. The server generates its endpoint
+  (`POST /api/v1/actions/<name>`), and `campbooks-server declarations`
+  prints the catalogue clients and tools generate from, committed as
+  `openapi/declarations.json`. Record types (`RecordType`,
+  `<module>.<record>`, pointed at with `RecordRef`) and the events a module
+  publishes (`.event::<E>()`) are declared there too. *(Startup and
+  `cargo xtask arch` reject misnamed, duplicate or inconsistent declarations,
+  and any action no test of its module calls by name; CI:
+  `cargo xtask declarations --check`.)*
 - **Every HTTP endpoint is in the OpenAPI document** (`utoipa`), which is
   generated to `openapi/openapi.json` and committed. *(CI: `cargo xtask openapi --check`.)*
 - **Errors are RFC 9457 problem+json** via `kernel::Error`. Permission failures
@@ -67,6 +80,36 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
   `lib/` never imports `modules/`. *(CI: dependency-cruiser.)*
 - **Clients never hand-write API types**; they come from `openapi/openapi.json`.
   *(CI: `pnpm api:check`.)*
+
+## Adding an action
+
+1. In the feature slice (`crates/modules/<m>/src/features/<feature>/mod.rs`),
+   define the input and output types (`Serialize`, `Deserialize`,
+   `ToSchema`; give them names unique across the API) and the handler,
+   `async fn(ActionContext, Input) -> Result<Output>`. Write through
+   `ctx.tx()` and publish the action's events on that transaction.
+2. Declare it next to the handler and list it in the module's
+   `Declarations` (`.action(features::<feature>::action())`):
+   ```rust
+   pub fn action() -> ActionDecl {
+       Action::<ArchiveInput, ArchiveOutput>::new("conversations.archive")
+           .describe("Archive a conversation: it leaves the inbox until something new arrives.")
+           .scope::<ConversationsWrite>() // one of the module's own scopes
+           .undoable(unarchive)           // or .mutates() if it cannot be undone
+           .shortcut("e")
+           .handler(archive)
+   }
+   ```
+   An undoable handler returns `Undoable<Output, U>`: `U` (ids and prior
+   state, never secrets) is what `unarchive(ctx, U)` gets back.
+3. Test it through its endpoint by name:
+   `testing::call_action(&app, "conversations.archive", Some(&token), &input)`.
+4. Run `cargo xtask openapi`, `cargo xtask declarations` and
+   `pnpm --dir clients api:generate`, and commit the results. Add the label
+   key (`<module>:actions.<verb>`) to the module's client i18n files when
+   the client shows the action.
+
+Never rename an action, record type or event: their names are wire contracts.
 
 ## Security rules
 

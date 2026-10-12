@@ -123,6 +123,7 @@ fn module(background: Background) -> Module {
         scopes: &[],
         router: OpenApiRouter::new(),
         background,
+        declarations: crate::Declarations::new(),
     }
 }
 
@@ -908,8 +909,8 @@ async fn enqueue_notifications_wake_an_idle_worker(db: PgPool) {
         enqueued_at.elapsed()
     );
     stop.send(()).unwrap();
-    // The probe, and the kernel's prune scheduled at start-up.
-    assert_eq!(worker.await.unwrap().succeeded, 2);
+    // The probe, and the kernel's two prunes scheduled at start-up.
+    assert_eq!(worker.await.unwrap().succeeded, 3);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -950,8 +951,8 @@ async fn shutdown_finishes_quick_jobs_and_releases_slow_ones(db: PgPool) {
 
     stop.send(()).unwrap();
     let stats = worker.await.unwrap();
-    // The quick probe and the kernel's prune scheduled at start-up.
-    assert_eq!((stats.succeeded, stats.released), (2, 1));
+    // The quick probe and the kernel's two prunes scheduled at start-up.
+    assert_eq!((stats.succeeded, stats.released), (3, 1));
     assert_eq!(job(&db, quick).await.state, "succeeded");
     let slow = job(&db, slow).await;
     assert_eq!((slow.state.as_str(), slow.attempts), ("pending", 0));
@@ -979,13 +980,17 @@ fn registry_collects_kernel_and_module_work() {
     assert_eq!(
         registry.kind_names(),
         [
+            "kernel.prune_actions",
             "kernel.prune_jobs",
             "test.count_a",
             "test.count_b",
             "test.probe"
         ]
     );
-    assert_eq!(registry.schedule_names(), ["kernel.prune_jobs"]);
+    assert_eq!(
+        registry.schedule_names(),
+        ["kernel.prune_jobs", "kernel.prune_actions"]
+    );
     assert_eq!(registry.queues(), ["default", "events", "maintenance"]);
     let consumers: Vec<_> = registry
         .consumers_of("test.pinged")

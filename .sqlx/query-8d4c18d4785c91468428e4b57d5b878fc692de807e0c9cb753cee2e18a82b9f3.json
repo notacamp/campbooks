@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM kernel.idempotency_keys\n          WHERE principal = $1 AND key = $2 AND expires_at <= now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8d4c18d4785c91468428e4b57d5b878fc692de807e0c9cb753cee2e18a82b9f3"
+}

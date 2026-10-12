@@ -1,0 +1,39 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT action = $3\n                   AND workspace_id IS NOT DISTINCT FROM $4\n                   AND request_hash = sha256(convert_to($5, 'UTF8')) AS \"same!\",\n               response\n          FROM kernel.idempotency_keys\n         WHERE principal = $1 AND key = $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "same!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "response",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "kernel.idempotency_keys",
+            "name": "response"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      true
+    ]
+  },
+  "hash": "ac7fcf6eff8b3be80f8afd043bd8a9500859f755215d112e5e7ccd5f008f6ab1"
+}

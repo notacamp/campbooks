@@ -11,7 +11,7 @@ use std::time::Duration;
 use axum::{
     Router,
     body::Body,
-    http::{Request, StatusCode, header},
+    http::{HeaderMap, Request, StatusCode, header},
 };
 use http_body_util::BodyExt;
 use secrecy::SecretString;
@@ -53,9 +53,11 @@ pub fn unreachable_pool() -> PgPool {
         .unwrap_or_else(|e| unreachable!("static URL parses: {e}"))
 }
 
-/// A module's routes as a plain router over `state`.
+/// A module's routes, and the endpoints of its declared actions, as a plain
+/// router over `state`.
 pub fn app(module: Module, state: AppState) -> Router {
-    module.router.with_state(state).into()
+    let actions = crate::declare::http::routes(module.declarations.actions());
+    module.router.merge(actions).with_state(state).into()
 }
 
 /// A response, read to the end.
@@ -65,6 +67,8 @@ pub struct TestResponse {
     pub status: StatusCode,
     /// `Content-Type` header, if any.
     pub content_type: Option<String>,
+    /// Every response header.
+    pub headers: HeaderMap,
     /// Body parsed as JSON (`Null` when empty or not JSON).
     pub json: serde_json::Value,
 }
@@ -77,6 +81,26 @@ pub async fn get(app: &Router, uri: &str) -> TestResponse {
     send(app, request).await
 }
 
+/// `POST /api/v1/actions/<name>` against `app` with `input` as the JSON body
+/// and, when given, `token` as the bearer token: how a test calls a declared
+/// action by its name (which `cargo xtask arch` looks for).
+pub async fn call_action(
+    app: &Router,
+    name: &str,
+    token: Option<&str>,
+    input: &serde_json::Value,
+) -> TestResponse {
+    let mut request = Request::post(format!("{}/{name}", crate::declare::http::ACTIONS_PATH))
+        .header(header::CONTENT_TYPE, "application/json");
+    if let Some(token) = token {
+        request = request.header(header::AUTHORIZATION, format!("Bearer {token}"));
+    }
+    let request = request
+        .body(Body::from(input.to_string()))
+        .unwrap_or_else(|e| unreachable!("POST request builds: {e}"));
+    send(app, request).await
+}
+
 /// Send any request through `app` in-process.
 pub async fn send(app: &Router, request: Request<Body>) -> TestResponse {
     let response = match app.clone().oneshot(request).await {
@@ -84,8 +108,8 @@ pub async fn send(app: &Router, request: Request<Body>) -> TestResponse {
         Err(never) => match never {},
     };
     let status = response.status();
-    let content_type = response
-        .headers()
+    let headers = response.headers().clone();
+    let content_type = headers
         .get(header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .map(ToOwned::to_owned);
@@ -99,6 +123,7 @@ pub async fn send(app: &Router, request: Request<Body>) -> TestResponse {
     TestResponse {
         status,
         content_type,
+        headers,
         json,
     }
 }

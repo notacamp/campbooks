@@ -2,14 +2,18 @@
 //!
 //! - `cargo xtask arch` enforces the architecture rules in `AGENTS.md`.
 //! - `cargo xtask openapi [--check]` regenerates (or verifies) `openapi/openapi.json`.
+//! - `cargo xtask declarations [--check]` regenerates (or verifies)
+//!   `openapi/declarations.json`, the catalogue of module declarations.
 
 #![forbid(unsafe_code)]
 
 mod arch;
+mod declarations;
+mod generated;
 mod openapi;
 
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fs,
     io::Write as _,
     path::{Path, PathBuf},
@@ -30,12 +34,20 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Check crate dependency directions, migration names and the schemas
-    /// they touch, versions, scope and background-work names, and that every
-    /// OpenAPI operation declares its security.
+    /// they touch, versions, scope, background-work and declaration names,
+    /// that every OpenAPI operation declares its security, and that every
+    /// declared action has a scope, schemas and a test.
     Arch,
     /// Write openapi/openapi.json from the server's routes.
     Openapi {
         /// Fail if the committed document is stale instead of writing it.
+        #[arg(long)]
+        check: bool,
+    },
+    /// Write openapi/declarations.json (record types, actions, events) from
+    /// the modules' declarations.
+    Declarations {
+        /// Fail if the committed catalogue is stale instead of writing it.
         #[arg(long)]
         check: bool,
     },
@@ -47,6 +59,7 @@ fn main() -> ExitCode {
     let result = match cli.command {
         Command::Arch => run_arch(&root),
         Command::Openapi { check } => openapi::run(&root, check),
+        Command::Declarations { check } => declarations::run(&root, check),
     };
     match result {
         Ok(message) => {
@@ -94,6 +107,7 @@ fn run_arch(root: &Path) -> Result<String> {
     let mut violations = Vec::new();
     violations.extend(arch::check_allowlist(&arch_file.allow, &modules));
     violations.extend(arch::check_dependencies(&crates, &arch_file.allow));
+    violations.extend(arch::check_reserved_module_names(&modules));
     violations.extend(arch::check_migrations(&migrations, &modules));
     violations.extend(arch::check_migration_schemas(&migration_sql, &modules));
     let background = campbooks_server::registry()
@@ -121,16 +135,39 @@ fn run_arch(root: &Path) -> Result<String> {
         arch::check_operation_security(&spec, campbooks_server::SECURITY_SCHEME, &catalogue);
     violations.extend(operations);
 
+    let mut actions = Vec::new();
+    match campbooks_server::catalogue() {
+        Ok(declared) => {
+            let json = serde_json::to_value(&declared).context("serializing the catalogue")?;
+            violations.extend(arch::check_action_entries(&json, &catalogue));
+            actions = declared
+                .actions
+                .iter()
+                .map(|a| (a.module.to_owned(), a.name.to_owned()))
+                .collect();
+        }
+        Err(e) => violations.extend(arch::check_declarations(&e.0)),
+    }
+    let tests = modules
+        .iter()
+        .map(|module| {
+            module_test_code(&root.join("crates/modules").join(module))
+                .map(|code| (module.clone(), code))
+        })
+        .collect::<Result<BTreeMap<_, _>>>()?;
+    violations.extend(arch::check_action_tests(&actions, &tests));
+
     if violations.is_empty() {
         let modules: Vec<_> = modules.iter().map(String::as_str).collect();
         return Ok(format!(
             "architecture OK: {} crates, {} module(s) [{}], {} migration(s), {} scope(s), \
-             every operation declares its security",
+             {} action(s), every operation declares its security, every action is tested",
             crates.len(),
             modules.len(),
             modules.join(", "),
             migrations.len(),
-            scopes.len()
+            scopes.len(),
+            actions.len()
         ));
     }
     let list: Vec<String> = violations.iter().map(|v| format!("  - {v}")).collect();
@@ -189,4 +226,31 @@ fn migration_file_names(dir: &Path) -> Result<Vec<String>> {
     }
     names.sort();
     Ok(names)
+}
+
+/// The test code of every `.rs` file under a module's crate directory.
+fn module_test_code(dir: &Path) -> Result<String> {
+    let mut code = String::new();
+    let mut pending = vec![dir.to_path_buf()];
+    while let Some(current) = pending.pop() {
+        for entry in
+            fs::read_dir(&current).with_context(|| format!("reading {}", current.display()))?
+        {
+            let path = entry?.path();
+            if path.is_dir() {
+                pending.push(path);
+            } else if path.extension().is_some_and(|ext| ext == "rs") {
+                let source = fs::read_to_string(&path)
+                    .with_context(|| format!("reading {}", path.display()))?;
+                let rel = path
+                    .strip_prefix(dir)
+                    .unwrap_or(&path)
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                code.push_str(arch::test_code(&rel, &source));
+                code.push('\n');
+            }
+        }
+    }
+    Ok(code)
 }

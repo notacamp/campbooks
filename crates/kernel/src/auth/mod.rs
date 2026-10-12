@@ -32,7 +32,12 @@ use std::{borrow::Borrow, collections::BTreeSet};
 use serde::{Deserialize, Serialize};
 
 pub use scoped::Scoped;
+pub(crate) use scoped::{authenticate, authorize};
 pub use verifier::TokenVerifier;
+
+/// Name of the OpenAPI security scheme every scoped operation references:
+/// `security(("bearer" = ["<scope>"]))`.
+pub const SECURITY_SCHEME: &str = "bearer";
 
 /// An OAuth scope a token carries, e.g. `mail:read`.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

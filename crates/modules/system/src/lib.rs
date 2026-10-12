@@ -1,4 +1,4 @@
-//! `campbooks-system` — instance health and version.
+//! `campbooks-system` — instance health and version, and who the caller is.
 //!
 //! This is the **reference vertical slice**: copy its shape for every new
 //! module. `lib.rs` only assembles [`module`]; each use case lives in its own
@@ -7,10 +7,15 @@
 //! the OpenAPI document by construction, and each one states its security:
 //! a scope from [`scopes`] (`security(("bearer" = ["system:read"]))` plus the
 //! `Scoped<SystemRead>` extractor), or explicitly public (`security(())`).
+//!
+//! What a caller can *do* is declared as an action instead (ADR 0008):
+//! `features/whoami` declares `system.whoami` with the kernel's `Action`
+//! builder, and the server generates its endpoint, OpenAPI operation and
+//! catalogue entry.
 
 #![forbid(unsafe_code)]
 
-use campbooks_kernel::{Background, Module};
+use campbooks_kernel::{Background, Declarations, Module};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 mod features;
@@ -28,6 +33,7 @@ pub fn module() -> Module {
             .routes(routes!(features::health::handler))
             .routes(routes!(features::version::handler)),
         background: Background::new(),
+        declarations: Declarations::new().action(features::whoami::action()),
     }
 }
 

@@ -8,16 +8,19 @@
 pub mod auth;
 pub mod clock;
 pub mod config;
+pub mod declare;
 pub mod error;
 pub mod events;
 pub mod ids;
 pub mod jobs;
 pub mod module;
+mod names;
 pub mod state;
 #[cfg(any(test, feature = "test-util"))]
 pub mod testing;
 
 pub use config::Config;
+pub use declare::{Action, ActionContext, Declarations, RecordRef, RecordType};
 pub use error::{Error, Problem, Result};
 pub use events::{DomainEvent, Event, EventBus, EventHandler};
 pub use jobs::{Background, Job, JobContext, JobError};

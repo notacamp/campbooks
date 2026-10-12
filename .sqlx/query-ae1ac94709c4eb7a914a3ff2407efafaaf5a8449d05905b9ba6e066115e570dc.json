@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM kernel.undo_tokens\n                  WHERE token_hash IN (\n                      SELECT token_hash FROM kernel.undo_tokens\n                       WHERE expires_at <= now() LIMIT $1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ae1ac94709c4eb7a914a3ff2407efafaaf5a8449d05905b9ba6e066115e570dc"
+}

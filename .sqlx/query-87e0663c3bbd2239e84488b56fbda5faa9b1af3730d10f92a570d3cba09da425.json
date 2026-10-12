@@ -1,0 +1,39 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH token AS (SELECT gen_random_uuid()::text AS value),\n        issued AS (\n            INSERT INTO kernel.undo_tokens\n                (token_hash, action, principal, workspace_id, payload, expires_at)\n            SELECT sha256(convert_to(token.value, 'UTF8')), $1, $2, $3, $4,\n                   now() + make_interval(secs => $5)\n              FROM token\n            RETURNING expires_at\n        )\n        SELECT token.value AS \"token!\", issued.expires_at AS \"expires_at!\"\n          FROM token, issued\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "token!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "expires_at!",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "kernel.undo_tokens",
+            "name": "expires_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      null,
+      false
+    ]
+  },
+  "hash": "87e0663c3bbd2239e84488b56fbda5faa9b1af3730d10f92a570d3cba09da425"
+}

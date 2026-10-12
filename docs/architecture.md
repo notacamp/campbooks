@@ -29,14 +29,16 @@ architecture.toml          module dependency allowlist, read by `cargo xtask arc
 crates/
   kernel/                  campbooks-kernel — config, errors (problem+json), db pool,
                            auth extractors, ids, clock, durable event bus and job
-                           queue (schema `kernel`), Module trait.
+                           queue (schema `kernel`), module declarations and the
+                           action registry, Module contract.
                            Depends on NO internal crate.
   ai/                      campbooks-ai — role-based AI gateway: decide (typed decision
                            model, ADR 0009), embed/complete/vision (OpenAI-compatible
                            protocol). Depends on kernel only.
   server/                  campbooks-server — the binary. Loads config, runs migrations,
-                           composes modules into one router and one job registry,
-                           serves OpenAPI and, when CAMPBOOKS_WEB_DIR is set, the
+                           composes modules into one router, one job registry and
+                           one declarations catalogue, generates an endpoint per
+                           action, serves OpenAPI and, when CAMPBOOKS_WEB_DIR is set, the
                            built web client; runs as `all`, `api` or `worker`.
   modules/
     system/                campbooks-system — health, version. The reference slice:
@@ -44,7 +46,9 @@ crates/
 migrations/                <ts>_<module>__<desc>.sql, one Postgres schema per module;
                            <ts>_kernel__<desc>.sql for the kernel's `kernel` schema
 openapi/openapi.json       generated, committed; the contract for every client
-xtask/                     `cargo xtask arch | openapi [--check]`
+openapi/declarations.json  generated, committed; every record type, action and event
+                           (clients build their shortcuts and command menu from it)
+xtask/                     `cargo xtask arch | openapi [--check] | declarations [--check]`
 clients/                   pnpm workspace
   app/                     the one UI (React + TypeScript + Vite)
     src/app/               shell: entry, router, providers, module manifest
@@ -59,11 +63,22 @@ docs/adr/                  numbered architecture decision records
 
 ## Anatomy of a module
 
-A module is a Rust crate that hands the server one value:
+A module is a Rust crate that hands the server one value, its descriptor:
 
 ```rust
 // crates/modules/<domain>/src/lib.rs
-pub fn module() -> campbooks_kernel::Module { … }   // name, scopes, router, background work
+pub fn module() -> Module {
+    Module {
+        name: NAME,                          // = crate directory = Postgres schema
+        scopes: scopes::ALL,                 // `<module>:<action>` OAuth scopes
+        router: OpenApiRouter::new(),        // plain endpoints, if any
+        background: Background::new(),       // jobs, event handlers, schedules
+        declarations: Declarations::new()    // what the module has (ADR 0008)
+            .record::<Conversation>()        // record types: `conversations.conversation`
+            .action(features::archive::action())  // actions: `conversations.archive`
+            .event::<ConversationArchived>(),     // events it publishes
+    }
+}
 ```
 
 Inside it, code is sliced **by use case**, not by layer:
@@ -73,13 +88,57 @@ crates/modules/mail/src/
   lib.rs                 module() + the public event types other modules may subscribe to
   features/
     list_threads/        mod.rs (handler + request/response + query) and tests
-    send_message/
+    send_message/        mod.rs: `pub fn action()` (its declaration), the handler,
+                         input/output types and tests calling it by name
   domain/                types shared by several features of THIS module only
 ```
 
 A feature owns everything it needs; when two features in one module share
 something, it moves to `domain/`. Nothing is shared across modules except
 through the kernel (types, events) — `cargo xtask arch` enforces it.
+
+### Declarations: record types, actions, events
+
+A module declares what it has, and the platform generates the rest
+(ADR 0008, `kernel::declare`):
+
+- **Record types** (`RecordType`): `<module>.<record>`, the JSON Schema of
+  the record's public shape, a label key and its **access container** —
+  the workspace, the member, or another declared record (a mailbox, a
+  calendar, a folder) whose sharing decides who sees it. Any record is
+  pointed at with `RecordRef { type, id }`, which is how links, rules,
+  search and attention reach across modules without knowing them.
+- **Actions** (`Action` builder): `<module>.<verb>`, typed input and output,
+  the scope a caller needs, whether it mutates, optional undo (with its
+  window) and an optional default keyboard shortcut. The handler gets an
+  `ActionContext` (state, principal, the call's transaction; the workspace
+  joins it with the `workspaces` module) and does its writes and event
+  publishing on `ctx.tx()`.
+- **Events**: the `DomainEvent`s the module publishes, with their version
+  and payload schema.
+
+From these the server generates, for every action, `POST
+/api/v1/actions/<module>.<verb>` — one namespace keyed by the action's name,
+so a client can call any action it read from the catalogue, while each one is
+still its own OpenAPI operation with its schemas and scope. The endpoint
+enforces the scope like `Scoped<S>`, validates the input (422 problem+json),
+honours `Idempotency-Key` on mutating actions (the response is stored in
+`kernel.idempotency_keys` in the action's own transaction and replayed for a
+repeat), and returns `{ result, undo: { token, expires_at } }` for undoable
+ones; `POST /api/v1/actions/undo` redeems a token once, for the same caller
+and workspace, before it expires. Expired keys and tokens are pruned hourly
+(`kernel.prune_actions`).
+
+`campbooks-server declarations` prints the catalogue (committed as
+`openapi/declarations.json`, checked in CI): every record type, action
+(scope, mutates, undo window, shortcut, label key, schemas, endpoint) and
+event (version, payload schema), with the schemas under
+`components.schemas`. The client's shortcut registry and command menu are
+generated from it; MCP tools, assistant tools and automation steps will be
+too (description and schemas for tools, `mutates` and undo to make
+assistant changes proposals, events as automation triggers). Startup and
+`cargo xtask arch` refuse misnamed, duplicate or inconsistent declarations
+and any action that no test of its module calls by name.
 
 ### Data
 

@@ -44,6 +44,10 @@ pub enum Error {
     /// The request conflicts with the current state; the message is shown.
     #[error("{0}")]
     Conflict(String),
+    /// The request is well-formed but its content is invalid (e.g. an action
+    /// input that does not match its schema); the message is shown.
+    #[error("{0}")]
+    Unprocessable(String),
     /// A dependency (database, provider) is unavailable; the message is shown.
     #[error("{0}")]
     Unavailable(String),
@@ -69,6 +73,7 @@ impl Error {
             Self::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             Self::InsufficientScope(_) | Self::Forbidden => StatusCode::FORBIDDEN,
             Self::Conflict(_) => StatusCode::CONFLICT,
+            Self::Unprocessable(_) => StatusCode::UNPROCESSABLE_ENTITY,
             Self::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
@@ -77,9 +82,10 @@ impl Error {
     /// The problem document sent to the client. Never includes internal detail.
     pub fn to_problem(&self) -> Problem {
         let detail = match self {
-            Self::BadRequest(msg) | Self::Conflict(msg) | Self::Unavailable(msg) => {
-                Some(msg.clone())
-            }
+            Self::BadRequest(msg)
+            | Self::Conflict(msg)
+            | Self::Unprocessable(msg)
+            | Self::Unavailable(msg) => Some(msg.clone()),
             Self::Unauthorized(failure) => Some(failure.code().to_owned()),
             Self::InsufficientScope(_) => Some("insufficient_scope".to_owned()),
             Self::NotFound | Self::Forbidden | Self::Internal(_) => None,
@@ -274,6 +280,10 @@ mod tests {
         assert_eq!(
             Error::Conflict(String::new()).status(),
             StatusCode::CONFLICT
+        );
+        assert_eq!(
+            Error::Unprocessable(String::new()).status(),
+            StatusCode::UNPROCESSABLE_ENTITY
         );
         assert_eq!(
             Error::Unavailable(String::new()).status(),

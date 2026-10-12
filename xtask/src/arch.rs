@@ -428,6 +428,110 @@ fn check_requirements(
     violations
 }
 
+/// Module names the platform reserves: `kernel` owns a schema (checked by
+/// [`check_migrations`]); `actions` owns the `/api/v1/actions/` routes.
+pub const RESERVED_MODULE_NAMES: [&str; 1] = ["actions"];
+
+/// No module takes a name the platform's routes use.
+pub fn check_reserved_module_names(modules: &BTreeSet<String>) -> Vec<String> {
+    RESERVED_MODULE_NAMES
+        .iter()
+        .filter(|name| modules.contains(**name))
+        .map(|name| {
+            format!("crates/modules/{name}: `{name}` is reserved (`/api/v1/{name}/` is generated)")
+        })
+        .collect()
+}
+
+/// Module declarations (record types, actions, events) are named
+/// `<module>.<name>` of the declaring module, unique, and consistent.
+/// `errors` is what building the catalogue reported.
+pub fn check_declarations(errors: &[String]) -> Vec<String> {
+    errors
+        .iter()
+        .map(|e| format!("module declarations: {e}"))
+        .collect()
+}
+
+/// Every action in the generated catalogue (`campbooks-server declarations`)
+/// requires a scope from the scope catalogue and has input and output
+/// schemas that resolve in its `components.schemas`.
+pub fn check_action_entries(
+    catalogue: &serde_json::Value,
+    scopes: &BTreeSet<String>,
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    let schemas = &catalogue["components"]["schemas"];
+    let actions = catalogue["actions"]
+        .as_array()
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    for action in actions {
+        let name = action["name"].as_str().unwrap_or("<unnamed>");
+        match action["scope"].as_str() {
+            Some(scope) if scopes.contains(scope) => {}
+            Some(scope) => violations.push(format!(
+                "action `{name}` requires scope `{scope}`, which no module declares"
+            )),
+            None => violations.push(format!("action `{name}` requires no scope")),
+        }
+        for side in ["input", "output"] {
+            let resolves = action[side]["$ref"]
+                .as_str()
+                .and_then(|r| r.strip_prefix("#/components/schemas/"))
+                .is_some_and(|schema| schemas[schema].is_object());
+            if !resolves {
+                violations.push(format!("action `{name}` has no {side} schema"));
+            }
+        }
+    }
+    violations
+}
+
+/// The part of a Rust source file that is test code: all of it for a file
+/// in a `tests/` directory or named `tests.rs`, else everything from the
+/// first `#[cfg(test)]` line on (tests sit at the bottom of a file).
+pub fn test_code<'a>(rel_path: &str, source: &'a str) -> &'a str {
+    let whole = rel_path.split('/').any(|part| part == "tests")
+        || rel_path.rsplit('/').next() == Some("tests.rs");
+    if whole {
+        return source;
+    }
+    let mut offset = 0;
+    for line in source.split_inclusive('\n') {
+        if line.trim_start().starts_with("#[cfg(test)]") {
+            return &source[offset..];
+        }
+        offset += line.len();
+    }
+    ""
+}
+
+/// Every declared action is exercised by a test of its module: the action's
+/// name, as a string literal (`"system.whoami"`, as
+/// `testing::call_action(&app, "system.whoami", …)` takes it), appears in the
+/// module's test code. `actions` are `(module, name)`; `tests` maps a module
+/// to its test code.
+pub fn check_action_tests(
+    actions: &[(String, String)],
+    tests: &BTreeMap<String, String>,
+) -> Vec<String> {
+    actions
+        .iter()
+        .filter(|(module, name)| {
+            !tests
+                .get(module)
+                .is_some_and(|code| code.contains(&format!("\"{name}\"")))
+        })
+        .map(|(module, name)| {
+            format!(
+                "action `{name}` has no test: call it by name from a test in \
+                 crates/modules/{module} (e.g. `testing::call_action(&app, \"{name}\", …)`)"
+            )
+        })
+        .collect()
+}
+
 /// A scope as a module declares it.
 #[derive(Debug, Clone)]
 pub struct DeclaredScope {
@@ -774,6 +878,78 @@ mod tests {
         assert!(v[0].contains("declared by module `mail`"));
         assert!(v.iter().any(|m| m.contains("needs a description")));
         assert!(v.iter().any(|m| m.contains("declared twice")));
+    }
+
+    #[test]
+    fn reserved_module_names() {
+        let modules: BTreeSet<String> = ["system", "actions"].map(String::from).into();
+        let v = check_reserved_module_names(&modules);
+        assert_eq!(v.len(), 1, "{v:?}");
+        assert!(v[0].contains("`actions` is reserved"));
+    }
+
+    #[test]
+    fn declaration_errors_are_violations() {
+        assert_eq!(
+            check_declarations(&["action `x`: bad".to_owned()]),
+            ["module declarations: action `x`: bad"]
+        );
+    }
+
+    #[test]
+    fn action_entries_need_a_known_scope_and_resolvable_schemas() {
+        let catalogue = serde_json::json!({
+            "actions": [
+                {"name": "mail.send", "scope": "mail:read",
+                 "input": {"$ref": "#/components/schemas/In"},
+                 "output": {"$ref": "#/components/schemas/Out"}},
+                {"name": "mail.bad", "scope": "mail:nope",
+                 "input": {"$ref": "#/components/schemas/Missing"},
+                 "output": {}},
+                {"name": "mail.none"},
+            ],
+            "components": {"schemas": {"In": {"type": "object"}, "Out": {"type": "object"}}},
+        });
+        let v = check_action_entries(&catalogue, &catalogue_scopes());
+        assert_eq!(v.len(), 6, "{v:#?}");
+        assert!(v[0].contains("`mail.bad` requires scope `mail:nope`"));
+        assert!(v[1].contains("`mail.bad` has no input schema"));
+        assert!(v[2].contains("`mail.bad` has no output schema"));
+        assert!(v[3].contains("`mail.none` requires no scope"));
+    }
+
+    fn catalogue_scopes() -> BTreeSet<String> {
+        catalogue()
+    }
+
+    #[test]
+    fn test_code_is_the_tail_after_cfg_test_or_a_whole_test_file() {
+        let source = "fn a() { \"x.y\" }\n#[cfg(test)]\nmod tests { \"x.z\" }\n";
+        assert_eq!(
+            test_code("src/lib.rs", source),
+            "#[cfg(test)]\nmod tests { \"x.z\" }\n"
+        );
+        assert_eq!(test_code("src/lib.rs", "fn a() {}\n"), "");
+        assert_eq!(test_code("tests/api.rs", source), source);
+        assert_eq!(test_code("src/features/x/tests.rs", source), source);
+    }
+
+    #[test]
+    fn every_action_needs_a_test_calling_it_by_name() {
+        let tests: BTreeMap<String, String> = [(
+            "mail".to_owned(),
+            "call_action(&app, \"mail.send\", None, &json!({}))".to_owned(),
+        )]
+        .into();
+        let actions = [
+            ("mail".to_owned(), "mail.send".to_owned()),
+            ("mail".to_owned(), "mail.archive".to_owned()),
+            ("calendar".to_owned(), "calendar.hold".to_owned()),
+        ];
+        let v = check_action_tests(&actions, &tests);
+        assert_eq!(v.len(), 2, "{v:#?}");
+        assert!(v[0].contains("`mail.archive` has no test"));
+        assert!(v[1].contains("`calendar.hold` has no test"));
     }
 
     #[test]

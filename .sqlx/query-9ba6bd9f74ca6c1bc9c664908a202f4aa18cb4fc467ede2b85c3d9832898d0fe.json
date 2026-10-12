@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE kernel.undo_tokens SET redeemed_at = now()\n          WHERE token_hash = sha256(convert_to($1, 'UTF8'))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9ba6bd9f74ca6c1bc9c664908a202f4aa18cb4fc467ede2b85c3d9832898d0fe"
+}

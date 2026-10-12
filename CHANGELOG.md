@@ -57,6 +57,18 @@ All notable changes to Campbooks Next are documented here. The format follows
   `CAMPBOOKS_JOBS__SHUTDOWN_GRACE_SECONDS` (8),
   `CAMPBOOKS_JOBS__RETRY_BASE_MS` (1000) and
   `CAMPBOOKS_JOBS__RETRY_MAX_SECONDS` (3600).
+- Actions. What you can do through the API is now declared once per module
+  and served at `POST /api/v1/actions/<module>.<verb>`, each with its scope,
+  input and output in the OpenAPI document. Changes are safe to retry with an
+  `Idempotency-Key` header (a repeat gets the first response back, for 24
+  hours), and undoable actions return an undo token, redeemed once at
+  `POST /api/v1/actions/undo`. The first action is `system.whoami` (scope
+  `system:read`): who the API takes your token to be. Idempotency keys and
+  undo tokens live in your Postgres (schema `kernel`) and are pruned hourly;
+  the migration runs on startup.
+- `campbooks-server declarations` prints the catalogue of every module's
+  record types, actions (scope, undo, default keyboard shortcut) and events
+  as JSON; it is also committed as `openapi/declarations.json`.
 
 ### Changed
 - The image's default command is now `all` instead of `serve` (same

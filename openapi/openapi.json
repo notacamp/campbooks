@@ -10,6 +10,113 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/v1/actions/system.whoami": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Who the API takes the caller to be: the subject, client, scopes and workspace of the access token the request carries.",
+        "operationId": "system_whoami",
+        "requestBody": {
+          "description": "The action's input.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WhoamiInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The action ran.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "result"
+                  ],
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/WhoamiOutput"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body is not JSON.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks the action's scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The body is over 1 MiB.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The body is not `application/json`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body does not match the action's input.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "system:read"
+            ]
+          }
+        ]
+      }
+    },
     "/api/v1/system/health": {
       "get": {
         "tags": [
@@ -71,6 +178,14 @@
   },
   "components": {
     "schemas": {
+      "CallerKind": {
+        "type": "string",
+        "description": "Who a token was issued to.",
+        "enum": [
+          "user",
+          "client"
+        ]
+      },
       "HealthResponse": {
         "type": "object",
         "description": "The instance is healthy.",
@@ -147,6 +262,56 @@
             "type": "string",
             "description": "Semantic version of the server.",
             "example": "0.1.0"
+          }
+        }
+      },
+      "WhoamiInput": {
+        "type": "object",
+        "description": "No input."
+      },
+      "WhoamiOutput": {
+        "type": "object",
+        "description": "The caller, as the access token describes it.",
+        "required": [
+          "subject",
+          "kind",
+          "scopes"
+        ],
+        "properties": {
+          "client_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The client the token was issued to, when it names one.",
+            "example": "campbooks-web"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CallerKind",
+            "description": "A person signed in through a client, or a client on its own behalf."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The scopes the token grants, sorted.",
+            "example": [
+              "openid",
+              "system:read"
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "description": "The token's subject (or, for a client acting on its own behalf, its\nclient id).",
+            "example": "8d6f0d5e-2c55-4f7e-9a8e-1b8c1f3f2a10"
+          },
+          "workspace": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The workspace a client is bound to; none for people."
           }
         }
       }

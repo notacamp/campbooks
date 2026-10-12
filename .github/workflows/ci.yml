@@ -57,6 +57,9 @@ jobs:
       - name: OpenAPI drift
         if: always()
         run: cargo xtask openapi --check
+      - name: Declarations catalogue drift
+        if: always()
+        run: cargo xtask declarations --check
       - name: Tests
         if: always()
         run: cargo nextest run --workspace --no-tests=warn && cargo test --workspace --doc

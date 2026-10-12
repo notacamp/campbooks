@@ -1,13 +1,14 @@
 //! The contract between a domain module and the server.
 //!
 //! A module crate exposes `pub fn module() -> Module`; `campbooks-server`
-//! collects them, merges their routers and registers their background work.
+//! collects them, merges their routers, registers their background work and
+//! generates an endpoint per declared action.
 //! Routes are declared with `utoipa-axum` so every endpoint lands in the
 //! OpenAPI document by construction.
 
 use utoipa_axum::router::OpenApiRouter;
 
-use crate::{auth::ScopeInfo, jobs::Background, state::AppState};
+use crate::{auth::ScopeInfo, declare::Declarations, jobs::Background, state::AppState};
 
 /// A domain module, as handed to the server.
 pub struct Module {
@@ -24,6 +25,11 @@ pub struct Module {
     /// `<name>.<…>`. The server builds the
     /// [`Registry`](crate::jobs::Registry) from these.
     pub background: Background,
+    /// The module's record types, actions and events (ADR 0008), each named
+    /// `<name>.<…>`. The server generates each action's endpoint
+    /// (`POST /api/v1/actions/<name>.<verb>`) and builds the
+    /// [`Catalogue`](crate::declare::Catalogue) from these.
+    pub declarations: Declarations,
 }
 
 impl std::fmt::Debug for Module {
@@ -32,6 +38,7 @@ impl std::fmt::Debug for Module {
             .field("name", &self.name)
             .field("scopes", &self.scopes)
             .field("background", &self.background)
+            .field("declarations", &self.declarations)
             .finish_non_exhaustive()
     }
 }

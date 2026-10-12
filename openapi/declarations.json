@@ -1,0 +1,88 @@
+{
+  "records": [],
+  "actions": [
+    {
+      "name": "system.whoami",
+      "module": "system",
+      "description": "Who the API takes the caller to be: the subject, client, scopes and workspace of the access token the request carries.",
+      "label": "system:actions.whoami",
+      "scope": "system:read",
+      "mutates": false,
+      "undoable": false,
+      "undo_window_seconds": null,
+      "shortcut": null,
+      "method": "POST",
+      "path": "/api/v1/actions/system.whoami",
+      "operation_id": "system_whoami",
+      "input": {
+        "$ref": "#/components/schemas/WhoamiInput"
+      },
+      "output": {
+        "$ref": "#/components/schemas/WhoamiOutput"
+      }
+    }
+  ],
+  "events": [],
+  "components": {
+    "schemas": {
+      "CallerKind": {
+        "type": "string",
+        "description": "Who a token was issued to.",
+        "enum": [
+          "user",
+          "client"
+        ]
+      },
+      "WhoamiInput": {
+        "type": "object",
+        "description": "No input."
+      },
+      "WhoamiOutput": {
+        "type": "object",
+        "description": "The caller, as the access token describes it.",
+        "required": [
+          "subject",
+          "kind",
+          "scopes"
+        ],
+        "properties": {
+          "client_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The client the token was issued to, when it names one.",
+            "example": "campbooks-web"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/CallerKind",
+            "description": "A person signed in through a client, or a client on its own behalf."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The scopes the token grants, sorted.",
+            "example": [
+              "openid",
+              "system:read"
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "description": "The token's subject (or, for a client acting on its own behalf, its\nclient id).",
+            "example": "8d6f0d5e-2c55-4f7e-9a8e-1b8c1f3f2a10"
+          },
+          "workspace": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The workspace a client is bound to; none for people."
+          }
+        }
+      }
+    }
+  }
+}

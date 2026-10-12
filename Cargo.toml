@@ -31,7 +31,7 @@ reqwest = { version = "0.13.5", default-features = false, features = ["rustls", 
 url = { version = "2.5.8", features = ["serde"] }
 
 # OpenAPI
-utoipa = { version = "6.0.0", features = ["axum_extras", "uuid", "chrono", "url"] }
+utoipa = { version = "6.0.0", features = ["axum_extras", "uuid", "chrono", "url", "debug"] }
 utoipa-axum = "0.3.0"
 
 # Database

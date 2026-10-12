@@ -1,7 +1,7 @@
 //! The OAuth scopes of the `system` module (see `campbooks_kernel::auth`).
 //!
-//! Health and version are public, so no endpoint requires these yet; they are
-//! declared so clients and the identity provider can already be granted them.
+//! Health and version are public; the `system.whoami` action requires
+//! `system:read`.
 
 use campbooks_kernel::auth::{ScopeInfo, ScopeName};
 

@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/v1/actions/system.whoami": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Who the API takes the caller to be: the subject, client, scopes and workspace of the access token the request carries. */
+        post: operations["system_whoami"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/health": {
         parameters: {
             query?: never;
@@ -42,6 +59,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description Who a token was issued to.
+         * @enum {string}
+         */
+        CallerKind: "user" | "client";
         /** @description The instance is healthy. */
         HealthResponse: {
             /**
@@ -92,6 +114,34 @@ export interface components {
              */
             version: string;
         };
+        /** @description No input. */
+        WhoamiInput: Record<string, never>;
+        /** @description The caller, as the access token describes it. */
+        WhoamiOutput: {
+            /**
+             * @description The client the token was issued to, when it names one.
+             * @example campbooks-web
+             */
+            client_id?: string | null;
+            /** @description A person signed in through a client, or a client on its own behalf. */
+            kind: components["schemas"]["CallerKind"];
+            /**
+             * @description The scopes the token grants, sorted.
+             * @example [
+             *       "openid",
+             *       "system:read"
+             *     ]
+             */
+            scopes: string[];
+            /**
+             * @description The token's subject (or, for a client acting on its own behalf, its
+             *     client id).
+             * @example 8d6f0d5e-2c55-4f7e-9a8e-1b8c1f3f2a10
+             */
+            subject: string;
+            /** @description The workspace a client is bound to; none for people. */
+            workspace?: string | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -101,6 +151,87 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    system_whoami: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The action's input. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WhoamiInput"];
+            };
+        };
+        responses: {
+            /** @description The action ran. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        result: components["schemas"]["WhoamiOutput"];
+                    };
+                };
+            };
+            /** @description The body is not JSON. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks the action's scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is over 1 MiB. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not `application/json`. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body does not match the action's input. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     system_health: {
         parameters: {
             query?: never;
