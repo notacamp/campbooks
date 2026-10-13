@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.messages SET read = false, updated_at = now()\n                  WHERE id = (SELECT id FROM conversations.messages WHERE conversation_id = $1\n                               ORDER BY direction = 'inbound' DESC, sent_at DESC, id DESC LIMIT 1)\n                    AND read\n                 RETURNING provider_message_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_message_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "provider_message_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e0fefe0b24ae29715daeefa1da1989f46a37011e84f6a843e999107e3493bc12"
+}

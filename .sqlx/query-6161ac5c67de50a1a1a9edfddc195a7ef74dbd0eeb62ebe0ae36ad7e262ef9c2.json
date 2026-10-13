@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.messages SET read = true, updated_at = now()\n                  WHERE conversation_id = $1 AND NOT read RETURNING provider_message_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_message_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "provider_message_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6161ac5c67de50a1a1a9edfddc195a7ef74dbd0eeb62ebe0ae36ad7e262ef9c2"
+}

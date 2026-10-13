@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id: AttachmentId\" FROM conversations.attachments WHERE message_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: AttachmentId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.attachments",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "098d0da67f36e98a7bdf9a85b36f06e95c1124ad35911574d0f64fd97339c93d"
+}

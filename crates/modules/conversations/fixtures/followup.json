@@ -1,0 +1,29 @@
+{
+  "changes": [
+    {"op": "upsert", "message": {
+      "provider_message_id": "en-1",
+      "thread_key": "thr-en-q4",
+      "rfc_message_id": "q4-plan-1@studio.example",
+      "from": {"name": "Maya Okafor", "address": "maya@northwind-studio.example"},
+      "to": [{"name": "Sam Rivers", "address": "sam@example.com"}],
+      "subject": "Q4 plan: can you review by Friday?",
+      "sent_at": "2026-10-05T08:30:00Z",
+      "direction": "inbound",
+      "mailbox": {"in_inbox": true},
+      "labels": [{"key": "Label_9", "name": "Board"}],
+      "read": true, "starred": true
+    }},
+    {"op": "upsert", "message": {
+      "provider_message_id": "en-3",
+      "thread_key": "thr-en-news",
+      "from": {"name": "The Paper Kite", "address": "hello@letters.paperkite.example"},
+      "subject": "Issue 142: five tools for calmer mornings",
+      "sent_at": "2026-10-06T06:00:00Z",
+      "direction": "inbound",
+      "mailbox": {"in_inbox": false},
+      "read": true, "starred": false
+    }},
+    {"op": "remove", "provider_message_id": "en-4"},
+    {"op": "remove", "provider_message_id": "never-seen"}
+  ]
+}
