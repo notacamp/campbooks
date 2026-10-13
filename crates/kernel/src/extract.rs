@@ -2,16 +2,17 @@
 //! error.
 
 use axum::{
-    extract::{FromRequest, FromRequestParts, Request},
+    extract::{FromRequest, FromRequestParts, Request, rejection::JsonRejection},
     http::request::Parts,
 };
 use serde::de::DeserializeOwned;
 
-use crate::Error;
+use crate::{Error, i18n::MESSAGES};
 
 /// A JSON request body. Like [`axum::Json`], but a missing or wrong
 /// `Content-Type`, malformed JSON or a body that does not match `T` is a
-/// problem+json 400 ([`Error::BadRequest`]) whose detail says what is wrong.
+/// problem+json 400 ([`Error::BadRequest`]): `missing_json_content_type`,
+/// `invalid_json` or `invalid_body`, whose detail quotes the parser.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Json<T>(pub T);
 
@@ -26,7 +27,19 @@ where
         axum::Json::<T>::from_request(request, state)
             .await
             .map(|axum::Json(value)| Self(value))
-            .map_err(|rejection| Error::BadRequest(rejection.body_text()))
+            .map_err(|rejection| {
+                Error::BadRequest(match &rejection {
+                    JsonRejection::MissingJsonContentType(_) => {
+                        MESSAGES.reason("missing_json_content_type")
+                    }
+                    JsonRejection::JsonSyntaxError(_) => MESSAGES
+                        .reason("invalid_json")
+                        .arg("reason", rejection.body_text()),
+                    _ => MESSAGES
+                        .reason("invalid_body")
+                        .arg("reason", rejection.body_text()),
+                })
+            })
     }
 }
 
@@ -52,7 +65,7 @@ where
 }
 
 /// A query string. Like [`axum::extract::Query`], but one that does not
-/// match `T` is a problem+json 400 ([`Error::BadRequest`]).
+/// match `T` is a problem+json 400 ([`Error::BadRequest`], `invalid_query`).
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Query<T>(pub T);
 
@@ -67,7 +80,13 @@ where
         axum::extract::Query::<T>::from_request_parts(parts, state)
             .await
             .map(|axum::extract::Query(value)| Self(value))
-            .map_err(|rejection| Error::BadRequest(rejection.body_text()))
+            .map_err(|rejection| {
+                Error::BadRequest(
+                    MESSAGES
+                        .reason("invalid_query")
+                        .arg("reason", rejection.body_text()),
+                )
+            })
     }
 }
 
@@ -126,10 +145,10 @@ mod tests {
 
     #[tokio::test]
     async fn rejections_are_problem_400s() {
-        for (content_type, body) in [
-            (None, r#"{"name":"x"}"#),
-            (Some("application/json"), "{"),
-            (Some("application/json"), r#"{"nom":"x"}"#),
+        for (content_type, body, code) in [
+            (None, r#"{"name":"x"}"#, "missing_json_content_type"),
+            (Some("application/json"), "{", "invalid_json"),
+            (Some("application/json"), r#"{"nom":"x"}"#, "invalid_body"),
         ] {
             let response = post_body(content_type, body).await;
             assert_eq!(response.status, StatusCode::BAD_REQUEST, "{body}");
@@ -138,6 +157,7 @@ mod tests {
                 Some("application/problem+json")
             );
             assert!(response.json["detail"].is_string());
+            assert_eq!(response.json["code"], code);
         }
     }
 
@@ -162,5 +182,6 @@ mod tests {
             bad.content_type.as_deref(),
             Some("application/problem+json")
         );
+        assert_eq!(bad.json["code"], "invalid_query");
     }
 }

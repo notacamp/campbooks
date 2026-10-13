@@ -148,13 +148,13 @@ impl Reply {
             .find(|c| c.starts_with(&format!("{name}=")))
     }
 
-    fn assert_problem(&self, status: StatusCode, detail: &str) {
+    fn assert_problem(&self, status: StatusCode, code: &str) {
         assert_eq!(self.status, status, "{}", self.body);
         assert_eq!(
             self.header(header::CONTENT_TYPE),
             Some("application/problem+json")
         );
-        assert_eq!(self.json()["detail"], detail, "{}", self.body);
+        assert_eq!(self.json()["code"], code, "{}", self.body);
     }
 }
 
@@ -1121,10 +1121,10 @@ async fn the_server_reaches_the_idp_at_its_internal_address(db: PgPool) {
     let app = app(AppState::new(db, config), Some(*settings));
     // Discovery names the test IdP's own issuer, not the configured public
     // one, so the BFF refuses to trust it.
-    Browser::new(&app).get("/bff/login").await.assert_problem(
-        StatusCode::SERVICE_UNAVAILABLE,
-        "the identity provider is unavailable",
-    );
+    Browser::new(&app)
+        .get("/bff/login")
+        .await
+        .assert_problem(StatusCode::SERVICE_UNAVAILABLE, "idp_unavailable");
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -1142,10 +1142,10 @@ async fn a_client_secret_file_is_read_when_needed(db: PgPool) {
     // Not written yet (the IdP provisioning runs after the server starts).
     let login = browser.get("/bff/login").await;
     let callback = path_and_query(&h.idp.authorize(login.header(header::LOCATION).unwrap()));
-    browser.get(&callback).await.assert_problem(
-        StatusCode::SERVICE_UNAVAILABLE,
-        "the identity provider is unavailable",
-    );
+    browser
+        .get(&callback)
+        .await
+        .assert_problem(StatusCode::SERVICE_UNAVAILABLE, "idp_unavailable");
     std::fs::write(&file, format!("{WEB_CLIENT_SECRET}\n")).unwrap();
     let reply = browser.sign_in(&h.idp, "/").await;
     assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);

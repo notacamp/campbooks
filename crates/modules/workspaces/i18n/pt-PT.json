@@ -1,0 +1,16 @@
+{
+  "errors": {
+    "invalid_role": "A função tem de ser administrador ou membro.",
+    "invalid_email": "Introduza um endereço de email válido.",
+    "invalid_name": "O nome tem de ter entre 1 e {{max}} caracteres.",
+    "invalid_limit": "O limite tem de estar entre 1 e {{max}}.",
+    "already_a_member": "Esta pessoa já é membro do espaço de trabalho.",
+    "invitation_used": "Este convite já foi utilizado.",
+    "invitation_expired": "Este convite expirou. Peça um novo.",
+    "invitation_email_mismatch": "Este convite foi enviado para outro endereço de email. Inicie sessão com esse endereço para o aceitar.",
+    "signup_invite_only": "Nesta instância, só é possível criar contas por convite.",
+    "signup_requires_approval": "O seu pedido de adesão foi enviado. Um administrador tem de o aprovar antes de poder criar um espaço de trabalho.",
+    "signup_code_invalid": "Este código de registo não é válido.",
+    "last_owner": "Um espaço de trabalho precisa de pelo menos um proprietário. Torne primeiro outra pessoa proprietária."
+  }
+}
