@@ -2,7 +2,7 @@
 #
 #   cp .env.example .env        # then edit it
 #   docker compose up -d        # server, postgres, identity provider
-#   docker compose --profile ai up -d     # + local open-weight models
+#   docker compose --profile ai up -d     # + local open-weight models (Laya, Ollama, TEI)
 #
 # See README.md in this directory.
 name: campbooks
@@ -104,7 +104,28 @@ services:
         condition: service_healthy
 
   # --- Local AI (open-weight models) --------------------------------------------
-  # CPU inference works but is slow; see README.md.
+  # Optional: `docker compose --profile ai up -d`. See README.md → Local AI.
+  #
+  # laya: the `decide` role (typed decisions, ADR 0009). Built locally from
+  # ./laya (there is no official image); downloads the multilingual checkpoint
+  # (~680 MB) into the `laya-models` volume on first start. Runs well on CPU.
+  # No published port: only the server reaches it, on the compose network.
+  laya:
+    profiles: ["ai"]
+    build: ./laya
+    restart: unless-stopped
+    environment:
+      # laya-serve answers anyone when its key is empty, so the container
+      # refuses to start without one. Set it in .env; the server sends the
+      # same value.
+      LAYA_API_KEY: ${CAMPBOOKS_AI__DECIDE__API_KEY:-}
+      # Cap the CPU threads inference uses (default: all cores).
+      # LAYA_THREADS: "4"
+    volumes:
+      - laya-models:/models
+    # The image's HEALTHCHECK probes /health; allow for the first download.
+
+  # ollama: `complete` (and optionally `vision`). CPU inference works but is slow.
   ollama:
     profiles: ["ai"]
     image: ollama/ollama:0.40.3
@@ -132,5 +153,6 @@ volumes:
   postgres-data:
   blobs-data:
   idp-data:
+  laya-models:
   ollama-data:
   embeddings-data:

@@ -6,6 +6,10 @@ pub enum Error {
     /// No provider is configured for this role.
     #[error("AI role `{0}` is not configured (set CAMPBOOKS_AI__{upper}__BASE_URL and __MODEL)", upper = .0.as_str().to_uppercase())]
     RoleNotConfigured(Role),
+    /// A `decide` call asked questions that cannot be answered (too many
+    /// options, duplicate ids, …). A bug in the calling module.
+    #[error("invalid decide question: {0}")]
+    InvalidQuestion(String),
     /// The AI configuration is invalid.
     #[error("invalid AI configuration: {0}")]
     Config(String),
