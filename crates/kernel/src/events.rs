@@ -191,11 +191,19 @@ impl EventBus {
     /// Append `event` to the log and enqueue one delivery per registered
     /// consumer, inside `tx`. Nothing is visible until `tx` commits, and
     /// nothing remains if it rolls back.
+    ///
+    /// # Errors
+    /// [`sqlx::Error::InvalidArgument`] when `tx` works in a workspace
+    /// ([`begin_for`](crate::db::BeginFor::begin_for), a job's
+    /// [`tx`](crate::JobContext::tx)) and the event belongs to another one:
+    /// a change is announced in the workspace it was made in, never across
+    /// (row-level security on the event log refuses it too).
     pub async fn publish<E: DomainEvent>(
         &self,
         tx: &mut Transaction<'_, Postgres>,
         event: &E,
     ) -> Result<EventId, sqlx::Error> {
+        check_workspace(tx, E::NAME, event.workspace()).await?;
         let payload = serde_json::to_value(event).map_err(|e| sqlx::Error::Encode(e.into()))?;
         let consumers = self.registry.consumers_of(E::NAME);
         let kinds: Vec<&str> = consumers.iter().map(|c| c.name).collect();
@@ -301,6 +309,30 @@ impl EventBus {
         tx.commit().await?;
         tracing::info!(consumer, enqueued, "events replayed");
         Ok(enqueued)
+    }
+}
+
+/// Refuse to publish `event` (of workspace `workspace`) in a transaction set
+/// to another workspace.
+async fn check_workspace(
+    tx: &mut Transaction<'_, Postgres>,
+    event: &str,
+    workspace: Option<&str>,
+) -> Result<(), sqlx::Error> {
+    let Some(workspace) = workspace else {
+        return Ok(());
+    };
+    let current = sqlx::query_scalar!(
+        "SELECT nullif(current_setting($1, true), '')",
+        crate::db::WORKSPACE_SETTING
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    match current {
+        Some(current) if current != workspace => Err(sqlx::Error::InvalidArgument(format!(
+            "event `{event}` belongs to another workspace than the transaction publishing it"
+        ))),
+        _ => Ok(()),
     }
 }
 

@@ -127,6 +127,7 @@ fn module(background: Background) -> Module {
         router: OpenApiRouter::new(),
         admin_router: None,
         background,
+        resources: crate::authz::Resources::default(),
     }
 }
 

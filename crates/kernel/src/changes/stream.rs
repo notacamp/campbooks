@@ -7,12 +7,13 @@
 //! : heartbeat
 //! id: 44  event: heartbeat data: {"cursor":"44"}       (the cursor moved past hidden changes)
 //! id: 44  event: reset    data: {"cursor":"44","reason":"cursor_expired"}
+//! id: 45  event: reset    data: {"cursor":"45","reason":"access_changed"}  (a container went out of sight)
 //!         event: revoked  data: {}
 //!         event: closing  data: {"reason":"max_age"}
 //! ```
 
 use std::{
-    collections::{BTreeSet, HashMap, VecDeque},
+    collections::{BTreeSet, HashMap, HashSet, VecDeque},
     convert::Infallible,
     time::Duration,
 };
@@ -23,7 +24,7 @@ use futures_util::Stream;
 use serde_json::json;
 use tokio::{sync::watch, time::Instant};
 
-use super::{ChangeOp, hub::StreamSlot};
+use super::{Audience, ChangeOp, hub::StreamSlot};
 use crate::{
     AppState, Error,
     auth::Principal,
@@ -159,6 +160,7 @@ pub async fn open(
     let feed = Feed {
         rules: ReadRules::from_state(state),
         access_records: state.membership.access_records(),
+        container_records: state.visibility.access_records(),
         state: state.clone(),
         workspace,
         subscription,
@@ -171,7 +173,7 @@ pub async fn open(
         next_heartbeat: now + heartbeat,
         poll: Duration::from_millis(config.poll_interval_ms),
         out: VecDeque::from([first]),
-        containers: HashMap::new(),
+        shown: HashSet::new(),
         done: false,
         _slot: slot,
     };
@@ -188,6 +190,8 @@ struct Feed {
     rules: ReadRules,
     /// Record types whose changes may change who belongs to the workspace.
     access_records: &'static [&'static str],
+    /// Record types whose changes may change who sees inside a container.
+    container_records: &'static [&'static str],
     /// The last change read (sent or hidden).
     cursor: i64,
     /// The last cursor the client was told.
@@ -199,8 +203,12 @@ struct Feed {
     next_heartbeat: Instant,
     poll: Duration,
     out: VecDeque<Frame>,
-    /// Visibility of containers already asked about.
-    containers: HashMap<RecordRef, bool>,
+    /// Containers this stream has shown changes from. Visibility is asked
+    /// afresh for every page (never cached across pages, so a member taken
+    /// out of an inbox stops getting its ids at once); when one of these
+    /// goes out of sight the client is told to drop what it cached
+    /// (`reset`, `access_changed`).
+    shown: HashSet<RecordRef>,
     done: bool,
     _slot: StreamSlot,
 }
@@ -212,6 +220,9 @@ struct Row {
     record: RecordRef,
     op: ChangeOp,
     container: Option<RecordRef>,
+    /// `None`: no audience; `Some(None)`: an audience this version cannot
+    /// read (shown to nobody).
+    audience: Option<Option<Audience>>,
 }
 
 impl Feed {
@@ -273,7 +284,7 @@ impl Feed {
             let _permit = self.state.changes.query_permit().await;
             sqlx::query!(
                 r#"SELECT seq AS "seq!", event_id, record_type, record_id, op,
-                          container_type, container_id
+                          container_type, container_id, audience, audience_user
                      FROM kernel.changes
                     WHERE workspace_id = $1 AND seq > $2
                     ORDER BY seq
@@ -302,13 +313,31 @@ impl Feed {
                     .container_type
                     .zip(row.container_id)
                     .map(|(t, id)| RecordRef { record_type: t, id }),
+                audience: row.audience.as_deref().map(|kind| {
+                    Audience::from_columns(kind, row.audience_user.as_deref())
+                }),
             })
             .collect();
         self.cursor = last;
-        let access_changed = rows.iter().any(|row| {
-            self.access_records
-                .contains(&row.record.record_type.as_str())
-        });
+        let touches = |records: &[&str]| {
+            rows.iter()
+                .any(|row| records.contains(&row.record.record_type.as_str()))
+        };
+        let access_changed = touches(self.access_records);
+        let containers_changed = touches(self.container_records);
+
+        // Who may see what changed before this page is read: the membership
+        // first (a former member gets nothing more), then the containers
+        // already shown.
+        if access_changed {
+            self.check_access().await?;
+            if self.done {
+                return Ok(true);
+            }
+        }
+        if access_changed || containers_changed {
+            self.recheck_shown().await?;
+        }
 
         // Several changes of one record in a page: the last one is enough
         // (the client refetches the current state either way).
@@ -317,42 +346,105 @@ impl Feed {
             latest.insert(&row.record, row.seq);
         }
         let keep: BTreeSet<i64> = latest.into_values().collect();
+        // Container visibility, asked once per container for this page.
+        let mut page_containers: HashMap<RecordRef, bool> = HashMap::new();
         for row in rows.iter().filter(|row| keep.contains(&row.seq)) {
-            if self.visible(row).await? {
+            if self.visible(row, &mut page_containers).await? {
                 self.out.push_back(change_frame(row));
                 self.delivered = row.seq;
             }
         }
+        // A container shown before and hidden now: drop the client's cache.
+        let lost = page_containers
+            .iter()
+            .any(|(container, visible)| !visible && self.shown.contains(container));
+        if lost {
+            self.lost_sight();
+        }
         if !self.out.is_empty() {
             self.next_heartbeat = Instant::now() + self.heartbeat;
-        }
-        if access_changed {
-            self.check_access().await?;
         }
         Ok(true)
     }
 
-    /// Whether the caller may see `row`.
-    async fn visible(&mut self, row: &Row) -> Result<bool, Error> {
+    /// Whether the caller may see `row`; container answers are kept in
+    /// `page` for the rest of the page.
+    async fn visible(
+        &mut self,
+        row: &Row,
+        page: &mut HashMap<RecordRef, bool>,
+    ) -> Result<bool, Error> {
         if !self
             .rules
             .allows(&self.subscription.principal, &row.record.record_type)
         {
             return Ok(false);
         }
+        match row.audience {
+            None => {}
+            Some(None) => return Ok(false),
+            Some(Some(audience)) => {
+                if !audience.admits(&self.subscription.access) {
+                    return Ok(false);
+                }
+            }
+        }
         let Some(container) = &row.container else {
             return Ok(true);
         };
-        if let Some(visible) = self.containers.get(container) {
-            return Ok(*visible);
+        let visible = match page.get(container) {
+            Some(visible) => *visible,
+            None => {
+                let visible = self
+                    .state
+                    .visibility
+                    .container_visible(&self.state.db, &self.subscription.access, container)
+                    .await?;
+                page.insert(container.clone(), visible);
+                visible
+            }
+        };
+        if visible {
+            self.shown.insert(container.clone());
         }
-        let visible = self
-            .state
-            .visibility
-            .container_visible(&self.state.db, &self.subscription.access, container)
-            .await?;
-        self.containers.insert(container.clone(), visible);
         Ok(visible)
+    }
+
+    /// Ask again about every container shown so far; tell the client to
+    /// drop its cache if one went out of sight.
+    async fn recheck_shown(&mut self) -> Result<(), Error> {
+        let mut lost = false;
+        for container in self.shown.clone() {
+            let visible = self
+                .state
+                .visibility
+                .container_visible(&self.state.db, &self.subscription.access, &container)
+                .await?;
+            if !visible {
+                lost = true;
+            }
+        }
+        if lost {
+            self.lost_sight();
+        }
+        Ok(())
+    }
+
+    /// Something the client cached is no longer the caller's to see: it
+    /// drops every record of the workspace and refetches, from the current
+    /// cursor (`reset`, `access_changed`).
+    fn lost_sight(&mut self) {
+        self.shown.clear();
+        self.delivered = self.cursor;
+        self.out.push_back(
+            Frame::default()
+                .event("reset")
+                .id(self.cursor.to_string())
+                .data(
+                    json!({ "cursor": self.cursor.to_string(), "reason": "access_changed" })
+                        .to_string(),
+                ),
+        );
     }
 
     /// Resolve membership again; when it is gone, say so and end.
@@ -370,9 +462,9 @@ impl Feed {
         match access {
             Some(access) => {
                 if access != self.subscription.access {
-                    // A changed role may change what containers show.
-                    self.containers.clear();
+                    // A changed role may change what the caller sees.
                     self.subscription.access = access;
+                    self.recheck_shown().await?;
                 }
             }
             None => {
@@ -390,6 +482,7 @@ impl Feed {
         if self.done {
             return Ok(());
         }
+        self.recheck_shown().await?;
         let frame = if self.delivered == self.cursor {
             Frame::default().comment("heartbeat")
         } else {

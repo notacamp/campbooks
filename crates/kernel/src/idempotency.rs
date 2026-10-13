@@ -20,6 +20,15 @@
 //! Responses are stored when the outcome is deterministic: every status
 //! below 500 except 401, 403, 408, 409, 425 and 429. Otherwise the key is
 //! released, so a retry runs the operation again.
+//!
+//! **A replay is authorized like the request it repeats.** Before a stored
+//! response is served, the caller must still hold the operation's scopes
+//! (else 403, as [`Scoped`](crate::auth::Scoped) answers), still belong to
+//! the workspace of a `{workspace_id}` route (a client token still bound to
+//! it), and still see every container the first run's handler checked
+//! ([`checked_container`]); otherwise the answer is the same 404 the handler
+//! would give. A member removed from a workspace or an inbox never gets a
+//! stored response back.
 
 use std::time::Duration;
 
@@ -38,11 +47,33 @@ use std::sync::Arc;
 use crate::{
     AppState,
     auth::{AuthenticatedPrincipal, Principal, PrincipalKind, TokenVerifier, bearer_token},
+    changes::VisibilityPort,
     error::LocalizableProblem,
     i18n::MESSAGES,
     jobs::{Job, JobContext, JobError},
     operations::{Catalogue, OperationInfo},
+    records::RecordRef,
+    tenancy::{MembershipPort, WORKSPACE_PATH_PARAM, WorkspaceId},
 };
+
+tokio::task_local! {
+    /// The containers the running request's handler checked access to.
+    static CHECKED: std::sync::Mutex<Vec<RecordRef>>;
+}
+
+/// Note that the running request's handler checked the caller's access to
+/// `container` (an inbox) before acting inside it. The idempotency layer
+/// keeps the list with a stored response and serves a replay only to a
+/// caller who may still see each one. A no-op outside a request.
+pub fn checked_container(container: RecordRef) {
+    let _ = CHECKED.try_with(|checked| {
+        if let Ok(mut checked) = checked.lock()
+            && !checked.contains(&container)
+        {
+            checked.push(container);
+        }
+    });
+}
 
 /// The request header carrying the key.
 pub const HEADER: &str = "idempotency-key";
@@ -73,6 +104,8 @@ pub struct Idempotency {
     db: PgPool,
     auth: TokenVerifier,
     catalogue: Arc<Catalogue>,
+    membership: MembershipPort,
+    visibility: VisibilityPort,
 }
 
 impl Idempotency {
@@ -84,7 +117,59 @@ impl Idempotency {
             db: state.db.clone(),
             auth: state.auth.clone(),
             catalogue,
+            membership: Arc::clone(&state.membership),
+            visibility: Arc::clone(&state.visibility),
         }
+    }
+
+    /// Whether `principal` may still have the stored response of
+    /// `operation`, a request to `parts`, whose handler checked
+    /// `containers`: `None` if so, else the answer to give instead.
+    async fn replay_refusal(
+        &self,
+        operation: &OperationInfo,
+        principal: &Principal,
+        parts: &Parts,
+        containers: &[RecordRef],
+    ) -> Option<Response> {
+        if !operation.scopes.iter().all(|scope| principal.has_scope(scope)) {
+            return Some(crate::Error::Forbidden.into_response());
+        }
+        let not_found = || Some(crate::Error::NotFound.into_response());
+        let Some(workspace) = workspace_of(operation, parts.uri.path()) else {
+            // Not a workspace route: nothing else to resolve unless the
+            // handler checked containers (it cannot have without one).
+            return if containers.is_empty() { None } else { not_found() };
+        };
+        let Ok(workspace) = workspace.parse::<WorkspaceId>() else {
+            return not_found();
+        };
+        if principal.kind == PrincipalKind::Client
+            && principal
+                .workspace
+                .as_deref()
+                .and_then(|claim| claim.parse::<WorkspaceId>().ok())
+                != Some(workspace)
+        {
+            return not_found();
+        }
+        let access = match self.membership.resolve(&self.db, principal, workspace).await {
+            Ok(Some(access)) if access.workspace == workspace => access,
+            Ok(_) => return not_found(),
+            Err(error) => return Some(error.into_response()),
+        };
+        for container in containers {
+            match self
+                .visibility
+                .container_visible(&self.db, &access, container)
+                .await
+            {
+                Ok(true) => {}
+                Ok(false) => return not_found(),
+                Err(error) => return Some(error.into_response()),
+            }
+        }
+        None
     }
 
     fn operation(&self, request: &Request) -> Option<&OperationInfo> {
@@ -115,13 +200,10 @@ pub async fn middleware(State(idem): State<Idempotency>, request: Request, next:
     let Some(key) = request.headers().get(HEADER).cloned() else {
         return next.run(request).await;
     };
-    let Some(operation_id) = idem
-        .operation(&request)
-        .filter(|op| op.mutates())
-        .map(|op| op.id.clone())
-    else {
+    let Some(operation) = idem.operation(&request).filter(|op| op.mutates()).cloned() else {
         return next.run(request).await;
     };
+    let operation_id = operation.id.clone();
     let key = match valid_key(&key) {
         Ok(key) => key,
         Err(problem) => return problem.into_response(),
@@ -151,7 +233,15 @@ pub async fn middleware(State(idem): State<Idempotency>, request: Request, next:
             tracing::warn!(%error, "idempotency: cannot claim the key");
             return problem(StatusCode::SERVICE_UNAVAILABLE, "database_unavailable");
         }
-        Ok(Claim::Replay(stored)) => return stored.into_response(),
+        Ok(Claim::Replay(stored)) => {
+            return match idem
+                .replay_refusal(&operation, &principal, &parts, &stored.containers)
+                .await
+            {
+                Some(refusal) => refusal,
+                None => stored.into_response(),
+            };
+        }
         Ok(Claim::Mismatch) => {
             return problem(StatusCode::UNPROCESSABLE_ENTITY, "idempotency_key_reused");
         }
@@ -161,8 +251,33 @@ pub async fn middleware(State(idem): State<Idempotency>, request: Request, next:
         Ok(Claim::Acquired) => {}
     }
 
-    let response = next.run(Request::from_parts(parts, Body::from(body))).await;
-    finish(&idem.db, &owner, &key, response).await
+    let (response, checked) = CHECKED
+        .scope(std::sync::Mutex::new(Vec::new()), async {
+            let response = next.run(Request::from_parts(parts, Body::from(body))).await;
+            let checked = CHECKED
+                .try_with(|checked| checked.lock().map(|c| c.clone()).unwrap_or_default())
+                .unwrap_or_default();
+            (response, checked)
+        })
+        .await;
+    finish(&idem.db, &owner, &key, response, &checked).await
+}
+
+/// The `{workspace_id}` segment of `path`, a request to `operation`'s route.
+fn workspace_of<'a>(operation: &OperationInfo, path: &'a str) -> Option<&'a str> {
+    // Templates and paths line up segment by segment, from `/api/` on (a
+    // router nested under `/bff` prefixes the path).
+    let template: Vec<&str> = operation.path.split('/').collect();
+    let path = path.find("/api/").map_or(path, |at| &path[at..]);
+    let segments: Vec<&str> = path.split('/').collect();
+    if template.len() != segments.len() {
+        return None;
+    }
+    let wanted = format!("{{{WORKSPACE_PATH_PARAM}}}");
+    template
+        .iter()
+        .zip(segments)
+        .find_map(|(t, s)| (*t == wanted).then_some(s))
 }
 
 fn valid_key(value: &HeaderValue) -> Result<String, LocalizableProblem> {
@@ -215,6 +330,7 @@ struct Stored {
     content_type: Option<String>,
     location: Option<String>,
     body: Vec<u8>,
+    containers: Vec<RecordRef>,
 }
 
 impl IntoResponse for Stored {
@@ -289,7 +405,7 @@ async fn claim(
         let existing = sqlx::query!(
             r#"
             SELECT operation_id, request_hash, state, response_status,
-                   response_content_type, response_location, response_body
+                   response_content_type, response_location, response_body, containers
               FROM kernel.idempotency
              WHERE principal = $1 AND key = $2 AND expires_at > now()
             "#,
@@ -311,6 +427,11 @@ async fn claim(
                     content_type: row.response_content_type,
                     location: row.response_location,
                     body,
+                    // Unreadable means "checked something": refuse the
+                    // replay rather than skip the check.
+                    containers: serde_json::from_value(row.containers).unwrap_or_else(|_| {
+                        vec![RecordRef::new("kernel.unreadable", "unreadable")]
+                    }),
                 }),
                 _ => Claim::InFlight,
             },
@@ -334,7 +455,13 @@ fn storable(status: StatusCode) -> bool {
 }
 
 /// Store the response for replay, or release the key.
-async fn finish(db: &PgPool, owner: &str, key: &str, response: Response) -> Response {
+async fn finish(
+    db: &PgPool,
+    owner: &str,
+    key: &str,
+    response: Response,
+    containers: &[RecordRef],
+) -> Response {
     let status = response.status();
     if !storable(status) {
         release(db, owner, key).await;
@@ -364,7 +491,7 @@ async fn finish(db: &PgPool, owner: &str, key: &str, response: Response) -> Resp
         r#"
         UPDATE kernel.idempotency
            SET state = 'completed', response_status = $3, response_content_type = $4,
-               response_location = $5, response_body = $6
+               response_location = $5, response_body = $6, containers = $7
          WHERE principal = $1 AND key = $2 AND state = 'pending'
         "#,
         owner,
@@ -373,6 +500,7 @@ async fn finish(db: &PgPool, owner: &str, key: &str, response: Response) -> Resp
         header(header::CONTENT_TYPE),
         header(header::LOCATION),
         body.as_ref(),
+        serde_json::to_value(containers).unwrap_or_default(),
     )
     .execute(db)
     .await;

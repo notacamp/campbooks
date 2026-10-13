@@ -7,6 +7,7 @@ use sqlx::PgPool;
 use crate::{
     admin::{AdminAuditPort, AdminProfilesPort, NoAdmins, NoAudit},
     auth::TokenVerifier,
+    authz,
     blobs::BlobStore,
     changes::{ChangeHub, NoContainers, VisibilityPort},
     config::Config,
@@ -81,6 +82,10 @@ pub struct AppState {
     /// The request and job instruments: from the meter provider installed
     /// when the state is built (the no-op without one).
     pub metrics: Metrics,
+    /// Every module's resource types and facts: what
+    /// [`authz::authorize`] decides with (ADR 0017). Empty (everything
+    /// denied) until the server registers it.
+    pub resources: authz::Catalogue,
     /// Reads admin profiles, for [`Admin`](crate::admin::Admin) handlers.
     /// The server registers the `admin` module's implementation; until then
     /// nobody is an administrator.
@@ -116,6 +121,7 @@ impl AppState {
             admin_audit: Arc::new(NoAudit),
             rate_limits: RateLimits::default(),
             signer: Signer::default(),
+            resources: authz::Catalogue::default(),
         }
     }
 
@@ -170,6 +176,13 @@ impl AppState {
     #[must_use]
     pub fn with_visibility(mut self, visibility: VisibilityPort) -> Self {
         self.visibility = visibility;
+        self
+    }
+
+    /// The same state, deciding access with `resources` (ADR 0017).
+    #[must_use]
+    pub fn with_resources(mut self, resources: authz::Catalogue) -> Self {
+        self.resources = resources;
         self
     }
 
