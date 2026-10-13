@@ -259,15 +259,21 @@ jobs:
           set -e
           [ "$code" = 64 ] || { echo "::error::expected exit 64 without LAYA_API_KEY, got $code"; exit 1; }
           key=$(openssl rand -hex 16)
-          docker run -d --name laya -p 127.0.0.1:8000:8000 -e LAYA_API_KEY="$key" -e LAYA_THREADS=3 --cpus 3 campbooks-laya:ci
+          # A failed checkpoint download (Hugging Face answering 5xx) exits the
+          # container; like `restart: unless-stopped` in compose, restart it.
+          docker run -d --name laya --restart on-failure:5 -p 127.0.0.1:8000:8000 \
+            -e LAYA_API_KEY="$key" -e LAYA_THREADS=3 --cpus 3 campbooks-laya:ci
           for i in $(seq 1 120); do
             s=$(docker inspect -f '{{.State.Health.Status}}' laya)
             [ "$s" = healthy ] && break
-            [ "$(docker inspect -f '{{.State.Running}}' laya)" = true ] || { docker logs laya; exit 1; }
+            if [ "$(docker inspect -f '{{.State.Status}}' laya)" = exited ]; then
+              echo "::error::laya exited after $(docker inspect -f '{{.RestartCount}}' laya) restarts"
+              docker logs --tail 50 laya; exit 1
+            fi
             sleep 5
           done
           [ "$s" = healthy ] || { docker logs --tail 50 laya; exit 1; }
-          echo "healthy after ~$((i * 5)) s (checkpoint download included)"
+          echo "healthy after ~$((i * 5)) s, $(docker inspect -f '{{.RestartCount}}' laya) restarts (checkpoint download included)"
           cat > /tmp/req.json <<'JSON'
           {"model": "convaiinnovations/laya-multilingual",
            "state": {"from": "Ana <ana@example.com>", "subject": "Invoice 2026-114 due Friday",
