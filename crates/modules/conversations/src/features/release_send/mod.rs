@@ -10,6 +10,7 @@ use campbooks_kernel::{
     JobContext, JobError, JobHandler,
     blobs::BlobOwner,
     db::BeginFor as _,
+    jobs::EnqueueOptions,
     tenancy::{Access, WorkspaceId},
 };
 use chrono::Utc;
@@ -18,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     domain::{drafts, format, redact},
     events::{DRAFT_RECORD, SendRequested},
+    features::check_send::{CHECK_AFTER, CheckSend, CheckSendPayload},
     model::{DraftId, DraftState, SendId},
     outgoing::{OUTGOING_CONTENT_TYPE, OUTGOING_VERSION, OutgoingAttachment, OutgoingMessage},
 };
@@ -115,6 +117,18 @@ impl JobHandler for ReleaseSend {
                 },
             )
             .await?;
+        // If nothing ever comes back, stop waiting (an hour on).
+        campbooks_kernel::jobs::enqueue_to::<CheckSend>(
+            tx,
+            &CheckSendPayload {
+                draft: payload.draft,
+                send_id,
+            },
+            EnqueueOptions::for_workspace(ws.clone())
+                .unique(format!("check:{send_id}"))
+                .run_at(Utc::now() + CHECK_AFTER),
+        )
+        .await?;
         tracing::info!(%workspace, draft = %payload.draft, %send_id, "send released");
         Ok(())
     }

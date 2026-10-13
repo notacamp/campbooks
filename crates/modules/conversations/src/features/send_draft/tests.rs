@@ -28,6 +28,17 @@ async fn reply(kit: &Kit, workspace: WorkspaceId, sam: &str) -> String {
     format!("{uri}/{}", draft.json["id"].as_str().unwrap())
 }
 
+/// Send the draft at `uri`, naming the version it has now.
+async fn send(kit: &Kit, token: &str, uri: &str) -> campbooks_kernel::testing::TestResponse {
+    let version = kit.get(token, uri).await.json["version"].clone();
+    kit.post(
+        token,
+        &format!("{uri}/send"),
+        Some(json!({"version": version})),
+    )
+    .await
+}
+
 /// Make every pending release due now and run the jobs.
 async fn window_ends(kit: &Kit) {
     sqlx::query(
@@ -69,12 +80,12 @@ async fn send_waits_out_the_window_then_requests_the_send_once(db: PgPool) {
     let (workspace, inbox, sam) = kit.sams_inbox().await;
     let draft = reply(&kit, workspace, &sam).await;
 
-    let sent = kit.post(&sam, &format!("{draft}/send"), None).await;
+    let sent = send(&kit, &sam, &draft).await;
     assert_eq!(sent.status, StatusCode::ACCEPTED, "{:?}", sent.json);
     assert_eq!(sent.json["state"], "scheduled");
     assert!(sent.json["send_at"].is_string());
     // Scheduled drafts cannot change or be sent twice.
-    let again = kit.post(&sam, &format!("{draft}/send"), None).await;
+    let again = send(&kit, &sam, &draft).await;
     assert_eq!(again.status, StatusCode::CONFLICT);
     assert_eq!(again.json["code"], "draft_not_editable");
     let edit = kit
@@ -154,7 +165,7 @@ async fn undo_then_send_again_releases_only_the_second(db: PgPool) {
     let (workspace, _, sam) = kit.sams_inbox().await;
     let draft = reply(&kit, workspace, &sam).await;
 
-    kit.post(&sam, &format!("{draft}/send"), None).await;
+    send(&kit, &sam, &draft).await;
     let undone = kit.post(&sam, &format!("{draft}/cancel_send"), None).await;
     assert_eq!(undone.status, StatusCode::OK, "{:?}", undone.json);
     assert_eq!(undone.json["state"], "draft");
@@ -172,7 +183,7 @@ async fn undo_then_send_again_releases_only_the_second(db: PgPool) {
     window_ends(&kit).await;
     assert!(kit.events("conversations.send_requested").await.is_empty());
 
-    kit.post(&sam, &format!("{draft}/send"), None).await;
+    send(&kit, &sam, &draft).await;
     window_ends(&kit).await;
     let requested = kit.events("conversations.send_requested").await;
     assert_eq!(requested.len(), 1);
@@ -191,7 +202,7 @@ async fn a_failed_send_can_be_fixed_and_sent_again(db: PgPool) {
     let kit = Kit::new(db).await;
     let (workspace, inbox, sam) = kit.sams_inbox().await;
     let draft = reply(&kit, workspace, &sam).await;
-    kit.post(&sam, &format!("{draft}/send"), None).await;
+    send(&kit, &sam, &draft).await;
     window_ends(&kit).await;
     let first = kit.events("conversations.send_requested").await[0]["send_id"]
         .as_str()
@@ -203,7 +214,7 @@ async fn a_failed_send_can_be_fixed_and_sent_again(db: PgPool) {
     assert_eq!(failed.json["failure_reason"], "rejected");
     assert_eq!(kit.events("conversations.send_failed").await.len(), 1);
 
-    let resent = kit.post(&sam, &format!("{draft}/send"), None).await;
+    let resent = send(&kit, &sam, &draft).await;
     assert_eq!(resent.status, StatusCode::ACCEPTED);
     window_ends(&kit).await;
     let requested = kit.events("conversations.send_requested").await;
@@ -220,7 +231,7 @@ async fn a_send_needs_valid_recipients(db: PgPool) {
         .post(&sam, &uri, Some(json!({"kind": "new", "inbox_id": inbox})))
         .await;
     let one = format!("{uri}/{}", draft.json["id"].as_str().unwrap());
-    let response = kit.post(&sam, &format!("{one}/send"), None).await;
+    let response = send(&kit, &sam, &one).await;
     assert_eq!(response.status, StatusCode::BAD_REQUEST);
     assert_eq!(response.json["code"], "no_recipients");
     kit.patch(
@@ -229,7 +240,61 @@ async fn a_send_needs_valid_recipients(db: PgPool) {
         json!({"version": 1, "to": [{"address": "not an address"}]}),
     )
     .await;
-    let response = kit.post(&sam, &format!("{one}/send"), None).await;
+    let response = send(&kit, &sam, &one).await;
     assert_eq!(response.json["code"], "invalid_address");
     assert_eq!(kit.get(&sam, &one).await.json["state"], "draft");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_send_names_the_version_it_sends(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let draft = reply(&kit, workspace, &sam).await;
+    // Saved elsewhere since the composer last saved: refuse rather than send
+    // something the member did not see.
+    let saved = kit
+        .patch(&sam, &draft, json!({"version": 1, "body": "Changed"}))
+        .await;
+    assert_eq!(saved.json["version"], 2);
+    let stale = kit
+        .post(&sam, &format!("{draft}/send"), Some(json!({"version": 1})))
+        .await;
+    assert_eq!(stale.status, StatusCode::CONFLICT);
+    assert_eq!(stale.json["code"], "draft_changed");
+    assert_eq!(kit.get(&sam, &draft).await.json["state"], "draft");
+    let no_version = kit.post(&sam, &format!("{draft}/send"), None).await;
+    assert_ne!(no_version.status, StatusCode::ACCEPTED);
+    assert_eq!(send(&kit, &sam, &draft).await.status, StatusCode::ACCEPTED);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_send_that_never_reports_back_stops_waiting(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, inbox, sam) = kit.sams_inbox().await;
+    let draft = reply(&kit, workspace, &sam).await;
+    send(&kit, &sam, &draft).await;
+    window_ends(&kit).await;
+    let send_id = kit.events("conversations.send_requested").await[0]["send_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(kit.get(&sam, &draft).await.json["state"], "sending");
+
+    // An hour on, still nothing: the draft is editable again, honestly.
+    sqlx::query(
+        "UPDATE kernel.jobs SET run_at = now() WHERE kind = 'conversations.check_send' AND state = 'pending'",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    kit.run_jobs().await;
+    let stopped = kit.get(&sam, &draft).await;
+    assert_eq!(stopped.json["state"], "failed");
+    assert_eq!(stopped.json["failure_reason"], "unknown_outcome");
+    assert_eq!(kit.events("conversations.send_failed").await.len(), 1);
+
+    // A late report still counts: it was sent after all.
+    complete(&kit, workspace, inbox, &send_id, true).await;
+    assert_eq!(kit.get(&sam, &draft).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(kit.events("conversations.draft_sent").await.len(), 1);
 }

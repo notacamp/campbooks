@@ -1,7 +1,8 @@
 //! `conversations.record_send` — the connector reports how a send ended
 //! (`connectors.send_completed`): a sent draft is deleted, a failed one is
 //! editable again with its reason. The sent message itself arrives in the
-//! connector's change batch, like any message.
+//! connector's change batch, like any message. A late outcome for a draft
+//! that stopped waiting (`failed`, same send) still counts.
 
 use campbooks_kernel::{Event, EventConsumer, JobContext, JobError};
 
@@ -31,7 +32,8 @@ impl EventConsumer for RecordSend {
         let Some(draft) = sqlx::query!(
             r#"SELECT id AS "id: DraftId", inbox_id AS "inbox: InboxId",
                       conversation_id AS "conversation: ConversationId"
-                 FROM conversations.drafts WHERE send_id = $1 AND state = 'sending'
+                 FROM conversations.drafts
+                WHERE send_id = $1 AND state IN ('sending', 'failed')
                   FOR UPDATE"#,
             completed.send_id as SendId,
         )

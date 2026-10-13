@@ -15,6 +15,8 @@ use campbooks_kernel::{
     tenancy::{Workspace, WorkspaceId},
 };
 use chrono::{TimeDelta, Utc};
+use serde::Deserialize;
+use utoipa::ToSchema;
 
 use crate::{
     domain::{
@@ -25,6 +27,14 @@ use crate::{
     model::{DraftId, DraftState},
     scopes::ConversationsSend,
 };
+
+/// Which version of the draft to send: the one the member last saw saved.
+#[derive(Debug, Clone, Copy, Deserialize, ToSchema)]
+pub struct SendDraft {
+    /// The draft's version as last saved by the caller; any other answers
+    /// 409 `draft_changed`, so what is sent is what the member saw.
+    pub version: u32,
+}
 
 /// How sending behaves, from the module's settings.
 #[derive(Debug, Clone, Copy)]
@@ -48,6 +58,7 @@ pub struct SendSettings {
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("draft_id" = DraftId, Path, description = "The draft."),
     ),
+    request_body = SendDraft,
     responses(
         (status = ACCEPTED, description = "Scheduled: it leaves at `send_at` unless cancelled.",
             body = DraftView),
@@ -59,7 +70,7 @@ pub struct SendSettings {
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such draft, or it is not yours.",
             body = Problem, content_type = "application/problem+json"),
-        (status = CONFLICT, description = "Already on its way (`draft_not_editable`).",
+        (status = CONFLICT, description = "Already on its way (`draft_not_editable`), or saved since that version (`draft_changed`).",
             body = Problem, content_type = "application/problem+json"),
     )
 )]
@@ -68,6 +79,7 @@ pub async fn send(
     Extension(settings): Extension<SendSettings>,
     workspace: Workspace<ConversationsSend>,
     extract::Path(path): extract::Path<DraftPath>,
+    extract::Json(body): extract::Json<SendDraft>,
 ) -> Result<(StatusCode, Json<DraftView>)> {
     let access = &workspace.access;
     let id = path.draft_id;
@@ -77,6 +89,9 @@ pub async fn send(
         return Err(Error::Conflict(
             crate::MESSAGES.reason("draft_not_editable"),
         ));
+    }
+    if i64::from(body.version) != i64::from(row.version) {
+        return Err(Error::Conflict(crate::MESSAGES.reason("draft_changed")));
     }
     let (to, cc, bcc) = row.recipients()?;
     if to.len() + cc.len() + bcc.len() == 0 {

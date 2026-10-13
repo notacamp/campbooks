@@ -2,6 +2,7 @@
 
 pub mod apply_changes;
 pub mod archive;
+pub mod check_send;
 pub mod create_draft;
 pub mod create_inbox;
 pub mod decide_message;

@@ -152,6 +152,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .publishes::<events::DraftSent>()
             .publishes::<events::SendFailed>()
             .handler(features::release_send::ReleaseSend)
+            .handler(features::check_send::CheckSend)
             .consumer(features::record_send::RecordSend)
             .handler(features::apply_changes::ApplyChanges::new(
                 deps.rules,
@@ -230,6 +231,7 @@ mod tests {
             "conversations.purge_workspace",
             "conversations.release_send",
             "conversations.record_send",
+            "conversations.check_send",
         ] {
             assert!(kinds.contains(&kind), "{kind}");
         }
