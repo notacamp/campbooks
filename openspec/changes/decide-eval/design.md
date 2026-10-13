@@ -32,93 +32,103 @@ crates/ai/evals/decide/mail-triage/
   reports/baseline.md  reports/baseline.json
 ```
 
-One item per line:
+One item per line (`message` is a `signals::email::Envelope` plus its date):
 
 ```json
-{"id": "pt-PT-0042", "lang": "pt-PT", "split": "test", "workspace": "atelier",
- "hard": ["deadline_in_prose", "polite_ask"],
+{"id": "pt-PT-atelier-01", "lang": "pt-PT", "split": "dev", "workspace": "atelier",
+ "hard": ["polite_ask"],
  "message": {
-   "from": {"name": "Marta Quintela", "address": "marta@quintela-arquitetos.example"},
-   "to": [{"name": "Rui", "address": "rui@atelier.example"}],
-   "subject": "Plantas do 2.º piso",
-   "headers": {"List-Unsubscribe": null},
-   "attachments": [{"name": "plantas_v3.pdf", "content_type": "application/pdf"}],
-   "body": "Olá Rui, …"},
+   "from": {"name": "Marta Figueiredo", "address": "marta.figueiredo@example.com"},
+   "to": [{"name": "Inês Valadares", "address": "ines@atelierpacheco.example"}],
+   "subject": "Cozinha – planta revista", "date": "2026-09-03T09:12:00+01:00",
+   "headers": {}, "attachments": [], "body": "Bom dia, Inês, …"},
  "labels": {"stream": "primary", "needs_reply": true, "asks_action": true,
-            "has_deadline": true, "urgency": 1, "suspicious": false},
- "rationale": "Pede revisão das plantas «até ao fim da próxima semana»."}
+            "has_deadline": false, "urgency": 1, "suspicious": false},
+ "rationale": "O pedido é amável ('quando puder') mas …"}
 ```
 
 - **Workspaces** are four fictional personas (a Lisbon architecture studio, a
   Madrid bakery, a Lyon household, a London freelance consultant), each with
-  mail in all four languages, so k-NN can be simulated per workspace.
-- **Split** is fixed in the data (`dev` ≈ 50 %, stratified by stream and
-  language): thresholds, temperatures and rule tuning use `dev` only; the
-  report's headline numbers are on `test`.
-- **Mix per language** (≈ 80): primary 40 %, updates 20 %, receipts 20 %,
-  newsletters 20 %; suspicious ≈ 10 % (look-alikes of updates and receipts);
-  ≥ ⅓ hard cases; ≈ 25 % of items carry no bulk headers at all, because some
-  providers don't expose them.
-- **Consistency rules** (checked by a test): `needs_reply`, `asks_action` and
-  `has_deadline` can be true outside `primary` only where the guide allows it
-  (a receipt with a payment due date has a deadline); `urgency = 2` implies
-  `has_deadline` or an explicit "today/now"; suspicious items are never
-  `needs_reply`. Ids unique; every address on `example.com`, `*.example`,
-  `*.test` or `*.invalid`.
-- **Labels are produced to spec, then checked blind.** Items are drafted by an
-  LLM from a target label vector and a hard-case tag, then a second, blind
-  pass labels them from the guide alone. Disagreements are adjudicated against
-  the guide and the ruling added to it; items still ambiguous are dropped. The
-  report records the agreement per question, which is also a ceiling on what
-  any strategy can be expected to reach. I spot-check a sample per language.
+  20 messages in each of the four languages, so k-NN can be simulated per
+  workspace.
+- **Split** is fixed in the data, exactly half `dev` per stream, workspace and
+  language: rule confidences, thresholds and temperatures use `dev` only; the
+  report's numbers are on `test`.
+- **Mix per language** (80): primary 40 %, updates 20 %, receipts 20 %,
+  newsletters 20 %; 10 % suspicious (look-alikes of banks, carriers,
+  suppliers and bosses); over two thirds carry a hard-case tag; 35–40 % of
+  the automated mail has no bulk headers, because some providers don't expose
+  them.
+- **Consistency rules** (a `cargo test` fails otherwise): `needs_reply` only in
+  `primary` and implies `asks_action`; `urgency > 0` implies `asks_action`;
+  `urgency = 2` implies `has_deadline`; suspicious means urgency 0 and no
+  reply; unique ids and messages; every address and link on a reserved domain.
+- **Every domain is `example.com` or `*.example`.** The first drafts put
+  phishing on `.test` and genuine senders on `.example`, which would have let
+  a rule read the label off the TLD; all of them were moved to `.example`.
+- **Labels are produced to spec, then checked blind.** Each language was
+  drafted by one model pass to a target label vector and hard-case quota, then
+  labelled again blind, from the guide alone, by another. Agreement before
+  adjudication was 97–100 % per question (table in `LABELLING.md`); the 23
+  items with a disagreement were settled against the guide and the rulings
+  added to it. Both passes are models, so this is an upper bound on human
+  agreement. I spot-checked a sample per language.
 - **Versioning:** the manifest has a `version`; changing a label or an item
   bumps it, and reports name the version they ran on.
 
-## Strategy trait
+## Strategies
 
-In `campbooks-ai::decide::strategy`, so conversations can use it and the
-harness measures exactly what ships:
+In `campbooks-ai`, the only crate both the harness and the conversations
+module may depend on, so the eval measures what ships:
 
 ```rust
-pub struct Envelope { from, to, subject, headers, attachments, body, lang_hint }
-
+// decide::strategy
 pub trait Strategy: Send + Sync {
     fn name(&self) -> &str;
     /// One entry per question, in order; `None` = abstains.
-    fn decide<'a>(&'a self, env: &'a Envelope, questions: &'a [Question],
-                  memory: &'a dyn Corrections)
-        -> BoxFuture<'a, Result<Vec<Option<Answer>>, Error>>;
+    fn decide<'a>(&'a self, envelope: &'a Envelope, questions: &'a [Question])
+        -> BoxFuture<'a, Result<Decisions, Error>>;
 }
-
-pub trait Corrections: Send + Sync {          // the workspace's labelled examples
-    fn examples(&self, question_id: &str) -> &[LabelledExample];
-}
+pub struct Decisions { pub answers: Vec<Option<Decided>>, pub remote_calls: u32 }
+pub struct Decided { pub answer: Answer, pub reasons: Vec<Reason> }
+pub struct Reason { pub rule: &'static str, pub evidence: String } // "signals.list_header", "List-Unsubscribe"
 ```
 
-- `Answer` is the existing type (value, probabilities, confidence, model,
-  latency), so a caller's `accept_if(τ)` works the same for every strategy.
-- **`rules`** — pure functions of the envelope. Each rule has a fixed
-  confidence set on `dev`; abstains when nothing fires. Signals: bulk headers,
-  `noreply`-style local parts, attachment MIME and names (`fatura`, `factura`,
-  `facture`, `invoice`, `recibo`, `reçu`, `receipt`), amounts with currency,
-  date expressions and deadline phrases per language, look-alike sender
-  domains and link/display mismatches.
-- **`knn`** — embeds the envelope's compact text, takes the k most similar
-  corrections of the same workspace (k = 5, distance-weighted), answers the
-  majority label with confidence = its weighted share, abstains below a
-  minimum number of examples or similarity. Embedders: `GatewayEmbedder` (the
-  `embed` role) and `LexicalEmbedder` (hashed character 3–5-grams, no model,
-  no dependency) — the latter is a floor, reported under its own name.
-  Simulated with each workspace's `dev` items as its corrections, evaluated on
-  its `test` items, plus a learning curve at 5, 10, 20 and all corrections.
-- **`model`** — `Gateway::decide` with a state built by a shared
-  `Envelope::decision_state()` (headers that matter, sender, subject,
-  attachment list, first ~1,500 characters of the body). Question wording per
-  question lives with the strategy; variants (e.g. `asks_action` as `noul` vs
-  a two-option `choice`) are separate named strategies.
-- **`cascade`** — `rules>knn>model`: per question, the first stage whose
-  answer reaches its stage threshold wins; the rest are not called for that
-  question (a model call is skipped entirely when every question is decided).
+- `Answer` is the existing `decide` type, so `accept_if(τ)` works the same for
+  every strategy. A `Reason` is a stable rule id plus the evidence it matched:
+  the UI translates the id for "Why?", logs can print it.
+- **`signals`** (`decide::signals::email::EmailSignals`) — the single source of
+  deterministic triage rules (the conversations module calls it and keeps no
+  copy). Envelope in, an `Option<Decided>` per question out, no I/O. Reads
+  bulk headers, `Auto-Submitted`, automated sender local parts, calendar
+  invites, attachments, amounts, and cue phrases in en/pt-PT/es-ES/fr
+  (requests, polite modals, conditional and "no need" sentences, payment
+  terms, paid/due, deadlines in dates and prose, "today", phishing phrases),
+  plus phishing tells (look-alike domain shapes, `Reply-To` elsewhere, links
+  elsewhere with a payment or login ask, pressure). Abstains where the
+  signals don't settle a question. Each rule's confidence is its `dev`
+  precision, smoothed as (correct + 1) / (answers + 2). The canonical
+  question wording is `triage_questions()`.
+- **`knn`** (`decide::knn::Knn`) — embeds `Envelope::embedding_text()`, takes
+  the 5 most similar corrections that answer the question, votes weighted by
+  similarity with additive smoothing, abstains under 2 neighbours of
+  similarity ≥ 0.1. Embedders: `GatewayEmbedder` (the `embed` role) and
+  `LexicalEmbedder` (hashed character 3–5-grams, no model, no dependency) — a
+  floor, reported under its own name. Examples come through a `Neighbours`
+  trait: pgvector in the module later, `InMemoryNeighbours` here. Simulated
+  per workspace with its `dev` items as its corrections (leave-one-out on
+  `dev`), plus a learning curve with the first 5, 10, 20 and all of them.
+- **`model`** (`decide::strategy::Model`) — one `Gateway::decide` call with
+  `Envelope::decision_state()` (sender, recipients, subject, the bulk headers
+  present, attachments, the first 1,500 characters of the body), Laya or an
+  instruct model.
+- **`cascade`** (`decide::strategy::Cascade`) — stages in order, each with a
+  threshold per question; the first stage whose answer reaches its threshold
+  wins, later stages are asked only the open questions, and not at all when
+  none is. A failing stage abstains (the earlier answers stand), so a model
+  server being down degrades to the rules. In the harness each stage but the
+  last uses its own `dev` operating point, and stages replay their recorded
+  answers through the real `Cascade`, so a cascade costs no second model call.
 
 ## Harness
 
@@ -126,9 +136,10 @@ pub trait Corrections: Send + Sync {          // the workspace's labelled exampl
 server; it gains a direct dependency and a tokio runtime for this command):
 
 ```
-cargo xtask eval decide                          # every runnable strategy, all questions, test split
-cargo xtask eval decide --strategy rules --question stream --lang pt-PT
-cargo xtask eval decide --strategy 'rules>knn-lexical>laya'
+cargo xtask eval decide                          # every runnable strategy, all questions
+cargo xtask eval decide --strategy signals --question stream --lang pt-PT
+cargo xtask eval decide --strategy 'signals>knn-lexical>laya'
+cargo xtask eval decide --offline --baseline     # rewrite reports/baseline.{md,json}
 cargo xtask eval decide --offline --check        # CI: offline strategies vs committed baseline
 ```
 
@@ -145,7 +156,8 @@ Per question × language × strategy (and "all languages"):
   noul (recall is what matters for `suspicious`); for `urgency` exact
   accuracy, mean absolute error and within-one.
 - **coverage@τ and precision@τ** for τ in 0.50–0.99, and the **operating
-  point**: the lowest τ whose precision on `dev` reaches the question's target
+  point**: the lowest τ whose precision on `dev` reaches the question's target,
+  with at least 10 answers covered,
   in the manifest (stream 0.95, needs_reply 0.90, asks_action 0.90,
   has_deadline 0.90, urgency 0.85, suspicious 0.98 for "warn"), then the
   precision and coverage at that τ on `test` with a 95 % Wilson interval. With
@@ -157,15 +169,21 @@ Per question × language × strategy (and "all languages"):
 - **latency:** p50 and p95 per call; and cost proxy = model calls per item
   (what a cascade saves).
 
-Output: `<out>/report.md` (tables) and `<out>/report.json` (every number,
-dataset version, strategy config, git commit, date). `--check` re-runs the
-offline strategies and fails if any operating-point precision or coverage
-moves below the committed baseline by more than a tolerance.
+- **hard cases:** accuracy per hard-case tag, so "polite asks" or "phishing
+  look-alikes" can be followed on their own.
+
+Output: `<out>/report.md` (tables, with whether each operating point *holds*
+on `test`), `<out>/report.json` (every number, dataset version, git commit,
+date) and `<out>/predictions.jsonl` (every answer with its reasons, for error
+analysis; never committed). `--check` re-runs the offline strategies and
+fails if any operating-point precision or coverage moves below the committed
+baseline by more than 2 points; it runs in CI in about 5 seconds, with no
+network.
 
 ## Deciding per question
 
-The eval produces, per question, a ranked list of strategies that reach the
-target precision on `test`, ranked by coverage, then cost. The chosen policy
+The eval produces, per question, the strategies whose operating point holds on
+`test`, ranked by coverage, then cost. The chosen policy
 is recorded in an ADR amending 0009 and shipped as a typed default
 (`DecidePolicy`: per question, a cascade and a threshold), overridable per
 instance. A question with no strategy reaching its target stays
@@ -197,9 +215,14 @@ decision by omission.
    repo; it arrives later as opt-in corrections.
 
 **Where the strategies live.**
-1. *Trait and strategies in `campbooks-ai`* (chosen): the only crate both the
-   harness and conversations may depend on, so the eval measures what ships.
-   Cost: mail-shaped knowledge (header names, keyword lists) in the AI crate.
+1. *Trait and strategies in `campbooks-ai`, the email rules as a documented
+   `decide::signals::email` module* (chosen, with the lead's constraint that
+   it is the single source of deterministic triage rules: conversations calls
+   it and keeps no copy; the API stays small: envelope in, an answer and its
+   reasons per question out). The reason: the eval must measure the code that
+   ships, and `campbooks-ai` is the only crate both the harness and the
+   module may depend on. Cost: mail-shaped knowledge (header names, cue
+   phrases) in the AI crate.
 2. *Rules in the conversations module, harness depending on it*: right owner
    for mail knowledge, but conversations does not exist yet, and a dev tool
    depending on a domain module inverts the layering.
@@ -243,5 +266,11 @@ and the eval set includes header-less items to keep the rules honest.
 - **Small n.** ~40 test items per language and question: Wilson intervals are
   shown and decisions are made on the all-language pool first.
 - **Model runs could not be made here** (no endpoint, no local Docker): those
-  strategies are implemented and tested against wiremock, but their numbers
-  wait for a configured endpoint.
+  strategies are implemented and tested against wiremock (and the harness
+  path against a throwaway local fake), but their numbers wait for a
+  configured endpoint (`openspec/decisions-needed.md`).
+- **The rules overfit `dev`.** On `dev` most rules are near 100 %; on `test`
+  several operating points do not hold (stream 87 % against a 95 % target,
+  suspicious recall 56 %). That gap is the honest measure of hand-written
+  rules on unseen mail, and the reason the per-question choice needs the
+  model numbers.

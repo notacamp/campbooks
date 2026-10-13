@@ -7,6 +7,19 @@ All notable changes to Campbooks Next are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- A way to measure the AI's sorting before it acts: a fictional, labelled set
+  of 320 emails in English, Portuguese, Spanish and French
+  (`crates/ai/evals/decide/mail-triage/`, with its labelling guide), and
+  `cargo xtask eval decide`, which reports for each triage question (stream,
+  needs a reply, asks you to do something, deadline, urgency, suspicious) how
+  often each strategy is right, how much mail it could handle on its own at
+  the confidence needed, its calibration and its speed. Model strategies run
+  against any endpoint set in `CAMPBOOKS_EVAL_LAYA_URL`,
+  `CAMPBOOKS_EVAL_INSTRUCT_URL` or `CAMPBOOKS_EVAL_EMBED_URL` and are reported
+  as not run otherwise.
+- Deterministic email signals, learning from your own corrections (nearest
+  neighbours) and cascades of them behind one interface with the `decide`
+  model, each answer carrying the reasons behind it.
 - Design system for the new app: light, dark and system themes; three
   workspace accents (business in ink, personal in terracotta, forest) and a
   compact density, remembered on each device and applied before the page

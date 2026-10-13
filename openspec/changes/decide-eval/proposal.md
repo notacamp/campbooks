@@ -27,14 +27,15 @@ Tracking issue: https://github.com/notacamp/campbooks-cloud/issues/59
   deadline, urgency (0–2) and suspicious. At least a third of each language is
   hard cases (polite asks, deadlines in prose, receipts vs invoices,
   newsletters from people, phishing look-alikes, quoted threads, mixed
-  languages). Only reserved domains (`example.com`, `.example`, `.test`) and
+  languages). Only reserved domains (`example.com`, `*.example`) and
   invented names.
 - **Strategy trait** in `campbooks-ai::decide::strategy`: one interface that
   answers triage questions about a message envelope, may abstain per question,
   and returns the same `Answer` type as `Gateway::decide`. Implementations:
-  - `rules`: deterministic signals (List-Unsubscribe / List-Id / Precedence /
+  - `signals` (`decide::signals::email`, the single source of the
+    deterministic triage rules): List-Unsubscribe / List-Id / Precedence /
     Auto-Submitted, attachment types, no-reply senders, per-language keyword
-    and date patterns, look-alike domains); abstains when no signal fires;
+    and date patterns, look-alike domains; abstains when no signal fires;
   - `knn`: k nearest neighbours over the workspace's own corrections, on top
     of an `Embedder`: the `embed` role (any OpenAI-compatible endpoint), or a
     dependency-free lexical embedder (hashed character n-grams) as a floor;
@@ -78,7 +79,7 @@ None (the `ai-decide` delta from `decide-role-laya` is unchanged).
   client change. No new crate dependency planned (`xtask` already has the
   workspace's `tokio`, `clap`, `serde_json`; it gains `campbooks-ai`, already
   in its build graph through the server).
-- CI: one new offline step (rules + lexical k-NN, milliseconds).
+- CI: one new offline step (signals + lexical k-NN, about 5 seconds).
 - Self-hosters: nothing changes at runtime.
 
 ## Non-goals

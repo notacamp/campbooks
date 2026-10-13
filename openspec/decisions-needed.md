@@ -15,6 +15,20 @@ configurable per instance and per workspace regardless of the default.
 extraction accuracy, latency and memory on the reference hardware) pick the
 default, and decide the hosted-cloud model together with the GPU sizing issue.
 
+## Model endpoints for decide evals (Laya + an open-weight instruct model)
+
+`cargo xtask eval decide` (campbooks-cloud#59) compares the triage strategies
+per question, but only the offline ones (email signals, lexical k-NN, their
+cascade) have been run: there is no Laya, instruct-model or embedding
+endpoint available to the agents, and no local Docker. Laya and the instruct
+model are implemented and tested against mocks and report "not run". The ADR
+amending 0009 with the strategy per question waits for those numbers.
+**Recommended:** a small hosted open-weight endpoint (an instruct model with
+logprobs, e.g. one of the catalog's 7–12B models, plus an embedding model),
+or the staging host's `ai` compose profile for Laya, reachable by a scheduled
+CI job with `CAMPBOOKS_EVAL_*` secrets. Run
+`cargo xtask eval decide` once there, then write the ADR from the report.
+
 ## Rauthy version bump to 0.37.x
 
 The compose file pins Rauthy 0.36.2, the newest release at least two weeks

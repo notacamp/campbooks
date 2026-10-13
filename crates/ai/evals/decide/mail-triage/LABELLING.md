@@ -7,7 +7,8 @@ conversations module asks of each inbound message (`docs/domain-map.md` →
 
 Everything here is fictional: invented people and organisations, and only
 reserved domains (`example.com`, `example.org`, `example.net`, or any name
-under `.example`, `.test`, `.invalid`). No real brand, bank, carrier, public
+under `.example`). Genuine senders and impersonations use the same top-level
+domain, so the domain's ending says nothing about the label. No real brand, bank, carrier, public
 body or person, not even in a phishing look-alike.
 
 ## Item format
@@ -91,7 +92,7 @@ on a suspicious message.
 ### `suspicious` (true/false)
 
 Phishing, scams and impersonation: a sender domain that imitates a known one
-(`banco-atlantico-seguranca.test` for `bancoatlantico.example`, digits for
+(`bancoatlantico-seguranca.example` for `bancoatlantico.example`, digits for
 letters), links whose text and target disagree, credentials or card details
 asked for through a link, gift-card or urgent-transfer requests from a "boss"
 or "supplier" at an odd address, fake invoices from unknown vendors with
