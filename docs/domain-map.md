@@ -166,7 +166,9 @@ are typed (`choice`, `score`, `noul`) and all asked in the item's single pass.
 - **Member** — a user's membership of a workspace, with a **role** (`owner`,
   `admin`, `member`). _Avoid_: seat.
 - **Invitation**, **Signup policy** (`open`, `invite_only`, `approval`,
-  `code`), **Security event**.
+  `code`), **Signup request** (one per user under `approval`; approved or
+  rejected by an administrator), **Signup code** (minted by an administrator,
+  single-use by default, stored as a digest), **Security event**.
 
 **Publishes** `WorkspaceCreated`, `MemberJoined`, `MemberLeft`,
 `MemberRoleChanged`, `WorkspaceDeleting`. **AI** none.

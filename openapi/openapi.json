@@ -473,6 +473,61 @@
         }
       }
     },
+    "/api/v1/signup": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "See where I stand with the signup policy.",
+        "operationId": "workspaces.get_signup",
+        "responses": {
+          "200": {
+            "description": "The policy and the caller's request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a user token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "workspaces:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/system/health": {
       "get": {
         "tags": [
@@ -4219,7 +4274,7 @@
             }
           },
           "403": {
-            "description": "Missing scope, a client token, or refused by the signup policy (`signup_invite_only`, `signup_requires_approval`, `signup_code_invalid`).",
+            "description": "Missing scope, a client token, or refused by the signup policy (`signup_invite_only`, `signup_requires_approval`, `signup_rejected`, `signup_code_invalid`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7769,6 +7824,15 @@
           }
         }
       },
+      "RequestStatus": {
+        "type": "string",
+        "description": "Where a user's signup request stands.",
+        "enum": [
+          "pending",
+          "approved",
+          "rejected"
+        ]
+      },
       "RevokeForm": {
         "type": "object",
         "description": "A revocation request (`application/x-www-form-urlencoded`).",
@@ -7944,6 +8008,45 @@
           "sub": {
             "type": "string",
             "description": "Stable user id at the identity provider."
+          }
+        }
+      },
+      "SignupPolicy": {
+        "type": "string",
+        "description": "Who may create a workspace when they are not a member of any yet.",
+        "enum": [
+          "open",
+          "invite_only",
+          "approval",
+          "code"
+        ]
+      },
+      "SignupStatus": {
+        "type": "object",
+        "description": "The caller's standing with the signup policy.",
+        "required": [
+          "policy",
+          "restricted"
+        ],
+        "properties": {
+          "policy": {
+            "$ref": "#/components/schemas/SignupPolicy",
+            "description": "The instance's policy."
+          },
+          "request": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RequestStatus",
+                "description": "Their signup request under the `approval` policy: `null` until they\nhave asked (asking is trying to create a workspace)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "restricted": {
+            "type": "boolean",
+            "description": "Whether the policy holds the caller back from creating a workspace:\n`false` for members of a workspace, the instance's first user and\nevery user of an `open` instance."
           }
         }
       },

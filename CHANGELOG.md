@@ -14,6 +14,17 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- Admin → Signups: administrators with `signups.review` (or `super`) see who asked to
+  join an instance that approves new accounts and approve or reject each request
+  (a rejection can carry a note only administrators see), and mint, copy once and
+  revoke **single-use signup codes** for instances that ask for a code. A person
+  waiting for approval, approved, or not approved sees that on the create-workspace
+  screen the next time they open the app (they are not emailed yet). Codes are
+  stored as digests, work for the number of uses and until the day you set, and are
+  spent when the workspace is created, so two people cannot share the last use.
+  `CAMPBOOKS_SIGNUP__CODES` keeps working as before (reusable codes), and
+  `CAMPBOOKS_SIGNUP__POLICY=code` no longer needs it to start. A refused request
+  now says `signup_rejected`, and asking again no longer repeats the request.
 - Reply, reply all, forward and new messages, sent through your Gmail. The
   composer opens under the thread (R, A, F) or on its own screen (C): From
   your mailbox, To, Cc and Bcc as chips, the quoted history folded under your

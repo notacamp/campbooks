@@ -210,7 +210,6 @@ impl Config {
                  (letters, digits, underscores)"
             ));
         }
-        self.signup.check()?;
         self.changes.check()?;
         self.telemetry.check()
     }
@@ -394,7 +393,8 @@ pub enum SignupPolicy {
     /// Nobody until an instance administrator approves them; the request is
     /// recorded.
     Approval,
-    /// Whoever presents one of the configured signup codes.
+    /// Whoever presents a valid signup code: one configured in the
+    /// environment, or one an administrator minted.
     Code,
 }
 
@@ -407,7 +407,9 @@ pub struct SignupConfig {
     /// `approval` or `code`.
     pub policy: SignupPolicy,
     /// `CAMPBOOKS_SIGNUP__CODES`: comma-separated codes accepted under the
-    /// `code` policy. Each can be used any number of times. Secret.
+    /// `code` policy. Each can be used any number of times. Secret. This is
+    /// the legacy path: administrators mint single-use codes in the admin
+    /// section, which need no setting.
     pub codes: Option<SecretString>,
 }
 
@@ -425,17 +427,6 @@ impl SignupConfig {
                     .collect()
             })
             .unwrap_or_default()
-    }
-
-    /// Startup check: the `code` policy needs at least one code.
-    pub fn check(&self) -> Result<(), String> {
-        if self.policy == SignupPolicy::Code && self.codes().is_empty() {
-            return Err(
-                "CAMPBOOKS_SIGNUP__POLICY=code needs at least one code in CAMPBOOKS_SIGNUP__CODES"
-                    .to_owned(),
-            );
-        }
-        Ok(())
     }
 }
 
@@ -1294,13 +1285,10 @@ mod tests {
                 .contains("CAMPBOOKS_CHANGES__MAX_CONNECTION_SECONDS")
         );
         config.changes = ChangesConfig::default();
+        // The `code` policy needs no environment code: administrators mint
+        // single-use codes in the database.
         config.signup.policy = SignupPolicy::Code;
-        assert!(
-            config
-                .check()
-                .unwrap_err()
-                .contains("CAMPBOOKS_SIGNUP__CODES")
-        );
+        assert!(config.check().is_ok());
         for policy in ["open", "invite_only", "approval"] {
             let figment = figment(&[("database_url", "postgres://localhost/x")]).merge(
                 Serialized::default("signup", serde_json::json!({ "policy": policy })),

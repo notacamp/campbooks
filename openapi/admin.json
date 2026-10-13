@@ -61,6 +61,462 @@
           "permission": "system.read"
         }
       }
+    },
+    "/admin/v1/workspaces/signup-codes": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "List signup codes.",
+        "operationId": "workspaces.admin_list_signup_codes",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Where the previous page ended (its `next`).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many: 1 to 200, default 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupCodeList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid limit or cursor.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not an administrator with `signups.review` (the same answer as an unknown route).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": false,
+          "permission": "signups.review"
+        }
+      },
+      "post": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Mint a signup code.",
+        "operationId": "workspaces.admin_mint_signup_code",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MintSignupCode"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Minted. The response is the only place the code appears.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MintedSignupCode"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid label, number of uses or expiry.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not an administrator with `signups.review` (the same answer as an unknown route).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": true,
+          "permission": "signups.review"
+        }
+      }
+    },
+    "/admin/v1/workspaces/signup-codes/{code_id}/revoke": {
+      "post": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Revoke a signup code.",
+        "operationId": "workspaces.admin_revoke_signup_code",
+        "parameters": [
+          {
+            "name": "code_id",
+            "in": "path",
+            "description": "The code.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SignupCodeId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The code, revoked (also when it already was).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupCodeView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such code, or not an administrator with `signups.review`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": true,
+          "permission": "signups.review"
+        }
+      }
+    },
+    "/admin/v1/workspaces/signup-requests": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "List signup requests.",
+        "operationId": "workspaces.admin_list_signup_requests",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Only requests in this state.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/RequestStatus"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Where the previous page ended (its `next`).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many: 1 to 200, default 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of requests.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupRequestList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid limit or cursor.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not an administrator with `signups.review` (the same answer as an unknown route).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": false,
+          "permission": "signups.review"
+        }
+      }
+    },
+    "/admin/v1/workspaces/signup-requests/{user_id}/approve": {
+      "post": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Approve a signup request.",
+        "operationId": "workspaces.admin_approve_signup_request",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "The requesting user.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UserId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request, approved (also when it already was).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupRequestView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such request, or not an administrator with `signups.review`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": true,
+          "permission": "signups.review"
+        }
+      }
+    },
+    "/admin/v1/workspaces/signup-requests/{user_id}/reject": {
+      "post": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Reject a signup request.",
+        "operationId": "workspaces.admin_reject_signup_request",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "The requesting user.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UserId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectSignupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The request, rejected (also when it already was).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupRequestView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The reason is too long.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such request, or not an administrator with `signups.review`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": true,
+          "permission": "signups.review"
+        }
+      }
     }
   },
   "components": {
@@ -196,6 +652,16 @@
         "enum": [
           "fs",
           "s3"
+        ]
+      },
+      "CodeState": {
+        "type": "string",
+        "description": "What a signup code can still do.",
+        "enum": [
+          "active",
+          "used_up",
+          "expired",
+          "revoked"
         ]
       },
       "ConfigSummary": {
@@ -360,6 +826,56 @@
           "separately"
         ]
       },
+      "MintSignupCode": {
+        "type": "object",
+        "description": "A new signup code.",
+        "required": [
+          "label"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "After this it cannot be redeemed; must be in the future. Never\nexpires when absent."
+          },
+          "label": {
+            "type": "string",
+            "description": "What it is for (who it goes to), 1 to 100 characters.",
+            "example": "Beta tester, Ana"
+          },
+          "max_uses": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "How many times it can be redeemed: 1 to 100000, default 1."
+          }
+        },
+        "additionalProperties": false
+      },
+      "MintedSignupCode": {
+        "type": "object",
+        "description": "A freshly minted code.",
+        "required": [
+          "code",
+          "entry"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The code to hand over, like `K7QM-2XWP-9DHE-RT4A`. Shown here once.",
+            "example": "K7QM-2XWP-9DHE-RT4A"
+          },
+          "entry": {
+            "$ref": "#/components/schemas/SignupCodeView",
+            "description": "The stored code (without the code itself)."
+          }
+        }
+      },
       "Problem": {
         "type": "object",
         "description": "RFC 9457 problem details.",
@@ -402,6 +918,119 @@
           "type": "about:blank"
         }
       },
+      "RejectSignupRequest": {
+        "type": "object",
+        "description": "Why a request is turned down.",
+        "properties": {
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "An optional note for the administrators' records, at most 500\ncharacters. The requester is told only that they were not approved."
+          }
+        },
+        "additionalProperties": false
+      },
+      "RequestStatus": {
+        "type": "string",
+        "description": "Where a user's signup request stands.",
+        "enum": [
+          "pending",
+          "approved",
+          "rejected"
+        ]
+      },
+      "SignupCodeId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "SignupCodeId (UUIDv7)"
+      },
+      "SignupCodeList": {
+        "type": "object",
+        "description": "A page of signup codes.",
+        "required": [
+          "codes"
+        ],
+        "properties": {
+          "codes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SignupCodeView"
+            },
+            "description": "The codes, newest first."
+          },
+          "next": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass as `after` for the next page; `null` on the last one."
+          }
+        }
+      },
+      "SignupCodeView": {
+        "type": "object",
+        "description": "One minted signup code. The code itself is never here: only its\nadministrators saw it, once, when it was minted.",
+        "required": [
+          "id",
+          "label",
+          "state",
+          "max_uses",
+          "uses",
+          "created_by",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When."
+          },
+          "created_by": {
+            "type": "string",
+            "description": "The administrator who minted it (their account id)."
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "After this it cannot be redeemed."
+          },
+          "id": {
+            "$ref": "#/components/schemas/SignupCodeId",
+            "description": "Its id."
+          },
+          "label": {
+            "type": "string",
+            "description": "What the administrator called it."
+          },
+          "max_uses": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many times it can be redeemed."
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was revoked."
+          },
+          "state": {
+            "$ref": "#/components/schemas/CodeState",
+            "description": "What it can still do."
+          },
+          "uses": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many times it was."
+          }
+        }
+      },
       "SignupPolicy": {
         "type": "string",
         "description": "Who may create a workspace when they are not a member of any yet.",
@@ -411,6 +1040,94 @@
           "approval",
           "code"
         ]
+      },
+      "SignupRequestList": {
+        "type": "object",
+        "description": "A page of signup requests.",
+        "required": [
+          "requests"
+        ],
+        "properties": {
+          "next": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass as `after` for the next page; `null` on the last one."
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SignupRequestView"
+            },
+            "description": "The requests: pending first, then newest first."
+          }
+        }
+      },
+      "SignupRequestView": {
+        "type": "object",
+        "description": "One signup request, as an administrator sees it: who asked and where it\nstands. No content, only the account's own name and address.",
+        "required": [
+          "user_id",
+          "status",
+          "requested_at"
+        ],
+        "properties": {
+          "decided_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When an administrator decided."
+          },
+          "decided_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The deciding administrator's account id."
+          },
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their display name, when their sign-in carried one."
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their email address, when their sign-in carried one."
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it was turned down, when the administrator said."
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When they first asked."
+          },
+          "status": {
+            "$ref": "#/components/schemas/RequestStatus",
+            "description": "Where the request stands."
+          },
+          "user_id": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The requesting user (also the request's id)."
+          }
+        }
+      },
+      "UserId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "UserId (UUIDv7)"
       }
     },
     "securitySchemes": {

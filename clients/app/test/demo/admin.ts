@@ -98,3 +98,77 @@ export const NOT_FOUND_PROBLEM = {
   detail: "This resource does not exist, or you cannot see it.",
   code: "not_found",
 } as const;
+
+type SignupRequest = AdminSchema<"SignupRequestView">;
+type SignupCode = AdminSchema<"SignupCodeView">;
+
+/** Two people waiting and one turned down (fictional). */
+export const SIGNUP_REQUESTS: SignupRequest[] = [
+  {
+    user_id: "0192f1a0-0000-7000-8000-0000000000a3",
+    display_name: "Inês Barros",
+    email: "ines@example.com",
+    status: "pending",
+    requested_at: "2026-10-12T09:30:00Z",
+    decided_at: null,
+    decided_by: null,
+    reason: null,
+  },
+  {
+    user_id: "0192f1a0-0000-7000-8000-0000000000a2",
+    display_name: null,
+    email: "tomas@example.com",
+    status: "pending",
+    requested_at: "2026-10-11T18:05:00Z",
+    decided_at: null,
+    decided_by: null,
+    reason: null,
+  },
+  {
+    user_id: "0192f1a0-0000-7000-8000-0000000000a1",
+    display_name: "Rui Matos",
+    email: "rui@example.com",
+    status: "rejected",
+    requested_at: "2026-10-09T07:00:00Z",
+    decided_at: "2026-10-10T10:00:00Z",
+    decided_by: "0192f1a0-0000-7000-8000-0000000000ff",
+    reason: "Not a customer",
+  },
+];
+
+/** An active single-use code, a team code half used, and a spent one. */
+export const SIGNUP_CODES: SignupCode[] = [
+  {
+    id: "0192f1a0-0000-7000-8000-0000000000c3",
+    label: "Beta, Inês",
+    state: "active",
+    max_uses: 1,
+    uses: 0,
+    expires_at: null,
+    created_by: "0192f1a0-0000-7000-8000-0000000000ff",
+    created_at: "2026-10-12T10:00:00Z",
+    revoked_at: null,
+  },
+  {
+    id: "0192f1a0-0000-7000-8000-0000000000c2",
+    label: "Team offsite",
+    state: "active",
+    max_uses: 5,
+    uses: 2,
+    expires_at: "2026-11-30T22:59:59Z",
+    created_by: "0192f1a0-0000-7000-8000-0000000000ff",
+    created_at: "2026-10-10T10:00:00Z",
+    revoked_at: null,
+  },
+  {
+    id: "0192f1a0-0000-7000-8000-0000000000c1",
+    label: "Launch day",
+    state: "used_up",
+    max_uses: 1,
+    uses: 1,
+    expires_at: null,
+    created_by: "0192f1a0-0000-7000-8000-0000000000ff",
+    created_at: "2026-10-01T10:00:00Z",
+    revoked_at: null,
+  },
+];

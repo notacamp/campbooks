@@ -123,6 +123,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/signup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** See where I stand with the signup policy. */
+        get: operations["workspaces.get_signup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/health": {
         parameters: {
             query?: never;
@@ -1850,6 +1867,11 @@ export interface components {
             /** @description The providers configured on this instance, in display order. */
             providers: string[];
         };
+        /**
+         * @description Where a user's signup request stands.
+         * @enum {string}
+         */
+        RequestStatus: "pending" | "approved" | "rejected";
         /** @description A revocation request (`application/x-www-form-urlencoded`). */
         RevokeForm: {
             /** @description The client (`client_secret_post`, or a public client). */
@@ -1923,6 +1945,23 @@ export interface components {
             name?: string | null;
             /** @description Stable user id at the identity provider. */
             sub: string;
+        };
+        /**
+         * @description Who may create a workspace when they are not a member of any yet.
+         * @enum {string}
+         */
+        SignupPolicy: "open" | "invite_only" | "approval" | "code";
+        /** @description The caller's standing with the signup policy. */
+        SignupStatus: {
+            /** @description The instance's policy. */
+            policy: components["schemas"]["SignupPolicy"];
+            request?: components["schemas"]["RequestStatus"] | null;
+            /**
+             * @description Whether the policy holds the caller back from creating a workspace:
+             *     `false` for members of a workspace, the instance's first user and
+             *     every user of an `open` instance.
+             */
+            restricted: boolean;
         };
         /** @description What to connect. */
         StartConnection: {
@@ -2521,6 +2560,44 @@ export interface operations {
             };
             /** @description It is the account's last way in (`last_way_in`). */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.get_signup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The policy and the caller's request. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupStatus"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not a user token. */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4874,7 +4951,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, a client token, or refused by the signup policy (`signup_invite_only`, `signup_requires_approval`, `signup_code_invalid`). */
+            /** @description Missing scope, a client token, or refused by the signup policy (`signup_invite_only`, `signup_requires_approval`, `signup_rejected`, `signup_code_invalid`). */
             403: {
                 headers: {
                     [name: string]: unknown;

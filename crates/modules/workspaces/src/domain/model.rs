@@ -18,6 +18,11 @@ campbooks_kernel::define_id!(
 );
 
 campbooks_kernel::define_id!(
+    /// A signup code an administrator minted.
+    SignupCodeId
+);
+
+campbooks_kernel::define_id!(
     /// An entry of the security log.
     SecurityEventId
 );
