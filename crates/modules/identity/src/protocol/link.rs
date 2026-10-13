@@ -222,6 +222,7 @@ async fn hand_over(ctx: &Ctx, flow: Flow, identity: ProviderIdentity, tokens: To
         subject: account.to_string(),
         provider: provider.as_str().to_owned(),
         account_subject: identity.subject,
+        issuer: identity.issuer,
         address,
         address_verified: identity.email_verified,
         display_name: identity.name,

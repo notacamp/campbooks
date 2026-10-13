@@ -9,7 +9,8 @@ use sqlx::PgPool;
 
 use crate::{
     testkit::{
-        HEALTHY, Kit, MAIL_SCOPE, ORIGIN, RECONNECTABLE, RECONNECTABLE_ADDRESS, TENANT, query,
+        HEALTHY, Kit, MAIL_SCOPE, ORIGIN, RECONNECTABLE, RECONNECTABLE_ADDRESS, TENANT, ZOHO_MAIL_SCOPES,
+        query,
     },
     upstream::{
         Provider,
@@ -572,6 +573,49 @@ async fn a_european_zoho_account_signs_in_at_its_data_centre(db: PgPool) {
         count(&kit, "SELECT count(*) FROM identity.held_grants").await,
         0
     );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_zoho_sign_up_brings_its_mailbox_and_its_data_centre(db: PgPool) {
+    let kit = Kit::new(db).await;
+    kit.intake.sync_zoho();
+    kit.zoho_eu.set_user(user("eu-sam"));
+    let (url, verifier) = Kit::web_authorize();
+    let request = kit.get(&url).await.location_query()["request"].clone();
+    let start = kit.get(&format!("/auth/start/zoho?request={request}")).await;
+    let asked = query(&start.location());
+    assert_eq!(asked["access_type"], "offline");
+    assert_eq!(
+        asked["scope"],
+        format!("openid email profile {}", ZOHO_MAIL_SCOPES.join(" "))
+    );
+    kit.via_zoho_eu(&start.location()).await;
+    let created = kit.create_account().await;
+    assert_eq!(created.status, StatusCode::CREATED, "{created:?}");
+    let back = query(created.json["redirect"].as_str().unwrap());
+    let tokens = kit.redeem(&back["code"], &verifier).await;
+    let access = tokens.json["access_token"].as_str().unwrap().to_owned();
+    let held = kit
+        .api(Method::GET, "/api/v1/identity/held-grants", &access)
+        .await;
+    let grant = held.json["items"][0]["id"].as_str().unwrap().to_owned();
+    assert_eq!(held.json["items"][0]["provider"], "zoho");
+    let workspace = uuid::Uuid::now_v7();
+    let adopted = kit
+        .api(
+            Method::POST,
+            &format!("/api/v1/w/{workspace}/identity/held-grants/{grant}/adopt"),
+            &access,
+        )
+        .await;
+    assert_eq!(adopted.status, StatusCode::OK, "{adopted:?}");
+    // The grant names the data centre that vouched for the account.
+    assert_eq!(kit.intake.issuers(), [kit.zoho_eu.issuer()]);
+    let handed = kit.intake.adopted();
+    assert!(handed[0].3.is_some(), "the refresh token went along");
+    for scope in ZOHO_MAIL_SCOPES {
+        assert!(handed[0].4.contains(&scope.to_owned()), "{scope}");
+    }
 }
 
 /// Ways in, live sessions and connections handed over, as counts.

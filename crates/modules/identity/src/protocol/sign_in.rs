@@ -488,14 +488,24 @@ pub(super) struct MailGrant {
 
 impl MailGrant {
     pub(super) fn of(ctx: &Ctx, provider: Provider, tokens: &Tokens) -> Self {
-        let scopes: Vec<String> = tokens
-            .scope
-            .as_deref()
-            .unwrap_or_default()
-            .split_whitespace()
-            .map(ToOwned::to_owned)
-            .collect();
         let wanted = ctx.state.grants.mailbox_scopes(provider.as_str());
+        Self::from_answer(provider, tokens.scope.as_deref(), wanted)
+    }
+
+    /// What a token answer's `scope` granted of the `wanted` mailbox scopes.
+    /// Scopes are split on spaces and commas (Zoho documents commas). Zoho
+    /// may leave `scope` out; its consent screen is all or nothing, so an
+    /// answer without it grants what was asked.
+    pub(super) fn from_answer(provider: Provider, scope: Option<&str>, wanted: Vec<String>) -> Self {
+        let scopes: Vec<String> = match scope {
+            None if provider == Provider::Zoho => wanted.clone(),
+            scope => scope
+                .unwrap_or_default()
+                .split(|c: char| c.is_whitespace() || c == ',')
+                .filter(|s| !s.is_empty())
+                .map(ToOwned::to_owned)
+                .collect(),
+        };
         let granted = !wanted.is_empty() && wanted.iter().all(|s| scopes.contains(s));
         Self { granted, scopes }
     }
@@ -765,4 +775,44 @@ pub async fn create_account(State(ctx): State<Ctx>, headers: HeaderMap) -> Resul
         response,
         issuer.cookies.clear(SIGN_UP_COOKIE, SameSite::Strict),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MailGrant, Provider};
+
+    fn wanted() -> Vec<String> {
+        ["ZohoMail.accounts.READ", "ZohoMail.messages.ALL"]
+            .map(str::to_owned)
+            .to_vec()
+    }
+
+    #[test]
+    fn granted_scopes_split_on_spaces_and_commas() {
+        let commas = MailGrant::from_answer(
+            Provider::Zoho,
+            Some("openid,ZohoMail.accounts.READ,ZohoMail.messages.ALL"),
+            wanted(),
+        );
+        assert!(commas.granted);
+        let spaces = MailGrant::from_answer(
+            Provider::Google,
+            Some("openid ZohoMail.accounts.READ, ZohoMail.messages.ALL"),
+            wanted(),
+        );
+        assert!(spaces.granted);
+        let partial = MailGrant::from_answer(Provider::Zoho, Some("ZohoMail.accounts.READ"), wanted());
+        assert!(!partial.granted);
+    }
+
+    #[test]
+    fn a_zoho_answer_without_scope_grants_what_was_asked() {
+        let zoho = MailGrant::from_answer(Provider::Zoho, None, wanted());
+        assert!(zoho.granted);
+        assert_eq!(zoho.scopes, wanted());
+        // Google always says what it granted.
+        assert!(!MailGrant::from_answer(Provider::Google, None, wanted()).granted);
+        // Nothing asked, nothing granted.
+        assert!(!MailGrant::from_answer(Provider::Zoho, None, Vec::new()).granted);
+    }
 }
