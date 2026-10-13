@@ -9,7 +9,8 @@
     "choice2": "Iniciar sesión con la segunda opción",
     "choice3": "Iniciar sesión con la tercera opción",
     "passkey": "Iniciar sesión con una llave de acceso",
-    "addWayIn": "Añadir una forma de iniciar sesión"
+    "addWayIn": "Añadir una forma de iniciar sesión",
+    "addPasskey": "Añadir una llave de acceso"
   },
   "signIn": {
     "title": "Inicia sesión en Campbooks",
@@ -48,6 +49,35 @@
     "failed": {
       "title": "No se han podido cargar las formas de iniciar sesión",
       "lead": "Campbooks no ha respondido. Comprueba tu conexión y vuelve a intentarlo."
+    },
+    "passkeyWaiting": "Esperando tu llave de acceso…",
+    "passkeySignUp": "¿No tienes cuenta? Crea una con una llave de acceso",
+    "passkeyField": {
+      "label": "Llaves de acceso guardadas",
+      "hint": "Tu navegador te ofrece aquí las llaves de acceso que guardaste para Campbooks.",
+      "placeholder": "Elige una llave de acceso"
+    },
+    "passkeyProblem": {
+      "cancelled": {
+        "title": "No se ha usado ninguna llave de acceso.",
+        "lead": "Vuelve a intentarlo cuando quieras o inicia sesión de otra forma."
+      },
+      "not_accepted": {
+        "title": "No se ha aceptado esa llave de acceso.",
+        "lead": "Puede que se haya quitado de tu cuenta. Prueba con otra llave de acceso o inicia sesión de otra forma."
+      },
+      "expired": {
+        "title": "Ha tardado demasiado.",
+        "lead": "Inténtalo de nuevo."
+      },
+      "rate_limited": {
+        "title": "Demasiados intentos.",
+        "lead": "Espera un minuto y vuelve a intentarlo."
+      },
+      "failed": {
+        "title": "No se ha podido iniciar sesión con una llave de acceso.",
+        "lead": "Algo ha fallado. Inténtalo de nuevo o inicia sesión de otra forma."
+      }
     }
   },
   "errors": {
@@ -245,6 +275,104 @@
       "unknown": {
         "title": "Algo ha salido mal.",
         "lead": "No ha cambiado nada. Inténtalo de nuevo."
+      }
+    }
+  },
+  "passkeySignUp": {
+    "eyebrow": "Cuenta nueva",
+    "title": "Crear una cuenta con una llave de acceso",
+    "lead": "Tu dispositivo guarda la llave de acceso y la desbloquea con tu cara, tu huella o el bloqueo de pantalla. No hay contraseña.",
+    "footer": "No hace falta una dirección de correo. Puedes añadir Google, Microsoft o Zoho más adelante.",
+    "name": {
+      "label": "¿Cómo quieres que te llamemos?",
+      "placeholder": "Tu nombre",
+      "hint": "Se muestra en Campbooks y a las personas que invites.",
+      "required": "Dinos cómo quieres que te llamemos.",
+      "tooLong": "Usa 64 caracteres o menos."
+    },
+    "create": "Crear con una llave de acceso",
+    "creating": "Esperando tu llave de acceso…",
+    "another": "Iniciar sesión de otra forma",
+    "nextTitle": "Qué pasa después",
+    "next1": "Tu dispositivo te pide guardar una llave de acceso para Campbooks.",
+    "next2": "Creas tu primer espacio de trabajo.",
+    "next3": "Conectas un buzón cuando quieras.",
+    "problem": {
+      "cancelled": {
+        "title": "No se ha creado ninguna llave de acceso.",
+        "lead": "No se ha creado nada. Vuelve a intentarlo cuando quieras."
+      },
+      "exists": {
+        "title": "Este dispositivo ya tiene una llave de acceso para eso.",
+        "lead": "Inicia sesión con ella."
+      },
+      "expired": {
+        "title": "Ha tardado demasiado.",
+        "lead": "No se ha creado nada. Inténtalo de nuevo."
+      },
+      "not_accepted": {
+        "title": "No se ha aceptado esa llave de acceso.",
+        "lead": "No se ha creado nada. Inténtalo de nuevo o usa otro dispositivo."
+      },
+      "failed": {
+        "title": "No se ha podido crear la cuenta.",
+        "lead": "No se ha creado nada. Inténtalo de nuevo."
+      }
+    },
+    "inviteOnly": {
+      "title": "Este Campbooks solo admite personas invitadas",
+      "lead": "Inicia sesión con la cuenta a la que se envió la invitación. Podrás añadir una llave de acceso cuando entres."
+    },
+    "unsupported": {
+      "title": "Este navegador no puede usar llaves de acceso",
+      "lead": "Usa otro navegador o dispositivo, o inicia sesión de otra forma."
+    }
+  },
+  "passkeys": {
+    "title": "Llaves de acceso",
+    "lead": "Inicia sesión con tu cara, tu huella o el bloqueo de pantalla en lugar de un proveedor. Las llaves de acceso no se pueden robar con phishing.",
+    "list": "Tus llaves de acceso",
+    "loading": "Cargando tus llaves de acceso…",
+    "loadError": "No se han podido cargar tus llaves de acceso.",
+    "retry": "Reintentar",
+    "none": "Aún no tienes llaves de acceso.",
+    "add": "Añadir una llave de acceso",
+    "adding": "Esperando tu llave de acceso…",
+    "added": "Se ha añadido {{name}}. Ya puedes iniciar sesión con ella.",
+    "nameOn": "Llave de acceso en {{device}}",
+    "synced": "Sincronizada entre tus dispositivos",
+    "thisDevice": "En un solo dispositivo",
+    "rename": "Cambiar el nombre",
+    "renameLabel": "Cambiar el nombre de {{name}}",
+    "removeLabel": "Quitar {{name}}",
+    "nameLabel": "Nombre",
+    "save": "Guardar",
+    "confirmRemove": "¿Dejar de iniciar sesión con {{name}}? Seguirá en tu dispositivo hasta que la borres allí, y quien haya iniciado sesión con ella cerrará la sesión.",
+    "renameFailed": {
+      "title": "No se ha podido cambiar el nombre.",
+      "lead": "Usa entre 1 y 64 caracteres e inténtalo de nuevo."
+    },
+    "unsupported": "Este navegador no puede crear llaves de acceso. Usa otro navegador o dispositivo para añadir una.",
+    "problem": {
+      "cancelled": {
+        "title": "No se ha añadido ninguna llave de acceso.",
+        "lead": "Vuelve a intentarlo cuando quieras."
+      },
+      "exists": {
+        "title": "Este dispositivo ya tiene una llave de acceso para tu cuenta.",
+        "lead": "Está en la lista."
+      },
+      "expired": {
+        "title": "Ha tardado demasiado.",
+        "lead": "No se ha añadido nada. Inténtalo de nuevo."
+      },
+      "notAccepted": {
+        "title": "No se ha aceptado esa llave de acceso.",
+        "lead": "No se ha añadido nada. Inténtalo de nuevo o usa otro dispositivo."
+      },
+      "failed": {
+        "title": "No se ha podido añadir una llave de acceso.",
+        "lead": "No se ha añadido nada. Inténtalo de nuevo."
       }
     }
   }
