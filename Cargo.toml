@@ -107,6 +107,11 @@ ammonia = "=4.2.3"
 mail-builder = { version = "1.0.0", default-features = false }
 mail-parser = { version = "0.11.9", default-features = false }
 
+# Passkeys (identity, ADR 0014): COSE_Key parsing and the CBOR of WebAuthn
+# attestation objects. Signatures are verified with aws-lc-rs.
+coset = "0.4.2"
+ciborium = "0.2.2"
+
 # Tests
 wiremock = "0.6.5"
 # JSON Schema (2020-12) validation in contract tests (`contracts/`).

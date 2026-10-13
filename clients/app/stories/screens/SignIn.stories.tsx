@@ -12,6 +12,12 @@ import { CONNECTION, HELD_GRANT, NEW_ACCOUNT, REQUEST } from "../../test/demo/id
 import { DUARTE, HOUSEHOLD, SESSION } from "../../test/demo/workspaces";
 
 import { mockFetch, saveThemeFromGlobals, type MockRoute } from "./mock-fetch";
+import {
+  CREATION_OPTIONS,
+  mockWebAuthn,
+  REQUEST_OPTIONS,
+  type MockWebAuthn,
+} from "./mock-webauthn";
 
 // The real app (router, public sign-in routes, session gate, first run, Home)
 // against in-memory demo data: every sign-in, new-account and mailbox state,
@@ -27,9 +33,23 @@ const signedOut: Record<string, MockRoute> = {
   "GET /bff/session": { body: { authenticated: false } },
 };
 
-const ways = (providers: string[]): Record<string, MockRoute> => ({
+const ways = (
+  providers: string[],
+  { passkeySignUp = true, signIn }: { passkeySignUp?: boolean; signIn?: MockRoute } = {},
+): Record<string, MockRoute> => ({
   ...signedOut,
-  [`GET /auth/requests/${REQUEST}`]: { body: { client_id: "campbooks-web", providers } },
+  [`GET /auth/requests/${REQUEST}`]: {
+    body: { client_id: "campbooks-web", providers, passkey_sign_up: passkeySignUp },
+  },
+  "POST /auth/passkey/sign-in/options": { body: REQUEST_OPTIONS },
+  "POST /auth/passkey/sign-in": signIn ?? problem(403, "passkey_not_accepted"),
+});
+
+/** The passkey-only sign-up, answering `signUp` when it finishes. */
+const passkeySignUp = (signUp?: MockRoute, options?: MockRoute): Record<string, MockRoute> => ({
+  ...signedOut,
+  "POST /auth/passkey/sign-up/options": options ?? { body: CREATION_OPTIONS },
+  "POST /auth/passkey/sign-up": signUp ?? problem(409, "passkey_expired"),
 });
 
 const newAccount = (create?: MockRoute): Record<string, MockRoute> => ({
@@ -85,6 +105,8 @@ interface ScreenArgs {
   api: Record<string, MockRoute>;
   /** Where this tab's sign-in comes back to. */
   returnTo?: string;
+  /** A pretend browser with passkeys (none: the real browser's, unused). */
+  webauthn?: MockWebAuthn;
 }
 
 const meta = {
@@ -93,7 +115,12 @@ const meta = {
   beforeEach: ({ args, globals }) => {
     saveThemeFromGlobals(globals);
     writeTabValue("signIn.returnTo", args.returnTo ?? "");
-    return mockFetch(args.api);
+    const restoreFetch = mockFetch(args.api);
+    const restoreWebAuthn = args.webauthn === undefined ? undefined : mockWebAuthn(args.webauthn);
+    return () => {
+      restoreFetch();
+      restoreWebAuthn?.();
+    };
   },
   render: ({ path }) => <AppAt path={path} />,
 } satisfies Meta<ScreenArgs>;
@@ -126,9 +153,152 @@ export const GmailDetails: Story = {
   },
 };
 
-/** Every way in the server can list (S2 and S3 turn them on): 1, 2, 3 and P. */
+/**
+ * Every way in the server can list: 1, 2, 3 and P, the field whose autofill
+ * offers saved passkeys, and the passkey-only sign-up.
+ */
 export const EveryWayIn: Story = {
-  args: { path: signInAt(""), api: ways(["google", "microsoft", "zoho", "passkey"]) },
+  args: {
+    path: signInAt(""),
+    api: ways(["google", "microsoft", "zoho", "passkey"]),
+    webauthn: {},
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const passkey = await canvas.findByRole("button", { name: /Use a passkey/u });
+    await expect(passkey).toHaveAttribute("aria-keyshortcuts", "P");
+    await expect(await canvas.findByRole("textbox", { name: "Saved passkeys" })).toHaveAttribute(
+      "autocomplete",
+      "username webauthn",
+    );
+    await expect(
+      canvas.getByRole("link", { name: /Create an account with a passkey/u }),
+    ).toBeVisible();
+  },
+};
+
+// --- Passkeys ----------------------------------------------------------------
+
+/** An instance with passkeys only: the passkey is the first way in. */
+export const PasskeyOnly: Story = {
+  args: { path: signInAt(""), api: ways(["passkey"]), webauthn: { autofill: false } },
+};
+
+/** A passkey that no account here knows any more. */
+export const PasskeyNotAccepted: Story = {
+  args: { path: signInAt(""), api: ways(["google", "passkey"]), webauthn: {} },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: /Use a passkey/u }));
+    await expect(await canvas.findByText("That passkey wasn’t accepted.")).toBeVisible();
+  },
+};
+
+/** The passkey dialog was closed. */
+export const PasskeyCancelled: Story = {
+  args: {
+    path: signInAt(""),
+    api: ways(["google", "passkey"]),
+    webauthn: { ceremony: "cancel" },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: /Use a passkey/u }));
+    await expect(await canvas.findByText("No passkey was used.")).toBeVisible();
+  },
+};
+
+/** An invite-only instance: passkeys sign in, but don't create accounts. */
+export const PasskeyInviteOnly: Story = {
+  args: {
+    path: signInAt(""),
+    api: ways(["google", "passkey"], { passkeySignUp: false }),
+    webauthn: {},
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByRole("button", { name: /Use a passkey/u });
+    await expect(canvas.queryByRole("link", { name: /Create an account/u })).toBeNull();
+  },
+};
+
+/** A new account with a passkey alone: one question. */
+export const PasskeySignUp: Story = {
+  args: { path: `/sign-in/passkey?request=${REQUEST}`, api: passkeySignUp(), webauthn: {} },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      await canvas.findByRole("textbox", { name: "What should we call you?" }),
+    ).toHaveFocus();
+  },
+};
+
+/** Create without a name. */
+export const PasskeySignUpNameMissing: Story = {
+  args: { path: `/sign-in/passkey?request=${REQUEST}`, api: passkeySignUp(), webauthn: {} },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: /Create with a passkey/u }));
+    await expect(await canvas.findByText("Tell us what to call you.")).toBeVisible();
+  },
+};
+
+/** The passkey dialog was closed: nothing was created. */
+export const PasskeySignUpCancelled: Story = {
+  args: {
+    path: `/sign-in/passkey?request=${REQUEST}`,
+    api: passkeySignUp(),
+    webauthn: { ceremony: "cancel" },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(
+      await canvas.findByRole("textbox", { name: "What should we call you?" }),
+      "Ana Duarte",
+    );
+    await userEvent.click(canvas.getByRole("button", { name: /Create with a passkey/u }));
+    await expect(await canvas.findByText("No passkey was made.")).toBeVisible();
+  },
+};
+
+/** Too slow: the ceremony expired on the server. */
+export const PasskeySignUpExpired: Story = {
+  args: { path: `/sign-in/passkey?request=${REQUEST}`, api: passkeySignUp(), webauthn: {} },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(
+      await canvas.findByRole("textbox", { name: "What should we call you?" }),
+      "Ana Duarte",
+    );
+    await userEvent.click(canvas.getByRole("button", { name: /Create with a passkey/u }));
+    await expect(await canvas.findByText("That took too long.")).toBeVisible();
+  },
+};
+
+/** An invite-only instance refuses a passkey-only account. */
+export const PasskeySignUpInviteOnly: Story = {
+  args: {
+    path: `/sign-in/passkey?request=${REQUEST}`,
+    api: passkeySignUp(undefined, problem(403, "signup_invite_only")),
+    webauthn: {},
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(
+      await canvas.findByRole("textbox", { name: "What should we call you?" }),
+      "Ana Duarte",
+    );
+    await userEvent.click(canvas.getByRole("button", { name: /Create with a passkey/u }));
+    await expect(
+      await canvas.findByRole("heading", { name: "This Campbooks takes invited people only" }),
+    ).toBeVisible();
+  },
+};
+
+/** The passkey-only sign-up in Portuguese, dark, forest. */
+export const PasskeySignUpPortuguese: Story = {
+  args: { path: `/sign-in/passkey?request=${REQUEST}`, api: passkeySignUp(), webauthn: {} },
+  globals: { locale: "pt-PT", theme: "dark", accent: "forest" },
 };
 
 /** On the way to an invitation link. */

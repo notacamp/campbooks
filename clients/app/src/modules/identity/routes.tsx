@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { AppsPage } from "./components/Apps/AppsPage";
 import { ConsentScreen } from "./components/Consent/ConsentScreen";
 import { NewAccountScreen } from "./components/NewAccount/NewAccount";
+import { PasskeySignUpScreen } from "./components/PasskeySignUp/PasskeySignUp";
 import { SignInScreen } from "./components/SignIn/SignInScreen";
 import { WaysInPage } from "./components/WaysIn/WaysInPage";
 import { WAY_IN_SECTIONS } from "./components/WaysIn/sections";
@@ -103,9 +104,10 @@ export interface IdentityRouteParents<TPublic extends AnyRoute, TWorkspace exten
 }
 
 /**
- * `/sign-in`, `/sign-in/new` and `/consent`, public: they are how a browser
- * gets a session or lets an app in; and Settings → Ways to sign in and Apps
- * and integrations, inside a workspace.
+ * `/sign-in`, `/sign-in/new`, `/sign-in/passkey` (a new account with a
+ * passkey alone) and `/consent`, public: they are how a browser gets a
+ * session or lets an app in; and Settings → Ways to sign in and Apps and
+ * integrations, inside a workspace.
  */
 export function buildIdentityRoutes<TPublic extends AnyRoute, TWorkspace extends AnyRoute>(
   parents: IdentityRouteParents<TPublic, TWorkspace>,
@@ -131,6 +133,15 @@ export function buildIdentityRoutes<TPublic extends AnyRoute, TWorkspace extends
       return <NewAccountScreen request={search.request} />;
     },
   });
+  const passkeySignUp = createRoute({
+    getParentRoute: () => parent,
+    path: "/sign-in/passkey",
+    validateSearch: validateSignInSearch,
+    component: function PasskeySignUpRoute() {
+      const search: SignInSearch = useSearch({ strict: false });
+      return <PasskeySignUpScreen request={search.request} />;
+    },
+  });
   const consent = createRoute({
     getParentRoute: () => parent,
     path: "/consent",
@@ -152,7 +163,7 @@ export function buildIdentityRoutes<TPublic extends AnyRoute, TWorkspace extends
     component: WaysInRoute,
   });
   return {
-    public: [signIn, newAccount, consent] as const,
+    public: [signIn, newAccount, passkeySignUp, consent] as const,
     workspace: [waysIn, apps] as const,
   };
 }

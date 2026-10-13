@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { api, operationKey, unwrap, unwrapEmpty, webRoutes, type Schema } from "~/lib/api";
 
+import { createPasskey, type AuthenticationJSON, type RequestOptions } from "../webauthn";
+
 export type NewAccount = Schema<"NewAccount">;
 export type HeldGrant = Schema<"HeldGrant">;
 
@@ -282,6 +284,131 @@ export function useRemoveClient(workspaceId: string) {
     onSuccess: (clientId) => {
       queryClient.setQueryData<WorkspaceClient[]>(clientsKey(workspaceId), (clients) =>
         clients?.filter((client) => client.client_id !== clientId),
+      );
+    },
+  });
+}
+
+// --- Passkeys ----------------------------------------------------------------
+
+export type PasskeyView = Schema<"PasskeyView">;
+type Passkeys = Schema<"Passkeys">;
+
+const passkeysKey = operationKey("identity.list_passkeys");
+
+/** The sign-in screens' actions carry the CSRF header; the issuer refuses them without it. */
+const SCREEN_ACTION = { header: { "x-campbooks-csrf": "1" } } as const;
+
+/**
+ * Sign in with a passkey from the sign-in screen: `identity.start_passkey_sign_in`
+ * for the options, `get` to have the browser sign them, then
+ * `identity.finish_passkey_sign_in`. Resolves to where to go next.
+ */
+export async function signInWithPasskey(
+  start: Schema<"SignInStart">,
+  get: (options: RequestOptions) => Promise<AuthenticationJSON>,
+): Promise<string> {
+  const options = unwrap(
+    await webRoutes().POST("/auth/passkey/sign-in/options", {
+      params: SCREEN_ACTION,
+      body: start,
+    }),
+  );
+  const credential = await get(options);
+  return unwrap(
+    await webRoutes().POST("/auth/passkey/sign-in", { params: SCREEN_ACTION, body: credential }),
+  ).redirect;
+}
+
+/**
+ * Create an account with a passkey alone: `identity.start_passkey_sign_up`,
+ * a new passkey from the browser, `identity.finish_passkey_sign_up`. Resolves
+ * to where to go next.
+ */
+export function usePasskeySignUp() {
+  return useMutation({
+    mutationFn: async (start: Schema<"SignUpStart">) => {
+      const options = unwrap(
+        await webRoutes().POST("/auth/passkey/sign-up/options", {
+          params: SCREEN_ACTION,
+          body: start,
+        }),
+      );
+      const credential = await createPasskey(options);
+      return unwrap(
+        await webRoutes().POST("/auth/passkey/sign-up", {
+          params: SCREEN_ACTION,
+          body: credential,
+        }),
+      ).redirect;
+    },
+  });
+}
+
+/** `identity.list_passkeys`: the passkeys you sign in with. */
+export function usePasskeys() {
+  return useQuery({
+    queryKey: passkeysKey,
+    queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/identity/passkeys", { signal })),
+  });
+}
+
+/**
+ * Add a passkey: `identity.start_passkey_registration` (needs a recent
+ * sign-in), a new passkey from the browser, then `identity.register_passkey`.
+ */
+export function useAddPasskey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (name: string | undefined) => {
+      const options = unwrap(await api.POST("/api/v1/identity/passkeys/registrations"));
+      const credential = await createPasskey(options);
+      return unwrap(
+        await api.POST("/api/v1/identity/passkeys", {
+          body: { credential, ...(name === undefined ? {} : { name }) },
+        }),
+      );
+    },
+    onSuccess: (added) => {
+      queryClient.setQueryData<Passkeys>(passkeysKey, (passkeys) =>
+        passkeys === undefined ? passkeys : { items: [...passkeys.items, added] },
+      );
+    },
+  });
+}
+
+/** `identity.rename_passkey`. */
+export function useRenamePasskey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) =>
+      unwrap(
+        await api.PATCH("/api/v1/identity/passkeys/{id}", {
+          params: { path: { id } },
+          body: { name },
+        }),
+      ),
+    onSuccess: (renamed) => {
+      queryClient.setQueryData<Passkeys>(passkeysKey, (passkeys) =>
+        passkeys === undefined
+          ? passkeys
+          : { items: passkeys.items.map((p) => (p.id === renamed.id ? renamed : p)) },
+      );
+    },
+  });
+}
+
+/** `identity.remove_passkey`: never the last way in; needs a recent sign-in. */
+export function useRemovePasskey() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      unwrapEmpty(await api.DELETE("/api/v1/identity/passkeys/{id}", { params: { path: { id } } }));
+      return id;
+    },
+    onSuccess: (id) => {
+      queryClient.setQueryData<Passkeys>(passkeysKey, (passkeys) =>
+        passkeys === undefined ? passkeys : { items: passkeys.items.filter((p) => p.id !== id) },
       );
     },
   });

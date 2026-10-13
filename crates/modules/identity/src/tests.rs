@@ -28,7 +28,7 @@ async fn a_new_person_signs_up_with_google_and_their_mailbox_waits_for_a_workspa
     assert_eq!(shown.json["client_id"], WEB_CLIENT_ID);
     assert_eq!(
         shown.json["providers"],
-        serde_json::json!(["google", "microsoft", "zoho"])
+        serde_json::json!(["google", "microsoft", "zoho", "passkey"])
     );
 
     // One consent: identity, the mailbox the instance can sync, offline.

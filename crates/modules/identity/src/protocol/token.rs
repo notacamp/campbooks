@@ -32,6 +32,7 @@ use crate::{
     domain::{
         accounts,
         clients::{self, Client, Kind},
+        sessions,
         tokens::{self, Grant, Mint, OFFLINE_ACCESS, Refusal, TOKEN_LIFETIME},
     },
     events::RefreshReuseDetected,
@@ -285,7 +286,9 @@ async fn respond(
         clients::touch(&ctx.state.db, &client.id, now).await?;
     }
     let signer = issuer.keys.signer(&ctx.state.db).await?;
+    let amr = sessions::amr(&ctx.state.db, grant.session_id).await?;
     let mint = Mint {
+        amr: &amr,
         issuer: &issuer.url,
         signer: &signer,
         grant: &grant,

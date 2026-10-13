@@ -43,7 +43,10 @@
     "unsure": "O Campbooks não tem a certeza",
     "happy": "O Campbooks está satisfeito",
     "alert": "O Campbooks precisa da sua atenção",
-    "asleep": "O Campbooks está em pausa"
+    "asleep": "O Campbooks está em pausa",
+    "dizzy": "O Campbooks tropeçou num problema",
+    "starry": "O Campbooks está radiante",
+    "hearts": "O Campbooks adorou"
   },
   "signal": {
     "review": "Rever",

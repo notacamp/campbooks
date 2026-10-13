@@ -402,7 +402,7 @@ Settings (all optional; defaults shown in `.env.example`) are the `CAMPBOOKS_BFF
 ## Built-in sign-in (Campbooks as its own identity provider)
 
 Campbooks is becoming its own identity provider (ADR 0014): it signs people in with
-Google, Microsoft or Zoho (passkeys follow) and issues every token itself, so the `idp`
+Google, Microsoft, Zoho or a passkey and issues every token itself, so the `idp`
 services above will go away. The built-in issuer is already in the server. It runs when
 `CAMPBOOKS_AUTH__ISSUER` is **unset** (or names `CAMPBOOKS_PUBLIC_URL` itself) and
 `CAMPBOOKS_SECRET_KEY` is set. The shipped `compose.yaml` still points
@@ -502,6 +502,19 @@ With the built-in issuer:
     tokens are bound to one workspace and can never manage accounts or apps.
   - Access tokens now name `${CAMPBOOKS_PUBLIC_URL}/api` as their audience;
     `CAMPBOOKS_AUTH__AUDIENCE` only applies to an outside identity provider.
+- **Passkeys.** Nothing to configure: people add passkeys under Settings → Ways to sign
+  in, sign in with them on the sign-in screen (the passkey button, `P`, or the browser's
+  autofill), and can create an account with a passkey alone. Passkeys belong to the host
+  of `CAMPBOOKS_PUBLIC_URL` (the WebAuthn relying party): **changing that host makes every
+  passkey stop working**, so people need another way in first. Browsers offer passkeys
+  only over `https://`, or `http://localhost` in development; on any other plain-http
+  host, or an IP address, the passkey options are hidden. Passkey-only accounts have no
+  email address, so on an `invite_only` instance passkeys can't create accounts (they
+  still sign in, and can be added once you are in). A passkey that reports an
+  authenticator counter going backwards (a possible clone) is allowed and recorded in
+  `identity.audit_events` as `passkey_sign_count_regressed`. Passkey ceremonies are
+  rate-limited per client address (set `CAMPBOOKS_TRUSTED_PROXIES` behind a proxy, as
+  above), and at most 30 passkey-only accounts are created per hour on the instance.
 
 ## Administrators
 

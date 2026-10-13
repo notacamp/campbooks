@@ -160,6 +160,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/identity/passkeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the caller's passkeys. */
+        get: operations["identity.list_passkeys"];
+        put?: never;
+        /** Add a passkey. */
+        post: operations["identity.register_passkey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/passkeys/registrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start adding a passkey. */
+        post: operations["identity.start_passkey_registration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/passkeys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a passkey. */
+        delete: operations["identity.remove_passkey"];
+        options?: never;
+        head?: never;
+        /** Rename a passkey. */
+        patch: operations["identity.rename_passkey"];
+        trace?: never;
+    };
     "/api/v1/identity/ways-in": {
         parameters: {
             query?: never;
@@ -920,6 +973,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/passkey/sign-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish signing in with a passkey. */
+        post: operations["identity.finish_passkey_sign_in"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/passkey/sign-in/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start signing in with a passkey. */
+        post: operations["identity.start_passkey_sign_in"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/passkey/sign-up": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish creating an account with a passkey. */
+        post: operations["identity.finish_passkey_sign_up"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/passkey/sign-up/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start creating an account with a passkey. */
+        post: operations["identity.start_passkey_sign_up"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/requests/{id}": {
         parameters: {
             query?: never;
@@ -1371,6 +1492,17 @@ export interface components {
              */
             redirect: string;
         };
+        /** @description `AuthenticatorAssertionResponseJSON`: the authenticator's signature. */
+        AssertionResponse: {
+            /** @description The authenticator data, base64url. */
+            authenticatorData: string;
+            /** @description The client data, base64url. */
+            clientDataJSON: string;
+            /** @description The signature, base64url. */
+            signature: string;
+            /** @description The user handle the passkey was created with, base64url. */
+            userHandle?: string | null;
+        };
         /**
          * Format: binary
          * @description An attachment's bytes, as the OpenAPI document describes them (a binary
@@ -1402,6 +1534,38 @@ export interface components {
              * @description Its size in bytes.
              */
             size: number;
+        };
+        /** @description `AuthenticatorAttestationResponseJSON`: what the authenticator made. */
+        AttestationResponse: {
+            /** @description The attestation object (CBOR), base64url. */
+            attestationObject: string;
+            /** @description The client data, base64url. */
+            clientDataJSON: string;
+            /** @description How the browser reached the authenticator. */
+            transports?: string[];
+        };
+        /**
+         * @description `AuthenticationResponseJSON`: a sign-in with a passkey, as the browser
+         *     returns it.
+         */
+        AuthenticationCredential: {
+            /** @description The credential id, base64url. */
+            id: string;
+            /** @description The same, as the raw id. */
+            rawId: string;
+            /** @description The authenticator's response. */
+            response: components["schemas"]["AssertionResponse"];
+            /** @description `public-key`. */
+            type: string;
+        };
+        /** @description What the authenticator must do. */
+        AuthenticatorSelection: {
+            /** @description `true`, for browsers that predate `residentKey`. */
+            requireResidentKey: boolean;
+            /** @description `required`: a discoverable credential (a passkey). */
+            residentKey: string;
+            /** @description `required`. */
+            userVerification: string;
         };
         BackchannelLogout: {
             /** @description The identity provider's signed logout token. */
@@ -1666,6 +1830,50 @@ export interface components {
              * @example https://campbooks.example.com/invitations/accept?token=…
              */
             accept_url: string;
+        };
+        /** @description `PublicKeyCredentialCreationOptionsJSON`: create a passkey. */
+        CreationOptions: {
+            /** @description `none`. */
+            attestation: string;
+            /** @description Discoverable, with user verification. */
+            authenticatorSelection: components["schemas"]["AuthenticatorSelection"];
+            /** @description The challenge, base64url (single use, five minutes). */
+            challenge: string;
+            /**
+             * @description The account's passkeys, so an authenticator holding one says so
+             *     instead of making a second.
+             */
+            excludeCredentials: components["schemas"]["CredentialDescriptor"][];
+            /** @description EdDSA, ES256, RS256. */
+            pubKeyCredParams: components["schemas"]["CredentialParameter"][];
+            /** @description The relying party. */
+            rp: components["schemas"]["RelyingPartyEntity"];
+            /**
+             * Format: int64
+             * @description Milliseconds.
+             */
+            timeout: number;
+            /** @description The account. */
+            user: components["schemas"]["UserEntity"];
+        };
+        /** @description A credential, by id. */
+        CredentialDescriptor: {
+            /** @description The credential id, base64url. */
+            id: string;
+            /** @description Transports the authenticator reported, when it did. */
+            transports?: string[];
+            /** @description `public-key`. */
+            type: string;
+        };
+        /** @description An algorithm the relying party accepts. */
+        CredentialParameter: {
+            /**
+             * Format: int64
+             * @description The COSE algorithm.
+             */
+            alg: number;
+            /** @description `public-key`. */
+            type: string;
         };
         /**
          * @description Allow or deny.
@@ -2103,6 +2311,36 @@ export interface components {
             /** @description Recipients, instead of the filled ones. */
             to?: components["schemas"]["Address"][] | null;
         };
+        /** @description A passkey, as its owner sees it. */
+        PasskeyView: {
+            /**
+             * Format: date-time
+             * @description When it was added.
+             */
+            created_at: string;
+            /**
+             * Format: uuid
+             * @description Its id.
+             */
+            id: string;
+            /**
+             * Format: date-time
+             * @description When it last signed in.
+             */
+            last_used_at?: string | null;
+            /** @description What its owner calls it. */
+            name: string;
+            /**
+             * @description Whether it may sync between devices (a password manager or a
+             *     platform account keeps it), as opposed to staying on one device.
+             */
+            synced: boolean;
+        };
+        /** @description The caller's passkeys. */
+        Passkeys: {
+            /** @description Oldest first. */
+            items: components["schemas"]["PasskeyView"][];
+        };
         /**
          * @description Where a stream is in its reading.
          * @enum {string}
@@ -2175,6 +2413,13 @@ export interface components {
              */
             type: components["schemas"]["ClientType"];
         };
+        /** @description The new passkey. */
+        RegisterPasskey: {
+            /** @description `PublicKeyCredential.toJSON()` of `navigator.credentials.create`. */
+            credential: components["schemas"]["RegistrationCredential"];
+            /** @description What to call it (default `Passkey`). */
+            name?: string | null;
+        };
         /** @description What a client sends (RFC 7591 §2; the fields read). */
         RegisterRequest: {
             /** @description A name to show on the consent screen (with "unverified"). */
@@ -2222,12 +2467,60 @@ export interface components {
             /** @description A confidential app's secret: shown now, never again. */
             client_secret?: string | null;
         };
+        /** @description `RegistrationResponseJSON`: a new passkey, as the browser returns it. */
+        RegistrationCredential: {
+            /** @description The credential id, base64url. */
+            id: string;
+            /** @description The same, as the raw id. */
+            rawId: string;
+            /** @description The authenticator's response. */
+            response: components["schemas"]["AttestationResponse"];
+            /** @description `public-key`. */
+            type: string;
+        };
+        /** @description The relying party, as the browser shows it. */
+        RelyingPartyEntity: {
+            /** @description The relying-party id (the public URL's host). */
+            id: string;
+            /** @description Shown by the browser: `Campbooks`. */
+            name: string;
+        };
+        /** @description The new name. */
+        RenamePasskey: {
+            /** @description 1 to 64 characters. */
+            name: string;
+        };
         /** @description What the sign-in screen shows for a waiting authorization request. */
         RequestInfo: {
             /** @description The client asking. */
             client_id: string;
-            /** @description The providers configured on this instance, in display order. */
+            /**
+             * @description Whether a passkey alone may create a new account here (not on an
+             *     invite-only instance).
+             */
+            passkey_sign_up: boolean;
+            /**
+             * @description The ways in this instance offers, in display order: the providers
+             *     configured, then `passkey` when it can offer passkeys (https, or
+             *     `localhost` in development).
+             */
             providers: string[];
+        };
+        /** @description `PublicKeyCredentialRequestOptionsJSON`: sign in with a passkey. */
+        RequestOptions: {
+            /** @description Empty: any of this site's passkeys (discoverable credentials). */
+            allowCredentials: components["schemas"]["CredentialDescriptor"][];
+            /** @description The challenge, base64url (single use, five minutes). */
+            challenge: string;
+            /** @description The relying-party id. */
+            rpId: string;
+            /**
+             * Format: int64
+             * @description Milliseconds.
+             */
+            timeout: number;
+            /** @description `required`. */
+            userVerification: string;
         };
         /** @description A revocation request (`application/x-www-form-urlencoded`). */
         RevokeForm: {
@@ -2302,6 +2595,33 @@ export interface components {
             name?: string | null;
             /** @description Stable user id at the identity provider. */
             sub: string;
+        };
+        /** @description What a sign-in ceremony continues. */
+        SignInStart: {
+            /**
+             * @description The waiting authorization request (`/sign-in?request=`), completed
+             *     afterwards.
+             */
+            request?: string | null;
+            /** @description Otherwise, a same-origin path to land on. */
+            return_to?: string | null;
+        };
+        /** @description A new account with a passkey alone. */
+        SignUpStart: {
+            /**
+             * @description What to call the person (shown in the app; the passkey is saved
+             *     under it).
+             */
+            display_name: string;
+            /** @description The waiting authorization request, completed afterwards. */
+            request?: string | null;
+            /** @description Otherwise, a same-origin path to land on. */
+            return_to?: string | null;
+        };
+        /** @description Where to go once signed in. */
+        SignedInWith: {
+            /** @description Navigate here: the client's redirect URI with a code, or `return_to`. */
+            redirect: string;
         };
         /** @description What to connect. */
         StartConnection: {
@@ -2486,6 +2806,18 @@ export interface components {
             accent?: components["schemas"]["Accent"] | null;
             /** @description A new name, 1 to 100 characters (trimmed). */
             name?: string | null;
+        };
+        /** @description The account the credential is for. */
+        UserEntity: {
+            /** @description The person's name. */
+            displayName: string;
+            /**
+             * @description The user handle: the account id's 16 bytes, base64url. It holds no
+             *     personal information.
+             */
+            id: string;
+            /** @description What the passkey is saved under (an address or a name). */
+            name: string;
         };
         /**
          * Format: uuid
@@ -2990,6 +3322,289 @@ export interface operations {
             };
             /** @description `rate_limited`. */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.list_passkeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's passkeys. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Passkeys"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:read`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.register_passkey": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterPasskey"];
+            };
+        };
+        responses: {
+            /** @description Added: a way in from now on. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeyView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`, the sign-in is more than ten minutes old (`step_up_required`), or the passkey did not verify (`passkey_not_accepted`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description This instance offers no passkeys, or another identity provider serves it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `passkey_expired` (no registration waits: it took more than five minutes, or was used), or `passkey_already_registered`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.start_passkey_registration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Options for `navigator.credentials.create`: a discoverable passkey, user verification required, attestation `none`, excluding the caller's passkeys. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreationOptions"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`, or the sign-in is more than ten minutes old (`step_up_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description This instance offers no passkeys (not https), or another identity provider serves it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `rate_limited`: ten registrations are already waiting for this account. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.remove_passkey": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The passkey. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed; the sessions signed in with it ended. The authenticator still holds the credential: the person can delete it there. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`, or the sign-in is more than ten minutes old (`step_up_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not the caller's passkey, or gone. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description It is the account's last way in (`last_way_in`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.rename_passkey": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The passkey. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenamePasskey"];
+            };
+        };
+        responses: {
+            /** @description Renamed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeyView"];
+                };
+            };
+            /** @description `passkey_name_required`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not the caller's passkey, or gone. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -6025,6 +6640,274 @@ export interface operations {
             };
             /** @description `sign_up_expired`, or `way_in_belongs_to_another_account` (another account took this identity meanwhile). */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.finish_passkey_sign_in": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Must be `1`. */
+                "x-campbooks-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /** @description `PublicKeyCredential.toJSON()` of the assertion. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthenticationCredential"];
+            };
+        };
+        responses: {
+            /** @description Signed in. */
+            200: {
+                headers: {
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignedInWith"];
+                };
+            };
+            /** @description `invalid_body` (not a credential, or over 16 KiB). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed`, or `passkey_not_accepted` (it did not verify, or it is no longer a way into any account). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description This instance offers no passkeys, or another identity provider serves it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `passkey_expired`: no ceremony waits for this browser (it took more than five minutes, or was used). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.start_passkey_sign_in": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Must be `1`. */
+                "x-campbooks-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignInStart"];
+            };
+        };
+        responses: {
+            /** @description Options for `navigator.credentials.get` (any of this site's passkeys, user verification required), with a ceremony cookie. */
+            200: {
+                headers: {
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestOptions"];
+                };
+            };
+            /** @description `invalid_return_to`, or `invalid_body` (not JSON, or over 16 KiB). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such waiting sign-in request (or it expired), this instance offers no passkeys (not https), or another identity provider serves it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `rate_limited`: too many ceremonies, or ten challenges waiting, for this address. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.finish_passkey_sign_up": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Must be `1`. */
+                "x-campbooks-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /** @description `PublicKeyCredential.toJSON()` of the new passkey. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrationCredential"];
+            };
+        };
+        responses: {
+            /** @description Created and signed in. */
+            201: {
+                headers: {
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignedInWith"];
+                };
+            };
+            /** @description `invalid_body` (not a credential, or over 16 KiB). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed`, `passkey_not_accepted`, or `signup_invite_only`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description This instance offers no passkeys, or another identity provider serves it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `passkey_expired`, or `passkey_already_registered`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `rate_limited`: too many ceremonies from this address, or too many passkey-only accounts made on this instance in the last hour. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.start_passkey_sign_up": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Must be `1`. */
+                "x-campbooks-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignUpStart"];
+            };
+        };
+        responses: {
+            /** @description Options for `navigator.credentials.create` (a discoverable passkey, user verification required, attestation `none`), with a ceremony cookie. */
+            200: {
+                headers: {
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreationOptions"];
+                };
+            };
+            /** @description `display_name_required`, `invalid_return_to`, or `invalid_body` (not JSON, or over 16 KiB). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed`, or `signup_invite_only` (this instance takes invited people only, and a passkey proves no address). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such waiting sign-in request (or it expired), this instance offers no passkeys, or another identity provider serves it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `rate_limited`: too many ceremonies, or ten challenges waiting, for this address. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

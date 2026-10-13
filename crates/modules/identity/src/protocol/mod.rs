@@ -17,13 +17,18 @@ pub mod consent;
 pub mod discovery;
 pub mod end_session;
 mod link;
+pub mod passkey;
 pub mod register;
 pub mod sign_in;
 pub mod token;
 
 use std::sync::Arc;
 
-use axum::{Router, extract::FromRef, http::HeaderMap};
+use axum::{
+    Router,
+    extract::{DefaultBodyLimit, FromRef},
+    http::HeaderMap,
+};
 use campbooks_kernel::{AppState, Error, Result};
 use chrono::{DateTime, Utc};
 use utoipa::openapi::OpenApi;
@@ -98,6 +103,18 @@ fn openapi_router() -> OpenApiRouter<Ctx> {
         .routes(routes!(sign_in::callback))
         .routes(routes!(sign_in::new_account, sign_in::create_account))
         .routes(routes!(consent::get, consent::answer))
+        .merge(passkey_routes())
+}
+
+/// The passkey ceremonies, which read at most [`passkey::MAX_BODY`] bytes of
+/// an unauthenticated body.
+fn passkey_routes() -> OpenApiRouter<Ctx> {
+    OpenApiRouter::new()
+        .routes(routes!(passkey::sign_in_options))
+        .routes(routes!(passkey::sign_in))
+        .routes(routes!(passkey::sign_up_options))
+        .routes(routes!(passkey::sign_up))
+        .layer(DefaultBodyLimit::max(passkey::MAX_BODY))
 }
 
 /// The protocol endpoints over `state` and `deps`, ready to merge into the

@@ -15,6 +15,7 @@ export const recordReaders: Readonly<Record<string, readonly string[]>> = {
   "identity.client": ["identity.list_clients"],
   "identity.consent": ["identity.list_consents"],
   "identity.held_grant": ["identity.list_held_grants"],
+  "identity.passkey": ["identity.list_passkeys"],
   "identity.pending_sign_up": ["identity.finish_sign_in", "identity.get_new_account"],
   "identity.provider_identity": ["identity.list_ways_in"],
   "identity.session": ["identity.end_session", "identity.finish_sign_in"],

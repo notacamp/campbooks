@@ -427,7 +427,7 @@ struct IdClaims<'a> {
     nonce: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     sid: Option<String>,
-    amr: [&'static str; 1],
+    amr: &'a [String],
     #[serde(skip_serializing_if = "Option::is_none")]
     email: Option<&'a str>,
     email_verified: bool,
@@ -445,6 +445,9 @@ pub struct Mint<'a> {
     pub grant: &'a Grant,
     /// The account's profile.
     pub profile: &'a Profile,
+    /// How the person authenticated (`amr`, RFC 8176): `fed` for a
+    /// provider; `hwk` or `swk`, and `user`, for a passkey.
+    pub amr: &'a [String],
     /// The time.
     pub now: DateTime<Utc>,
 }
@@ -543,7 +546,7 @@ impl Mint<'_> {
                 auth_time: self.grant.auth_time.timestamp(),
                 nonce,
                 sid: self.grant.session_id.map(|id| id.to_string()),
-                amr: ["fed"],
+                amr: self.amr,
                 email: wants("email")
                     .then_some(self.profile.primary_email.as_deref())
                     .flatten(),

@@ -1,6 +1,6 @@
 //! `identity.prune`: delete what the issuer no longer needs, every
 //! [`PRUNE_EVERY`]. Expired sign-in state (authorization requests, round
-//! trips, pending sign-ups, codes), held mailbox grants nobody adopted in
+//! trips, pending sign-ups, passkey challenges, codes), held mailbox grants nobody adopted in
 //! time, ended sessions, and refresh-token families that expired or were
 //! revoked a day ago (kept that long so reuse of their tokens is still
 //! recognised as such), revoked consents after 30 days, and clients that
@@ -52,6 +52,10 @@ impl Job for Prune {
             ),
             (
                 "DELETE FROM identity.pending_sign_ups WHERE expires_at <= $1",
+                now,
+            ),
+            (
+                "DELETE FROM identity.webauthn_challenges WHERE expires_at <= $1",
                 now,
             ),
             (

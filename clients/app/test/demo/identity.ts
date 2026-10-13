@@ -169,3 +169,20 @@ export const WORKSPACE_CLIENTS: Schema<"WorkspaceClient">[] = [
 
 /** A secret shown once (fictional). */
 export const DEMO_SECRET = "demo-secret-3c9f0b7a1e5d4c2b8a6f0e1d2c3b4a59";
+
+/** Ana's passkeys: a synced one on her Mac, and one kept on her phone. */
+export const LAPTOP_PASSKEY: Schema<"PasskeyView"> = {
+  id: "0192f1a0-0000-7000-8000-0000000000e1",
+  name: "Passkey on Mac",
+  synced: true,
+  created_at: "2026-10-02T09:00:00Z",
+  last_used_at: "2026-10-13T08:30:00Z",
+};
+
+export const PHONE_PASSKEY: Schema<"PasskeyView"> = {
+  id: "0192f1a0-0000-7000-8000-0000000000e2",
+  name: "Phone",
+  synced: false,
+  created_at: "2026-10-05T18:00:00Z",
+  last_used_at: null,
+};

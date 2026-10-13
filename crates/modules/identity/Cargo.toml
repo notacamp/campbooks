@@ -15,6 +15,9 @@ axum.workspace = true
 base64.workspace = true
 campbooks-kernel.workspace = true
 chrono.workspace = true
+# Passkeys: the CBOR of attestation objects, and COSE_Key parsing.
+ciborium.workspace = true
+coset.workspace = true
 figment.workspace = true
 jsonwebtoken.workspace = true
 reqwest.workspace = true
