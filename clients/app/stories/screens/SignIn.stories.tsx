@@ -189,6 +189,11 @@ export const BelongsToAnotherAccount: Story = {
   },
 };
 
+/** An invite-only instance, and nobody invited this address. */
+export const InviteOnly: Story = {
+  args: { path: signInAt("&error=signup_invite_only"), api: ways(["google"]) },
+};
+
 /** A code this client doesn't know. */
 export const UnknownError: Story = {
   args: { path: signInAt("&error=something_new"), api: ways(["google"]) },
@@ -274,6 +279,21 @@ export const NewAccountTaken: Story = {
     const canvas = within(canvasElement);
     await userEvent.click(await canvas.findByRole("button", { name: /Create account/u }));
     await expect(await canvas.findByRole("alert")).toBeVisible();
+  },
+};
+
+/** Invite-only, refused on Create. */
+export const NewAccountInviteOnly: Story = {
+  args: {
+    path: `/sign-in/new?request=${REQUEST}`,
+    api: newAccount(problem(403, "signup_invite_only")),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: /Create account/u }));
+    await expect(
+      await canvas.findByRole("heading", { name: "This Campbooks is by invitation only" }),
+    ).toBeVisible();
   },
 };
 

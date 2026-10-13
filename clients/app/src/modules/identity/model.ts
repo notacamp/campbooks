@@ -79,6 +79,7 @@ const SIGN_IN_ERRORS = [
   "login_failed",
   "account_disabled",
   "way_in_belongs_to_another_account",
+  "signup_invite_only",
 ] as const;
 export type SignInError = (typeof SIGN_IN_ERRORS)[number] | "unknown";
 

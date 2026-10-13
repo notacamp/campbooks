@@ -206,7 +206,8 @@ with the reason and how to continue.
 ### Requirement: Sign-in errors explained
 The sign-in screen SHALL explain each `error` the identity module sends it
 (`cancelled_at_provider`, `invalid_state`, `provider_unavailable`,
-`login_failed`, `account_disabled`, `way_in_belongs_to_another_account`)
+`login_failed`, `account_disabled`, `way_in_belongs_to_another_account`,
+`signup_invite_only`)
 and any other code generically, each saying what happened and what to do,
 above the ways in when the request is still waiting, or with an action that
 starts again when it is not.
@@ -228,7 +229,9 @@ with `X-Campbooks-CSRF: 1` and, on 201, navigate to the returned `redirect`.
 "Sign in another way" (`Esc`) SHALL return to `/sign-in?request=<id>`. A 404
 or `sign_up_expired` SHALL say the sign-up is no longer waiting and offer to
 sign in again; `way_in_belongs_to_another_account` SHALL say that this
-provider account signs in to another Campbooks account; any other failure
+provider account signs in to another Campbooks account; `signup_invite_only`
+SHALL say that the instance is by invitation only and offer to sign in with
+another account; any other failure
 SHALL say that nothing was created and offer to try again. The screen SHALL
 NOT say whether another account uses the address.
 

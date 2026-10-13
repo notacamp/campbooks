@@ -112,7 +112,7 @@ const server = createServer((request, response) => {
       if (q.get("decision") !== "allow") {
         response.writeHead(200, {
           "content-type": "text/html; charset=utf-8",
-          "set-cookie": `fg_account=${cookie ?? `demo-${b64url(randomBytes(6))}`}; Path=/; HttpOnly`,
+          "set-cookie": `fg_account=${cookie ?? `demo-${b64url(randomBytes(6))}`}; Path=/; HttpOnly; Secure; SameSite=Lax`,
         });
         response.end(consentPage(q));
         return;

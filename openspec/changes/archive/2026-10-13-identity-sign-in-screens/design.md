@@ -181,10 +181,12 @@ page's form, shown as a one-off hint on the primary button.
 | | `login_failed` | Google couldn't confirm who you are | Try again / another way |
 | | `account_disabled` | This account is turned off; ask the administrator | — |
 | | `way_in_belongs_to_another_account` | That Google account signs in to another Campbooks account | sign in with it |
+| | `signup_invite_only` | This instance is by invitation only; nobody invited this address, nothing was kept | the ways in (another account) |
 | | unknown | Something went wrong; nothing changed | Start again |
 | `/sign-in?request=` | 404 | This sign-in page expired | Start again |
 | `/sign-in/new` | 404 / `sign_up_expired` | The sign-up isn't waiting any more | Sign in again |
 | | `way_in_belongs_to_another_account` | as above | Sign in with it |
+| | `signup_invite_only` | as above | Sign in another way |
 | | `csrf_check_failed`, network | Couldn't create it; nothing was created | Try again |
 | mailbox step / Home | 404 | That mailbox isn't waiting any more | continue / connect later |
 | | `account_connected_by_another_member` | Someone else in this workspace already connected it | continue |

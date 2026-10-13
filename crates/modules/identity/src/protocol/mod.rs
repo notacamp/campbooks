@@ -13,6 +13,7 @@
 
 pub mod authorize;
 pub mod discovery;
+pub mod end_session;
 pub mod sign_in;
 pub mod token;
 
@@ -67,7 +68,10 @@ fn openapi_router() -> OpenApiRouter<Ctx> {
         .routes(routes!(authorize::authorize))
         .routes(routes!(token::token))
         .routes(routes!(token::revoke))
-        .routes(routes!(authorize::end_session))
+        .routes(routes!(
+            end_session::end_session,
+            end_session::end_session_post
+        ))
         .routes(routes!(sign_in::request))
         .routes(routes!(sign_in::start))
         .routes(routes!(sign_in::callback))

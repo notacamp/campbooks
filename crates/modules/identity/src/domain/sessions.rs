@@ -109,6 +109,26 @@ pub async fn current(db: &PgPool, token: &str, now: DateTime<Utc>) -> Result<Opt
     Ok(session)
 }
 
+/// End session `id` of `account` (nothing when it is someone else's) and
+/// revoke the refresh tokens issued in it.
+pub async fn end_for(
+    conn: &mut PgConnection,
+    id: Uuid,
+    account: Uuid,
+    now: DateTime<Utc>,
+) -> Result<()> {
+    let owned: Option<Uuid> =
+        sqlx::query_scalar("SELECT id FROM identity.sessions WHERE id = $1 AND account_id = $2")
+            .bind(id)
+            .bind(account)
+            .fetch_optional(&mut *conn)
+            .await?;
+    if owned.is_some() {
+        end(conn, id, now).await?;
+    }
+    Ok(())
+}
+
 /// End session `id` and revoke the refresh tokens issued in it.
 pub async fn end(conn: &mut PgConnection, id: Uuid, now: DateTime<Utc>) -> Result<()> {
     sqlx::query("UPDATE identity.sessions SET ended_at = $2 WHERE id = $1 AND ended_at IS NULL")

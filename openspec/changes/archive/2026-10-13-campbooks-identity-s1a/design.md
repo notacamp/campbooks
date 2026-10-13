@@ -90,7 +90,29 @@ Decided while building it, against the first draft below:
   `/oauth2/revoke` revokes refresh tokens.
 - **Rate limits are deferred** to a follow-up before #57: behind a reverse
   proxy they need a trusted-proxy setting to tell clients apart, or they
-  would throttle everyone at once.
+  would throttle everyone at once. No limiter exists in the kernel or the
+  BFF yet to reuse.
+
+After the security review of this slice:
+
+- `campbooks-native` is defined but refused until native sign-in (S4): a
+  signed-in browser would otherwise give a code to any local process on a
+  loopback port, with no one asked (RFC 8252 §8.6).
+- The API accepts only `typ: at+jwt` from the in-process issuer, so its ID
+  tokens never pass as access tokens; an outside IdP (Rauthy) keeps the
+  lenient check until it is removed.
+- `/oauth2/end_session` needs an `id_token_hint` (GET or form POST); the BFF
+  ends the issuer session itself, server-side, with the ID token it keeps, and
+  gives the browser no logout URL. No site can sign anyone out.
+- A signing key that does not open fails closed: nothing is signed or
+  deleted, and the server refuses to start, naming `CAMPBOOKS_SECRET_KEY`.
+- The issuer refuses a plain-http public URL outside development.
+- New accounts follow the signup policy: on `invite_only`, only a verified
+  address with a pending invitation (the `workspaces` module answers through
+  the kernel's invitation port) gets an account; nothing is kept otherwise.
+- Adopting a held mailbox needs `connectors:write` as well as
+  `identity:write`.
+- The `request` id is percent-encoded wherever it goes into a `Location`.
 
 ## Data ownership
 

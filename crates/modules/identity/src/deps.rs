@@ -135,6 +135,14 @@ impl Deps {
         let Some(secret) = secret else {
             return Ok(Self::default());
         };
+        if !secure && config.env != Environment::Development {
+            return Err(format!(
+                "CAMPBOOKS_PUBLIC_URL={} is plain http: Campbooks' own sign-in needs https, so \
+                 its cookies are Secure and __Host- prefixed (plain http is for \
+                 CAMPBOOKS_ENV=development only)",
+                config.public_url
+            ));
+        }
         let google: GoogleConfig = if figment.contains("google") {
             figment
                 .extract_inner("google")
@@ -230,6 +238,7 @@ mod tests {
 
     fn config(public_url: &str, issuer: Option<&str>) -> Config {
         let mut config = campbooks_kernel::testing::config("postgres://test@localhost/test");
+        config.env = Environment::Development;
         config.public_url = public_url.to_owned();
         config.auth.issuer = issuer.map(ToOwned::to_owned);
         config
@@ -304,6 +313,9 @@ mod tests {
         .unwrap();
         assert!(with_google.issuer.unwrap().google.is_some());
 
+        let mut config = config;
+        config.env = Environment::Production;
+        config.public_url = "https://app.example.com".to_owned();
         let fake = deps(
             &config,
             KEY,
@@ -311,6 +323,30 @@ mod tests {
         )
         .unwrap_err();
         assert!(fake.contains("development only"), "{fake}");
+    }
+
+    #[test]
+    fn plain_http_is_for_development_only() {
+        let mut production = config("http://app.example.com", None);
+        production.env = Environment::Production;
+        let err = deps(&production, KEY, &serde_json::json!({})).unwrap_err();
+        assert!(err.contains("https"), "{err}");
+        production.public_url = "https://app.example.com".to_owned();
+        assert!(
+            deps(&production, KEY, &serde_json::json!({}))
+                .unwrap()
+                .issuer
+                .is_some()
+        );
+        // Another identity provider: this check is not ours to make.
+        let mut rauthy = config("http://app.example.com", Some("http://auth.example.com/"));
+        rauthy.env = Environment::Production;
+        assert!(
+            deps(&rauthy, KEY, &serde_json::json!({}))
+                .unwrap()
+                .issuer
+                .is_none()
+        );
     }
 
     #[test]

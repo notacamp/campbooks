@@ -6,6 +6,8 @@
     "way_in_belongs_to_another_account": "This account is already a way into another Campbooks account. Sign in with it to use that account.",
     "sign_up_expired": "This sign-up took too long. Sign in again to start over.",
     "invalid_return_to": "After signing in, Campbooks can only return to one of its own pages.",
-    "held_grant_not_found": "There is no mailbox waiting to be connected."
+    "held_grant_not_found": "There is no mailbox waiting to be connected.",
+    "invalid_id_token_hint": "This sign-out request is not signed by Campbooks for this app; nothing was ended.",
+    "signup_invite_only": "This Campbooks takes invited people only. Ask someone to invite this address, then sign in again."
   }
 }

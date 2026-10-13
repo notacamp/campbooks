@@ -21,8 +21,10 @@ use campbooks_kernel::{
     AppState,
     auth::{Principal, TokenVerifier},
     clock::SystemClock,
+    config::SignupPolicy,
     connections::{AdoptFuture, GrantIntake, ProviderGrant},
     crypto::{SecretKey, pkce_challenge, random_token},
+    signup::{Invitations, InvitedFuture},
     tenancy::{Access, Membership, MembershipFuture, Role, UserId, WorkspaceId},
     testing::{
         self, TestIdp, WEB_CLIENT_ID as FAKE_GOOGLE_CLIENT, WEB_CLIENT_SECRET as FAKE_GOOGLE_SECRET,
@@ -90,6 +92,17 @@ impl GrantIntake for FakeIntake {
                 grant.scopes,
             ));
         Box::pin(async { Ok("connection-1".to_owned()) })
+    }
+}
+
+/// These addresses have a pending invitation.
+#[derive(Debug)]
+struct Invited(Vec<String>);
+
+impl Invitations for Invited {
+    fn pending_for<'a>(&'a self, _db: &'a PgPool, email: &'a str) -> InvitedFuture<'a> {
+        let invited = self.0.iter().any(|e| e == email);
+        Box::pin(async move { Ok(invited) })
     }
 }
 
@@ -166,16 +179,31 @@ pub struct Kit {
 }
 
 impl Kit {
-    /// A fresh world over the `#[sqlx::test]` database `db`.
+    /// A fresh world over the `#[sqlx::test]` database `db`, open to new
+    /// accounts.
     pub async fn new(db: PgPool) -> Self {
+        Self::with_signup(db, SignupPolicy::Open, &[]).await
+    }
+
+    /// A fresh world whose instance has signup `policy`, where `invited`
+    /// addresses have a pending invitation.
+    pub async fn with_signup(db: PgPool, policy: SignupPolicy, invited: &[&str]) -> Self {
         let google = TestIdp::start().await;
         let pool = testing::app_role_pool(&db).await;
-        let config = testing::config("postgres://test@localhost/test");
+        let mut config = testing::config("postgres://test@localhost/test");
+        // Plain-http public URL (the tests' localhost): development only.
+        config.env = campbooks_kernel::config::Environment::Development;
+        config.signup.policy = policy;
         let mut deps = Deps::from_figment(
             &Figment::from(Serialized::defaults(serde_json::json!({}))),
             &config,
             Some(SecretKey::from_bytes([9; 32])),
-            &["system:read", "identity:read", "identity:write"],
+            &[
+                "system:read",
+                "identity:read",
+                "identity:write",
+                "connectors:write",
+            ],
             Arc::new(SystemClock),
         )
         .unwrap_or_else(|e| panic!("deps: {e}"));
@@ -206,6 +234,9 @@ impl Kit {
         let state = AppState::new(pool.clone(), config.clone())
             .with_membership(Arc::new(Everyone))
             .with_grant_intake(intake.clone())
+            .with_invitations(Arc::new(Invited(
+                invited.iter().map(|e| (*e).to_owned()).collect(),
+            )))
             .with_auth(TokenVerifier::in_process(
                 &config.auth,
                 &issuer.url,
@@ -233,6 +264,17 @@ impl Kit {
         )
         .expose_secret()
         .to_owned()
+    }
+
+    /// Use the browser of `other` (its cookies), as when two instances
+    /// configured differently serve the same database.
+    pub fn share_cookies_with(&self, other: &Self) {
+        let theirs = other
+            .cookies
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone();
+        *self.cookies.lock().unwrap_or_else(PoisonError::into_inner) = theirs;
     }
 
     /// Forget every cookie (another browser).
@@ -344,7 +386,7 @@ impl Kit {
         Self::authorize_url(
             WEB_CLIENT_ID,
             &format!("{ORIGIN}/bff/callback"),
-            "openid profile email offline_access identity:read identity:write",
+            "openid profile email offline_access identity:read identity:write connectors:write",
         )
     }
 

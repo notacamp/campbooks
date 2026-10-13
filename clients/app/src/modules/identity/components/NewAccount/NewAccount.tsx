@@ -153,7 +153,29 @@ function CreateAccount({
   if (code === "sign_up_expired" || (create.isError && errorStatus(create.error) === 404)) {
     return <Gone leave={leave} />;
   }
-  const takenElsewhere = code === "way_in_belongs_to_another_account";
+  if (code === "signup_invite_only") {
+    // Nothing was kept: the only way on is another (invited) account.
+    return (
+      <Simple
+        visor="unsure"
+        title={t("errors.signup_invite_only.title").replace(/\.$/u, "")}
+        lead={t("errors.signup_invite_only.lead")}
+        action={
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={() => {
+              leave(startAgainUrl());
+            }}
+          >
+            {t("newAccount.another")}
+          </Button>
+        }
+      />
+    );
+  }
+  // A refusal with its own explanation; anything else: nothing was created.
+  const refusal = code === "way_in_belongs_to_another_account" ? code : undefined;
   const busy = create.isPending || create.isSuccess;
 
   return (
@@ -217,14 +239,10 @@ function CreateAccount({
           tone="danger"
           role="alert"
           title={
-            takenElsewhere
-              ? t("errors.way_in_belongs_to_another_account.title")
-              : t("newAccount.failed.title")
+            refusal === undefined ? t("newAccount.failed.title") : t(`errors.${refusal}.title`)
           }
         >
-          {takenElsewhere
-            ? t("errors.way_in_belongs_to_another_account.lead")
-            : t("newAccount.failed.lead")}
+          {refusal === undefined ? t("newAccount.failed.lead") : t(`errors.${refusal}.lead`)}
         </Banner>
       ) : undefined}
     </FocusPage>

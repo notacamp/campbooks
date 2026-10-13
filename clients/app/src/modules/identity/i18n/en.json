@@ -74,6 +74,10 @@
       "title": "This account already signs in to another Campbooks account.",
       "lead": "Sign in with it to use that account."
     },
+    "signup_invite_only": {
+      "title": "This Campbooks is by invitation only.",
+      "lead": "Nobody has invited this address yet, and nothing was kept. Ask someone who uses it to invite you, then sign in with the address they invite."
+    },
     "unknown": {
       "title": "Something went wrong while signing in.",
       "lead": "Nothing changed. Start again."

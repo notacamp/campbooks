@@ -412,8 +412,14 @@ With the built-in issuer:
   keys at `/oauth2/jwks`, and its endpoints under `/oauth2/*`. The web app signs in through
   it exactly as through Rauthy, with no client secret to provision.
 - It signs with Ed25519 keys it generates on first start and rotates every 30 days,
-  stored in Postgres (schema `identity`) encrypted with `CAMPBOOKS_SECRET_KEY`. Replacing
-  that key signs everyone out (a new key is made); nothing else to do.
+  stored in Postgres (schema `identity`) encrypted with `CAMPBOOKS_SECRET_KEY`. A server
+  whose secret key does not open them refuses to start ("CAMPBOOKS_SECRET_KEY does not
+  match the stored signing keys"): restore the right key. To replace the secret key on
+  purpose, also delete the rows of `identity.signing_keys`; everyone signs in again.
+- The public URL must be `https://` (plain `http://` only with `CAMPBOOKS_ENV=development`),
+  so the sign-in cookies are always `Secure`.
+- New accounts follow `CAMPBOOKS_SIGNUP__POLICY`: on `invite_only`, only people whose
+  Google address has a pending invitation get an account.
 - **Sign in with Google** uses the same Google OAuth client as connected accounts (below).
   Add the redirect URI `${CAMPBOOKS_PUBLIC_URL}/auth/callback/google` to it, and the
   `profile` scope to its consent screen. A new person's sign-in asks, in the same consent,

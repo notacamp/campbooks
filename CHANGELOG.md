@@ -34,7 +34,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   `${CAMPBOOKS_PUBLIC_URL}/auth/callback/google` to your Google OAuth client
   (see `deploy/README.md` → Built-in sign-in). The shipped `compose.yaml`
   still uses Rauthy, so existing installs see no change yet; the sign-in
-  screens arrive in the next release.
+  screens arrive in the next release. The built-in issuer needs an https
+  `CAMPBOOKS_PUBLIC_URL` (http only with `CAMPBOOKS_ENV=development`), refuses
+  to start if `CAMPBOOKS_SECRET_KEY` cannot open its stored signing keys,
+  and on an `invite_only` instance creates accounts only for invited
+  addresses.
 - The new app's first run: a calm signed-out page with one "Sign in" (that
   brings you back to the page you opened), then creating your first
   workspace one question at a time (its name, then Business or Personal,

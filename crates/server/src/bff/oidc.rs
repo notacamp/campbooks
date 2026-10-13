@@ -247,6 +247,34 @@ impl Oidc {
         &self.issuer
     }
 
+    /// Whether the issuer runs in this process.
+    pub fn in_process(&self) -> bool {
+        matches!(self.http, Transport::InProcess(_))
+    }
+
+    /// End the issuer session `id_token` was issued in, server-side (the
+    /// in-process issuer's `end_session` with the ID token as hint), so the
+    /// browser never holds the token and no other site can sign anyone out.
+    pub async fn end_issuer_session(&self, id_token: &str) -> Result<(), OidcError> {
+        let endpoints = self.endpoints().await?;
+        let Some(end_session) = &endpoints.end_session else {
+            return Ok(());
+        };
+        let form = url::form_urlencoded::Serializer::new(String::new())
+            .append_pair("id_token_hint", id_token)
+            .append_pair("client_id", &self.client_id)
+            .finish();
+        let answer = self
+            .http
+            .send(axum::http::Method::POST, end_session, Some(form))
+            .await?;
+        if (200..400).contains(&answer.status) {
+            Ok(())
+        } else {
+            Err(OidcError::Rejected(format!("HTTP {}", answer.status)))
+        }
+    }
+
     /// The OIDC client id.
     pub fn client_id(&self) -> &str {
         &self.client_id

@@ -23,6 +23,7 @@ pub mod jobs;
 pub mod module;
 pub mod operations;
 pub mod records;
+pub mod signup;
 pub mod state;
 pub mod telemetry;
 pub mod tenancy;

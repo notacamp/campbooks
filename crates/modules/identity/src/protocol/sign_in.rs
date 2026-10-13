@@ -14,7 +14,9 @@
 //!
 //! Errors at the callback send the browser back to the sign-in screen with
 //! `?error=<code>`: `invalid_state`, `cancelled_at_provider`,
-//! `provider_unavailable`, `login_failed`, `account_disabled`.
+//! `provider_unavailable`, `login_failed`, `account_disabled`, and
+//! `signup_invite_only` (an invite-only instance, and no pending invitation
+//! for the provider's verified address: nothing is kept).
 
 use axum::{
     Json,
@@ -24,6 +26,7 @@ use axum::{
 };
 use campbooks_kernel::{
     Error, Operation, Result, Risk,
+    config::SignupPolicy,
     crypto::{pkce_challenge, random_token},
 };
 use chrono::{DateTime, Utc};
@@ -108,8 +111,36 @@ pub struct StartQuery {
 
 fn sign_in_error(code: &str, request: Option<&str>) -> Response {
     match request {
-        Some(request) => see_other(&format!("{SIGN_IN_PATH}?error={code}&request={request}")),
+        Some(request) => see_other(&format!(
+            "{SIGN_IN_PATH}?error={code}&request={}",
+            encode(request)
+        )),
         None => see_other(&format!("{SIGN_IN_PATH}?error={code}")),
+    }
+}
+
+/// `value` percent-encoded for a query string.
+fn encode(value: &str) -> String {
+    url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
+}
+
+/// Whether the instance's signup policy lets `identity` create an account.
+/// On an invite-only instance only an address the provider verified, with a
+/// pending invitation, may. Open, code and approval instances let everyone
+/// create an account; their gate is creating a workspace (the workspaces
+/// module asks for the code, or records the request for approval).
+async fn may_create_account(ctx: &Ctx, identity: &ProviderIdentity) -> Result<bool> {
+    if ctx.state.config.signup.policy != SignupPolicy::InviteOnly {
+        return Ok(true);
+    }
+    match (&identity.email, identity.email_verified) {
+        (Some(email), true) => {
+            ctx.state
+                .invitations
+                .pending_for(&ctx.state.db, &email.to_lowercase())
+                .await
+        }
+        _ => Ok(false),
     }
 }
 
@@ -291,6 +322,10 @@ pub async fn callback(
         // A sign-in never changes a workspace's mailbox: a refresh token
         // Google sent along is dropped, not stored.
         Some(linked) => sign_in_known(&ctx, issuer, &headers, linked, &flow, provider, now).await?,
+        None if !may_create_account(&ctx, &identity).await? => {
+            // Nothing is kept: no pending sign-up, no tokens.
+            sign_in_error("signup_invite_only", request)
+        }
         None => {
             let mail = MailGrant::of(&ctx, provider, &tokens);
             if mail.granted && tokens.refresh_token.is_none() && !flow.consent_retry {
@@ -438,7 +473,7 @@ async fn pend_sign_up(
     };
     upstream::store_sign_up(&ctx.state.db, &issuer.cipher, &browser, &pending, now).await?;
     let location = match &flow.request_id {
-        Some(request) => format!("{NEW_ACCOUNT_PATH}?request={request}"),
+        Some(request) => format!("{NEW_ACCOUNT_PATH}?request={}", encode(request)),
         None => NEW_ACCOUNT_PATH.to_owned(),
     };
     Ok(with_cookie(
@@ -574,7 +609,8 @@ pub struct Created {
     responses(
         (status = 201, description = "Created and signed in.", body = Created,
             headers(("set-cookie" = String))),
-        (status = 403, description = "`csrf_check_failed`.", body = campbooks_kernel::Problem,
+        (status = 403, description = "`csrf_check_failed`, or `signup_invite_only` (this \
+            instance takes invited people only; nothing was kept).", body = campbooks_kernel::Problem,
             content_type = "application/problem+json"),
         (status = 404, description = "Nothing pending for this browser."),
         (status = 409, description = "`sign_up_expired`, or `way_in_belongs_to_another_account` \
@@ -596,6 +632,11 @@ pub async fn create_account(State(ctx): State<Ctx>, headers: HeaderMap) -> Resul
     let pending = upstream::take_sign_up(&mut tx, &issuer.cipher, &token, now)
         .await?
         .ok_or_else(|| Error::Conflict(MESSAGES.reason("sign_up_expired")))?;
+    if !may_create_account(&ctx, &pending.identity).await? {
+        // The pending sign-up (and its tokens) is gone with this commit.
+        tx.commit().await?;
+        return Err(Error::Denied(MESSAGES.reason("signup_invite_only")));
+    }
     let Some(linked) = accounts::create(&mut tx, &pending.identity, now).await? else {
         return Err(Error::Conflict(
             MESSAGES.reason("way_in_belongs_to_another_account"),

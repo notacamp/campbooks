@@ -74,6 +74,10 @@
       "title": "Esta cuenta ya da acceso a otra cuenta de Campbooks.",
       "lead": "Inicia sesión con ella para usar esa cuenta."
     },
+    "signup_invite_only": {
+      "title": "Este Campbooks solo admite personas por invitación.",
+      "lead": "Nadie ha invitado todavía a esta dirección, y no se ha guardado nada. Pide a alguien que lo use que te invite y luego inicia sesión con la dirección invitada."
+    },
     "unknown": {
       "title": "Algo ha fallado al iniciar sesión.",
       "lead": "No ha cambiado nada. Empieza de nuevo."

@@ -74,6 +74,10 @@
       "title": "Ce compte permet déjà d’accéder à un autre compte Campbooks.",
       "lead": "Connectez-vous avec lui pour utiliser ce compte."
     },
+    "signup_invite_only": {
+      "title": "Ce Campbooks n’accepte que des personnes invitées.",
+      "lead": "Personne n’a encore invité cette adresse, et rien n’a été conservé. Demandez à quelqu’un qui l’utilise de vous inviter, puis connectez-vous avec l’adresse invitée."
+    },
     "unknown": {
       "title": "Un problème est survenu pendant la connexion.",
       "lead": "Rien n’a changé. Recommencez."
