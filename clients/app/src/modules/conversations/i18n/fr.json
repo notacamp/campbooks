@@ -1,4 +1,205 @@
 {
-  "title": "Conversations",
-  "summary": "Ce module n’a pas encore d’écrans."
+  "title": "Boîte de réception",
+  "streams": {
+    "label": "Flux",
+    "primary": "Principal",
+    "updates": "Notifications",
+    "receipts": "Reçus",
+    "newsletters": "Newsletters"
+  },
+  "list": {
+    "label": "Conversations",
+    "show": "Afficher",
+    "all": "Toutes",
+    "unread": "Non lues",
+    "more": "Afficher plus",
+    "loadingMore": "Chargement d’autres conversations"
+  },
+  "empty": {
+    "streamTitle": "Rien dans {{stream}}",
+    "streamBody": "Le courrier que Campbooks range dans {{stream}} arrive ici.",
+    "unreadTitle": "Rien de non lu dans {{stream}}",
+    "unreadBody": "Vous avez tout lu ici.",
+    "noInboxTitle": "Pas encore de boîte mail",
+    "noInboxBody": "Connectez une boîte mail : son courrier apparaîtra ici, rangé en flux.",
+    "readerTitle": "Choisissez une conversation",
+    "readerBody": "Choisissez-en une dans la liste, ou utilisez le clavier :"
+  },
+  "error": {
+    "listTitle": "Impossible de charger {{stream}}",
+    "listBody": "Campbooks n’a pas pu joindre le serveur. Rien n’a été perdu.",
+    "conversationTitle": "Impossible d’ouvrir cette conversation",
+    "conversationBody": "Campbooks n’a pas pu joindre le serveur. Rien n’a été perdu.",
+    "goneTitle": "Cette conversation n’existe plus",
+    "goneBody": "Elle a été supprimée, ou vous n’y avez plus accès.",
+    "body": "Impossible de charger ce message.",
+    "retry": "Réessayer",
+    "action": "Impossible de modifier « {{subject}} ». Réessayez."
+  },
+  "reader": {
+    "label": "Conversation",
+    "back": "Retour à {{stream}}",
+    "actions": "Actions de la conversation",
+    "messages_one": "{{count}} message",
+    "messages_other": "{{count}} messages",
+    "to": "À {{names}}",
+    "cc": "cc {{names}}",
+    "noSubject": "(sans objet)",
+    "frameTitle": "Message de {{name}}",
+    "truncated": "Ce message est long : Campbooks en affiche le début.",
+    "older_one": "{{count}} message plus ancien",
+    "older_other": "{{count}} messages plus anciens",
+    "showOlder": "Afficher",
+    "attachments": "Pièces jointes"
+  },
+  "actions": {
+    "star": "Suivre",
+    "unstar": "Ne plus suivre",
+    "read": "Marquer comme lue",
+    "unread": "Marquer comme non lue",
+    "move": "Déplacer",
+    "moveTo": "Déplacer vers",
+    "replyAll": "Répondre à tous",
+    "forward": "Transférer",
+    "showImages": "Afficher les images",
+    "imagesHidden_one": "{{count}} image distante masquée, pour que l’expéditeur ne sache pas quand vous lisez ceci.",
+    "imagesHidden_other": "{{count}} images distantes masquées, pour que l’expéditeur ne sache pas quand vous lisez ceci.",
+    "imagesShown": "Images distantes affichées."
+  },
+  "toast": {
+    "done": "Terminé · {{subject}}",
+    "starred": "Suivie · {{subject}}",
+    "unstarred": "Plus suivie · {{subject}}",
+    "read": "Marquée comme lue · {{subject}}",
+    "unread": "Marquée comme non lue · {{subject}}",
+    "moved": "Déplacée vers {{stream}} · {{subject}}"
+  },
+  "scout": {
+    "label": "Où en sont les choses",
+    "suggestion": "Suggère {{stream}}",
+    "suggestionSure": "Suggère {{stream}}, sûr à {{confidence}} %",
+    "suggestionNote": "Campbooks pense que ceci va dans {{stream}}. C’est une suggestion : rien ne bouge sans votre accord.",
+    "prompt": "La déplacer ?",
+    "accept": "Déplacer vers {{stream}}",
+    "keep": "Garder dans {{stream}}",
+    "sortedRule": "Rangée dans {{stream}} par une règle",
+    "sortedRuleSure": "Rangée dans {{stream}} par une règle, sûr à {{confidence}} %",
+    "sortedModel": "Rangée dans {{stream}} par Campbooks",
+    "sortedMember": "Vous l’avez mise dans {{stream}}",
+    "sortedDefault": "Dans {{stream}} : rien ne l’a déplacée",
+    "read": "La lecture de Campbooks, sous forme de suggestions : {{list}}.",
+    "nothing": "Rien ici ne semble vous demander quoi que ce soit.",
+    "needsReply": "elle attend une réponse",
+    "asksAction": "elle vous demande de faire quelque chose",
+    "hasDeadline": "elle mentionne une date à respecter",
+    "urgent": "elle semble urgente",
+    "suspicious": "elle semble suspecte : vérifiez l’expéditeur avant d’ouvrir un lien",
+    "whyStream": "Flux",
+    "whyNeedsReply": "Attend une réponse",
+    "whyAsksAction": "Vous demande de faire quelque chose",
+    "whyHasDeadline": "Mentionne une date",
+    "whyUrgent": "Urgent",
+    "whySuspicious": "Suspect"
+  },
+  "reasons": {
+    "signals": {
+      "reply_to_mismatch": "Les réponses partiraient vers un autre domaine ({{evidence}}).",
+      "lookalike_domain": "Le domaine de l’expéditeur imite un domaine plus connu ({{evidence}}).",
+      "link_elsewhere": "Un lien mène ailleurs que ce qu’il annonce ({{evidence}}).",
+      "phishing_phrase": "Il demande ce que demande l’hameçonnage (« {{evidence}} »).",
+      "pressure": "Il vous presse d’agir vite (« {{evidence}} »).",
+      "auto_reply": "C’est une réponse automatique (« {{evidence}} »).",
+      "list_header": "Il porte un en-tête de liste de diffusion ({{evidence}}).",
+      "unsubscribe_text": "Il contient un lien de désabonnement (« {{evidence}} »).",
+      "money_words": "Il parle d’argent (« {{evidence}} »).",
+      "notification_words": "Il ressemble à une notification (« {{evidence}} »).",
+      "calendar_invite": "C’est une invitation d’agenda ({{evidence}}).",
+      "automated_sender": "Il vient d’une adresse automatique ({{evidence}}).",
+      "person_sender": "Une personne l’a écrit.",
+      "service_sender": "Un service l’a envoyé, pas une personne.",
+      "reply_asked": "Il vous demande de répondre (« {{evidence}} »).",
+      "question": "Il pose une question.",
+      "no_question": "Il ne pose aucune question.",
+      "list_mail": "Il a été envoyé à une liste.",
+      "payment_due": "Un paiement est attendu (« {{evidence}} »).",
+      "already_paid": "Il dit que c’est déjà payé (« {{evidence}} »).",
+      "action_asked": "Il vous demande de faire quelque chose (« {{evidence}} »).",
+      "conditional_ask": "Il ne demande quelque chose que si c’est le cas (« {{evidence}} »).",
+      "notice": "C’est un avis : rien à faire.",
+      "request": "Il fait une demande (« {{evidence}} »).",
+      "no_request": "Il ne fait aucune demande.",
+      "deadline": "Il mentionne une date (« {{evidence}} »).",
+      "no_date": "Il ne mentionne aucune date.",
+      "today": "Il concerne aujourd’hui (« {{evidence}} »).",
+      "no_today": "Rien dedans n’est pour aujourd’hui.",
+      "no_phishing_tell": "Rien dedans ne ressemble à de l’hameçonnage."
+    },
+    "model": {
+      "decide": "Le modèle de décision a répondu ({{evidence}})."
+    },
+    "knn": {
+      "neighbours": "Un courrier semblable a déjà été rangé ainsi."
+    },
+    "other": "{{rule}} ({{evidence}})"
+  },
+  "shortcuts": {
+    "primary": "Aller à Principal",
+    "updates": "Aller à Notifications",
+    "receipts": "Aller à Reçus",
+    "newsletters": "Aller à Newsletters",
+    "star": "Suivre ou ne plus suivre",
+    "unread": "Marquer comme lue ou non lue",
+    "move": "Déplacer vers un flux",
+    "replyAll": "Répondre à tous",
+    "forward": "Transférer",
+    "showImages": "Afficher les images"
+  },
+  "compose": {
+    "title": {
+      "reply": "Répondre à {{name}}",
+      "reply_all": "Répondre à tous",
+      "forward": "Transférer",
+      "new": "Nouveau message"
+    },
+    "newMessage": "Nouveau message",
+    "noInbox": "Connectez une boîte mail pour envoyer depuis celle-ci.",
+    "readOnly": "Vous pouvez lire cette boîte mail, mais pas envoyer depuis celle-ci.",
+    "from": "De",
+    "sending": "Envoi à {{name}}",
+    "sendingNoName": "Envoi en cours",
+    "draftSaved": "Brouillon enregistré",
+    "saveState": {
+      "saved": "Enregistré",
+      "saving": "Enregistrement…",
+      "unsaved": "Pas encore enregistré",
+      "failed": "Impossible d’enregistrer. Campbooks va réessayer."
+    },
+    "quote": {
+      "wrote": "Le {{date}}, {{name}} a écrit :",
+      "forwarded": "Message transféré",
+      "from": "De",
+      "date": "Date",
+      "subject": "Objet",
+      "to": "À"
+    },
+    "errors": {
+      "no_recipients": "Ajoutez au moins un destinataire.",
+      "invalid_address": "Une des adresses n’est pas valide.",
+      "attachments_too_large": "Les pièces jointes sont trop lourdes pour être envoyées (25 Mo au plus).",
+      "draft_not_editable": "Ce message est déjà en route.",
+      "not_connected": "Cette boîte mail n’est plus connectée. Reconnectez-la, puis renvoyez le message.",
+      "needs_reauth": "Campbooks a de nouveau besoin de votre autorisation pour envoyer depuis cette boîte mail. Reconnectez-la, puis renvoyez le message.",
+      "rejected": "Gmail a refusé ce message. Vérifiez les adresses et réessayez.",
+      "too_large": "Ce message est trop lourd pour que Gmail l’envoie.",
+      "unavailable": "Gmail était injoignable, rien n’a été envoyé. Réessayez.",
+      "unknown_outcome": "Campbooks n’a pas pu confirmer l’envoi de ce message. Vérifiez votre dossier Envoyés avant de le renvoyer.",
+      "unknown": "Un problème est survenu. Réessayez.",
+      "not_saved": "Vos dernières modifications n’ont pas pu être enregistrées, rien n’a donc été envoyé. Réessayez.",
+      "draft_changed": "Ce brouillon a été modifié ailleurs. Fermez-le et rouvrez-le pour voir la dernière version."
+    },
+    "shortcuts": {
+      "newMessage": "Nouveau message"
+    },
+    "tooLate": "Trop tard pour annuler : il a été envoyé."
+  }
 }

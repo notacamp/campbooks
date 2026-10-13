@@ -18,6 +18,7 @@ use crate::{
     domain::{
         access::visible_inboxes,
         conversation::{ConversationSummary, SummaryRow},
+        suggestions,
     },
     model::{ConversationId, InboxId, Stream},
     scopes::ConversationsRead,
@@ -99,11 +100,12 @@ pub async fn handler(
         inboxes = vec![inbox];
     }
     let rows = fetch_page(&mut tx, &inboxes, &query, after, limit).await?;
-    tx.commit().await?;
     let mut conversations = rows
         .into_iter()
         .map(ConversationSummary::try_from)
         .collect::<Result<Vec<_>>>()?;
+    suggestions::attach(&mut tx, &mut conversations).await?;
+    tx.commit().await?;
     let next_cursor = if conversations.len() > limit as usize {
         conversations.truncate(limit as usize);
         conversations

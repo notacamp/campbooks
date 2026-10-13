@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT label_id FROM connectors.gmail_labels WHERE stream_id = $1 AND kind = 'user'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "label_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.gmail_labels",
+            "name": "label_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3c4a2d755e7544159617b352f47372742ce6cc9b342f63b6448cf82e751c0347"
+}

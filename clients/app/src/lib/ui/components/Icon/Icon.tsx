@@ -74,6 +74,7 @@ const ICONS = {
     path("M10 4.5H6.5A1.5 1.5 0 0 0 5 6v12a1.5 1.5 0 0 0 1.5 1.5H10"),
     path("m15 8 4 4-4 4M19 12h-9"),
   ],
+  key: [<circle key="c" cx="8" cy="12" r="3.5" />, path("M11.5 12H20M17 12v3M20 12v2.5")],
   mail: [<rect key="r" x="3.5" y="5.5" width="17" height="13" rx="2" />, path("m4 7 8 6 8-6")],
   "chevron-right": [path("m9 6 6 6-6 6")],
   close: [path("M6 6l12 12M18 6 6 18")],
@@ -82,6 +83,45 @@ const ICONS = {
     path("M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"),
   ],
   "chevron-up-down": [path("m8 9.5 4-4 4 4M8 14.5l4 4 4-4")],
+  send: [path("M4.5 12 20 4.5 15.5 20l-3.5-6.5Z"), path("M12 13.5 20 4.5")],
+  bold: [path("M7.5 5h5.25a3.5 3.5 0 0 1 0 7H7.5Zm0 7h6.25a3.5 3.5 0 0 1 0 7H7.5Z")],
+  italic: [path("M10.5 5H18M6 19h7.5M14.5 5l-5 14")],
+  bullets: [
+    path("M10 7h10M10 12h10M10 17h10"),
+    <circle key="a" cx="5.5" cy="7" r="1" />,
+    <circle key="b" cx="5.5" cy="12" r="1" />,
+    <circle key="c" cx="5.5" cy="17" r="1" />,
+  ],
+  numbers: [
+    path(
+      "M10.5 7H20M10.5 12H20M10.5 17H20M4.5 5.5 6 4.5v5M4.5 14.5a1.5 1.5 0 1 1 2.5 1.1L4.5 19.5H7",
+    ),
+  ],
+  star: [path("m12 4 2.4 5 5.4.7-4 3.7 1 5.4-4.8-2.6-4.8 2.6 1-5.4-4-3.7 5.4-.7Z")],
+  "star-filled": [
+    <path
+      key="s"
+      fill="currentColor"
+      d="m12 4 2.4 5 5.4.7-4 3.7 1 5.4-4.8-2.6-4.8 2.6 1-5.4-4-3.7 5.4-.7Z"
+    />,
+  ],
+  archive: [
+    <rect key="r" x="3.5" y="4.5" width="17" height="4.5" rx="1.5" />,
+    path("M5 9v9a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 18V9M10 13h4"),
+  ],
+  move: [path("M4 12h11M11 8l4 4-4 4"), path("M19 5v14")],
+  image: [
+    <rect key="r" x="3.5" y="4.5" width="17" height="15" rx="2.5" />,
+    <circle key="c" cx="9" cy="10" r="1.6" />,
+    path("m4 17 5-4.5 4 3.5 2.5-2 4.5 3.5"),
+  ],
+  forward: [path("m15 6 5 5-5 5"), path("M20 11H9.5A5.5 5.5 0 0 0 4 16.5V19")],
+  "reply-all": [
+    path("M11 14 6 9l5-5"),
+    path("M7 14 2 9l5-5"),
+    path("M6 9h8.5a5.5 5.5 0 0 1 0 11H12"),
+  ],
+  unread: [<circle key="c" cx="12" cy="12" r="4" fill="currentColor" />],
 } satisfies Record<string, ReactElement[]>;
 
 export type IconName = keyof typeof ICONS;

@@ -35,3 +35,6 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+
+/** Floats above the phone's tab bar (and, with `phoneOnly`, hides from 48rem up). */
+export const AboveTabBar: Story = { args: { aboveTabBar: true } };

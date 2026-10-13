@@ -4,6 +4,9 @@
 pub mod adopt_held_grant;
 pub mod discard_held_grant;
 pub mod list_held_grants;
+pub mod list_ways_in;
+pub mod remove_way_in;
+pub mod start_link;
 
 use std::sync::Arc;
 

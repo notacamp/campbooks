@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM connectors.outbound_changes\n            WHERE stream_id = $1 AND state <> 'pending' AND done_at < $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0ab31ee36c46209bcfa1b7559d3723e16e611805bbd7e5c179ceb1f9e6d33a31"
+}

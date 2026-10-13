@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT author FROM conversations.drafts WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "author",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "author"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "a67d9f965254b2bdbfa96460af3b85afaa5d639d1fef2b292fe2db3f9abf3aa2"
+}

@@ -7,10 +7,13 @@
 //! provider**, in-process, on the app's own origin: discovery, JWKS, the
 //! authorization and token endpoints, revocation and logout, with Ed25519
 //! keys it generates, seals and rotates itself. It runs the **provider round
-//! trips** (Google first): one consent grants identity and mailbox, and the
-//! mailbox grant of a new account is **held** until the person puts it in a
-//! workspace, where it goes to the connectors module through the kernel's
-//! grant-intake port.
+//! trips** (Google, Microsoft, Zoho), the one front door for every provider
+//! consent: signing in (one consent grants identity and mailbox; a new
+//! account's mailbox grant is **held** until the person puts it in a
+//! workspace), adding a way in while signed in, and connecting or
+//! reconnecting a mailbox. Grants go to the connectors module through the
+//! kernel's grant-intake port; the connectors module starts its consents
+//! through the consent-door port this module implements.
 //!
 //! Its surface is in two parts:
 //!
@@ -28,6 +31,7 @@ use axum::Extension;
 use campbooks_kernel::{AppState, Background, Module, i18n::Catalogue};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
+mod consent;
 pub mod deps;
 pub mod domain;
 pub mod events;
@@ -38,6 +42,7 @@ pub mod scopes;
 pub mod upstream;
 mod web;
 
+pub use consent::consent_door;
 pub use deps::Deps;
 pub use domain::keys::LocalKeys;
 pub use prune::{PRUNE_EVERY, Prune};
@@ -71,9 +76,14 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(features::list_held_grants::handler))
         .routes(routes!(features::discard_held_grant::handler))
         .routes(routes!(features::adopt_held_grant::handler))
+        .routes(routes!(features::list_ways_in::handler))
+        .routes(routes!(features::remove_way_in::handler))
+        .routes(routes!(features::start_link::handler))
 }
 
 #[cfg(test)]
 mod testkit;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod ways_in_tests;

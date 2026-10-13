@@ -46,9 +46,18 @@ pub const CACHE_REVALIDATE: &str = "no-cache";
 /// `style-src` has no `'unsafe-inline'`: the Vite build emits an external
 /// stylesheet only, and React sets `style` props through the CSSOM, which CSP
 /// does not govern.
+///
+/// Email bodies render in a sandboxed `srcdoc` frame, which inherits this
+/// policy on top of its own stricter one (`lib/ui/safe-html`). So the policy
+/// allows what a sanitised email may still use and nothing more:
+/// `style-src-attr 'unsafe-inline'` for its inline `style` attributes (style
+/// sheets stay blocked, and the server strips them anyway) and `https:`
+/// images for "Show images" (the frame's own policy blocks remote images
+/// until the member asks for them).
 pub const CONTENT_SECURITY_POLICY: &str = "default-src 'self'; script-src 'self'; \
-     style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; \
-     base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
+     style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: https:; \
+     connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; \
+     form-action 'self'";
 
 /// Name of the entry point every client-side route falls back to.
 const INDEX_HTML: &str = "index.html";

@@ -15,7 +15,10 @@ use axum::{
     body::Body,
     http::{HeaderMap, Method, Request, StatusCode, header},
 };
-use campbooks_identity::upstream::google::{Google, GoogleEndpoints};
+use campbooks_identity::upstream::{
+    Provider,
+    client::{Endpoints, IssuerRule, Server, Upstream},
+};
 use campbooks_kernel::{
     AppState,
     blobs::BlobStore,
@@ -189,20 +192,23 @@ async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_w
         .unwrap();
     let base = google.issuer();
     let at = |path: &str| url::Url::parse(&format!("{base}{path}")).unwrap();
-    issuer.google = Some(
-        Google::new(
+    issuer.upstreams = vec![
+        Upstream::new(
+            Provider::Google,
             FAKE_GOOGLE_CLIENT.to_owned(),
             campbooks_identity::deps::ClientSecret::Inline(SecretString::from(FAKE_GOOGLE_SECRET)),
-            ORIGIN,
-            GoogleEndpoints {
-                issuer: base.to_owned(),
+            campbooks_identity::upstream::redirect_uri(Provider::Google, ORIGIN, None).unwrap(),
+            Endpoints {
                 authorize: at("oidc/authorize"),
-                token: at("oidc/token"),
-                jwks: url::Url::parse(&google.jwks_url()).unwrap(),
+                issuers: IssuerRule::Fixed(Server {
+                    issuer: base.to_owned(),
+                    token: at("oidc/token"),
+                    jwks: url::Url::parse(&google.jwks_url()).unwrap(),
+                }),
             },
         )
         .unwrap(),
-    );
+    ];
     let Ok(Loaded::Enabled(settings)) =
         config::settings(&config, BffConfig::default(), Some(secret), &scopes)
     else {

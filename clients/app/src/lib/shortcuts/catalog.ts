@@ -94,6 +94,22 @@ export const DEFAULT_SHORTCUTS = [
     label: "shortcuts:compose.send",
     allowInInputs: true,
   },
+  {
+    id: "compose.bold",
+    keys: "mod+b",
+    scope: "compose",
+    group: "compose",
+    label: "shortcuts:compose.bold",
+    allowInInputs: true,
+  },
+  {
+    id: "compose.italic",
+    keys: "mod+i",
+    scope: "compose",
+    group: "compose",
+    label: "shortcuts:compose.italic",
+    allowInInputs: true,
+  },
 
   // Everywhere
   {

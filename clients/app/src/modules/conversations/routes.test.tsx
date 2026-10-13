@@ -1,36 +1,188 @@
 import {
   createMemoryHistory,
   createRootRoute,
+  createRoute,
   createRouter,
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
-import { screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { renderWithProviders } from "../../../test/render";
+import {
+  INBOX,
+  LEDGER,
+  LEDGER_DETAIL,
+  ledgerBody,
+  PRIMARY,
+  Q4,
+  Q4_BODY,
+  Q4_DETAIL,
+  STREAM_COUNTS,
+  W,
+} from "../../../test/demo/conversations";
+import { DUARTE } from "../../../test/demo/workspaces";
+import { mockApi, problem, renderWithProviders } from "../../../test/render";
 
 import { buildConversationsRoutes } from "./index";
 
 function renderAt(path: string, locale: "en" | "pt-PT" = "en") {
   const root = createRootRoute({ component: Outlet });
+  const workspace = createRoute({
+    getParentRoute: () => root,
+    path: "/w/$workspaceId",
+    component: Outlet,
+  });
   const router = createRouter({
-    routeTree: root.addChildren(buildConversationsRoutes(root)),
+    routeTree: root.addChildren([workspace.addChildren(buildConversationsRoutes(workspace))]),
     history: createMemoryHistory({ initialEntries: [path] }),
   });
-  renderWithProviders(<RouterProvider router={router} />, locale);
+  return { router, ...renderWithProviders(<RouterProvider router={router} />, locale) };
 }
 
-describe("buildConversationsRoutes", () => {
-  it("mounts the conversations home page", async () => {
-    renderAt("/conversations");
+const summary = (id: string) => PRIMARY.find((conversation) => conversation.id === id);
 
-    expect(await screen.findByRole("heading", { name: "Conversations" })).toBeVisible();
+function inbox(extra: Parameters<typeof mockApi>[0] = {}) {
+  return mockApi({
+    [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
+    [`GET ${W}/streams`]: { body: { streams: STREAM_COUNTS } },
+    [`GET ${W}/conversations`]: (request) => {
+      const stream = new URL(request.url).searchParams.get("stream");
+      return {
+        body: {
+          conversations: stream === "primary" ? PRIMARY : [],
+          next_cursor: null,
+        },
+      };
+    },
+    [`GET ${W}/conversations/${Q4.id}`]: { body: Q4_DETAIL },
+    [`GET ${W}/conversations/${LEDGER.id}`]: { body: LEDGER_DETAIL },
+    [`GET ${W}/conversations/${Q4.id}/messages/${Q4_DETAIL.messages[2]?.id ?? ""}/body`]: {
+      body: Q4_BODY,
+    },
+    [`GET ${W}/conversations/${LEDGER.id}/messages/${LEDGER_DETAIL.messages[0]?.id ?? ""}/body`]: (
+      request,
+    ) => ({ body: ledgerBody(new URL(request.url).searchParams.get("show_images") === "true") }),
+    [`POST ${W}/conversations/${Q4.id}/read`]: { body: { ...Q4, unread_count: 0 } },
+    [`POST ${W}/conversations/${LEDGER.id}/read`]: { body: { ...LEDGER, unread_count: 0 } },
+    [`POST ${W}/conversations/${Q4.id}/archive`]: { body: { ...Q4, archived: true } },
+    [`POST ${W}/conversations/${Q4.id}/unarchive`]: { body: Q4 },
+    [`POST ${W}/conversations/${LEDGER.id}/stream`]: (_request, body) => ({
+      body: { ...LEDGER, ...(body as object), stream_source: "member", suggestion: null },
+    }),
+    ...extra,
+  });
+}
+
+describe("the inbox", () => {
+  it("lists a stream newest first, with its suggestion shown as a suggestion", async () => {
+    inbox();
+    renderAt(`/w/${DUARTE.id}/inbox/primary`);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Primary" })).toBeVisible();
+    const list = screen.getByRole("region", { name: "Conversations" });
+    expect(await within(list).findByText(Q4.subject)).toBeVisible();
+    expect(within(list).getByText("Suggests Newsletters")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Pick a conversation" })).toBeVisible();
+  });
+
+  it("goes to Primary from an unknown stream", async () => {
+    inbox();
+    const { router } = renderAt(`/w/${DUARTE.id}/inbox/spam`);
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}/inbox/primary`);
+    });
+  });
+
+  it("opens a conversation: newest message open, older folded, read on open", async () => {
+    const api = inbox();
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${Q4.id}`);
+
+    const reader = await screen.findByRole("main", { name: "Conversation" });
+    expect(await within(reader).findByRole("heading", { name: Q4.subject })).toBeVisible();
+    // The newest message is open, in the sandboxed frame.
+    const frame = await within(reader).findByTitle("Message from Maya Okafor");
+    expect(frame.getAttribute("sandbox")).toBe("allow-popups allow-popups-to-escape-sandbox");
+    expect(within(reader).getByText("q4-plan-v3.pdf")).toBeVisible();
+    // The two older ones are folded until opened.
+    const folded = within(reader).getAllByRole("button", { expanded: false });
+    expect(folded.length).toBeGreaterThanOrEqual(2);
+    fireEvent.click(within(reader).getByRole("button", { name: /Sam Rivera/u }));
+    expect(await within(reader).findByText(/Is the timeline fixed\?/u)).toBeVisible();
+    // The note says what the decide pass thinks, as suggestions, with why.
+    const note = within(reader).getByRole("region", { name: "Where things stand" });
+    expect(note).toHaveTextContent("it needs a reply and it mentions a date to meet");
+    fireEvent.click(within(note).getByRole("button", { name: "Why?" }));
+    expect(within(note).getByText("Mentions a date: It names a date (“Friday”).")).toBeVisible();
+    await waitFor(() => {
+      expect(api.calls.map((call) => call.route)).toContain(
+        `POST ${W}/conversations/${Q4.id}/read`,
+      );
+    });
+  });
+
+  it("archives with E and takes it back with Z", async () => {
+    const api = inbox();
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${Q4.id}`);
+    await screen.findByRole("heading", { name: Q4.subject });
+
+    fireEvent.keyDown(document, { key: "e" });
+    expect(await screen.findByText(`Done · ${Q4.subject}`)).toBeVisible();
+    await waitFor(() => {
+      expect(api.calls.map((call) => call.route)).toContain(
+        `POST ${W}/conversations/${Q4.id}/archive`,
+      );
+    });
+    fireEvent.keyDown(document, { key: "z" });
+    await waitFor(() => {
+      expect(api.calls.map((call) => call.route)).toContain(
+        `POST ${W}/conversations/${Q4.id}/unarchive`,
+      );
+    });
+  });
+
+  it("takes a suggestion with 1, and shows images only when asked", async () => {
+    const api = inbox();
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${LEDGER.id}`);
+    const reader = await screen.findByRole("main", { name: "Conversation" });
+    await within(reader).findByRole("heading", { name: LEDGER.subject });
+
+    const frame = await within(reader).findByTitle("Message from The Weekly Ledger");
+    expect(frame.getAttribute("srcdoc")).toContain("img-src data:;");
+    expect(within(reader).getByText(/1 remote image hidden/u)).toBeVisible();
+    fireEvent.click(within(reader).getByRole("button", { name: /Show images/u }));
+    await waitFor(() => {
+      expect(
+        within(reader).getByTitle("Message from The Weekly Ledger").getAttribute("srcdoc"),
+      ).toContain("img-src data: https: http:");
+    });
+
+    fireEvent.keyDown(document, { key: "1" });
+    expect(await screen.findByText(`Moved to Newsletters · ${LEDGER.subject}`)).toBeVisible();
+    const moved = api.calls.find(
+      (call) => call.route === `POST ${W}/conversations/${LEDGER.id}/stream`,
+    );
+    expect(moved?.body).toEqual({ stream: "newsletters" });
+  });
+
+  it("says when a conversation is gone, and when the list cannot load", async () => {
+    inbox({
+      [`GET ${W}/conversations/${Q4.id}`]: problem(404, "not_found"),
+      [`GET ${W}/conversations`]: problem(503, "unavailable"),
+    });
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${Q4.id}`);
+
+    expect(await screen.findByRole("heading", { name: "This conversation is gone" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Could not load Primary" })).toBeVisible();
+    expect(summary(Q4.id)).toBeDefined();
   });
 
   it("renders in the user's language", async () => {
-    renderAt("/conversations", "pt-PT");
+    inbox();
+    renderAt(`/w/${DUARTE.id}/inbox/primary`, "pt-PT");
 
-    expect(await screen.findByText("Este módulo ainda não tem ecrãs.")).toBeVisible();
+    expect(await screen.findByRole("heading", { level: 1, name: "Principal" })).toBeVisible();
+    expect(await screen.findByText("Sugere Newsletters")).toBeVisible();
   });
 });

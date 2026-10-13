@@ -114,6 +114,50 @@ describe("UndoProvider", () => {
     expect(screen.getByRole("button", { name: "undo 1" })).toBeInTheDocument();
   });
 
+  it("keeps an action's toast for its own window, and says things without Undo", () => {
+    vi.useFakeTimers();
+    function Window() {
+      const undo = useUndoToast();
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              undo.push({ label: "Sending to Ana", undo: vi.fn(), durationMs: 10_000 });
+            }}
+          >
+            send
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              undo.notify("Too late: it was already sent");
+            }}
+          >
+            late
+          </button>
+        </>
+      );
+    }
+    renderUi(
+      <UndoProvider toastMs={1000}>
+        <Window />
+      </UndoProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "send" }));
+    act(() => {
+      vi.advanceTimersByTime(9000);
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("Sending to Ana");
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    fireEvent.click(screen.getByRole("button", { name: "late" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Too late: it was already sent");
+    expect(screen.queryByRole("button", { name: /^Undo/ })).not.toBeInTheDocument();
+  });
+
   it("refuses useUndoToast outside a provider", () => {
     vi.spyOn(console, "error").mockImplementation(() => {
       // React reports the thrown render error; the assertion is what matters.

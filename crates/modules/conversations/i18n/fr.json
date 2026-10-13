@@ -3,6 +3,17 @@
     "invalid_limit": "La limite doit être comprise entre 1 et {{max}}.",
     "invalid_cursor": "Ce lien de page n’est pas valide. Recommencez à la première page.",
     "invalid_label_name": "Le nom d’une étiquette doit comporter entre 1 et {{max}} caractères.",
-    "inbox_read_only": "Vous pouvez lire cette boîte de réception, mais pas modifier ses conversations. Demandez un accès d’envoi à la personne qui la gère."
+    "inbox_read_only": "Vous pouvez lire cette boîte de réception, mais pas modifier ses conversations. Demandez un accès d’envoi à la personne qui la gère.",
+    "draft_needs_inbox": "Un nouveau message a besoin de la boîte depuis laquelle l’envoyer.",
+    "draft_needs_message": "Une réponse ou un transfert a besoin du message auquel il répond.",
+    "too_many_recipients": "Un message peut avoir au plus {{max}} destinataires.",
+    "invalid_subject": "L’objet tient sur une seule ligne d’au plus {{max}} caractères.",
+    "draft_too_long": "Ce message est trop long pour être envoyé.",
+    "draft_changed": "Ce brouillon a été modifié ailleurs. Rechargez-le pour voir la dernière version.",
+    "draft_not_editable": "Ce message est en route et ne peut plus être modifié.",
+    "no_recipients": "Ajoutez au moins un destinataire.",
+    "invalid_address": "Cette adresse n’est pas valide : {{address}}",
+    "attachments_too_large": "Les pièces jointes peuvent totaliser au plus {{max}} Mo.",
+    "too_late": "Il est trop tard pour annuler : le message est déjà parti."
   }
 }

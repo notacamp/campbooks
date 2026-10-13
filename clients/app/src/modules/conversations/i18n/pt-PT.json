@@ -1,4 +1,205 @@
 {
-  "title": "Conversas",
-  "summary": "Este módulo ainda não tem ecrãs."
+  "title": "Caixa de entrada",
+  "streams": {
+    "label": "Fluxos",
+    "primary": "Principal",
+    "updates": "Atualizações",
+    "receipts": "Recibos",
+    "newsletters": "Newsletters"
+  },
+  "list": {
+    "label": "Conversas",
+    "show": "Mostrar",
+    "all": "Todas",
+    "unread": "Não lidas",
+    "more": "Mostrar mais",
+    "loadingMore": "A carregar mais conversas"
+  },
+  "empty": {
+    "streamTitle": "Nada em {{stream}}",
+    "streamBody": "O correio que o Campbooks arruma em {{stream}} aparece aqui.",
+    "unreadTitle": "Nada por ler em {{stream}}",
+    "unreadBody": "Já leu tudo o que está aqui.",
+    "noInboxTitle": "Ainda sem caixa de correio",
+    "noInboxBody": "Ligue uma caixa de correio e o correio aparece aqui, arrumado em fluxos.",
+    "readerTitle": "Escolha uma conversa",
+    "readerBody": "Escolha uma na lista ou use o teclado:"
+  },
+  "error": {
+    "listTitle": "Não foi possível carregar {{stream}}",
+    "listBody": "O Campbooks não conseguiu contactar o servidor. Nada se perdeu.",
+    "conversationTitle": "Não foi possível abrir esta conversa",
+    "conversationBody": "O Campbooks não conseguiu contactar o servidor. Nada se perdeu.",
+    "goneTitle": "Esta conversa já não existe",
+    "goneBody": "Foi removida ou já não tem acesso a ela.",
+    "body": "Não foi possível carregar esta mensagem.",
+    "retry": "Tentar de novo",
+    "action": "Não foi possível alterar «{{subject}}». Tente de novo."
+  },
+  "reader": {
+    "label": "Conversa",
+    "back": "Voltar a {{stream}}",
+    "actions": "Ações da conversa",
+    "messages_one": "{{count}} mensagem",
+    "messages_other": "{{count}} mensagens",
+    "to": "Para {{names}}",
+    "cc": "cc {{names}}",
+    "noSubject": "(sem assunto)",
+    "frameTitle": "Mensagem de {{name}}",
+    "truncated": "Esta mensagem é longa: o Campbooks mostra a primeira parte.",
+    "older_one": "{{count}} mensagem anterior",
+    "older_other": "{{count}} mensagens anteriores",
+    "showOlder": "Mostrar",
+    "attachments": "Anexos"
+  },
+  "actions": {
+    "star": "Marcar com estrela",
+    "unstar": "Tirar a estrela",
+    "read": "Marcar como lida",
+    "unread": "Marcar como não lida",
+    "move": "Mover",
+    "moveTo": "Mover para",
+    "replyAll": "Responder a todos",
+    "forward": "Reencaminhar",
+    "showImages": "Mostrar imagens",
+    "imagesHidden_one": "{{count}} imagem remota oculta, para que o remetente não saiba quando lê isto.",
+    "imagesHidden_other": "{{count}} imagens remotas ocultas, para que o remetente não saiba quando lê isto.",
+    "imagesShown": "Imagens remotas visíveis."
+  },
+  "toast": {
+    "done": "Concluída · {{subject}}",
+    "starred": "Com estrela · {{subject}}",
+    "unstarred": "Sem estrela · {{subject}}",
+    "read": "Marcada como lida · {{subject}}",
+    "unread": "Marcada como não lida · {{subject}}",
+    "moved": "Movida para {{stream}} · {{subject}}"
+  },
+  "scout": {
+    "label": "Ponto da situação",
+    "suggestion": "Sugere {{stream}}",
+    "suggestionSure": "Sugere {{stream}}, com {{confidence}}% de certeza",
+    "suggestionNote": "O Campbooks acha que isto pertence a {{stream}}. É uma sugestão: nada sai do sítio sem a sua decisão.",
+    "prompt": "Mover?",
+    "accept": "Mover para {{stream}}",
+    "keep": "Manter em {{stream}}",
+    "sortedRule": "Arrumada em {{stream}} por uma regra",
+    "sortedRuleSure": "Arrumada em {{stream}} por uma regra, com {{confidence}}% de certeza",
+    "sortedModel": "Arrumada em {{stream}} pelo Campbooks",
+    "sortedMember": "Moveu-a para {{stream}}",
+    "sortedDefault": "Em {{stream}}: nada a moveu",
+    "read": "A leitura do Campbooks, em forma de sugestão: {{list}}.",
+    "nothing": "Nada aqui parece pedir-lhe alguma coisa.",
+    "needsReply": "precisa de resposta",
+    "asksAction": "pede-lhe que faça algo",
+    "hasDeadline": "refere uma data a cumprir",
+    "urgent": "parece urgente",
+    "suspicious": "parece suspeita, por isso confirme o remetente antes de abrir uma ligação",
+    "whyStream": "Fluxo",
+    "whyNeedsReply": "Precisa de resposta",
+    "whyAsksAction": "Pede-lhe que faça algo",
+    "whyHasDeadline": "Refere uma data",
+    "whyUrgent": "Urgente",
+    "whySuspicious": "Suspeita"
+  },
+  "reasons": {
+    "signals": {
+      "reply_to_mismatch": "As respostas iriam para outro domínio ({{evidence}}).",
+      "lookalike_domain": "O domínio do remetente imita um mais conhecido ({{evidence}}).",
+      "link_elsewhere": "Uma ligação leva a outro sítio do que diz ({{evidence}}).",
+      "phishing_phrase": "Pede o que o correio de phishing costuma pedir («{{evidence}}»).",
+      "pressure": "Pressiona-o a agir depressa («{{evidence}}»).",
+      "auto_reply": "É uma resposta automática («{{evidence}}»).",
+      "list_header": "Traz um cabeçalho de lista de correio ({{evidence}}).",
+      "unsubscribe_text": "Tem uma ligação para cancelar a subscrição («{{evidence}}»).",
+      "money_words": "Fala de dinheiro («{{evidence}}»).",
+      "notification_words": "Parece uma notificação («{{evidence}}»).",
+      "calendar_invite": "É um convite de calendário ({{evidence}}).",
+      "automated_sender": "Vem de um endereço automático ({{evidence}}).",
+      "person_sender": "Foi escrita por uma pessoa.",
+      "service_sender": "Foi enviada por um serviço, não por uma pessoa.",
+      "reply_asked": "Pede-lhe uma resposta («{{evidence}}»).",
+      "question": "Faz uma pergunta.",
+      "no_question": "Não faz perguntas.",
+      "list_mail": "Foi enviada para uma lista.",
+      "payment_due": "Há um pagamento a fazer («{{evidence}}»).",
+      "already_paid": "Diz que já está pago («{{evidence}}»).",
+      "action_asked": "Pede-lhe que faça algo («{{evidence}}»).",
+      "conditional_ask": "Só pede algo se se aplicar («{{evidence}}»).",
+      "notice": "É um aviso: não há nada a fazer.",
+      "request": "Faz um pedido («{{evidence}}»).",
+      "no_request": "Não faz nenhum pedido.",
+      "deadline": "Refere uma data («{{evidence}}»).",
+      "no_date": "Não refere nenhuma data.",
+      "today": "É sobre hoje («{{evidence}}»).",
+      "no_today": "Nada nela é para hoje.",
+      "no_phishing_tell": "Nada nela parece phishing."
+    },
+    "model": {
+      "decide": "O modelo de decisão respondeu ({{evidence}})."
+    },
+    "knn": {
+      "neighbours": "Correio parecido foi arrumado assim antes."
+    },
+    "other": "{{rule}} ({{evidence}})"
+  },
+  "shortcuts": {
+    "primary": "Ir para Principal",
+    "updates": "Ir para Atualizações",
+    "receipts": "Ir para Recibos",
+    "newsletters": "Ir para Newsletters",
+    "star": "Pôr ou tirar a estrela",
+    "unread": "Marcar como lida ou não lida",
+    "move": "Mover para um fluxo",
+    "replyAll": "Responder a todos",
+    "forward": "Reencaminhar",
+    "showImages": "Mostrar imagens"
+  },
+  "compose": {
+    "title": {
+      "reply": "Responder a {{name}}",
+      "reply_all": "Responder a todos",
+      "forward": "Reencaminhar",
+      "new": "Nova mensagem"
+    },
+    "newMessage": "Nova mensagem",
+    "noInbox": "Ligue uma caixa de correio para enviar a partir dela.",
+    "readOnly": "Pode ler esta caixa de correio, mas não enviar a partir dela.",
+    "from": "De",
+    "sending": "A enviar para {{name}}",
+    "sendingNoName": "A enviar",
+    "draftSaved": "Rascunho guardado",
+    "saveState": {
+      "saved": "Guardado",
+      "saving": "A guardar…",
+      "unsaved": "Ainda não guardado",
+      "failed": "Não foi possível guardar. O Campbooks vai tentar de novo."
+    },
+    "quote": {
+      "wrote": "Em {{date}}, {{name}} escreveu:",
+      "forwarded": "Mensagem reencaminhada",
+      "from": "De",
+      "date": "Data",
+      "subject": "Assunto",
+      "to": "Para"
+    },
+    "errors": {
+      "no_recipients": "Adicione pelo menos um destinatário.",
+      "invalid_address": "Um dos endereços não é válido.",
+      "attachments_too_large": "Os anexos são demasiado grandes para enviar (no máximo 25 MB).",
+      "draft_not_editable": "Esta mensagem já está a caminho.",
+      "not_connected": "Esta caixa de correio já não está ligada. Volte a ligá-la e envie de novo.",
+      "needs_reauth": "O Campbooks precisa de nova autorização para enviar a partir desta caixa de correio. Volte a ligá-la e envie de novo.",
+      "rejected": "O Gmail recusou esta mensagem. Verifique os endereços e tente de novo.",
+      "too_large": "Esta mensagem é demasiado grande para o Gmail a enviar.",
+      "unavailable": "Não foi possível contactar o Gmail, por isso nada foi enviado. Tente de novo.",
+      "unknown_outcome": "O Campbooks não conseguiu confirmar que esta mensagem foi enviada. Verifique a pasta Enviados antes de a enviar de novo.",
+      "unknown": "Algo correu mal. Tente de novo.",
+      "not_saved": "Não foi possível guardar as últimas alterações, por isso nada foi enviado. Tente de novo.",
+      "draft_changed": "Este rascunho foi alterado noutro sítio. Feche-o e abra-o de novo para ver a versão mais recente."
+    },
+    "shortcuts": {
+      "newMessage": "Nova mensagem"
+    },
+    "tooLate": "Já não é possível anular: a mensagem foi enviada."
+  }
 }

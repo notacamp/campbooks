@@ -179,3 +179,59 @@ pub enum Category {
     /// Mailing lists.
     Forums,
 }
+
+/// The outgoing message document's media type
+/// (`contracts/outgoing-message.v1.schema.json`).
+pub const OUTGOING_CONTENT_TYPE: &str =
+    "application/vnd.campbooks.outgoing-message+json; version=1";
+
+/// A message to send, as the conversations module writes it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OutgoingMessage {
+    /// The format version, 1.
+    pub version: u16,
+    /// The inbox it is sent from.
+    pub inbox: InboxId,
+    /// The `Message-ID` to send with, without angle brackets.
+    pub rfc_message_id: String,
+    /// The inbox's address and name.
+    pub from: Address,
+    /// Recipients.
+    pub to: Vec<Address>,
+    /// Copied recipients.
+    pub cc: Vec<Address>,
+    /// Blind-copied recipients.
+    pub bcc: Vec<Address>,
+    /// The subject.
+    pub subject: String,
+    /// The `Date` header.
+    pub date: DateTime<Utc>,
+    /// `In-Reply-To`, without angle brackets.
+    #[serde(default)]
+    pub in_reply_to: Option<String>,
+    /// `References`, oldest first.
+    #[serde(default)]
+    pub references: Vec<String>,
+    /// The provider's thread to send in.
+    #[serde(default)]
+    pub thread_key: Option<String>,
+    /// The plain-text part.
+    pub text: String,
+    /// The HTML alternative.
+    #[serde(default)]
+    pub html: Option<String>,
+    /// Attachments, in order.
+    #[serde(default)]
+    pub attachments: Vec<OutgoingAttachment>,
+}
+
+/// An attachment to send.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OutgoingAttachment {
+    /// Its file name.
+    pub filename: String,
+    /// Its media type.
+    pub content_type: String,
+    /// The bytes, a blob of the workspace.
+    pub blob: BlobRef,
+}

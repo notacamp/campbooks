@@ -37,7 +37,7 @@ pub struct TokenVerifier {
 }
 
 pub(super) struct Inner {
-    issuer: String,
+    pub(super) issuer: String,
     audience: String,
     leeway_seconds: u64,
     keys: Jwks,
@@ -170,6 +170,21 @@ impl Inner {
         allowed_types: &[&str],
         require_iat: bool,
     ) -> Result<T, Error> {
+        self.decode_from(token, &self.issuer, audience, allowed_types, require_iat)
+            .await
+    }
+
+    /// [`decode`](Self::decode) for tokens of `issuer` instead of the
+    /// configured one, still signed by one of this verifier's keys (a
+    /// multi-tenant provider publishes one key set for many issuers).
+    pub(super) async fn decode_from<T: DeserializeOwned>(
+        &self,
+        token: &str,
+        issuer: &str,
+        audience: &str,
+        allowed_types: &[&str],
+        require_iat: bool,
+    ) -> Result<T, Error> {
         let invalid = || Error::Unauthorized(AuthFailure::InvalidToken);
 
         let header = jsonwebtoken::decode_header(token).map_err(|_| invalid())?;
@@ -185,7 +200,7 @@ impl Inner {
         let key = self.keys.key(kid, header.alg).await?.ok_or_else(invalid)?;
 
         let mut validation = Validation::new(header.alg);
-        validation.set_issuer(&[&self.issuer]);
+        validation.set_issuer(&[issuer]);
         validation.set_audience(&[audience]);
         validation.set_required_spec_claims(&["exp", "iss", "aud"]);
         validation.validate_nbf = true;

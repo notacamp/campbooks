@@ -72,6 +72,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/identity/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start adding a way in, connecting or reconnecting a mailbox. */
+        post: operations["identity.start_link"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/ways-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List how you sign in. */
+        get: operations["identity.list_ways_in"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/ways-in/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a way in. */
+        delete: operations["identity.remove_way_in"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/health": {
         parameters: {
             query?: never;
@@ -184,23 +235,6 @@ export interface paths {
         put?: never;
         /** Start connecting an account. */
         post: operations["connectors.start_connection"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/w/{workspace_id}/connections/authorizations/complete": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Complete a connection. */
-        post: operations["connectors.complete_connection"];
         delete?: never;
         options?: never;
         head?: never;
@@ -446,6 +480,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List your drafts. */
+        get: operations["conversations.list_drafts"];
+        put?: never;
+        /** Start a draft. */
+        post: operations["conversations.create_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/drafts/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one of your drafts. */
+        get: operations["conversations.get_draft"];
+        put?: never;
+        post?: never;
+        /** Discard a draft (also a scheduled one, which then never leaves). */
+        delete: operations["conversations.delete_draft"];
+        options?: never;
+        head?: never;
+        /** Save a draft. */
+        patch: operations["conversations.update_draft"];
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/drafts/{draft_id}/cancel_send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take a send back within its undo window. */
+        post: operations["conversations.cancel_send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/drafts/{draft_id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a draft. */
+        post: operations["conversations.send_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/identity/held-grants/{id}/adopt": {
         parameters: {
             query?: never;
@@ -559,6 +664,23 @@ export interface paths {
         };
         /** Read the security log. */
         get: operations["workspaces.list_security_events"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/streams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the streams and their counts. */
+        get: operations["conversations.list_streams"];
         put?: never;
         post?: never;
         delete?: never;
@@ -984,6 +1106,8 @@ export interface components {
             /** @description The connection's id (a `connectors.connection`). */
             connection: string;
         };
+        /** @description An answer's value: a label (choice), a level (score) or yes/no. */
+        AnswerView: boolean | number | string;
         /**
          * Format: uuid
          * @description AttachmentId (UUIDv7)
@@ -1005,11 +1129,6 @@ export interface components {
              */
             size: number;
         };
-        /**
-         * Format: uuid
-         * @description AuthorizationId (UUIDv7)
-         */
-        AuthorizationId: string;
         BackchannelLogout: {
             /** @description The identity provider's signed logout token. */
             logout_token: string;
@@ -1029,13 +1148,6 @@ export interface components {
          * @enum {string}
          */
         Channel: "email";
-        /** @description What Google redirected the browser with. */
-        CompleteConnection: {
-            /** @description The `code` query parameter. */
-            code: string;
-            /** @description The `state` query parameter. */
-            state: string;
-        };
         /**
          * Format: uuid
          * @description ConnectionId (UUIDv7)
@@ -1083,6 +1195,11 @@ export interface components {
         ConversationDetail: {
             /** @description The conversation. */
             conversation: components["schemas"]["ConversationSummary"];
+            /**
+             * @description The decide pass's answers about the newest inbound message, with
+             *     their reasons: suggestions, except an answer marked `acted`.
+             */
+            decisions: components["schemas"]["DecisionView"][];
             /** @description Up to the 100 newest messages, oldest first. */
             messages: components["schemas"]["MessageView"][];
         };
@@ -1129,6 +1246,7 @@ export interface components {
             stream_source: components["schemas"]["StreamSource"];
             /** @description The first message's subject. */
             subject: string;
+            suggestion?: components["schemas"]["StreamSuggestion"] | null;
             /**
              * Format: int32
              * @description Unread inbound messages.
@@ -1166,10 +1284,150 @@ export interface components {
             accept_url: string;
         };
         /**
+         * @description What kind of strategy gave an answer.
+         * @enum {string}
+         */
+        DecisionSource: "rules" | "model" | "knn" | "cascade";
+        /** @description One answer of the decide pass about the newest inbound message. */
+        DecisionView: {
+            /**
+             * @description Whether it changed anything. In this version only a confident rules
+             *     stream answer may; every other answer is a suggestion.
+             */
+            acted: boolean;
+            /**
+             * Format: int32
+             * @description How sure, 0 to 100, when the source says.
+             */
+            confidence?: number | null;
+            /**
+             * @description The question: `stream`, `needs_reply`, `asks_action`,
+             *     `has_deadline`, `urgency` or `suspicious`.
+             * @example needs_reply
+             */
+            question: string;
+            /** @description Why. */
+            reasons: components["schemas"]["ReasonView"][];
+            /** @description Who answered. */
+            source: components["schemas"]["DecisionSource"];
+            /** @description The answer. */
+            value: components["schemas"]["AnswerView"];
+        };
+        /**
          * @description Whether a message came in or went out.
          * @enum {string}
          */
         Direction: "inbound" | "outbound";
+        /** @description A forwarded attachment, as the draft shows it. */
+        DraftAttachment: {
+            /** @description Its media type, as sent (not trusted). */
+            content_type: string;
+            /** @description Its file name. */
+            filename: string;
+            /** @description The original message's attachment. */
+            id: components["schemas"]["AttachmentId"];
+            /**
+             * Format: int64
+             * @description Its size in bytes.
+             */
+            size: number;
+        };
+        /** @description The fields to change; the others stay. */
+        DraftChanges: {
+            /** @description The forwarded attachments to keep (the others are dropped). */
+            attachments?: components["schemas"]["AttachmentId"][] | null;
+            /** @description Blind-copied recipients. */
+            bcc?: components["schemas"]["Address"][] | null;
+            /** @description The text. */
+            body?: string | null;
+            /** @description Copied recipients. */
+            cc?: components["schemas"]["Address"][] | null;
+            /** @description The quoted history. */
+            quoted?: string | null;
+            /** @description The subject. */
+            subject?: string | null;
+            /** @description Recipients. */
+            to?: components["schemas"]["Address"][] | null;
+            /**
+             * Format: int32
+             * @description The version this change was made on (from the draft last read).
+             */
+            version: number;
+        };
+        /**
+         * Format: uuid
+         * @description DraftId (UUIDv7)
+         */
+        DraftId: string;
+        /**
+         * @description What a draft answers.
+         * @enum {string}
+         */
+        DraftKind: "new" | "reply" | "reply_all" | "forward";
+        /** @description The caller's drafts. */
+        DraftList: {
+            /** @description Newest first, at most 50. */
+            drafts: components["schemas"]["DraftView"][];
+        };
+        /**
+         * @description Where a draft is in its life.
+         * @enum {string}
+         */
+        DraftState: "draft" | "scheduled" | "sending" | "failed";
+        /** @description A draft. */
+        DraftView: {
+            /** @description The forwarded attachments. */
+            attachments: components["schemas"]["DraftAttachment"][];
+            /** @description Blind-copied recipients. */
+            bcc: components["schemas"]["Address"][];
+            /** @description What the member writes: plain text with basic formatting. */
+            body: string;
+            /** @description Copied recipients. */
+            cc: components["schemas"]["Address"][];
+            conversation_id?: components["schemas"]["ConversationId"] | null;
+            /**
+             * Format: date-time
+             * @description When it was started.
+             */
+            created_at: string;
+            /**
+             * @description Why the last send failed (`not_connected`, `needs_reauth`,
+             *     `rejected`, `too_large`, `unknown_outcome`).
+             */
+            failure_reason?: string | null;
+            /** @description The inbox's address and name. */
+            from: components["schemas"]["Address"];
+            /** @description The draft. */
+            id: components["schemas"]["DraftId"];
+            /** @description The inbox it is sent from. */
+            inbox_id: components["schemas"]["InboxId"];
+            /** @description What it answers. */
+            kind: components["schemas"]["DraftKind"];
+            message_id?: components["schemas"]["MessageId"] | null;
+            /** @description The quoted history under it. */
+            quoted: string;
+            /**
+             * Format: date-time
+             * @description When a scheduled send leaves (until then it can be cancelled).
+             */
+            send_at?: string | null;
+            /** @description Where it is in its life. */
+            state: components["schemas"]["DraftState"];
+            /** @description The subject. */
+            subject: string;
+            /** @description Recipients. */
+            to: components["schemas"]["Address"][];
+            /**
+             * Format: date-time
+             * @description When it was last saved.
+             */
+            updated_at: string;
+            /**
+             * Format: int32
+             * @description Bumped by every save; name it when saving.
+             */
+            version: number;
+        };
         /** @description `/oauth2/end_session` parameters (query for GET, form for POST). */
         EndSession: {
             /** @description The client asking; must be the hint's audience when given. */
@@ -1326,6 +1584,11 @@ export interface components {
             /** @description Its name. */
             name: string;
         };
+        /**
+         * @description What the round trip is for.
+         * @enum {string}
+         */
+        LinkPurpose: "link" | "connect" | "reconnect";
         /** @description Where to send the browser to sign out of the identity provider too. */
         LogoutResponse: {
             /**
@@ -1357,8 +1620,16 @@ export interface components {
         };
         /** @description A message's bodies. */
         MessageBody: {
-            /** @description The HTML part: untrusted, to be shown only in a sandboxed frame. */
+            /** @description The HTML part, sanitised; still to be shown only in a sandboxed frame. */
             html?: string | null;
+            /** @description Whether the remote images were kept. */
+            images_shown: boolean;
+            /**
+             * Format: int32
+             * @description Remote images in the HTML part: held back (their `src` removed)
+             *     unless `show_images` was asked for.
+             */
+            remote_images: number;
             /** @description The plain-text part. */
             text?: string | null;
             /** @description Whether either part was cut short. */
@@ -1421,6 +1692,28 @@ export interface components {
             /** @description The provider signed in with. */
             provider: string;
         };
+        /** @description A message to start. */
+        NewDraft: {
+            /** @description Blind-copied recipients. */
+            bcc?: components["schemas"]["Address"][] | null;
+            /** @description The text. */
+            body?: string | null;
+            /** @description Copied recipients, instead of the filled ones. */
+            cc?: components["schemas"]["Address"][] | null;
+            inbox_id?: components["schemas"]["InboxId"] | null;
+            /** @description What it answers. */
+            kind: components["schemas"]["DraftKind"];
+            message_id?: components["schemas"]["MessageId"] | null;
+            /**
+             * @description The quoted history (written by the client: an attribution line and
+             *     the message quoted with `> `, or a forwarded-message header).
+             */
+            quoted?: string | null;
+            /** @description The subject, instead of the filled one. */
+            subject?: string | null;
+            /** @description Recipients, instead of the filled ones. */
+            to?: components["schemas"]["Address"][] | null;
+        };
         /**
          * @description Where a stream is in its reading.
          * @enum {string}
@@ -1466,6 +1759,19 @@ export interface components {
          * @enum {string}
          */
         Provider: "google";
+        /**
+         * @description One reason behind an answer: a stable rule id the client translates,
+         *     and what it matched.
+         */
+        ReasonView: {
+            /** @description What it matched (a header name, a word), possibly empty. */
+            evidence: string;
+            /**
+             * @description `<strategy>.<rule>`, e.g. `signals.list_header`.
+             * @example signals.list_header
+             */
+            rule: string;
+        };
         /** @description What the sign-in screen shows for a waiting authorization request. */
         RequestInfo: {
             /** @description The client asking. */
@@ -1518,6 +1824,15 @@ export interface components {
             metadata: unknown;
             user_id?: components["schemas"]["UserId"] | null;
         };
+        /** @description Which version of the draft to send: the one the member last saw saved. */
+        SendDraft: {
+            /**
+             * Format: int32
+             * @description The draft's version as last saved by the caller; any other answers
+             *     409 `draft_changed`, so what is sent is what the member saw.
+             */
+            version: number;
+        };
         /** @description Who is signed in. Never contains a token. */
         SessionInfo: {
             /** @description Whether the request carries a live session. */
@@ -1546,17 +1861,47 @@ export interface components {
             /** @description The provider. */
             provider: components["schemas"]["Provider"];
         };
+        /** @description The round trip to start. */
+        StartLink: {
+            /** @description The connection, for `reconnect`. */
+            connection_id?: string | null;
+            /**
+             * @description `google`, `microsoft` or `zoho`; for `link` and `connect`. A
+             *     reconnect uses the connection's.
+             */
+            provider?: string | null;
+            /** @description What for. */
+            purpose: components["schemas"]["LinkPurpose"];
+            /**
+             * @description Same-origin path to come back to (default `/`), with `linked=`,
+             *     `connected=` or `link_error=` added.
+             */
+            return_to?: string | null;
+            workspace_id?: components["schemas"]["WorkspaceId"] | null;
+        };
         /** @description A started consent. */
         StartedConnection: {
-            /** @description The started authorization. */
-            authorization: components["schemas"]["AuthorizationId"];
-            /** @description Where to send the browser. */
+            /**
+             * @description Where to send the browser: this instance's front door
+             *     (`/auth/start/{provider}?link=…`), which comes back with
+             *     `connected=<connection id>` or `link_error=<code>`.
+             */
             authorize_url: string;
             /**
              * Format: date-time
-             * @description When the consent must be completed by.
+             * @description When the consent must be started by.
              */
             expires_at: string;
+        };
+        /** @description A started round trip. */
+        StartedLink: {
+            /**
+             * Format: date-time
+             * @description It stops working then.
+             */
+            expires_at: string;
+            /** @description Send the browser here (same origin). */
+            url: string;
         };
         /**
          * @description The one place Campbooks sorts a conversation into. The built-in set; the
@@ -1564,11 +1909,48 @@ export interface components {
          * @enum {string}
          */
         Stream: "primary" | "updates" | "receipts" | "newsletters";
+        /** @description A stream and what it holds. */
+        StreamCount: {
+            /**
+             * Format: int32
+             * @description Conversations in it that are still in the inbox.
+             */
+            conversations: number;
+            /** @description The stream. */
+            stream: components["schemas"]["Stream"];
+            /**
+             * Format: int32
+             * @description Of those, the ones with an unread message.
+             */
+            unread: number;
+        };
+        /** @description Every built-in stream, in display order (Primary first). */
+        StreamCounts: {
+            /** @description The streams, each listed even when empty. */
+            streams: components["schemas"]["StreamCount"][];
+        };
         /**
          * @description Who put a conversation in its stream.
          * @enum {string}
          */
         StreamSource: "default" | "rules" | "model" | "member";
+        /**
+         * @description Where the decide pass would put a conversation, when that is not where it
+         *     is: a suggestion the member can take or leave.
+         */
+        StreamSuggestion: {
+            /**
+             * Format: int32
+             * @description How sure, 0 to 100, when the source says.
+             */
+            confidence?: number | null;
+            /** @description Why. */
+            reasons: components["schemas"]["ReasonView"][];
+            /** @description Who suggested it. */
+            source: components["schemas"]["DecisionSource"];
+            /** @description The suggested stream. */
+            stream: components["schemas"]["Stream"];
+        };
         /** @description A change stream as the API shows it. */
         StreamView: {
             /** @description The capability it reads. */
@@ -1660,6 +2042,42 @@ export interface components {
              * @example 0.1.0
              */
             version: string;
+        };
+        /** @description A provider account the caller signs in with. */
+        WayIn: {
+            /**
+             * @description The address the provider gave when it was added (shown, never used
+             *     to find an account).
+             */
+            email?: string | null;
+            /**
+             * Format: uuid
+             * @description Its id.
+             */
+            id: string;
+            /** @description `provider` (passkeys are listed with the passkeys). */
+            kind: string;
+            /**
+             * Format: date-time
+             * @description When it was last used to sign in.
+             */
+            last_used_at?: string | null;
+            /**
+             * Format: date-time
+             * @description When it was added.
+             */
+            linked_at: string;
+            /** @description `sign_up`, `link` or `connect`. */
+            linked_via: string;
+            /** @description `google`, `microsoft` or `zoho`. */
+            provider: string;
+        };
+        /** @description The caller's ways in. */
+        WaysIn: {
+            /** @description Oldest first. */
+            items: components["schemas"]["WayIn"][];
+            /** @description The providers this instance offers, in display order. */
+            providers: string[];
         };
         /** @description A deleted workspace. */
         WorkspaceDeletion: {
@@ -1850,6 +2268,188 @@ export interface operations {
             };
             /** @description Not the caller's, or gone. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.start_link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartLink"];
+            };
+        };
+        responses: {
+            /** @description Send the browser to `url`. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartedLink"];
+                };
+            };
+            /** @description A field the purpose needs is missing (`link_incomplete`), or `invalid_return_to`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`, or adding a way in or connecting needs a sign-in in the last ten minutes (`step_up_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unknown or unconfigured provider, a workspace the caller is not in, a connection the caller did not grant, or another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description This instance cannot connect that provider's mailbox (`mailbox_unsupported`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.list_ways_in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's provider ways in. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaysIn"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:read`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.remove_way_in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The way in. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed; the sessions signed in with it ended. Mailbox connections are untouched. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`, or the sign-in is more than ten minutes old (`step_up_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not the caller's way in, or gone. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description It is the account's last way in (`last_way_in`). */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2233,7 +2833,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or a client token (`connection_needs_user`). */
+            /** @description Missing scope, a client token (`connection_needs_user`), or a sign-in more than ten minutes old for a new connection (`step_up_required`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2251,80 +2851,8 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description The provider is not configured on this instance (`provider_not_configured`). */
+            /** @description The provider is not configured on this instance (`provider_not_configured`), or this instance has no front door for consents (`mailbox_unsupported`). */
             409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "connectors.complete_connection": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CompleteConnection"];
-            };
-        };
-        responses: {
-            /** @description The connection, syncing. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConnectionView"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope; a client token (`connection_needs_user`); no capability granted (`consent_incomplete`); or no offline access (`no_offline_access`). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such started connection of yours in this workspace, or it expired. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The code was refused (`authorization_code_invalid`), another account consented (`account_mismatch`), another member connected this account (`account_connected_by_another_member`), or the provider is not configured. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The provider could not be reached (`provider_unavailable`). */
-            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2790,7 +3318,13 @@ export interface operations {
     };
     "conversations.get_message_body": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description `true` to keep remote images (the member chose "Show images");
+                 *     tracking pixels are removed either way.
+                 */
+                show_images?: boolean;
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -3158,6 +3692,442 @@ export interface operations {
             };
             /** @description No such conversation, or you cannot see it. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.list_drafts": {
+        parameters: {
+            query?: {
+                /** @description Only drafts answering this conversation. */
+                conversation_id?: components["schemas"]["ConversationId"];
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your drafts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftList"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not in it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.create_draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewDraft"];
+            };
+        };
+        responses: {
+            /** @description The draft. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftView"];
+                };
+            };
+            /** @description A missing inbox or message, or a field over its limit. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you only read this inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such inbox or message, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.get_draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The draft. */
+                draft_id: components["schemas"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you only read its inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such draft, or it is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.delete_draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The draft. */
+                draft_id: components["schemas"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Discarded. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you only read its inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such draft, or it is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description On its way (`draft_not_editable`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.update_draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The draft. */
+                draft_id: components["schemas"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftChanges"];
+            };
+        };
+        responses: {
+            /** @description The draft, with its new version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftView"];
+                };
+            };
+            /** @description A field over its limit. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you only read its inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such draft, or it is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Changed since that version (`draft_changed`), or on its way (`draft_not_editable`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.cancel_send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The draft. */
+                draft_id: components["schemas"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A draft again. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you only read its inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such draft, or it is not yours (a sent draft is gone). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description It has already left (`too_late`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.send_draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The draft. */
+                draft_id: components["schemas"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendDraft"];
+            };
+        };
+        responses: {
+            /** @description Scheduled: it leaves at `send_at` unless cancelled. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftView"];
+                };
+            };
+            /** @description No recipient (`no_recipients`), a malformed address (`invalid_address`) or too many attachments (`attachments_too_large`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you only read its inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such draft, or it is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Already on its way (`draft_not_editable`), or saved since that version (`draft_changed`). */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3702,6 +4672,59 @@ export interface operations {
             };
         };
     };
+    "conversations.list_streams": {
+        parameters: {
+            query?: {
+                /** @description Only this inbox; every inbox you can read when absent. */
+                inbox?: components["schemas"]["InboxId"];
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The streams. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StreamCounts"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace or inbox, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "workspaces.list": {
         parameters: {
             query?: never;
@@ -3871,17 +4894,19 @@ export interface operations {
                 error?: string;
                 /** @description The provider's issuer (RFC 9207), when it sends one. */
                 iss?: string;
+                /** @description Zoho's accounts server of the person's data centre. */
+                "accounts-server"?: string;
             };
             header?: never;
             path: {
-                /** @description `google`. */
+                /** @description `google`, `microsoft` or `zoho`. */
                 provider: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Signed in (to the client, or `return_to`), to the new-account screen, back to the provider for consent, or to the sign-in screen with `?error=`. */
+            /** @description Signed in (to the client, or `return_to`), to the new-account screen, back to the provider for consent, or to the sign-in screen with `?error=`. A signed-in round trip returns to its `return_to` with `linked=`, `connected=` or `link_error=`. */
             303: {
                 headers: {
                     location?: string;
@@ -3896,6 +4921,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };
@@ -4012,17 +5046,19 @@ export interface operations {
                 request?: string;
                 /** @description Otherwise, a same-origin path to land on. */
                 return_to?: string;
+                /** @description A signed-in round trip's ticket (from `identity.start_link`). */
+                link?: string;
             };
             header?: never;
             path: {
-                /** @description `google`. */
+                /** @description `google`, `microsoft` or `zoho`. */
                 provider: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description To the provider, with a round-trip cookie. */
+            /** @description To the provider, with a round-trip cookie; or, for a `link` ticket that is spent, expired or opened by a browser not signed in to its account, back with `link_error=`. */
             303: {
                 headers: {
                     location?: string;
@@ -4046,6 +5082,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };

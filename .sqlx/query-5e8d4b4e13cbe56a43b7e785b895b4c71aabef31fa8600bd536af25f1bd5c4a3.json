@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.outbound_changes SET state = 'pending', attempts = 7, done_at = NULL\n            WHERE kind = 'unstar'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "5e8d4b4e13cbe56a43b7e785b895b4c71aabef31fa8600bd536af25f1bd5c4a3"
+}

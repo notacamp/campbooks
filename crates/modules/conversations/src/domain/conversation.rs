@@ -15,6 +15,8 @@ use crate::{
     model::{Address, ConversationId, InboxId, LabelId, Stream, StreamSource},
 };
 
+use super::suggestions::{self, StreamSuggestion};
+
 /// A label as shown on a conversation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct LabelView {
@@ -53,6 +55,9 @@ pub struct ConversationSummary {
     pub snippet: String,
     /// Its labels, by name.
     pub labels: Vec<LabelView>,
+    /// Where the decide pass would put it instead, when it would: a
+    /// suggestion, never applied by itself.
+    pub suggestion: Option<StreamSuggestion>,
 }
 
 /// A row of the summary queries.
@@ -95,6 +100,7 @@ impl TryFrom<SummaryRow> for ConversationSummary {
             snippet: row.snippet.unwrap_or_default(),
             labels: serde_json::from_value(row.labels)
                 .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?,
+            suggestion: None,
         })
     }
 }
@@ -126,10 +132,13 @@ pub async fn summary(conn: &mut PgConnection, id: ConversationId) -> Result<Conv
         "#,
         id as ConversationId,
     )
-    .fetch_optional(conn)
+    .fetch_optional(&mut *conn)
     .await?
     .ok_or(Error::NotFound)?;
-    row.try_into()
+    let mut summary = [ConversationSummary::try_from(row)?];
+    suggestions::attach(conn, &mut summary).await?;
+    let [summary] = summary;
+    Ok(summary)
 }
 
 /// Recompute conversation `id`'s counts and flags from its messages; delete

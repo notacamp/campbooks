@@ -4,7 +4,9 @@
 //!    authorization request (the client, the providers on offer).
 //! 2. `GET /auth/start/{provider}`: one round trip to the provider, asking in
 //!    one consent for identity, the mailbox scopes this instance can use
-//!    (the grant-intake port says which) and offline access.
+//!    (the grant-intake port says which) and, with them, offline access.
+//!    With `?link=<ticket>` it is a signed-in round trip instead (adding a
+//!    way in, connecting or reconnecting a mailbox): see [`super::link`].
 //! 3. `GET /auth/callback/{provider}`: back from the provider. A provider
 //!    identity already linked signs that account in. An unknown one becomes
 //!    a pending sign-up, and the browser goes to the new-account screen;
@@ -12,11 +14,13 @@
 //! 4. `GET /auth/new-account` shows that pending sign-up, `POST` creates the
 //!    account with that way in, holds the mailbox grant, and signs in.
 //!
-//! Errors at the callback send the browser back to the sign-in screen with
+//! Errors at a sign-in callback send the browser back to the sign-in screen with
 //! `?error=<code>`: `invalid_state`, `cancelled_at_provider`,
 //! `provider_unavailable`, `login_failed`, `account_disabled`, and
 //! `signup_invite_only` (an invite-only instance, and no pending invitation
 //! for the provider's verified address: nothing is kept).
+
+use std::time::Duration;
 
 use axum::{
     Json,
@@ -28,13 +32,14 @@ use campbooks_kernel::{
     Error, Operation, Result, Risk,
     config::SignupPolicy,
     crypto::{pkce_challenge, random_token},
+    rate_limit::{ClientIp, Limit, RateKey},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use super::{Ctx, NEW_ACCOUNT_PATH, SIGN_IN_PATH, authorize};
+use super::{Ctx, NEW_ACCOUNT_PATH, SIGN_IN_PATH, authorize, link};
 use crate::{
     MESSAGES,
     deps::Issuer,
@@ -45,8 +50,8 @@ use crate::{
     },
     events::{AccountCreated, SignedIn},
     upstream::{
-        self, FLOW_LIFETIME, Flow, PendingSignUp, Provider, SIGN_UP_LIFETIME,
-        google::{AuthorizeRequest, Google, GoogleTokens, UpstreamError},
+        self, FLOW_LIFETIME, Flow, PendingSignUp, Provider, Purpose, SIGN_UP_LIFETIME,
+        client::{AuthorizeRequest, SignedIn as Upstreamed, Tokens, Upstream, UpstreamError},
     },
     web::{
         self, SESSION_COOKIE, SIGN_UP_COOKIE, SameSite, UPSTREAM_COOKIE, see_other, with_cookie,
@@ -55,6 +60,11 @@ use crate::{
 
 /// Scopes every provider round trip asks for to know who signed in.
 const IDENTITY_SCOPES: [&str; 3] = ["openid", "email", "profile"];
+
+/// Round trips one address may start (`/auth/start`).
+const START_LIMIT: Limit = Limit::new("identity.start_sign_in", 30, Duration::from_mins(1));
+/// Callbacks one address may finish.
+const CALLBACK_LIMIT: Limit = Limit::new("identity.finish_sign_in", 30, Duration::from_mins(1));
 
 /// What the sign-in screen shows for a waiting authorization request.
 #[derive(Debug, Serialize, ToSchema)]
@@ -65,11 +75,11 @@ pub struct RequestInfo {
     pub providers: Vec<String>,
 }
 
-fn providers(issuer: &Issuer) -> Vec<String> {
+pub(super) fn providers(issuer: &Issuer) -> Vec<String> {
     issuer
-        .google
+        .upstreams
         .iter()
-        .map(|_| Provider::Google.as_str().to_owned())
+        .map(|upstream| upstream.provider().as_str().to_owned())
         .collect()
 }
 
@@ -107,9 +117,11 @@ pub struct StartQuery {
     pub request: Option<String>,
     /// Otherwise, a same-origin path to land on.
     pub return_to: Option<String>,
+    /// A signed-in round trip's ticket (from `identity.start_link`).
+    pub link: Option<String>,
 }
 
-fn sign_in_error(code: &str, request: Option<&str>) -> Response {
+pub(super) fn sign_in_error(code: &str, request: Option<&str>) -> Response {
     match request {
         Some(request) => see_other(&format!(
             "{SIGN_IN_PATH}?error={code}&request={}",
@@ -120,7 +132,7 @@ fn sign_in_error(code: &str, request: Option<&str>) -> Response {
 }
 
 /// `value` percent-encoded for a query string.
-fn encode(value: &str) -> String {
+pub(super) fn encode(value: &str) -> String {
     url::form_urlencoded::byte_serialize(value.as_bytes()).collect()
 }
 
@@ -152,14 +164,18 @@ async fn may_create_account(ctx: &Ctx, identity: &ProviderIdentity) -> Result<bo
     operation_id = "identity.start_sign_in",
     extensions(("x-campbooks" = json!(Operation::query().records(["identity.upstream_flow"])))),
     params(
-        ("provider" = String, Path, description = "`google`."),
+        ("provider" = String, Path, description = "`google`, `microsoft` or `zoho`."),
         StartQuery,
     ),
     security(()),
     responses(
-        (status = 303, description = "To the provider, with a round-trip cookie.",
+        (status = 303, description = "To the provider, with a round-trip cookie; or, for a \
+            `link` ticket that is spent, expired or opened by a browser not signed in to its \
+            account, back with `link_error=`.",
             headers(("location" = String), ("set-cookie" = String))),
         (status = 400, description = "`invalid_return_to`.", body = campbooks_kernel::Problem,
+            content_type = "application/problem+json"),
+        (status = 429, description = "`rate_limited`.", body = campbooks_kernel::Problem,
             content_type = "application/problem+json"),
         (status = 404, description = "Unknown or unconfigured provider, or another identity \
             provider serves this instance."),
@@ -167,53 +183,71 @@ async fn may_create_account(ctx: &Ctx, identity: &ProviderIdentity) -> Result<bo
 )]
 pub async fn start(
     State(ctx): State<Ctx>,
+    ip: ClientIp,
+    headers: HeaderMap,
     Path(provider): Path<String>,
     Query(query): Query<StartQuery>,
 ) -> Result<Response> {
     let issuer = ctx.issuer()?;
     let provider = Provider::parse(&provider).ok_or(Error::NotFound)?;
-    let google = configured(issuer, provider)?;
+    let upstream = configured(issuer, provider)?;
+    ctx.state
+        .rate_limits
+        .check(&ctx.state.db, &START_LIMIT, &RateKey::ip(ip))
+        .await?;
+    if let Some(ticket) = query.link.as_deref() {
+        return link::start(&ctx, issuer, &headers, upstream, ticket).await;
+    }
     let return_to = web::return_to(query.return_to.as_deref())
         .ok_or_else(|| Error::BadRequest(MESSAGES.reason("invalid_return_to")))?;
-    let flow = Flow {
-        provider,
-        request_id: query.request,
-        return_to,
-        nonce: random_token(),
-        code_verifier: random_token(),
-        consent_retry: false,
-    };
-    redirect_to_provider(&ctx, issuer, google, flow, None).await
+    let flow = Flow::sign_in(provider, query.request, return_to);
+    redirect_to_provider(&ctx, issuer, upstream, flow, Prompt::default()).await
 }
 
-fn configured(issuer: &Issuer, provider: Provider) -> Result<&Google> {
-    match provider {
-        Provider::Google => issuer.google.as_ref().ok_or(Error::NotFound),
-    }
+/// The client of `provider`, when this instance has one; 404 otherwise.
+pub(super) fn configured(issuer: &Issuer, provider: Provider) -> Result<&Upstream> {
+    issuer.upstream(provider).ok_or(Error::NotFound)
 }
 
-/// Store `flow` and send the browser to the provider, asking for consent
-/// again (for `login_hint`'s account) when `login_hint` is given.
-async fn redirect_to_provider(
+/// How to ask the provider.
+#[derive(Debug, Default, Clone, Copy)]
+pub(super) struct Prompt<'a> {
+    /// Ask for consent again (a refresh token comes back).
+    pub consent: bool,
+    /// The account to suggest.
+    pub login_hint: Option<&'a str>,
+}
+
+/// Store `flow` and send the browser to the provider. Identity scopes
+/// always; the mailbox scopes (and offline access) for a sign-in, a connect
+/// and a reconnect.
+pub(super) async fn redirect_to_provider(
     ctx: &Ctx,
     issuer: &Issuer,
-    google: &Google,
+    upstream: &Upstream,
     flow: Flow,
-    login_hint: Option<&str>,
+    prompt: Prompt<'_>,
 ) -> Result<Response> {
     let now = issuer.now();
     let state = random_token();
     let browser = random_token();
     upstream::store_flow(&ctx.state.db, &issuer.cipher, &state, &browser, &flow, now).await?;
     let mut scopes: Vec<String> = IDENTITY_SCOPES.iter().map(|s| (*s).to_owned()).collect();
-    scopes.extend(ctx.state.grants.mailbox_scopes(flow.provider.as_str()));
-    let location = google.authorize_url(&AuthorizeRequest {
+    let mailbox = if flow.purpose == Purpose::Link {
+        Vec::new()
+    } else {
+        ctx.state.grants.mailbox_scopes(flow.provider.as_str())
+    };
+    let offline = !mailbox.is_empty();
+    scopes.extend(mailbox);
+    let location = upstream.authorize_url(&AuthorizeRequest {
         scopes: &scopes,
         state: &state,
         nonce: &flow.nonce,
         code_challenge: &pkce_challenge(&flow.code_verifier),
-        consent: login_hint.is_some(),
-        login_hint,
+        consent: prompt.consent,
+        offline,
+        login_hint: prompt.login_hint,
     });
     Ok(with_cookie(
         see_other(&location),
@@ -238,6 +272,9 @@ pub struct CallbackQuery {
     pub error: Option<String>,
     /// The provider's issuer (RFC 9207), when it sends one.
     pub iss: Option<String>,
+    /// Zoho's accounts server of the person's data centre.
+    #[serde(rename = "accounts-server")]
+    pub data_centre: Option<String>,
 }
 
 /// Finish a round trip.
@@ -248,27 +285,36 @@ pub struct CallbackQuery {
     operation_id = "identity.finish_sign_in",
     extensions(("x-campbooks" = json!(Operation::query().records(["identity.upstream_flow", "identity.session", "identity.pending_sign_up"])))),
     params(
-        ("provider" = String, Path, description = "`google`."),
+        ("provider" = String, Path, description = "`google`, `microsoft` or `zoho`."),
         CallbackQuery,
     ),
     security(()),
     responses(
         (status = 303, description = "Signed in (to the client, or `return_to`), to the \
             new-account screen, back to the provider for consent, or to the sign-in screen \
-            with `?error=`.", headers(("location" = String), ("set-cookie" = String))),
+            with `?error=`. A signed-in round trip returns to its `return_to` with \
+            `linked=`, `connected=` or `link_error=`.",
+            headers(("location" = String), ("set-cookie" = String))),
+        (status = 429, description = "`rate_limited`.", body = campbooks_kernel::Problem,
+            content_type = "application/problem+json"),
         (status = 404, description = "Unknown or unconfigured provider, or another identity \
             provider serves this instance."),
     ),
 )]
 pub async fn callback(
     State(ctx): State<Ctx>,
+    ip: ClientIp,
     Path(provider): Path<String>,
     headers: HeaderMap,
     Query(query): Query<CallbackQuery>,
 ) -> Result<Response> {
     let issuer = ctx.issuer()?;
     let provider = Provider::parse(&provider).ok_or(Error::NotFound)?;
-    let google = configured(issuer, provider)?;
+    let upstream = configured(issuer, provider)?;
+    ctx.state
+        .rate_limits
+        .check(&ctx.state.db, &CALLBACK_LIMIT, &RateKey::ip(ip))
+        .await?;
     let now = issuer.now();
     let clear_flow = issuer.cookies.clear(UPSTREAM_COOKIE, SameSite::Lax);
     let browser = issuer.cookies.read(&headers, UPSTREAM_COOKIE);
@@ -292,35 +338,38 @@ pub async fn callback(
             clear_flow,
         ));
     };
-    let request = flow.request_id.as_deref();
+    let fail = |code: &str| {
+        if flow.purpose == Purpose::SignIn {
+            sign_in_error(code, flow.request_id.as_deref())
+        } else {
+            link::back(&flow.return_to, "link_error", code)
+        }
+    };
     if let Some(error) = &query.error {
         let code = if error == "access_denied" {
             "cancelled_at_provider"
         } else {
             "login_failed"
         };
-        return Ok(with_cookie(sign_in_error(code, request), clear_flow));
+        return Ok(with_cookie(fail(code), clear_flow));
     }
-    let (Some(code), true) = (
-        &query.code,
-        query
-            .iss
-            .as_deref()
-            .is_none_or(|iss| iss == google.issuer()),
-    ) else {
-        return Ok(with_cookie(
-            sign_in_error("login_failed", request),
-            clear_flow,
-        ));
+    let Some(code) = &query.code else {
+        return Ok(with_cookie(fail("login_failed"), clear_flow));
     };
-    let (identity, tokens) = match identify(google, provider, code, &flow).await {
+    let signed_in = match identify(upstream, code, &query, &flow).await {
         Ok(found) => found,
-        Err(code) => return Ok(with_cookie(sign_in_error(code, request), clear_flow)),
+        Err(code) => return Ok(with_cookie(fail(code), clear_flow)),
     };
+    if flow.purpose != Purpose::SignIn {
+        let response = link::finish(&ctx, issuer, &headers, flow, signed_in, now).await?;
+        return Ok(with_cookie(response, clear_flow));
+    }
+    let Upstreamed { identity, tokens } = signed_in;
+    let request = flow.request_id.as_deref();
     let response = match accounts::find(&ctx.state.db, &identity).await? {
         Some(Linked { disabled: true, .. }) => sign_in_error("account_disabled", request),
         // A sign-in never changes a workspace's mailbox: a refresh token
-        // Google sent along is dropped, not stored.
+        // the provider sent along is dropped, not stored.
         Some(linked) => sign_in_known(&ctx, issuer, &headers, linked, &flow, provider, now).await?,
         None if !may_create_account(&ctx, &identity).await? => {
             // Nothing is kept: no pending sign-up, no tokens.
@@ -337,9 +386,22 @@ pub async fn callback(
                     code_verifier: random_token(),
                     ..flow
                 };
+                let hint = match provider {
+                    Provider::Google => Some(identity.subject.as_str()),
+                    Provider::Microsoft | Provider::Zoho => identity.email.as_deref(),
+                };
                 // Its new round-trip cookie replaces this one.
-                return redirect_to_provider(&ctx, issuer, google, retry, Some(&identity.subject))
-                    .await;
+                return redirect_to_provider(
+                    &ctx,
+                    issuer,
+                    upstream,
+                    retry,
+                    Prompt {
+                        consent: true,
+                        login_hint: hint,
+                    },
+                )
+                .await;
             }
             pend_sign_up(&ctx, issuer, identity, &tokens, mail, &flow, now).await?
         }
@@ -348,40 +410,33 @@ pub async fn callback(
 }
 
 /// Redeem the provider's code and validate its ID token; on failure, the
-/// sign-in screen's error code.
+/// error code the browser is sent back with.
 async fn identify(
-    google: &Google,
-    provider: Provider,
+    upstream: &Upstream,
     code: &str,
+    query: &CallbackQuery,
     flow: &Flow,
-) -> Result<(ProviderIdentity, GoogleTokens), &'static str> {
-    let tokens = match google.exchange(code, &flow.code_verifier).await {
-        Ok(tokens) => tokens,
-        Err(UpstreamError::Unavailable(reason)) => {
-            tracing::warn!(provider = provider.as_str(), %reason, "a provider could not finish a sign-in");
-            return Err("provider_unavailable");
-        }
-        Err(error) => {
-            tracing::info!(provider = provider.as_str(), %error, "a provider refused to finish a sign-in");
-            return Err("login_failed");
-        }
-    };
-    let Some(token) = tokens.id_token.as_deref() else {
-        return Err("login_failed");
-    };
-    let id = google
-        .verify_id_token(token, &flow.nonce)
+) -> Result<Upstreamed, &'static str> {
+    let provider = upstream.provider().as_str();
+    upstream
+        .sign_in(
+            code,
+            &flow.code_verifier,
+            &flow.nonce,
+            query.data_centre.as_deref(),
+            query.iss.as_deref(),
+        )
         .await
-        .map_err(|_| "login_failed")?;
-    let identity = ProviderIdentity {
-        provider: provider.as_str().to_owned(),
-        issuer: google.issuer().to_owned(),
-        subject: id.subject,
-        email: id.email,
-        email_verified: id.email_verified,
-        name: id.name,
-    };
-    Ok((identity, tokens))
+        .map_err(|error| match error {
+            UpstreamError::Unavailable(reason) => {
+                tracing::warn!(provider, %reason, "a provider could not finish a sign-in");
+                "provider_unavailable"
+            }
+            error => {
+                tracing::info!(provider, %error, "a provider refused to finish a sign-in");
+                "login_failed"
+            }
+        })
 }
 
 /// Sign the account `linked` belongs to in, and move on.
@@ -426,13 +481,13 @@ async fn sign_in_known(
 
 /// Whether the provider granted every mailbox scope this instance asked
 /// for, and what it granted.
-struct MailGrant {
-    granted: bool,
-    scopes: Vec<String>,
+pub(super) struct MailGrant {
+    pub granted: bool,
+    pub scopes: Vec<String>,
 }
 
 impl MailGrant {
-    fn of(ctx: &Ctx, provider: Provider, tokens: &GoogleTokens) -> Self {
+    pub(super) fn of(ctx: &Ctx, provider: Provider, tokens: &Tokens) -> Self {
         let scopes: Vec<String> = tokens
             .scope
             .as_deref()
@@ -452,7 +507,7 @@ async fn pend_sign_up(
     ctx: &Ctx,
     issuer: &Issuer,
     identity: ProviderIdentity,
-    tokens: &GoogleTokens,
+    tokens: &Tokens,
     mail: MailGrant,
     flow: &Flow,
     now: DateTime<Utc>,
@@ -487,7 +542,7 @@ async fn pend_sign_up(
     ))
 }
 
-fn session_cookie(issuer: &Issuer, token: &str) -> axum::http::HeaderValue {
+pub(super) fn session_cookie(issuer: &Issuer, token: &str) -> axum::http::HeaderValue {
     issuer.cookies.set(
         SESSION_COOKIE,
         token,
@@ -528,7 +583,7 @@ async fn signed_in(
 
 /// Where the browser goes once signed in: back to the client with a code
 /// when an authorization request waits, else `return_to`.
-async fn continue_after_sign_in(
+pub(super) async fn continue_after_sign_in(
     ctx: &Ctx,
     issuer: &Issuer,
     request: Option<&str>,

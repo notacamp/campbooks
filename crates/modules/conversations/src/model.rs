@@ -39,6 +39,100 @@ define_id!(
     /// A member's correction of where a conversation was sorted.
     CorrectionId
 );
+define_id!(
+    /// A message being written: new, or a reply or forward of a message.
+    DraftId
+);
+define_id!(
+    /// One send of a draft, minted when it leaves its undo window: the
+    /// connector's idempotency key.
+    SendId
+);
+
+/// What a draft answers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DraftKind {
+    /// A new message.
+    New,
+    /// A reply to the sender.
+    Reply,
+    /// A reply to the sender and every other recipient.
+    ReplyAll,
+    /// A forward, with the message's attachments.
+    Forward,
+}
+
+impl DraftKind {
+    /// The wire and database name.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::New => "new",
+            Self::Reply => "reply",
+            Self::ReplyAll => "reply_all",
+            Self::Forward => "forward",
+        }
+    }
+}
+
+impl FromStr for DraftKind {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "new" => Ok(Self::New),
+            "reply" => Ok(Self::Reply),
+            "reply_all" => Ok(Self::ReplyAll),
+            "forward" => Ok(Self::Forward),
+            other => Err(Error::internal(format!("unknown draft kind `{other}`"))),
+        }
+    }
+}
+
+/// Where a draft is in its life.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DraftState {
+    /// Being written.
+    Draft,
+    /// Sent, waiting out its undo window.
+    Scheduled,
+    /// Handed to the connector.
+    Sending,
+    /// The provider did not send it; editable and sendable again.
+    Failed,
+}
+
+impl DraftState {
+    /// The wire and database name.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Draft => "draft",
+            Self::Scheduled => "scheduled",
+            Self::Sending => "sending",
+            Self::Failed => "failed",
+        }
+    }
+
+    /// Whether the member may change, discard or send it.
+    pub const fn editable(self) -> bool {
+        matches!(self, Self::Draft | Self::Failed)
+    }
+}
+
+impl FromStr for DraftState {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "draft" => Ok(Self::Draft),
+            "scheduled" => Ok(Self::Scheduled),
+            "sending" => Ok(Self::Sending),
+            "failed" => Ok(Self::Failed),
+            other => Err(Error::internal(format!("unknown draft state `{other}`"))),
+        }
+    }
+}
 
 /// A kind of messaging. Email is the first.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -291,6 +385,22 @@ mod tests {
         }
         for direction in [Direction::Inbound, Direction::Outbound] {
             assert_eq!(direction.as_str().parse::<Direction>().unwrap(), direction);
+        }
+        for kind in [
+            DraftKind::New,
+            DraftKind::Reply,
+            DraftKind::ReplyAll,
+            DraftKind::Forward,
+        ] {
+            assert_eq!(kind.as_str().parse::<DraftKind>().unwrap(), kind);
+        }
+        for state in [
+            DraftState::Draft,
+            DraftState::Scheduled,
+            DraftState::Sending,
+            DraftState::Failed,
+        ] {
+            assert_eq!(state.as_str().parse::<DraftState>().unwrap(), state);
         }
         assert_eq!("email".parse::<Channel>().unwrap(), Channel::Email);
         assert!("sms".parse::<Channel>().is_err());

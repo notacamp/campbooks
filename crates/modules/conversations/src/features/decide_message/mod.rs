@@ -234,6 +234,7 @@ mod tests {
             ai: Some(gateway),
             config: ConversationsConfig {
                 decide_backfill_days: backfill_days,
+                ..ConversationsConfig::default()
             },
             ..sorting_deps()
         };
