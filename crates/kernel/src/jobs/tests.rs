@@ -11,7 +11,10 @@ use utoipa_axum::router::OpenApiRouter;
 use super::*;
 use crate::{
     AppState, Module,
-    events::{DomainEvent, Event, EventCatalogue, EventHandler, EventId, ReplayError, ReplayFrom},
+    events::{
+        DomainEvent, Event, EventCatalogue, EventConsumer, EventHandler, EventId, ReplayError,
+        ReplayFrom,
+    },
     testing,
 };
 
@@ -384,6 +387,85 @@ async fn delivery_of_an_event_with_another_version_fails(db: PgPool) {
         .await
         .unwrap();
     assert!(error.contains("has version 2"), "{error}");
+}
+
+// --- handlers that own their dependencies -------------------------------------
+
+/// A job handler composed with a prefix it writes in front of every note.
+struct Stamp {
+    prefix: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct StampPayload {
+    note: String,
+}
+
+impl JobHandler for Stamp {
+    type Payload = StampPayload;
+    const NAME: &'static str = "test.stamp";
+    const QUEUE: &'static str = "default";
+
+    async fn run(&self, ctx: &mut JobContext, payload: StampPayload) -> Result<(), JobError> {
+        let note = format!("{}{}", self.prefix, payload.note);
+        log(ctx, Self::NAME, &note, 1).await
+    }
+}
+
+/// An event consumer composed with a prefix.
+struct StampPings {
+    prefix: String,
+}
+
+impl EventConsumer for StampPings {
+    type Event = Pinged;
+    const NAME: &'static str = "test.stamp_pings";
+    const QUEUE: &'static str = "events";
+
+    async fn handle(&self, ctx: &mut JobContext, event: Event<Pinged>) -> Result<(), JobError> {
+        let note = format!("{}{}", self.prefix, event.payload.n);
+        log(ctx, Self::NAME, &note, 1).await
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn handlers_run_with_the_dependencies_they_were_composed_with(db: PgPool) {
+    let base = state(db.clone()).await;
+    let registry = Registry::build(&[module(
+        background()
+            .publishes::<Pinged>()
+            .handler(Stamp {
+                prefix: "job:".into(),
+            })
+            .consumer(StampPings {
+                prefix: "event:".into(),
+            }),
+    )])
+    .unwrap();
+    assert!(registry.consumer("test.stamp_pings").is_some());
+    let state = base.with_registry(registry);
+
+    let mut tx = state.db.begin().await.unwrap();
+    enqueue_to::<Stamp>(
+        &mut tx,
+        &StampPayload { note: "a".into() },
+        EnqueueOptions::default(),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    publish(
+        &state,
+        &Pinged {
+            workspace: None,
+            n: 7,
+        },
+    )
+    .await;
+    Worker::new(state).run_until_idle().await;
+
+    assert_eq!(notes(&db, "test.stamp").await, ["job:a"]);
+    assert_eq!(notes(&db, "test.stamp_pings").await, ["event:7"]);
 }
 
 // --- running, retrying, failing ----------------------------------------------

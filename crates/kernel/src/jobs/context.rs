@@ -2,7 +2,7 @@
 
 use sqlx::{PgPool, Postgres, Transaction};
 
-use super::{EnqueueOptions, Enqueued, Job, JobError, JobId};
+use super::{EnqueueOptions, Enqueued, Job, JobError, JobHandler, JobId};
 use crate::{
     AppState,
     events::{DomainEvent, EventId},
@@ -123,6 +123,20 @@ impl JobContext {
         }
         let tx = self.tx().await?;
         Ok(super::enqueue(tx, job, options).await?)
+    }
+
+    /// Enqueue a job of `H`'s kind in the job's transaction, like
+    /// [`enqueue`](Self::enqueue).
+    pub async fn enqueue_to<H: JobHandler>(
+        &mut self,
+        payload: &H::Payload,
+        mut options: EnqueueOptions,
+    ) -> Result<Enqueued, JobError> {
+        if options.workspace.is_none() {
+            options.workspace.clone_from(&self.info.workspace);
+        }
+        let tx = self.tx().await?;
+        Ok(super::enqueue_to::<H>(tx, payload, options).await?)
     }
 
     /// Hand the open transaction (if any) to the worker for completion.
