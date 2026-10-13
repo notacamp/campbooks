@@ -1,0 +1,161 @@
+{
+  "provider": {
+    "google": "Google",
+    "microsoft": "Microsoft",
+    "zoho": "Zoho"
+  },
+  "shortcuts": {
+    "choice1": "Iniciar sessão com a primeira opção",
+    "choice2": "Iniciar sessão com a segunda opção",
+    "choice3": "Iniciar sessão com a terceira opção",
+    "passkey": "Iniciar sessão com uma chave de acesso"
+  },
+  "signIn": {
+    "title": "Iniciar sessão no Campbooks",
+    "lead": "O que precisa de si, num só sítio e com calma. O Campbooks lê o seu correio e traz-lhe apenas o que precisa de si.",
+    "invitedTitle": "Inicie sessão para entrar no espaço de trabalho",
+    "invitedLead": "Use o endereço de email para o qual o convite foi enviado e entra logo.",
+    "waysIn": "Formas de iniciar sessão",
+    "with": {
+      "google": "Continuar com Google",
+      "microsoft": "Continuar com Microsoft",
+      "zoho": "Continuar com Zoho"
+    },
+    "passkey": "Usar uma chave de acesso",
+    "gmail": {
+      "summary": "A Google vai também pedir autorização para o Campbooks usar o seu Gmail, para que a sua primeira caixa de correio fique pronta quando quiser.",
+      "details": "O que o Campbooks lê e guarda",
+      "keeps": "O Campbooks guarda o seu nome, o seu endereço e a autorização que a Google lhe dá. Nunca vê a sua palavra-passe da Google.",
+      "reads": "Essa autorização permite ao Campbooks ler e organizar o correio desta conta Gmail. Nada é ligado a um espaço de trabalho sem a sua decisão, e uma autorização que não use é apagada ao fim de 7 dias.",
+      "optional": "Pode desmarcar o acesso ao correio no ecrã da Google. A sessão é iniciada na mesma; o seu correio apenas não fica ligado.",
+      "existing": "Se já tem conta, iniciar sessão não altera nenhuma caixa de correio que tenha ligado."
+    },
+    "unverified": "A Google pode avisar que ainda não verificou esta aplicação. A Google analisa todas as aplicações que podem ler o Gmail, e essa análise ainda não terminou. Para continuar, escolha «Avançado» e depois continue para a aplicação.",
+    "footer": "Código disponível. O seu correio fica no seu espaço de trabalho.",
+    "starting": "A abrir o início de sessão…",
+    "loading": "A carregar as formas de iniciar sessão…",
+    "startAgain": "Recomeçar",
+    "retry": "Tentar novamente",
+    "noWayIn": {
+      "title": "O início de sessão ainda não está configurado",
+      "lead": "Este Campbooks não tem nenhuma forma de iniciar sessão ativa. Peça a quem o gere que configure o início de sessão com Google."
+    },
+    "expired": {
+      "title": "Esta página de início de sessão expirou",
+      "lead": "Esperou demasiado tempo. Recomece; nada se perdeu."
+    },
+    "failed": {
+      "title": "Não foi possível carregar as formas de iniciar sessão",
+      "lead": "O Campbooks não respondeu. Verifique a ligação e tente novamente."
+    }
+  },
+  "errors": {
+    "cancelled_at_provider": {
+      "title": "Cancelou no ecrã de início de sessão.",
+      "lead": "Nada foi criado. Escolha uma forma de iniciar sessão quando quiser."
+    },
+    "invalid_state": {
+      "title": "Não é possível concluir esse início de sessão.",
+      "lead": "Demorou demasiado ou foi aberto noutro navegador. Recomece neste."
+    },
+    "provider_unavailable": {
+      "title": "O fornecedor de início de sessão não respondeu.",
+      "lead": "Nada mudou. Aguarde um momento e tente novamente."
+    },
+    "login_failed": {
+      "title": "O fornecedor de início de sessão não conseguiu confirmar quem é.",
+      "lead": "Tente novamente ou inicie sessão de outra forma."
+    },
+    "account_disabled": {
+      "title": "Esta conta está desativada.",
+      "lead": "Peça a quem gere este Campbooks que a volte a ativar."
+    },
+    "way_in_belongs_to_another_account": {
+      "title": "Esta conta já dá acesso a outra conta do Campbooks.",
+      "lead": "Inicie sessão com ela para usar essa conta."
+    },
+    "signup_invite_only": {
+      "title": "Este Campbooks só aceita pessoas por convite.",
+      "lead": "Ainda ninguém convidou este endereço, e nada foi guardado. Peça a alguém que o use para o convidar e depois inicie sessão com o endereço convidado."
+    },
+    "unknown": {
+      "title": "Algo correu mal ao iniciar sessão.",
+      "lead": "Nada mudou. Recomece."
+    }
+  },
+  "newAccount": {
+    "eyebrow": "Nova conta",
+    "title": "Crie a sua conta Campbooks",
+    "lead": "Ainda nenhuma conta Campbooks usa {{email}}.",
+    "leadNoEmail": "Ainda nenhuma conta Campbooks usa esta conta {{provider}}.",
+    "identity": "A sua nova conta",
+    "from": "{{provider}}",
+    "nameNote": "Este é o nome que a {{provider}} nos deu. As pessoas dos seus espaços de trabalho vão vê-lo.",
+    "nextTitle": "O que acontece a seguir",
+    "next1": "A sua conta é criada e inicia sessão com esta conta {{provider}}.",
+    "next2": "Dá um nome ao seu primeiro espaço de trabalho.",
+    "next3": "Se deixar o Campbooks usar o seu correio, escolhe se o liga a esse espaço de trabalho.",
+    "create": "Criar conta",
+    "creating": "A criar…",
+    "another": "Iniciar sessão de outra forma",
+    "footer": "Já usa o Campbooks com outra conta? Inicie sessão com essa.",
+    "loading": "A carregar a sua nova conta…",
+    "retry": "Tentar novamente",
+    "signInAgain": "Iniciar sessão novamente",
+    "gone": {
+      "title": "Este registo já não está à espera",
+      "lead": "Demorou demasiado ou foi iniciado noutro navegador. Inicie sessão novamente para recomeçar."
+    },
+    "failed": {
+      "title": "Não foi possível criar a conta.",
+      "lead": "Nada foi criado. Tente novamente."
+    },
+    "loadFailed": {
+      "title": "Não foi possível carregar a sua nova conta",
+      "lead": "O Campbooks não respondeu. Verifique a ligação e tente novamente."
+    }
+  },
+  "mailbox": {
+    "loading": "A procurar a sua caixa de correio…",
+    "eyebrow": "{{workspace}} está pronto",
+    "title": "O seu Gmail {{address}} vai ser ligado a este espaço de trabalho",
+    "titleOther": "A sua caixa de correio {{address}} vai ser ligada a este espaço de trabalho",
+    "lead": "O Campbooks lê o correio dessa caixa, guarda uma cópia do que lê para lho mostrar aqui e continua atento a correio novo.",
+    "later": "Se escolher «Agora não», fica à espera no Início até {{date}}.",
+    "signIn": "Se a desligar mais tarde, continua a poder iniciar sessão com esta conta.",
+    "formLabel": "Ligar a sua caixa de correio",
+    "connect": "Ligar",
+    "connecting": "A ligar…",
+    "notNow": "Agora não",
+    "continue": "Continuar para o Início",
+    "errors": {
+      "gone": {
+        "title": "Essa caixa de correio já não está à espera.",
+        "lead": "A autorização expirou ou já foi usada, por isso não pode ser ligada a partir daqui."
+      },
+      "taken": {
+        "title": "Outra pessoa daqui já a ligou.",
+        "lead": "Outro membro deste espaço de trabalho ligou {{address}}."
+      },
+      "unsupported": {
+        "title": "O Campbooks ainda não consegue ler esta caixa de correio.",
+        "lead": "Nada foi ligado."
+      },
+      "failed": {
+        "title": "Não foi possível ligar.",
+        "lead": "Nada mudou. Tente novamente."
+      }
+    }
+  },
+  "offer": {
+    "title": "Ligar {{address}}",
+    "lead": "Esta caixa de correio está à espera desde que se registou. Ligue-a a {{workspace}} e o Campbooks traz para aqui o que precisa de si.",
+    "waits": "À espera até {{date}}",
+    "connect": "Ligar",
+    "forget": "Não ligar",
+    "confirmForget": "Esquecer {{address}}? O Campbooks apaga a autorização que a Google lhe deu. Continua a poder iniciar sessão com esta conta.",
+    "confirm": "Esquecer",
+    "cancel": "Manter",
+    "forgetFailed": "Não foi possível esquecê-la. Tente novamente."
+  }
+}

@@ -1,0 +1,161 @@
+{
+  "provider": {
+    "google": "Google",
+    "microsoft": "Microsoft",
+    "zoho": "Zoho"
+  },
+  "shortcuts": {
+    "choice1": "Se connecter avec la première option",
+    "choice2": "Se connecter avec la deuxième option",
+    "choice3": "Se connecter avec la troisième option",
+    "passkey": "Se connecter avec une clé d’accès"
+  },
+  "signIn": {
+    "title": "Se connecter à Campbooks",
+    "lead": "Ce qui a besoin de vous, au même endroit, au calme. Campbooks lit votre courrier et ne vous apporte que ce qui a besoin de vous.",
+    "invitedTitle": "Connectez-vous pour rejoindre l’espace de travail",
+    "invitedLead": "Utilisez l’adresse e-mail à laquelle l’invitation a été envoyée, et vous rejoindrez l’espace aussitôt.",
+    "waysIn": "Façons de se connecter",
+    "with": {
+      "google": "Continuer avec Google",
+      "microsoft": "Continuer avec Microsoft",
+      "zoho": "Continuer avec Zoho"
+    },
+    "passkey": "Utiliser une clé d’accès",
+    "gmail": {
+      "summary": "Google vous demandera aussi d’autoriser Campbooks à utiliser votre Gmail, pour que votre première boîte mail soit prête quand vous le serez.",
+      "details": "Ce que Campbooks lit et conserve",
+      "keeps": "Campbooks conserve votre nom, votre adresse et l’autorisation que Google lui donne. Il ne voit jamais votre mot de passe Google.",
+      "reads": "Cette autorisation permet à Campbooks de lire et de ranger le courrier de ce compte Gmail. Rien n’est relié à un espace de travail tant que vous ne l’avez pas décidé, et une autorisation inutilisée est supprimée au bout de 7 jours.",
+      "optional": "Vous pouvez décocher l’accès au courrier sur l’écran de Google. Vous serez quand même connecté ; votre courrier ne sera simplement pas relié.",
+      "existing": "Si vous avez déjà un compte, vous connecter ne modifie aucune boîte mail que vous avez reliée."
+    },
+    "unverified": "Google peut indiquer qu’il n’a pas encore validé cette application. Google examine toutes les applications qui peuvent lire Gmail, et cet examen n’est pas encore terminé. Pour continuer, choisissez « Paramètres avancés », puis accédez à l’application.",
+    "footer": "Code source disponible. Votre courrier reste dans votre espace de travail.",
+    "starting": "Ouverture de la connexion…",
+    "loading": "Chargement des façons de se connecter…",
+    "startAgain": "Recommencer",
+    "retry": "Réessayer",
+    "noWayIn": {
+      "title": "La connexion n’est pas encore configurée",
+      "lead": "Ce Campbooks n’a aucune façon de se connecter activée. Demandez à la personne qui le gère de configurer la connexion avec Google."
+    },
+    "expired": {
+      "title": "Cette page de connexion a expiré",
+      "lead": "Elle a attendu trop longtemps. Recommencez ; rien n’a été perdu."
+    },
+    "failed": {
+      "title": "Impossible de charger les façons de se connecter",
+      "lead": "Campbooks n’a pas répondu. Vérifiez votre connexion, puis réessayez."
+    }
+  },
+  "errors": {
+    "cancelled_at_provider": {
+      "title": "Vous avez annulé sur l’écran de connexion.",
+      "lead": "Rien n’a été créé. Choisissez une façon de vous connecter quand vous voulez."
+    },
+    "invalid_state": {
+      "title": "Cette connexion ne peut pas aboutir.",
+      "lead": "Elle a pris trop de temps, ou elle a été ouverte dans un autre navigateur. Recommencez dans celui-ci."
+    },
+    "provider_unavailable": {
+      "title": "Le service de connexion n’a pas répondu.",
+      "lead": "Rien n’a changé. Patientez un instant, puis réessayez."
+    },
+    "login_failed": {
+      "title": "Le service de connexion n’a pas pu confirmer votre identité.",
+      "lead": "Réessayez, ou connectez-vous d’une autre façon."
+    },
+    "account_disabled": {
+      "title": "Ce compte est désactivé.",
+      "lead": "Demandez à la personne qui gère ce Campbooks de le réactiver."
+    },
+    "way_in_belongs_to_another_account": {
+      "title": "Ce compte permet déjà d’accéder à un autre compte Campbooks.",
+      "lead": "Connectez-vous avec lui pour utiliser ce compte."
+    },
+    "signup_invite_only": {
+      "title": "Ce Campbooks n’accepte que des personnes invitées.",
+      "lead": "Personne n’a encore invité cette adresse, et rien n’a été conservé. Demandez à quelqu’un qui l’utilise de vous inviter, puis connectez-vous avec l’adresse invitée."
+    },
+    "unknown": {
+      "title": "Un problème est survenu pendant la connexion.",
+      "lead": "Rien n’a changé. Recommencez."
+    }
+  },
+  "newAccount": {
+    "eyebrow": "Nouveau compte",
+    "title": "Créez votre compte Campbooks",
+    "lead": "Aucun compte Campbooks n’utilise encore {{email}}.",
+    "leadNoEmail": "Aucun compte Campbooks n’utilise encore ce compte {{provider}}.",
+    "identity": "Votre nouveau compte",
+    "from": "{{provider}}",
+    "nameNote": "C’est le nom que {{provider}} nous a donné. Les personnes de vos espaces de travail le verront.",
+    "nextTitle": "Ce qui se passe ensuite",
+    "next1": "Votre compte est créé, et vous vous connectez avec ce compte {{provider}}.",
+    "next2": "Vous nommez votre premier espace de travail.",
+    "next3": "Si vous laissez Campbooks utiliser votre courrier, vous choisissez de le relier ou non à cet espace de travail.",
+    "create": "Créer le compte",
+    "creating": "Création…",
+    "another": "Se connecter d’une autre façon",
+    "footer": "Vous utilisez déjà Campbooks avec un autre compte ? Connectez-vous plutôt avec celui-là.",
+    "loading": "Chargement de votre nouveau compte…",
+    "retry": "Réessayer",
+    "signInAgain": "Se reconnecter",
+    "gone": {
+      "title": "Cette inscription n’est plus en attente",
+      "lead": "Elle a pris trop de temps, ou elle a été commencée dans un autre navigateur. Reconnectez-vous pour recommencer."
+    },
+    "failed": {
+      "title": "Impossible de créer le compte.",
+      "lead": "Rien n’a été créé. Réessayez."
+    },
+    "loadFailed": {
+      "title": "Impossible de charger votre nouveau compte",
+      "lead": "Campbooks n’a pas répondu. Vérifiez votre connexion, puis réessayez."
+    }
+  },
+  "mailbox": {
+    "loading": "Recherche de votre boîte mail…",
+    "eyebrow": "{{workspace}} est prêt",
+    "title": "Votre Gmail {{address}} sera relié à cet espace de travail",
+    "titleOther": "Votre boîte mail {{address}} sera reliée à cet espace de travail",
+    "lead": "Campbooks lit le courrier de cette boîte, conserve une copie de ce qu’il lit pour vous le montrer ici, et reste attentif au nouveau courrier.",
+    "later": "Avec « Pas maintenant », elle reste proposée sur l’Accueil jusqu’au {{date}}.",
+    "signIn": "Si vous la déconnectez plus tard, vous pourrez toujours vous connecter avec ce compte.",
+    "formLabel": "Relier votre boîte mail",
+    "connect": "Relier",
+    "connecting": "Connexion…",
+    "notNow": "Pas maintenant",
+    "continue": "Continuer vers l’Accueil",
+    "errors": {
+      "gone": {
+        "title": "Cette boîte mail n’est plus en attente.",
+        "lead": "Son autorisation a expiré ou a déjà servi, elle ne peut donc pas être reliée d’ici."
+      },
+      "taken": {
+        "title": "Quelqu’un d’autre ici l’a déjà reliée.",
+        "lead": "Un autre membre de cet espace de travail a relié {{address}}."
+      },
+      "unsupported": {
+        "title": "Campbooks ne sait pas encore lire cette boîte mail.",
+        "lead": "Rien n’a été relié."
+      },
+      "failed": {
+        "title": "La connexion n’a pas abouti.",
+        "lead": "Rien n’a changé. Réessayez."
+      }
+    }
+  },
+  "offer": {
+    "title": "Relier {{address}}",
+    "lead": "Cette boîte mail attend depuis votre inscription. Reliez-la à {{workspace}} et Campbooks vous apportera ici ce qui a besoin de vous.",
+    "waits": "En attente jusqu’au {{date}}",
+    "connect": "Relier",
+    "forget": "Ne pas la relier",
+    "confirmForget": "Oublier {{address}} ? Campbooks supprime l’autorisation que Google lui a donnée. Vous pourrez toujours vous connecter avec ce compte.",
+    "confirm": "L’oublier",
+    "cancel": "La garder",
+    "forgetFailed": "Impossible de l’oublier. Réessayez."
+  }
+}

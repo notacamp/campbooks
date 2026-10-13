@@ -1,4 +1,13 @@
 {
   "title": "Contas ligadas",
-  "summary": "Este módulo ainda não tem ecrãs."
+  "summary": "Este módulo ainda não tem ecrãs.",
+  "mail": {
+    "title": "O seu correio",
+    "health": {
+      "ok": "Ligada",
+      "needs_reauth": "Precisa que inicie sessão novamente",
+      "throttled": "Em pausa por momentos",
+      "failing": "Sem sincronizar"
+    }
+  }
 }

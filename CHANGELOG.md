@@ -7,6 +7,19 @@ All notable changes to Campbooks Next are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- The sign-in screens are Campbooks screens, in English, Portuguese, Spanish
+  and French. Opening the app signed out goes straight to "Sign in to
+  Campbooks" (and back to the page you opened afterwards), with one button
+  per way in this instance offers (keys `1`, `2`, `3`; `P` for a passkey once
+  passkeys arrive). Before you leave for Google it says what the one consent
+  covers (your Gmail is connected too, what Campbooks keeps, that you can
+  untick mail access) and that Google may warn the app isn't verified yet.
+  A first sign-in shows the new-account screen (your name and address, and
+  what happens next); every sign-in problem is explained with what to do.
+- Right after you create your first workspace, "Your Gmail … will be
+  connected to this workspace": Connect, or Not now. Home keeps offering it
+  (Connect, or forget it) until it expires after 7 days, and names the
+  mailbox once it is connected.
 - Sign in with Microsoft (personal, work and school accounts;
   `CAMPBOOKS_MICROSOFT__CLIENT_ID`, `__CLIENT_SECRET_FILE`, `__TENANT`, default
   `common`) and with Zoho in every data centre (`CAMPBOOKS_ZOHO__CLIENT_ID`,
@@ -18,13 +31,6 @@ All notable changes to Campbooks Next are documented here. The format follows
   mailbox you connect becomes a way in too. A provider account that is already
   another Campbooks account's way in is refused, never merged. Adding or removing
   a way in, or connecting a mailbox, needs a sign-in in the last ten minutes.
-
-### Changed
-- Connecting a mailbox goes through the built-in sign-in: Google redirects to
-  `/auth/callback/google`, and `/connections/google/callback` is no longer used
-  (remove it from your Google OAuth client). `connectors.complete_connection` is
-  gone; `connectors.start_connection` answers with the sign-in URL. An install still
-  on Rauthy cannot connect mail until it switches to the built-in sign-in.
 - `CAMPBOOKS_GOOGLE__REDIRECT_PATH` (default `/auth/callback/google`): the callback
   path Campbooks sends to Google when your OAuth app registered another one, with a
   reverse proxy rewriting it to `/auth/callback/google`. The same
@@ -307,6 +313,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   ever recorded; a test enforces it. See `deploy/README.md` → Monitoring.
 
 ### Changed
+- Connecting a mailbox goes through the built-in sign-in: Google redirects to
+  `/auth/callback/google`, and `/connections/google/callback` is no longer used
+  (remove it from your Google OAuth client). `connectors.complete_connection` is
+  gone; `connectors.start_connection` answers with the sign-in URL. An install still
+  on Rauthy cannot connect mail until it switches to the built-in sign-in.
 - **API clients:** `POST /api/v1/w/{workspace_id}/invitations` now answers
   with `accept_url`, the invitation's accept link, built from
   `CAMPBOOKS_PUBLIC_URL`. It is returned only in that response (never listed,
