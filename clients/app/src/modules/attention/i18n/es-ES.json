@@ -1,0 +1,47 @@
+{
+  "title": "Lo que te necesita",
+  "hero": {
+    "count_one": "{{count}} cosa te necesita",
+    "count_other": "{{count}} cosas te necesitan",
+    "subline": "Campbooks lee tu correo y guarda aquí lo que te pide algo.",
+    "clear": "Nada te necesita",
+    "clearSubline": "Ahora mismo nada en tu correo te pide algo. Campbooks sigue leyendo."
+  },
+  "groups": {
+    "review": "Revisar",
+    "reply": "Responder",
+    "decide": "Decidir",
+    "do": "Hacer",
+    "pay": "Pagar"
+  },
+  "context": "Hecho hoy y teclas",
+  "doneTodayTitle": "Hecho hoy",
+  "doneTodayEmpty": "Todavía nada hoy.",
+  "doneToday": {
+    "done": "Hecho · {{subject}}",
+    "notNeeded": "No hacía falta · {{subject}}",
+    "replied": "Respondido · {{subject}}",
+    "archived": "Archivado · {{subject}}",
+    "later": "Más tarde · {{subject}}",
+    "gone": "Ya no hace falta · {{subject}}"
+  },
+  "later": {
+    "title": "Volver a mostrar",
+    "today": "Más tarde hoy",
+    "tomorrow": "Mañana",
+    "monday": "El lunes",
+    "toast": "Más tarde · {{name}}, vuelve {{when}}"
+  },
+  "actions": {
+    "reply": "Responder",
+    "open": "Abrir conversación",
+    "undo": "Deshacer"
+  },
+  "keyboard": "Teclado",
+  "error": {
+    "title": "No se ha podido cargar lo que te necesita",
+    "body": "Campbooks no ha podido conectar con el servidor. No se ha perdido nada.",
+    "retry": "Reintentar"
+  },
+  "noSubject": "(sin asunto)"
+}

@@ -2,79 +2,124 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
 
 import { Button } from "../Button/Button";
+import { HowDecided } from "../HowDecided/HowDecided";
+import { Pill } from "../Pill/Pill";
+import { Tag } from "../Tag/Tag";
 
 import { Note } from "./Note";
+
+const how = (
+  <HowDecided
+    rows={[
+      {
+        question: "Needs a reply",
+        answer: "Yes. It asks you to reply (“could you confirm”).",
+        source: "Rules · 0.90 · acts from 0.88",
+      },
+      {
+        question: "Mentions a date",
+        answer: "Yes (“Wednesday”).",
+        source: "Rules · 0.96 · acts from 0.75",
+      },
+    ]}
+  />
+);
 
 const meta = {
   title: "Components/Note",
   component: Note,
   args: {
-    children:
-      "Sofia is waiting on your review of the Q4 proposal by Thursday. Version 3 moves the timeline two weeks; the price is unchanged.",
+    children: "Marta Ferreira is waiting for your reply.",
+    quote: {
+      text: "Could you confirm Thursday’s walkthrough? The builders need to know by Wednesday.",
+      attribution: "Marta Ferreira, Mon 12 Oct",
+    },
+    chips: (
+      <>
+        <Pill signal="reply">Needs a reply</Pill>
+        <Tag>Due tomorrow</Tag>
+      </>
+    ),
+    actions: (
+      <>
+        <Button variant="secondary" keys="E">
+          Done
+        </Button>
+        <Button variant="ghost" keys="X">
+          Not needed
+        </Button>
+      </>
+    ),
+    how,
     links: [
-      { icon: "check", title: "Review Q4 proposal", kind: "Task, Thu", onSelect: fn() },
-      { icon: "document", title: "Brightloop-Q4-scope-v3.pdf", kind: "Document", onSelect: fn() },
-      { icon: "event", title: "Held Thu 09:00", kind: "Schedule", onSelect: fn() },
+      { icon: "document", title: "Walkthrough-plan.pdf", kind: "Document", onSelect: fn() },
     ],
-    confidence: "Sorted into Primary, 98% sure",
-    why: [
-      "You have replied to Sofia 14 times this year.",
-      "The message asks you a direct question with a deadline.",
-      "It is not a bulk or automated sender.",
-    ],
-    footer: <Button variant="link">Move</Button>,
   },
 } satisfies Meta<typeof Note>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** What a conversation needs: the sentence, the sender's own words, chips and actions. */
 export const Default: Story = {};
 
-/** "Why?" is a disclosure: it reveals the reasons and says it is expanded. */
-export const WhyOpen: Story = {
+/** "How Campbooks decided" is the only place the numbers show. */
+export const HowOpen: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const why = canvas.getByRole("button", { name: "Why?" });
-    await userEvent.click(why);
-    await expect(canvas.getByRole("button", { name: "Hide why" })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
-    await expect(canvas.getByText("You have replied to Sofia 14 times this year.")).toBeVisible();
+    await userEvent.click(canvas.getByText("How Campbooks decided"));
+    await expect(canvas.getByText("Rules · 0.90 · acts from 0.88")).toBeVisible();
   },
 };
 
-/** Below 80% the assistant asks instead of acting. */
-export const LowConfidence: Story = {
+/** A warning: the reasons first, the sender by address, then the quote. */
+export const Warning: Story = {
+  args: {
+    visor: "alert",
+    children: "This may be phishing. Don’t use its links.",
+    reasons: [
+      "The sender’s domain imitates yours (at3lier-sol.example).",
+      "A link goes somewhere other than it says (verify-mailbox.example).",
+    ],
+    quote: {
+      text: "Your mailbox will be closed today unless you verify your account using the link below.",
+      attribution: "it-support@at3lier-sol.example, today 07:52",
+    },
+    chips: <Pill signal="review">Looks suspicious</Pill>,
+    links: [],
+  },
+};
+
+/** Unsure: the assistant asks instead of acting. */
+export const Question: Story = {
   args: {
     visor: "unsure",
-    children: "An invitation to a workshop. Campbooks has not seen this sender before.",
-    links: [],
+    children: "Does Inês Rocha need a reply?",
     choice: {
-      prompt: "Where does this go?",
+      prompt: "Campbooks is not sure.",
       options: [
-        { label: "Primary", keys: "1", onSelect: fn() },
-        { label: "Updates", keys: "2", onSelect: fn() },
+        { label: "Yes", keys: "1", onSelect: fn() },
+        { label: "No", keys: "2", onSelect: fn() },
       ],
     },
-    confidence: "61% sure. Below 80% Campbooks asks instead of acting.",
-    why: [],
-    footer: undefined,
+    actions: undefined,
+    chips: undefined,
+    links: [],
+  },
+};
+
+/** A stream suggestion, with Move in the footer. */
+export const Suggestion: Story = {
+  args: {
+    visor: "unsure",
+    children: "Campbooks thinks this belongs in Newsletters. Nothing moves until you say so.",
+    quote: undefined,
+    chips: undefined,
+    actions: undefined,
+    links: [],
+    footer: <Button variant="link">Move</Button>,
   },
 };
 
 /** Phones: smaller text and visor. */
-export const Compact: Story = {
-  args: {
-    compact: true,
-    children:
-      "Sofia is waiting on your review by Thursday. Version 3 moves the timeline two weeks; the price is unchanged.",
-    links: [
-      { icon: "check", title: "Review Q4 proposal", onSelect: fn() },
-      { icon: "event", title: "Held Thu 09:00", onSelect: fn() },
-    ],
-    confidence: "Primary, 98% sure",
-    footer: undefined,
-  },
-};
+export const Compact: Story = { args: { compact: true } };

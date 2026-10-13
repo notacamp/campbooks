@@ -35,6 +35,7 @@ pub enum ListState {
 pub struct ListQuery {
     /// `open` (default) or `cleared`.
     #[serde(default)]
+    #[param(inline)]
     pub state: ListState,
 }
 

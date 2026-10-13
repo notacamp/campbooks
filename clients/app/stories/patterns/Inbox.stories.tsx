@@ -11,6 +11,7 @@ import {
   ConversationRow,
   EmptyState,
   Heading,
+  HowDecided,
   IconButton,
   ListPane,
   MessageCard,
@@ -223,8 +224,15 @@ function InboxScreen({
               key={current.id}
               visor={current.unsure === true ? "unsure" : "idle"}
               links={current.links.map((link) => ({ ...link, onSelect: noop }))}
-              confidence={current.sortedLine}
-              why={current.why}
+              how={
+                <HowDecided
+                  rows={current.why.map((answer) => ({
+                    question: "Stream",
+                    answer,
+                    source: current.sortedLine,
+                  }))}
+                />
+              }
               footer={<Button variant="link">Move</Button>}
               {...(current.unsure === true
                 ? {

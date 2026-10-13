@@ -13,9 +13,7 @@
     "redone": "Rétabli : {{label}}"
   },
   "note": {
-    "label": "Où en sont les choses",
-    "why": "Pourquoi ?",
-    "hideWhy": "Masquer le pourquoi"
+    "label": "Où en sont les choses"
   },
   "search": {
     "label": "Rechercher ou demander"
@@ -89,5 +87,8 @@
     "discard": "Supprimer",
     "send": "Envoyer",
     "close": "Fermer"
+  },
+  "howDecided": {
+    "title": "Comment Campbooks a décidé"
   }
 }

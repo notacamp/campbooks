@@ -91,11 +91,11 @@ export function reasonText(
 
 /** Questions whose "yes" the note mentions, with their phrase and "Why?" label. */
 const FLAGS = [
-  { question: "needs_reply", phrase: "scout.needsReply", why: "scout.whyNeedsReply" },
-  { question: "asks_action", phrase: "scout.asksAction", why: "scout.whyAsksAction" },
-  { question: "has_deadline", phrase: "scout.hasDeadline", why: "scout.whyHasDeadline" },
-  { question: "urgency", phrase: "scout.urgent", why: "scout.whyUrgent" },
-  { question: "suspicious", phrase: "scout.suspicious", why: "scout.whySuspicious" },
+  { question: "needs_reply", phrase: "scout.needsReply" },
+  { question: "asks_action", phrase: "scout.asksAction" },
+  { question: "has_deadline", phrase: "scout.hasDeadline" },
+  { question: "urgency", phrase: "scout.urgent" },
+  { question: "suspicious", phrase: "scout.suspicious" },
 ] as const;
 
 /** Urgency is a level from 0 (no hurry) to 2 (today): 2 counts as urgent. */
@@ -130,19 +130,12 @@ export function noteSentence(
   return t("scout.read", { list: list.format(flags.map((flag) => t(flag.phrase))) });
 }
 
-/** The note's footer line: where the conversation is and who put it there. */
-export function placementLine(
-  t: Translate,
-  conversation: ConversationSummary,
-  decisions: readonly DecisionView[],
-): string {
+/** The note's footer line: where the conversation is and who put it there, in words. */
+export function placementLine(t: Translate, conversation: ConversationSummary): string {
   const stream = streamName(t, conversation.stream);
   const suggestion = conversation.suggestion;
   if (suggestion !== null && suggestion !== undefined) {
-    const suggested = streamName(t, suggestion.stream);
-    return suggestion.confidence === null || suggestion.confidence === undefined
-      ? t("scout.suggestion", { stream: suggested })
-      : t("scout.suggestionSure", { stream: suggested, confidence: suggestion.confidence });
+    return t("scout.suggestion", { stream: streamName(t, suggestion.stream) });
   }
   switch (conversation.stream_source) {
     case "member": {
@@ -152,37 +145,12 @@ export function placementLine(
       return t("scout.sortedModel", { stream });
     }
     case "rules": {
-      const confidence = decisions.find((d) => d.question === "stream")?.confidence;
-      return confidence === null || confidence === undefined
-        ? t("scout.sortedRule", { stream })
-        : t("scout.sortedRuleSure", { stream, confidence });
+      return t("scout.sortedRule", { stream });
     }
     case "default": {
       return t("scout.sortedDefault", { stream });
     }
   }
-}
-
-/** Every stored reason behind what the note says, labelled by question. */
-export function whyLines(
-  t: Translate,
-  exists: (key: string) => boolean,
-  conversation: ConversationSummary,
-  decisions: readonly DecisionView[],
-): string[] {
-  const streamReasons =
-    conversation.suggestion?.reasons ??
-    decisions.find((d) => d.question === "stream")?.reasons ??
-    [];
-  const lines = streamReasons.map(
-    (reason) => `${t("scout.whyStream")}: ${reasonText(t, exists, reason)}`,
-  );
-  for (const flag of flagsOf(decisions)) {
-    for (const reason of flag.decision.reasons) {
-      lines.push(`${t(flag.why)}: ${reasonText(t, exists, reason)}`);
-    }
-  }
-  return [...new Set(lines)];
 }
 
 /** Older messages fold; the newest (and any unread) stay open. */

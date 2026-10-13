@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { LEDGER, LEDGER_DETAIL, NOW, Q4, Q4_DETAIL } from "../../../test/demo/conversations";
+import { LEDGER, NOW, Q4, Q4_DETAIL } from "../../../test/demo/conversations";
 
 import {
   displayName,
@@ -9,7 +9,6 @@ import {
   openByDefault,
   placementLine,
   reasonText,
-  whyLines,
   type Translate,
 } from "./model";
 
@@ -40,13 +39,10 @@ describe("inbox model", () => {
   });
 
   it("puts a suggestion before where the conversation is", () => {
-    expect(placementLine(t, LEDGER, LEDGER_DETAIL.decisions)).toBe(
-      'scout.suggestionSure{"stream":"streams.newsletters","confidence":95}',
-    );
-    expect(placementLine(t, Q4, Q4_DETAIL.decisions)).toBe(
-      'scout.sortedDefault{"stream":"streams.primary"}',
-    );
-    expect(placementLine(t, { ...Q4, stream_source: "member" }, [])).toBe(
+    // In words: no percentage up front.
+    expect(placementLine(t, LEDGER)).toBe('scout.suggestion{"stream":"streams.newsletters"}');
+    expect(placementLine(t, Q4)).toBe('scout.sortedDefault{"stream":"streams.primary"}');
+    expect(placementLine(t, { ...Q4, stream_source: "member" })).toBe(
       'scout.sortedMember{"stream":"streams.primary"}',
     );
   });
@@ -58,8 +54,6 @@ describe("inbox model", () => {
     expect(reasonText(t, exists, { rule: "unknown.rule", evidence: "x" })).toBe(
       'reasons.other{"rule":"unknown.rule","evidence":"x"}',
     );
-    expect(whyLines(t, exists, LEDGER, LEDGER_DETAIL.decisions)).toHaveLength(2);
-    expect(whyLines(t, exists, Q4, Q4_DETAIL.decisions)).toHaveLength(3);
   });
 
   it("opens the newest message and the unread ones", () => {

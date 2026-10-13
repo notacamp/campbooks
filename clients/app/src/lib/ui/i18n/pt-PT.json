@@ -13,9 +13,7 @@
     "redone": "Refeito: {{label}}"
   },
   "note": {
-    "label": "Ponto da situação",
-    "why": "Porquê?",
-    "hideWhy": "Ocultar o porquê"
+    "label": "Ponto da situação"
   },
   "search": {
     "label": "Pesquisar ou perguntar"
@@ -89,5 +87,8 @@
     "discard": "Descartar",
     "send": "Enviar",
     "close": "Fechar"
+  },
+  "howDecided": {
+    "title": "Como o Campbooks decidiu"
   }
 }

@@ -1,0 +1,47 @@
+{
+  "title": "O que precisa de si",
+  "hero": {
+    "count_one": "{{count}} coisa precisa de si",
+    "count_other": "{{count}} coisas precisam de si",
+    "subline": "O Campbooks lê o seu correio e guarda aqui o que lhe pede algo.",
+    "clear": "Nada precisa de si",
+    "clearSubline": "Neste momento nada no seu correio lhe pede algo. O Campbooks continua a ler."
+  },
+  "groups": {
+    "review": "Rever",
+    "reply": "Responder",
+    "decide": "Decidir",
+    "do": "Fazer",
+    "pay": "Pagar"
+  },
+  "context": "Feito hoje e teclas",
+  "doneTodayTitle": "Feito hoje",
+  "doneTodayEmpty": "Ainda nada hoje.",
+  "doneToday": {
+    "done": "Feito · {{subject}}",
+    "notNeeded": "Não era preciso · {{subject}}",
+    "replied": "Respondido · {{subject}}",
+    "archived": "Arquivado · {{subject}}",
+    "later": "Mais tarde · {{subject}}",
+    "gone": "Já não é preciso · {{subject}}"
+  },
+  "later": {
+    "title": "Voltar a mostrar",
+    "today": "Mais logo",
+    "tomorrow": "Amanhã",
+    "monday": "Segunda-feira",
+    "toast": "Mais tarde · {{name}}, volta {{when}}"
+  },
+  "actions": {
+    "reply": "Responder",
+    "open": "Abrir conversa",
+    "undo": "Anular"
+  },
+  "keyboard": "Teclado",
+  "error": {
+    "title": "Não foi possível carregar o que precisa de si",
+    "body": "O Campbooks não conseguiu contactar o servidor. Nada se perdeu.",
+    "retry": "Tentar de novo"
+  },
+  "noSubject": "(sem assunto)"
+}

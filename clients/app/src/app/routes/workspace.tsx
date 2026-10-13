@@ -23,6 +23,7 @@ import {
   WorkspaceMenu,
   WorkspaceSwitcher,
 } from "~/lib/ui";
+import { useAttentionCount } from "~/modules/attention";
 import { StreamNav, streamPath } from "~/modules/conversations";
 import { useWorkspaces, type Workspace } from "~/modules/workspaces";
 
@@ -135,6 +136,7 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const inSettings = pathname.startsWith(`${base}/settings`);
   const inInbox = pathname.startsWith(`${base}/inbox`);
   const atHome = !inSettings && !inInbox;
+  const needsYou = useAttentionCount(workspace.id);
   const inboxPath = streamPath(workspace.id, "primary");
   const openStream = /\/inbox\/(primary|updates|receipts|newsletters)\b/u.exec(pathname)?.[1] as
     "primary" | "updates" | "receipts" | "newsletters" | undefined;
@@ -187,6 +189,7 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
             icon="home"
             shortcut="nav.home"
             current={atHome}
+            count={needsYou}
             {...link(base)}
           />
           <NavItem
@@ -223,7 +226,14 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
       <TabBar
         phoneOnly
         items={[
-          { id: "home", label: tNav("nav.home"), icon: "home", current: atHome, ...link(base) },
+          {
+            id: "home",
+            label: tNav("nav.home"),
+            icon: "home",
+            current: atHome,
+            ...(needsYou === undefined ? {} : { badge: needsYou }),
+            ...link(base),
+          },
           {
             id: "inbox",
             label: tNav("nav.inbox"),

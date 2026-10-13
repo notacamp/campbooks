@@ -818,7 +818,12 @@
             "description": "`open` (default) or `cleared`.",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/ListState"
+              "type": "string",
+              "description": "Open items, or what left the list today.",
+              "enum": [
+                "open",
+                "cleared"
+              ]
             }
           }
         ],

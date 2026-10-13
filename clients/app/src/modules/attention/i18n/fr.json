@@ -1,0 +1,47 @@
+{
+  "title": "Ce qui a besoin de vous",
+  "hero": {
+    "count_one": "{{count}} chose a besoin de vous",
+    "count_other": "{{count}} choses ont besoin de vous",
+    "subline": "Campbooks lit votre courrier et garde ici ce qui vous demande quelque chose.",
+    "clear": "Rien n’a besoin de vous",
+    "clearSubline": "Pour l’instant, rien dans votre courrier ne vous demande quoi que ce soit. Campbooks continue de lire."
+  },
+  "groups": {
+    "review": "À vérifier",
+    "reply": "À répondre",
+    "decide": "À décider",
+    "do": "À faire",
+    "pay": "À payer"
+  },
+  "context": "Fait aujourd’hui et raccourcis",
+  "doneTodayTitle": "Fait aujourd’hui",
+  "doneTodayEmpty": "Rien pour l’instant aujourd’hui.",
+  "doneToday": {
+    "done": "Fait · {{subject}}",
+    "notNeeded": "Pas nécessaire · {{subject}}",
+    "replied": "Répondu · {{subject}}",
+    "archived": "Archivé · {{subject}}",
+    "later": "Plus tard · {{subject}}",
+    "gone": "Plus nécessaire · {{subject}}"
+  },
+  "later": {
+    "title": "Faire revenir",
+    "today": "Plus tard aujourd’hui",
+    "tomorrow": "Demain",
+    "monday": "Lundi",
+    "toast": "Plus tard · {{name}}, revient {{when}}"
+  },
+  "actions": {
+    "reply": "Répondre",
+    "open": "Ouvrir la conversation",
+    "undo": "Annuler"
+  },
+  "keyboard": "Clavier",
+  "error": {
+    "title": "Impossible de charger ce qui a besoin de vous",
+    "body": "Campbooks n’a pas pu joindre le serveur. Rien n’a été perdu.",
+    "retry": "Réessayer"
+  },
+  "noSubject": "(sans objet)"
+}

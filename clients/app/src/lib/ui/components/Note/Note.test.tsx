@@ -2,6 +2,7 @@ import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { renderUi } from "../../../../../test/render";
+import { HowDecided } from "../HowDecided/HowDecided";
 
 import { Note } from "./Note";
 
@@ -22,29 +23,30 @@ describe("Note", () => {
     expect(onSelect).toHaveBeenCalledOnce();
   });
 
-  it("explains itself behind a Why? disclosure", () => {
+  it("quotes the sender as plain text, never as markup", () => {
     renderUi(
       <Note
-        confidence="Sorted into Primary, 98% sure"
-        why={["You have replied to Sofia 14 times this year."]}
+        quote={{ text: "<b>Click</b> https://example.com", attribution: "Marta, Mon 12 Oct" }}
+        reasons={["The sender’s domain imitates yours."]}
       >
+        Marta is waiting for your reply.
+      </Note>,
+    );
+    const quote = screen.getByText("<b>Click</b> https://example.com");
+    expect(quote.tagName).toBe("Q");
+    expect(quote.querySelector("b")).toBeNull();
+    expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.getByText("Marta, Mon 12 Oct")).toBeInTheDocument();
+    expect(screen.getByText("The sender’s domain imitates yours.")).toBeInTheDocument();
+  });
+
+  it("keeps how it decided behind a disclosure", () => {
+    renderUi(
+      <Note how={<HowDecided rows={[{ question: "Needs a reply", answer: "Yes.", source: "0.90" }]} />}>
         Note text
       </Note>,
     );
-    const why = screen.getByRole("button", { name: "Why?" });
-    const reasons = screen.getByRole("list", { hidden: true });
-
-    expect(why).toHaveAttribute("aria-expanded", "false");
-    expect(reasons).not.toBeVisible();
-
-    fireEvent.click(why);
-
-    expect(screen.getByRole("button", { name: "Hide why" })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
-    expect(why).toHaveAttribute("aria-controls", reasons.id);
-    expect(reasons).toBeVisible();
+    expect(screen.getByText("0.90")).not.toBeVisible();
   });
 
   it("asks instead of acting when unsure", () => {
