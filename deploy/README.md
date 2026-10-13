@@ -24,7 +24,10 @@
    one `command: ["api"]`. Worker settings are the `CAMPBOOKS_JOBS__*` block
    of `.env.example`.
 
-8. Workspaces: the first person to sign in creates the first workspace and
+8. Files (message bodies, attachments, documents) are stored outside Postgres,
+   in the `blobs-data` volume by default. See "Blob storage" below to use an
+   S3-compatible bucket instead.
+9. Workspaces: the first person to sign in creates the first workspace and
    invites the others (`POST /api/v1/w/{id}/invitations`; screens come later).
    Who else may create a workspace is `CAMPBOOKS_SIGNUP__POLICY` (`open` by
    default; `invite_only`, `approval`, `code`). Invitations are not emailed
@@ -33,7 +36,7 @@
    sign-in clients provisioned before this release keep their old scope list
    until you add the scopes to them in the IdP admin UI (or re-provision them,
    see "Identity provider").
-9. Workspace isolation: every workspace's rows are guarded by Postgres
+10. Workspace isolation: every workspace's rows are guarded by Postgres
    row-level security as well as by the queries. The server connects with the
    database user from `CAMPBOOKS_DATABASE_URL`, runs migrations as that user,
    and then switches each connection to the role `campbooks_app`, which the
@@ -92,6 +95,68 @@ recent laptop).
   (and option count) temperatures in `CAMPBOOKS_AI__DECIDE__CALIBRATION__*` soften
   the probabilities (see `.env.example`); they default to 1.0 and will later be
   refitted from users' corrections.
+
+## Blob storage
+
+Raw messages, attachments and files live in object storage; Postgres keeps their
+metadata and who uses them. Each file is stored once per workspace, under its SHA-256,
+however many messages carry it. A file nothing uses any more is deleted by an hourly
+sweep once `CAMPBOOKS_BLOBS__SWEEP_GRACE_HOURS` (default 24) have passed. Files larger
+than `CAMPBOOKS_BLOBS__MAX_OBJECT_BYTES` (default 50 MiB) are refused.
+
+**Local disk (default).** `CAMPBOOKS_BLOBS__BACKEND=fs` stores files under
+`CAMPBOOKS_BLOBS__PATH` (`/data/blobs`, the `blobs-data` volume). Writes are atomic: a
+temporary file, flushed to disk, then renamed into place.
+
+**S3-compatible store.** Any store that speaks the S3 API works (AWS S3, Garage, MinIO,
+Ceph, Cloudflare R2, ...). Create a private bucket and an access key limited to it, then
+set in `.env`:
+
+```sh
+CAMPBOOKS_BLOBS__BACKEND=s3
+CAMPBOOKS_BLOBS__S3__BUCKET=campbooks-blobs
+CAMPBOOKS_BLOBS__S3__ENDPOINT=https://s3.example.com   # unset for AWS
+CAMPBOOKS_BLOBS__S3__REGION=us-east-1                  # what your store expects
+CAMPBOOKS_BLOBS__S3__ACCESS_KEY_ID=...
+CAMPBOOKS_BLOBS__S3__SECRET_ACCESS_KEY=...
+CAMPBOOKS_BLOBS__S3__PATH_STYLE=true                   # most self-hosted stores
+```
+
+The server checks that it can reach the bucket on startup and refuses to start
+otherwise. Large uploads go up in parts; add a lifecycle rule to the bucket that aborts
+incomplete multipart uploads after a day, so a crash mid-upload leaves nothing behind.
+The `blobs-data` volume is unused with this backend.
+
+**Encryption at rest.** Campbooks does not encrypt files itself yet. Use your store's
+encryption: server-side encryption on the bucket (SSE-S3 or SSE-KMS on AWS; Garage,
+MinIO and Ceph have their own), or an encrypted disk under `blobs-data` for the local
+backend.
+
+**Moving between backends.** Copy the whole tree (`<workspace>/<aa>/<sha256>` keys,
+the `_staging/` prefix excepted) to the new store with the server stopped, then switch
+the settings: the keys are identical on disk and in a bucket.
+
+## Backups
+
+Back up these together, at about the same time:
+
+| What | Where | Holds |
+| --- | --- | --- |
+| Postgres | `postgres-data` volume (use `pg_dump`) | Everything except files and the IdP's state |
+| Files | `blobs-data` volume, or your bucket | Raw messages, attachments, documents |
+| Identity provider | `idp-data` volume | Accounts, sign-in clients and the IdP's encryption key |
+
+Restore Postgres and the files from the same point in time. A file that is missing from
+the store while Postgres still lists it cannot be read, so take the database dump first,
+then copy the files: files uploaded in between are only harmless extras. For a bucket,
+turn on versioning (and keep old versions for a few days) instead of copying.
+
+For the local volume, for example:
+
+```sh
+docker run --rm -v campbooks_blobs-data:/data -v "$PWD":/backup busybox:1.37.0-musl \
+  tar czf /backup/blobs-data.tgz -C /data .
+```
 
 ## Identity provider
 

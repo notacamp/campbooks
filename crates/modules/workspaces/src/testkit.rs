@@ -12,7 +12,8 @@ use axum::{
 use campbooks_kernel::{
     AppState,
     auth::{Principal, PrincipalKind},
-    config::SignupPolicy,
+    blobs::BlobStore,
+    config::{BlobsConfig, SignupPolicy},
     jobs::Registry,
     tenancy::{Membership as _, UserId, WorkspaceId},
     testing::{self, TestIdp, TestResponse},
@@ -62,8 +63,11 @@ impl Kit {
     /// The module under a signup policy (and codes, for `code`).
     pub async fn with_signup(db: PgPool, policy: SignupPolicy, codes: Option<&str>) -> Self {
         let idp = TestIdp::start().await;
+        let pool = testing::app_role_pool(&db).await;
+        let blobs = BlobStore::memory(&BlobsConfig::default(), pool.clone());
         let mut state = idp
-            .state(testing::app_role_pool(&db).await)
+            .state(pool)
+            .with_blobs(blobs)
             .with_membership(crate::membership())
             .with_registry(Registry::build(&[crate::module()]).unwrap());
         let config = Arc::make_mut(&mut state.config);
@@ -332,5 +336,16 @@ impl Kit {
         .await
         .unwrap();
         (row.w, row.m, row.i)
+    }
+
+    /// Blobs stored for `workspace`.
+    pub async fn blobs_of(&self, workspace: WorkspaceId) -> i64 {
+        sqlx::query_scalar!(
+            r#"SELECT count(*) AS "n!" FROM kernel.blobs WHERE workspace_id = $1"#,
+            workspace.to_string()
+        )
+        .fetch_one(&self.db)
+        .await
+        .unwrap()
     }
 }

@@ -13,7 +13,8 @@ use std::sync::Arc;
 
 use campbooks_kernel::{
     AppState, Config,
-    config::LogFormat,
+    blobs::BlobStore,
+    config::{BlobBackend, LogFormat},
     db,
     events::{EventId, ReplayFrom},
     jobs::Worker,
@@ -174,9 +175,14 @@ async fn run(config: Config, role: Role) -> Result<(), Box<dyn std::error::Error
     let db = connect(&config).await?;
     warn_if_row_security_is_bypassed(&db).await;
 
+    let blobs = blob_store(&config, &db).await?;
+
     let bind_addr = config.bind_addr;
-    let state =
-        campbooks_server::with_ports(AppState::new(db.clone(), config).with_registry(registry));
+    let state = campbooks_server::with_ports(
+        AppState::new(db.clone(), config)
+            .with_registry(registry)
+            .with_blobs(blobs),
+    );
     // Flipped to `true` on Ctrl-C/SIGTERM, or when one part stops, so the
     // other parts stop too.
     let stop = Arc::new(watch::channel(false).0);
@@ -223,6 +229,27 @@ async fn run(config: Config, role: Role) -> Result<(), Box<dyn std::error::Error
     result?;
     tracing::info!("shut down cleanly");
     Ok(())
+}
+
+/// The configured blob store, checked to answer before the server starts.
+async fn blob_store(config: &Config, db: &PgPool) -> Result<BlobStore, String> {
+    let blobs = BlobStore::from_config(&config.blobs, db.clone())?;
+    let backend = blobs.backend().unwrap_or_default();
+    blobs.probe().await.map_err(|e| {
+        format!("blob storage (CAMPBOOKS_BLOBS__BACKEND={backend}) does not answer: {e}")
+    })?;
+    match config.blobs.backend {
+        BlobBackend::Fs => {
+            tracing::info!(backend, path = %config.blobs.path.display(), "storing blobs");
+        }
+        BlobBackend::S3 => tracing::info!(
+            backend,
+            bucket = config.blobs.s3.bucket.as_deref().unwrap_or_default(),
+            endpoint = config.blobs.s3.endpoint().unwrap_or("<aws>"),
+            "storing blobs"
+        ),
+    }
+    Ok(blobs)
 }
 
 /// Resolves once `stop` is flipped.

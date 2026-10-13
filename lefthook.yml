@@ -1,0 +1,61 @@
+# Local git hooks (lefthook): the fast gates, before CI runs them. Opt-in,
+# never required: CI stays the source of truth. See CONTRIBUTING.md → Local
+# hooks.
+#
+#   lefthook install              # once per clone (worktrees share the hooks)
+#   LEFTHOOK=0 git push           # skip every hook, once
+#   LEFTHOOK_EXCLUDE=clippy git push   # skip one job, once
+#
+# Jobs only run when files they care about changed: staged files for
+# pre-commit, the files being pushed for pre-push.
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: rustfmt
+      glob: "*.rs"
+      run: cargo fmt --all --check
+
+    - name: prettier
+      root: "clients/"
+      glob: "*.{ts,tsx,js,cjs,mjs,json,css,md,html,yaml,yml}"
+      run: |
+        if [ ! -d node_modules ]; then
+          echo "clients/node_modules missing (pnpm --dir clients install); skipping prettier"
+          exit 0
+        fi
+        pnpm exec prettier --check --ignore-unknown {staged_files}
+
+    - name: gitleaks
+      # `gitleaks git --staged` is the current form of `gitleaks protect --staged`.
+      run: |
+        if ! command -v gitleaks >/dev/null 2>&1; then
+          echo "gitleaks not installed; skipping (CI runs it on every PR)"
+          exit 0
+        fi
+        gitleaks git --staged --redact --no-banner
+
+pre-push:
+  parallel: true
+  jobs:
+    # Queries compile against the committed `.sqlx` cache, as in CI, whatever
+    # state your local database is in.
+    - name: clippy
+      glob: "*.{rs,toml,sql}"
+      env: { SQLX_OFFLINE: "true" }
+      run: cargo clippy --workspace --all-targets -- -D warnings
+
+    - name: arch
+      glob: "*.{rs,toml,sql}"
+      env: { SQLX_OFFLINE: "true" }
+      run: cargo xtask arch
+
+    - name: clients-lint
+      root: "clients/"
+      glob: "*.{ts,tsx,js,cjs,mjs}"
+      run: |
+        if [ ! -d node_modules ]; then
+          echo "clients/node_modules missing (pnpm --dir clients install); skipping lint"
+          exit 0
+        fi
+        pnpm lint

@@ -14,7 +14,11 @@ blockExoticSubdeps: true
 # Lifecycle scripts are denied by default; anything that wants one fails the
 # install until it is reviewed and listed in `allowBuilds` below.
 strictDepBuilds: true
-allowBuilds: {}
+allowBuilds:
+  # Storybook pulls in esbuild for its own tooling. Its postinstall only checks
+  # the platform binary, which pnpm already installs as an optional
+  # dependency, so the script stays denied.
+  esbuild: false
 engineStrict: true
 # Reviewed false positives of `trustPolicy: no-downgrade` (old releases that
 # simply predate the publisher's provenance setup). Pin exact versions only.

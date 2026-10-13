@@ -33,6 +33,7 @@ use sqlx::{PgConnection, Postgres, Transaction};
 
 pub use context::JobContext;
 pub use maintenance::PruneJobs;
+pub(crate) use registry::is_dotted;
 pub use registry::{Background, ConsumerInfo, Registry, RegistryError};
 pub use worker::{Worker, WorkerStats};
 

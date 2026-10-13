@@ -6,6 +6,7 @@ use sqlx::PgPool;
 
 use crate::{
     auth::TokenVerifier,
+    blobs::BlobStore,
     config::Config,
     events::EventBus,
     jobs::Registry,
@@ -28,6 +29,9 @@ pub struct AppState {
     /// registers the `workspaces` module's implementation; until then nobody
     /// belongs anywhere.
     pub membership: MembershipPort,
+    /// Message bodies, attachments and files (ADR 0011). Not configured
+    /// until the server attaches one with [`with_blobs`](Self::with_blobs).
+    pub blobs: BlobStore,
 }
 
 impl AppState {
@@ -41,6 +45,7 @@ impl AppState {
             config: Arc::new(config),
             events: EventBus::default(),
             membership: Arc::new(NoMembership),
+            blobs: BlobStore::default(),
         }
     }
 
@@ -55,6 +60,13 @@ impl AppState {
     #[must_use]
     pub fn with_registry(mut self, registry: Registry) -> Self {
         self.events = EventBus::new(Arc::new(registry));
+        self
+    }
+
+    /// The same state, storing blobs in `blobs`.
+    #[must_use]
+    pub fn with_blobs(mut self, blobs: BlobStore) -> Self {
+        self.blobs = blobs;
         self
     }
 }

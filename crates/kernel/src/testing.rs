@@ -20,7 +20,8 @@ use tower::ServiceExt;
 
 use crate::{
     AppState, Config, Module,
-    config::{AuthConfig, Environment, JobsConfig, LogFormat, SignupConfig},
+    blobs::BlobStore,
+    config::{AuthConfig, BlobsConfig, Environment, JobsConfig, LogFormat, SignupConfig},
     db,
 };
 
@@ -40,6 +41,7 @@ pub fn config(database_url: &str) -> Config {
         auth: AuthConfig::default(),
         jobs: JobsConfig::default(),
         signup: SignupConfig::default(),
+        blobs: BlobsConfig::default(),
     }
 }
 
@@ -61,9 +63,12 @@ pub async fn app_role_pool(db: &PgPool) -> PgPool {
         .unwrap_or_else(|e| panic!("connecting as the runtime role: {e}"))
 }
 
-/// App state over `db` (e.g. the pool `#[sqlx::test]` hands you).
+/// App state over `db` (e.g. the pool `#[sqlx::test]` hands you), storing
+/// blobs in memory.
 pub fn state(db: PgPool) -> AppState {
-    AppState::new(db, config("postgres://test@localhost/test"))
+    let config = config("postgres://test@localhost/test");
+    let blobs = BlobStore::memory(&config.blobs, db.clone());
+    AppState::new(db, config).with_blobs(blobs)
 }
 
 /// A pool whose every acquire fails quickly: for "database is down" paths.

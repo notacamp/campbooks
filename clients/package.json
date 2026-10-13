@@ -9,10 +9,13 @@
   "scripts": {
     "dev": "pnpm --filter @campbooks/app run dev",
     "tauri": "pnpm --filter @campbooks/app run tauri",
+    "storybook": "pnpm --filter @campbooks/app run storybook",
+    "build-storybook": "pnpm --filter @campbooks/app run build-storybook",
     "build": "pnpm -r run build",
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
+    "test-storybook": "pnpm -r run test-storybook",
     "deps:check": "pnpm -r run deps:check",
     "deadcode": "knip",
     "api:generate": "pnpm -r run api:generate",

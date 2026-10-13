@@ -1,0 +1,108 @@
+/*
+ * Tailwind 4 theme: the SEMANTIC tokens only.
+ *
+ * `--*: initial` wipes Tailwind's default theme, so `bg-blue-500`, `p-7`,
+ * `rounded-2xl` or `shadow-lg` generate nothing. What is left is a utility per
+ * token (bg-surface-raised, text-secondary, border-subtle, p-3, rounded-md,
+ * ...). `inline reference` makes each utility read the token directly
+ * (`.p-3 { padding: var(--space-3) }`) without re-emitting it, so a theme
+ * switch on <html> restyles utilities and components alike.
+ *
+ * Arbitrary values (`text-[#123]`, `p-[13px]`) still compile in Tailwind;
+ * ESLint rejects them (eslint.config.js, "token-only styling").
+ */
+@theme inline reference {
+  --*: initial;
+
+  /* Breakpoints are compiled into media queries, so they are literals here. */
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 64rem;
+  --breakpoint-xl: 80rem;
+
+  /* Backgrounds: bg-surface-*, bg-accent, bg-danger-soft */
+  --background-color-surface-base: var(--surface-base);
+  --background-color-surface-raised: var(--surface-raised);
+  --background-color-surface-sunken: var(--surface-sunken);
+  --background-color-surface-overlay: var(--surface-overlay);
+  --background-color-surface-hover: var(--surface-hover);
+  --background-color-surface-selected: var(--surface-selected);
+  --background-color-accent: var(--accent);
+  --background-color-accent-soft: var(--accent-soft);
+  --background-color-danger-soft: var(--danger-soft);
+  --background-color-transparent: transparent;
+
+  /* Text colour: text-primary, text-secondary, text-tertiary, ... */
+  --text-color-primary: var(--text-primary);
+  --text-color-secondary: var(--text-secondary);
+  --text-color-tertiary: var(--text-tertiary);
+  --text-color-disabled: var(--text-disabled);
+  --text-color-accent: var(--accent-text);
+  --text-color-on-accent: var(--on-accent);
+  --text-color-danger: var(--danger);
+  --text-color-success: var(--success);
+  --text-color-current: currentColor;
+
+  /* Borders: border-subtle, border-strong */
+  --border-color-subtle: var(--border-subtle);
+  --border-color-strong: var(--border-strong);
+
+  /* Type */
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+  --text-xs: var(--text-xs);
+  --text-sm: var(--text-sm);
+  --text-md: var(--text-md);
+  --text-lg: var(--text-lg);
+  --text-xl: var(--text-xl);
+  --text-2xl: var(--text-2xl);
+  --text-3xl: var(--text-3xl);
+  --font-weight-regular: var(--weight-regular);
+  --font-weight-medium: var(--weight-medium);
+  --font-weight-semibold: var(--weight-semibold);
+  --font-weight-bold: var(--weight-bold);
+  --leading-none: var(--leading-none);
+  --leading-tight: var(--leading-tight);
+  --leading-normal: var(--leading-normal);
+  --leading-relaxed: var(--leading-relaxed);
+  --tracking-tight: var(--tracking-tight);
+  --tracking-display: var(--tracking-display);
+  --tracking-caps: var(--tracking-caps);
+
+  /* Space: p-*, m-*, gap-*, w-*, h-* on the 4px grid (0-5 = 2px, 1-5 = 6px) */
+  --spacing-0: var(--space-0);
+  --spacing-0-5: var(--space-0-5);
+  --spacing-1: var(--space-1);
+  --spacing-1-5: var(--space-1-5);
+  --spacing-2: var(--space-2);
+  --spacing-3: var(--space-3);
+  --spacing-4: var(--space-4);
+  --spacing-5: var(--space-5);
+  --spacing-6: var(--space-6);
+  --spacing-8: var(--space-8);
+  --spacing-10: var(--space-10);
+  --spacing-12: var(--space-12);
+  --spacing-hit: var(--size-hit);
+  --spacing-sidebar: var(--sidebar-width);
+  --spacing-aside: var(--aside-width);
+  --spacing-list: var(--list-width);
+
+  /* Max widths: max-w-measure, max-w-content, max-w-overlay, max-w-list, max-w-sidebar */
+  --container-measure: var(--measure);
+  --container-content: var(--content-max);
+  --container-overlay: var(--overlay-width);
+  --container-list: var(--list-width);
+  --container-sidebar: var(--sidebar-width);
+  --container-aside: var(--aside-width);
+
+  /* Radius, shadow, motion */
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-full: var(--radius-full);
+  --shadow-overlay: var(--shadow-overlay);
+  --ease-out: var(--ease-out);
+  --ease-in-out: var(--ease-in-out);
+}

@@ -1,0 +1,402 @@
+/*
+ * Campbooks design tokens.
+ *
+ * Three layers. Components read ONLY layers 2 and 3; nothing outside
+ * src/lib/ui/tokens/ contains a colour, size or duration literal (stylelint).
+ *   1. Primitives  raw hues, chroma, scales. Retheming starts here.
+ *   2. Semantic    roles (surface, text, border, accent, signal, ...), each
+ *                  defined once for light AND dark with light-dark().
+ *   3. Component   per-component knobs built from semantic tokens.
+ *
+ * A theme is attributes on <html> (or any element, for previews):
+ *   data-theme   = light | dark | system      (which half of light-dark())
+ *   data-accent  = business | personal | forest (accent + neutral tint preset)
+ *   data-density = comfortable | compact
+ * Put data-accent on the same element as data-theme (or above it): semantic
+ * tokens resolve their primitives where they are declared.
+ */
+
+/* ── 1 · Primitives ─────────────────────────────────────────────────────── */
+:root {
+  /* neutral tint: hue + chroma shared by every grey (almost colourless) */
+  --neutral-h: 70;
+  --neutral-c: 0.004;
+
+  /* accent (one per workspace): hue, chroma, and its lightness in each theme.
+     The default is ink: no hue at all, near-black on light, near-white on dark. */
+  --accent-h: 70;
+  --accent-c: 0.008;
+  --accent-l-light: 0.24;
+  --accent-l-dark: 0.93;
+  --accent-hover-l-light: 0.33;
+  --accent-hover-l-dark: 0.86;
+  --on-accent-l-light: 0.99;
+  --on-accent-l-dark: 0.17;
+
+  /* signal hues: meaning only, never decoration */
+  --signal-reply-h: 195;
+  --signal-decide-h: 62;
+  --signal-do-h: 300;
+  --signal-pay-h: 155;
+  --signal-review-h: 25;
+  --signal-sort-h: 70;
+
+  /* avatar hues: identity only, deliberately low chroma */
+  --avatar-c: 0.055;
+  --avatar-1-h: 20;
+  --avatar-2-h: 70;
+  --avatar-3-h: 120;
+  --avatar-4-h: 165;
+  --avatar-5-h: 190;
+  --avatar-6-h: 230;
+  --avatar-7-h: 300;
+  --avatar-8-h: 345;
+
+  /* type: Funnel Sans + Funnel Display, self-hosted (SIL OFL 1.1) */
+  --font-sans: "Funnel Sans Variable", "Funnel Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display:
+    "Funnel Display Variable", "Funnel Display", "Funnel Sans Variable", ui-sans-serif, sans-serif;
+  --text-xs: 0.75rem; /* 12  meta, kbd */
+  --text-sm: 0.8125rem; /* 13  secondary UI */
+  --text-md: 0.875rem; /* 14  body, rows */
+  --text-lg: 1.0625rem; /* 17  item titles */
+  --text-xl: 1.3125rem; /* 21  pane titles */
+  --text-2xl: 1.625rem; /* 26  page titles */
+  --text-3xl: 2.0625rem; /* 33  hero sentence */
+  --weight-regular: 400;
+  --weight-medium: 520;
+  --weight-semibold: 620;
+  --weight-bold: 720;
+  --leading-none: 1;
+  --leading-tight: 1.2;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.62;
+  --tracking-tight: -0.02em;
+  --tracking-display: -0.035em;
+  --tracking-caps: 0.06em;
+  --measure: 68ch;
+
+  /* space: 4px grid */
+  --space-0: 0px;
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* radius */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 999px;
+
+  /* motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-none: 0s;
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+
+  /* lines, layers, opacity */
+  --border-width: 1px;
+  --focus-width: 2px;
+  --focus-offset: 2px;
+  --dot-size: 7px;
+  --z-sticky: 5;
+  --z-toast: 20;
+  --z-overlay: 30;
+  --opacity-dim: 0.5;
+  --opacity-muted: 0.6;
+  --opacity-soft: 0.8;
+
+  /* sizes */
+  --size-hit: 44px; /* minimum touch target */
+  --size-control-sm: 26px;
+  --size-control-md: 32px;
+  --size-control-lg: 40px;
+  --size-avatar-sm: 28px;
+  --size-avatar-md: 32px;
+  --size-avatar-lg: 40px;
+  --size-viewport-min: 100dvh;
+  --size-overlay-max: 92vw;
+}
+
+/* Workspace accent presets: the accent hue AND the tint of every grey. */
+[data-accent="business"] {
+  /* ink: the default, defined in the primitives above */
+}
+
+[data-accent="personal"] {
+  --accent-h: 38;
+  --accent-c: 0.13;
+  --neutral-h: 55;
+  --neutral-c: 0.006;
+  --accent-l-light: 0.52;
+  --accent-l-dark: 0.76;
+  --accent-hover-l-light: 0.46;
+  --accent-hover-l-dark: 0.82;
+  --on-accent-l-light: 0.99;
+  --on-accent-l-dark: 0.18;
+}
+
+[data-accent="forest"] {
+  --accent-h: 158;
+  --accent-c: 0.1;
+  --neutral-h: 150;
+  --neutral-c: 0.005;
+  --accent-l-light: 0.47;
+  --accent-l-dark: 0.76;
+  --accent-hover-l-light: 0.41;
+  --accent-hover-l-dark: 0.82;
+  --on-accent-l-light: 0.99;
+  --on-accent-l-dark: 0.18;
+}
+
+/* ── 2 · Semantic (light, dark) ─────────────────────────────────────────── */
+:root,
+[data-theme="system"] {
+  color-scheme: light dark;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+:root,
+[data-theme],
+[data-accent] {
+  --n: var(--neutral-c) var(--neutral-h);
+
+  --surface-base: light-dark(oklch(0.985 var(--n)), oklch(0.165 var(--n)));
+  --surface-raised: light-dark(oklch(1 0 0), oklch(0.195 var(--n)));
+  --surface-sunken: light-dark(oklch(0.965 var(--n)), oklch(0.145 var(--n)));
+  --surface-overlay: light-dark(oklch(1 0 0), oklch(0.225 var(--n)));
+  --surface-hover: light-dark(oklch(0.2 var(--n) / 0.045), oklch(1 0 0 / 0.045));
+  --surface-selected: light-dark(oklch(0.2 var(--n) / 0.075), oklch(1 0 0 / 0.08));
+  --surface-scrim: light-dark(oklch(0.25 var(--n) / 0.28), oklch(0 0 0 / 0.5));
+
+  --border-subtle: light-dark(oklch(0.2 var(--n) / 0.09), oklch(1 0 0 / 0.075));
+  --border-strong: light-dark(oklch(0.2 var(--n) / 0.16), oklch(1 0 0 / 0.13));
+  --edge-highlight: light-dark(oklch(1 0 0 / 0.85), oklch(1 0 0 / 0.055));
+
+  /* text: contrast on surface-base ≈ 15, 9, 5.7 (AA), 3.5 (disabled/placeholder only) */
+  --text-primary: light-dark(oklch(0.22 var(--n)), oklch(0.965 var(--n)));
+  --text-secondary: light-dark(oklch(0.4 var(--n)), oklch(0.79 var(--n)));
+  --text-tertiary: light-dark(oklch(0.5 var(--n)), oklch(0.67 var(--n)));
+  --text-disabled: light-dark(oklch(0.63 var(--n)), oklch(0.52 var(--n)));
+
+  /* accent: fill with readable text in both themes (≥ 6:1) */
+  --accent: light-dark(
+    oklch(var(--accent-l-light) var(--accent-c) var(--accent-h)),
+    oklch(var(--accent-l-dark) var(--accent-c) var(--accent-h))
+  );
+  --accent-hover: light-dark(
+    oklch(var(--accent-hover-l-light) var(--accent-c) var(--accent-h)),
+    oklch(var(--accent-hover-l-dark) var(--accent-c) var(--accent-h))
+  );
+  --on-accent: light-dark(
+    oklch(var(--on-accent-l-light) 0.004 var(--accent-h)),
+    oklch(var(--on-accent-l-dark) 0.01 var(--accent-h))
+  );
+  --accent-soft: light-dark(
+    oklch(var(--accent-l-light) var(--accent-c) var(--accent-h) / 0.08),
+    oklch(var(--accent-l-dark) var(--accent-c) var(--accent-h) / 0.1)
+  );
+  --accent-text: light-dark(
+    oklch(var(--accent-l-light) var(--accent-c) var(--accent-h)),
+    oklch(var(--accent-l-dark) var(--accent-c) var(--accent-h))
+  );
+  --focus-ring: var(--accent);
+
+  --danger: light-dark(oklch(0.52 0.19 25), oklch(0.72 0.16 25));
+  --danger-soft: light-dark(oklch(0.52 0.19 25 / 0.09), oklch(0.72 0.16 25 / 0.14));
+  --success: light-dark(oklch(0.5 0.13 155), oklch(0.76 0.14 155));
+
+  /* signals: dot colour; soft fills mix it at --signal-soft-mix */
+  --signal-soft-mix: 15%;
+  --signal-reply: light-dark(
+    oklch(0.56 0.15 var(--signal-reply-h)),
+    oklch(0.74 0.13 var(--signal-reply-h))
+  );
+  --signal-decide: light-dark(
+    oklch(0.62 0.15 var(--signal-decide-h)),
+    oklch(0.78 0.14 var(--signal-decide-h))
+  );
+  --signal-do: light-dark(oklch(0.56 0.16 var(--signal-do-h)), oklch(0.74 0.14 var(--signal-do-h)));
+  --signal-pay: light-dark(
+    oklch(0.58 0.13 var(--signal-pay-h)),
+    oklch(0.76 0.13 var(--signal-pay-h))
+  );
+  --signal-review: light-dark(
+    oklch(0.56 0.18 var(--signal-review-h)),
+    oklch(0.72 0.16 var(--signal-review-h))
+  );
+  --signal-sort: light-dark(
+    oklch(0.58 0.1 var(--signal-sort-h)),
+    oklch(0.76 0.1 var(--signal-sort-h))
+  );
+
+  /* the visor (assistant's face) */
+  --visor-glass-top: light-dark(
+    oklch(0.3 0.025 var(--neutral-h)),
+    oklch(0.36 0.03 var(--neutral-h))
+  );
+  --visor-glass-bottom: light-dark(
+    oklch(0.15 0.02 var(--neutral-h)),
+    oklch(0.22 0.025 var(--neutral-h))
+  );
+  --visor-eye: oklch(0.99 0.005 var(--neutral-h));
+  --visor-eye-glow: oklch(0.99 0.005 var(--neutral-h) / 0.5);
+  --visor-rim: light-dark(oklch(0 0 0 / 0), oklch(1 0 0 / 0.09));
+
+  --shadow-color: light-dark(oklch(0.3 0.04 var(--neutral-h) / 0.24), oklch(0 0 0 / 0.65));
+  --shadow-overlay: 0 14px 36px -10px var(--shadow-color), 0 2px 8px -3px var(--shadow-color);
+}
+
+/* ── 3 · Component ──────────────────────────────────────────────────────── */
+/* Sizes and timings: declared once, so data-density works on any element. */
+:root {
+  --btn-height: var(--size-control-md);
+  --btn-radius: var(--radius-md);
+  --btn-pad-x: var(--space-3);
+  --row-pad-y: var(--space-3);
+  --row-pad-x: var(--space-3);
+  --row-radius: var(--radius-md);
+  --pill-height: 22px;
+  --kbd-size: 18px;
+  --kbd-opacity: 1;
+  --kbd-on-accent-opacity: var(--opacity-soft);
+  --nav-height: var(--size-control-md);
+  --hint-opacity: 0;
+  --panel-radius: var(--radius-lg);
+  --overlay-radius: var(--radius-lg);
+  --visor-size: 22px;
+  --visor-asleep-opacity: var(--opacity-muted);
+  --sidebar-width: 248px;
+  --aside-width: 300px;
+  --list-width: 400px;
+  --content-max: 1180px;
+  --toast-height: 44px;
+  --toast-offset: var(--space-6);
+  --overlay-width: 560px;
+  --size-sheet-column: 220px;
+  --home-min: 640px;
+  --home-main-min: 520px;
+  --reader-min: 480px;
+  --icon-size: var(--space-4);
+  --icon-size-lg: var(--space-5);
+  --icon-stroke: 1.75;
+  --duration-blink: 5.6s;
+  --duration-scan: 1.25s;
+  --duration-pulse: 1.5s;
+  --duration-shimmer: 1.4s;
+}
+
+/* Colour knobs follow the theme and accent of the element that sets them.
+   Phone swipe actions: each fill keeps its label at AA in both themes. */
+:root,
+[data-theme],
+[data-accent] {
+  --kbd-bg: var(--surface-sunken);
+  --kbd-fg: var(--text-tertiary);
+  --kbd-border: var(--border-strong);
+  --swipe-later-bg: var(--signal-decide);
+  --swipe-later-fg: oklch(0.2 0.01 var(--neutral-h));
+  --swipe-done-bg: var(--success);
+  --swipe-done-fg: light-dark(
+    oklch(0.99 0.004 var(--neutral-h)),
+    oklch(0.17 0.01 var(--neutral-h))
+  );
+}
+
+/* Phones navigate with a bottom tab bar: toasts sit above it. */
+@media (width < 48rem) {
+  :root {
+    --toast-offset: calc(var(--size-hit) + var(--space-10));
+  }
+}
+
+[data-density="compact"] {
+  --row-pad-y: var(--space-1-5);
+  --btn-height: var(--size-control-sm);
+  --nav-height: 28px;
+}
+
+/* Bindings: an element picks a signal or avatar hue by data attribute;
+   components then read --sig / --avatar-bg / --avatar-fg without knowing which. */
+[data-signal="reply"] {
+  --sig: var(--signal-reply);
+}
+
+[data-signal="decide"] {
+  --sig: var(--signal-decide);
+}
+
+[data-signal="do"] {
+  --sig: var(--signal-do);
+}
+
+[data-signal="pay"] {
+  --sig: var(--signal-pay);
+}
+
+[data-signal="review"] {
+  --sig: var(--signal-review);
+}
+
+[data-signal="sort"] {
+  --sig: var(--signal-sort);
+}
+
+[data-avatar-hue="1"] {
+  --av-h: var(--avatar-1-h);
+}
+
+[data-avatar-hue="2"] {
+  --av-h: var(--avatar-2-h);
+}
+
+[data-avatar-hue="3"] {
+  --av-h: var(--avatar-3-h);
+}
+
+[data-avatar-hue="4"] {
+  --av-h: var(--avatar-4-h);
+}
+
+[data-avatar-hue="5"] {
+  --av-h: var(--avatar-5-h);
+}
+
+[data-avatar-hue="6"] {
+  --av-h: var(--avatar-6-h);
+}
+
+[data-avatar-hue="7"] {
+  --av-h: var(--avatar-7-h);
+}
+
+[data-avatar-hue="8"] {
+  --av-h: var(--avatar-8-h);
+}
+
+[data-avatar-hue] {
+  --avatar-bg: light-dark(
+    oklch(0.9 var(--avatar-c) var(--av-h)),
+    oklch(0.33 var(--avatar-c) var(--av-h))
+  );
+  --avatar-fg: light-dark(oklch(0.36 0.07 var(--av-h)), oklch(0.87 0.06 var(--av-h)));
+}

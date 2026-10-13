@@ -3,6 +3,9 @@
 **/*.rs.bk
 *.pdb
 
+# Local data (CAMPBOOKS_BLOBS__PATH in development)
+/.data/
+
 # Local configuration and secrets
 .env
 .env.*

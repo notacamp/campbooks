@@ -60,7 +60,11 @@ pub const SECURITY_SCHEME: &str = "bearer";
 
 /// Every module, in mount order.
 pub fn modules() -> Vec<Module> {
-    vec![campbooks_system::module(), campbooks_workspaces::module()]
+    vec![
+        campbooks_system::module(),
+        campbooks_workspaces::module(),
+        // `cargo xtask new-module` inserts above this line.
+    ]
 }
 
 /// `state` with the ports modules implement for the kernel registered: the
@@ -125,6 +129,7 @@ fn security_scheme() -> SecurityScheme {
         (name = "workspaces", description = "Workspaces, members and roles, invitations and the \
             security log. Workspace-owned resources live under `/api/v1/w/{workspace_id}/`; a \
             caller who is not a member (or a client token bound to another workspace) gets 404."),
+        // `cargo xtask new-module` inserts above this line.
     ),
 )]
 struct ApiDoc;

@@ -3,7 +3,8 @@
 //! The workspace disappears at once (soft delete) and `WorkspaceDeleting`
 //! tells every module to purge its data. Its own records are hard-deleted
 //! by the [`PurgeWorkspace`] job, scheduled in the same transaction for the
-//! end of the grace period.
+//! end of the grace period, which also purges its blobs from the kernel's
+//! blob store.
 
 use std::time::Duration;
 
@@ -118,8 +119,8 @@ pub async fn execute(state: &AppState, access: &Access) -> Result<WorkspaceDelet
 }
 
 /// Hard-delete a deleted workspace's records once its grace period is over:
-/// the workspace row, and with it (foreign keys cascade) its members,
-/// invitations and security events. Runs in the workspace, so row-level
+/// its blobs (`BlobStore::purge_workspace`), then the workspace row, and with
+/// it (foreign keys cascade) its members, invitations and security events. Runs in the workspace, so row-level
 /// security applies; a workspace that is gone already is a no-op.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PurgeWorkspace {
@@ -133,31 +134,42 @@ impl Job for PurgeWorkspace {
 
     async fn run(self, ctx: &mut JobContext) -> Result<(), JobError> {
         let id = self.workspace;
-        if ctx.workspace() != Some(id.to_string().as_str()) {
+        let workspace = id.to_string();
+        if ctx.workspace() != Some(workspace.as_str()) {
             return Err(JobError::fatal("purge enqueued outside its workspace"));
         }
-        let tx = ctx.tx().await?;
-        let Some(row) = sqlx::query!(
+        // Is it due? Read in a short transaction of its own (in the
+        // workspace, for row-level security), so the blob purge below runs
+        // outside the job's transaction.
+        let mut check = ctx.pool().begin_for(id).await?;
+        let row = sqlx::query!(
             r#"SELECT purge_after, (purge_after <= now()) AS "due"
                  FROM workspaces.workspaces WHERE id = $1"#,
             id as WorkspaceId,
         )
-        .fetch_optional(&mut **tx)
-        .await?
-        else {
-            return Ok(()); // purged already
-        };
-        match (row.purge_after, row.due) {
-            (Some(_), Some(true)) => {}
-            (Some(purge_after), _) => {
+        .fetch_optional(&mut *check)
+        .await?;
+        check.commit().await?;
+        match row.map(|row| (row.purge_after, row.due)) {
+            // Purged already, or not deleted (any more): nothing to do.
+            None | Some((None, _)) => return Ok(()),
+            Some((Some(_), Some(true))) => {}
+            Some((Some(purge_after), _)) => {
                 let wait = (purge_after - Utc::now())
                     .to_std()
                     .unwrap_or(Duration::from_mins(1));
                 return Err(JobError::retry_after("grace period not over", wait));
             }
-            // Not deleted (any more): nothing to purge.
-            (None, _) => return Ok(()),
         }
+        // The workspace's files first (idempotent: a failure retries the job).
+        let blobs = &ctx.state().blobs;
+        if blobs.backend().is_some() {
+            blobs
+                .purge_workspace(&workspace)
+                .await
+                .map_err(|e| JobError::retry(format!("purging the workspace's blobs: {e}")))?;
+        }
+        let tx = ctx.tx().await?;
         sqlx::query!(
             "DELETE FROM workspaces.workspaces WHERE id = $1",
             id as WorkspaceId
@@ -184,6 +196,12 @@ mod tests {
         let ws = kit.create_workspace(&ana, "Shop").await;
         let bea = kit.join(&ana, ws, "bea", "member").await;
         kit.invite(&ana, ws, "cid@example.com", "member").await;
+        kit.state
+            .blobs
+            .put(&ws.to_string(), b"a receipt".as_slice(), "text/plain")
+            .await
+            .unwrap();
+        assert_eq!(kit.blobs_of(ws).await, 1);
 
         let response = kit.delete(&ana, &format!("/api/v1/w/{ws}")).await;
         assert_eq!(response.status, StatusCode::ACCEPTED, "{:?}", response.json);
@@ -210,6 +228,7 @@ mod tests {
         let worker = Worker::new(kit.state.clone());
         worker.run_until_idle().await;
         assert_eq!(kit.rows_of(ws).await, (1, 2, 2));
+        assert_eq!(kit.blobs_of(ws).await, 1, "kept through the grace period");
         let delay = sqlx::query_scalar!(
             r#"SELECT (run_at - now() > interval '29 days') AS "later!"
                  FROM kernel.jobs WHERE kind = 'workspaces.purge_workspace' AND workspace_id = $1"#,
@@ -237,6 +256,7 @@ mod tests {
         let stats = worker.run_until_idle().await;
         assert_eq!(stats.succeeded, 1, "{stats:?}");
         assert_eq!(kit.rows_of(ws).await, (0, 0, 0));
+        assert_eq!(kit.blobs_of(ws).await, 0);
     }
 
     #[sqlx::test(migrations = "../../../migrations")]
