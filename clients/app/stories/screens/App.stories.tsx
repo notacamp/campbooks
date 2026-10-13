@@ -198,6 +198,33 @@ export const Members: Story = {
   },
 };
 
+/** Inviting someone shows the accept link once, to copy and send on. */
+export const InviteWithLink: Story = {
+  args: {
+    path: `/w/${DUARTE.id}/settings/members`,
+    api: {
+      ...signedIn([DUARTE]),
+      [`POST /bff/api/v1/w/${DUARTE.id}/invitations`]: (body) => ({
+        status: 201,
+        body: {
+          ...PENDING,
+          id: "new",
+          email: (body as { email: string }).email,
+          accept_url: "https://campbooks.example.com/invitations/accept?token=demo-not-real",
+        },
+      }),
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(await canvas.findByRole("textbox", { name: "Email" }), "bea@example.com");
+    await userEvent.click(canvas.getByRole("button", { name: "Invite" }));
+    await expect(
+      await canvas.findByRole("textbox", { name: "Invitation link for bea@example.com" }),
+    ).toBeVisible();
+  },
+};
+
 /** Members, as a member: read-only. */
 export const MembersReadOnly: Story = {
   args: {

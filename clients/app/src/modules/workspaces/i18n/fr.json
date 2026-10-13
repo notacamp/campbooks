@@ -10,7 +10,8 @@
   },
   "shortcuts": {
     "create": "Créer un espace de travail",
-    "invite": "Inviter quelqu’un"
+    "invite": "Inviter quelqu’un",
+    "copyLink": "Copier le lien d’invitation"
   },
   "create": {
     "step": "Étape {{step}} sur {{total}}",
@@ -94,7 +95,7 @@
   },
   "invite": {
     "title": "Inviter quelqu’un",
-    "lead": "Une invitation dure 7 jours. Campbooks n’envoie pas encore les invitations par e-mail : la personne qui gère ce Campbooks doit transmettre le lien.",
+    "lead": "Une invitation dure 7 jours et ne fonctionne que pour l’adresse que vous invitez.",
     "email": "E-mail",
     "placeholder": "nom@example.com",
     "role": "Rôle",
@@ -112,7 +113,13 @@
     "expired": "{{role}} · expirée le {{date}}",
     "resend": "Inviter à nouveau",
     "resendLabel": "Inviter {{email}} à nouveau",
-    "loadError": "Impossible de charger les invitations en attente."
+    "loadError": "Impossible de charger les invitations en attente.",
+    "passOn": "Campbooks n’envoie pas encore les invitations par e-mail. Copiez ce lien et envoyez-le vous-même.",
+    "linkLabel": "Lien d’invitation pour {{email}}",
+    "copy": "Copier le lien",
+    "copied": "Lien copié. Collez-le dans un message à {{email}}.",
+    "copyFailed": "Impossible de copier. Sélectionnez le lien et copiez-le.",
+    "onceOnly": "Ce lien n’est affiché que maintenant. Si vous le perdez, invitez à nouveau la personne pour en obtenir un nouveau."
   },
   "accept": {
     "joining": "Vous rejoignez l’espace de travail…",

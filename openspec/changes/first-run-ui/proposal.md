@@ -35,8 +35,9 @@ Tracking issue: https://github.com/notacamp/campbooks-cloud/issues/61.
   and the keyboard shortcuts that work today.
 - **Members and invitations (Settings → Members):** members with their
   roles; owners and admins change roles (with undo) and remove members
-  (confirmed inline), invite by email and see pending invitations. An
-  accept-invitation page (`/invitations/accept?token=…`) signs in first when
+  (confirmed inline), invite by email and see pending invitations. Nothing
+  emails invitations yet, so the inviter gets the accept link once, right
+  after inviting, with a Copy button. An accept-invitation page (`/invitations/accept?token=…`) signs in first when
   needed and then accepts.
 - Loading, empty and error states on every screen, shortcuts for the new
   actions in the registry (`workspaces.create`, `workspaces.invite_member`,
@@ -53,7 +54,7 @@ Tracking issue: https://github.com/notacamp/campbooks-cloud/issues/61.
 
 - `first-run-ui`: the web client's session handling, first-run workspace
   creation, workspace shell and switcher, empty Home, and members and
-  invitations screens.
+  invitations screens; the invitation link returned once to the inviter.
 
 ### Modified Capabilities
 
@@ -61,11 +62,13 @@ None.
 
 ## Impact
 
-- Modules: client only. `clients/app/src/modules/workspaces` is the client
+- Server: `workspaces.invite_member` answers with `accept_url` (the accept
+  link, built from the public URL), once; development servers stop logging
+  the link. No new endpoint or scope.
+- Modules: `clients/app/src/modules/workspaces` is the client
   half of `crates/modules/workspaces` (new); the app shell (`src/app`) owns
   the session gate, landing, workspace layout, account menu and Home. No
-  server change, no new endpoint, no cross-module dependency, no
-  `architecture.toml` entry.
+  cross-module dependency, no `architecture.toml` entry.
 - `lib/api` gains `signOut()`, a problem-code helper and a typed schema
   alias; `lib/ui` gains the components above.
 - No new dependencies.
@@ -75,6 +78,7 @@ None.
 - Workspace settings beyond members (rename, accent picker, delete, leave)
   and the security log.
 - Revoking an invitation (the API has no endpoint for it yet).
+- Emailing invitations (the `notifications` module).
 - Connecting mail (connectors, #36): the call to action is a placeholder.
 - Native (Tauri) sign-in: the native shell owns its session (ADR 0004); the
   session gate is a web concern and is skipped there.

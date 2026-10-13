@@ -10,7 +10,8 @@
   },
   "shortcuts": {
     "create": "Create a workspace",
-    "invite": "Invite someone"
+    "invite": "Invite someone",
+    "copyLink": "Copy the invitation link"
   },
   "create": {
     "step": "Step {{step}} of {{total}}",
@@ -94,7 +95,7 @@
   },
   "invite": {
     "title": "Invite someone",
-    "lead": "An invitation lasts 7 days. Campbooks doesn’t email invitations yet, so whoever runs this Campbooks needs to pass the link on.",
+    "lead": "An invitation lasts 7 days and works only for the address you invite.",
     "email": "Email",
     "placeholder": "name@example.com",
     "role": "Role",
@@ -112,7 +113,13 @@
     "expired": "{{role}} · expired {{date}}",
     "resend": "Invite again",
     "resendLabel": "Invite {{email}} again",
-    "loadError": "Couldn’t load the pending invitations."
+    "loadError": "Couldn’t load the pending invitations.",
+    "passOn": "Campbooks doesn’t email invitations yet. Copy this link and send it to them yourself.",
+    "linkLabel": "Invitation link for {{email}}",
+    "copy": "Copy link",
+    "copied": "Link copied. Paste it into a message to {{email}}.",
+    "copyFailed": "Couldn’t copy. Select the link and copy it.",
+    "onceOnly": "This link is shown only now. If you lose it, invite them again for a new one."
   },
   "accept": {
     "joining": "Joining the workspace…",

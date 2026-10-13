@@ -17,14 +17,16 @@ export interface ModuleRouteParents<TRoot extends AnyRoute, TWorkspace extends A
 export function buildModuleRoutes<TRoot extends AnyRoute, TWorkspace extends AnyRoute>(
   parents: ModuleRouteParents<TRoot, TWorkspace>,
 ) {
-  const workspaces = buildWorkspacesRoutes(parents);
+  const { root, workspace } = parents;
+  const workspaces = buildWorkspacesRoutes({ root, workspace });
   return {
-    root: [
-      ...buildSystemRoutes(parents.root),
-      ...workspaces.root,
+    // Pages outside any workspace: status, first run, invitation links.
+    root: [...buildSystemRoutes(root), ...workspaces.root],
+    // A domain module's pages live inside a workspace (`/w/$workspaceId/...`).
+    workspace: [
+      ...workspaces.workspace,
       // `cargo xtask new-module` inserts above this line.
     ],
-    workspace: [...workspaces.workspace],
   } as const;
 }
 

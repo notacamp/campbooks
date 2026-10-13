@@ -290,6 +290,7 @@ import { createRoute, type AnyRoute } from "@tanstack/react-router";
 
 import { DemoNotesHome } from "./components/DemoNotesHome/DemoNotesHome";
 
+/** The module's pages; in the app, `parent` is the workspace layout (`/w/$workspaceId`). */
 export function buildDemoNotesRoutes<TParent extends AnyRoute>(parent: TParent) {
   const home = createRoute({
     getParentRoute: () => parent,
@@ -340,16 +341,18 @@ describe("buildDemoNotesRoutes", () => {
 ==> clients/app/src/modules/demo-notes/components/DemoNotesHome/DemoNotesHome.tsx <==
 import { useTranslation } from "react-i18next";
 
+import { Heading, Text } from "~/lib/ui";
+
 /** Placeholder home page of the `demo_notes` module. */
 export function DemoNotesHome() {
   const { t } = useTranslation("demo-notes");
 
   return (
-    <section aria-labelledby="demo-notes-home-title" className="max-w-xl space-y-4">
-      <h1 id="demo-notes-home-title" className="text-2xl font-semibold">
+    <section aria-labelledby="demo-notes-home-title" className="flex max-w-measure flex-col gap-4 p-6">
+      <Heading level={1} size="page" id="demo-notes-home-title">
         {t("title")}
-      </h1>
-      <p className="text-muted">{t("summary")}</p>
+      </Heading>
+      <Text tone="secondary">{t("summary")}</Text>
     </section>
   );
 }

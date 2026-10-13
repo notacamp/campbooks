@@ -107,6 +107,24 @@ see the list without actions.
 - **WHEN** an admin chooses Remove on a member
 - **THEN** a confirmation appears in that row, and `workspaces.remove_member` is called only when it is confirmed
 
+### Requirement: Invitation link returned once
+`workspaces.invite_member` SHALL answer 201 with the invitation and
+`accept_url`, the link `<public URL>/invitations/accept?token=<token>`. The
+link SHALL appear in no other response, log line or event, and
+`workspaces.list_invitations` SHALL never include a token or link. Inviting
+the same address again SHALL return a new link and invalidate the previous
+one. The members page SHALL show the link right after inviting, with a Copy
+action that has a shortcut, and SHALL say that Campbooks does not email
+invitations yet.
+
+#### Scenario: Link returned once
+- **WHEN** an owner invites `bea@example.com`
+- **THEN** the response carries `accept_url` on the public URL, and listing invitations shows no link or token
+
+#### Scenario: Fresh link on re-invite
+- **WHEN** the owner invites `bea@example.com` again
+- **THEN** a different `accept_url` is returned, and only its token can be accepted
+
 ### Requirement: Accepting an invitation
 `/invitations/accept?token=…` SHALL, for a signed-in user, accept the
 invitation once and then offer to open the workspace. A signed-out user SHALL

@@ -10,7 +10,8 @@
   },
   "shortcuts": {
     "create": "Criar um espaço de trabalho",
-    "invite": "Convidar alguém"
+    "invite": "Convidar alguém",
+    "copyLink": "Copiar a ligação do convite"
   },
   "create": {
     "step": "Passo {{step}} de {{total}}",
@@ -94,7 +95,7 @@
   },
   "invite": {
     "title": "Convidar alguém",
-    "lead": "Um convite dura 7 dias. O Campbooks ainda não envia convites por email, por isso quem gere este Campbooks tem de fazer chegar a ligação.",
+    "lead": "Um convite dura 7 dias e só funciona para o endereço que convidar.",
     "email": "Email",
     "placeholder": "nome@example.com",
     "role": "Função",
@@ -112,7 +113,13 @@
     "expired": "{{role}} · expirou a {{date}}",
     "resend": "Convidar novamente",
     "resendLabel": "Convidar {{email}} novamente",
-    "loadError": "Não foi possível carregar os convites pendentes."
+    "loadError": "Não foi possível carregar os convites pendentes.",
+    "passOn": "O Campbooks ainda não envia convites por email. Copie esta ligação e envie-a a essa pessoa.",
+    "linkLabel": "Ligação do convite para {{email}}",
+    "copy": "Copiar ligação",
+    "copied": "Ligação copiada. Cole-a numa mensagem para {{email}}.",
+    "copyFailed": "Não foi possível copiar. Selecione a ligação e copie-a.",
+    "onceOnly": "Esta ligação só é mostrada agora. Se a perder, convide a pessoa novamente para obter uma nova."
   },
   "accept": {
     "joining": "A entrar no espaço de trabalho…",

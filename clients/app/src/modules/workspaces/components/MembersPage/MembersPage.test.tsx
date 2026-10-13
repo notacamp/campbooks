@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   ANA,
@@ -140,11 +140,20 @@ describe("MembersPage", () => {
           const { email } = body as { email: string };
           return email === "rui@example.com"
             ? problem(409, "already_a_member")
-            : { status: 201, body: { ...PENDING, id: "new", email, role: "admin" } };
+            : {
+                status: 201,
+                body: {
+                  ...PENDING,
+                  id: "new",
+                  email,
+                  role: "admin",
+                  accept_url: "https://campbooks.example.com/invitations/accept?token=demo",
+                },
+              };
         },
       }),
     );
-    renderWithProviders(<MembersPage workspace={DUARTE} />);
+    const { queryClient } = renderWithProviders(<MembersPage workspace={DUARTE} />);
     await rowOf("Ana Duarte");
 
     fireEvent.keyDown(document.body, { key: "i" });
@@ -169,11 +178,26 @@ describe("MembersPage", () => {
 
     expect(await screen.findByText("Invited bea@example.com as Admin.")).toBeVisible();
     expect(api.calls.at(-1)?.body).toEqual({ email: "bea@example.com", role: "admin" });
-    expect(
-      within(screen.getByRole("list", { name: "Pending invitations" })).getByText(
-        "bea@example.com",
-      ),
-    ).toBeVisible();
+    const pending = screen.getByRole("list", { name: "Pending invitations" });
+    expect(within(pending).getByText("bea@example.com")).toBeVisible();
+
+    // The link is shown once, to copy and send on (C copies it).
+    const link = screen.getByRole("textbox", { name: "Invitation link for bea@example.com" });
+    expect(link).toHaveValue("https://campbooks.example.com/invitations/accept?token=demo");
+    expect(screen.getByText(/doesn’t email invitations yet/u)).toBeVisible();
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    fireEvent.keyDown(document.body, { key: "c" });
+    expect(await screen.findByText(/Link copied/u)).toBeVisible();
+    expect(writeText).toHaveBeenCalledWith(
+      "https://campbooks.example.com/invitations/accept?token=demo",
+    );
+    // The cached invitation list never keeps the link.
+    const cached = queryClient
+      .getQueryCache()
+      .getAll()
+      .map((query) => JSON.stringify(query.state.data));
+    expect(cached.join("\n")).not.toContain("token=demo");
   });
 
   it("invites an expired invitation again", async () => {
@@ -181,7 +205,11 @@ describe("MembersPage", () => {
       routes({
         [`POST ${W}/invitations`]: {
           status: 201,
-          body: { ...EXPIRED, expires_at: PENDING.expires_at },
+          body: {
+            ...EXPIRED,
+            expires_at: PENDING.expires_at,
+            accept_url: "https://campbooks.example.com/invitations/accept?token=fresh",
+          },
         },
       }),
     );
@@ -189,9 +217,10 @@ describe("MembersPage", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Invite joao@example.com again" }));
 
-    await waitFor(() => {
-      expect(api.calls.at(-1)?.body).toEqual({ email: "joao@example.com", role: "admin" });
-    });
+    expect(
+      await screen.findByRole("textbox", { name: "Invitation link for joao@example.com" }),
+    ).toHaveValue("https://campbooks.example.com/invitations/accept?token=fresh");
+    expect(api.calls.at(-1)?.body).toEqual({ email: "joao@example.com", role: "admin" });
   });
 
   it("shows members read-only to a member", async () => {

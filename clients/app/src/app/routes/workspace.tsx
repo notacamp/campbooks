@@ -1,7 +1,10 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 
+import { createWebChangeSource, subscribeToChanges } from "~/lib/api";
+import { isTauri } from "~/lib/platform";
 import { useShortcut, useShortcuts } from "~/lib/shortcuts";
 import {
   Button,
@@ -37,6 +40,25 @@ function useInAppLink() {
       void navigate({ to: href });
     },
   });
+}
+
+/**
+ * Keeps the open workspace's cached queries fresh from its change feed (web
+ * only for now: the native source is not built yet, and there is nothing to
+ * follow where `EventSource` is missing).
+ */
+function useWorkspaceChanges(workspaceId: string) {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    if (isTauri() || typeof EventSource === "undefined") {
+      return;
+    }
+    return subscribeToChanges({
+      queryClient,
+      workspace: workspaceId,
+      source: createWebChangeSource(),
+    });
+  }, [queryClient, workspaceId]);
 }
 
 /**
@@ -95,6 +117,7 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const theme = useTheme();
   const link = useInAppLink();
   const [switching, setSwitching] = useState(false);
+  useWorkspaceChanges(workspace.id);
 
   // The server's accent is the source of truth; the device remembers it so
   // the next load paints it before any code runs.

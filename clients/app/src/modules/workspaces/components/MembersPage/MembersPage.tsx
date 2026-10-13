@@ -7,6 +7,7 @@ import {
   Avatar,
   Banner,
   Button,
+  CopyField,
   EmptyState,
   Heading,
   InlineConfirm,
@@ -29,6 +30,7 @@ import {
   useInviteMember,
   useMembers,
   useRemoveMember,
+  type CreatedInvitation,
   type Invitation,
   type Member,
   type Role,
@@ -281,12 +283,12 @@ function InviteForm({
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"member" | "admin">("member");
   const [error, setError] = useState<string | undefined>();
-  const [sent, setSent] = useState<string | undefined>();
+  const [issued, setIssued] = useState<CreatedInvitation | undefined>();
   const titleId = useId();
 
   const submit = () => {
     const address = email.trim();
-    setSent(undefined);
+    setIssued(undefined);
     if (!looksLikeEmail(address)) {
       setError(t("invite.errors.email"));
       emailField.current?.focus();
@@ -296,9 +298,9 @@ function InviteForm({
     invite.mutate(
       { email: address, role },
       {
-        onSuccess: (invitation) => {
+        onSuccess: (created) => {
           setEmail("");
-          setSent(t("invite.sent", { email: invitation.email, role: roleLabel(invitation.role) }));
+          setIssued(created);
         },
         onError: (failure) => {
           setError(
@@ -360,7 +362,18 @@ function InviteForm({
           </Button>
         </div>
       </form>
-      {sent === undefined ? null : <Banner icon="check" role="status" title={sent} />}
+      {issued === undefined ? null : (
+        <>
+          <Banner
+            icon="check"
+            role="status"
+            title={t("invite.sent", { email: issued.email, role: roleLabel(issued.role) })}
+          >
+            {t("invite.passOn")}
+          </Banner>
+          <InvitationLink invitation={issued} />
+        </>
+      )}
     </section>
   );
 }
@@ -442,6 +455,27 @@ function InvitationRow({
       {invite.isError ? (
         <Banner tone="danger" role="alert" title={t("invite.errors.generic")} />
       ) : null}
+      {invite.data === undefined ? null : <InvitationLink invitation={invite.data} />}
     </ListRow>
+  );
+}
+
+/** The accept link of a new invitation, shown once, to copy and send on. */
+function InvitationLink({ invitation }: { invitation: CreatedInvitation }) {
+  const { t } = useTranslation("workspaces");
+  return (
+    <div className="flex flex-col gap-1">
+      <CopyField
+        label={t("invite.linkLabel", { email: invitation.email })}
+        value={invitation.accept_url}
+        copyLabel={t("invite.copy")}
+        copiedLabel={t("invite.copied", { email: invitation.email })}
+        failedLabel={t("invite.copyFailed")}
+        shortcut="invitation.copy_link"
+      />
+      <Text tone="tertiary" size="xs">
+        {t("invite.onceOnly")}
+      </Text>
+    </div>
   );
 }

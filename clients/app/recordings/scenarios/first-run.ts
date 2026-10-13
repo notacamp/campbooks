@@ -132,7 +132,12 @@ function fakeBff() {
             expires_at: "2026-10-20T09:00:00Z",
           };
           state.invitations.set(id, [invitation, ...invitations]);
-          return json(route, invitation, 201);
+          // The accept link comes back once, to the inviter (demo token).
+          return json(
+            route,
+            { ...invitation, accept_url: `${url.origin}/invitations/accept?token=demo-not-real` },
+            201,
+          );
         }
       }
       return json(route, { status: 404, code: "not_found", title: "Not found" }, 404);
@@ -146,6 +151,7 @@ const click = async (page: Page, name: string | RegExp) => {
 
 export default async function firstRun({ page }: ScenarioContext): Promise<void> {
   const bff = fakeBff();
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.route("**/bff/**", (route) => bff.handle(route));
   // Each viewport records in a fresh browser context: a clean device.
 
@@ -182,6 +188,10 @@ export default async function firstRun({ page }: ScenarioContext): Promise<void>
   await click(page, /^Invite$/u);
   await page.getByText("Invited sofia@example.com as Admin.").waitFor();
   await pause(1500);
+  // Nothing emails invitations yet: copy the link (C) to send it on.
+  await page.keyboard.press("c");
+  await page.getByText(/Link copied/u).waitFor();
+  await pause(1800);
 
   // Later: two people have joined. Change a role (with Undo), confirm a removal inline.
   const workspaceId = bff.state.workspaces[0]?.id ?? "";

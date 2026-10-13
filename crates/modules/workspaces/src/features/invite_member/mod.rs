@@ -1,15 +1,15 @@
 //! `POST /api/v1/w/{workspace_id}/invitations` — invite someone by email.
 //! Owners and admins; as `admin` or `member`.
 //!
-//! The response never carries the token. It will be emailed by the
-//! `notifications` module; until then, a server running with
-//! `CAMPBOOKS_ENV=development` logs the accept link, and no other server
-//! ever does.
+//! Nothing emails invitations yet (the `notifications` module will), so the
+//! inviter gets the accept link once, in this response, to pass on. The link
+//! carries the token: it is never stored in clear, logged, published in an
+//! event or returned by any other endpoint. Inviting the same address again
+//! replaces the invitation and returns a fresh link.
 
 use axum::{Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result, Risk,
-    config::Environment,
     db::BeginFor as _,
     extract,
     tenancy::{Access, Role, UserId, Workspace, WorkspaceId},
@@ -53,9 +53,29 @@ fn member() -> Role {
 pub struct Issued {
     /// The invitation.
     pub invitation: InvitationView,
-    /// The token to send to the invitee. Never returned by the API or logged
-    /// outside development.
+    /// The token to send to the invitee. Returned to the inviter once, inside
+    /// the accept link; never logged.
     pub token: String,
+}
+
+/// A new invitation, as the inviter sees it once: with the link to pass on.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct CreatedInvitation {
+    /// The invitation.
+    #[serde(flatten)]
+    pub invitation: InvitationView,
+    /// The link that accepts it (it carries the token). Returned only here,
+    /// once: no other endpoint, log or event ever shows it.
+    #[schema(example = "https://campbooks.example.com/invitations/accept?token=…")]
+    pub accept_url: String,
+}
+
+/// The accept link for `token` on this instance's public origin.
+fn accept_url(public_url: &str, token: &str) -> String {
+    format!(
+        "{}/invitations/accept?token={token}",
+        public_url.trim_end_matches('/')
+    )
 }
 
 /// Invite someone.
@@ -70,8 +90,9 @@ pub struct Issued {
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     request_body = InviteMember,
     responses(
-        (status = CREATED, description = "Invited. A previous pending invitation to the same \
-            address is replaced.", body = InvitationView),
+        (status = CREATED, description = "Invited, with the accept link to pass on (shown only \
+            in this response). A previous pending invitation to the same address is replaced.",
+            body = CreatedInvitation),
         (status = BAD_REQUEST, description = "Invalid email, role or body.", body = Problem,
             content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
@@ -88,20 +109,16 @@ pub async fn handler(
     State(state): State<AppState>,
     workspace: Workspace<WorkspacesAdmin>,
     extract::Json(input): extract::Json<InviteMember>,
-) -> Result<(StatusCode, Json<InvitationView>)> {
+) -> Result<(StatusCode, Json<CreatedInvitation>)> {
     let issued = execute(&state, &workspace.access, input).await?;
-    if state.config.env == Environment::Development {
-        // Development only: nothing emails invitations yet.
-        tracing::info!(
-            link = %format!(
-                "{}/invitations/accept?token={}",
-                state.config.public_url.trim_end_matches('/'),
-                issued.token
-            ),
-            "invitation link (development only)"
-        );
-    }
-    Ok((StatusCode::CREATED, Json(issued.invitation)))
+    let accept_url = accept_url(&state.config.public_url, &issued.token);
+    Ok((
+        StatusCode::CREATED,
+        Json(CreatedInvitation {
+            invitation: issued.invitation,
+            accept_url,
+        }),
+    ))
 }
 
 /// Invite `input.email` to the workspace of `access`.
@@ -184,7 +201,70 @@ mod tests {
     use crate::testkit::Kit;
 
     #[sqlx::test(migrations = "../../../migrations")]
-    async fn invites_without_returning_the_token(db: PgPool) {
+    async fn returns_the_accept_link_once_and_never_lists_it(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let ana = kit.user("ana");
+        let ws = kit.create_workspace(&ana, "Shop").await;
+        let uri = format!("/api/v1/w/{ws}/invitations");
+        let created = kit
+            .post(
+                &ana,
+                &uri,
+                serde_json::json!({ "email": "bea@example.com" }),
+            )
+            .await;
+        assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
+        let link = created.json["accept_url"].as_str().unwrap().to_owned();
+        let token = link
+            .strip_prefix(&format!(
+                "{}/invitations/accept?token=",
+                kit.state.config.public_url.trim_end_matches('/')
+            ))
+            .expect("a link on the public origin")
+            .to_owned();
+        assert!(token.len() >= 32, "{token}");
+
+        // Listing invitations never shows the link or the token.
+        let list = kit.get(&ana, &uri).await;
+        let listed = list.json.to_string();
+        assert!(!listed.contains(&token), "{listed}");
+        assert!(
+            !listed.contains("accept_url") && !listed.contains("token"),
+            "{listed}"
+        );
+
+        // Inviting again returns a fresh link; only the new one works.
+        let again = kit
+            .post(
+                &ana,
+                &uri,
+                serde_json::json!({ "email": "bea@example.com" }),
+            )
+            .await;
+        let fresh = again.json["accept_url"].as_str().unwrap().to_owned();
+        assert_ne!(fresh, link);
+        let bea = kit.user("bea");
+        let stale = kit
+            .post(
+                &bea,
+                "/api/v1/workspaces/invitations/accept",
+                serde_json::json!({ "token": token }),
+            )
+            .await;
+        assert_eq!(stale.status, StatusCode::NOT_FOUND);
+        let fresh_token = fresh.rsplit_once("token=").unwrap().1;
+        let accepted = kit
+            .post(
+                &bea,
+                "/api/v1/workspaces/invitations/accept",
+                serde_json::json!({ "token": fresh_token }),
+            )
+            .await;
+        assert_eq!(accepted.status, StatusCode::OK, "{:?}", accepted.json);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn invites_without_exposing_the_token_outside_the_link(db: PgPool) {
         let kit = Kit::new(db).await;
         let ana = kit.user("ana");
         let ws = kit.create_workspace(&ana, "Shop").await;
@@ -200,6 +280,7 @@ mod tests {
         assert_eq!(response.json["role"], "member");
         let fields: Vec<_> = response.json.as_object().unwrap().keys().cloned().collect();
         assert!(!fields.iter().any(|f| f.contains("token")), "{fields:?}");
+        assert!(response.json["accept_url"].is_string());
         assert_eq!(
             kit.security_kinds(&ws.to_string()).await.last().unwrap(),
             "invitation_created"

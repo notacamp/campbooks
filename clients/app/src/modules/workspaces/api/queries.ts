@@ -1,17 +1,22 @@
 import { queryOptions, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api, unwrap, unwrapEmpty, type Schema } from "~/lib/api";
+import { api, operationKey, unwrap, unwrapEmpty, type Schema } from "~/lib/api";
 
 export type Workspace = Schema<"WorkspaceView">;
 export type Member = Schema<"MemberView">;
 export type Invitation = Schema<"InvitationView">;
 export type Role = Schema<"Role">;
 export type Kind = Schema<"Kind">;
+/** A new invitation with its accept link, which the API returns only once. */
+export type CreatedInvitation = Schema<"CreatedInvitation">;
 
+// Keyed by operationId (`operationKey`), so the change feed invalidates them.
 const keys = {
-  list: ["workspaces", "list"] as const,
-  members: (workspaceId: string) => ["workspaces", workspaceId, "members"] as const,
-  invitations: (workspaceId: string) => ["workspaces", workspaceId, "invitations"] as const,
+  list: operationKey("workspaces.list"),
+  members: (workspaceId: string) =>
+    operationKey("workspaces.list_members", { workspace_id: workspaceId }),
+  invitations: (workspaceId: string) =>
+    operationKey("workspaces.list_invitations", { workspace_id: workspaceId }),
 };
 
 const path = (workspaceId: string) => ({ path: { workspace_id: workspaceId } });
@@ -108,15 +113,26 @@ export function useRemoveMember(workspaceId: string) {
   });
 }
 
-/** `workspaces.invite_member`. A new invitation to the same address replaces the old one. */
+/** The invitation as the list shows it: the accept link stays out of the cache. */
+function withoutLink(created: CreatedInvitation): Invitation {
+  const { id, email, role, invited_by, created_at, expires_at } = created;
+  return { id, email, role, invited_by, created_at, expires_at };
+}
+
+/**
+ * `workspaces.invite_member`. A new invitation to the same address replaces
+ * the old one. The result carries the accept link, shown once to the
+ * inviter; the cached list keeps the invitation without it.
+ */
 export function useInviteMember(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (body: Schema<"InviteMember">) =>
+    mutationFn: async (body: Schema<"InviteMember">): Promise<CreatedInvitation> =>
       unwrap(
         await api.POST("/api/v1/w/{workspace_id}/invitations", { params: path(workspaceId), body }),
       ),
-    onSuccess: (invitation) => {
+    onSuccess: (created) => {
+      const invitation = withoutLink(created);
       queryClient.setQueryData<Invitation[]>(keys.invitations(workspaceId), (invitations) => [
         invitation,
         ...(invitations ?? []).filter((current) => current.email !== invitation.email),

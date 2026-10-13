@@ -2,7 +2,8 @@ import type { ShortcutDefinition } from "~/lib/shortcuts";
 
 /**
  * Shortcuts for `workspaces` operations, keyed by their OpenAPI operationId
- * (ADR 0013). The module manifest hands them to the app's registry.
+ * (ADR 0013), plus the client-only commands of its screens (ids outside the
+ * module namespace). The module manifest hands them to the app's registry.
  */
 export const WORKSPACES_SHORTCUTS = [
   {
@@ -18,5 +19,12 @@ export const WORKSPACES_SHORTCUTS = [
     scope: "list",
     group: "general",
     label: "workspaces:shortcuts.invite",
+  },
+  {
+    id: "invitation.copy_link",
+    keys: "c",
+    scope: "item",
+    group: "item",
+    label: "workspaces:shortcuts.copyLink",
   },
 ] as const satisfies readonly ShortcutDefinition[];

@@ -10,7 +10,8 @@
   },
   "shortcuts": {
     "create": "Crear un espacio de trabajo",
-    "invite": "Invitar a alguien"
+    "invite": "Invitar a alguien",
+    "copyLink": "Copiar el enlace de la invitación"
   },
   "create": {
     "step": "Paso {{step}} de {{total}}",
@@ -94,7 +95,7 @@
   },
   "invite": {
     "title": "Invitar a alguien",
-    "lead": "Una invitación dura 7 días. Campbooks aún no envía invitaciones por correo, así que quien gestiona este Campbooks tiene que hacer llegar el enlace.",
+    "lead": "Una invitación dura 7 días y solo funciona para la dirección a la que invitas.",
     "email": "Correo electrónico",
     "placeholder": "nombre@example.com",
     "role": "Rol",
@@ -112,7 +113,13 @@
     "expired": "{{role}} · caducó el {{date}}",
     "resend": "Invitar de nuevo",
     "resendLabel": "Invitar de nuevo a {{email}}",
-    "loadError": "No se han podido cargar las invitaciones pendientes."
+    "loadError": "No se han podido cargar las invitaciones pendientes.",
+    "passOn": "Campbooks aún no envía invitaciones por correo. Copia este enlace y envíaselo tú.",
+    "linkLabel": "Enlace de invitación para {{email}}",
+    "copy": "Copiar enlace",
+    "copied": "Enlace copiado. Pégalo en un mensaje para {{email}}.",
+    "copyFailed": "No se ha podido copiar. Selecciona el enlace y cópialo.",
+    "onceOnly": "Este enlace solo se muestra ahora. Si lo pierdes, vuelve a invitar a esa persona para obtener uno nuevo."
   },
   "accept": {
     "joining": "Entrando en el espacio de trabajo…",

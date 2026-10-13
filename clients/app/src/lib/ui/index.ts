@@ -52,6 +52,7 @@ export {
   type CommandMenuProps,
 } from "./components/CommandMenu/CommandMenu";
 export { Composer, type ComposerProps } from "./components/Composer/Composer";
+export { CopyField, type CopyFieldProps } from "./components/CopyField/CopyField";
 export {
   ConversationRow,
   type ConversationRowProps,

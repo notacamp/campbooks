@@ -107,6 +107,26 @@ or remove an owner, and the API's `last_owner` refusal is explained in the
 row. Who "you" are in the list is matched by email, the only identifier the
 session and the member list share.
 
+### Handing on the invitation link
+
+Nothing emails invitations yet, and a development-only log line left every
+other instance with no way to deliver one. `workspaces.invite_member` now
+answers with `accept_url`, the accept link built from the instance's public
+URL (`CAMPBOOKS_PUBLIC_URL`), in that one response only: the token is still
+stored only as a hash, never listed (`list_invitations` returns no link or
+token), never logged (the development log line is gone) and never in an
+event. Inviting the same address again replaces the invitation and returns
+a fresh link. The members page shows the link right after inviting (and
+after "Invite again") with a Copy button (C) and says plainly that
+Campbooks does not email invitations yet; the cached invitation list keeps
+the invitation without the link.
+
+Alternatives considered: *keep logging the link* (works only for whoever
+can read server logs, and puts a credential in logs); *an endpoint that
+reveals a pending invitation's link again* (needs the token stored
+recoverably, a weaker secret store than a hash). Returning it once, like an
+API key, is the smallest honest step until notifications send the email.
+
 ### Accepting an invitation
 
 `/invitations/accept?token=…` sits behind the session gate like every route,
@@ -170,8 +190,10 @@ Alternatives considered:
   first workspace.
 - No revoke for invitations yet; expired invitations stay listed until the
   API offers one.
+- A lost link cannot be shown again; inviting again issues a new one (and
+  invalidates the old).
 
 ## Migration Plan
 
-Client only; nothing to migrate. The system status page moves from `/` to
+No data to migrate. API clients see one new response field. The system status page moves from `/` to
 `/system`.

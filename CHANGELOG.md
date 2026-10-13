@@ -23,9 +23,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   built yet.
 - Settings → Members: owners and admins change roles (with Undo), remove
   members after confirming in place, invite people by email and see pending
-  invitations. Invitation links open a page that signs you in if needed and
-  joins the workspace. Campbooks does not email invitations yet: whoever runs
-  the instance passes the link on.
+  invitations. Campbooks does not email invitations yet, so right after
+  inviting you get the invitation link once, with a Copy button (C), to send
+  it on yourself; inviting again gives a fresh link. The link opens a page
+  that signs you in if needed and joins the workspace.
 - Live updates: the app learns what changed in a workspace (renamed, a
   member joined, left or changed role) as it happens and refreshes only what
   it shows, catching up after a lost connection or a sleeping laptop. API
@@ -235,6 +236,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   ever recorded; a test enforces it. See `deploy/README.md` → Monitoring.
 
 ### Changed
+- **API clients:** `POST /api/v1/w/{workspace_id}/invitations` now answers
+  with `accept_url`, the invitation's accept link, built from
+  `CAMPBOOKS_PUBLIC_URL`. It is returned only in that response (never listed,
+  logged or sent in an event); inviting the same address again returns a
+  fresh link. Development servers no longer log invitation links.
 - **API clients:** every problem+json error now carries a stable `code`
   (`not_found`, `invalid_token`, `last_owner`, …); `detail` is now a
   sentence in the caller's language instead of that code. Match on `code`.

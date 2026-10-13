@@ -123,12 +123,12 @@ published and a `member_left` or `member_removed` security event recorded.
 
 ### Requirement: Invitations
 Owners and admins SHALL be able to invite an email address as `admin` or
-`member`. The API SHALL never return the invitation token; Campbooks SHALL
-store only a hash of it. An invitation SHALL expire after 7 days and SHALL
-be usable once. Accepting SHALL require a user token whose email is
-verified and equal, ignoring case, to the invited address. When the server
-runs with `CAMPBOOKS_ENV=development` it SHALL log the accept link; in any
-other environment it SHALL NOT.
+`member`. The API SHALL return the invitation's accept link (which carries
+its token) only once, in the response that creates the invitation, and SHALL
+never list, log or publish it in an event; Campbooks SHALL store only a hash
+of the token. An invitation SHALL expire after 7 days and SHALL be usable
+once. Accepting SHALL require a user token whose email is verified and
+equal, ignoring case, to the invited address.
 
 #### Scenario: Accept
 - **WHEN** the invited user, with a verified matching email, accepts with the token

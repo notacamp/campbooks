@@ -2,6 +2,7 @@ import { createRoute, type AnyRoute } from "@tanstack/react-router";
 
 import { {{pascal}}Home } from "./components/{{pascal}}Home/{{pascal}}Home";
 
+/** The module's pages; in the app, `parent` is the workspace layout (`/w/$workspaceId`). */
 export function build{{pascal}}Routes<TParent extends AnyRoute>(parent: TParent) {
   const home = createRoute({
     getParentRoute: () => parent,
