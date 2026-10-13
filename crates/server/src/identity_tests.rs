@@ -55,6 +55,30 @@ impl GrantIntake for Intake {
     }
 }
 
+/// Every log line written while a test runs (all levels).
+#[derive(Clone, Default)]
+struct Logs(Arc<Mutex<Vec<u8>>>);
+
+impl std::io::Write for Logs {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl Logs {
+    fn text(&self) -> String {
+        String::from_utf8_lossy(&self.0.lock().unwrap_or_else(PoisonError::into_inner)).into_owned()
+    }
+}
+
 struct Browser {
     app: Router,
     cookies: BTreeMap<String, String>,
@@ -134,6 +158,14 @@ impl Browser {
 async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_workspace(
     db: PgPool,
 ) {
+    let logs = Logs::default();
+    let writer = logs.clone();
+    let _logging = tracing::subscriber::set_default(
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::TRACE)
+            .with_writer(move || writer.clone())
+            .finish(),
+    );
     let google = TestIdp::start().await;
     let config = testing::config("postgres://test@localhost/test");
     assert!(config.auth.issuer.is_none(), "no other identity provider");
@@ -257,4 +289,17 @@ async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_w
     }
     let again = browser.get(&to_issuer.location()).await;
     assert!(again.location().starts_with("/sign-in?request="));
+
+    // Nothing secret or personal reached a log line: no code, cookie,
+    // token or address.
+    let text = logs.text();
+    assert!(!text.is_empty(), "the flow logged something");
+    let google_code = callback.split("code=").nth(1).unwrap().split('&').next().unwrap();
+    let our_code = to_bff.split("code=").nth(1).unwrap().split('&').next().unwrap();
+    for secret in [google_code, our_code, "test-user@example.com", FAKE_GOOGLE_SECRET] {
+        assert!(!text.contains(secret), "a log line holds a secret or an address");
+    }
+    for cookie in browser.cookies.values() {
+        assert!(!text.contains(cookie.as_str()), "a log line holds a cookie");
+    }
 }
