@@ -4,9 +4,12 @@
 
 ADR 0014 records the decision. This document is the how: who owns what, the
 data, the flows, the alternatives behind each choice, the security posture,
-the migration away from Rauthy, and the order of the pull requests.
+the migration away from Rauthy, and the order of the pull requests. It
+records every decision of ADR 0014, because they were taken together; this
+change builds **slice S1a** (see "This change: slice S1a" below), and each
+later slice writes and archives its own change for its part.
 
-What exists today on `next`:
+What existed on `next` before this change:
 
 - **`kernel::auth`** validates JWT access tokens: an EdDSA/RS256 allowlist,
   issuer, audience and expiry, with keys from a lazily fetched, single-flight,
@@ -19,7 +22,7 @@ What exists today on `next`:
 - **`workspaces`** keys `users` by `idp_subject`. It applies the signup
   policy when a workspace is created, and requires a verified email matching
   the invitation to accept one.
-- **`connectors`** (#450, not merged) has its own Google consent flow
+- **`connectors`** (#450) has its own Google consent flow
   (`start_connection`/`complete_connection`). That flow funnels into one
   seam, `domain::grants::create_or_refresh_connection(ProviderGrant)`, which
   is unique per (workspace, provider, account_subject) and refuses an account
@@ -58,6 +61,37 @@ deltas:
    accepted until Google's verification (campbooks-cloud#53) passes. There
    is no fallback switch to a second consent.
 
+## This change: slice S1a
+
+Built here: the issuer (keys, discovery, authorize, token, revoke,
+end_session), the first-party clients, Google sign-in with the new-account
+step, held mailbox grants and their hand-off through `GrantIntake`, and the
+BFF signing in against the in-process issuer. Rauthy keeps serving installs
+whose `CAMPBOOKS_AUTH__ISSUER` names it; the issuer runs only when that
+setting is unset (or names this instance) and the secret key is set.
+
+Decided while building it, against the first draft below:
+
+- **First-party clients are defined in code**, not stored: their redirect
+  URIs follow `CAMPBOOKS_PUBLIC_URL` and the web client's secret is derived
+  from the instance secret (`kernel::crypto::derive_secret`), which the BFF
+  derives too. There is no `clients` table until workspace clients (S4).
+- **Keys are scheduled on demand, not by a job.** The issuer checks the
+  schedule (under an advisory lock) whenever it signs or publishes and its
+  view is a minute old. An idle instance issues no tokens and needs no
+  rotation.
+- **Held grants and pending sign-ups are deleted, not revoked at Google,**
+  when they expire: Google revokes every token of an account's grant to the
+  same app at once, which would cut a mailbox connected through that app.
+  Their sealed tokens are destroyed.
+- **The BFF reaches the issuer through its router** (an in-process transport
+  in the BFF's OIDC client), not over the network. The protocol is the same.
+- **Access-token revocation is not tracked**: they live ten minutes;
+  `/oauth2/revoke` revokes refresh tokens.
+- **Rate limits are deferred** to a follow-up before #57: behind a reverse
+  proxy they need a trusted-proxy setting to tell clients apart, or they
+  would throttle everyone at once.
+
 ## Data ownership
 
 Schema **`identity`**, owned by the new module and migrated by
@@ -65,7 +99,12 @@ Schema **`identity`**, owned by the new module and migrated by
 authorization server's state belong to people and clients, not to a
 workspace, so those tables carry **no** row-level security. Like
 `workspaces.users` and `bff.sessions`, only `identity` reads them. The one
-workspace-owned table, `clients`, is under forced RLS (below).
+workspace-owned table, `clients` (slice S4), will be under forced RLS
+(below). The block below is the full model across slices; slice S1a creates
+`accounts`, `provider_identities`, `sessions`, `authorize_requests`,
+`upstream_flows`, `pending_sign_ups` (a provider identity waiting for the
+person to confirm a new account), `held_grants`, `refresh_families`,
+`refresh_tokens`, `authorization_codes`, `signing_keys` and `audit_events`.
 
 ```text
 accounts            id uuid (v7) = token `sub` · display_name · primary_email ·
@@ -131,20 +170,21 @@ audit_events        id · account_id? · client_id? · workspace_id? · kind · 
   account id. The `email` and `email_verified` claims come from the account's
   primary email.
 - **Pruning.** `identity.prune` (schedule, every 15 min) deletes expired
-  flows, requests, challenges, codes, ended sessions, refresh families past
-  their lifetime, and keys past `delete_after`. `identity.expire_held_grants`
-  revokes and deletes held grants past `expires_at`.
+  flows, requests, pending sign-ups, held grants, codes, ended sessions and
+  refresh families a day past their end. Keys past `delete_after` are
+  deleted by the key schedule itself.
 
 ## Events
 
 Published (instance-scoped, `WORKSPACE_SCOPED = false`, except where a
-workspace is named), each declared with `Background::publishes`:
+workspace is named), each declared with `Background::publishes`. Slice S1a
+publishes the first three; the rest arrive with their slices:
 
 - `identity.account_created`
-- `identity.way_in_added` (provider or passkey)
-- `identity.way_in_removed`
 - `identity.signed_in`
 - `identity.refresh_reuse_detected`
+- `identity.way_in_added` (provider or passkey)
+- `identity.way_in_removed`
 - `identity.client_registered` (workspace)
 - `identity.client_removed` (workspace)
 - `identity.consent_granted` (workspace)
@@ -153,9 +193,11 @@ workspace is named), each declared with `Background::publishes`:
 Payloads hold ids, the provider name and the method, never addresses or
 tokens.
 
-Consumed: `workspaces.member_left` and `workspaces.workspace_deleting`, so
-that consents and workspace-bound refresh families for that member or
-workspace are revoked, and the workspace's clients are removed.
+Consumed (from slice S4, when consents and workspace clients exist):
+`workspaces.member_left` and `workspaces.workspace_deleting`, so that
+consents and workspace-bound refresh families for that member or workspace
+are revoked, and the workspace's clients are removed. Slice S1a consumes
+nothing.
 
 ## Endpoints and scopes
 
@@ -214,10 +256,10 @@ API operations (resource server, `/api/v1/…`), new scopes in
    - **Known `(provider, issuer, sub)`:** the issuer session starts for that
      account. If Google returned a refresh token (a fresh consent), it is
      **not** used for existing connections: a sign-in never changes a
-     workspace's mailbox behind the member's back. It is revoked unless the
-     account has a held grant to replace.
+     workspace's mailbox behind the member's back. It is dropped, not
+     stored (and not revoked: that would also cut the mailbox connection).
    - **Unknown:** nothing is created yet. The flow becomes a
-     `pending_account` (sealed tokens included) and the browser goes to
+     pending sign-up (sealed tokens included) and the browser goes to
      `/sign-in/new?request=<id>`: "No Campbooks account uses
      ana@example.com yet. Create one, or go back and sign in another way to
      add it later." The page never says whether any other account has that
@@ -543,17 +585,19 @@ Alternatives for linking:
     signatures and no gain over EdDSA for our verifier).
 - **Lifecycle.** States are `published` → `active` → `retiring` →
   `deleted`.
-  - `identity.rotate_signing_keys` runs hourly and is idempotent under a
-    row lock. It keeps exactly one active key, creates the next one 7 days
-    before rotation (longer than the verifier's 24 h maximum JWKS cache), and
-    activates it at 30 days.
+  - The schedule is kept on demand: whenever the issuer signs or publishes
+    and its view is a minute old, it checks under an advisory lock. It keeps
+    exactly one active key, creates the next one 7 days before rotation
+    (longer than the verifier's 24 h maximum JWKS cache), and activates it
+    at 30 days. (The first draft had an hourly job; on demand needs no
+    worker and does nothing for an idle instance.)
   - It keeps a retired key in the JWKS for 2 days (longer than any access or
     ID token, which live 10 minutes).
   - At first start, if no active key exists, one is created inside a
     transaction under an advisory lock, so many processes starting at once
     make one key.
-- **Storage.** The private key (PKCS#8) is sealed with
-  `Cipher(purpose = "identity.signing-key")`. Self-hosters already have
+- **Storage.** The private key (PKCS#8) is sealed with the module's
+  `Cipher` (purpose `campbooks identity sealing v1`), bound to its `kid`. Self-hosters already have
   `CAMPBOOKS_SECRET_KEY` (generated by `server-init`, ADR 0006), so there
   is nothing new to set.
   - Rotating `CAMPBOOKS_SECRET_KEY` makes the sealed keys unreadable. The
@@ -579,7 +623,8 @@ Alternatives for linking:
     `identity.adopt_held_grant` after `workspaces.create`. If that call
     fails or the person joins a workspace by invitation instead, Home offers
     "Connect ana@example.com" with one click and no second consent.
-  - 7-day expiry with revocation at the provider.
+  - 7-day expiry; an expired grant is deleted (not revoked at Google, which
+    would also cut a mailbox connected through the same app).
   - Nobody's personal mailbox lands in a team workspace they were invited
     to without their say.
 - **B. Automatic adoption on `workspaces.workspace_created`.** No extra
@@ -673,7 +718,8 @@ redirect into these SPA routes. Every response carries
   - `return_to` must be a same-origin path (the BFF's validator).
   - Zoho's `accounts-server` comes from the allowlist.
   - The Client ID Metadata Document fetch is SSRF-guarded.
-- **Rate limits** are Postgres-backed so every `api` process shares them,
+- **Rate limits** (a follow-up before #57; see "This change") are
+  Postgres-backed so every `api` process shares them,
   keyed by a keyed hash of the IP (from `CAMPBOOKS_TRUSTED_PROXIES`) and,
   where known, by the account. They cover `/auth/start`, the callbacks,
   passkey verification, `/oauth2/token` (and per client),

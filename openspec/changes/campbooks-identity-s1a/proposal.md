@@ -2,123 +2,86 @@
 
 ## Why
 
-The owner's requirements for sign-in (campbooks-cloud#75):
+The owner decided that Campbooks owns identity end to end and that Rauthy
+goes (ADR 0014, campbooks-cloud#75):
 
-- The Google, Microsoft or Zoho account you first sign in with **is also
-  your first mailbox**, granted in one consent.
-- **Every mailbox you own is a way in** to the same account,
-  interchangeably. Connecting another mailbox while signed in adds it as a
-  sign-in method. Passkeys are a way in too.
-- Accounts are linked by **proven ownership**, never by matching email
-  addresses.
-- **Campbooks issues every token**: the web session, native apps, third-party
-  clients and MCP agents.
-- The login, consent and passkey screens are **Campbooks screens** in en,
-  pt-PT, es-ES and fr.
+- the Google, Microsoft or Zoho account you first sign in with is also your
+  first mailbox, in one consent;
+- every mailbox you own is a way in to the same account;
+- accounts are linked by proven ownership, never by email;
+- Campbooks issues every token;
+- the sign-in screens are Campbooks screens.
 
-Rauthy (ADR 0004) links one upstream provider per account, never exposes
-the upstream tokens (so sign-in cannot connect a mailbox), and has no API to
-set a federation id. ADR 0014 supersedes 0004: Campbooks owns identity end
-to end and Rauthy is removed.
+ADR 0014 records the design and the slices. This change is **slice S1a**
+(campbooks-cloud#77): the issuer itself, signing in with Google, the
+held mailbox grant and its hand-off to connections, and the web BFF signing
+in against the issuer instead of Rauthy. Rauthy keeps working, untouched,
+for installs that name it, until slice S5 removes it.
 
-Tracking issue: https://github.com/notacamp/campbooks-cloud/issues/75.
+Tracking issue: https://github.com/notacamp/campbooks-cloud/issues/77
+(parent: https://github.com/notacamp/campbooks-cloud/issues/75).
 
 **Modules touched**
-- New module **`identity`** (`crates/modules/identity`, schema `identity`).
-  It depends on the kernel only, like every module.
-- **kernel**: two additions.
-  - A local key source for `TokenVerifier`, so the API reads the issuer's
-    keys in-process.
-  - The `GrantIntake` port (`kernel::connections`) and its `ProviderGrant`
-    type, which hand an upstream grant to `connectors`.
-- **connectors** (#450): implements `GrantIntake` over
-  `create_or_refresh_connection`. Its own Google consent endpoints delegate
-  to `identity`.
-- **server**: composes `identity`. The BFF's issuer becomes the server
-  itself and its client secret is derived (no provisioning). The `identity`
-  protocol routes are mounted outside `/api/v1`.
-- **clients/app**: new `identity` module (sign-in, new account, consent,
-  passkeys, ways to sign in). The first-run UI (#451) gains the "connect
-  this mailbox here" step.
-- **deploy/docs**: Rauthy's services, `deploy/idp/` and their settings are
-  removed.
+- New module **`identity`** (`crates/modules/identity`, schema `identity`),
+  depending on the kernel only.
+- **kernel**:
+  - `auth::KeySource`: a verifier reads an in-process issuer's keys;
+  - `connections::GrantIntake` + `ProviderGrant`: the port a mailbox grant
+    crosses;
+  - `crypto::derive_secret`;
+  - `IdToken` carries `email_verified` and `auth_time`;
+  - `TestIdp` can play an upstream provider.
+- **connectors**: implements `GrantIntake` over
+  `create_or_refresh_connection`.
+- **server**:
+  - composes `identity` and mounts its protocol endpoints;
+  - registers the in-process verifier and the grant intake;
+  - the BFF signs in against the in-process issuer (derived secret, requests
+    through its router).
 
-No cross-module dependency is added. `identity` ↔ `connectors` goes through
-a kernel port (the pattern of `Membership`), so `architecture.toml` gets no
-entry.
+No cross-module dependency is added: `identity` reaches `connectors` through
+the kernel port, so `architecture.toml` is unchanged.
 
 ## What Changes
 
-- **Accounts and credentials.** An account has one or more **ways in**:
-  provider identities (provider, issuer, subject, the email at link time) and
-  passkeys. The token `sub` is the account id. An account can never lose
-  its last way in.
-- **Provider sign-in with the mailbox in the same consent.** Google first,
-  then Microsoft and Zoho. Sign-in asks for identity scopes plus the mail
-  scopes `connectors` declares for that provider, with offline access. An
-  unknown provider identity creates a new account, after a "new account"
-  confirmation. A known one signs in. Signed in, a round trip links the
-  identity to the current account, and is refused if another account already
-  holds it.
-- **The mailbox grant goes to `connectors`.** It is handed over through
-  `GrantIntake` into the current workspace. On a first sign-up, before any
-  workspace exists, it is held sealed and adopted when the person creates or
-  picks their first workspace. If they never do, it is revoked at the
-  provider after 7 days.
-- **Authorization server**, in-process, on the app origin:
-  - discovery (OIDC + RFC 8414) and RFC 9728 resource metadata;
-  - `/oauth2/authorize` with code + PKCE S256 only, single-use codes and RFC
-    9207 `iss`;
-  - `/oauth2/token`: authorization_code, refresh_token (rotation with reuse
-    detection), client_credentials;
-  - `/oauth2/revoke`, `/oauth2/jwks`, `/oauth2/userinfo`,
-    `/oauth2/end_session`;
-  - JWT access tokens (RFC 9068) signed with Ed25519, with keys rotated
-    automatically.
-- **Clients.**
-  - First-party clients are created by migration: `campbooks-web` (the BFF)
-    and `campbooks-native` (Tauri, public, loopback and private-use-scheme
-    redirects).
-  - Workspace clients are registered through the API by owners and admins:
-    confidential (client_credentials, `workspace_id` claim) or public.
-  - Dynamic Client Registration (RFC 7591) and Client ID Metadata Documents
-    for MCP agents.
-  - A consent screen for every third-party client. Its tokens are bound to
-    one workspace the person picks.
-- **Passkeys.** Register while signed in, sign in, and sign up with a
-  passkey alone (self-hosters with no provider app, IMAP-only users).
-- **BFF.** It signs in against the in-process issuer. Logout ends the issuer
-  session too, with no confirmation page.
-- **Removal of Rauthy.**
-  - Gone: the `idp`, `idp-init` and `idp-provision` compose services,
-    `deploy/idp/`, `xtask/tests/idp_provision.rs`, the
-    `CAMPBOOKS_IDP_*`/`CAMPBOOKS_BFF__IDP_INTERNAL_URL`/`CAMPBOOKS_BFF__CLIENT_SECRET*`
-    settings and the Rauthy sections of `deploy/README.md`.
-  - ADR 0004 is marked superseded. The `upstream-sign-in` change is
-    withdrawn.
-  - The relevant `openspec/decisions-needed.md` entries are resolved: the
-    Rauthy bump, the IdP origin, the logout page and one provider per
-    account.
+- **Issuer**, active when `CAMPBOOKS_AUTH__ISSUER` is unset (or names this
+  instance) and `CAMPBOOKS_SECRET_KEY` is set:
+  - discovery (OIDC and RFC 8414) and `/oauth2/jwks`;
+  - `/oauth2/authorize`: code + PKCE S256 only, single sign-on, `prompt`
+    and `max_age`, RFC 9207 `iss`;
+  - `/oauth2/token`: authorization_code and refresh_token, with rotation and
+    reuse detection;
+  - `/oauth2/revoke` and `/oauth2/end_session`.
+- **Keys**: Ed25519, generated on first use, sealed at rest, published a week
+  ahead, rotated every 30 days, retired after two more days.
+- **First-party clients** `campbooks-web` and `campbooks-native`, defined in
+  code and needing no provisioning.
+- **Google sign-in** (`/auth/start/google`, `/auth/callback/google`), the
+  new-account step (`GET`/`POST /auth/new-account`), and what the sign-in
+  screen shows for a waiting request (`GET /auth/requests/{id}`).
+- **Held mailbox grants** and the API operations `identity.list_held_grants`,
+  `identity.adopt_held_grant` and `identity.discard_held_grant`.
+- **BFF on the in-process issuer**; logout ends the issuer session with no
+  confirmation page.
+- **Docs**: `deploy/README.md` → Built-in sign-in, `.env.example`,
+  architecture, domain map, CHANGELOG.
 
 ## Non-goals
 
-- **Passwords**, email one-time codes and password reset.
-- **Account merging.** Two accounts are never merged, not even with proof of
-  both; a way in can be moved by removing it from one account and linking it
-  to the other.
-- **Account deletion.** It needs every module (a follow-up issue).
-- **"Sign in with Campbooks" for other websites.** ID tokens for third-party
-  OpenID relying parties (RS256 ID tokens, pairwise subjects) are out of
-  scope; third parties get access tokens to our API.
-- **IMAP mailboxes as ways in.** There is no OAuth proof of ownership for
-  them (#74).
-- DPoP / sender-constrained tokens, token introspection (RFC 7662),
-  back-channel logout to third-party clients, SAML, SCIM.
-- Campbooks-side second factors: providers keep their own MFA, and passkeys
-  verify the user.
-- Supporting an outside identity provider as the issuer. The verifier stays
-  standard, so this can return later, but nothing is built or tested for it.
-- The MCP server itself (milestone M4). This change only makes the authorization side
-  ready for it.
-- Google's restricted-scope verification (#53) and the security review
-  (#57). Both must happen before production.
+- The sign-in and new-account **screens** (S1b): until they land, the
+  issuer's redirects to `/sign-in` and `/sign-in/new` reach the web app's
+  fallback.
+- **More ways in** (S2): Microsoft and Zoho, linking and removing ways in,
+  connecting another mailbox through `identity`, step-up.
+- **Passkeys** (S3).
+- **Native sign-in end to end, third-party clients, consent, DCR, client
+  metadata documents, RFC 8707 resources and RFC 9728 metadata** (S4). The
+  native client is defined here, but the Tauri side is #17.
+- **Removing Rauthy** (S5): compose, `deploy/idp`, its docs and settings stay.
+- **Rate limits** on the sign-in and token endpoints: they need a trusted-proxy
+  setting to know a client's address behind a reverse proxy. They are a
+  follow-up before security review #57.
+- Revoking held grants at the provider: Google revokes every token of an
+  account's grant to an app at once, which would also cut a mailbox
+  connected through that app; held grants are deleted instead.
+- Tracking access-token revocation (`jti`): access tokens live ten minutes.

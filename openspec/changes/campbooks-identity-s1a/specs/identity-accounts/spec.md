@@ -1,128 +1,90 @@
 ## Purpose
 
-Who a person is to Campbooks: an account with one or more ways in (provider
-identities and passkeys), linked only by proven ownership, where the
-provider account a person signs up with is also their first mailbox.
+Who a person is to Campbooks: an account with one or more ways in, linked
+only by proven ownership, where the provider account a person signs up with
+is also their first mailbox (ADR 0014).
 
 ## ADDED Requirements
 
-### Requirement: Accounts and ways in
-An account SHALL have one or more ways in: provider identities, each keyed by
-provider, issuer and subject, and passkeys. A provider identity SHALL belong
-to at most one account. The account id SHALL be the `sub` of every token
-issued for the person. An account SHALL never be left without a way in: a
-request to remove its last one SHALL be refused with `code` = `last_way_in`.
+### Requirement: Accounts and provider ways in
+An account SHALL have one or more ways in. A provider identity SHALL be keyed
+by provider, issuer and subject, and SHALL belong to at most one account. The
+account id SHALL be the `sub` of every token issued for the person.
 
-#### Scenario: Last way in
-- **WHEN** a person whose only way in is a Google identity asks to remove it
-- **THEN** the response is 409 with `code` = `last_way_in` and the identity is kept
-
-#### Scenario: Several ways in reach one account
-- **WHEN** a person has linked a Google and a Zoho identity and signs in with either
-- **THEN** both sign-ins yield tokens with the same `sub`
+#### Scenario: The same identity signs in to the same account
+- **WHEN** a person who signed up with a Google account signs in with it again in another browser
+- **THEN** no account is created and the new tokens carry the same `sub`
 
 ### Requirement: Linking by proven ownership only
 A provider identity SHALL be linked to an account only by the provider round
-trip that created the account, or by a round trip started and completed
-while signed in to that account. The server SHALL NOT link, suggest linking
-or reveal an existing account on the basis of an email address, verified or
-not. A round trip that returns an identity already linked to another account
-SHALL be refused with `code` = `way_in_belongs_to_another_account`, and its
-provider tokens SHALL be revoked.
+trip that created the account. The server SHALL NOT link, suggest linking or
+reveal an existing account on the basis of an email address, verified or
+not.
 
-#### Scenario: Same email, different account
-- **WHEN** an account was created with Google identity A for ana@example.com and a signed-out person signs in with a Microsoft identity whose email is also ana@example.com
-- **THEN** no link is made and the person is shown the new-account page, which does not mention any existing account
+#### Scenario: Same email, different provider account
+- **WHEN** an account exists for Google account A with address ana@example.com and a person signs in with Google account B that reports the same address
+- **THEN** the person is offered a new account, and creating it yields a different `sub`
 
-#### Scenario: Identity held by another account
-- **WHEN** a person signed in to account X completes a link round trip that returns an identity linked to account Y
-- **THEN** the response carries `code` = `way_in_belongs_to_another_account` and neither account changes
+### Requirement: Signing in with Google
+Signing in with Google SHALL use the authorization code flow with a `state`
+bound to the browser that started it by a cookie, a `nonce`, and PKCE S256. A
+round trip SHALL be usable once, only from that browser, and only within ten
+minutes; otherwise the browser SHALL return to the sign-in screen with
+`error=invalid_state`. The server SHALL validate Google's ID token
+signature against Google's published keys, plus its issuer, audience,
+`azp`, expiry and nonce. A cancelled consent SHALL return to the sign-in
+screen with `error=cancelled_at_provider`. A known identity SHALL start a
+session for its account. An unknown identity SHALL lead to the new-account
+screen, and no account SHALL exist until the person confirms it.
 
-### Requirement: Provider sign-in
-Sign-in with a configured provider SHALL use the authorization code flow
-with a `state` bound to the browser, a `nonce`, and PKCE S256. It SHALL
-validate the provider's ID token signature against the provider's published
-keys, plus its issuer, audience, `azp`, expiry and nonce. Microsoft sign-in
-SHALL accept personal, work and school accounts (the `common` endpoint), and
-the issuer SHALL equal the tenant-specific issuer of the token's own `tid`. For
-Zoho the accounts server SHALL be one of the known Zoho data-centre servers,
-and any other value SHALL be refused before any request is made. A
-known identity SHALL start a session for its account. An unknown identity
-SHALL lead to a new-account confirmation before any account is created.
+#### Scenario: Replayed or foreign callback
+- **WHEN** a Google callback is opened a second time, or by a browser that did not start the round trip
+- **THEN** the browser is sent to `/sign-in?error=invalid_state` and nobody is signed in
 
-#### Scenario: Microsoft personal account
-- **WHEN** a person signs in with a personal Microsoft account
-- **THEN** the sign-in succeeds, the identity is keyed by the issuer of the consumer tenant, and its email is recorded as unverified unless Microsoft states the domain owner verified it
+#### Scenario: Unknown identity
+- **WHEN** a Google account no Campbooks account uses completes the round trip
+- **THEN** the browser is sent to `/sign-in/new`, which shows the provider and address, and no account exists until `POST /auth/new-account`
 
-#### Scenario: Issuer from another tenant
-- **WHEN** a Microsoft ID token's `iss` names a tenant other than its `tid`
-- **THEN** the sign-in fails with `code` = `login_failed`
+### Requirement: Creating an account needs the browser and the screen
+`POST /auth/new-account` SHALL require the `X-Campbooks-CSRF: 1` header from
+the same origin and the pending sign-up cookie of the browser that completed
+the round trip; otherwise it SHALL answer 403 `csrf_check_failed` or 404.
 
-#### Scenario: Forged Zoho accounts server
-- **WHEN** a Zoho callback names an `accounts-server` that is not a Zoho data centre
-- **THEN** the sign-in fails with `code` = `login_failed` and no request is sent to that host
-
-#### Scenario: Replayed callback
-- **WHEN** the same provider callback URL is opened twice, or by another browser
-- **THEN** the second attempt fails with `code` = `invalid_state`
+#### Scenario: Forged request
+- **WHEN** a cross-site form posts to `/auth/new-account`
+- **THEN** the response is 403 with `code` = `csrf_check_failed`
 
 ### Requirement: The first mailbox comes with sign-up
-A sign-in round trip SHALL ask the provider, in the same consent, for the
-identity scopes, the mailbox scopes the instance's connectors can use for
-that provider, and offline access. There SHALL be no separate second
-consent for mail, including while the provider shows its unverified-app
-warning. When a new account is created from a
-round trip that granted mailbox scopes and a refresh token, the grant SHALL
-be held sealed for that account for at most 7 days. When the person adopts
-it into a workspace, it SHALL be handed to the connectors through the grant
-intake port. If it is not adopted in time, it SHALL be revoked at the
-provider and deleted. A sign-in to an existing account SHALL NOT change any
-existing mailbox connection.
+A Google round trip SHALL ask in one consent for `openid email profile`, the
+mailbox scopes the grant-intake port reports for Google, and offline access.
+When a new account is created from a round trip that granted every mailbox
+scope and a refresh token, the grant SHALL be held, sealed, for that account
+for seven days. When the person adopts it into a workspace they belong to,
+it SHALL be handed to the grant-intake port and then forgotten. A grant not
+adopted in time SHALL be deleted. A sign-in to an existing account SHALL NOT
+store or hand over a grant. When Google returns no refresh token for a new
+account whose mailbox was granted, the server SHALL ask Google once more
+with `prompt=consent` for that account.
 
 #### Scenario: Sign up, then first workspace
-- **WHEN** a person signs up with Google granting Gmail access, creates their first workspace and adopts the held grant
-- **THEN** the workspace has a mail connection for that Google account granted by that person, and the held grant is gone
+- **WHEN** a person signs up with Google granting mail access, creates a workspace and calls `identity.adopt_held_grant` for it
+- **THEN** the grant-intake port receives the grant (with its refresh token) for that workspace and person, and the held grant is gone
 
-#### Scenario: Grant never adopted
-- **WHEN** 7 days pass after sign-up without the held grant being adopted
-- **THEN** the grant is revoked at the provider and deleted
+#### Scenario: Mail permission declined
+- **WHEN** the person unchecks the mail permission on Google's consent screen
+- **THEN** the account is created, nothing is held, and sign-in succeeds
 
-#### Scenario: Mail scope declined
-- **WHEN** the person unchecks the mail permission on the provider's consent screen
-- **THEN** the account is created, no grant is held, and sign-in succeeds
-
-### Requirement: Connecting a mailbox adds a way in
-Connecting or reconnecting a provider mailbox while signed in SHALL run
-through the identity round trip, link the provider identity to the signed-in
-account (or refuse as above), and hand the grant to the connectors for the
-current workspace. Disconnecting a mailbox SHALL NOT remove the way in, and
-removing a way in SHALL NOT disconnect a mailbox.
-
-#### Scenario: Disconnecting keeps the sign-in
-- **WHEN** a person disconnects the Google mailbox they signed up with from their workspace
-- **THEN** they can still sign in with that Google account
-
-#### Scenario: Second mailbox becomes a way in
-- **WHEN** a signed-in person connects a Zoho mailbox to their workspace, signs out and signs in with that Zoho account
-- **THEN** they are signed in to the same account
-
-### Requirement: Step-up for sensitive changes
-Adding or removing a way in, registering a passkey, and creating or rotating
-a client secret SHALL require a sign-in within the last 10 minutes; an older
-session SHALL get 401 with `code` = `reauthentication_required`.
-
-#### Scenario: Stale session removes a way in
-- **WHEN** a person who signed in an hour ago asks to remove a way in
-- **THEN** the response is 401 with `code` = `reauthentication_required` and nothing is removed
+#### Scenario: Consented before
+- **WHEN** Google returns no refresh token for a new account whose mailbox was granted
+- **THEN** the browser is sent back to Google once with `prompt=consent` and `login_hint` naming that account
 
 ### Requirement: Identity audit trail without personal data
-Account creation, ways in added or removed, sign-ins, refresh-token reuse,
-client registration and consent changes SHALL be recorded as audit events
-and published as `identity.*` domain events. Neither SHALL contain email
-addresses, tokens, codes or secrets. No log line, span field or metric
-attribute SHALL contain a token, code, PKCE verifier, state, nonce, client
-secret, cookie, WebAuthn assertion or email address.
+Account creation, sign-ins and refresh-token reuse SHALL be recorded as audit
+events and published as `identity.account_created`, `identity.signed_in` and
+`identity.refresh_reuse_detected`, holding ids, provider names and methods
+only. No log line SHALL contain a code, token, cookie, client secret or email
+address.
 
-#### Scenario: Telemetry stays clean
-- **WHEN** a full sign-up, sign-in and token refresh run with telemetry captured
-- **THEN** no captured field contains any of the values exchanged
+#### Scenario: A sign-in leaves no secret in the logs
+- **WHEN** a person signs up through the web app and the app redeems the code, with every log level captured
+- **THEN** no captured line contains either authorization code, a cookie value, the provider client secret or the person's address

@@ -69,8 +69,26 @@ client registration, per workspace; per-client claims such as
 - **Rauthy is removed**: the `idp`, `idp-init` and `idp-provision` services,
   `deploy/idp/`, its settings and its docs.
 
-The design, alternatives and slicing are in
-`openspec/changes/campbooks-identity/design.md`.
+The design and its alternatives are in the first slice's change,
+`openspec/changes/campbooks-identity-s1a/design.md` (archived with it).
+
+## Slices
+Each is one pull request with its own OpenSpec change and recording,
+tracked as a sub-issue of campbooks-cloud#75:
+
+1. **S1a** (#77): the issuer, its keys, Google sign-in, the held mailbox
+   grant and its hand-off, the BFF on the in-process issuer.
+2. **S1b** (#78): the sign-in and new-account screens, and first-run's
+   "connect this mailbox here".
+3. **S2** (#79): more ways in (link, connect, reconnect, remove), Microsoft
+   and Zoho, and `connectors`' consent through `identity`.
+4. **S3** (#80): passkeys.
+5. **S4** (#81): native apps, workspace clients, consent, DCR and client
+   metadata documents for MCP agents.
+6. **S5** (#82): Rauthy removed and staging cut over.
+
+After S1a, S2–S5 can proceed in parallel. The OpenID conformance suite runs
+against staging, then security review #57, before production.
 
 ## Consequences
 - We own security-critical code: token issuance, refresh-reuse detection,

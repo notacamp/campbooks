@@ -394,6 +394,35 @@ losing it signs everyone out and asks members to connect their accounts again.
 
 Settings (all optional; defaults shown in `.env.example`) are the `CAMPBOOKS_BFF__*` block.
 
+## Built-in sign-in (Campbooks as its own identity provider)
+
+Campbooks is becoming its own identity provider (ADR 0014): it signs people in with
+Google (Microsoft, Zoho and passkeys follow) and issues every token itself, so the `idp`
+services above will go away. The built-in issuer is already in the server. It runs when
+`CAMPBOOKS_AUTH__ISSUER` is **unset** (or names `CAMPBOOKS_PUBLIC_URL` itself) and
+`CAMPBOOKS_SECRET_KEY` is set. The shipped `compose.yaml` still points
+`CAMPBOOKS_AUTH__ISSUER` at Rauthy, so nothing changes for an existing install until the
+switch-over release removes Rauthy.
+
+With the built-in issuer:
+
+- The issuer is `CAMPBOOKS_PUBLIC_URL` (no path). Its metadata is at
+  `/.well-known/openid-configuration` (and `/.well-known/oauth-authorization-server`), its
+  keys at `/oauth2/jwks`, and its endpoints under `/oauth2/*`. The web app signs in through
+  it exactly as through Rauthy, with no client secret to provision.
+- It signs with Ed25519 keys it generates on first start and rotates every 30 days,
+  stored in Postgres (schema `identity`) encrypted with `CAMPBOOKS_SECRET_KEY`. Replacing
+  that key signs everyone out (a new key is made); nothing else to do.
+- **Sign in with Google** uses the same Google OAuth client as connected accounts (below).
+  Add the redirect URI `${CAMPBOOKS_PUBLIC_URL}/auth/callback/google` to it, and the
+  `profile` scope to its consent screen. A new person's sign-in asks, in the same consent,
+  for their mail: once they create their first workspace, that mailbox is connected
+  without asking again. Until Google verifies your app for the Gmail scope, people see
+  Google's "unverified app" screen when they sign up. Publish the app (rather than leaving it
+  in "Testing"): testing apps issue refresh tokens that expire after 7 days.
+- Accounts are linked to a Google account by its id, never by email address. Signing in
+  with a Google account Campbooks doesn't know offers to create a new account.
+
 ## Connected accounts
 
 Members connect outside accounts (Gmail today); Campbooks asks Google for consent, keeps the grant encrypted with the instance secret key (schema `connectors`), and
@@ -403,9 +432,10 @@ hours when nothing changes. Nothing is connected until you register an OAuth cli
 1. In the Google Cloud console, create an OAuth client of type **Web application** and
    enable the **Gmail API** for its project.
 2. Add the redirect URI `${CAMPBOOKS_PUBLIC_URL}/connections/google/callback`, e.g.
-   `https://campbooks.example.com/connections/google/callback`.
-3. Add the scopes `openid`, `email` and `https://www.googleapis.com/auth/gmail.modify` to
-   the consent screen. Gmail's scope is restricted: until Google verifies your app, only
+   `https://campbooks.example.com/connections/google/callback` (and, for the built-in
+   sign-in, `${CAMPBOOKS_PUBLIC_URL}/auth/callback/google`).
+3. Add the scopes `openid`, `email`, `profile` and
+   `https://www.googleapis.com/auth/gmail.modify` to the consent screen. Gmail's scope is restricted: until Google verifies your app, only
    the test users you list can connect.
 4. Set `CAMPBOOKS_GOOGLE__CLIENT_ID` and put the client secret in a file the server reads
    (`CAMPBOOKS_GOOGLE__CLIENT_SECRET_FILE`; `CAMPBOOKS_GOOGLE__CLIENT_SECRET` inline for
