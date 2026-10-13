@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.messages SET reemit = true\n                WHERE stream_id = $1 AND provider_message_id = ANY($2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "be7ba9791f687b75e5ce2bd276e43dad7a0a3a19052bac0ae2f1a5f6df285d3b"
+}

@@ -11,3 +11,6 @@ fastapi==0.141.1
 starlette==1.7.0
 uvicorn==0.54.0
 python-multipart==0.0.32
+# torch needs setuptools>=77.0.3; the PyTorch index serves an old one whose
+# vendored jaraco.context and wheel have fixable CVEs.
+setuptools==84.0.0

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM connectors.messages WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6e3828c17d4cca0ab80d1c8f67c9b2e0bb948e81fe94e7819c7888d3f5369b03"
+}

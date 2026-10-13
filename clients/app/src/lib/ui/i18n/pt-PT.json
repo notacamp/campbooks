@@ -92,5 +92,13 @@
     "discard": "Descartar",
     "send": "Enviar",
     "close": "Fechar"
+  },
+  "attachments": {
+    "label": "Anexos",
+    "count_one": "{{count}} anexo",
+    "count_other": "{{count}} anexos",
+    "previewOf": "Pré-visualizar {{name}}",
+    "downloadOf": "Transferir {{name}}",
+    "previewTitle": "Pré-visualização de {{name}}"
   }
 }

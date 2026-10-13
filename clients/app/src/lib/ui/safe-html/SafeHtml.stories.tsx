@@ -25,10 +25,17 @@ type Story = StoryObj<typeof meta>;
 /** Sanitised HTML in the sandbox: a white page in every theme. */
 export const Default: Story = {};
 
-/** A remote image the server held back: its alt text, until "Show images". */
+/**
+ * The server's placeholder for a remote image it held back (a fixed `data:`
+ * picture at the image's declared size), until "Show images".
+ */
+const PLACEHOLDER =
+  "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%3E%3Crect%20width='100%25'%20height='100%25'%20rx='6'%20fill='%23f1f0ee'/%3E%3Csvg%20x='50%25'%20y='50%25'%20overflow='visible'%3E%3Cg%20transform='translate(-10%20-10)'%20fill='none'%20stroke='%238f8d89'%20stroke-width='1.5'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Crect%20x='2'%20y='3'%20width='16'%20height='14'%20rx='2'/%3E%3Ccircle%20cx='7'%20cy='8'%20r='1.5'/%3E%3Cpath%20d='m2.5%2015%204.5-4.5%203.5%203.5%202-2%204.5%204.5'/%3E%3C/g%3E%3C/svg%3E%3C/svg%3E";
+
+/** A remote image the server held back: the placeholder, until "Show images". */
 export const ImageBlocked: Story = {
   args: {
-    html: `<img alt="The Weekly Ledger" width="480" height="100">${NEWSLETTER}`,
+    html: `<img alt="The Weekly Ledger" width="480" height="100" style="width:100%;height:auto" src="${PLACEHOLDER}">${NEWSLETTER}<p>Logo: <img alt="Logo" src="${PLACEHOLDER}" width="48" height="48"></p>`,
   },
 };
 

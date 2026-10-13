@@ -86,11 +86,12 @@ async fn select(conn: &mut PgConnection, id: Option<ConnectionId>) -> Result<Vec
 pub async fn view(conn: &mut PgConnection, connection: Connection) -> Result<ConnectionView> {
     let rows = sqlx::query!(
         r#"SELECT s.id AS "id: StreamId", s.capability, s.inbox_id AS "inbox_id: InboxId",
-                  s.phase, s.paused, s.last_synced_at, s.last_change_at, d.due_at AS "due_at?"
+                  s.address, s.phase, s.paused, s.last_synced_at, s.last_change_at,
+                  d.due_at AS "due_at?"
              FROM connectors.streams s
              LEFT JOIN connectors.sync_due d ON d.stream_id = s.id
             WHERE s.connection_id = $1
-            ORDER BY s.capability"#,
+            ORDER BY s.capability, s.created_at, s.id"#,
         connection.id as ConnectionId,
     )
     .fetch_all(conn)
@@ -101,6 +102,7 @@ pub async fn view(conn: &mut PgConnection, connection: Connection) -> Result<Con
             Ok(StreamView {
                 capability: Capability::parse(&row.capability)?,
                 inbox_id: row.inbox_id,
+                address: row.address,
                 phase: Phase::parse(&row.phase)?,
                 paused: row.paused,
                 last_synced_at: row.last_synced_at,

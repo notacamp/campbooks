@@ -361,6 +361,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/attachments/{attachment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download one attachment of a message. */
+        get: operations["conversations.get_attachment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/body": {
         parameters: {
             query?: never;
@@ -1180,6 +1197,12 @@ export interface components {
         /** @description An answer's value: a label (choice), a level (score) or yes/no. */
         AnswerView: boolean | number | string;
         /**
+         * Format: binary
+         * @description An attachment's bytes, as the OpenAPI document describes them (a binary
+         *     string); the handler streams them.
+         */
+        AttachmentBytes: string;
+        /**
          * Format: uuid
          * @description AttachmentId (UUIDv7)
          */
@@ -1192,6 +1215,11 @@ export interface components {
             filename: string;
             /** @description The attachment. */
             id: components["schemas"]["AttachmentId"];
+            /**
+             * @description Shown by the HTML body (an inline raster image its `cid:` source
+             *     names), so a reader need not list it with the files.
+             */
+            in_body: boolean;
             /** @description Shown inside the body rather than attached. */
             inline: boolean;
             /**
@@ -1829,7 +1857,7 @@ export interface components {
          * @description An outside provider.
          * @enum {string}
          */
-        Provider: "google";
+        Provider: "google" | "zoho";
         /**
          * @description One reason behind an answer: a stable rule id the client translates,
          *     and what it matched.
@@ -2024,6 +2052,11 @@ export interface components {
         };
         /** @description A change stream as the API shows it. */
         StreamView: {
+            /**
+             * @description The mailbox it reads (`messages`): one connection can reach several
+             *     (a Zoho login's mail accounts).
+             */
+            address?: string | null;
             /** @description The capability it reads. */
             capability: components["schemas"]["Capability"];
             inbox_id?: components["schemas"]["InboxId"] | null;
@@ -3377,6 +3410,69 @@ export interface operations {
                 };
             };
             /** @description No such conversation, or the label is not on it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.get_attachment": {
+        parameters: {
+            query?: {
+                /**
+                 * @description `true` to show it in the browser (`Content-Disposition: inline`):
+                 *     honoured for raster images and PDFs only; anything else is still a
+                 *     download.
+                 */
+                inline?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+                /** @description The message. */
+                message_id: components["schemas"]["MessageId"];
+                /** @description The attachment. */
+                attachment_id: components["schemas"]["AttachmentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The bytes, as a download. `Content-Type` is the stored type when it is on the safe list (raster images, PDF, plain text, CSV, calendar, archives, office documents, common audio and video), else `application/octet-stream`; `Content-Disposition` carries the sanitised file name. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": components["schemas"]["AttachmentBytes"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such attachment, or you cannot see it. */
             404: {
                 headers: {
                     [name: string]: unknown;

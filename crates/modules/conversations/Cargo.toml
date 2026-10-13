@@ -34,6 +34,8 @@ utoipa-axum.workspace = true
 boon.workspace = true
 campbooks-kernel = { workspace = true, features = ["test-util"] }
 tokio.workspace = true
+# `Kit::get_raw`: whole responses (headers and bytes).
+tower.workspace = true
 wiremock.workspace = true
 
 [lints]

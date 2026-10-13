@@ -10,6 +10,8 @@
     "no_offline_access": "The provider did not allow Campbooks to stay connected. Connect again and allow access.",
     "account_mismatch": "You signed in with a different account than the one you are extending. Use the same account.",
     "account_connected_by_another_member": "Another member of this workspace already connected this account.",
-    "needs_reauth": "This connection needs you to connect the account again before it can sync."
+    "needs_reauth": "This connection needs you to connect the account again before it can sync.",
+    "unknown_data_centre": "Campbooks does not know the Zoho data centre of this account. Ask your administrator.",
+    "no_mailbox": "This account has no mailbox Campbooks can read."
   }
 }

@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO connectors.messages\n                           (id, workspace_id, stream_id, provider_message_id, thread_id, label_ids,\n                            internal_date, document_hash, document_size, listed_generation,\n                            rfc_message_id)\n                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)\n                       ON CONFLICT (stream_id, provider_message_id) DO UPDATE\n                          SET label_ids = EXCLUDED.label_ids,\n                              listed_generation = EXCLUDED.listed_generation\n                    RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.messages",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "TextArray",
+        "Timestamptz",
+        "Text",
+        "Int8",
+        "Int4",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "740debbc4b2a4682d7aa15741ec15c4b6465f655a1c536955042228057ad61ba"
+}

@@ -18,6 +18,38 @@ All notable changes to Campbooks Next are documented here. The format follows
   our side), starry (a big win) and heart eyes (a warm moment), with an optional
   gold/rose tint. Its thinking motion is now a typing-indicator hop that reads at
   small sizes.
+- A ready-made image for the local `decide` model: `ghcr.io/notacamp/campbooks-laya`,
+  published for linux/amd64 and linux/arm64 with the same tags as the Campbooks image
+  and scanned the same way. `docker compose --profile ai` now pulls it instead of
+  building `deploy/laya` on your machine (the `build:` line is still there, commented,
+  if you prefer to build it). The model checkpoint still downloads into the
+  `laya-models` volume on first start. Pin it to the same tag as the server image.
+- Zoho Mail. Signing up with Zoho also connects your Zoho mailbox (Zoho
+  asks a second time, for the mail, only when the account is new; signing
+  in again never asks), and members can connect more Zoho logins; every
+  mail account of a login becomes its own inbox, beside Gmail in the same
+  streams. Mail is read from the account's own data centre and polled (Zoho
+  has no push); read, star (flag), archive and unarchive go back to Zoho;
+  unarchiving never moves your own sent mail into the Inbox; replies and new
+  messages are sent through Zoho, never twice. Uses the Zoho
+  app of Sign in with Zoho, which must allow `ZohoMail.accounts.READ`,
+  `ZohoMail.folders.READ` and `ZohoMail.messages.ALL`. New settings
+  `CAMPBOOKS_CONNECTORS__ZOHO__*` (window, size limits,
+  `REQUESTS_PER_MINUTE` per Zoho login, default 60, and `SWEEP_MINUTES`).
+  Zoho labels are not synced yet. A migration renames the connectors' message
+  index (`connectors.messages`); nothing to do.
+- Attachments open from the reader. Each message lists its files with their
+  size, Download and, for pictures and PDFs, Preview: a picture opens in a
+  dialog, a PDF in your browser's own viewer in a new tab. V moves through
+  the attachments, Enter opens one. HTML, SVG and every other type only
+  download. The new operation `conversations.get_attachment` (scope
+  `conversations:read`) serves the bytes as a download under a cleaned file
+  name, with the stored type only when it is on a safe list (pictures and
+  PDFs must also start like one) and a `sandbox` policy. Pictures inside a message's body (`cid:`) now show without asking,
+  since nothing remote loads; remote images that stay hidden show a quiet
+  placeholder instead of a broken-image icon. Mail synced before this
+  release keeps the placeholder for its inline pictures. The web client's
+  Content-Security-Policy now allows `blob:` images (the picture preview).
 - Reply, reply all, forward and new messages, sent through your Gmail. The
   composer opens under the thread (R, A, F) or on its own screen (C): From
   your mailbox, To, Cc and Bcc as chips, the quoted history folded under your

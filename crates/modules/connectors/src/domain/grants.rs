@@ -23,7 +23,7 @@ use crate::{
     MESSAGES,
     deps::Deps,
     events::{ACCOUNT_CONTENT_TYPE, AccountDocument, CapabilityGranted, ConnectionAdded},
-    google::TokenGrant,
+    provider::TokenGrant,
 };
 
 /// A provider grant already obtained for a member.
@@ -50,12 +50,31 @@ pub struct ProviderGrant {
     pub tokens: TokenGrant,
     /// The connection this consent extends, when it was started as one.
     pub extending: Option<ConnectionId>,
+    /// The accounts server of a Zoho grant's data centre.
+    pub provider_server: Option<String>,
+    /// The mailboxes the grant reaches (one for Gmail; a Zoho login's mail
+    /// accounts). Never empty for `messages`.
+    pub mailboxes: Vec<Mailbox>,
+}
+
+/// A mailbox a grant reaches: one `messages` stream and inbox.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Mailbox {
+    /// The provider's key for it (Zoho's `accountId`; empty for Gmail).
+    pub key: String,
+    /// Its address, lower-cased.
+    pub address: String,
+    /// Whether the provider vouches for the address.
+    pub address_verified: bool,
+    /// Its display name.
+    pub display_name: Option<String>,
 }
 
 /// What [`save`] stores.
 struct Pending<'a> {
     grant: &'a ProviderGrant,
-    account_blob: &'a BlobRef,
+    /// Each mailbox with its account document.
+    mailboxes: Vec<(&'a Mailbox, BlobRef)>,
     now: DateTime<Utc>,
 }
 
@@ -70,25 +89,30 @@ pub async fn create_or_refresh_connection(
     deps: &Deps,
     grant: &ProviderGrant,
 ) -> Result<ConnectionView> {
-    let document = AccountDocument {
-        version: 1,
-        provider: grant.provider,
-        address: grant.address.trim().to_lowercase(),
-        address_verified: grant.address_verified,
-        display_name: grant.display_name.clone(),
-    };
-    let account_blob = state
-        .blobs
-        .put(
-            &grant.workspace.to_string(),
-            serde_json::to_vec(&document).map_err(Error::internal)?,
-            ACCOUNT_CONTENT_TYPE,
-        )
-        .await?;
+    // Blobs are stored before the transaction that references them.
+    let mut mailboxes = Vec::with_capacity(grant.mailboxes.len());
+    for mailbox in &grant.mailboxes {
+        let document = AccountDocument {
+            version: 1,
+            provider: grant.provider,
+            address: mailbox.address.trim().to_lowercase(),
+            address_verified: mailbox.address_verified,
+            display_name: mailbox.display_name.clone(),
+        };
+        let blob = state
+            .blobs
+            .put(
+                &grant.workspace.to_string(),
+                serde_json::to_vec(&document).map_err(Error::internal)?,
+                ACCOUNT_CONTENT_TYPE,
+            )
+            .await?;
+        mailboxes.push((mailbox, blob));
+    }
     let mut tx = state.db.begin_for(grant.workspace).await?;
     let pending = Pending {
         grant,
-        account_blob: &account_blob,
+        mailboxes,
         now: deps.clock.now(),
     };
     let id = save(&mut tx, state, deps, &pending).await?;
@@ -131,11 +155,11 @@ async fn save(
         r#"INSERT INTO connectors.connections
                (id, workspace_id, provider, account_subject, address, display_name, granted_by,
                 capabilities, scopes, health, health_reason, health_changed_at, created_at, updated_at,
-                address_verified)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'ok', NULL, $10, $10, $10, $11)
+                address_verified, provider_server)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'ok', NULL, $10, $10, $10, $11, $12)
            ON CONFLICT (id) DO UPDATE
               SET address = $5, display_name = $6, capabilities = $8, scopes = $9,
-                  address_verified = $11,
+                  address_verified = $11, provider_server = $12,
                   health = 'ok', health_reason = NULL,
                   health_changed_at = CASE WHEN connectors.connections.health = 'ok'
                                            THEN connectors.connections.health_changed_at ELSE $10 END,
@@ -151,6 +175,7 @@ async fn save(
         g.grant.tokens.scope.clone().unwrap_or_default(),
         g.now,
         g.grant.address_verified,
+        g.grant.provider_server,
     )
     .execute(&mut **tx)
     .await?;
@@ -164,15 +189,17 @@ async fn save(
         g.now,
     )
     .await?;
-    state
-        .blobs
-        .attach(
-            tx,
-            &workspace_key,
-            g.account_blob,
-            &BlobOwner::new(CONNECTION_OWNER, id),
-        )
-        .await?;
+    for (_, blob) in &g.mailboxes {
+        state
+            .blobs
+            .attach(
+                tx,
+                &workspace_key,
+                blob,
+                &BlobOwner::new(CONNECTION_OWNER, id),
+            )
+            .await?;
+    }
     if existing.is_none() {
         state
             .events
@@ -230,7 +257,8 @@ async fn existing(
 }
 
 /// Resume a reconnected connection's paused streams, and create, announce
-/// and start the streams of capabilities it did not have.
+/// and start the streams it did not have: one per new capability, and for
+/// `messages` one per mailbox (a refreshed grant can reach a new one).
 async fn start_streams(
     tx: &mut Transaction<'static, Postgres>,
     state: &AppState,
@@ -254,42 +282,67 @@ async fn start_streams(
         schedule::run_now(tx, g.grant.workspace, stream, g.now).await?;
     }
     let min_interval = i32::try_from(deps.config.poll.min_seconds).unwrap_or(i32::MAX);
-    for &capability in g.grant.capabilities.iter().filter(|c| !had.contains(c)) {
-        let stream = StreamId::new();
-        let inbox = (capability == Capability::Messages).then(InboxId::new);
-        sqlx::query!(
-            r#"INSERT INTO connectors.streams
-                   (id, workspace_id, connection_id, capability, inbox_id, phase, interval_seconds, created_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-               ON CONFLICT (connection_id, capability) DO NOTHING"#,
-            stream as StreamId,
-            g.grant.workspace as WorkspaceId,
-            id as ConnectionId,
-            capability.as_str(),
-            inbox as Option<InboxId>,
-            Phase::Backfill.as_str(),
-            min_interval,
-            g.now,
-        )
-        .execute(&mut **tx)
-        .await?;
-        // The inbox is announced before any batch can name it: the first
-        // run cannot commit before this transaction does.
-        state
-            .events
-            .publish(
-                tx,
-                &CapabilityGranted {
-                    workspace: workspace_key.clone(),
-                    connection: id,
-                    capability,
-                    granted_by: g.grant.user,
-                    inbox_id: inbox,
-                    account: g.account_blob.clone(),
-                },
+    for &capability in &g.grant.capabilities {
+        // `messages` reads each mailbox; other capabilities are one stream
+        // per connection, created once.
+        let per_mailbox = capability == Capability::Messages;
+        if !per_mailbox && had.contains(&capability) {
+            continue;
+        }
+        let targets = if per_mailbox {
+            &g.mailboxes[..]
+        } else {
+            g.mailboxes.get(..1).unwrap_or_default()
+        };
+        for (mailbox, account) in targets {
+            let stream = StreamId::new();
+            let inbox = per_mailbox.then(InboxId::new);
+            let key = if per_mailbox {
+                mailbox.key.as_str()
+            } else {
+                ""
+            };
+            let created = sqlx::query_scalar!(
+                r#"INSERT INTO connectors.streams
+                       (id, workspace_id, connection_id, capability, inbox_id, phase,
+                        interval_seconds, created_at, mailbox_key, address)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                   ON CONFLICT (connection_id, capability, mailbox_key) DO NOTHING
+                   RETURNING id AS "id: StreamId""#,
+                stream as StreamId,
+                g.grant.workspace as WorkspaceId,
+                id as ConnectionId,
+                capability.as_str(),
+                inbox as Option<InboxId>,
+                Phase::Backfill.as_str(),
+                min_interval,
+                g.now,
+                key,
+                mailbox.address,
             )
+            .fetch_optional(&mut **tx)
             .await?;
-        schedule::run_now(tx, g.grant.workspace, stream, g.now).await?;
+            if created.is_none() {
+                continue;
+            }
+            // The inbox is announced before any batch can name it: the first
+            // run cannot commit before this transaction does.
+            state
+                .events
+                .publish(
+                    tx,
+                    &CapabilityGranted {
+                        workspace: workspace_key.clone(),
+                        connection: id,
+                        capability,
+                        granted_by: g.grant.user,
+                        inbox_id: inbox,
+                        account: account.clone(),
+                    },
+                )
+                .await?;
+            schedule::run_now(tx, g.grant.workspace, stream, g.now).await?;
+        }
     }
     Ok(())
 }
