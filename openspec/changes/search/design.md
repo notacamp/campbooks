@@ -256,7 +256,7 @@ them, so nobody has to type them.
 The parser is deterministic Rust in the module. It never fails a query: an
 unknown operator or a bad value is kept as text and reported in
 `query.warnings`, so typing `from:` never errors mid-keystroke. Limits: 512
-characters, 16 terms, 8 operators (422 beyond). User text reaches SQL only as
+characters, 16 terms, 8 operators (400 beyond). User text reaches SQL only as
 bound parameters, through `plainto_tsquery`/`phraseto_tsquery` per term and
 configuration, combined in SQL; it is never spliced into `tsquery` syntax.
 
@@ -302,7 +302,7 @@ hit, the snippet is the start of the body, unhighlighted.
 
 Opaque cursors. `newest`: keyset on `(occurred_at, id)`. `relevance`: an
 offset into the ranked candidates, carried with a hash of the query (a
-cursor from another query is 422). 20 results a page by default, 50 at most;
+cursor from another query is 400). 20 results a page by default, 50 at most;
 relevance stops at 1,000 results ("refine your search").
 
 ### Semantic layer (next change, decided here)
@@ -378,7 +378,7 @@ Parameters: `q`, `sort` (`relevance`|`newest`), `prefix` (bool), `limit`,
 ```
 
 A hit carries what a conversation row needs, so a result list renders from
-one response. Errors are problem+json: 422 `query_too_long`,
+one response. Errors are problem+json: 400 `query_too_long`,
 `cursor_mismatch`; 404 for a workspace the caller is not in.
 
 **Alternatives.** (a) Return refs only and let the client fetch the rows from

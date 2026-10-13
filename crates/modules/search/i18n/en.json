@@ -1,0 +1,7 @@
+{
+  "errors": {
+    "invalid_limit": "The limit must be between 1 and {{max}}.",
+    "query_too_long": "This search is too long or has too many words or filters. Shorten it and try again.",
+    "cursor_mismatch": "This page link belongs to another search. Start again from the first page."
+  }
+}

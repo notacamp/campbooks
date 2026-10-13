@@ -80,7 +80,7 @@ stream, `inbox`, `archive`, `spam`, `trash` or `anywhere`), `is:` (`unread`,
 in spam or trash SHALL be excluded unless `in:spam`, `in:trash` or
 `in:anywhere` asks for them. An unknown operator or a bad value SHALL be
 treated as text and reported in `query.warnings`, never as an error. A query
-over 512 characters, 16 terms or 8 operators SHALL get 422 `query_too_long`.
+over 512 characters, 16 terms or 8 operators SHALL get 400 `query_too_long`.
 The response SHALL return the parsed filters in `query.filters`. User text
 SHALL reach the database only as bound parameters.
 
@@ -110,7 +110,7 @@ as a prefix.
 by field (subject, then people and attachment names, then body) and by
 recency. Results SHALL come in pages of `limit` (20 by default, at most 50)
 with an opaque `next_cursor`; a cursor SHALL only be valid for the query and
-order that produced it (422 `cursor_mismatch` otherwise), and relevance
+order that produced it (400 `cursor_mismatch` otherwise), and relevance
 results SHALL stop after 1,000.
 
 #### Scenario: Next page
@@ -119,7 +119,7 @@ results SHALL stop after 1,000.
 
 #### Scenario: Cursor from another query
 - **WHEN** a cursor from the query "invoice" is sent with the query "receipt"
-- **THEN** the response is 422 with code `cursor_mismatch`
+- **THEN** the response is 400 with code `cursor_mismatch`
 
 ### Requirement: Highlights without HTML
 Each hit SHALL carry the group, its container, the best-matching entry, the
@@ -131,7 +131,7 @@ create or end a highlight.
 
 #### Scenario: Markup in a message
 - **WHEN** a matching message's text contains `<b>urgent</b>` and the private-use characters the server uses as highlight delimiters
-- **THEN** the snippet's segments contain the text `<b>urgent</b>` verbatim, the delimiters are gone, and only the query's words are marked as hits
+- **THEN** the snippet's segments are plain text holding the word "urgent" without the tags, the delimiters are gone, and only the query's words are marked as hits
 
 ### Requirement: Backfill
 A workspace's index SHALL be built per source in the background, in pages,
