@@ -2,7 +2,7 @@
 #
 #   cp .env.example .env        # then edit it
 #   docker compose up -d        # server, postgres, identity provider
-#   docker compose --profile ai up -d     # + local open-weight models
+#   docker compose --profile ai up -d     # + local open-weight models (Laya, Ollama, TEI)
 #
 # See README.md in this directory.
 name: campbooks
@@ -26,8 +26,12 @@ services:
       CAMPBOOKS_BFF__CLIENT_SECRET_FILE: /run/campbooks/campbooks-web.client-secret
       CAMPBOOKS_SECRET_KEY_FILE: /run/campbooks/secret-key
     volumes:
+      # Message bodies, attachments and files (CAMPBOOKS_BLOBS__PATH). Back it
+      # up with Postgres; unused when CAMPBOOKS_BLOBS__BACKEND=s3.
+      - blobs-data:/data/blobs
+      # The instance secret key and the web client's OIDC secret, read through
+      # the supplementary group 10001 (the files are 0440, see server/init.sh).
       - server-secrets:/run/campbooks:ro
-    # The secrets are group 10001 and 0440 (see server/init.sh).
     group_add: ["10001"]
     # Web app and API on one port (the image sets CAMPBOOKS_WEB_DIR).
     ports:
@@ -129,7 +133,28 @@ services:
         condition: service_completed_successfully
 
   # --- Local AI (open-weight models) --------------------------------------------
-  # CPU inference works but is slow; see README.md.
+  # Optional: `docker compose --profile ai up -d`. See README.md → Local AI.
+  #
+  # laya: the `decide` role (typed decisions, ADR 0009). Built locally from
+  # ./laya (there is no official image); downloads the multilingual checkpoint
+  # (~680 MB) into the `laya-models` volume on first start. Runs well on CPU.
+  # No published port: only the server reaches it, on the compose network.
+  laya:
+    profiles: ["ai"]
+    build: ./laya
+    restart: unless-stopped
+    environment:
+      # laya-serve answers anyone when its key is empty, so the container
+      # refuses to start without one. Set it in .env; the server sends the
+      # same value.
+      LAYA_API_KEY: ${CAMPBOOKS_AI__DECIDE__API_KEY:-}
+      # Cap the CPU threads inference uses (default: all cores).
+      # LAYA_THREADS: "4"
+    volumes:
+      - laya-models:/models
+    # The image's HEALTHCHECK probes /health; allow for the first download.
+
+  # ollama: `complete` (and optionally `vision`). CPU inference works but is slow.
   ollama:
     profiles: ["ai"]
     image: ollama/ollama:0.40.3
@@ -155,8 +180,10 @@ services:
 
 volumes:
   postgres-data:
+  blobs-data:
   idp-data:
   # The instance secret key and the web client's OIDC secret (read-only for the server).
   server-secrets:
+  laya-models:
   ollama-data:
   embeddings-data:

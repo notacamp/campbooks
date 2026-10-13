@@ -1,0 +1,12 @@
+import { createRoute, type AnyRoute } from "@tanstack/react-router";
+
+import { {{pascal}}Home } from "./components/{{pascal}}Home/{{pascal}}Home";
+
+export function build{{pascal}}Routes<TParent extends AnyRoute>(parent: TParent) {
+  const home = createRoute({
+    getParentRoute: () => parent,
+    path: "/{{kebab}}",
+    component: {{pascal}}Home,
+  });
+  return [home] as const;
+}

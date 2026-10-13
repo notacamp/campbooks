@@ -1,0 +1,25 @@
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: grid;
+  place-items: start center;
+  padding: var(--space-12) var(--space-3) var(--space-3);
+  background: var(--surface-scrim);
+}
+
+.dialog {
+  width: min(var(--overlay-width), var(--size-overlay-max));
+  max-height: calc(var(--size-viewport-min) - var(--space-12) * 2);
+  overflow: auto;
+  border-radius: var(--overlay-radius);
+  background: var(--surface-overlay);
+  box-shadow:
+    var(--shadow-overlay),
+    inset 0 0 0 var(--border-width) var(--border-strong);
+  color: var(--text-primary);
+}
+
+.dialog:focus-visible {
+  outline: 0;
+}

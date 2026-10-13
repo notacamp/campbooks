@@ -1,0 +1,97 @@
+//! `GET /api/v1/{{kebab}}/{{feature_kebab}}` — {{feature_title_lower}}.
+//!
+//! TODO(new-feature): say what this use case answers and replace the
+//! placeholder response. The feature owns its handler, request and response
+//! types, queries and tests; anything another feature of this module needs
+//! too moves to `domain/`.
+
+use axum::Json;
+use campbooks_kernel::{Problem, auth::Scoped};
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+
+use crate::scopes::{{pascal}}Read;
+
+/// The answer to `{{feature}}`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct {{feature_pascal}}Response {
+    /// Who asked: the access token's subject.
+    #[schema(example = "user-123")]
+    pub subject: String,
+}
+
+/// {{feature_title}}.
+#[utoipa::path(
+    get,
+    path = "/api/v1/{{kebab}}/{{feature_kebab}}",
+    operation_id = "{{name}}_{{feature}}",
+    tag = "{{name}}",
+    security(("bearer" = ["{{name}}:read"])),
+    responses(
+        (status = OK, description = "The answer for the caller.", body = {{feature_pascal}}Response),
+        (status = UNAUTHORIZED, description = "No valid access token.",
+            body = Problem, content_type = "application/problem+json"),
+        (status = FORBIDDEN, description = "The token lacks `{{name}}:read`.",
+            body = Problem, content_type = "application/problem+json"),
+    )
+)]
+pub async fn handler(
+    Scoped { principal, .. }: Scoped<{{pascal}}Read>,
+) -> Json<{{feature_pascal}}Response> {
+    // To read this module's tables, also take `State(state): State<AppState>`,
+    // query `state.db` with `sqlx::query!` (then refresh the offline cache:
+    // `cargo sqlx prepare --workspace -- --all-targets`), return
+    // `campbooks_kernel::Result<Json<_>>`, and answer `Error::NotFound` for a
+    // record the principal may not see, never 403.
+    Json({{feature_pascal}}Response {
+        subject: principal.subject,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::{
+        body::Body,
+        http::{Request, StatusCode, header},
+    };
+    use campbooks_kernel::testing::{self, TestIdp, TestResponse};
+
+    const PATH: &str = "/api/v1/{{kebab}}/{{feature_kebab}}";
+
+    /// `GET PATH` with a token granting `scope`.
+    async fn call_with_scope(idp: &TestIdp, scope: &str) -> TestResponse {
+        let app = testing::app(crate::module(), idp.state(testing::unreachable_pool()));
+        let token = idp.token(&idp.claims(scope));
+        let request = Request::get(PATH)
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .body(Body::empty())
+            .unwrap();
+        testing::send(&app, request).await
+    }
+
+    #[tokio::test]
+    async fn answers_a_caller_with_the_read_scope() {
+        let idp = TestIdp::start().await;
+        let response = call_with_scope(&idp, "{{name}}:read").await;
+
+        assert_eq!(response.status, StatusCode::OK);
+        assert_eq!(response.json["subject"], "test-user");
+    }
+
+    #[tokio::test]
+    async fn refuses_a_token_without_the_read_scope() {
+        let idp = TestIdp::start().await;
+        let response = call_with_scope(&idp, "{{name}}:write").await;
+
+        assert_eq!(response.status, StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn refuses_an_anonymous_caller() {
+        let idp = TestIdp::start().await;
+        let app = testing::app(crate::module(), idp.state(testing::unreachable_pool()));
+        let response = testing::get(&app, PATH).await;
+
+        assert_eq!(response.status, StatusCode::UNAUTHORIZED);
+    }
+}

@@ -80,6 +80,17 @@ export default async function home({ page }: ScenarioContext): Promise<void> {
 
 Recordings must show demo data only, never a real person's mail or documents.
 
+## Design system and Storybook
+
+UI is built from `src/lib/ui` (tokens, themes, components) and `src/lib/shortcuts` (the
+keyboard shortcut registry); see `../docs/design-system.md` and AGENTS.md → UI.
+
+```sh
+pnpm --dir clients --filter @campbooks/app exec playwright install chromium   # once
+pnpm --dir clients storybook          # http://localhost:6006
+pnpm --dir clients test-storybook     # stories as tests, with axe
+```
+
 ## Desktop development
 
 ```sh
@@ -98,18 +109,19 @@ Rust command `api_request` (`src-tauri/src/api.rs`), which forwards it to `CAMPB
 All of these run in CI and must pass. Run them from the repo root with `--dir clients`, or
 from `clients/`:
 
-| Command                                     | What it checks                                                                       |
-| ------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `pnpm lint`                                 | ESLint (typescript-eslint strict + stylistic type-checked, React, hooks, a11y, ...)  |
-| `pnpm typecheck`                            | `tsc -b` with `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`     |
-| `pnpm test`                                 | Vitest + Testing Library; >= 80% coverage of `src/lib` and `src/modules`             |
-| `pnpm deps:check`                           | dependency-cruiser architecture rules (`app/.dependency-cruiser.cjs`)                |
-| `pnpm deadcode`                             | knip: unused files, exports and dependencies                                         |
-| `pnpm format:check`                         | Prettier (`pnpm format` to fix)                                                      |
-| `pnpm build`                                | type-check + production build to `app/dist`                                          |
-| `pnpm audit --prod`                         | known vulnerabilities in shipped dependencies                                        |
-| `pnpm api:check`                            | `src/lib/api/schema.gen.ts` is up to date with `openapi/openapi.json`                |
-| `cargo clippy --all-targets -- -D warnings` | the Tauri shell (run inside `app/src-tauri`, plus `cargo fmt --check`, `cargo test`) |
+| Command                                     | What it checks                                                                                                     |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `pnpm lint`                                 | ESLint (typescript-eslint strict + stylistic type-checked, React, hooks, a11y, ...) and stylelint (token-only CSS) |
+| `pnpm typecheck`                            | `tsc -b` with `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`                                   |
+| `pnpm test`                                 | Vitest + Testing Library; >= 80% coverage of `src/lib` and `src/modules`                                           |
+| `pnpm test-storybook`                       | every Storybook story in headless Chromium, with axe, in light and in dark                                         |
+| `pnpm deps:check`                           | dependency-cruiser architecture rules (`app/.dependency-cruiser.cjs`)                                              |
+| `pnpm deadcode`                             | knip: unused files, exports and dependencies                                                                       |
+| `pnpm format:check`                         | Prettier (`pnpm format` to fix)                                                                                    |
+| `pnpm build`                                | type-check + production build to `app/dist`                                                                        |
+| `pnpm audit --prod`                         | known vulnerabilities in shipped dependencies                                                                      |
+| `pnpm api:check`                            | `src/lib/api/schema.gen.ts` is up to date with `openapi/openapi.json`                                              |
+| `cargo clippy --all-targets -- -D warnings` | the Tauri shell (run inside `app/src-tauri`, plus `cargo fmt --check`, `cargo test`)                               |
 
 Rules worth knowing before you write code:
 
@@ -127,8 +139,11 @@ Rules worth knowing before you write code:
 ```
 app/
   src/app/        shell: main.tsx, router.tsx (the one router), providers, module manifest, routes/
-  src/lib/        business-agnostic toolbox: api (typed client + transport), i18n, platform, storage
+  src/lib/        business-agnostic toolbox: api (typed client + transport), i18n, platform, storage,
+                  ui (design system), shortcuts (keyboard shortcut registry)
   src/modules/    one folder per server module (crates/modules/<name>), public surface = index.ts
+  stories/        Storybook pattern stories (the approved screens, demo data)
+  .storybook/     Storybook config: theme × accent × density × locale toolbar
   test/           test helpers, setup, and the architecture (dependency-cruiser) test
   src-tauri/      Tauri 2 shell (desktop + mobile)
 ```

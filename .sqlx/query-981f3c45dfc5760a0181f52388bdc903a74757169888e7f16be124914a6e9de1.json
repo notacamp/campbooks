@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO kernel.blobs (workspace_id, hash, size) VALUES ($1, $2, $3)\n            ON CONFLICT (workspace_id, hash) DO UPDATE SET touched_at = now()\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "981f3c45dfc5760a0181f52388bdc903a74757169888e7f16be124914a6e9de1"
+}

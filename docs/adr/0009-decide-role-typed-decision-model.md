@@ -63,3 +63,19 @@ It is served by `laya-serve` on `POST /v1/systemone`.
   written) — slower per message, no reliable probabilities, parsing failures.
 - Training a classifier per question — no zero-shot start, a model per
   question to ship and maintain.
+
+## Notes
+- **2026-10-13, first integration (campbooks-cloud#58).** The decision stands;
+  one claim above needs a caveat. The multilingual checkpoint ships with no
+  fitted temperature, and its zero-shot answers can be confidently wrong. On a
+  sample invoice email (CPU, 6 cores, about 0.3–0.6 s per three-question call,
+  about 2 GB of RAM), it chose the right category in English (0.99) but
+  "newsletter" for the same email in Portuguese (0.9997), and gave P(true)
+  ≈ 0.003 to "the sender asks the recipient to do something" in both
+  languages, also when asked as a two-option `choice`. The model card reports
+  the base checkpoints near chance on its typed-decisions benchmark zero-shot.
+  So the probabilities are not calibrated until we refit them, and a high
+  confidence is not, by itself, a reason to act. Until a question has an eval
+  set from user corrections that shows it works, its answers are suggestions,
+  never automatic actions. Fine-tuning a checkpoint on our own decisions is the
+  expected way to make them reliable.

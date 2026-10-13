@@ -1,0 +1,77 @@
+.row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-0-5) var(--space-3);
+  width: 100%;
+  padding: var(--row-pad-y) var(--row-pad-x);
+  border: 0;
+  border-radius: var(--row-radius);
+  background: none;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--surface-hover);
+}
+
+.row[aria-current="true"] {
+  background: var(--accent-soft);
+}
+
+.row > :first-child {
+  grid-row: span 3;
+}
+
+.from {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  min-width: 0;
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+}
+
+.fromName,
+.subject,
+.snippet {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row[data-unread] .from {
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.row[data-unread] .from::before {
+  flex: none;
+  width: var(--space-1-5);
+  height: var(--space-1-5);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  content: "";
+}
+
+.time {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.subject {
+  grid-column: 2 / 4;
+  font-size: var(--text-md);
+}
+
+.snippet {
+  grid-column: 2 / 4;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+[data-density="compact"] .snippet {
+  display: none;
+}

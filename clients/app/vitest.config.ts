@@ -11,11 +11,14 @@ export default mergeConfig(
       include: ["src/**/*.test.{ts,tsx}", "test/**/*.test.{ts,tsx}"],
       exclude: ["test/fixtures/**"],
       restoreMocks: true,
+      // Process CSS so component class names are real and token files can be
+      // read with `?raw` (tokens.test.ts).
+      css: true,
       unstubGlobals: true,
       coverage: {
         provider: "v8",
         include: ["src/lib/**", "src/modules/**"],
-        exclude: ["**/*.gen.ts", "**/*.test.{ts,tsx}", "**/*.json"],
+        exclude: ["**/*.gen.ts", "**/*.test.{ts,tsx}", "**/*.stories.tsx", "**/*.json", "**/*.css"],
         reporter: ["text", "html", "lcov"],
         thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 },
       },

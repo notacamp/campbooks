@@ -4,6 +4,8 @@ import { Suspense, type ReactNode } from "react";
 import { I18nextProvider } from "react-i18next";
 
 import { createI18n, loadersFromGlob, type Locale, type Messages } from "~/lib/i18n";
+import { ShortcutProvider, ShortcutRegistry, DEFAULT_SHORTCUTS } from "~/lib/shortcuts";
+import { UI_NAMESPACES } from "~/lib/ui";
 
 import en from "../src/app/i18n/en.json";
 
@@ -17,6 +19,7 @@ export function renderWithProviders(ui: ReactNode, locale: Locale = "en"): Rende
   const i18n = createI18n({
     locale,
     shell: { en, "pt-PT": en, "es-ES": en, fr: en },
+    bundled: UI_NAMESPACES,
     loaders: loadersFromGlob(moduleMessages),
   });
   return render(
@@ -26,6 +29,34 @@ export function renderWithProviders(ui: ReactNode, locale: Locale = "en"): Rende
       </QueryClientProvider>
     </I18nextProvider>,
   );
+}
+
+/**
+ * Renders design-system UI with real i18n (bundled `ui` and `shortcuts`
+ * namespaces) and a fresh shortcut registry on the non-Apple platform, so
+ * hints read "Ctrl" and key presses on `document` reach bound handlers.
+ */
+export function renderUi(
+  ui: ReactNode,
+  {
+    locale = "en",
+    registry = new ShortcutRegistry(DEFAULT_SHORTCUTS),
+  }: { locale?: Locale; registry?: ShortcutRegistry } = {},
+): RenderResult & { registry: ShortcutRegistry } {
+  const i18n = createI18n({
+    locale,
+    shell: { en, "pt-PT": en, "es-ES": en, fr: en },
+    bundled: UI_NAMESPACES,
+    loaders: {},
+  });
+  const result = render(
+    <I18nextProvider i18n={i18n}>
+      <ShortcutProvider registry={registry} platform="other">
+        {ui}
+      </ShortcutProvider>
+    </I18nextProvider>,
+  );
+  return { ...result, registry };
 }
 
 /** Stubs `fetch` with JSON responses keyed by request path. */

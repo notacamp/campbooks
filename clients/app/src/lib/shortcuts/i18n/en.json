@@ -1,0 +1,48 @@
+{
+  "nav": {
+    "home": "Home",
+    "inbox": "Inbox",
+    "schedule": "Schedule",
+    "tasks": "Tasks",
+    "documents": "Documents",
+    "money": "Money"
+  },
+  "list": {
+    "next": "Next item",
+    "previous": "Previous item",
+    "open": "Open"
+  },
+  "item": {
+    "reply": "Reply",
+    "done": "Done",
+    "later": "Later",
+    "hold": "Hold time",
+    "paid": "Mark as paid",
+    "choice1": "First choice",
+    "choice2": "Second choice"
+  },
+  "compose": {
+    "draft": "Draft it for me",
+    "send": "Send"
+  },
+  "command": {
+    "open": "Search or ask"
+  },
+  "undo": "Undo",
+  "workspace": {
+    "switch": "Switch workspace"
+  },
+  "sheet": {
+    "open": "Keyboard shortcuts"
+  },
+  "overlay": {
+    "close": "Close"
+  },
+  "groups": {
+    "navigation": "Go to",
+    "general": "General",
+    "list": "Lists",
+    "item": "Selected item",
+    "compose": "Writing"
+  }
+}

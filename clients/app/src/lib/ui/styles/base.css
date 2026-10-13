@@ -1,0 +1,58 @@
+/*
+ * Base styles for the whole document. Reads only tokens.
+ *
+ * Resets are wrapped in :where() on purpose: zero specificity, so a
+ * component's own rule always wins (otherwise `button { color: inherit }`
+ * beats `.primary { color: var(--on-accent) }` and primary buttons inherit the
+ * page colour).
+ */
+:where(html) {
+  background: var(--surface-base);
+}
+
+:where(body) {
+  margin: var(--space-0);
+  font: var(--weight-regular) var(--text-md) / var(--leading-normal) var(--font-sans);
+  color: var(--text-primary);
+  background: var(--surface-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:where(*, *::before, *::after) {
+  box-sizing: border-box;
+}
+
+:where(button, input, textarea, select) {
+  font: inherit;
+  color: inherit;
+}
+
+:where(a) {
+  color: var(--accent-text);
+  text-decoration: none;
+}
+
+:where(h1, h2, h3, h4, p, ul, ol, dl, dd, figure) {
+  margin: var(--space-0);
+}
+
+:where(ul, ol) {
+  padding: var(--space-0);
+}
+
+:focus-visible {
+  outline: var(--focus-width) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: var(--duration-none) !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: var(--duration-none) !important;
+    scroll-behavior: auto !important;
+  }
+}

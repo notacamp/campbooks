@@ -5,8 +5,10 @@
    provider. The server answers both the web app (open `http://localhost:8080/`) and the
    API (`/api/v1/...`) on port 8080; the identity provider listens on port 8081.
 3. Check it: `curl http://localhost:8080/api/v1/system/health` should return `{"status":"ok","database":"ok"}`.
-4. Optional local AI: `docker compose --profile ai up -d`, then pull the models once:
-   `docker compose exec ollama ollama pull qwen3:8b` (TEI downloads `BAAI/bge-m3` itself).
+4. Optional local AI: set `CAMPBOOKS_AI__DECIDE__API_KEY` in `.env`
+   (`openssl rand -hex 32`), run `docker compose --profile ai up -d`, then pull the
+   `complete` model once: `docker compose exec ollama ollama pull qwen3:8b`. Laya and
+   TEI download their models themselves. See "Local AI" below.
 5. Sign-in: the identity provider (Rauthy) starts with everything else, the
    API trusts its access tokens out of the box (issuer derived from
    `CAMPBOOKS_IDP_URL`), and the web app signs you in through it. See
@@ -24,8 +26,120 @@
    one `command: ["api"]`. Worker settings are the `CAMPBOOKS_JOBS__*` block
    of `.env.example`.
 
-CPU inference works but is slow. For the `decide` and `complete` roles, use a GPU
-host or a hosted provider serving open-weight models (set its URL in `.env`).
+8. Files (message bodies, attachments, documents) are stored outside Postgres,
+   in the `blobs-data` volume by default. See "Blob storage" below to use an
+   S3-compatible bucket instead.
+
+CPU inference works but is slow for `complete`. Use a GPU host or a hosted provider
+serving open-weight models for it (set its URL in `.env`). `decide` (Laya) and `embed`
+run fine on CPU.
+
+## Local AI
+
+`docker compose --profile ai up -d` adds three services, one per AI role it serves
+(see `docs/adr/0005-open-weight-ai-by-role.md` and `0009-decide-role-typed-decision-model.md`):
+
+| Service | Role | Model | Notes |
+| --- | --- | --- | --- |
+| `laya` | `decide` | `convaiinnovations/laya-multilingual` (Apache-2.0, 322M) | Built from `deploy/laya`; ~680 MB download on first start; about 2 GB of RAM |
+| `ollama` | `complete` (and `vision`) | `qwen3:8b` | Pull models with `docker compose exec ollama ollama pull …` |
+| `embeddings` | `embed` | `BAAI/bge-m3` | linux/amd64 only; on arm64 use Ollama's `bge-m3` |
+
+### Laya (`decide`)
+
+`decide` answers typed questions about an item — which option, what score, is this
+true — with a probability for each answer. Laya is a small decision model that does
+this in one forward pass, so it runs on CPU (a few hundred milliseconds per item on a
+recent laptop).
+
+- **API key, required.** `laya-serve` accepts unauthenticated requests when it has no
+  key, so the `laya` service refuses to start until `CAMPBOOKS_AI__DECIDE__API_KEY` is
+  set in `.env`. The server sends the same value. The service has no published port:
+  only containers on the compose network reach it.
+- **The image.** There is no official image, so compose builds one from
+  `deploy/laya/Dockerfile`: Python slim, CPU-only PyTorch, `laya[serve]` and its
+  libraries at pinned versions, running as a non-root user. On first start it
+  downloads the multilingual checkpoint (at the commit the `laya` package lists as
+  reviewed) into the `laya-models` volume; later starts load it from there. Build it
+  again after an upgrade with `docker compose --profile ai build laya`. The image is
+  optional and is not scanned by the release pipeline (only the Campbooks image is).
+- **CPU threads.** Inference uses every core by default; set `LAYA_THREADS` on the
+  `laya` service to cap it.
+- **Another model.** `CAMPBOOKS_AI__DECIDE__MODEL` also accepts
+  `convaiinnovations/laya` (English only, 512 tokens) and
+  `convaiinnovations/laya-typed-decisions`; the image preloads only the multilingual
+  one, so set `LAYA_MODELS` on the service too.
+- **An instruct model instead.** Set `CAMPBOOKS_AI__DECIDE__PROTOCOL=openai` and point
+  `decide` at any OpenAI-compatible endpoint (Ollama, vLLM, a hosted provider). It
+  answers the same questions with JSON-schema output. Probabilities come from token
+  log-probabilities when the server returns them; without them answers carry no
+  confidence, so nothing that needs one acts on its own.
+- **Calibration.** Out of the box the models are over-confident. Per question type
+  (and option count) temperatures in `CAMPBOOKS_AI__DECIDE__CALIBRATION__*` soften
+  the probabilities (see `.env.example`); they default to 1.0 and will later be
+  refitted from users' corrections.
+
+## Blob storage
+
+Raw messages, attachments and files live in object storage; Postgres keeps their
+metadata and who uses them. Each file is stored once per workspace, under its SHA-256,
+however many messages carry it. A file nothing uses any more is deleted by an hourly
+sweep once `CAMPBOOKS_BLOBS__SWEEP_GRACE_HOURS` (default 24) have passed. Files larger
+than `CAMPBOOKS_BLOBS__MAX_OBJECT_BYTES` (default 50 MiB) are refused.
+
+**Local disk (default).** `CAMPBOOKS_BLOBS__BACKEND=fs` stores files under
+`CAMPBOOKS_BLOBS__PATH` (`/data/blobs`, the `blobs-data` volume). Writes are atomic: a
+temporary file, flushed to disk, then renamed into place.
+
+**S3-compatible store.** Any store that speaks the S3 API works (AWS S3, Garage, MinIO,
+Ceph, Cloudflare R2, ...). Create a private bucket and an access key limited to it, then
+set in `.env`:
+
+```sh
+CAMPBOOKS_BLOBS__BACKEND=s3
+CAMPBOOKS_BLOBS__S3__BUCKET=campbooks-blobs
+CAMPBOOKS_BLOBS__S3__ENDPOINT=https://s3.example.com   # unset for AWS
+CAMPBOOKS_BLOBS__S3__REGION=us-east-1                  # what your store expects
+CAMPBOOKS_BLOBS__S3__ACCESS_KEY_ID=...
+CAMPBOOKS_BLOBS__S3__SECRET_ACCESS_KEY=...
+CAMPBOOKS_BLOBS__S3__PATH_STYLE=true                   # most self-hosted stores
+```
+
+The server checks that it can reach the bucket on startup and refuses to start
+otherwise. Large uploads go up in parts; add a lifecycle rule to the bucket that aborts
+incomplete multipart uploads after a day, so a crash mid-upload leaves nothing behind.
+The `blobs-data` volume is unused with this backend.
+
+**Encryption at rest.** Campbooks does not encrypt files itself yet. Use your store's
+encryption: server-side encryption on the bucket (SSE-S3 or SSE-KMS on AWS; Garage,
+MinIO and Ceph have their own), or an encrypted disk under `blobs-data` for the local
+backend.
+
+**Moving between backends.** Copy the whole tree (`<workspace>/<aa>/<sha256>` keys,
+the `_staging/` prefix excepted) to the new store with the server stopped, then switch
+the settings: the keys are identical on disk and in a bucket.
+
+## Backups
+
+Back up these together, at about the same time:
+
+| What | Where | Holds |
+| --- | --- | --- |
+| Postgres | `postgres-data` volume (use `pg_dump`) | Everything except files and the IdP's state |
+| Files | `blobs-data` volume, or your bucket | Raw messages, attachments, documents |
+| Identity provider | `idp-data` volume | Accounts, sign-in clients and the IdP's encryption key |
+
+Restore Postgres and the files from the same point in time. A file that is missing from
+the store while Postgres still lists it cannot be read, so take the database dump first,
+then copy the files: files uploaded in between are only harmless extras. For a bucket,
+turn on versioning (and keep old versions for a few days) instead of copying.
+
+For the local volume, for example:
+
+```sh
+docker run --rm -v campbooks_blobs-data:/data -v "$PWD":/backup busybox:1.37.0-musl \
+  tar czf /backup/blobs-data.tgz -C /data .
+```
 
 ## Identity provider
 

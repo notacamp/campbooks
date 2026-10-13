@@ -1,0 +1,65 @@
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: var(--border-width) solid var(--border-subtle);
+}
+
+.input {
+  flex: 1 1 0;
+  min-width: 0;
+  height: var(--size-control-md);
+  border: 0;
+  outline: 0;
+  background: none;
+  font-size: var(--text-md);
+  color: var(--text-primary);
+}
+
+.input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.list {
+  padding: var(--space-1-5);
+}
+
+.groupLabel {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  font: var(--weight-semibold) var(--text-xs) / var(--leading-none) var(--font-sans);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--size-control-lg);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.option[aria-selected="true"] {
+  background: var(--surface-selected);
+  color: var(--text-primary);
+}
+
+.label {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty {
+  padding: var(--space-4) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}

@@ -1,0 +1,58 @@
+{
+  "close": "Close",
+  "undo": "Undo",
+  "redo": "Redo",
+  "loading": "Loading",
+  "kbd": {
+    "then": "then",
+    "shortcut": "Shortcut: {{keys}}"
+  },
+  "toast": {
+    "region": "Notifications",
+    "undone": "Undone: {{label}}",
+    "redone": "Redone: {{label}}"
+  },
+  "note": {
+    "label": "Where things stand",
+    "why": "Why?",
+    "hideWhy": "Hide why"
+  },
+  "search": {
+    "label": "Search or ask"
+  },
+  "commandMenu": {
+    "label": "Command menu",
+    "placeholder": "Search, ask, or run a command",
+    "empty": "Nothing matches “{{query}}”",
+    "results": "Commands",
+    "ask": "Ask Campbooks: {{query}}",
+    "askGroup": "Ask"
+  },
+  "shortcutSheet": {
+    "title": "Keyboard shortcuts"
+  },
+  "workspace": {
+    "switch": "Switch workspace",
+    "current": "Switch workspace (current: {{name}})"
+  },
+  "visor": {
+    "idle": "Campbooks",
+    "reading": "Campbooks is reading",
+    "thinking": "Campbooks is thinking",
+    "unsure": "Campbooks is not sure",
+    "happy": "Campbooks is happy",
+    "alert": "Campbooks needs your attention",
+    "asleep": "Campbooks is paused"
+  },
+  "signal": {
+    "review": "Review",
+    "reply": "Reply",
+    "decide": "Decide",
+    "do": "Do",
+    "pay": "Pay",
+    "sort": "Sort"
+  },
+  "navigation": {
+    "main": "Main"
+  }
+}

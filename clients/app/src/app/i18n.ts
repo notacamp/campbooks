@@ -1,5 +1,6 @@
 import { createI18n, detectLocale, loadersFromGlob, type Messages } from "~/lib/i18n";
 import { readPref } from "~/lib/storage/prefs";
+import { UI_NAMESPACES } from "~/lib/ui";
 
 import en from "./i18n/en.json";
 import es from "./i18n/es-ES.json";
@@ -15,6 +16,7 @@ const moduleMessages = import.meta.glob<Messages>("../modules/*/i18n/*.json", {
 export const i18n = createI18n({
   locale: detectLocale(readPref("locale"), navigator.languages),
   shell: { en, "pt-PT": pt, "es-ES": es, fr },
+  bundled: UI_NAMESPACES,
   loaders: loadersFromGlob(moduleMessages),
 });
 

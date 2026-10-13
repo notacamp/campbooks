@@ -7,6 +7,25 @@ All notable changes to Campbooks Next are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Design system for the new app: light, dark and system themes; three
+  workspace accents (business in ink, personal in terracotta, forest) and a
+  compact density, remembered on each device and applied before the page
+  first paints; Funnel Sans and Funnel Display, self-hosted; and the shared
+  components the new screens are built from (buttons, keyboard hints,
+  avatars, signals, the assistant's visor and note, toasts with undo, empty
+  and loading states, queue rows, conversation rows, navigation, tab bar).
+- Keyboard shortcuts everywhere, shown on the buttons and rows they trigger:
+  G then a letter to move between places, J/K/Enter in lists, E, L, R, H on
+  the selected item, Z to undo, ? for the full list, and ⌘K (Ctrl+K) to search
+  every command. Shortcuts never fire while you type in a field.
+- Storybook for the design system (`pnpm --dir clients storybook`), with the
+  approved Home, Inbox, phone, states and themes screens on demo data, checked
+  for accessibility in light and dark on every pull request.
+- Versioned releases of Next: bumping `VERSION` (with a rolled changelog
+  section) on `next` publishes `ghcr.io/notacamp/campbooks:next-vX.Y.Z` and
+  `:next-vX.Y` (amd64 + arm64, Trivy-scanned, with provenance and SBOM
+  attestations), tags `next-vX.Y.Z` and creates a GitHub prerelease. See
+  CONTRIBUTING.md → Releases.
 - Foundation for the rewrite: Rust API skeleton (kernel, AI gateway, `system`
   module with health and version), one React/TypeScript client with a Tauri 2
   shell, OpenSpec workflow, architecture decision records, CI quality and
@@ -69,6 +88,43 @@ All notable changes to Campbooks Next are documented here. The format follows
 - `docker compose up` starts a one-shot `server-init` service that prepares the
   `server-secrets` volume; the web client's sign-in secret is now saved there
   (it used to be in `idp-data`).
+- Storage for message bodies, attachments and files, outside Postgres. Each
+  file is stored once per workspace however many messages carry it, checked
+  against its SHA-256 on the way in and out, and deleted by an hourly sweep
+  once nothing uses it and `CAMPBOOKS_BLOBS__SWEEP_GRACE_HOURS` (default 24)
+  have passed. By default files go to the new `blobs-data` volume
+  (`CAMPBOOKS_BLOBS__PATH`, `/data/blobs`); set
+  `CAMPBOOKS_BLOBS__BACKEND=s3` and `CAMPBOOKS_BLOBS__S3__*` to use any
+  S3-compatible bucket instead. Files over `CAMPBOOKS_BLOBS__MAX_OBJECT_BYTES`
+  (default 50 MiB) are refused. The server checks the store on startup and
+  will not start if it cannot reach it. Back up `blobs-data` (or the bucket)
+  together with Postgres; see `deploy/README.md`.
+- The AI gateway's `decide` role is now typed (ADR 0009): modules ask
+  `choice`, `score` and yes/no questions about an item and get answers with a
+  probability per option and a confidence, which they must clear before
+  acting. It is served by Laya, an open-weight decision model, or by any
+  instruct model through the OpenAI-compatible API. New settings:
+  `CAMPBOOKS_AI__DECIDE__PROTOCOL` (`laya` or `openai`, default `openai`, so
+  existing `decide` settings keep working), `CAMPBOOKS_AI__DECIDE__LOGPROBS`
+  (default `true`; set it to `false` for servers that reject the parameter)
+  and `CAMPBOOKS_AI__DECIDE__CALIBRATION__<TYPE>[_<OPTIONS>]` temperatures
+  (default 1.0). An empty `CAMPBOOKS_AI__<ROLE>__API_KEY` now means no key.
+- Self-hosting: `docker compose --profile ai` now also runs `laya`, the
+  default `decide` model (Laya multilingual, Apache-2.0, CPU-friendly). It is
+  built locally from `deploy/laya`, downloads its checkpoint (about 680 MB)
+  into the new `laya-models` volume on first start, is reachable only on the
+  compose network, and refuses to start until you set
+  `CAMPBOOKS_AI__DECIDE__API_KEY` in `.env` (`openssl rand -hex 32`).
+  `.env.example` now points `decide` at it; see `deploy/README.md`.
+- Contributor tooling: `cargo xtask new-module <name>` scaffolds a module
+  (crate, scopes, events, a scoped read slice with tests, schema migration,
+  OpenSpec change, client module with its four locale files) and registers it
+  in the workspace, the server and the client shell; `cargo xtask new-feature
+  <module> <feature>` adds a slice to a module; `cargo xtask scaffold-check`
+  (also run in CI) proves their output passes the gates. Optional local git
+  hooks (`lefthook install`), Claude Code skills for starting a task,
+  developing a feature and adding a module, and a guide to working in
+  parallel worktrees (`docs/parallel-work.md`).
 
 ### Changed
 - `/bff/api/*` now requires a signed-in session and calls the API with your

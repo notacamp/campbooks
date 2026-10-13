@@ -29,7 +29,7 @@ architecture.toml          module dependency allowlist, read by `cargo xtask arc
 crates/
   kernel/                  campbooks-kernel — config, errors (problem+json), db pool,
                            auth extractors, ids, clock, durable event bus and job
-                           queue (schema `kernel`), Module trait.
+                           queue (schema `kernel`), blob storage, Module trait.
                            Depends on NO internal crate.
   ai/                      campbooks-ai — role-based AI gateway: decide (typed decision
                            model, ADR 0009), embed/complete/vision (OpenAI-compatible
@@ -46,7 +46,7 @@ migrations/                <ts>_<module>__<desc>.sql, one Postgres schema per mo
                            <ts>_kernel__<desc>.sql for the kernel's `kernel` schema,
                            <ts>_bff__<desc>.sql for the web BFF's `bff` schema
 openapi/openapi.json       generated, committed; the contract for every client
-xtask/                     `cargo xtask arch | openapi [--check]`
+xtask/                     `cargo xtask arch | openapi [--check] | new-module | new-feature`
 clients/                   pnpm workspace
   app/                     the one UI (React + TypeScript + Vite)
     src/app/               shell: entry, router, providers, module manifest
@@ -68,7 +68,10 @@ A module is a Rust crate that hands the server one value:
 pub fn module() -> campbooks_kernel::Module { … }   // name, scopes, router, background work
 ```
 
-Inside it, code is sliced **by use case**, not by layer:
+`cargo xtask new-module <name>` scaffolds one (crate, schema migration,
+OpenSpec change, client module) and `cargo xtask new-feature <module>
+<feature>` adds a slice. Inside it, code is sliced **by use case**, not by
+layer:
 
 ```
 crates/modules/mail/src/
@@ -93,6 +96,22 @@ and the job queue (ADR 0012), written only through the kernel's API; and
 schema. A read that needs data from two modules is composed in the
 client, or by subscribing to the other module's events and keeping a local
 projection.
+
+### Files (blobs)
+
+Message bodies (raw MIME), attachments and files are not stored in
+Postgres but in object storage (ADR 0011), through `state.blobs`
+(`kernel::blobs::BlobStore`): local disk by default, any S3-compatible
+bucket otherwise (`CAMPBOOKS_BLOBS__*`). Blobs are content-addressed per
+workspace (`<workspace>/<aa>/<sha256>`), so the same bytes are stored once.
+A module `put`s the bytes (streamed and hashed; it gets a `BlobRef` of
+hash, size and content type to keep on its record), then `attach`es the blob
+to its record in the transaction that writes the record, and `detach`es it in
+the transaction that removes it. The kernel's hourly `kernel.sweep_blobs`
+deletes blobs nothing holds once `CAMPBOOKS_BLOBS__SWEEP_GRACE_HOURS` have
+passed, and `purge_workspace` removes a deleted workspace's blobs. The store
+never serves blobs by URL: a module's download endpoint checks access, then
+streams `get`.
 
 ### Endpoints and auth
 
@@ -158,6 +177,22 @@ tuned with `CAMPBOOKS_JOBS__*` (concurrency, per-workspace limit, poll
 interval, lease, retention, shutdown grace, retry backoff). A third role,
 `sync`, arrives with the connectors (ADR 0011).
 
+### AI calls
+
+A module asks `campbooks-ai` for a **role**, never a vendor (ADR 0005).
+`embed`, `complete` and `vision` use the OpenAI-compatible protocol. `decide`
+is typed (ADR 0009): `Gateway::decide(ctx, state, questions)` takes a compact
+state built by the module and `choice` / `score` / `noul` questions, and
+returns one answer per question with a probability per option and a
+confidence. It is served by Laya over `laya-serve` (`protocol = laya`, the
+default) or by an instruct model through a JSON-schema adapter
+(`protocol = openai`, probabilities from logprobs when available). Questions
+are checked before any call (at most 20 options: split larger sets into a
+coarse choice and a fine one). Probabilities pass through a per (question
+type, option count) temperature, from config today and refitted from user
+corrections later. A module acts on an answer only through
+`answer.accept_if(threshold)` and asks the user below it.
+
 ## Clients
 
 One React/TypeScript UI, three delivery targets (ADR 0003):
@@ -170,6 +205,11 @@ One React/TypeScript UI, three delivery targets (ADR 0003):
 
 `src/lib/api` hides the difference behind one typed client generated from
 `openapi/openapi.json`, so modules never know which target they run on.
+
+Screens are composed from the design system in `src/lib/ui` (three-layer
+tokens, themes, components) and `src/lib/shortcuts` (one keyboard shortcut
+registry); modules use them through `lib/ui/index.ts` and style nothing
+themselves. See [`design-system.md`](design-system.md).
 
 The web target is served by `campbooks-server` itself (ADR 0006): the release
 image builds `clients/app` and sets `CAMPBOOKS_WEB_DIR`, so UI and API share
