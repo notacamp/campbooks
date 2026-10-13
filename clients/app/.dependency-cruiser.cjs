@@ -65,7 +65,7 @@ module.exports = {
         "The generated OpenAPI types are an implementation detail of lib/api; use its client and ApiSchema<> instead.",
       severity: "error",
       from: { pathNot: "^src/lib/api/" },
-      to: { path: String.raw`^src/lib/api/schema\.gen\.ts$` },
+      to: { path: String.raw`^src/lib/api/(schema|admin)\.gen\.ts$` },
     },
     {
       name: "no-circular",

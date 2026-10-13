@@ -1,3 +1,4 @@
+import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -7,6 +8,7 @@ import { writePref } from "~/lib/storage/prefs";
 import {
   AccountButton,
   Button,
+  ButtonLink,
   DENSITIES,
   Popover,
   PopoverSection,
@@ -16,6 +18,8 @@ import {
   THEME_MODES,
   useTheme,
 } from "~/lib/ui";
+
+import { useAdminAccess } from "../admin/access";
 
 /** Each language in its own name: the same in every locale. */
 const LANGUAGE_NAMES: Record<Locale, string> = {
@@ -102,6 +106,7 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
           }}
         />
       </PopoverSection>
+      <AdminEntry />
       <PopoverSection>
         <Button
           variant="ghost"
@@ -118,5 +123,37 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
         </Button>
       </PopoverSection>
     </Popover>
+  );
+}
+
+/**
+ * "Administration", for administrators only: shown once the admin API's
+ * system overview answers (it answers 404 to everyone else). Asked only
+ * while the menu is open.
+ */
+function AdminEntry() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { access } = useAdminAccess();
+  if (access !== "admin" && access !== "reauth") {
+    return null;
+  }
+  return (
+    <PopoverSection>
+      <ButtonLink
+        variant="ghost"
+        icon="settings"
+        href="/admin"
+        onClick={(event) => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) {
+            return;
+          }
+          event.preventDefault();
+          void navigate({ to: "/admin" });
+        }}
+      >
+        {t("admin.menuEntry")}
+      </ButtonLink>
+    </PopoverSection>
   );
 }

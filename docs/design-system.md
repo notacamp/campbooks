@@ -108,6 +108,7 @@ Funnel Sans and Funnel Display, self-hosted from `@fontsource-variable/*`
 | Popover, PopoverSection | a small non-modal panel on its trigger (the account menu); Escape and outside clicks close it |
 | WorkspaceMenu, WorkspaceMark, AccountButton, PhoneHeader | the workspace switcher (⌘⇧W) with each workspace in its own accent, who is signed in, the phone's top bar |
 | List, ListRow, InlineConfirm | rows of people or invitations; risky actions confirm in place, not in a modal |
+| Fact, FactList | a description list of label and value (the admin System panel), with an optional status dot: success, danger or off |
 | Heading, Text, VisuallyHidden, Icon | typography and icons for modules |
 
 ## Keyboard shortcuts

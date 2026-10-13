@@ -80,6 +80,7 @@ describe("createWebTransport", () => {
 
   it.each([
     ["the API refused the token", 401, { code: "invalid_token" }],
+    ["the admin API wants a fresh sign-in", 401, { code: "admin_reauth_required" }],
     ["a non-problem body", 401, "nope"],
     ["another status", 403, { code: "session_required" }],
   ])("does not sign in when %s", async (_, status, body) => {
@@ -107,6 +108,24 @@ describe("createWebTransport", () => {
     await transport.fetch(new Request(`${transport.baseUrl}/api/v1/things`));
 
     expect(assign).toHaveBeenCalledWith(loginUrl("/"));
+  });
+
+  it("asks for a fresh sign-in when told to", () => {
+    expect(loginUrl("/admin/system", { fresh: true })).toBe(
+      "/bff/login?return_to=%2Fadmin%2Fsystem&max_age=0",
+    );
+    expect(loginUrl("/")).toBe("/bff/login?return_to=%2F");
+  });
+
+  it("sends admin API requests through the BFF too", async () => {
+    const send = vi.fn((request: Request) => Promise.resolve(Response.json({ url: request.url })));
+    const transport = createWebTransport(ORIGIN, send);
+
+    const response = await transport.fetch(
+      new Request(`${transport.baseUrl}/admin/v1/system/overview`),
+    );
+
+    expect(await response.json()).toStrictEqual({ url: `${ORIGIN}/bff/admin/v1/system/overview` });
   });
 
   it("forwards request bodies", async () => {
