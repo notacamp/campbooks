@@ -216,6 +216,18 @@ static MIGRATION_NAME: LazyLock<Regex> = LazyLock::new(|| {
         .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
 });
 
+/// No module may take the name of a non-module operation owner (the change
+/// feed's `changes`): operation ids are prefixed by their owner.
+pub fn check_reserved_owner(modules: &BTreeSet<String>, owner: &str) -> Vec<String> {
+    if modules.contains(owner) {
+        vec![format!(
+            "crates/modules/{owner}: `{owner}` is reserved for operations the server owns"
+        )]
+    } else {
+        Vec::new()
+    }
+}
+
 /// Migration files are `<14-digit timestamp>_<owner>__<description>.sql`,
 /// where the owner is an existing module or an infrastructure schema
 /// (`kernel`, `bff`), and have unique timestamps. No module may take an
@@ -942,6 +954,13 @@ mod tests {
         let v = check_migrations(&[], &clash);
         assert_eq!(v.len(), 2, "{v:?}");
         assert!(v.iter().all(|m| m.contains("reserved")));
+    }
+
+    #[test]
+    fn modules_may_not_take_a_reserved_owner_name() {
+        let modules: BTreeSet<String> = ["changes", "mail"].map(String::from).into();
+        assert_eq!(check_reserved_owner(&modules, "changes").len(), 1);
+        assert!(check_reserved_owner(&modules, "feed").is_empty());
     }
 
     #[test]

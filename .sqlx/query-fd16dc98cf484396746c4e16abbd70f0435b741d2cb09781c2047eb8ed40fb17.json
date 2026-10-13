@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO kernel.change_heads (workspace_id, head) VALUES ($1, 0)\n         ON CONFLICT (workspace_id) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fd16dc98cf484396746c4e16abbd70f0435b741d2cb09781c2047eb8ed40fb17"
+}

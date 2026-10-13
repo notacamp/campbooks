@@ -7,6 +7,7 @@
     "409": "Conflito",
     "413": "Conteúdo demasiado grande",
     "422": "Conteúdo não processável",
+    "429": "Demasiados pedidos",
     "500": "Erro interno do servidor",
     "503": "Serviço indisponível"
   },
@@ -31,6 +32,7 @@
     "database_unavailable": "A base de dados está indisponível neste momento. Tente novamente daqui a pouco.",
     "file_too_large": "O ficheiro excede o limite de {{limit}} bytes.",
     "upload_mismatch": "O ficheiro enviado não corresponde ao esperado. Envie-o novamente.",
-    "upload_failed": "Não foi possível ler o envio. Tente novamente."
+    "upload_failed": "Não foi possível ler o envio. Tente novamente.",
+    "too_many_streams": "Tem demasiadas ligações de atualização em direto abertas. Feche alguns separadores ou janelas e tente novamente."
   }
 }

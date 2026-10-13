@@ -70,4 +70,11 @@ impl Membership for WorkspaceMembership {
             Ok(access)
         })
     }
+
+    fn access_records(&self) -> &'static [&'static str] {
+        &[
+            crate::events::MEMBER_RECORD,
+            crate::events::WORKSPACE_RECORD,
+        ]
+    }
 }

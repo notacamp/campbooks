@@ -7,6 +7,7 @@
     "409": "Conflict",
     "413": "Content too large",
     "422": "Unprocessable content",
+    "429": "Too many requests",
     "500": "Internal server error",
     "503": "Service unavailable"
   },
@@ -31,6 +32,7 @@
     "database_unavailable": "The database is unavailable right now. Try again in a moment.",
     "file_too_large": "The file is larger than the limit of {{limit}} bytes.",
     "upload_mismatch": "The uploaded file does not match what was expected. Upload it again.",
-    "upload_failed": "Reading the upload failed. Try again."
+    "upload_failed": "Reading the upload failed. Try again.",
+    "too_many_streams": "You have too many live update connections open. Close some tabs or windows and try again."
   }
 }

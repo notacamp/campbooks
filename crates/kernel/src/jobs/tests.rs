@@ -1010,7 +1010,7 @@ async fn enqueue_notifications_wake_an_idle_worker(db: PgPool) {
     wait_for_kernel_schedules(&db).await;
     stop.send(()).unwrap();
     // The probe, and the kernel's prunes and blob sweep scheduled at start-up.
-    assert_eq!(worker.await.unwrap().succeeded, 4);
+    assert_eq!(worker.await.unwrap().succeeded, 5);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -1058,7 +1058,7 @@ async fn shutdown_finishes_quick_jobs_and_releases_slow_ones(db: PgPool) {
     let stats = worker.await.unwrap();
     // The quick probe and the kernel's prunes and blob sweep scheduled at
     // start-up.
-    assert_eq!((stats.succeeded, stats.released), (4, 1));
+    assert_eq!((stats.succeeded, stats.released), (5, 1));
     assert_eq!(job(&db, quick).await.state, "succeeded");
     let slow = job(&db, slow).await;
     assert_eq!((slow.state.as_str(), slow.attempts), ("pending", 0));
@@ -1086,8 +1086,10 @@ fn registry_collects_kernel_and_module_work() {
     assert_eq!(
         registry.kind_names(),
         [
+            "kernel.prune_changes",
             "kernel.prune_idempotency",
             "kernel.prune_jobs",
+            "kernel.sequence_changes",
             "kernel.sweep_blobs",
             "test.count_a",
             "test.count_b",
@@ -1099,10 +1101,14 @@ fn registry_collects_kernel_and_module_work() {
         [
             "kernel.prune_jobs",
             "kernel.sweep_blobs",
-            "kernel.prune_idempotency"
+            "kernel.prune_idempotency",
+            "kernel.prune_changes"
         ]
     );
-    assert_eq!(registry.queues(), ["default", "events", "maintenance"]);
+    assert_eq!(
+        registry.queues(),
+        ["changes", "default", "events", "maintenance"]
+    );
     let consumers: Vec<_> = registry
         .consumers_of("test.pinged")
         .iter()

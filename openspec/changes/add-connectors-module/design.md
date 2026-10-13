@@ -262,6 +262,11 @@ Published (workspace-scoped, v1, ids and non-personal facts only):
 | `connectors.connection_removed` | workspace, connection, inbox_ids |
 | `connectors.messages_changed` | workspace, inbox_id, batch (blob ref), cursor |
 
+Each of the first four declares its connection to the client change feed
+(`connectors.connection`, upsert or delete, ids only), so clients refetch
+it. Health moves between `ok`, `throttled` and `failing` are not announced
+yet (follow-up).
+
 Consumed (mirror types):
 
 - `connectors.revoke_workspace_grants` ← `workspaces.workspace_deleting`:

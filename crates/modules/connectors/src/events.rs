@@ -8,12 +8,20 @@
 //! [`MessagesChanged`] and [`CapabilityGranted`] are contracts with the
 //! conversations module (`contracts/*.schema.json`).
 
-use campbooks_kernel::{DomainEvent, blobs::BlobRef, tenancy::UserId};
+use campbooks_kernel::{DomainEvent, RecordRef, blobs::BlobRef, changes::Change, tenancy::UserId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::domain::model::{Capability, ConnectionId, InboxId, Provider};
+
+/// The record type of a connection in the client change feed.
+pub const CONNECTION_RECORD: &str = "connectors.connection";
+
+/// A connection, as the change feed names it (ids only).
+fn connection_record(connection: ConnectionId) -> RecordRef {
+    RecordRef::new(CONNECTION_RECORD, &connection)
+}
 
 /// How a [`BlobRef`] looks on the wire, for the events catalogue.
 #[derive(ToSchema)]
@@ -48,6 +56,10 @@ impl DomainEvent for ConnectionAdded {
     fn workspace(&self) -> Option<&str> {
         Some(&self.workspace)
     }
+
+    fn changes(&self) -> Vec<Change> {
+        vec![Change::upsert(connection_record(self.connection))]
+    }
 }
 
 /// A connection gained a capability: a new connection, or an incremental
@@ -78,6 +90,10 @@ impl DomainEvent for CapabilityGranted {
 
     fn workspace(&self) -> Option<&str> {
         Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<Change> {
+        vec![Change::upsert(connection_record(self.connection))]
     }
 }
 
@@ -120,6 +136,10 @@ impl DomainEvent for ConnectionNeedsReauth {
     fn workspace(&self) -> Option<&str> {
         Some(&self.workspace)
     }
+
+    fn changes(&self) -> Vec<Change> {
+        vec![Change::upsert(connection_record(self.connection))]
+    }
 }
 
 /// A connection was disconnected: its grant is revoked and its streams are
@@ -140,6 +160,10 @@ impl DomainEvent for ConnectionRemoved {
 
     fn workspace(&self) -> Option<&str> {
         Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<Change> {
+        vec![Change::delete(connection_record(self.connection))]
     }
 }
 

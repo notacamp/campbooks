@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH old AS (SELECT name, accent FROM workspaces.workspaces WHERE id = $1)\n           UPDATE workspaces.workspaces w\n              SET name = coalesce($2, w.name), accent = coalesce($3, w.accent)\n             FROM old\n            WHERE w.id = $1\n        RETURNING w.name IS DISTINCT FROM old.name AS \"name!\",\n                  w.accent IS DISTINCT FROM old.accent AS \"accent!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "accent!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "f502f37f759130b84183b7cc60ee147c51f68a5038e36c3eb618f3ef7679b16c"
+}

@@ -82,6 +82,9 @@ async fn harness_with(db: PgPool, origin: &str, tweak: impl FnOnce(&mut BffConfi
     let mut config = testing::config("postgres://test@localhost/test");
     config.auth = idp.auth_config();
     origin.clone_into(&mut config.public_url);
+    // Change streams end quickly, so a test can read one to its end.
+    config.changes.heartbeat_seconds = 1;
+    config.changes.max_connection_seconds = 2;
     let mut bff = BffConfig {
         client_secret: Some(SecretString::from(WEB_CLIENT_SECRET)),
         ..BffConfig::default()
@@ -710,6 +713,44 @@ async fn create_workspace(browser: &mut Browser, name: &str) -> Reply {
             Body::from(json!({ "name": name, "kind": "personal" }).to_string()),
         )
         .await
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_change_feed_streams_through_the_bff(db: PgPool) {
+    let h = harness_with(db, ORIGIN, |bff| {
+        bff.scopes = Some("openid workspaces:read workspaces:write".to_owned());
+    })
+    .await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let created = create_workspace(&mut browser, "Household").await;
+    assert_eq!(created.status, StatusCode::CREATED, "{}", created.body);
+    let ws = created.json()["id"].as_str().unwrap().to_owned();
+
+    // A GET: no CSRF header needed, as `EventSource` cannot send one. The
+    // stream ends after the configured two seconds, so it can be read whole.
+    let reply = browser
+        .send(
+            Request::get(format!("/bff/api/v1/w/{ws}/changes")),
+            Body::empty(),
+        )
+        .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(
+        reply.header(header::CONTENT_TYPE),
+        Some("text/event-stream")
+    );
+    assert!(reply.body.contains("event: ready"), "{}", reply.body);
+    assert!(reply.body.contains("event: closing"), "{}", reply.body);
+
+    // Not a member of another workspace: 404, as on the API.
+    let other = browser
+        .send(
+            Request::get(format!("/bff/api/v1/w/{}/changes", uuid::Uuid::now_v7())),
+            Body::empty(),
+        )
+        .await;
+    assert_eq!(other.status, StatusCode::NOT_FOUND);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

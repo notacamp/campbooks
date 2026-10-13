@@ -69,7 +69,32 @@ one-time same-origin `/bff/logout/continue` that 303s to the IdP with the hint
 **Recommended:** (b), with (a) as the fallback for other IdPs, decided with
 the sign-in UI.
 
-## Report Rauthy issues upstream## Report Rauthy issues upstream
+## One sign-in provider per account
+
+Rauthy (0.36 and 0.37) links an account to at most one upstream provider. A
+person who signed up with Google cannot also sign in with Zoho on the same
+account; the second provider is refused ("already exists but is not linked")
+until they unlink Google from their account page. Options: (a) accept it:
+one provider plus a password or passkey per account, documented in
+`deploy/README.md`; (b) contribute multi-provider linking to Rauthy upstream
+(a schema change on their side); (c) let Campbooks merge two IdP subjects with
+the same verified email into one Campbooks user (a second source of truth for
+identity, against ADR 0004).
+**Recommended:** (a) now; open an upstream feature request for (b) and revisit
+if people ask for it.
+
+## Microsoft sign-ins start with an unverified email
+
+Microsoft Entra sends no `email_verified` claim, so Rauthy creates accounts
+signed up through Microsoft with an unverified email, and accepting a
+Campbooks invitation requires a verified one. Options: (a) admins mark the
+email verified in the IdP admin UI (documented); (b) contribute to Rauthy a
+per-provider "trust this provider's emails" switch or support for Microsoft's
+`xms_edov` claim; (c) relax the invitation check for Microsoft accounts in
+Campbooks (weakens the guarantee that only the invited address joins).
+**Recommended:** (a) now, (b) upstream; never (c).
+
+## Report Rauthy issues upstream
 
 The IdP spike found that client_credentials rejects HTTP Basic client
 authentication although discovery advertises it. (The missing Portuguese and

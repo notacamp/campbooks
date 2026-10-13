@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 pub mod bff;
+pub mod changes;
 pub mod telemetry;
 pub mod web;
 
@@ -187,6 +188,9 @@ fn security_scheme() -> SecurityScheme {
             connect with the provider's consent, see their health, sync now, disconnect. \
             Credentials are never returned."),
         // `cargo xtask new-module` inserts above this line.
+        (name = "changes", description = "The change feed: a Server-Sent Events stream per \
+            workspace of the records that changed (ids only), so clients refetch only what \
+            they show."),
     ),
 )]
 struct ApiDoc;
@@ -206,6 +210,7 @@ fn api_with(composition: &Composition) -> OpenApiRouter<AppState> {
         .fold(OpenApiRouter::with_openapi(doc), |api, module| {
             api.merge(module.router)
         })
+        .merge(changes::router())
 }
 
 /// The OpenAPI document: every module's routes and the web BFF's.
@@ -566,6 +571,7 @@ mod tests {
             email: None,
             email_verified: false,
             name: None,
+            expires_at: None,
         };
         // Probes opt neither automation nor the assistant in.
         let refused = operations::invoke(

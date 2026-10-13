@@ -56,5 +56,16 @@ async fn the_grantor_disconnects_and_the_grant_is_revoked(db: PgPool) {
     .await
     .unwrap();
     assert_eq!(left, 0);
+    // The client change feed heard of it: added, then deleted (ids only).
+    let feed: Vec<String> = sqlx::query_scalar!(
+        "SELECT op FROM kernel.changes
+          WHERE record_type = 'connectors.connection' AND record_id = $1 ORDER BY published",
+        id
+    )
+    .fetch_all(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(feed.first().map(String::as_str), Some("upsert"));
+    assert_eq!(feed.last().map(String::as_str), Some("delete"));
     assert_eq!(kit.get(&ana, &uri).await.status, StatusCode::NOT_FOUND);
 }
