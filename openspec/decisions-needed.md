@@ -44,11 +44,32 @@ sign-in (campbooks-cloud#17) lands; the resource server must accept both `JWT` a
 The IdP is served from its own origin (`CAMPBOOKS_IDP_URL`, default port 8081).
 All of Rauthy's routes live under `/auth/v1/`, so the server could proxy
 `/auth/*` to it and self-hosters would expose a single URL and certificate.
-**Recommended:** decide in the BFF issue (campbooks-cloud#16). Proxying under the app origin
-needs Rauthy's `cookie_mode = secure` and care with the CSP; a separate host
-is simpler and is what ships now.
+The web BFF (campbooks-cloud#16) works either way: browsers are sent to the
+issuer's public URL and the server talks to it on the internal one
+(`CAMPBOOKS_BFF__IDP_INTERNAL_URL`).
+**Recommended:** keep the separate host for now (what ships); revisit with the
+sign-in UI, since proxying needs Rauthy's `cookie_mode = secure`, care with
+both CSPs, and a path-aware `__Host-` cookie story.
 
-## Report Rauthy issues upstream
+## Web logout with Rauthy: confirmation page, no return to the app
+
+`POST /bff/logout` ends the web session, revokes the refresh token and returns
+the IdP's end-session URL with `client_id` and `post_logout_redirect_uri` but
+no `id_token_hint`, because that would hand the ID token to browser
+JavaScript. Rauthy 0.36 then shows "Do you really want to logout?" and, after
+confirming, stays on its own page instead of returning to the app (it only
+honours `post_logout_redirect_uri` with an `id_token_hint`). Options:
+(a) keep it (standard, slightly clumsy); (b) have the server end the IdP
+session itself: a server-to-server `POST` to Rauthy's end-session endpoint with
+the stored `id_token_hint` (Rauthy treats requests without fetch metadata as
+back-channel and needs no confirmation), then send the browser home; Rauthy-
+specific, and it signs the user out of every app on that IdP session; (c) a
+one-time same-origin `/bff/logout/continue` that 303s to the IdP with the hint
+(the token passes through the URL bar, not JavaScript).
+**Recommended:** (b), with (a) as the fallback for other IdPs, decided with
+the sign-in UI.
+
+## Report Rauthy issues upstream## Report Rauthy issues upstream
 
 The IdP spike found that client_credentials rejects HTTP Basic client
 authentication although discovery advertises it. (The missing Portuguese and

@@ -9,10 +9,12 @@
    (`openssl rand -hex 32`), run `docker compose --profile ai up -d`, then pull the
    `complete` model once: `docker compose exec ollama ollama pull qwen3:8b`. Laya and
    TEI download their models themselves. See "Local AI" below.
-5. Sign-in: the identity provider (Rauthy) starts with everything else, and the
+5. Sign-in: the identity provider (Rauthy) starts with everything else, the
    API trusts its access tokens out of the box (issuer derived from
-   `CAMPBOOKS_IDP_URL`). See "Identity provider" below; to use another IdP,
-   edit the two `CAMPBOOKS_AUTH__*` lines of the `server` service in `compose.yaml`.
+   `CAMPBOOKS_IDP_URL`), and the web app signs you in through it. See
+   "Identity provider" and "Web sign-in" below; to use another IdP, edit the
+   `CAMPBOOKS_AUTH__*` and `CAMPBOOKS_BFF__*` lines of the `server` service in
+   `compose.yaml`.
 6. Upgrades: `docker compose pull && docker compose up -d`; migrations run on startup
    (the server's and the identity provider's).
 7. Background work (maintenance today; mail sync and the AI pass as they land)
@@ -37,19 +39,61 @@
    until you add the scopes to them in the IdP admin UI (or re-provision them,
    see "Identity provider").
 10. Workspace isolation: every workspace's rows are guarded by Postgres
-   row-level security as well as by the queries. The server connects with the
-   database user from `CAMPBOOKS_DATABASE_URL`, runs migrations as that user,
-   and then switches each connection to the role `campbooks_app`, which the
-   migrations create (superusers would skip the policies). Nothing to do with
-   the bundled Postgres. On a managed Postgres where your user cannot create
-   roles, ask the administrator once for
-   `CREATE ROLE campbooks_app NOLOGIN; GRANT campbooks_app TO <your user>;`.
-   The server warns at startup if the role it queries as bypasses row-level
-   security.
+   row-level security as well as by the queries. The server queries as a
+   dedicated login that cannot bypass the policies, and refuses to start if
+   it could. With the bundled Postgres this is automatic; see "Database
+   logins" below for your own Postgres.
 
 CPU inference works but is slow for `complete`. Use a GPU host or a hosted provider
 serving open-weight models for it (set its URL in `.env`). `decide` (Laya) and `embed`
 run fine on CPU.
+
+## Database logins
+
+Postgres skips row-level security for superusers and `BYPASSRLS` roles, and
+a query that can `RESET ROLE` can climb back to the login's own power. So the
+server uses two logins:
+
+| Login | Setting | Used for | Must be |
+|---|---|---|---|
+| runtime | `CAMPBOOKS_DATABASE_URL` (+ optional `CAMPBOOKS_DATABASE_PASSWORD_FILE`) | every request and job | `LOGIN`, not superuser, no `BYPASSRLS`, owns nothing, member of `campbooks_app` |
+| migration | `CAMPBOOKS_DATABASE_MIGRATION_URL` | applying migrations on startup, nothing else | the schema owner (or a superuser) |
+
+**Bundled Postgres (compose).** Nothing to do. The one-shot `db-init` service
+creates the `campbooks_runtime` login on every `up` (idempotent; it also
+upgrades an existing installation), generates its password once into the
+`db-secrets` volume and the server reads it from `/run/db/runtime-password`.
+The owner login stays `campbooks` / `POSTGRES_PASSWORD`, used for migrations
+only. To rotate the runtime password, delete the file in the volume
+(`docker compose run --rm --entrypoint rm db-init /run/db/runtime-password`)
+and `docker compose up -d`.
+
+**Your own or a managed Postgres.** Create the login once, as an administrator
+(the migrations then grant `campbooks_app` what each table needs):
+
+```sql
+CREATE ROLE campbooks_app NOLOGIN;            -- skip if it exists
+CREATE ROLE campbooks_runtime LOGIN PASSWORD '...' NOSUPERUSER NOBYPASSRLS
+  NOCREATEDB NOCREATEROLE;
+GRANT campbooks_app TO campbooks_runtime;
+-- Allow the migration user to run the first migration's grants:
+GRANT campbooks_app TO <migration user>;      -- skip for a superuser
+```
+
+Then set `CAMPBOOKS_DATABASE_URL=postgres://campbooks_runtime:<password>@host/db`
+(or omit the password and point `CAMPBOOKS_DATABASE_PASSWORD_FILE` at a file
+holding it) and `CAMPBOOKS_DATABASE_MIGRATION_URL` to the owner's URL. On
+managed services the "owner" is the user that created the database; do not
+reuse it as the runtime login.
+
+**Startup checks.** The server refuses to start (and says why) when the role
+it queries as is a superuser, has `BYPASSRLS`, is a member of such a role, or
+owns tables with row-level security; and, when a migration login is
+configured, when the runtime login could still switch to a privileged role.
+Only the old single-URL setup (a privileged login that `SET ROLE campbooks_app`)
+keeps working, with a warning to split the logins. If you cannot yet, set
+`CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS=true` to start anyway; workspace
+isolation then rests on the queries alone.
 
 ## Local AI
 
@@ -168,9 +212,10 @@ It needs no setup: three compose services take care of it.
 | --- | --- | --- |
 | `idp-init` | before `idp`, every `up` | Generates the secrets once (first boot), rewrites the config from `.env` |
 | `idp` | always | The IdP. Issuer `${CAMPBOOKS_IDP_URL}/auth/v1/`, data in the `idp-data` volume |
-| `idp-provision` | after `idp` is healthy, every `up` | Registers Campbooks' scopes and clients once |
+| `idp-provision` | after `idp` is healthy, every `up` | Registers Campbooks' scopes and clients once, and saves the web client's secret for the server |
 
-The API does not check tokens yet; that lands with the resource-server work.
+A fourth one-shot, `server-init`, prepares the `server-secrets` volume for the
+Campbooks server (see "Web sign-in").
 
 ### First sign-in to the admin UI
 
@@ -217,7 +262,6 @@ variables to the `idp` service.
 | `secrets.toml` | Encryption key and cluster secrets. Without it the database cannot be read |
 | `config.toml` | Generated from `.env` on every start. Do not edit |
 | `campbooks/api-key` | Admin API key used by `idp-provision` (clients, scopes, client secrets) |
-| `campbooks/campbooks-web.client-secret` | Secret of the web app's OIDC client |
 | `campbooks/initial-admin-password` | The first admin password |
 | `campbooks/provisioned/<client>` | Markers: the client was set up, never touch it again |
 | everything else | Rauthy's embedded database, with a nightly local backup in `state_machine/backups/` |
@@ -233,8 +277,9 @@ docker run --rm -v campbooks_idp-data:/data -v "$PWD":/backup busybox:1.37.0-mus
 
 - **Admin password:** change it in the account page.
 - **Web client secret:** admin UI → **Clients** → `campbooks-web` → generate a new secret, then
-  `docker compose run --rm idp-init rm /app/data/campbooks/campbooks-web.client-secret` and
-  `docker compose up -d`: `idp-provision` saves the new one.
+  `docker compose run --rm server-init rm /secrets/campbooks-web.client-secret` and
+  `docker compose up -d`: `idp-provision` saves the new one, and the server reads it again
+  the next time the IdP refuses the old one (no restart).
 - **Admin API key:** admin UI → **API Keys** → `campbooks` → new secret, then write the new
   token (`campbooks$<secret>`) to `campbooks/api-key` in the volume.
 - **Encryption key:** generate one with `docker compose run --rm --no-deps idp generate-enc-key`,
@@ -248,6 +293,42 @@ To re-apply Campbooks' default settings to a client, delete it in the admin UI, 
 `docker compose run --rm idp-init rm /app/data/campbooks/provisioned/<client-id>` and
 `docker compose up -d`.
 
+## Web sign-in
+
+The server signs browsers in itself (a backend-for-frontend, ADR 0004): open the app, and
+if you are not signed in it sends you to the identity provider and back. The browser only
+ever gets one `HttpOnly`, `SameSite=Strict` session cookie; the tokens stay on the server,
+encrypted, in Postgres (schema `bff`). Any account of the identity provider can sign in,
+including the first admin; create more under **Users** in its admin UI.
+
+Sessions end after 48 hours unused or 30 days at most, when you sign out, or when your
+identity-provider session ends (back-channel logout). The cookie is `Secure` and
+`__Host-`-prefixed when `CAMPBOOKS_PUBLIC_URL` is `https://`; over plain `http://` (fine on
+`localhost` only) it is neither, and the server logs a warning.
+
+| `server-secrets` volume | What |
+| --- | --- |
+| `secret-key` | `CAMPBOOKS_SECRET_KEY`: encrypts the web sessions' tokens. Generated on first boot |
+| `campbooks-web.client-secret` | Secret of the web app's OIDC client, written by `idp-provision` |
+
+The server mounts this volume read-only (through group 10001); it never sees the
+`idp-data` volume. Both files are regenerated if missing, so the volume needs no backup:
+losing it only signs everyone out.
+
+- **Instance secret key:** `docker compose run --rm server-init rm /secrets/secret-key`,
+  then `docker compose up -d && docker compose restart server`. Everyone has to sign in to
+  the web app again; nothing else is lost. (Without compose, set `CAMPBOOKS_SECRET_KEY` to
+  `openssl rand -base64 32`.)
+- **Back-channel logout** needs an `https://` `CAMPBOOKS_PUBLIC_URL` that the `idp`
+  container can reach: Rauthy only calls https URLs. `idp-provision` registers
+  `${CAMPBOOKS_PUBLIC_URL}/bff/backchannel-logout` for new installs; override it with
+  `CAMPBOOKS_BACKCHANNEL_LOGOUT_URL`. On plain http there is none, and sessions end by
+  sign-out or timeout.
+- **Signing out** of the web app ends its session and revokes its refresh token, then sends
+  you to the identity provider to end that session too (Rauthy asks you to confirm).
+
+Settings (all optional; defaults shown in `.env.example`) are the `CAMPBOOKS_BFF__*` block.
+
 ### Developing against the IdP
 
 The API runs on the host in development (`compose.dev.yaml` only starts Postgres). To get
@@ -258,4 +339,12 @@ cp deploy/.env.example deploy/.env      # the defaults are fine for this
 docker compose -f deploy/compose.yaml up -d idp-provision
 ```
 
-That starts only `idp-init`, `idp` and `idp-provision`, at `http://localhost:8081`.
+That starts only `server-init`, `idp-init`, `idp` and `idp-provision`, at
+`http://localhost:8081`. Set `CAMPBOOKS_PUBLIC_URL` in `deploy/.env` to where you open the
+app (`http://localhost:8080` for `cargo run`, `http://localhost:5173` for the Vite dev
+server) before the first `up`: it becomes the web client's redirect URI. Then run the server
+with `CAMPBOOKS_AUTH__ISSUER=http://localhost:8081/auth/v1/`, the same
+`CAMPBOOKS_PUBLIC_URL`, `CAMPBOOKS_SECRET_KEY` (any `openssl rand -base64 32`) and
+`CAMPBOOKS_BFF__CLIENT_SECRET` (read it with
+`docker compose -f deploy/compose.yaml run --rm --no-deps server-init cat /secrets/campbooks-web.client-secret`);
+`clients/README.md` has the full recipe.

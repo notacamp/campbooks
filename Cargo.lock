@@ -385,23 +385,29 @@ dependencies = [
 name = "campbooks-server"
 version = "0.1.0"
 dependencies = [
+ "aws-lc-rs",
  "axum",
+ "base64 0.22.1",
  "campbooks-kernel",
  "campbooks-system",
  "campbooks-workspaces",
  "chrono",
  "clap",
+ "reqwest",
  "secrecy",
  "serde",
  "serde_json",
  "sqlx",
+ "thiserror",
  "tokio",
  "tower",
  "tower-http 0.7.1",
  "tracing",
  "tracing-subscriber",
+ "url",
  "utoipa",
  "utoipa-axum",
+ "uuid",
 ]
 
 [[package]]

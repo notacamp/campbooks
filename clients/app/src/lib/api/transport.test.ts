@@ -4,6 +4,8 @@ import { TransportError } from "./errors";
 import {
   createTauriTransport,
   createWebTransport,
+  CSRF_HEADER,
+  loginUrl,
   selectTransport,
   type Invoke,
 } from "./transport";
@@ -30,6 +32,66 @@ describe("createWebTransport", () => {
     expect(sent?.mode).toBe("same-origin");
     expect(sent?.headers.get("authorization")).toBeNull();
     expect(sent?.headers.get("accept")).toBe("application/json");
+    expect(sent?.headers.get(CSRF_HEADER)).toBe("1");
+  });
+
+  it("sends the browser to sign in when the BFF says the session is required", async () => {
+    const problem = { type: "about:blank", title: "Unauthorized", status: 401 };
+    const send = vi.fn(() =>
+      Promise.resolve(
+        Response.json(
+          { ...problem, detail: "session_required" },
+          { status: 401, headers: { "content-type": "application/problem+json" } },
+        ),
+      ),
+    );
+    const signIn = vi.fn<(url: string) => void>();
+    globalThis.history.replaceState(null, "", "/people/42?thread=7#m-3");
+    const transport = createWebTransport(ORIGIN, send, signIn);
+
+    const response = await transport.fetch(new Request(`${transport.baseUrl}/api/v1/things`));
+
+    expect(signIn).toHaveBeenCalledExactlyOnceWith(
+      "/bff/login?return_to=%2Fpeople%2F42%3Fthread%3D7%23m-3",
+    );
+    // The caller still gets the answer, body unread.
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ detail: "session_required" });
+
+    // Other requests failing the same way do not navigate again.
+    await transport.fetch(new Request(`${transport.baseUrl}/api/v1/other`));
+    expect(signIn).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["the API refused the token", 401, { detail: "invalid_token" }],
+    ["a non-problem body", 401, "nope"],
+    ["another status", 403, { detail: "session_required" }],
+  ])("does not sign in when %s", async (_, status, body) => {
+    const send = vi.fn(() => Promise.resolve(Response.json(body, { status })));
+    const signIn = vi.fn<(url: string) => void>();
+    const transport = createWebTransport(ORIGIN, send, signIn);
+
+    await transport.fetch(new Request(`${transport.baseUrl}/api/v1/things`));
+
+    expect(signIn).not.toHaveBeenCalled();
+  });
+
+  it("navigates to the BFF's login by default", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("location", {
+      assign,
+      pathname: "/",
+      search: "",
+      hash: "",
+    });
+    const transport = createWebTransport(ORIGIN, () =>
+      Promise.resolve(Response.json({ detail: "session_required" }, { status: 401 })),
+    );
+
+    await transport.fetch(new Request(`${transport.baseUrl}/api/v1/things`));
+
+    expect(assign).toHaveBeenCalledWith(loginUrl("/"));
   });
 
   it("forwards request bodies", async () => {

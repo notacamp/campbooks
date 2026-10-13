@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (SELECT 1 FROM pg_roles r\n                           WHERE (r.rolsuper OR r.rolbypassrls)\n                             AND pg_has_role(session_user, r.oid, 'MEMBER')) AS \"can!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "can!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "f7d9498a9a9c01927a694c8ac474cb68c3838a4d7c847e154559329d51038057"
+}

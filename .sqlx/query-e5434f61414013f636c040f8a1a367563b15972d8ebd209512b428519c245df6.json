@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE bff.sessions\n           SET previous_token_hash = token_hash, token_hash = $3, rotated_at = $4\n         WHERE id = $1 AND token_hash = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea",
+        "Bytea",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e5434f61414013f636c040f8a1a367563b15972d8ebd209512b428519c245df6"
+}

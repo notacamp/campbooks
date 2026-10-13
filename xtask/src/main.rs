@@ -244,8 +244,11 @@ fn run_arch(root: &Path) -> Result<String> {
     let catalogue: BTreeSet<String> = scopes.iter().map(|s| s.name.clone()).collect();
     let spec = serde_json::to_value(campbooks_server::openapi())
         .context("serializing the OpenAPI document")?;
-    let operations =
-        arch::check_operation_security(&spec, campbooks_server::SECURITY_SCHEME, &catalogue);
+    let schemes = arch::Schemes {
+        bearer: campbooks_server::SECURITY_SCHEME,
+        session: campbooks_server::bff::SESSION_SCHEME,
+    };
+    let operations = arch::check_operation_security(&spec, schemes, &catalogue);
     violations.extend(operations);
     violations.extend(arch::check_operations(&spec, &operation_owners()?));
 
@@ -269,13 +272,18 @@ fn run_arch(root: &Path) -> Result<String> {
     )
 }
 
-/// `(METHOD, path)` → the module whose router declares the operation.
+/// `(METHOD, path)` → the module whose router declares the operation, or
+/// `bff` for the web BFF's own `/bff/*` operations (no module may take that
+/// name).
 fn operation_owners() -> Result<arch::Owners> {
     let mut owners = arch::Owners::new();
-    for module in campbooks_server::modules() {
-        let name = module.name;
-        let spec = serde_json::to_value(module.router.into_openapi())
-            .with_context(|| format!("serializing module `{name}`'s OpenAPI"))?;
+    let documents = campbooks_server::modules()
+        .into_iter()
+        .map(|module| (module.name, module.router.into_openapi()))
+        .chain([(arch::BFF_SCHEMA, campbooks_server::bff::openapi())]);
+    for (name, document) in documents {
+        let spec = serde_json::to_value(document)
+            .with_context(|| format!("serializing `{name}`'s OpenAPI"))?;
         let paths = spec["paths"].as_object().cloned().unwrap_or_default();
         for (path, item) in paths {
             for method in arch::OPERATION_METHODS {
