@@ -26,11 +26,11 @@
 - [x] 4.6 Workspace purge on `workspaces.workspace_deleting`
 - [x] 4.7 Recorded fixtures (en, pt-PT, es-ES, fr) and dev helpers; server message catalogue for the module's errors
 
-## 5. Follow-ups (not in this change)
+## 5. Follow-ups
 
-- [ ] 5.1 k-NN over the workspace's corrections and a cascade, once the policy has a measured reason to use them
+- [x] 5.1 k-NN over the workspace's corrections and a cascade: moved to campbooks-cloud#83
 - [ ] 5.2 Consume `connectors.messages_changed` and `connectors.capability_granted` once #36 publishes them
-- [ ] 5.3 Custom streams, inbox sharing operations, `MessageDecided` / `AttachmentReceived`
+- [x] 5.3 Custom streams and inbox sharing: moved to campbooks-cloud#84; `MessageDecided` / `AttachmentReceived`: moved to campbooks-cloud#85; the module scaffold's client template: campbooks-cloud#72
 
 ## 6. Wrap-up
 
