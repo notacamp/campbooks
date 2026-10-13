@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT m.user_id AS \"user_id: UserId\", m.role\n                      FROM workspaces.members m\n                      JOIN workspaces.users u ON u.id = m.user_id\n                      JOIN workspaces.workspaces w ON w.id = m.workspace_id\n                     WHERE m.workspace_id = $1 AND u.idp_subject = $2 AND w.deleted_at IS NULL\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id: UserId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "workspaces.members",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "role",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces.members",
+            "name": "role"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "4c467e19731e1fa85f5bbf2816040c9c88f6abd3066e70293232e14598980afe"
+}

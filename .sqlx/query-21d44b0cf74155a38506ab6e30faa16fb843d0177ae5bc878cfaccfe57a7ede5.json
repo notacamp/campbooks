@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT (SELECT count(*) FROM workspaces.users) AS \"users!\",\n                      (SELECT count(*) FROM workspaces.security_events\n                        WHERE kind = 'signed_in') AS \"sign_ins!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "users!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "sign_ins!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "21d44b0cf74155a38506ab6e30faa16fb843d0177ae5bc878cfaccfe57a7ede5"
+}

@@ -31,7 +31,8 @@
 //! never trusted: serve downloads as attachments with `nosniff`.
 //!
 //! **Deleting a workspace** calls [`BlobStore::purge_workspace`] (the
-//! `workspaces` module does, on `WorkspaceDeleting`).
+//! `workspaces` module's `workspaces.purge_workspace` job does, when the
+//! deleted workspace's grace period ends).
 
 mod store;
 mod sweep;

@@ -8,10 +8,6 @@ use crate::{
     events::{DomainEvent, EventId},
 };
 
-/// The Postgres setting a job's transaction carries its workspace in (ADR
-/// 0011): `current_setting('campbooks.workspace_id', true)`.
-pub const WORKSPACE_SETTING: &str = "campbooks.workspace_id";
-
 /// A claimed job, as the worker hands it over.
 #[derive(Debug, Clone)]
 pub(crate) struct JobInfo {
@@ -94,20 +90,16 @@ impl JobContext {
         &self.state.db
     }
 
-    /// The job's transaction, opened on first use with the workspace set.
+    /// The job's transaction, opened on first use with the workspace set
+    /// ([`WORKSPACE_SETTING`](crate::db::WORKSPACE_SETTING), as
+    /// [`BeginFor::begin_for`](crate::db::BeginFor::begin_for) does).
     pub async fn tx(&mut self) -> Result<&mut Transaction<'static, Postgres>, JobError> {
         if let Some(tx) = self.tx.take() {
             return Ok(self.tx.insert(tx));
         }
         let mut tx = self.state.db.begin().await?;
         if let Some(workspace) = &self.info.workspace {
-            sqlx::query_scalar!(
-                "SELECT set_config($1, $2, true)",
-                WORKSPACE_SETTING,
-                workspace
-            )
-            .fetch_one(&mut *tx)
-            .await?;
+            crate::db::set_workspace(&mut tx, workspace).await?;
         }
         Ok(self.tx.insert(tx))
     }

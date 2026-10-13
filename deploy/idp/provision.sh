@@ -24,7 +24,8 @@ BODY="$(mktemp)"
 # Scopes Campbooks clients may request. `openid`, `profile` and `email` are
 # built into Rauthy. `offline_access` is accepted for client compatibility;
 # Rauthy issues refresh tokens to clients with the refresh_token flow enabled.
-SCOPES="offline_access system:read"
+# The rest mirror `campbooks-server scopes`.
+SCOPES="offline_access system:read workspaces:read workspaces:write workspaces:admin"
 # The API's audience: every first-party token carries it in `aud`.
 AUDIENCE="campbooks-api"
 
@@ -110,7 +111,8 @@ ensure_client campbooks-web true "$(cat <<EOF
   "id_token_alg": "EdDSA",
   "auth_code_lifetime": 60,
   "access_token_lifetime": 900,
-  "scopes": ["openid", "profile", "email", "offline_access", "system:read"],
+  "scopes": ["openid", "profile", "email", "offline_access", "system:read",
+             "workspaces:read", "workspaces:write", "workspaces:admin"],
   "default_scopes": ["openid"],
   "default_aud": ["$AUDIENCE"],
   "force_mfa": false,
@@ -134,7 +136,8 @@ ensure_client campbooks-native false "$(cat <<EOF
   "id_token_alg": "EdDSA",
   "auth_code_lifetime": 60,
   "access_token_lifetime": 900,
-  "scopes": ["openid", "profile", "email", "offline_access", "system:read"],
+  "scopes": ["openid", "profile", "email", "offline_access", "system:read",
+             "workspaces:read", "workspaces:write", "workspaces:admin"],
   "default_scopes": ["openid"],
   "default_aud": ["$AUDIENCE"],
   "force_mfa": false,

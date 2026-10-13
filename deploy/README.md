@@ -27,6 +27,25 @@
 8. Files (message bodies, attachments, documents) are stored outside Postgres,
    in the `blobs-data` volume by default. See "Blob storage" below to use an
    S3-compatible bucket instead.
+9. Workspaces: the first person to sign in creates the first workspace and
+   invites the others (`POST /api/v1/w/{id}/invitations`; screens come later).
+   Who else may create a workspace is `CAMPBOOKS_SIGNUP__POLICY` (`open` by
+   default; `invite_only`, `approval`, `code`). Invitations are not emailed
+   yet: with `CAMPBOOKS_ENV=development` the server logs the link. The new
+   `workspaces:*` scopes are registered by `idp-provision` on the next `up`;
+   sign-in clients provisioned before this release keep their old scope list
+   until you add the scopes to them in the IdP admin UI (or re-provision them,
+   see "Identity provider").
+10. Workspace isolation: every workspace's rows are guarded by Postgres
+   row-level security as well as by the queries. The server connects with the
+   database user from `CAMPBOOKS_DATABASE_URL`, runs migrations as that user,
+   and then switches each connection to the role `campbooks_app`, which the
+   migrations create (superusers would skip the policies). Nothing to do with
+   the bundled Postgres. On a managed Postgres where your user cannot create
+   roles, ask the administrator once for
+   `CREATE ROLE campbooks_app NOLOGIN; GRANT campbooks_app TO <your user>;`.
+   The server warns at startup if the role it queries as bypasses row-level
+   security.
 
 CPU inference works but is slow for `complete`. Use a GPU host or a hosted provider
 serving open-weight models for it (set its URL in `.env`). `decide` (Laya) and `embed`

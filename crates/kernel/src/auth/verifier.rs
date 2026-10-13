@@ -153,6 +153,10 @@ struct Claims {
     iat: Option<u64>,
     workspace_id: Option<String>,
     custom: Option<CustomClaims>,
+    email: Option<String>,
+    email_verified: Option<bool>,
+    name: Option<String>,
+    preferred_username: Option<String>,
 }
 
 /// Per-client claims an IdP may nest under `custom` instead of the root.
@@ -185,6 +189,20 @@ impl Claims {
                 }
             }
         };
+        // Identity claims describe a person; a client has none.
+        let (email, email_verified, name) = match kind {
+            PrincipalKind::User => (
+                self.email
+                    .map(|e| e.trim().to_owned())
+                    .filter(|e| !e.is_empty()),
+                self.email_verified.unwrap_or(false),
+                self.name
+                    .or(self.preferred_username)
+                    .map(|n| n.trim().to_owned())
+                    .filter(|n| !n.is_empty()),
+            ),
+            PrincipalKind::Client => (None, false, None),
+        };
         let subject = sub.or_else(|| azp.clone())?;
         let scopes: BTreeSet<Scope> = self
             .scope
@@ -198,6 +216,9 @@ impl Claims {
             client_id: azp,
             scopes,
             workspace,
+            email,
+            email_verified,
+            name,
         })
     }
 }
@@ -290,6 +311,38 @@ mod tests {
         .unwrap();
         assert_eq!(user.kind, PrincipalKind::User);
         assert_eq!(user.workspace, None);
+    }
+
+    #[test]
+    fn identity_claims_only_for_users() {
+        let user = claims(serde_json::json!({
+            "sub": "user-1", "azp": "campbooks-web", "email": " ana@example.com ",
+            "email_verified": true, "preferred_username": "ana"
+        }))
+        .into_principal()
+        .unwrap();
+        assert_eq!(user.email.as_deref(), Some("ana@example.com"));
+        assert!(user.email_verified);
+        assert_eq!(user.name.as_deref(), Some("ana"));
+
+        let named = claims(serde_json::json!({
+            "sub": "user-1", "name": "Ana Lima", "preferred_username": "ana", "email": ""
+        }))
+        .into_principal()
+        .unwrap();
+        assert_eq!(named.name.as_deref(), Some("Ana Lima"));
+        assert_eq!(named.email, None);
+        assert!(!named.email_verified);
+
+        let client = claims(serde_json::json!({
+            "azp": "c", "email": "bot@example.com", "email_verified": true, "name": "Bot"
+        }))
+        .into_principal()
+        .unwrap();
+        assert_eq!(
+            (client.email, client.email_verified, client.name),
+            (None, false, None)
+        );
     }
 
     #[test]
