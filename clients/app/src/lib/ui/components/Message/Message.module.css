@@ -1,0 +1,66 @@
+.message {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: var(--border-width) solid var(--border-subtle);
+}
+
+.body {
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.from {
+  font-weight: var(--weight-semibold);
+}
+
+.time {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.text {
+  max-width: var(--measure);
+  margin-top: var(--space-1-5);
+  line-height: var(--leading-relaxed);
+  color: var(--text-secondary);
+}
+
+.attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  height: var(--size-control-lg);
+  margin-top: var(--space-3);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  box-shadow: inset 0 0 0 var(--border-width) var(--border-strong);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.attachmentName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}

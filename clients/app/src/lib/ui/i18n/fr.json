@@ -1,0 +1,58 @@
+{
+  "close": "Fermer",
+  "undo": "Annuler",
+  "redo": "Rétablir",
+  "loading": "Chargement",
+  "kbd": {
+    "then": "puis",
+    "shortcut": "Raccourci : {{keys}}"
+  },
+  "toast": {
+    "region": "Notifications",
+    "undone": "Annulé : {{label}}",
+    "redone": "Rétabli : {{label}}"
+  },
+  "note": {
+    "label": "Où en sont les choses",
+    "why": "Pourquoi ?",
+    "hideWhy": "Masquer le pourquoi"
+  },
+  "search": {
+    "label": "Rechercher ou demander"
+  },
+  "commandMenu": {
+    "label": "Menu des commandes",
+    "placeholder": "Rechercher, demander ou lancer une commande",
+    "empty": "Rien ne correspond à « {{query}} »",
+    "results": "Commandes",
+    "ask": "Demander à Campbooks : {{query}}",
+    "askGroup": "Demander"
+  },
+  "shortcutSheet": {
+    "title": "Raccourcis clavier"
+  },
+  "workspace": {
+    "switch": "Changer d’espace de travail",
+    "current": "Changer d’espace de travail (actuel : {{name}})"
+  },
+  "visor": {
+    "idle": "Campbooks",
+    "reading": "Campbooks lit",
+    "thinking": "Campbooks réfléchit",
+    "unsure": "Campbooks n’est pas sûr",
+    "happy": "Campbooks est content",
+    "alert": "Campbooks a besoin de votre attention",
+    "asleep": "Campbooks est en pause"
+  },
+  "signal": {
+    "review": "Vérifier",
+    "reply": "Répondre",
+    "decide": "Décider",
+    "do": "Faire",
+    "pay": "Payer",
+    "sort": "Trier"
+  },
+  "navigation": {
+    "main": "Principale"
+  }
+}

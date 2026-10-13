@@ -204,6 +204,11 @@ One React/TypeScript UI, three delivery targets (ADR 0003):
 `src/lib/api` hides the difference behind one typed client generated from
 `openapi/openapi.json`, so modules never know which target they run on.
 
+Screens are composed from the design system in `src/lib/ui` (three-layer
+tokens, themes, components) and `src/lib/shortcuts` (one keyboard shortcut
+registry); modules use them through `lib/ui/index.ts` and style nothing
+themselves. See [`design-system.md`](design-system.md).
+
 The web target is served by `campbooks-server` itself (ADR 0006): the release
 image builds `clients/app` and sets `CAMPBOOKS_WEB_DIR`, so UI and API share
 one origin and port. Until the BFF lands, `/bff/api/*` is an interim

@@ -1,0 +1,82 @@
+/**
+ * Names of the tokens components may read, for typed use from TypeScript
+ * (`cssVar("surface-raised")` → `var(--surface-raised)`). The values live in
+ * tokens.css; `tokens.test.ts` fails if a name here is not declared there.
+ *
+ * Only layers 2 (semantic) and 3 (component) are listed: primitives are the
+ * raw material for themes, never read by components.
+ */
+export const SEMANTIC_TOKENS = {
+  surface: [
+    "surface-base",
+    "surface-raised",
+    "surface-sunken",
+    "surface-overlay",
+    "surface-hover",
+    "surface-selected",
+    "surface-scrim",
+  ],
+  border: ["border-subtle", "border-strong", "edge-highlight"],
+  text: ["text-primary", "text-secondary", "text-tertiary", "text-disabled"],
+  accent: ["accent", "accent-hover", "on-accent", "accent-soft", "accent-text", "focus-ring"],
+  status: ["danger", "danger-soft", "success"],
+  signal: [
+    "signal-reply",
+    "signal-decide",
+    "signal-do",
+    "signal-pay",
+    "signal-review",
+    "signal-sort",
+  ],
+  visor: ["visor-glass-top", "visor-glass-bottom", "visor-eye", "visor-eye-glow", "visor-rim"],
+  elevation: ["shadow-color", "shadow-overlay"],
+} as const;
+
+export const COMPONENT_TOKENS = [
+  "btn-height",
+  "btn-radius",
+  "btn-pad-x",
+  "row-pad-y",
+  "row-pad-x",
+  "row-radius",
+  "pill-height",
+  "kbd-size",
+  "kbd-bg",
+  "kbd-fg",
+  "kbd-border",
+  "nav-height",
+  "panel-radius",
+  "overlay-radius",
+  "visor-size",
+  "sidebar-width",
+  "aside-width",
+  "list-width",
+  "content-max",
+  "toast-height",
+  "overlay-width",
+] as const;
+
+export type SemanticToken = (typeof SEMANTIC_TOKENS)[keyof typeof SEMANTIC_TOKENS][number];
+export type ComponentToken = (typeof COMPONENT_TOKENS)[number];
+export type Token = SemanticToken | ComponentToken;
+
+/** `var(--<name>)` for a token, typed so a typo fails to compile. */
+export function cssVar(name: Token): string {
+  return `var(--${name})`;
+}
+
+/** The workspace accent presets (data-accent). `business` is ink: no hue. */
+export const ACCENTS = ["business", "personal", "forest"] as const;
+export type Accent = (typeof ACCENTS)[number];
+
+/** Theme modes (data-theme). `system` follows the OS through light-dark(). */
+export const THEME_MODES = ["system", "light", "dark"] as const;
+export type ThemeMode = (typeof THEME_MODES)[number];
+
+/** Densities (data-density). */
+export const DENSITIES = ["comfortable", "compact"] as const;
+export type Density = (typeof DENSITIES)[number];
+
+/** Signals: what a queue item asks of you. Colour carries meaning only. */
+export const SIGNALS = ["review", "reply", "decide", "do", "pay", "sort"] as const;
+export type Signal = (typeof SIGNALS)[number];

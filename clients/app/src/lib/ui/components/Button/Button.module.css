@@ -1,0 +1,95 @@
+.button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  height: var(--btn-height);
+  padding: 0 var(--btn-pad-x);
+  border: 0;
+  border-radius: var(--btn-radius);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.button[data-variant="primary"] {
+  --kbd-bg: transparent;
+  --kbd-fg: var(--on-accent);
+  --kbd-border: var(--on-accent);
+  --kbd-opacity: var(--kbd-on-accent-opacity);
+
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.button[data-variant="primary"]:hover {
+  background: var(--accent-hover);
+}
+
+.button[data-variant="secondary"] {
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  box-shadow:
+    inset 0 0 0 var(--border-width) var(--border-strong),
+    inset 0 var(--border-width) 0 var(--edge-highlight);
+}
+
+.button[data-variant="secondary"]:hover {
+  background: var(--surface-hover);
+}
+
+.button[data-variant="ghost"] {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.button[data-variant="ghost"]:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.button[data-variant="danger"] {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.button[data-variant="link"] {
+  height: auto;
+  padding: 0;
+  background: none;
+  color: var(--accent-text);
+}
+
+.button[data-variant="link"]:hover {
+  text-decoration: underline;
+}
+
+.button[data-size="lg"] {
+  height: var(--size-hit);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-md);
+}
+
+.button[data-grow] {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.button:disabled {
+  cursor: default;
+  opacity: var(--opacity-muted);
+}

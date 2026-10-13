@@ -1,0 +1,47 @@
+import { fireEvent, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+
+import { renderUi } from "../../../../../test/render";
+
+import { ShortcutSheet } from "./ShortcutSheet";
+
+describe("ShortcutSheet", () => {
+  it("lists every registered shortcut by group with its announced keys", () => {
+    renderUi(<ShortcutSheet open onClose={vi.fn()} />);
+    const dialog = screen.getByRole("dialog", { name: "Keyboard shortcuts" });
+
+    expect(within(dialog).getByRole("heading", { name: "Go to" })).toBeInTheDocument();
+    expect(within(dialog).getByText("Inbox").closest("div")).toHaveTextContent(
+      "Shortcut: G then I",
+    );
+    expect(within(dialog).getByText("Search or ask").closest("div")).toHaveTextContent(
+      "Shortcut: Ctrl K",
+    );
+  });
+
+  it("is translated", () => {
+    renderUi(<ShortcutSheet open onClose={vi.fn()} />, { locale: "es-ES" });
+
+    expect(screen.getByRole("dialog", { name: "Atajos de teclado" })).toHaveTextContent(
+      "Bandeja de entrada",
+    );
+  });
+
+  it("closes on Escape and traps Tab inside", () => {
+    const onClose = vi.fn();
+    renderUi(
+      <>
+        <button type="button">outside</button>
+        <ShortcutSheet open onClose={onClose} />
+      </>,
+    );
+    const dialog = screen.getByRole("dialog");
+
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+    fireEvent.keyDown(dialog, { key: "Escape" });
+
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(screen.getByRole("button", { name: "outside" })).not.toHaveFocus();
+  });
+});
