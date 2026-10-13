@@ -125,6 +125,10 @@ pub struct Config {
     /// The client change feed (`CAMPBOOKS_CHANGES__*`).
     #[serde(default)]
     pub changes: ChangesConfig,
+
+    /// Traces and metrics export (`CAMPBOOKS_TELEMETRY__*`); off by default.
+    #[serde(default)]
+    pub telemetry: TelemetryConfig,
 }
 
 impl Config {
@@ -175,7 +179,100 @@ impl Config {
             ));
         }
         self.signup.check()?;
-        self.changes.check()
+        self.changes.check()?;
+        self.telemetry.check()
+    }
+}
+
+/// Telemetry export settings (`CAMPBOOKS_TELEMETRY__*`). With neither
+/// [`otlp_endpoint`](Self::otlp_endpoint) nor
+/// [`metrics_addr`](Self::metrics_addr) set, nothing is exported and no
+/// extra listener opens.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct TelemetryConfig {
+    /// Base URL of an OTLP/HTTP receiver (`CAMPBOOKS_TELEMETRY__OTLP_ENDPOINT`,
+    /// e.g. `http://collector:4318`). Traces go to `<url>/v1/traces`, metrics
+    /// to `<url>/v1/metrics`. Unset (or empty) means no OTLP export.
+    pub otlp_endpoint: Option<String>,
+    /// Headers sent with every export (`CAMPBOOKS_TELEMETRY__OTLP_HEADERS`),
+    /// as `key=value,key=value`, e.g. an authorization header for a hosted
+    /// collector. Secret.
+    pub otlp_headers: Option<SecretString>,
+    /// Share of new traces kept, from 0 to 1
+    /// (`CAMPBOOKS_TELEMETRY__SAMPLE_RATIO`, default 1). A caller's sampling
+    /// decision (an incoming `traceparent`) wins.
+    pub sample_ratio: f64,
+    /// Address of a separate listener serving Prometheus metrics at
+    /// `GET /metrics` (`CAMPBOOKS_TELEMETRY__METRICS_ADDR`, e.g.
+    /// `0.0.0.0:9464`). Unauthenticated: keep it off the internet. Unset
+    /// means no listener.
+    pub metrics_addr: Option<SocketAddr>,
+}
+
+impl Default for TelemetryConfig {
+    fn default() -> Self {
+        Self {
+            otlp_endpoint: None,
+            otlp_headers: None,
+            sample_ratio: 1.0,
+            metrics_addr: None,
+        }
+    }
+}
+
+impl TelemetryConfig {
+    /// The OTLP endpoint without a trailing slash; `None` when unset or blank.
+    pub fn otlp_endpoint(&self) -> Option<&str> {
+        non_blank(self.otlp_endpoint.as_deref()).map(|url| url.trim_end_matches('/'))
+    }
+
+    /// The export headers, trimmed, without empty entries.
+    pub fn otlp_headers(&self) -> Vec<(String, String)> {
+        self.otlp_headers
+            .as_ref()
+            .map(|headers| {
+                headers
+                    .expose_secret()
+                    .split(',')
+                    .filter_map(|pair| pair.split_once('='))
+                    .map(|(k, v)| (k.trim().to_owned(), v.trim().to_owned()))
+                    .filter(|(k, _)| !k.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Whether metrics leave the process (OTLP or the Prometheus listener).
+    pub fn exports_metrics(&self) -> bool {
+        self.otlp_endpoint().is_some() || self.metrics_addr.is_some()
+    }
+
+    /// Startup check: the endpoint is an http(s) URL and the ratio is
+    /// between 0 and 1. The message names the offending setting (never the
+    /// headers' values).
+    pub fn check(&self) -> Result<(), String> {
+        if let Some(endpoint) = self.otlp_endpoint() {
+            check_url("CAMPBOOKS_TELEMETRY__OTLP_ENDPOINT", endpoint)?;
+        }
+        if !(0.0..=1.0).contains(&self.sample_ratio) {
+            return Err(format!(
+                "CAMPBOOKS_TELEMETRY__SAMPLE_RATIO={} must be between 0 and 1",
+                self.sample_ratio
+            ));
+        }
+        if let Some(headers) = &self.otlp_headers
+            && headers
+                .expose_secret()
+                .split(',')
+                .map(str::trim)
+                .any(|pair| !pair.is_empty() && !pair.contains('='))
+        {
+            return Err("CAMPBOOKS_TELEMETRY__OTLP_HEADERS must be key=value pairs \
+                        separated by commas"
+                .to_owned());
+        }
+        Ok(())
     }
 }
 
@@ -714,6 +811,10 @@ mod tests {
         assert!(config.blobs.check().is_ok());
         assert_eq!(config.changes, ChangesConfig::default());
         assert_eq!(config.changes.max_connection_seconds, 900);
+        assert_eq!(config.telemetry.otlp_endpoint(), None);
+        assert_eq!(config.telemetry.metrics_addr, None);
+        assert!((config.telemetry.sample_ratio - 1.0).abs() < f64::EPSILON);
+        assert!(!config.telemetry.exports_metrics());
         assert_eq!(
             config.database_url.expose_secret(),
             "postgres://u:p@db.example.com/campbooks"
@@ -1023,6 +1124,68 @@ mod tests {
                 "{policy}"
             );
         }
+    }
+
+    #[test]
+    fn parses_telemetry_section() {
+        let figment =
+            figment(&[("database_url", "postgres://localhost/x")]).merge(Serialized::default(
+                "telemetry",
+                serde_json::json!({
+                    "otlp_endpoint": "http://collector:4318/",
+                    "otlp_headers": "authorization=Bearer hunter2, x-tenant = cloud ,",
+                    "sample_ratio": 0.25,
+                    "metrics_addr": "127.0.0.1:9464",
+                }),
+            ));
+        let config = Config::from_figment(&figment).unwrap();
+        let telemetry = &config.telemetry;
+        assert_eq!(telemetry.otlp_endpoint(), Some("http://collector:4318"));
+        assert_eq!(
+            telemetry.otlp_headers(),
+            [
+                ("authorization".to_owned(), "Bearer hunter2".to_owned()),
+                ("x-tenant".to_owned(), "cloud".to_owned()),
+            ]
+        );
+        assert!((telemetry.sample_ratio - 0.25).abs() < f64::EPSILON);
+        assert_eq!(telemetry.metrics_addr.unwrap().port(), 9464);
+        assert!(telemetry.exports_metrics());
+        assert!(config.check().is_ok());
+        assert!(!format!("{config:?}").contains("hunter2"));
+    }
+
+    #[test]
+    fn telemetry_check_names_the_bad_setting() {
+        let cases = [
+            (
+                TelemetryConfig {
+                    otlp_endpoint: Some("collector:4318".into()),
+                    ..TelemetryConfig::default()
+                },
+                "CAMPBOOKS_TELEMETRY__OTLP_ENDPOINT",
+            ),
+            (
+                TelemetryConfig {
+                    sample_ratio: 2.0,
+                    ..TelemetryConfig::default()
+                },
+                "CAMPBOOKS_TELEMETRY__SAMPLE_RATIO",
+            ),
+            (
+                TelemetryConfig {
+                    otlp_headers: Some(SecretString::from("hunter2")),
+                    ..TelemetryConfig::default()
+                },
+                "CAMPBOOKS_TELEMETRY__OTLP_HEADERS",
+            ),
+        ];
+        for (config, setting) in cases {
+            let err = config.check().unwrap_err();
+            assert!(err.contains(setting), "{setting}: {err}");
+            assert!(!err.contains("hunter2"), "{err}");
+        }
+        assert!(TelemetryConfig::default().check().is_ok());
     }
 
     #[test]

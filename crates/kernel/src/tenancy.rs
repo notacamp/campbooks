@@ -214,6 +214,10 @@ impl<S: ScopeName> FromRequestParts<AppState> for Workspace<S> {
             .await?
             .filter(|access| access.workspace == id)
             .ok_or(Error::NotFound)?;
+        tracing::Span::current().record(
+            crate::telemetry::field::WORKSPACE_ID,
+            tracing::field::display(id),
+        );
         Ok(Self {
             principal,
             id,

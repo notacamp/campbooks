@@ -1,0 +1,25 @@
+{
+  "name": "mail-triage",
+  "version": 1,
+  "purpose": "conversations.triage",
+  "locales": ["en", "pt-PT", "es-ES", "fr"],
+  "workspaces": {
+    "atelier": "An architecture studio in Lisbon (two partners, clients, contractors, suppliers).",
+    "bakery": "A family bakery in Madrid (suppliers, wholesale customers, staff, utilities).",
+    "household": "A family in Lyon (school, landlord, health, bank, relatives, shopping).",
+    "consultant": "A freelance data consultant in London (clients, accountant, conferences, SaaS tools)."
+  },
+  "questions": [
+    {
+      "id": "stream",
+      "type": "choice",
+      "labels": ["primary", "updates", "receipts", "newsletters"],
+      "target_precision": 0.95
+    },
+    { "id": "needs_reply", "type": "noul", "target_precision": 0.9 },
+    { "id": "asks_action", "type": "noul", "target_precision": 0.9 },
+    { "id": "has_deadline", "type": "noul", "target_precision": 0.9 },
+    { "id": "urgency", "type": "score", "levels": 3, "target_precision": 0.85 },
+    { "id": "suspicious", "type": "noul", "target_precision": 0.98 }
+  ]
+}

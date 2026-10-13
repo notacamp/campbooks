@@ -23,6 +23,7 @@ use crate::{
     blobs::BlobStore,
     config::{
         AuthConfig, BlobsConfig, ChangesConfig, Environment, JobsConfig, LogFormat, SignupConfig,
+        TelemetryConfig,
     },
     db,
 };
@@ -48,6 +49,7 @@ pub fn config(database_url: &str) -> Config {
         signup: SignupConfig::default(),
         blobs: BlobsConfig::default(),
         changes: ChangesConfig::default(),
+        telemetry: TelemetryConfig::default(),
     }
 }
 

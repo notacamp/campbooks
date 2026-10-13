@@ -22,6 +22,7 @@ pub mod module;
 pub mod operations;
 pub mod records;
 pub mod state;
+pub mod telemetry;
 pub mod tenancy;
 #[cfg(any(test, feature = "test-util"))]
 pub mod testing;

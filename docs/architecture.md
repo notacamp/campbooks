@@ -302,6 +302,22 @@ tuned with `CAMPBOOKS_JOBS__*` (concurrency, per-workspace limit, poll
 interval, lease, retention, shutdown grace, retry backoff). A third role,
 `sync`, arrives with the connectors (ADR 0011).
 
+### Telemetry
+
+Spans are `tracing` spans, bridged to OpenTelemetry by the server; metrics
+use the OpenTelemetry metrics API. The kernel gives every request a server
+span (route template, status, request id, `workspace.id` and
+`principal.kind` recorded by the `Workspace`/`Scoped` extractors), every job
+attempt a consumer span linked to whoever enqueued it, and the IdP fetch a
+client span; `campbooks-ai` does the same for each provider call. Outbound
+calls carry the trace on with `kernel::telemetry::inject`. A module adds
+spans with `tracing::info_span!` like anywhere else, and **never puts
+personal data or secrets in a span field, log field or metric attribute**,
+nor ids in metric attributes. Nothing is exported unless
+`CAMPBOOKS_TELEMETRY__OTLP_ENDPOINT` (OTLP/HTTP) or
+`CAMPBOOKS_TELEMETRY__METRICS_ADDR` (a Prometheus page on its own port) is
+set; see `deploy/README.md` → Monitoring.
+
 ### AI calls
 
 A module asks `campbooks-ai` for a **role**, never a vendor (ADR 0005).
@@ -317,6 +333,19 @@ coarse choice and a fine one). Probabilities pass through a per (question
 type, option count) temperature, from config today and refitted from user
 corrections later. A module acts on an answer only through
 `answer.accept_if(threshold)` and asks the user below it.
+
+The model is one **strategy** among several behind
+`campbooks_ai::decide::strategy::Strategy`, which all return the same
+`Answer` plus the reasons for it (for the UI's "Why?"): deterministic email
+signals (`decide::signals::email`, the single home of the triage rules: bulk
+headers, senders, attachments, cue phrases in en/pt-PT/es-ES/fr), k nearest
+neighbours over the workspace's own corrections (`decide::knn`, on the
+`embed` role or a model-free lexical embedder), the `decide` model, and a
+`Cascade` of them that asks each later stage only the questions still open.
+Which strategy answers which question, and from which confidence, is measured
+by `cargo xtask eval decide` on a fictional labelled set
+(`crates/ai/evals/decide/mail-triage/`); CI checks that the offline strategies
+hold the committed baseline.
 
 ## Clients
 

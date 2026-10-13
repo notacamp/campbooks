@@ -121,6 +121,16 @@ pub enum PrincipalKind {
     Client,
 }
 
+impl PrincipalKind {
+    /// `user` or `client`, as telemetry records it.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::User => "user",
+            Self::Client => "client",
+        }
+    }
+}
+
 /// The authenticated caller of a request.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Principal {

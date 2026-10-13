@@ -144,6 +144,9 @@ pub async fn localize(State(state): State<AppState>, mut request: Request, next:
     let Some(problem) = response.extensions_mut().remove::<LocalizableProblem>() else {
         return response;
     };
+    response
+        .extensions_mut()
+        .insert(crate::error::ProblemCode(problem.code()));
     let locale = if let Some(locale) = slot.0.get() {
         *locale
     } else {

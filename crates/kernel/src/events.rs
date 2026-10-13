@@ -190,9 +190,10 @@ impl EventBus {
                 RETURNING id, workspace_id
             ), deliveries AS (
                 INSERT INTO kernel.jobs
-                    (queue, kind, payload, workspace_id, event_id, unique_key, max_attempts)
+                    (queue, kind, payload, workspace_id, event_id, unique_key, max_attempts,
+                     trace_context)
                 SELECT c.queue, c.kind, '{}'::jsonb, event.workspace_id, event.id,
-                       event.id::text, c.max_attempts
+                       event.id::text, c.max_attempts, $8
                   FROM event,
                        unnest($5::text[], $6::text[], $7::int[]) AS c(kind, queue, max_attempts)
             )
@@ -205,6 +206,7 @@ impl EventBus {
             &kinds as &[&str],
             &queues as &[&str],
             &max_attempts,
+            crate::telemetry::current_traceparent(),
         )
         .fetch_one(&mut **tx)
         .await?;

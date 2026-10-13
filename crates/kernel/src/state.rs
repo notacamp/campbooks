@@ -13,6 +13,7 @@ use crate::{
     i18n::{LocalePreferencePort, NoLocalePreference},
     jobs::Registry,
     operations::Operations,
+    telemetry::{self, Metrics},
     tenancy::{MembershipPort, NoMembership},
 };
 
@@ -49,6 +50,9 @@ pub struct AppState {
     /// inbox, a calendar). Until a module registers one, such changes are
     /// shown to nobody.
     pub visibility: VisibilityPort,
+    /// The request and job instruments: from the meter provider installed
+    /// when the state is built (the no-op without one).
+    pub metrics: Metrics,
 }
 
 impl AppState {
@@ -56,9 +60,11 @@ impl AppState {
     /// verifier for `config.auth`. The server adds the modules' registry with
     /// [`with_registry`](Self::with_registry).
     pub fn new(db: PgPool, config: Config) -> Self {
+        let metrics = Metrics::new(&telemetry::meter(), config.telemetry.exports_metrics());
         Self {
             changes: ChangeHub::new(db.clone(), &config.changes),
             visibility: Arc::new(NoContainers),
+            metrics,
             db,
             auth: TokenVerifier::new(&config.auth),
             config: Arc::new(config),
@@ -103,6 +109,13 @@ impl AppState {
     #[must_use]
     pub fn with_blobs(mut self, blobs: BlobStore) -> Self {
         self.blobs = blobs;
+        self
+    }
+
+    /// The same state, recording into `metrics`.
+    #[must_use]
+    pub fn with_metrics(mut self, metrics: Metrics) -> Self {
+        self.metrics = metrics;
         self
     }
 

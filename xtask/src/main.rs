@@ -3,6 +3,7 @@
 //! - `cargo xtask arch` enforces the architecture rules in `AGENTS.md`.
 //! - `cargo xtask openapi [--check]` regenerates (or verifies) `openapi/openapi.json`.
 //! - `cargo xtask events [--check]` regenerates (or verifies) `openapi/events.json`.
+//! - `cargo xtask eval decide` measures `decide` strategies on a labelled eval set.
 //! - `cargo xtask i18n` checks that every server message catalogue is at parity.
 //! - `cargo xtask new-module <name>` and `cargo xtask new-feature <module> <feature>`
 //!   scaffold a module or a feature slice; `cargo xtask scaffold-check` proves
@@ -11,6 +12,7 @@
 #![forbid(unsafe_code)]
 
 mod arch;
+mod eval;
 mod events;
 mod i18n;
 mod openapi;
@@ -48,6 +50,11 @@ enum Command {
         /// Fail if the committed document is stale instead of writing it.
         #[arg(long)]
         check: bool,
+    },
+    /// Measure AI strategies on a labelled eval set.
+    Eval {
+        #[command(subcommand)]
+        what: EvalCommand,
     },
     /// Write openapi/events.json from the modules' published events.
     Events {
@@ -87,6 +94,14 @@ enum Command {
     },
 }
 
+#[derive(Debug, Subcommand)]
+enum EvalCommand {
+    /// Run `decide` strategies (rules, k-NN, models, cascades) over an eval
+    /// set and report accuracy, coverage and precision at the auto-act
+    /// threshold, calibration and latency per question and locale.
+    Decide(eval::DecideArgs),
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let root = workspace_root();
@@ -94,6 +109,9 @@ fn main() -> ExitCode {
         Command::Arch => run_arch(&root),
         Command::Openapi { check } => openapi::run(&root, check),
         Command::Events { check } => events::run(&root, check),
+        Command::Eval {
+            what: EvalCommand::Decide(args),
+        } => eval::run_decide(&root, &args),
         Command::I18n => i18n::run(&root),
         Command::NewModule { name, issue } => run_new_module(&root, &name, issue),
         Command::NewFeature { module, feature } => run_new_feature(&root, &module, &feature),
@@ -188,12 +206,10 @@ fn run_arch(root: &Path) -> Result<String> {
     violations.extend(arch::check_allowlist(&arch_file.allow, &modules));
     violations.extend(arch::check_dependencies(&crates, &arch_file.allow));
     violations.extend(arch::check_migrations(&migrations, &modules));
-    if modules.contains(campbooks_server::changes::OWNER) {
-        violations.push(format!(
-            "crates/modules/{0}: `{0}` is reserved for the change feed's operations",
-            campbooks_server::changes::OWNER
-        ));
-    }
+    violations.extend(arch::check_reserved_owner(
+        &modules,
+        campbooks_server::changes::OWNER,
+    ));
     violations.extend(arch::check_migration_schemas(&migration_sql, &modules));
     let registry = campbooks_server::registry();
     let background = registry

@@ -101,6 +101,11 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
   scope; a server test checks that every scoped operation refuses anonymous
   calls.)*
 - No `unsafe` (`#![forbid(unsafe_code)]` in every crate, workspace lint).
+- **Telemetry carries no personal data or secrets.** Span fields, log fields
+  and metric attributes never hold message content, prompts, tokens, cookies,
+  codes or email addresses, and metric attributes never hold ids (route
+  templates, names and small enums only). See `kernel::telemetry`.
+  *(CI: the server's telemetry privacy test.)*
 - Untrusted HTML (email bodies) is rendered only in a sandboxed iframe with a
   strict CSP; never `dangerouslySetInnerHTML` outside `lib/ui/safe-html`.
 
