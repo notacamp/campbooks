@@ -313,6 +313,12 @@ pub fn redirect_host(uri: &str) -> Option<String> {
 /// the database.
 pub struct Clients {
     first_party: Vec<Client>,
+    /// Whether clients that registered themselves (RFC 7591) are accepted
+    /// (`CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION`).
+    dynamic: bool,
+    /// Whether clients known by their metadata document are
+    /// (`CAMPBOOKS_OAUTH__CLIENT_METADATA_DOCUMENTS`).
+    documents: bool,
 }
 
 impl Clients {
@@ -321,6 +327,8 @@ impl Clients {
     pub fn first_party(origin: &str, web_secret: SecretString) -> Self {
         let code = vec!["authorization_code".to_owned(), "refresh_token".to_owned()];
         Self {
+            dynamic: false,
+            documents: false,
             first_party: vec![
                 Client {
                     id: WEB_CLIENT_ID.to_owned(),
@@ -358,6 +366,26 @@ impl Clients {
         }
     }
 
+    /// The same clients, accepting self-registered ones (`dynamic`) and
+    /// metadata-document ones (`documents`). Both are off unless the
+    /// instance turns them on.
+    #[must_use]
+    pub fn with_self_registration(mut self, dynamic: bool, documents: bool) -> Self {
+        self.dynamic = dynamic;
+        self.documents = documents;
+        self
+    }
+
+    /// Whether `/oauth2/register` takes registrations.
+    pub fn dynamic_registration(&self) -> bool {
+        self.dynamic
+    }
+
+    /// Whether an `https` client id names a metadata document.
+    pub fn metadata_documents(&self) -> bool {
+        self.documents
+    }
+
     /// The first-party client `id` (RP-initiated logout serves only these).
     pub fn first_party_client(&self, id: &str) -> Option<&Client> {
         self.first_party.iter().find(|client| client.id == id)
@@ -373,7 +401,13 @@ impl Clients {
         let mut tx = begin_as_server(db).await?;
         let client = load(&mut tx, id).await?;
         tx.commit().await?;
-        Ok(client)
+        // A kind the instance turned off is unknown, even if registered
+        // while it was on: its codes and tokens stop with it.
+        Ok(client.filter(|c| match c.kind {
+            Kind::Dynamic => self.dynamic,
+            Kind::MetadataDocument => self.documents,
+            Kind::FirstParty | Kind::Workspace => true,
+        }))
     }
 }
 

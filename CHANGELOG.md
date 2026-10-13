@@ -31,9 +31,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   apps under Settings → Apps and integrations. Their tokens work in that
   workspace only.
 - MCP agents can connect: dynamic client registration (`/oauth2/register`,
+  off unless `CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION=on`,
   rate-limited, public clients only, deleted after 30 days unused), client
-  metadata documents (an `https` client id, fetched with SSRF protection and
-  cached up to a day), protected-resource metadata
+  metadata documents (off unless `CAMPBOOKS_OAUTH__CLIENT_METADATA_DOCUMENTS=on`;
+  an `https` client id, fetched with SSRF protection and cached up to a day), protected-resource metadata
   (`/.well-known/oauth-protected-resource/api`), `resource_metadata` in the
   API's `WWW-Authenticate`, and resource indicators. Apps that aren't
   Campbooks' own can never hold an `identity:*`, `workspaces:write` or

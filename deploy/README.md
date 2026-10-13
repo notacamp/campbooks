@@ -496,9 +496,15 @@ With the built-in issuer:
     client id for its users to allow.
   - **MCP agents and other apps** find everything from the API's URL: a call without a
     token answers `WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource/api"`,
-    which names this issuer. They register themselves at `/oauth2/register` (public
-    clients only; unused ones are deleted after 30 days) or use an `https` URL of their
-    metadata document as their client id. The consent screen marks them unverified. Their
+    which names this issuer. **Self-registration is off by default.** To let agents
+    connect without anyone setting them up first, turn on
+    `CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION=on` (they register at `/oauth2/register`:
+    public clients only, unused ones deleted after 30 days) and/or
+    `CAMPBOOKS_OAUTH__CLIENT_METADATA_DOCUMENTS=on` (an `https` URL of their metadata
+    document is their client id). With both off, `/oauth2/register` answers 404, the
+    issuer metadata lists no `registration_endpoint`, and such clients are unknown;
+    turning one off later also stops the clients that used it. Agents can still use a
+    sign-in app a workspace admin registers under Settings → Apps and integrations. The consent screen marks them unverified. Their
     tokens are bound to one workspace (they see no other, and can't create or join one)
     and can never manage accounts, apps or members. Registrations and document fetches
     are also capped per hour for the whole instance.

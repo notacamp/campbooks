@@ -1138,3 +1138,67 @@ async fn a_document_that_failed_is_not_fetched_again_at_once(db: PgPool) {
     }
     assert_eq!(kit.documents.fetched(), [missing]);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn self_registration_is_off_unless_the_instance_turns_it_on(db: PgPool) {
+    let kit = Kit::without_self_registration(db).await;
+    kit.sign_up().await;
+    let refused = register(
+        &kit,
+        &serde_json::json!({ "redirect_uris": [AGENT_CALLBACK] }),
+    )
+    .await;
+    assert_eq!(refused.status, StatusCode::NOT_FOUND);
+    let metadata = kit.get("/.well-known/oauth-authorization-server").await;
+    assert!(
+        metadata.json.get("registration_endpoint").is_none(),
+        "{metadata:?}"
+    );
+    assert_eq!(
+        metadata.json["client_id_metadata_document_supported"],
+        false
+    );
+
+    // An https client id is no document to fetch: an unknown client.
+    let id = "https://agent.example.com/oauth/client.json";
+    kit.documents.serve(
+        id,
+        &serde_json::json!({ "client_id": id, "redirect_uris": [AGENT_CALLBACK] }),
+        None,
+    );
+    let (url, _) = Kit::authorize_url(id, AGENT_CALLBACK, "openid");
+    let unknown = kit.get(&url).await;
+    assert_eq!(unknown.status, StatusCode::BAD_REQUEST);
+    assert_eq!(unknown.json["code"], "invalid_client");
+    assert!(kit.documents.fetched().is_empty(), "nothing fetched");
+
+    // A client registered while it was on stops with it.
+    let mut tx = crate::domain::clients::begin_as_server(&kit.state.db)
+        .await
+        .unwrap_or_else(|e| panic!("{e}"));
+    sqlx::query(
+        "INSERT INTO identity.clients
+             (client_id, kind, name, redirect_uris, grant_types, auth_method, allowed_scopes,
+              created_at)
+         VALUES ('dcr_old', 'dynamic', 'Old Agent', $1, '{authorization_code}', 'none',
+                 '{conversations:read}', now())",
+    )
+    .bind(vec![AGENT_CALLBACK.to_owned()])
+    .execute(&mut *tx)
+    .await
+    .unwrap_or_else(|e| panic!("{e}"));
+    tx.commit().await.unwrap_or_else(|e| panic!("{e}"));
+    let (url, _) = Kit::authorize_url("dcr_old", AGENT_CALLBACK, "conversations:read");
+    assert_eq!(kit.get(&url).await.json["code"], "invalid_client");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn turned_on_both_are_advertised(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let metadata = kit.get("/.well-known/oauth-authorization-server").await;
+    assert_eq!(
+        metadata.json["registration_endpoint"],
+        format!("{ORIGIN}/oauth2/register")
+    );
+    assert_eq!(metadata.json["client_id_metadata_document_supported"], true);
+}

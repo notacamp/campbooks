@@ -148,7 +148,7 @@ pub async fn find_client(
     id: &str,
     ip: ClientIp,
 ) -> Result<Option<Client>> {
-    if let Some(url) = metadata::document_url(id) {
+    if let Some(url) = metadata::document_url(id).filter(|_| issuer.clients.metadata_documents()) {
         ctx.state
             .rate_limits
             .check(&ctx.state.db, &DOCUMENT_LIMIT, &RateKey::ip(ip))

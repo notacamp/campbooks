@@ -187,10 +187,21 @@ impl Deps {
             };
             upstreams.extend(upstream_client(provider, settings, config, &url)?);
         }
+        let oauth: OAuthConfig = if figment.contains("oauth") {
+            figment
+                .extract_inner("oauth")
+                .map_err(|e| format!("CAMPBOOKS_OAUTH__*: {e}"))?
+        } else {
+            OAuthConfig::default()
+        };
         let cipher = Cipher::new(&secret, SEALING_PURPOSE);
         let resource = format!("{url}{API_RESOURCE_PATH}");
         let issuer = Issuer {
-            clients: Clients::first_party(&url, derive_secret(&secret, WEB_CLIENT_SECRET_PURPOSE)),
+            clients: Clients::first_party(&url, derive_secret(&secret, WEB_CLIENT_SECRET_PURPOSE))
+                .with_self_registration(
+                    oauth.dynamic_registration.0,
+                    oauth.client_metadata_documents.0,
+                ),
             url,
             cookies: Cookies::new(secure),
             keys: Arc::new(Keys::new(
@@ -208,6 +219,51 @@ impl Deps {
         Ok(Self {
             issuer: Some(Arc::new(issuer)),
         })
+    }
+}
+
+/// `CAMPBOOKS_OAUTH__*`: whether apps may register themselves. Both off by
+/// default; an instance that wants MCP agents to connect without a person
+/// setting them up turns them on.
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+struct OAuthConfig {
+    /// `CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION`: `/oauth2/register`
+    /// (RFC 7591).
+    dynamic_registration: Switch,
+    /// `CAMPBOOKS_OAUTH__CLIENT_METADATA_DOCUMENTS`: an `https` URL as a
+    /// client id, its metadata fetched from there.
+    client_metadata_documents: Switch,
+}
+
+/// `on` or `off` (also `true`/`false`, `1`/`0`, `yes`/`no`).
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct Switch(bool);
+
+impl<'de> Deserialize<'de> for Switch {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Raw {
+            Bool(bool),
+            Number(i64),
+            Text(String),
+        }
+        match Raw::deserialize(deserializer)? {
+            Raw::Bool(on) => Ok(Self(on)),
+            Raw::Number(1) => Ok(Self(true)),
+            Raw::Number(0) => Ok(Self(false)),
+            Raw::Text(text) => match text.trim().to_ascii_lowercase().as_str() {
+                "on" | "true" | "1" | "yes" => Ok(Self(true)),
+                "off" | "false" | "0" | "no" | "" => Ok(Self(false)),
+                other => Err(serde::de::Error::custom(format!(
+                    "`{other}` is not on or off"
+                ))),
+            },
+            Raw::Number(other) => Err(serde::de::Error::custom(format!(
+                "`{other}` is not on or off"
+            ))),
+        }
     }
 }
 
@@ -548,6 +604,40 @@ mod tests {
                 .issuer
                 .is_none()
         );
+    }
+
+    #[test]
+    fn self_registration_is_off_unless_turned_on() {
+        let config = config("https://app.example.com", None);
+        let off = deps(&config, KEY, &serde_json::json!({})).unwrap();
+        let issuer = off.issuer.unwrap();
+        assert!(!issuer.clients.dynamic_registration());
+        assert!(!issuer.clients.metadata_documents());
+        let on = Deps::from_figment(
+            &Figment::from(Serialized::defaults(serde_json::json!({
+                "oauth": { "dynamic_registration": "on", "client_metadata_documents": "ON" }
+            }))),
+            &config,
+            KEY,
+            &[],
+            Arc::new(SystemClock),
+        )
+        .unwrap()
+        .issuer
+        .unwrap();
+        assert!(on.clients.dynamic_registration());
+        assert!(on.clients.metadata_documents());
+        let bad = Deps::from_figment(
+            &Figment::from(Serialized::defaults(serde_json::json!({
+                "oauth": { "dynamic_registration": "maybe" }
+            }))),
+            &config,
+            KEY,
+            &[],
+            Arc::new(SystemClock),
+        )
+        .unwrap_err();
+        assert!(bad.contains("CAMPBOOKS_OAUTH__"), "{bad}");
     }
 
     #[test]

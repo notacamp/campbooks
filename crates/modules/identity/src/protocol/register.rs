@@ -1,7 +1,9 @@
 //! `/oauth2/register`: dynamic client registration (RFC 7591), for agents
 //! that connect without a person setting them up first (MCP).
 //!
-//! Only public clients are registered (`token_endpoint_auth_method:
+//! Off unless the instance turns it on
+//! (`CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION=on`); then only public clients are
+//! registered (`token_endpoint_auth_method:
 //! none`), using the code flow with PKCE, with `https` or loopback redirect
 //! URIs. A registered client can do nothing on its own: every token needs a
 //! person's consent, it is shown as unverified, and it may never hold an
@@ -103,7 +105,8 @@ fn refuse(error: &'static str, description: &'static str) -> Response {
     responses(
         (status = 201, description = "Registered.", body = Registered),
         (status = 400, description = "`invalid_redirect_uri` or `invalid_client_metadata`."),
-        (status = 404, description = "Another identity provider serves this instance."),
+        (status = 404, description = "Dynamic registration is off on this instance \
+            (`CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION`), or another identity provider serves it."),
         (status = 429, description = "`rate_limited`.", body = campbooks_kernel::Problem,
             content_type = "application/problem+json"),
     ),
@@ -114,6 +117,10 @@ pub async fn register(
     body: std::result::Result<Json<RegisterRequest>, JsonRejection>,
 ) -> Result<Response> {
     let issuer = ctx.issuer()?;
+    if !issuer.clients.dynamic_registration() {
+        // Off unless the instance turns it on (CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION).
+        return Err(campbooks_kernel::Error::NotFound);
+    }
     ctx.state
         .rate_limits
         .check(&ctx.state.db, &REGISTER_LIMIT, &RateKey::ip(ip))

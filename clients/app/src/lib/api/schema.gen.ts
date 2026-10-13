@@ -8137,7 +8137,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Another identity provider serves this instance. */
+            /** @description Dynamic registration is off on this instance (`CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION`), or another identity provider serves it. */
             404: {
                 headers: {
                     [name: string]: unknown;

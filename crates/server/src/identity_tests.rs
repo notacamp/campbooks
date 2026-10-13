@@ -213,7 +213,10 @@ async fn world(db: PgPool) -> (Browser, TestIdp) {
         )
         .unwrap(),
         identity: campbooks_identity::Deps::from_figment(
-            &Figment::from(Serialized::defaults(serde_json::json!({}))),
+            // MCP agents may register themselves here (off by default).
+            &Figment::from(Serialized::defaults(serde_json::json!({
+                "oauth": { "dynamic_registration": "on" },
+            }))),
             &config,
             Some(secret.clone()),
             &crate::scope_catalogue(),

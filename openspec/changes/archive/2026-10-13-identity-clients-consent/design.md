@@ -571,3 +571,16 @@ From `kernel::rate_limit` (per address unless noted):
   - Remembered consents cover their own redirect URI only, for 90 days.
   - Access-token `jti` tracking on removal is left for #57 (they live ten
     minutes).
+
+## Self-registration is opt-in (owner)
+
+`CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION` and
+`CAMPBOOKS_OAUTH__CLIENT_METADATA_DOCUMENTS` are both `off` by default, and
+production keeps them off.
+
+- When off, `/oauth2/register` answers 404, the metadata lists no
+  `registration_endpoint` (and `client_id_metadata_document_supported` is
+  false), and `https` client ids are unknown clients.
+- Turning one off later also makes the clients that came through it unknown:
+  `Clients::find` filters their kind.
+- An instance whose people use MCP agents turns them on.

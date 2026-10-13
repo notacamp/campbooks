@@ -26,12 +26,14 @@ plain `http` public URL, so its cookies are always `Secure` and
 
 ### Requirement: Issuer metadata
 The issuer SHALL be the instance's public origin. It SHALL publish OpenID
-Connect Discovery and RFC 8414 metadata naming its endpoints (including
-`registration_endpoint`), `S256` as the only code challenge method, the
+Connect Discovery and RFC 8414 metadata naming its endpoints (with
+`registration_endpoint` only while dynamic registration is on), `S256` as
+the only code challenge method, the
 grant types `authorization_code`, `refresh_token` and `client_credentials`,
 `EdDSA` as the signing algorithm, the scopes it accepts, support for the
 RFC 9207 `iss` response parameter, and
-`client_id_metadata_document_supported: true`.
+`client_id_metadata_document_supported` (true only while metadata documents
+are on).
 
 #### Scenario: Metadata advertises PKCE
 - **WHEN** a client fetches `/.well-known/oauth-authorization-server`
@@ -39,7 +41,7 @@ RFC 9207 `iss` response parameter, and
 
 #### Scenario: Metadata names registration
 - **WHEN** a client fetches `/.well-known/oauth-authorization-server`
-- **THEN** `registration_endpoint` is `<origin>/oauth2/register` and `grant_types_supported` includes `client_credentials`
+- **THEN** with dynamic registration on, `registration_endpoint` is `<origin>/oauth2/register`; with it off (the default) there is none; `grant_types_supported` includes `client_credentials`
 
 ### Requirement: Authorization code with PKCE
 `/oauth2/authorize` SHALL accept only `response_type=code` with an S256
@@ -328,6 +330,9 @@ with `invalid_target`. The issuer SHALL serve RFC 9728 metadata for it at
 - **THEN** the answer is `invalid_target`
 
 ### Requirement: Dynamic client registration
+Dynamic registration SHALL be off unless
+`CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION` is on: then `/oauth2/register`
+answers 404 and clients registered while it was on are unknown. When on,
 `POST /oauth2/register` (RFC 7591) SHALL register public clients only: 1 to
 10 redirect URIs, each `https` or loopback `http` without fragment or
 userinfo (`invalid_redirect_uri`); `token_endpoint_auth_method` `none` or
@@ -341,6 +346,10 @@ limit registrations per client address and for the whole instance per hour
 (429 `rate_limited`), and delete a client unused for 30 days. Such clients SHALL be shown on the consent screen as
 unverified.
 
+#### Scenario: Off by default
+- **WHEN** an instance that did not set `CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION` receives a registration
+- **THEN** the answer is 404, and its issuer metadata has no `registration_endpoint`
+
 #### Scenario: A confidential registration
 - **WHEN** a client registers with `token_endpoint_auth_method=client_secret_basic`
 - **THEN** the answer is 400 `invalid_client_metadata` and nothing is stored
@@ -350,7 +359,10 @@ unverified.
 - **THEN** the answer is 429 with `Retry-After`
 
 ### Requirement: Client ID Metadata Documents
-An `https` `client_id` URL with a path SHALL name a client whose metadata
+Metadata documents SHALL be off unless
+`CAMPBOOKS_OAUTH__CLIENT_METADATA_DOCUMENTS` is on: then an `https`
+`client_id` is an unknown client and nothing is fetched. When on, an `https`
+`client_id` URL with a path SHALL name a client whose metadata
 document is fetched at that URL through an SSRF guard: `https` only, no IP
 literal, no userinfo, the default port; every address the name resolves to
 public (no loopback, private, link-local or metadata, CGNAT, multicast,

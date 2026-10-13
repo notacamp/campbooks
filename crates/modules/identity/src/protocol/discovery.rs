@@ -26,16 +26,15 @@ fn metadata(issuer: &Issuer) -> serde_json::Value {
         .copied()
         .chain(issuer.api_scopes.iter().map(|s| s.name))
         .collect();
-    serde_json::json!({
+    let mut metadata = serde_json::json!({
         "issuer": url,
         "authorization_endpoint": format!("{url}/oauth2/authorize"),
         "token_endpoint": format!("{url}/oauth2/token"),
         "revocation_endpoint": format!("{url}/oauth2/revoke"),
-        "registration_endpoint": format!("{url}/oauth2/register"),
         "end_session_endpoint": format!("{url}/oauth2/end_session"),
         "jwks_uri": format!("{url}/oauth2/jwks"),
         "scopes_supported": scopes,
-        "client_id_metadata_document_supported": true,
+        "client_id_metadata_document_supported": issuer.clients.metadata_documents(),
         "response_types_supported": ["code"],
         "response_modes_supported": ["query"],
         "grant_types_supported": ["authorization_code", "refresh_token", "client_credentials"],
@@ -48,7 +47,12 @@ fn metadata(issuer: &Issuer) -> serde_json::Value {
             "email", "email_verified", "name"],
         "authorization_response_iss_parameter_supported": true,
         "prompt_values_supported": ["none", "login", "consent", "select_account"],
-    })
+    });
+    // Only where self-registration is on (CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION).
+    if issuer.clients.dynamic_registration() {
+        metadata["registration_endpoint"] = format!("{url}/oauth2/register").into();
+    }
+    metadata
 }
 
 /// OIDC Discovery metadata.
