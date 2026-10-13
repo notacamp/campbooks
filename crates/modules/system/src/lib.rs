@@ -7,6 +7,9 @@
 //! the OpenAPI document by construction, and each one states its security:
 //! a scope from [`scopes`] (`security(("bearer" = ["system:read"]))` plus the
 //! `Scoped<SystemRead>` extractor), or explicitly public (`security(())`).
+//! Each one is an entry of the operation catalogue (ADR 0013): an
+//! `operation_id` named `system.<verb>[_<noun>]` and an `x-campbooks`
+//! extension built from `campbooks_kernel::Operation`.
 
 #![forbid(unsafe_code)]
 

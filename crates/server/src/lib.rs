@@ -2,13 +2,14 @@
 //!
 //! This is the only crate that knows the full list of modules. Adding a module
 //! means adding one line to [`modules`]. Their background work (jobs, event
-//! handlers, schedules) is collected by [`registry`].
+//! handlers, schedules, published events) is collected by [`registry`]; their
+//! operations form the catalogue of [`openapi`] (ADR 0013).
 
 #![forbid(unsafe_code)]
 
 pub mod web;
 
-use std::{fmt::Write as _, time::Duration};
+use std::{fmt::Write as _, sync::Arc, time::Duration};
 
 use axum::{
     Json, Router,
@@ -19,7 +20,9 @@ use axum::{
 use campbooks_kernel::{
     AppState, Error, Module, Problem,
     auth::ScopeInfo,
+    events::EventCatalogue,
     jobs::{Registry, RegistryError},
+    operations,
 };
 use tower::ServiceBuilder;
 use tower_http::{
@@ -78,6 +81,12 @@ pub fn with_ports(state: AppState) -> AppState {
 /// is duplicated (also checked by `cargo xtask arch`).
 pub fn registry() -> Result<Registry, RegistryError> {
     Registry::build(&modules())
+}
+
+/// Every event the modules publish, with its payload schema: what
+/// `campbooks-server events catalogue` prints and `openapi/events.json` holds.
+pub fn events_catalogue() -> Result<EventCatalogue, RegistryError> {
+    registry().map(|registry| EventCatalogue::new(&registry))
 }
 
 /// Every OAuth scope the API knows, sorted by name: what
@@ -152,13 +161,22 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
     api().into_openapi()
 }
 
-/// The full HTTP application: module routes, `/openapi.json`, the interim
-/// `/bff/api/*` passthrough, the web client (when `CAMPBOOKS_WEB_DIR` is set)
-/// or else a problem+json 404 fallback, and the middleware stack (security
-/// headers, request id, tracing, timeout, compression).
+/// The full HTTP application: module routes (behind the idempotency layer),
+/// `/openapi.json`, the interim `/bff/api/*` passthrough, the web client
+/// (when `CAMPBOOKS_WEB_DIR` is set) or else a problem+json 404 fallback, and
+/// the middleware stack (security headers, request id, tracing, timeout,
+/// compression).
+///
+/// The same module routes are installed in the state's
+/// [`Operations`](operations::Operations), so automation and the assistant invoke operations by id
+/// through exactly what HTTP requests reach.
 pub fn router(state: AppState) -> Router {
-    let (routes, spec) = api().split_for_parts();
-    let spec = std::sync::Arc::new(spec);
+    let operations::Composed {
+        routes,
+        spec,
+        state,
+    } = operations::compose(api(), state);
+    let spec = Arc::new(spec);
     let request_id = HeaderName::from_static(REQUEST_ID_HEADER);
     let web_client = web::configured_dir(&state.config).map(web::WebClient::new);
 
@@ -240,11 +258,21 @@ mod tests {
         assert_eq!(spec["info"]["version"], env!("CARGO_PKG_VERSION"));
         assert_eq!(
             spec["paths"]["/api/v1/system/health"]["get"]["operationId"],
-            "system_health"
+            "system.health"
         );
         assert_eq!(
             spec["paths"]["/api/v1/system/version"]["get"]["operationId"],
-            "system_version"
+            "system.version"
+        );
+        assert_eq!(
+            spec["paths"]["/api/v1/system/version"]["get"]["x-campbooks"],
+            serde_json::json!({
+                "mutates": false,
+                "automation": false,
+                "assistant": false,
+                "risk": "low",
+                "records": []
+            })
         );
         assert!(spec["components"]["schemas"]["Problem"].is_object());
     }
@@ -425,6 +453,63 @@ mod tests {
     fn registry_builds() {
         let registry = registry().unwrap();
         assert!(registry.kind_names().contains(&"kernel.prune_jobs"));
+        assert!(registry.kind_names().contains(&"kernel.prune_idempotency"));
+    }
+
+    #[test]
+    fn events_catalogue_lists_published_events() {
+        let catalogue = serde_json::to_value(events_catalogue().unwrap()).unwrap();
+        let names: Vec<&str> = catalogue["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|event| event["name"].as_str())
+            .collect();
+        assert!(names.contains(&"workspaces.workspace_created"), "{names:?}");
+        let created = &catalogue["events"][names
+            .iter()
+            .position(|n| *n == "workspaces.workspace_created")
+            .unwrap()];
+        assert_eq!(created["module"], "workspaces");
+        assert_eq!(created["version"], 1);
+        assert_eq!(created["workspaceScoped"], true);
+        assert!(created["payload"]["properties"]["owner"].is_object());
+    }
+
+    #[tokio::test]
+    async fn operations_are_invocable_by_id_and_gated_by_their_metadata() {
+        let composed = operations::compose(api(), testing::state(testing::unreachable_pool()));
+        let catalogue = composed.state.operations.catalogue().unwrap();
+        assert!(
+            catalogue
+                .get("system.health")
+                .is_some_and(|op| !op.mutates())
+        );
+        let principal = campbooks_kernel::auth::Principal {
+            subject: "user-1".to_owned(),
+            kind: campbooks_kernel::auth::PrincipalKind::User,
+            client_id: None,
+            scopes: std::collections::BTreeSet::new(),
+            workspace: None,
+            email: None,
+            email_verified: false,
+            name: None,
+        };
+        // Probes opt neither automation nor the assistant in.
+        let refused = operations::invoke(
+            &composed.state,
+            operations::Invocation::new(
+                operations::Caller::Assistant,
+                principal,
+                "system.version",
+                serde_json::Value::Null,
+            ),
+        )
+        .await;
+        assert!(matches!(
+            refused,
+            Err(operations::InvokeError::NotAllowed { .. })
+        ));
     }
 
     #[test]

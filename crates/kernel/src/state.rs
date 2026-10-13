@@ -10,6 +10,7 @@ use crate::{
     config::Config,
     events::EventBus,
     jobs::Registry,
+    operations::Operations,
     tenancy::{MembershipPort, NoMembership},
 };
 
@@ -32,6 +33,9 @@ pub struct AppState {
     /// Message bodies, attachments and files (ADR 0011). Not configured
     /// until the server attaches one with [`with_blobs`](Self::with_blobs).
     pub blobs: BlobStore,
+    /// The composed API, for running operations by id
+    /// ([`invoke`](crate::operations::invoke)). Installed by the server.
+    pub operations: Operations,
 }
 
 impl AppState {
@@ -46,6 +50,7 @@ impl AppState {
             events: EventBus::default(),
             membership: Arc::new(NoMembership),
             blobs: BlobStore::default(),
+            operations: Operations::default(),
         }
     }
 
@@ -67,6 +72,14 @@ impl AppState {
     #[must_use]
     pub fn with_blobs(mut self, blobs: BlobStore) -> Self {
         self.blobs = blobs;
+        self
+    }
+
+    /// The same state, able to [`invoke`](crate::operations::invoke) the
+    /// operations of `operations`.
+    #[must_use]
+    pub fn with_operations(mut self, operations: Operations) -> Self {
+        self.operations = operations;
         self
     }
 }

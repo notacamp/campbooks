@@ -12,7 +12,7 @@ export interface paths {
             cookie?: never;
         };
         /** Report instance health. */
-        get: operations["system_health"];
+        get: operations["system.health"];
         put?: never;
         post?: never;
         delete?: never;
@@ -29,7 +29,7 @@ export interface paths {
             cookie?: never;
         };
         /** Report the server version. */
-        get: operations["system_version"];
+        get: operations["system.version"];
         put?: never;
         post?: never;
         delete?: never;
@@ -435,7 +435,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    system_health: {
+    "system.health": {
         parameters: {
             query?: never;
             header?: never;
@@ -464,7 +464,7 @@ export interface operations {
             };
         };
     };
-    system_version: {
+    "system.version": {
         parameters: {
             query?: never;
             header?: never;

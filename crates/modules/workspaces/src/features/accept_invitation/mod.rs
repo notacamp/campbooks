@@ -3,7 +3,7 @@
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
-    AppState, Error, Problem, Result,
+    AppState, Error, Operation, Problem, Result, Risk,
     auth::{Principal, Scoped},
     db::BeginFor as _,
     extract,
@@ -40,6 +40,8 @@ pub struct AcceptInvitation {
     operation_id = "workspaces.accept_invitation",
     tag = "workspaces",
     security(("bearer" = ["workspaces:write"])),
+    // Accepting an invitation is the invitee's own act; not for rules or the assistant.
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["workspaces.invitation", "workspaces.member"])))),
     request_body = AcceptInvitation,
     responses(
         (status = OK, description = "You are a member; the workspace with your role.",

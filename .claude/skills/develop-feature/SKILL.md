@@ -40,8 +40,11 @@ recommended answer instead of guessing.
 AGENTS.md → Architecture rules and Security rules.
 
 - A new use case: `cargo xtask new-feature <module> <feature>` scaffolds the
-  slice (handler, OpenAPI path with its security, tests) and mounts it.
-  Replace its placeholder and every `TODO(new-feature)`.
+  slice (handler, OpenAPI path with its security, `operationId` and
+  `x-campbooks` metadata, tests) and mounts it. Replace its placeholder and
+  every `TODO(new-feature)`; the metadata rules are ADR 0013.
+- A new event: derive `utoipa::ToSchema`, declare it with
+  `Background::publishes`, then `cargo xtask events`.
 - Write the test first where you can; database tests use `#[sqlx::test]`.
 - New `sqlx::query!` macros: refresh the offline cache with
   `cargo sqlx prepare --workspace -- --all-targets` (needs `DATABASE_URL`).
@@ -57,7 +60,7 @@ All of AGENTS.md → Code quality must pass; the commands are in
 
 ```sh
 cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace && cargo xtask arch && cargo xtask openapi --check
+cargo test --workspace && cargo xtask arch && cargo xtask openapi --check && cargo xtask events --check
 cargo deny check && cargo machete
 ```
 

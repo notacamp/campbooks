@@ -342,7 +342,7 @@ pub fn check_versions(version_file: &str, crates: &[Crate]) -> Vec<String> {
 }
 
 /// HTTP methods an OpenAPI path item may hold operations under.
-const OPERATION_METHODS: [&str; 8] = [
+pub const OPERATION_METHODS: [&str; 8] = [
     "get", "put", "post", "delete", "options", "head", "patch", "trace",
 ];
 
@@ -423,6 +423,256 @@ fn check_requirements(
                     ));
                 }
             }
+        }
+    }
+    violations
+}
+
+/// An operation's place in the catalogue: the module whose router serves it.
+pub type Owners = BTreeMap<(String, String), String>;
+
+static OPERATION_ID: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^([a-z][a-z0-9_]*)\.([a-z][a-z0-9_]*)$")
+        .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+});
+
+/// The `x-campbooks` keys every operation declares (ADR 0013); `undo` is
+/// optional.
+const REQUIRED_META: [&str; 5] = ["mutates", "automation", "assistant", "risk", "records"];
+
+/// Every operation of the generated document is a catalogue entry
+/// (ADR 0013): an `operationId` `<module>.<verb>[_<noun>]` naming the module
+/// that serves it, unique; a complete `x-campbooks` block whose `mutates`
+/// matches the method (POST/PUT/PATCH/DELETE mutate, GET/HEAD don't), whose
+/// records are the module's own `<module>.<record>` types, and whose `undo`
+/// names an existing mutating operation. `owners` maps `(METHOD, path)` to
+/// the module whose router declares it.
+pub fn check_operations(spec: &serde_json::Value, owners: &Owners) -> Vec<String> {
+    let mut violations = Vec::new();
+    let Some(paths) = spec.get("paths").and_then(serde_json::Value::as_object) else {
+        return violations;
+    };
+    // id → (operation, mutates)
+    let mut ids: BTreeMap<String, (String, Option<bool>)> = BTreeMap::new();
+    let mut undos: Vec<(String, String)> = Vec::new();
+    for (path, item) in paths {
+        for method in OPERATION_METHODS {
+            let Some(operation) = item.get(method) else {
+                continue;
+            };
+            let method = method.to_uppercase();
+            let name = format!("{method} {path}");
+            let owner = owners.get(&(method.clone(), path.clone()));
+            if owner.is_none() {
+                violations.push(format!(
+                    "OpenAPI operation `{name}` is not served by any module's router"
+                ));
+            }
+            let Some(id) = operation
+                .get("operationId")
+                .and_then(serde_json::Value::as_str)
+            else {
+                violations.push(format!(
+                    "OpenAPI operation `{name}` has no `operationId`: add \
+                     `operation_id = \"<module>.<verb>[_<noun>]\"` to its `#[utoipa::path]`"
+                ));
+                continue;
+            };
+            match (OPERATION_ID.captures(id), owner) {
+                (None, _) => violations.push(format!(
+                    "OpenAPI operation `{name}`: operationId `{id}` must be \
+                     `<module>.<verb>[_<noun>]`, lower-case snake case"
+                )),
+                (Some(caps), Some(owner))
+                    if caps.get(1).map(|m| m.as_str()) != Some(owner.as_str()) =>
+                {
+                    violations.push(format!(
+                        "OpenAPI operation `{name}`: operationId `{id}` must start with \
+                         `{owner}.`, the module that serves it"
+                    ));
+                }
+                _ => {}
+            }
+            let meta = check_meta(&name, &method, operation, owner, &mut violations);
+            if let Some(undo) = meta.as_ref().and_then(|m| m.undo.clone()) {
+                undos.push((id.to_owned(), undo));
+            }
+            if let Some((other, _)) =
+                ids.insert(id.to_owned(), (name.clone(), meta.map(|m| m.mutates)))
+            {
+                violations.push(format!(
+                    "operationId `{id}` is used by both `{other}` and `{name}`; ids are unique"
+                ));
+            }
+        }
+    }
+    for (id, undo) in undos {
+        let mutates = ids.get(&id).and_then(|(_, mutates)| *mutates);
+        if mutates == Some(false) {
+            violations.push(format!(
+                "operation `{id}` names an undo (`{undo}`) but does not mutate; only \
+                 mutating operations can be undone"
+            ));
+        }
+        match ids.get(&undo) {
+            None => violations.push(format!(
+                "operation `{id}`: undo target `{undo}` is not an operation"
+            )),
+            Some((_, Some(false))) => violations.push(format!(
+                "operation `{id}`: undo target `{undo}` does not mutate"
+            )),
+            Some(_) if undo == id => {
+                violations.push(format!("operation `{id}` names itself as its undo"));
+            }
+            Some(_) => {}
+        }
+    }
+    violations
+}
+
+/// The parts of `x-campbooks` the cross-operation checks need.
+struct Meta {
+    mutates: bool,
+    undo: Option<String>,
+}
+
+fn check_meta(
+    name: &str,
+    method: &str,
+    operation: &serde_json::Value,
+    owner: Option<&String>,
+    violations: &mut Vec<String>,
+) -> Option<Meta> {
+    let Some(meta) = operation.get("x-campbooks") else {
+        violations.push(format!(
+            "OpenAPI operation `{name}` has no `x-campbooks` extension: add \
+             `extensions((\"x-campbooks\" = json!(Operation::query() | Operation::command(..))))`"
+        ));
+        return None;
+    };
+    let Some(meta) = meta.as_object() else {
+        violations.push(format!(
+            "OpenAPI operation `{name}`: `x-campbooks` must be an object"
+        ));
+        return None;
+    };
+    for key in REQUIRED_META {
+        if !meta.contains_key(key) {
+            violations.push(format!(
+                "OpenAPI operation `{name}`: `x-campbooks.{key}` is missing"
+            ));
+        }
+    }
+    for key in meta.keys() {
+        if !REQUIRED_META.contains(&key.as_str()) && key != "undo" {
+            violations.push(format!(
+                "OpenAPI operation `{name}`: unknown key `x-campbooks.{key}`"
+            ));
+        }
+    }
+    for key in ["mutates", "automation", "assistant"] {
+        if meta.get(key).is_some_and(|v| !v.is_boolean()) {
+            violations.push(format!(
+                "OpenAPI operation `{name}`: `x-campbooks.{key}` must be a boolean"
+            ));
+        }
+    }
+    if meta
+        .get("risk")
+        .is_some_and(|risk| !matches!(risk.as_str(), Some("low" | "high")))
+    {
+        violations.push(format!(
+            "OpenAPI operation `{name}`: `x-campbooks.risk` must be \"low\" or \"high\""
+        ));
+    }
+    match meta.get("records") {
+        None => {}
+        Some(serde_json::Value::Array(records)) => {
+            for record in records {
+                let record = record.as_str().unwrap_or_default();
+                let module = OPERATION_ID
+                    .captures(record)
+                    .and_then(|caps| caps.get(1))
+                    .map(|m| m.as_str());
+                match (module, owner) {
+                    (None, _) => violations.push(format!(
+                        "OpenAPI operation `{name}`: record type `{record}` must be \
+                         `<module>.<record>`"
+                    )),
+                    (Some(module), Some(owner)) if module != owner => {
+                        violations.push(format!(
+                            "OpenAPI operation `{name}`: record type `{record}` belongs to \
+                             `{module}`; an operation touches only its own module's records"
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Some(_) => violations.push(format!(
+            "OpenAPI operation `{name}`: `x-campbooks.records` must be a list of \
+             `<module>.<record>` names"
+        )),
+    }
+    let undo = match meta.get("undo") {
+        None => None,
+        Some(serde_json::Value::String(undo)) => Some(undo.clone()),
+        Some(_) => {
+            violations.push(format!(
+                "OpenAPI operation `{name}`: `x-campbooks.undo` must be an operationId"
+            ));
+            None
+        }
+    };
+    if let Some(mutates) = meta.get("mutates").and_then(serde_json::Value::as_bool) {
+        let writes = matches!(method, "POST" | "PUT" | "PATCH" | "DELETE");
+        let reads = matches!(method, "GET" | "HEAD");
+        if mutates && !writes {
+            violations.push(format!(
+                "OpenAPI operation `{name}` mutates, so it must be POST, PUT, PATCH or DELETE"
+            ));
+        }
+        if !mutates && !reads {
+            violations.push(format!(
+                "OpenAPI operation `{name}` does not mutate, so it must be GET or HEAD"
+            ));
+        }
+    }
+    meta.get("mutates")
+        .and_then(serde_json::Value::as_bool)
+        .map(|mutates| Meta { mutates, undo })
+}
+
+/// An event type a module publishes, or one a consumer reads.
+#[derive(Debug, Clone)]
+pub struct EventDecl {
+    /// The publishing module, or the consumer's name.
+    pub by: String,
+    /// `DomainEvent::NAME`.
+    pub name: String,
+    /// `DomainEvent::VERSION`.
+    pub version: u16,
+}
+
+/// Every event a consumer handles is published (declared with
+/// `Background::publishes`) by some module, at the version the consumer
+/// reads, so the events catalogue lists every trigger in use.
+pub fn check_events(published: &[EventDecl], consumed: &[EventDecl]) -> Vec<String> {
+    let mut violations = Vec::new();
+    for consumer in consumed {
+        match published.iter().find(|p| p.name == consumer.name) {
+            None => violations.push(format!(
+                "event handler `{}` consumes `{}`, which no module declares with \
+                 `Background::publishes`",
+                consumer.by, consumer.name
+            )),
+            Some(declared) if declared.version != consumer.version => {
+                violations.push(format!(
+                    "event handler `{}` reads `{}` version {}, but `{}` publishes version {}",
+                    consumer.by, consumer.name, consumer.version, declared.by, declared.version
+                ));
+            }
+            Some(_) => {}
         }
     }
     violations
@@ -740,6 +990,215 @@ mod tests {
         );
         assert!(v.iter().any(|m| m.contains("scheme `apiKey`")));
         assert!(v.iter().any(|m| m.contains("malformed")));
+    }
+
+    fn meta(mutates: bool) -> serde_json::Value {
+        serde_json::json!({
+            "mutates": mutates, "automation": true, "assistant": false,
+            "risk": "low", "records": ["mail.thread"],
+        })
+    }
+
+    fn owners(routes: &[(&str, &str, &str)]) -> Owners {
+        routes
+            .iter()
+            .map(|(method, path, module)| {
+                (
+                    ((*method).to_owned(), (*path).to_owned()),
+                    (*module).to_owned(),
+                )
+            })
+            .collect()
+    }
+
+    fn healthy_catalogue() -> (serde_json::Value, Owners) {
+        let mut archive = meta(true);
+        archive["undo"] = serde_json::json!("mail.unarchive");
+        let spec = serde_json::json!({ "paths": {
+            "/api/v1/mail/threads": {
+                "get": { "operationId": "mail.list_threads", "x-campbooks": meta(false) },
+                "parameters": [],
+            },
+            "/api/v1/mail/threads/{id}/archive": {
+                "post": { "operationId": "mail.archive", "x-campbooks": archive },
+            },
+            "/api/v1/mail/threads/{id}/unarchive": {
+                "post": { "operationId": "mail.unarchive", "x-campbooks": meta(true) },
+            },
+        }});
+        let owners = owners(&[
+            ("GET", "/api/v1/mail/threads", "mail"),
+            ("POST", "/api/v1/mail/threads/{id}/archive", "mail"),
+            ("POST", "/api/v1/mail/threads/{id}/unarchive", "mail"),
+        ]);
+        (spec, owners)
+    }
+
+    #[test]
+    fn complete_catalogue_entries_pass() {
+        let (spec, owners) = healthy_catalogue();
+        assert!(
+            check_operations(&spec, &owners).is_empty(),
+            "{:#?}",
+            check_operations(&spec, &owners)
+        );
+    }
+
+    #[test]
+    fn operation_ids_are_present_prefixed_by_their_module_and_unique() {
+        let spec = serde_json::json!({ "paths": {
+            "/a": { "get": { "x-campbooks": meta(false) } },
+            "/b": { "get": { "operationId": "calendar.list", "x-campbooks": meta(false) } },
+            "/c": { "get": { "operationId": "mail_list", "x-campbooks": meta(false) } },
+            "/d": { "get": { "operationId": "mail.list", "x-campbooks": meta(false) } },
+            "/e": { "get": { "operationId": "mail.list", "x-campbooks": meta(false) } },
+            "/f": { "get": { "operationId": "mail.orphan", "x-campbooks": meta(false) } },
+        }});
+        let owners = owners(&[
+            ("GET", "/a", "mail"),
+            ("GET", "/b", "mail"),
+            ("GET", "/c", "mail"),
+            ("GET", "/d", "mail"),
+            ("GET", "/e", "mail"),
+        ]);
+        let v = check_operations(&spec, &owners);
+        assert_eq!(v.len(), 5, "{v:#?}");
+        assert!(
+            v.iter()
+                .any(|m| m.contains("`GET /a` has no `operationId`"))
+        );
+        assert!(
+            v.iter()
+                .any(|m| m.contains("`calendar.list` must start with `mail.`"))
+        );
+        assert!(
+            v.iter()
+                .any(|m| m.contains("`mail_list` must be `<module>.<verb>"))
+        );
+        assert!(v.iter().any(|m| m.contains("`mail.list` is used by both")));
+        assert!(
+            v.iter()
+                .any(|m| m.contains("`GET /f` is not served by any module"))
+        );
+    }
+
+    #[test]
+    fn x_campbooks_must_be_complete_and_well_typed() {
+        let spec = serde_json::json!({ "paths": {
+            "/a": { "get": { "operationId": "mail.a" } },
+            "/b": { "get": { "operationId": "mail.b", "x-campbooks": { "mutates": false } } },
+            "/c": { "get": { "operationId": "mail.c", "x-campbooks": {
+                "mutates": "no", "automation": 1, "assistant": false, "risk": "medium",
+                "records": ["thread", "calendar.event"], "colour": "red", "undo": 5,
+            }}},
+        }});
+        let owners = owners(&[
+            ("GET", "/a", "mail"),
+            ("GET", "/b", "mail"),
+            ("GET", "/c", "mail"),
+        ]);
+        let v = check_operations(&spec, &owners);
+        assert!(
+            v.iter()
+                .any(|m| m.contains("`GET /a` has no `x-campbooks`")),
+            "{v:#?}"
+        );
+        for key in ["automation", "assistant", "risk", "records"] {
+            assert!(
+                v.iter().any(|m| m.contains("`GET /b`")
+                    && m.contains(&format!("`x-campbooks.{key}` is missing"))),
+                "{key}: {v:#?}"
+            );
+        }
+        for expected in [
+            "`x-campbooks.mutates` must be a boolean",
+            "`x-campbooks.automation` must be a boolean",
+            "`x-campbooks.risk` must be \"low\" or \"high\"",
+            "record type `thread` must be `<module>.<record>`",
+            "record type `calendar.event` belongs to `calendar`",
+            "unknown key `x-campbooks.colour`",
+            "`x-campbooks.undo` must be an operationId",
+        ] {
+            assert!(v.iter().any(|m| m.contains(expected)), "{expected}: {v:#?}");
+        }
+    }
+
+    #[test]
+    fn mutates_matches_the_method() {
+        let spec = serde_json::json!({ "paths": {
+            "/a": {
+                "get": { "operationId": "mail.a", "x-campbooks": meta(true) },
+                "delete": { "operationId": "mail.b", "x-campbooks": meta(false) },
+                "patch": { "operationId": "mail.c", "x-campbooks": meta(true) },
+                "head": { "operationId": "mail.d", "x-campbooks": meta(false) },
+            },
+        }});
+        let owners = owners(&[
+            ("GET", "/a", "mail"),
+            ("DELETE", "/a", "mail"),
+            ("PATCH", "/a", "mail"),
+            ("HEAD", "/a", "mail"),
+        ]);
+        let v = check_operations(&spec, &owners);
+        assert_eq!(v.len(), 2, "{v:#?}");
+        assert!(
+            v.iter()
+                .any(|m| m.contains("`GET /a` mutates, so it must be POST"))
+        );
+        assert!(
+            v.iter()
+                .any(|m| m.contains("`DELETE /a` does not mutate, so it must be GET"))
+        );
+    }
+
+    #[test]
+    fn undo_targets_exist_and_mutate() {
+        let (mut spec, owners) = healthy_catalogue();
+        let ops = &mut spec["paths"];
+        ops["/api/v1/mail/threads/{id}/archive"]["post"]["x-campbooks"]["undo"] =
+            serde_json::json!("mail.restore");
+        ops["/api/v1/mail/threads/{id}/unarchive"]["post"]["x-campbooks"]["undo"] =
+            serde_json::json!("mail.list_threads");
+        ops["/api/v1/mail/threads"]["get"]["x-campbooks"]["undo"] =
+            serde_json::json!("mail.unarchive");
+        let v = check_operations(&spec, &owners);
+        assert_eq!(v.len(), 3, "{v:#?}");
+        assert!(
+            v.iter()
+                .any(|m| m.contains("undo target `mail.restore` is not an operation"))
+        );
+        assert!(
+            v.iter()
+                .any(|m| m.contains("undo target `mail.list_threads` does not mutate"))
+        );
+        assert!(
+            v.iter()
+                .any(|m| m.contains("`mail.list_threads` names an undo"))
+        );
+    }
+
+    fn event(by: &str, name: &str, version: u16) -> EventDecl {
+        EventDecl {
+            by: by.into(),
+            name: name.into(),
+            version,
+        }
+    }
+
+    #[test]
+    fn consumed_events_are_published_at_the_same_version() {
+        let published = [event("mail", "mail.received", 2)];
+        assert!(check_events(&published, &[event("parties.track", "mail.received", 2)]).is_empty());
+        let v = check_events(
+            &published,
+            &[
+                event("parties.track", "mail.received", 1),
+                event("parties.other", "calendar.moved", 1),
+            ],
+        );
+        assert_eq!(v.len(), 2, "{v:#?}");
+        assert!(v[0].contains("reads `mail.received` version 1, but `mail` publishes version 2"));
+        assert!(v[1].contains("`calendar.moved`, which no module declares"));
     }
 
     fn scope(module: &str, name: &str) -> DeclaredScope {

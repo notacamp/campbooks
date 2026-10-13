@@ -23,6 +23,10 @@
 //! state.events.publish(&mut tx, &MessageReceived { .. }).await?;
 //! tx.commit().await?;
 //!
+//! // It declares the events it publishes, which lists them in `openapi/events.json`
+//! // (payload schema from `utoipa::ToSchema`):
+//! // Module { background: Background::new().publishes::<MessageReceived>(), … }
+//!
 //! // A consumer in another module handles it.
 //! struct TrackSender;
 //! impl EventHandler for TrackSender {
@@ -36,9 +40,12 @@
 
 use std::{future::Future, sync::Arc};
 
+use std::collections::BTreeMap;
+
 use chrono::{DateTime, Utc};
 use serde::{Serialize, de::DeserializeOwned};
 use sqlx::{PgPool, Postgres, Transaction};
+use utoipa::openapi::{RefOr, schema::Schema};
 
 use crate::jobs::{self, JobContext, JobError, Registry};
 
@@ -58,6 +65,10 @@ pub trait DomainEvent: Serialize + DeserializeOwned + Send + Sync + 'static {
     const NAME: &'static str;
     /// Payload schema version, starting at 1. Deliberately has no default.
     const VERSION: u16;
+    /// Whether every event of this type belongs to a workspace (the default)
+    /// or is instance-wide. Listed in `openapi/events.json`; keep
+    /// [`workspace`](Self::workspace) consistent with it.
+    const WORKSPACE_SCOPED: bool = true;
 
     /// The workspace this event belongs to, or `None` for instance-wide
     /// events. Its deliveries run with that workspace set
@@ -261,4 +272,90 @@ pub enum ReplayError {
     /// The database refused.
     #[error(transparent)]
     Database(#[from] sqlx::Error),
+}
+
+/// One event type a module publishes, as declared with
+/// [`Background::publishes`](crate::jobs::Background::publishes).
+#[derive(Debug, Clone, Copy)]
+pub struct PublishedEvent {
+    /// The declaring module.
+    pub module: &'static str,
+    /// `DomainEvent::NAME`.
+    pub name: &'static str,
+    /// `DomainEvent::VERSION`.
+    pub version: u16,
+    /// `DomainEvent::WORKSPACE_SCOPED`.
+    pub workspace_scoped: bool,
+    pub(crate) schema: fn() -> RefOr<Schema>,
+    pub(crate) schemas: fn(&mut Vec<(String, RefOr<Schema>)>),
+}
+
+/// The generated catalogue of events, committed as `openapi/events.json`:
+/// what rules can trigger on and projections can read.
+#[derive(Clone, Serialize)]
+pub struct EventCatalogue {
+    /// What the document is.
+    pub description: &'static str,
+    /// The dialect payload schemas are written in.
+    #[serde(rename = "jsonSchemaDialect")]
+    pub json_schema_dialect: &'static str,
+    /// Every published event, by name.
+    pub events: Vec<EventEntry>,
+    /// Schemas the payloads reference (`#/components/schemas/<name>`).
+    pub components: EventComponents,
+}
+
+/// One event of the [`EventCatalogue`].
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventEntry {
+    /// Stable wire name, `<module>.<event>`.
+    pub name: &'static str,
+    /// The publishing module.
+    pub module: &'static str,
+    /// Payload schema version.
+    pub version: u16,
+    /// Whether each event belongs to a workspace.
+    pub workspace_scoped: bool,
+    /// The payload's JSON Schema.
+    pub payload: RefOr<Schema>,
+}
+
+/// Shared schemas of the [`EventCatalogue`].
+#[derive(Clone, Default, Serialize)]
+pub struct EventComponents {
+    /// By name.
+    pub schemas: BTreeMap<String, RefOr<Schema>>,
+}
+
+impl EventCatalogue {
+    /// The catalogue of every event `registry` knows to be published.
+    pub fn new(registry: &Registry) -> Self {
+        let mut events: Vec<EventEntry> = registry
+            .published()
+            .iter()
+            .map(|event| EventEntry {
+                name: event.name,
+                module: event.module,
+                version: event.version,
+                workspace_scoped: event.workspace_scoped,
+                payload: (event.schema)(),
+            })
+            .collect();
+        events.sort_by_key(|event| event.name);
+        let mut referenced = Vec::new();
+        for event in registry.published() {
+            (event.schemas)(&mut referenced);
+        }
+        Self {
+            description: "Domain events Campbooks publishes (ADR 0012, ADR 0013): the triggers \
+                automation rules listen to and the inputs projections read. Generated from \
+                the modules' DomainEvent types; do not edit.",
+            json_schema_dialect: "https://spec.openapis.org/oas/3.1/dialect/base",
+            events,
+            components: EventComponents {
+                schemas: referenced.into_iter().collect(),
+            },
+        }
+    }
 }

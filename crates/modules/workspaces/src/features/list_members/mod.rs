@@ -2,7 +2,7 @@
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
-    AppState, Problem, Result,
+    AppState, Operation, Problem, Result,
     db::BeginFor as _,
     tenancy::{Access, Role, UserId, Workspace, WorkspaceId},
 };
@@ -26,6 +26,7 @@ pub struct MemberList {
     operation_id = "workspaces.list_members",
     tag = "workspaces",
     security(("bearer" = ["workspaces:read"])),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["workspaces.member"])))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     responses(
         (status = OK, description = "The members.", body = MemberList),

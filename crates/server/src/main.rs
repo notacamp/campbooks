@@ -89,6 +89,10 @@ enum EventsCommand {
         #[arg(long)]
         since: Option<String>,
     },
+    /// Print the events catalogue as JSON (what `openapi/events.json`
+    /// holds): every event the modules publish, its version, whether it is
+    /// workspace-scoped, and its payload schema.
+    Catalogue,
 }
 
 /// Which parts of the server a process runs (ADR 0011).
@@ -117,6 +121,12 @@ fn main() -> ExitCode {
         Command::Events {
             command: EventsCommand::Replay { consumer, since },
         } => replay(&consumer, since.as_deref()),
+        Command::Events {
+            command: EventsCommand::Catalogue,
+        } => match campbooks_server::events_catalogue() {
+            Ok(catalogue) => print_json(&catalogue, "events catalogue"),
+            Err(e) => fail(&e.to_string()),
+        },
         Command::Openapi => print_json(&campbooks_server::openapi(), "OpenAPI document"),
         Command::Scopes => print_json(&campbooks_server::scope_catalogue(), "scope catalogue"),
         Command::Healthcheck { port } => healthcheck(port.unwrap_or_else(port_from_env)),

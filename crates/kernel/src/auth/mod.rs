@@ -32,6 +32,7 @@ use std::{borrow::Borrow, collections::BTreeSet};
 use serde::{Deserialize, Serialize};
 
 pub use scoped::Scoped;
+pub(crate) use scoped::bearer_token;
 pub use verifier::TokenVerifier;
 
 /// An OAuth scope a token carries, e.g. `mail:read`.
@@ -151,6 +152,17 @@ impl Principal {
         self.scopes.contains(scope)
     }
 }
+
+/// A caller already authenticated in-process, attached to a request's
+/// extensions by the kernel only: by [`invoke`](crate::operations::invoke)
+/// (automation and the assistant act for a principal without a token) and
+/// by the idempotency layer (which verifies the token once, before the
+/// handler). [`Scoped`] uses it instead of the `Authorization` header and
+/// still checks the scope. Nothing outside the process can set request
+/// extensions, and the type is private to the kernel, so a module cannot
+/// forge one either.
+#[derive(Debug, Clone)]
+pub(crate) struct AuthenticatedPrincipal(pub(crate) Principal);
 
 /// Why a request carries no usable access token. Each reason's
 /// [`code`](Self::code) is shown to the client as the problem `detail`; it

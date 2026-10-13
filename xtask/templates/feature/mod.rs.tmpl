@@ -6,7 +6,7 @@
 //! too moves to `domain/`.
 
 use axum::Json;
-use campbooks_kernel::{Problem, auth::Scoped};
+use campbooks_kernel::{Operation, Problem, auth::Scoped};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -24,9 +24,16 @@ pub struct {{feature_pascal}}Response {
 #[utoipa::path(
     get,
     path = "/api/v1/{{kebab}}/{{feature_kebab}}",
-    operation_id = "{{name}}_{{feature}}",
+    // `<module>.<verb>[_<noun>]`: a wire contract, never renamed (ADR 0013).
+    operation_id = "{{name}}.{{feature}}",
     tag = "{{name}}",
     security(("bearer" = ["{{name}}:read"])),
+    // TODO(new-feature): list the record types it touches
+    // (`.records(["{{name}}.<record>"])`), and opt in `.automation()` /
+    // `.assistant()` if rules or the assistant may call it. A write starts
+    // from `Operation::command(Risk::Low | Risk::High)` and names its
+    // inverse with `.undo("{{name}}.<verb>")`.
+    extensions(("x-campbooks" = json!(Operation::query()))),
     responses(
         (status = OK, description = "The answer for the caller.", body = {{feature_pascal}}Response),
         (status = UNAUTHORIZED, description = "No valid access token.",

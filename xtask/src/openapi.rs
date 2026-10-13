@@ -39,7 +39,7 @@ pub fn run(root: &Path, check: bool) -> Result<String> {
 }
 
 /// 1-based line number of the first difference, if any.
-fn first_difference(a: &str, b: &str) -> Option<usize> {
+pub fn first_difference(a: &str, b: &str) -> Option<usize> {
     if a == b {
         return None;
     }

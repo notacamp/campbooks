@@ -4,7 +4,7 @@
 
 use axum::{extract::State, http::StatusCode};
 use campbooks_kernel::{
-    AppState, Problem, Result, extract,
+    AppState, Operation, Problem, Result, Risk, extract,
     tenancy::{Access, UserId, Workspace, WorkspaceId},
 };
 
@@ -24,6 +24,7 @@ use crate::{
     operation_id = "workspaces.remove_member",
     tag = "workspaces",
     security(("bearer" = ["workspaces:admin"])),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.member"])))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("user_id" = UserId, Path, description = "The member."),

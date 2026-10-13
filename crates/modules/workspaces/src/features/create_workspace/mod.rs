@@ -5,7 +5,7 @@
 use aws_lc_rs::{constant_time, digest};
 use axum::{Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
-    AppState, Error, Problem, Result,
+    AppState, Error, Operation, Problem, Result, Risk,
     auth::{Principal, Scoped},
     config::SignupPolicy,
     db::BeginFor as _,
@@ -52,6 +52,7 @@ pub struct CreateWorkspace {
     operation_id = "workspaces.create",
     tag = "workspaces",
     security(("bearer" = ["workspaces:write"])),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["workspaces.workspace", "workspaces.member"])))),
     request_body = CreateWorkspace,
     responses(
         (status = CREATED, description = "Created; you are its owner.", body = WorkspaceView),

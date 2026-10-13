@@ -3,7 +3,7 @@
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
-    AppState, Problem, Result,
+    AppState, Operation, Problem, Result, Risk,
     db::BeginFor as _,
     extract,
     tenancy::{Access, Workspace, WorkspaceId},
@@ -39,6 +39,7 @@ pub struct UpdateWorkspace {
     operation_id = "workspaces.update",
     tag = "workspaces",
     security(("bearer" = ["workspaces:admin"])),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["workspaces.workspace"])))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     request_body = UpdateWorkspace,
     responses(

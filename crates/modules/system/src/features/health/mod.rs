@@ -6,7 +6,7 @@
 use std::time::Duration;
 
 use axum::{Json, extract::State};
-use campbooks_kernel::{AppState, Error, Problem, Result};
+use campbooks_kernel::{AppState, Error, Operation, Problem, Result};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use utoipa::ToSchema;
@@ -38,10 +38,12 @@ impl HealthResponse {
 #[utoipa::path(
     get,
     path = "/api/v1/system/health",
-    operation_id = "system_health",
+    operation_id = "system.health",
     tag = "system",
     // Public: probes and support tools call it without a token.
     security(()),
+    // A probe: neither rules nor the assistant have a reason to call it.
+    extensions(("x-campbooks" = json!(Operation::query()))),
     responses(
         (status = OK, description = "The instance and its database are up.", body = HealthResponse),
         (status = SERVICE_UNAVAILABLE, description = "The database is unreachable.",

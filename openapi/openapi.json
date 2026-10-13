@@ -16,7 +16,7 @@
           "system"
         ],
         "summary": "Report instance health.",
-        "operationId": "system_health",
+        "operationId": "system.health",
         "responses": {
           "200": {
             "description": "The instance and its database are up.",
@@ -41,7 +41,14 @@
         },
         "security": [
           {}
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [],
+          "risk": "low"
+        }
       }
     },
     "/api/v1/system/version": {
@@ -50,7 +57,7 @@
           "system"
         ],
         "summary": "Report the server version.",
-        "operationId": "system_version",
+        "operationId": "system.version",
         "responses": {
           "200": {
             "description": "The running build.",
@@ -65,7 +72,14 @@
         },
         "security": [
           {}
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [],
+          "risk": "low"
+        }
       }
     },
     "/api/v1/w/{workspace_id}": {
@@ -134,7 +148,16 @@
               "workspaces:read"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "workspaces.workspace"
+          ],
+          "risk": "low"
+        }
       },
       "delete": {
         "tags": [
@@ -201,7 +224,16 @@
               "workspaces:admin"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.workspace"
+          ],
+          "risk": "high"
+        }
       },
       "patch": {
         "tags": [
@@ -288,7 +320,16 @@
               "workspaces:admin"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.workspace"
+          ],
+          "risk": "low"
+        }
       }
     },
     "/api/v1/w/{workspace_id}/invitations": {
@@ -357,7 +398,16 @@
               "workspaces:admin"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "workspaces.invitation"
+          ],
+          "risk": "low"
+        }
       },
       "post": {
         "tags": [
@@ -454,7 +504,16 @@
               "workspaces:admin"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.invitation"
+          ],
+          "risk": "high"
+        }
       }
     },
     "/api/v1/w/{workspace_id}/members": {
@@ -523,7 +582,16 @@
               "workspaces:read"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "workspaces.member"
+          ],
+          "risk": "low"
+        }
       }
     },
     "/api/v1/w/{workspace_id}/members/{user_id}": {
@@ -604,7 +672,16 @@
               "workspaces:admin"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.member"
+          ],
+          "risk": "high"
+        }
       },
       "patch": {
         "tags": [
@@ -710,7 +787,16 @@
               "workspaces:admin"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.member"
+          ],
+          "risk": "high"
+        }
       }
     },
     "/api/v1/w/{workspace_id}/membership": {
@@ -782,7 +868,16 @@
               "workspaces:write"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.member"
+          ],
+          "risk": "high"
+        }
       }
     },
     "/api/v1/w/{workspace_id}/security-events": {
@@ -872,7 +967,16 @@
               "workspaces:admin"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "workspaces.security_event"
+          ],
+          "risk": "low"
+        }
       }
     },
     "/api/v1/workspaces": {
@@ -920,7 +1024,16 @@
               "workspaces:read"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "workspaces.workspace"
+          ],
+          "risk": "low"
+        }
       },
       "post": {
         "tags": [
@@ -986,7 +1099,17 @@
               "workspaces:write"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.workspace",
+            "workspaces.member"
+          ],
+          "risk": "low"
+        }
       }
     },
     "/api/v1/workspaces/invitations/accept": {
@@ -1074,7 +1197,17 @@
               "workspaces:write"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.invitation",
+            "workspaces.member"
+          ],
+          "risk": "low"
+        }
       }
     }
   },

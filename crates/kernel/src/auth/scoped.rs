@@ -7,7 +7,7 @@ use axum::{
     http::{HeaderMap, header, request::Parts},
 };
 
-use super::{AuthFailure, Principal, ScopeName, TokenVerifier};
+use super::{AuthFailure, AuthenticatedPrincipal, Principal, ScopeName, TokenVerifier};
 use crate::Error;
 
 /// Requires a valid access token that grants scope `S`, and yields its
@@ -47,12 +47,18 @@ where
     type Rejection = Error;
 
     async fn from_request_parts(parts: &mut Parts, state: &St) -> Result<Self, Self::Rejection> {
-        let verifier = TokenVerifier::from_ref(state);
-        if !verifier.is_configured() {
-            return Err(Error::Unauthorized(AuthFailure::NotConfigured));
-        }
-        let token = bearer_token(&parts.headers)?;
-        let principal = verifier.verify(token).await?;
+        // Authenticated in-process (invoke-by-id, idempotency layer), or by
+        // the request's bearer token.
+        let principal = if let Some(AuthenticatedPrincipal(principal)) = parts.extensions.get() {
+            principal.clone()
+        } else {
+            let verifier = TokenVerifier::from_ref(state);
+            if !verifier.is_configured() {
+                return Err(Error::Unauthorized(AuthFailure::NotConfigured));
+            }
+            let token = bearer_token(&parts.headers)?;
+            verifier.verify(token).await?
+        };
         if !principal.has_scope(S::NAME) {
             return Err(Error::InsufficientScope(S::NAME));
         }
@@ -64,7 +70,7 @@ where
 }
 
 /// The token of the request's single `Authorization: Bearer <token>` header.
-fn bearer_token(headers: &HeaderMap) -> Result<&str, Error> {
+pub(crate) fn bearer_token(headers: &HeaderMap) -> Result<&str, Error> {
     let mut values = headers.get_all(header::AUTHORIZATION).iter();
     let Some(value) = values.next() else {
         return Err(Error::Unauthorized(AuthFailure::MissingToken));

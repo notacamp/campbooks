@@ -17,5 +17,6 @@ it superseded. Disagree? Write a new ADR that supersedes the old one.
 | [0010](0010-connectors-and-change-streams.md) | Every outside source is a connector producing a change stream | Accepted |
 | [0011](0011-scaling-shape.md) | One binary in three roles; projections from an event log; blobs outside Postgres | Accepted |
 | [0012](0012-postgres-job-queue.md) | Our own Postgres job queue; events fan out to jobs at publish time | Accepted |
+| [0013](0013-openapi-is-the-operation-catalogue.md) | The OpenAPI document is the operation catalogue | Accepted |
 
 Template: Context → Decision → Consequences → Alternatives considered.

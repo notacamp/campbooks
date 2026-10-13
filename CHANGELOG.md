@@ -97,6 +97,21 @@ All notable changes to Campbooks Next are documented here. The format follows
   (default `true`; set it to `false` for servers that reject the parameter)
   and `CAMPBOOKS_AI__DECIDE__CALIBRATION__<TYPE>[_<OPTIONS>]` temperatures
   (default 1.0). An empty `CAMPBOOKS_AI__<ROLE>__API_KEY` now means no key.
+- Every API operation is now an entry of one catalogue, the OpenAPI document
+  (ADR 0013): each has a stable `operationId` (`<module>.<verb>`, for example
+  `system.health`; the old `system_health`-style ids are gone) and an
+  `x-campbooks` extension saying whether it changes data, which operation
+  undoes it, whether automation rules and the assistant may call it, its risk
+  and the record types it touches. Domain events are listed the same way in
+  the new `openapi/events.json` (`campbooks-server events catalogue` prints
+  it).
+- Mutating API calls accept an `Idempotency-Key` header: retrying a request
+  with the same key returns the first response (marked
+  `Idempotency-Replayed: true`) instead of running it twice. Reusing a key
+  for a different request answers 422, and a key whose first request is still
+  running answers 409. Keys are kept for 24 hours, in the new
+  `kernel.idempotency` table (created by the migration that runs on startup),
+  and an hourly job deletes expired ones.
 - Self-hosting: `docker compose --profile ai` now also runs `laya`, the
   default `decide` model (Laya multilingual, Apache-2.0, CPU-friendly). It is
   built locally from `deploy/laya`, downloads its checkpoint (about 680 MB)
