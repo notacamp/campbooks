@@ -4,256 +4,256 @@
  */
 
 export interface paths {
-    "/admin/v1/system/overview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** See the instance's version, health and configuration. */
-        get: operations["system.admin_overview"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+  "/admin/v1/system/overview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
+    /** See the instance's version, health and configuration. */
+    get: operations["system.admin_overview"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: {
-        /** @description The instance at a glance, for administrators. */
-        AdminOverview: {
-            /**
-             * @description Each AI role: configured or not, model, provider and whether it
-             *     answers.
-             */
-            ai: components["schemas"]["AiRoleStatus"][];
-            /** @description Git commit the build came from, when known. */
-            commit?: string | null;
-            /** @description The effective configuration: enumerated facts only, no secret. */
-            configuration: components["schemas"]["ConfigSummary"];
-            /** @description Whether the database answers, and its migrations. */
-            database: components["schemas"]["DatabaseStatus"];
-            /** @description Who signs people in, and which providers are set up. */
-            services: components["schemas"]["Facts"];
-            /**
-             * Format: date-time
-             * @description When this server process started.
-             */
-            started_at: string;
-            /**
-             * Format: int64
-             * @description Seconds since then.
-             */
-            uptime_seconds: number;
-            /**
-             * @description Semantic version of the server.
-             * @example 0.1.0
-             */
-            version: string;
-        };
-        /**
-         * @description The protocol a provider speaks.
-         * @enum {string}
-         */
-        AiProtocol: "openai" | "laya";
-        /**
-         * @description An AI role (ADR 0005).
-         * @enum {string}
-         */
-        AiRole: "decide" | "embed" | "complete" | "vision";
-        /**
-         * @description One AI role, without a secret: the provider is shown as scheme, host
-         *     and port only, and keys never.
-         */
-        AiRoleStatus: {
-            /** @description Whether a provider is configured for it. */
-            configured: boolean;
-            /**
-             * @description The provider's scheme, host and port.
-             * @example http://ollama:11434
-             */
-            endpoint?: string | null;
-            /** @description The model it calls. */
-            model?: string | null;
-            protocol?: components["schemas"]["AiProtocol"] | null;
-            /**
-             * @description Whether the provider answered a probe within 3 seconds (probes are
-             *     reused for a minute); `null` when not configured.
-             */
-            reachable?: boolean | null;
-            /** @description The role. */
-            role: components["schemas"]["AiRole"];
-        };
-        /**
-         * @description Which object store holds the blobs.
-         * @enum {string}
-         */
-        BlobBackend: "fs" | "s3";
-        /**
-         * @description The non-secret facts of a [`Config`] an administrator sees
-         *     ([`Config::summary`]).
-         */
-        ConfigSummary: {
-            /** @description `CAMPBOOKS_BLOBS__BACKEND`. */
-            blob_store: components["schemas"]["BlobBackend"];
-            /** @description Whether migrations use a login of their own. */
-            database_logins: components["schemas"]["DatabaseLogins"];
-            /** @description `CAMPBOOKS_ENV`. */
-            environment: components["schemas"]["Environment"];
-            /** @description Whether traces and metrics are exported over OTLP. */
-            exports_telemetry: boolean;
-            /** @description Whether a Prometheus endpoint is open. */
-            metrics_endpoint: boolean;
-            /** @description When migrations run (`CAMPBOOKS_RUN_MIGRATIONS`). */
-            migrations: components["schemas"]["Migrations"];
-            /** @description The scheme, host and port of `CAMPBOOKS_PUBLIC_URL`. */
-            public_origin?: string | null;
-            /** @description Whether the server serves the web client (`CAMPBOOKS_WEB_DIR`). */
-            serves_web_client: boolean;
-            /** @description `CAMPBOOKS_SIGNUP__POLICY` (never the codes). */
-            signup_policy: components["schemas"]["SignupPolicy"];
-        };
-        /**
-         * @description How the server signs in to the database (`deploy/README.md`).
-         * @enum {string}
-         */
-        DatabaseLogins: "single" | "split";
-        /** @description The database, as this server sees it. */
-        DatabaseStatus: {
-            /**
-             * Format: int64
-             * @description How long a trivial query took, in milliseconds.
-             */
-            latency_ms?: number | null;
-            /**
-             * Format: int64
-             * @description The newest applied migration's version (`YYYYMMDDHHMMSS`).
-             */
-            latest_migration?: number | null;
-            /** @description The newest applied migration's description. */
-            latest_migration_description?: string | null;
-            /**
-             * Format: int64
-             * @description How many schema migrations are applied.
-             */
-            migrations_applied?: number | null;
-            /** @description Whether it answered within 3 seconds. */
-            reachable: boolean;
-        };
-        /**
-         * @description The kind of deployment (`CAMPBOOKS_ENV`).
-         * @enum {string}
-         */
-        Environment: "production" | "development";
-        /** @description Who signs people in, and the outside providers set up, by name only. */
-        Facts: {
-            /** @description Which identity provider issues tokens. */
-            identity_provider: components["schemas"]["IdentityProvider"];
-            /** @description The mail providers mailboxes can be connected from (`google`, …). */
-            mail_providers: string[];
-            /** @description The providers people can sign in with (`google`, …). */
-            sign_in_providers: string[];
-        };
-        /**
-         * @description Which identity provider issues this instance's tokens (ADR 0014).
-         * @enum {string}
-         */
-        IdentityProvider: "built_in" | "external" | "none";
-        /**
-         * @description When schema migrations run.
-         * @enum {string}
-         */
-        Migrations: "on_start" | "separately";
-        /**
-         * @description RFC 9457 problem details.
-         * @example {
-         *       "code": "not_found",
-         *       "detail": "This resource does not exist, or you cannot see it.",
-         *       "status": 404,
-         *       "title": "Not found",
-         *       "type": "about:blank"
-         *     }
-         */
-        Problem: {
-            /**
-             * @description Stable machine-readable reason (`not_found`, `invalid_token`,
-             *     `last_owner`, …); the same in every locale. Match on this, never on
-             *     `title` or `detail`.
-             */
-            code: string;
-            /** @description What went wrong in this occurrence, in the request's locale. */
-            detail: string;
-            /**
-             * Format: int32
-             * @description HTTP status code.
-             */
-            status: number;
-            /**
-             * @description Short summary of the problem type, in the request's locale
-             *     (`Content-Language`).
-             */
-            title: string;
-            /**
-             * @description URI identifying the problem type; `about:blank` when the HTTP status
-             *     says it all.
-             */
-            type: string;
-        };
-        /**
-         * @description Who may create a workspace when they are not a member of any yet.
-         * @enum {string}
-         */
-        SignupPolicy: "open" | "invite_only" | "approval" | "code";
+  schemas: {
+    /** @description The instance at a glance, for administrators. */
+    AdminOverview: {
+      /**
+       * @description Each AI role: configured or not, model, provider and whether it
+       *     answers.
+       */
+      ai: components["schemas"]["AiRoleStatus"][];
+      /** @description Git commit the build came from, when known. */
+      commit?: string | null;
+      /** @description The effective configuration: enumerated facts only, no secret. */
+      configuration: components["schemas"]["ConfigSummary"];
+      /** @description Whether the database answers, and its migrations. */
+      database: components["schemas"]["DatabaseStatus"];
+      /** @description Who signs people in, and which providers are set up. */
+      services: components["schemas"]["Facts"];
+      /**
+       * Format: date-time
+       * @description When this server process started.
+       */
+      started_at: string;
+      /**
+       * Format: int64
+       * @description Seconds since then.
+       */
+      uptime_seconds: number;
+      /**
+       * @description Semantic version of the server.
+       * @example 0.1.0
+       */
+      version: string;
     };
-    responses: never;
-    parameters: never;
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+    /**
+     * @description The protocol a provider speaks.
+     * @enum {string}
+     */
+    AiProtocol: "openai" | "laya";
+    /**
+     * @description An AI role (ADR 0005).
+     * @enum {string}
+     */
+    AiRole: "decide" | "embed" | "complete" | "vision";
+    /**
+     * @description One AI role, without a secret: the provider is shown as scheme, host
+     *     and port only, and keys never.
+     */
+    AiRoleStatus: {
+      /** @description Whether a provider is configured for it. */
+      configured: boolean;
+      /**
+       * @description The provider's scheme, host and port.
+       * @example http://ollama:11434
+       */
+      endpoint?: string | null;
+      /** @description The model it calls. */
+      model?: string | null;
+      protocol?: components["schemas"]["AiProtocol"] | null;
+      /**
+       * @description Whether the provider answered a probe within 3 seconds (probes are
+       *     reused for a minute); `null` when not configured.
+       */
+      reachable?: boolean | null;
+      /** @description The role. */
+      role: components["schemas"]["AiRole"];
+    };
+    /**
+     * @description Which object store holds the blobs.
+     * @enum {string}
+     */
+    BlobBackend: "fs" | "s3";
+    /**
+     * @description The non-secret facts of a [`Config`] an administrator sees
+     *     ([`Config::summary`]).
+     */
+    ConfigSummary: {
+      /** @description `CAMPBOOKS_BLOBS__BACKEND`. */
+      blob_store: components["schemas"]["BlobBackend"];
+      /** @description Whether migrations use a login of their own. */
+      database_logins: components["schemas"]["DatabaseLogins"];
+      /** @description `CAMPBOOKS_ENV`. */
+      environment: components["schemas"]["Environment"];
+      /** @description Whether traces and metrics are exported over OTLP. */
+      exports_telemetry: boolean;
+      /** @description Whether a Prometheus endpoint is open. */
+      metrics_endpoint: boolean;
+      /** @description When migrations run (`CAMPBOOKS_RUN_MIGRATIONS`). */
+      migrations: components["schemas"]["Migrations"];
+      /** @description The scheme, host and port of `CAMPBOOKS_PUBLIC_URL`. */
+      public_origin?: string | null;
+      /** @description Whether the server serves the web client (`CAMPBOOKS_WEB_DIR`). */
+      serves_web_client: boolean;
+      /** @description `CAMPBOOKS_SIGNUP__POLICY` (never the codes). */
+      signup_policy: components["schemas"]["SignupPolicy"];
+    };
+    /**
+     * @description How the server signs in to the database (`deploy/README.md`).
+     * @enum {string}
+     */
+    DatabaseLogins: "single" | "split";
+    /** @description The database, as this server sees it. */
+    DatabaseStatus: {
+      /**
+       * Format: int64
+       * @description How long a trivial query took, in milliseconds.
+       */
+      latency_ms?: number | null;
+      /**
+       * Format: int64
+       * @description The newest applied migration's version (`YYYYMMDDHHMMSS`).
+       */
+      latest_migration?: number | null;
+      /** @description The newest applied migration's description. */
+      latest_migration_description?: string | null;
+      /**
+       * Format: int64
+       * @description How many schema migrations are applied.
+       */
+      migrations_applied?: number | null;
+      /** @description Whether it answered within 3 seconds. */
+      reachable: boolean;
+    };
+    /**
+     * @description The kind of deployment (`CAMPBOOKS_ENV`).
+     * @enum {string}
+     */
+    Environment: "production" | "development";
+    /** @description Who signs people in, and the outside providers set up, by name only. */
+    Facts: {
+      /** @description Which identity provider issues tokens. */
+      identity_provider: components["schemas"]["IdentityProvider"];
+      /** @description The mail providers mailboxes can be connected from (`google`, …). */
+      mail_providers: string[];
+      /** @description The providers people can sign in with (`google`, …). */
+      sign_in_providers: string[];
+    };
+    /**
+     * @description Which identity provider issues this instance's tokens (ADR 0014).
+     * @enum {string}
+     */
+    IdentityProvider: "built_in" | "external" | "none";
+    /**
+     * @description When schema migrations run.
+     * @enum {string}
+     */
+    Migrations: "on_start" | "separately";
+    /**
+     * @description RFC 9457 problem details.
+     * @example {
+     *       "code": "not_found",
+     *       "detail": "This resource does not exist, or you cannot see it.",
+     *       "status": 404,
+     *       "title": "Not found",
+     *       "type": "about:blank"
+     *     }
+     */
+    Problem: {
+      /**
+       * @description Stable machine-readable reason (`not_found`, `invalid_token`,
+       *     `last_owner`, …); the same in every locale. Match on this, never on
+       *     `title` or `detail`.
+       */
+      code: string;
+      /** @description What went wrong in this occurrence, in the request's locale. */
+      detail: string;
+      /**
+       * Format: int32
+       * @description HTTP status code.
+       */
+      status: number;
+      /**
+       * @description Short summary of the problem type, in the request's locale
+       *     (`Content-Language`).
+       */
+      title: string;
+      /**
+       * @description URI identifying the problem type; `about:blank` when the HTTP status
+       *     says it all.
+       */
+      type: string;
+    };
+    /**
+     * @description Who may create a workspace when they are not a member of any yet.
+     * @enum {string}
+     */
+    SignupPolicy: "open" | "invite_only" | "approval" | "code";
+  };
+  responses: never;
+  parameters: never;
+  requestBodies: never;
+  headers: never;
+  pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    "system.admin_overview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The overview. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminOverview"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again (the last sign-in is more than 12 hours old). */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Not an administrator with `system.read` (the same answer as an unknown route). */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
+  "system.admin_overview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
+    requestBody?: never;
+    responses: {
+      /** @description The overview. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminOverview"];
+        };
+      };
+      /** @description `admin_reauth_required`: sign in again (the last sign-in is more than 12 hours old). */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description Not an administrator with `system.read` (the same answer as an unknown route). */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+    };
+  };
 }

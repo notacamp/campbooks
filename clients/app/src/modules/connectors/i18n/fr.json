@@ -1,13 +1,141 @@
 {
-  "title": "Comptes associés",
-  "summary": "Ce module n’a pas encore d’écrans.",
+  "provider": {
+    "google": "Gmail",
+    "zoho": "Zoho Mail",
+    "microsoft": "Microsoft 365"
+  },
   "mail": {
-    "title": "Votre courrier",
-    "health": {
-      "ok": "Reliée",
-      "needs_reauth": "Vous devez vous reconnecter",
-      "throttled": "En pause un instant",
-      "failing": "Ne se synchronise plus"
+    "title": "Vos e-mails",
+    "manage": "Gérer les boîtes mail"
+  },
+  "mailboxes": {
+    "title": "Boîtes mail",
+    "lead": "Les boîtes mail que Campbooks lit pour {{workspace}}. Chacune se synchronise de son côté, et aucune ne change la façon dont quelqu’un se connecte.",
+    "list": "Boîtes mail reliées",
+    "loading": "Chargement des boîtes mail",
+    "onlyYours": "Vous voyez les boîtes mail que vous avez reliées. Les propriétaires et les administrateurs les voient toutes.",
+    "empty": {
+      "title": "Aucune boîte mail pour l’instant",
+      "lead": "Reliez-en une ci-dessous et Campbooks commence à trier ses e-mails."
+    },
+    "loadError": {
+      "title": "Les boîtes mail n’ont pas pu être chargées",
+      "lead": "Rien n’a changé. Réessayez dans un instant.",
+      "retry": "Réessayer"
     }
+  },
+  "row": {
+    "byYou": "Reliée par vous",
+    "by": "Reliée par {{name}}",
+    "byAnother": "Reliée par un autre membre",
+    "reconnect": "Reconnecter",
+    "reconnectLabel": "Reconnecter {{address}}",
+    "disconnect": "Déconnecter",
+    "disconnectLabel": "Déconnecter {{address}}"
+  },
+  "health": {
+    "ok": "Synchronisation en cours",
+    "needsYou": "Vous devez vous reconnecter",
+    "needsThem": "{{name}} doit se reconnecter",
+    "throttled": "Mise en pause par {{provider}} pendant quelques minutes",
+    "failing": "Pas de synchronisation — nous continuons d’essayer"
+  },
+  "disconnect": {
+    "question": "Déconnecter {{address}} ? Campbooks arrête de la synchroniser et renonce à son accès chez {{provider}}. Les e-mails déjà dans Campbooks restent, et vous pourrez toujours vous connecter avec ce compte.",
+    "confirm": "Déconnecter",
+    "cancel": "La garder",
+    "done": "{{address}} est déconnectée",
+    "doneLead": "Ses e-mails restent ici. Reliez-la de nouveau quand vous voulez.",
+    "failed": "Impossible de déconnecter {{address}}. Réessayez."
+  },
+  "connect": {
+    "title": "Relier une boîte mail",
+    "lead": "Vous passerez chez le fournisseur pour autoriser l’accès, puis vous reviendrez ici.",
+    "provider": "Relier {{provider}}",
+    "none": "Ce Campbooks n’a encore aucun fournisseur de messagerie configuré. La personne qui le gère peut ajouter Gmail ou Zoho Mail.",
+    "loading": "Chargement des fournisseurs",
+    "loadError": "Les fournisseurs que vous pouvez relier n’ont pas pu être chargés. Rechargez la page pour réessayer."
+  },
+  "connected": {
+    "title": "Votre boîte mail est reliée",
+    "named": "{{provider}} {{address}} est reliée",
+    "lead": "Campbooks récupère ses e-mails dès maintenant."
+  },
+  "stepUp": {
+    "title": "Reconnectez-vous d’abord",
+    "lead": "Pour relier une boîte mail, il faut vous être connecté au cours des dix dernières minutes.",
+    "action": "Se reconnecter"
+  },
+  "refusal": {
+    "unsupported": "Ce Campbooks ne peut pas relier les e-mails de ce fournisseur.",
+    "rate_limited": "Trop de tentatives. Attendez quelques minutes, puis recommencez.",
+    "failed": "La liaison n’a pas pu démarrer. Réessayez."
+  },
+  "errors": {
+    "sign_in_again": {
+      "title": "Vous avez été déconnecté en chemin",
+      "lead": "Reconnectez-vous, puis reliez la boîte mail une nouvelle fois."
+    },
+    "link_expired": {
+      "title": "Cela a pris trop de temps",
+      "lead": "La liaison doit se terminer en deux minutes. Recommencez."
+    },
+    "cancelled_at_provider": {
+      "title": "Annulé chez le fournisseur",
+      "lead": "Rien n’a été relié. Recommencez quand vous voulez."
+    },
+    "login_failed": {
+      "title": "Le fournisseur ne vous a pas laissé entrer",
+      "lead": "Rien n’a été relié. Réessayez, ou vérifiez le compte chez le fournisseur."
+    },
+    "provider_unavailable": {
+      "title": "Le fournisseur n’a pas répondu",
+      "lead": "Rien n’a été relié. Réessayez dans quelques minutes."
+    },
+    "consent_incomplete": {
+      "title": "L’accès aux e-mails n’a pas été autorisé",
+      "lead": "Campbooks a besoin de l’autorisation de lire et d’envoyer ces e-mails. Reliez de nouveau et laissez l’accès aux e-mails coché."
+    },
+    "account_mismatch": {
+      "title": "C’était un autre compte",
+      "lead": "Pour reconnecter une boîte mail, connectez-vous chez le fournisseur avec ce même compte."
+    },
+    "account_connected_by_another_member": {
+      "title": "Quelqu’un ici l’a déjà reliée",
+      "lead": "Un autre membre de cet espace de travail a relié cette boîte mail. Demandez-lui, ou à un propriétaire, si vous en avez besoin."
+    },
+    "way_in_belongs_to_another_account": {
+      "title": "Ce compte appartient à un autre compte Campbooks",
+      "lead": "Sa boîte mail ne peut être reliée qu’en étant connecté à ce compte-là."
+    },
+    "mailbox_unsupported": {
+      "title": "Cette boîte mail ne peut pas être reliée ici",
+      "lead": "Ce Campbooks ne peut pas synchroniser les e-mails de ce fournisseur."
+    },
+    "provider_not_configured": {
+      "title": "Ce fournisseur n’est pas configuré ici",
+      "lead": "Demandez à la personne qui gère ce Campbooks de le configurer."
+    },
+    "no_offline_access": {
+      "title": "L’accès continu n’a pas été autorisé",
+      "lead": "Campbooks doit continuer à synchroniser en votre absence. Reliez de nouveau et autorisez-le."
+    },
+    "unknown_data_centre": {
+      "title": "Cette région Zoho n’est pas prise en charge",
+      "lead": "Campbooks ne peut pas encore accéder aux e-mails de ce centre de données Zoho."
+    },
+    "no_mailbox": {
+      "title": "Ce compte n’a pas de boîte mail",
+      "lead": "Le fournisseur indique qu’il n’y a pas d’e-mails pour ce compte. Vérifiez que la messagerie y est activée."
+    },
+    "unknown": {
+      "title": "La boîte mail n’a pas été reliée",
+      "lead": "Quelque chose s’est mal passé en chemin. Réessayez."
+    }
+  },
+  "shortcuts": {
+    "connect": "Relier une boîte mail",
+    "reconnect": "Reconnecter la boîte mail",
+    "disconnect": "Déconnecter la boîte mail"
   }
 }

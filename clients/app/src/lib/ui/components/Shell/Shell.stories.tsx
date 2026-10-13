@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
 
 import { Button } from "../Button/Button";
+import { Chip, ChipRow } from "../Chip/Chip";
 import { IconButton } from "../IconButton/IconButton";
 import { NavItem } from "../NavItem/NavItem";
 import { Segmented } from "../Segmented/Segmented";
@@ -17,6 +18,7 @@ import {
   Sidebar,
   SidebarFooter,
   PhoneHeader,
+  PhoneSubnav,
   Spacer,
   StatusLine,
   WorkspaceMark,
@@ -159,6 +161,33 @@ export const Phone: Story = {
         <Spacer />
         <AccountButton compact label="Account" name="Ana Duarte" onClick={fn()} />
       </PhoneHeader>
+    </Shell>
+  ),
+};
+
+/** A page's sections under the phone header (Settings), as chips. */
+export const PhoneSections: Story = {
+  args: { children: null },
+  render: () => (
+    <Shell>
+      <PhoneHeader>
+        <WorkspaceSwitcher
+          compact
+          mark="DP"
+          name="Duarte & Pessoa"
+          kind="Business"
+          onClick={fn()}
+        />
+        <Spacer />
+        <AccountButton compact label="Account" name="Ana Duarte" onClick={fn()} />
+      </PhoneHeader>
+      <PhoneSubnav label="Settings">
+        <ChipRow label="Settings sections">
+          <Chip pressed={false}>Members</Chip>
+          <Chip pressed>Mailboxes</Chip>
+          <Chip pressed={false}>Ways to sign in</Chip>
+        </ChipRow>
+      </PhoneSubnav>
     </Shell>
   ),
 };

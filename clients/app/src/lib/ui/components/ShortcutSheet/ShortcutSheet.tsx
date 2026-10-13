@@ -24,7 +24,8 @@ export function ShortcutSheet({ open, onClose }: ShortcutSheetProps) {
   const { definitions, isBound } = useShortcutDefinitions();
   // A focus page's keys (signing in, a first-run step) mean nothing elsewhere.
   const shown = definitions.filter(
-    (definition) => definition.scope !== "focus" || isBound(definition.id),
+    (definition) =>
+      (definition.scope !== "focus" && definition.scope !== "settings") || isBound(definition.id),
   );
   return (
     <Overlay open={open} onClose={onClose} label={t("shortcutSheet.title")}>

@@ -1,6 +1,6 @@
 //! `GET /api/v1/identity/ways-in` — how the caller can sign in: their
-//! provider ways in, and the providers this instance offers. Passkeys are
-//! listed by `identity.list_passkeys`.
+//! provider ways in, the providers this instance offers, and those a mailbox
+//! can be connected from. Passkeys are listed by `identity.list_passkeys`.
 
 use axum::{Extension, Json, extract::State};
 use campbooks_kernel::{AppState, Operation, Problem, Result, auth::Scoped};
@@ -38,6 +38,9 @@ pub struct WaysIn {
     pub items: Vec<WayIn>,
     /// The providers this instance offers, in display order.
     pub providers: Vec<String>,
+    /// The providers a mailbox can be connected from (`identity.start_link`
+    /// with `connect`): offered, and with a mail adapter. Same order.
+    pub mailbox_providers: Vec<String>,
 }
 
 /// List how you sign in.
@@ -77,12 +80,19 @@ pub async fn handler(
             last_used_at: way.last_used_at,
         })
         .collect();
+    let providers: Vec<String> = issuer
+        .upstreams
+        .iter()
+        .map(|u| u.provider().as_str().to_owned())
+        .collect();
+    let mailbox_providers = providers
+        .iter()
+        .filter(|provider| !state.grants.mailbox_scopes(provider).is_empty())
+        .cloned()
+        .collect();
     Ok(Json(WaysIn {
         items,
-        providers: issuer
-            .upstreams
-            .iter()
-            .map(|u| u.provider().as_str().to_owned())
-            .collect(),
+        providers,
+        mailbox_providers,
     }))
 }

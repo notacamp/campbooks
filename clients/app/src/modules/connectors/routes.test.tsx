@@ -1,36 +1,68 @@
 import {
   createMemoryHistory,
   createRootRoute,
+  createRoute,
   createRouter,
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
-import { screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { screen, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
-import { renderWithProviders } from "../../../test/render";
+import { CONNECTION } from "../../../test/demo/identity";
+import { ANA, DUARTE, SESSION } from "../../../test/demo/workspaces";
+import { mockApi, renderWithProviders } from "../../../test/render";
 
-import { buildConnectorsRoutes } from "./index";
+import { buildConnectorsRoutes, type MailboxConsent } from "./index";
 
-function renderAt(path: string, locale: "en" | "pt-PT" = "en") {
-  const root = createRootRoute({ component: Outlet });
-  const router = createRouter({
-    routeTree: root.addChildren(buildConnectorsRoutes(root)),
-    history: createMemoryHistory({ initialEntries: [path] }),
+const PAGE = `/w/${DUARTE.id}/settings/mailboxes`;
+
+function renderAt(path: string) {
+  const useConsent = vi.fn((): MailboxConsent => ({
+    providers: ["google"],
+    providersFailed: false,
+    start: vi.fn(),
+    starting: false,
+    refusal: undefined,
+    signInAgain: vi.fn(),
+  }));
+  mockApi({
+    "GET /bff/session": { body: SESSION },
+    "GET /bff/api/v1/workspaces": { body: { workspaces: [DUARTE] } },
+    [`GET /bff/api/v1/w/${DUARTE.id}/connections`]: { body: { connections: [CONNECTION] } },
+    [`GET /bff/api/v1/w/${DUARTE.id}/members`]: { body: { members: [ANA] } },
   });
-  renderWithProviders(<RouterProvider router={router} />, locale);
+  const root = createRootRoute({ component: Outlet });
+  const workspace = createRoute({
+    getParentRoute: () => root,
+    path: "/w/$workspaceId",
+    component: Outlet,
+  });
+  const history = createMemoryHistory({ initialEntries: [path] });
+  const router = createRouter({
+    routeTree: root.addChildren([
+      workspace.addChildren(buildConnectorsRoutes(workspace, { useConsent })),
+    ]),
+    history,
+  });
+  renderWithProviders(<RouterProvider router={router} />);
+  return { useConsent, history };
 }
 
 describe("buildConnectorsRoutes", () => {
-  it("mounts the connectors home page", async () => {
-    renderAt("/connectors");
+  it("mounts Settings → Mailboxes with the front door, coming back to it", async () => {
+    const { useConsent } = renderAt(PAGE);
 
-    expect(await screen.findByRole("heading", { name: "Connected accounts" })).toBeVisible();
+    expect(await screen.findByRole("heading", { level: 1, name: "Mailboxes" })).toBeVisible();
+    expect(useConsent).toHaveBeenCalledWith({ workspaceId: DUARTE.id, returnTo: PAGE });
   });
 
-  it("renders in the user's language", async () => {
-    renderAt("/connectors", "pt-PT");
+  it("reads the front door's answer once, then clears it", async () => {
+    const { history } = renderAt(`${PAGE}?connected=${CONNECTION.id}`);
 
-    expect(await screen.findByText("Este módulo ainda não tem ecrãs.")).toBeVisible();
+    expect(await screen.findByText("Gmail ana@example.com is connected")).toBeVisible();
+    await waitFor(() => {
+      expect(history.location.search).toBe("");
+    });
   });
 });

@@ -106,8 +106,11 @@ describe("the app", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Connect" }));
 
     const mail = (await screen.findByRole("heading", { name: "Your mail" })).closest("section");
-    expect(mail).toHaveTextContent("ana@example.comConnected");
-    expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
+    expect(mail).toHaveTextContent("ana@example.comSyncing");
+    expect(screen.getByRole("link", { name: "Manage mailboxes" })).toHaveAttribute(
+      "href",
+      `/w/${DUARTE.id}/settings/mailboxes`,
+    );
   });
 
   it("asks to connect the held mailbox right after the first workspace is created", async () => {
@@ -152,8 +155,9 @@ describe("the app", () => {
     await waitFor(() => {
       expect(document.documentElement.dataset["accent"]).toBe("personal");
     });
-    expect(screen.getByRole("button", { name: /Connect your mail/u })).toBeDisabled();
-    expect(screen.getByText("Coming soon")).toBeVisible();
+    fireEvent.click(screen.getByRole("link", { name: /Connect your mail/u }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Mailboxes" })).toBeVisible();
+    expect(router.state.location.pathname).toBe(`/w/${HOUSEHOLD.id}/settings/mailboxes`);
   });
 
   it("switches workspace with Ctrl+Shift+W", async () => {

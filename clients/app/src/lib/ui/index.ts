@@ -112,6 +112,7 @@ export {
   type NoteProps,
 } from "./components/Note/Note";
 export { Pill, type PillProps } from "./components/Pill/Pill";
+export { ProviderMark, type ProviderMarkProps } from "./components/ProviderMark/ProviderMark";
 export {
   Popover,
   PopoverSection,
@@ -148,6 +149,7 @@ export {
   ListPane,
   PaneHeader,
   PhoneHeader,
+  PhoneSubnav,
   ReaderBody,
   ReaderPane,
   SearchButton,
@@ -164,6 +166,11 @@ export {
 export { SafeHtml, type SafeHtmlProps } from "./safe-html/SafeHtml";
 export { ShortcutSheet, type ShortcutSheetProps } from "./components/ShortcutSheet/ShortcutSheet";
 export { Skeleton, SkeletonList, type SkeletonProps } from "./components/Skeleton/Skeleton";
+export {
+  StatusText,
+  type StatusTextProps,
+  type StatusTone,
+} from "./components/StatusText/StatusText";
 export { Steps, type StepsProps } from "./components/Steps/Steps";
 export { TabBar, type TabBarItem, type TabBarProps } from "./components/TabBar/TabBar";
 export { Tag, type TagProps } from "./components/Tag/Tag";

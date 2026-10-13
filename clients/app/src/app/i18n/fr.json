@@ -47,9 +47,8 @@
     "title": "Rien n’a encore besoin de vous",
     "subline": "Quand Campbooks aura quelque chose pour vous, cela apparaîtra ici.",
     "connectTitle": "Connectez votre messagerie",
-    "connectLead": "Campbooks lira vos e-mails et apportera sur cette page ce qui a besoin de vous. Relier une boîte mail depuis cette page est encore en construction.",
+    "connectLead": "Campbooks lit vos e-mails et apporte sur cette page ce qui a besoin de vous. Reliez une boîte mail pour commencer.",
     "connect": "Connecter votre messagerie",
-    "soon": "Bientôt",
     "context": "Premiers pas",
     "start": "Premiers pas",
     "invite": "Invitez les personnes avec qui vous travaillez",
@@ -70,5 +69,11 @@
     "reauthAction": "Se reconnecter",
     "unreachableTitle": "Impossible d’ouvrir l’administration",
     "unreachableLead": "Le serveur n’a pas répondu. Vérifiez votre connexion, puis réessayez."
+  },
+  "settings": {
+    "sections": "Sections des paramètres",
+    "members": "Membres",
+    "mailboxes": "Boîtes mail",
+    "waysIn": "Moyens de connexion"
   }
 }

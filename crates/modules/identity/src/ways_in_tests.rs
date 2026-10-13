@@ -81,6 +81,13 @@ async fn a_person_adds_zoho_as_a_way_in_then_signs_in_with_it(db: PgPool) {
     assert_eq!(ways["items"][1]["linked_via"], "link");
     assert_eq!(ways["items"][1]["email"], "zoho-sam@example.com");
     assert_eq!(ways["providers"], json!(["google", "microsoft", "zoho"]));
+    // Mail only where there is an adapter: not Microsoft, Zoho once synced.
+    assert_eq!(ways["mailbox_providers"], json!(["google"]));
+    kit.intake.sync_zoho();
+    assert_eq!(
+        kit.ways_in(&access).await["mailbox_providers"],
+        json!(["google", "zoho"])
+    );
     let added = count(
         &kit,
         "SELECT count(*) FROM kernel.events WHERE name = 'identity.way_in_added'",

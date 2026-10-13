@@ -157,7 +157,8 @@
     "confirmForget": "Esquecer {{address}}? O Campbooks apaga a autorização que a Google lhe deu. Continua a poder iniciar sessão com esta conta.",
     "confirm": "Esquecer",
     "cancel": "Manter",
-    "forgetFailed": "Não foi possível esquecê-la. Tente novamente."
+    "forgetFailed": "Não foi possível esquecê-la. Tente novamente.",
+    "other": "Ligar outra caixa de correio"
   },
   "waysIn": {
     "title": "Formas de iniciar sessão",

@@ -4,13 +4,18 @@
 import type { AnyRoute } from "@tanstack/react-router";
 
 import type { ShortcutDefinition } from "~/lib/shortcuts";
-import { buildConnectorsRoutes } from "~/modules/connectors";
+import { buildConnectorsRoutes, CONNECTORS_SHORTCUTS } from "~/modules/connectors";
 import {
   buildConversationsRoutes,
   COMPOSE_SHORTCUTS,
   CONVERSATIONS_SHORTCUTS,
 } from "~/modules/conversations";
-import { buildIdentityRoutes, IDENTITY_SHORTCUTS, MailboxStep } from "~/modules/identity";
+import {
+  buildIdentityRoutes,
+  IDENTITY_SHORTCUTS,
+  MailboxStep,
+  useMailboxConsent,
+} from "~/modules/identity";
 import { buildSystemAdminRoutes, buildSystemRoutes, SYSTEM_ADMIN_SECTION } from "~/modules/system";
 import { buildWorkspacesRoutes, WORKSPACES_SHORTCUTS } from "~/modules/workspaces";
 
@@ -46,7 +51,8 @@ export function buildModuleRoutes<
       ...workspaces.workspace,
       ...identity.workspace,
       ...buildConversationsRoutes(workspace),
-      ...buildConnectorsRoutes(workspace),
+      // `identity` is the front door for connecting a mailbox (as on the server).
+      ...buildConnectorsRoutes(workspace, { useConsent: useMailboxConsent }),
       // `cargo xtask new-module` inserts above this line.
     ],
   } as const;
@@ -70,4 +76,5 @@ export const MODULE_SHORTCUTS: readonly ShortcutDefinition[] = [
   ...CONVERSATIONS_SHORTCUTS,
   ...COMPOSE_SHORTCUTS,
   ...IDENTITY_SHORTCUTS,
+  ...CONNECTORS_SHORTCUTS,
 ];

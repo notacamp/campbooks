@@ -1,13 +1,141 @@
 {
-  "title": "Cuentas conectadas",
-  "summary": "Este módulo aún no tiene pantallas.",
+  "provider": {
+    "google": "Gmail",
+    "zoho": "Zoho Mail",
+    "microsoft": "Microsoft 365"
+  },
   "mail": {
     "title": "Tu correo",
-    "health": {
-      "ok": "Conectado",
-      "needs_reauth": "Necesita que vuelvas a iniciar sesión",
-      "throttled": "En pausa un momento",
-      "failing": "Sin sincronizar"
+    "manage": "Gestionar buzones"
+  },
+  "mailboxes": {
+    "title": "Buzones",
+    "lead": "Los buzones que Campbooks lee para {{workspace}}. Cada uno se sincroniza por su cuenta, y ninguno cambia cómo inicia sesión nadie.",
+    "list": "Buzones conectados",
+    "loading": "Cargando los buzones",
+    "onlyYours": "Ves los buzones que has conectado tú. Los propietarios y administradores los ven todos.",
+    "empty": {
+      "title": "Todavía no hay buzones",
+      "lead": "Conecta uno abajo y Campbooks empezará a ordenar su correo."
+    },
+    "loadError": {
+      "title": "No se han podido cargar los buzones",
+      "lead": "No ha cambiado nada. Vuelve a intentarlo dentro de un momento.",
+      "retry": "Reintentar"
     }
+  },
+  "row": {
+    "byYou": "Conectado por ti",
+    "by": "Conectado por {{name}}",
+    "byAnother": "Conectado por otro miembro",
+    "reconnect": "Volver a conectar",
+    "reconnectLabel": "Volver a conectar {{address}}",
+    "disconnect": "Desconectar",
+    "disconnectLabel": "Desconectar {{address}}"
+  },
+  "health": {
+    "ok": "Sincronizando",
+    "needsYou": "Necesita que vuelvas a iniciar sesión",
+    "needsThem": "Necesita que {{name}} vuelva a iniciar sesión",
+    "throttled": "En pausa por {{provider}} durante unos minutos",
+    "failing": "No se está sincronizando — seguiremos intentándolo"
+  },
+  "disconnect": {
+    "question": "¿Desconectar {{address}}? Campbooks deja de sincronizarlo y renuncia a su acceso en {{provider}}. El correo que ya está en Campbooks se queda, y podrás seguir iniciando sesión con esta cuenta.",
+    "confirm": "Desconectar",
+    "cancel": "Conservarlo",
+    "done": "{{address}} se ha desconectado",
+    "doneLead": "Su correo se queda aquí. Vuelve a conectarlo cuando quieras.",
+    "failed": "No se ha podido desconectar {{address}}. Vuelve a intentarlo."
+  },
+  "connect": {
+    "title": "Conectar un buzón",
+    "lead": "Irás al proveedor para permitir el acceso y luego volverás aquí.",
+    "provider": "Conectar {{provider}}",
+    "none": "Este Campbooks todavía no tiene ningún proveedor de correo configurado. Quien lo gestiona puede añadir Gmail o Zoho Mail.",
+    "loading": "Cargando los proveedores",
+    "loadError": "No se han podido cargar los proveedores que puedes conectar. Recarga la página para volver a intentarlo."
+  },
+  "connected": {
+    "title": "Tu buzón está conectado",
+    "named": "{{provider}} {{address}} está conectado",
+    "lead": "Campbooks está trayendo su correo ahora."
+  },
+  "stepUp": {
+    "title": "Vuelve a iniciar sesión primero",
+    "lead": "Para conectar un buzón hace falta haber iniciado sesión en los últimos diez minutos.",
+    "action": "Volver a iniciar sesión"
+  },
+  "refusal": {
+    "unsupported": "Este Campbooks no puede conectar correo de ese proveedor.",
+    "rate_limited": "Demasiados intentos. Espera unos minutos y vuelve a empezar.",
+    "failed": "No se ha podido empezar a conectar. Vuelve a intentarlo."
+  },
+  "errors": {
+    "sign_in_again": {
+      "title": "Se cerró tu sesión por el camino",
+      "lead": "Vuelve a iniciar sesión y conecta el buzón otra vez."
+    },
+    "link_expired": {
+      "title": "Ha tardado demasiado",
+      "lead": "La conexión tiene que terminar en dos minutos. Vuelve a empezar."
+    },
+    "cancelled_at_provider": {
+      "title": "Cancelado en el proveedor",
+      "lead": "No se ha conectado nada. Vuelve a empezar cuando quieras."
+    },
+    "login_failed": {
+      "title": "El proveedor no te ha dejado entrar",
+      "lead": "No se ha conectado nada. Vuelve a intentarlo o revisa la cuenta en el proveedor."
+    },
+    "provider_unavailable": {
+      "title": "El proveedor no ha respondido",
+      "lead": "No se ha conectado nada. Vuelve a intentarlo dentro de unos minutos."
+    },
+    "consent_incomplete": {
+      "title": "No se ha permitido el acceso al correo",
+      "lead": "Campbooks necesita permiso para leer y enviar este correo. Vuelve a conectarlo y deja marcado el acceso al correo."
+    },
+    "account_mismatch": {
+      "title": "Era otra cuenta",
+      "lead": "Para volver a conectar un buzón, inicia sesión en el proveedor con esa misma cuenta."
+    },
+    "account_connected_by_another_member": {
+      "title": "Alguien de aquí ya lo ha conectado",
+      "lead": "Otro miembro de este espacio de trabajo ha conectado ese buzón. Pídeselo a él, o a un propietario, si lo necesitas."
+    },
+    "way_in_belongs_to_another_account": {
+      "title": "Esa cuenta pertenece a otra cuenta de Campbooks",
+      "lead": "Su buzón solo se puede conectar con la sesión iniciada en esa cuenta."
+    },
+    "mailbox_unsupported": {
+      "title": "Este buzón no se puede conectar aquí",
+      "lead": "Este Campbooks no puede sincronizar correo de ese proveedor."
+    },
+    "provider_not_configured": {
+      "title": "Ese proveedor no está configurado aquí",
+      "lead": "Pide a quien gestiona este Campbooks que lo configure."
+    },
+    "no_offline_access": {
+      "title": "No se ha permitido el acceso continuo",
+      "lead": "Campbooks necesita seguir sincronizando mientras no estás. Vuelve a conectarlo y permítelo."
+    },
+    "unknown_data_centre": {
+      "title": "Esa región de Zoho no es compatible",
+      "lead": "Campbooks todavía no puede llegar al correo de ese centro de datos de Zoho."
+    },
+    "no_mailbox": {
+      "title": "Esa cuenta no tiene buzón",
+      "lead": "El proveedor dice que no hay correo para ella. Comprueba que el correo está activado en esa cuenta."
+    },
+    "unknown": {
+      "title": "No se ha conectado el buzón",
+      "lead": "Algo ha fallado por el camino. Vuelve a intentarlo."
+    }
+  },
+  "shortcuts": {
+    "connect": "Conectar un buzón",
+    "reconnect": "Volver a conectar el buzón",
+    "disconnect": "Desconectar el buzón"
   }
 }

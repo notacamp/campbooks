@@ -224,7 +224,8 @@
   color: var(--text-tertiary);
 }
 
-.phoneHeader {
+.phoneHeader,
+.phoneSubnav {
   display: none;
 }
 
@@ -262,6 +263,17 @@
     gap: var(--space-1);
     min-width: 0;
     padding: var(--space-2) var(--space-2) var(--space-1);
+    background: var(--surface-base);
+  }
+}
+
+@media (width < 48rem) {
+  .phoneSubnav {
+    display: flex;
+    flex: 1 1 100%;
+    min-width: 0;
+    padding: 0 var(--space-2) var(--space-1);
+    border-bottom: var(--border-width) solid var(--border-subtle);
     background: var(--surface-base);
   }
 }

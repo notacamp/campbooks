@@ -1,13 +1,141 @@
 {
-  "title": "Contas ligadas",
-  "summary": "Este módulo ainda não tem ecrãs.",
+  "provider": {
+    "google": "Gmail",
+    "zoho": "Zoho Mail",
+    "microsoft": "Microsoft 365"
+  },
   "mail": {
     "title": "O seu correio",
-    "health": {
-      "ok": "Ligada",
-      "needs_reauth": "Precisa que inicie sessão novamente",
-      "throttled": "Em pausa por momentos",
-      "failing": "Sem sincronizar"
+    "manage": "Gerir caixas de correio"
+  },
+  "mailboxes": {
+    "title": "Caixas de correio",
+    "lead": "As caixas de correio que o Campbooks lê para {{workspace}}. Cada uma sincroniza por si, e nenhuma muda a forma como alguém inicia sessão.",
+    "list": "Caixas de correio ligadas",
+    "loading": "A carregar as caixas de correio",
+    "onlyYours": "Vê as caixas de correio que ligou. Os proprietários e administradores veem todas.",
+    "empty": {
+      "title": "Ainda não há caixas de correio",
+      "lead": "Ligue uma abaixo e o Campbooks começa a organizar o correio dela."
+    },
+    "loadError": {
+      "title": "Não foi possível carregar as caixas de correio",
+      "lead": "Nada mudou. Tente novamente daqui a pouco.",
+      "retry": "Tentar novamente"
     }
+  },
+  "row": {
+    "byYou": "Ligada por si",
+    "by": "Ligada por {{name}}",
+    "byAnother": "Ligada por outro membro",
+    "reconnect": "Voltar a ligar",
+    "reconnectLabel": "Voltar a ligar {{address}}",
+    "disconnect": "Desligar",
+    "disconnectLabel": "Desligar {{address}}"
+  },
+  "health": {
+    "ok": "A sincronizar",
+    "needsYou": "Precisa que inicie sessão novamente",
+    "needsThem": "Precisa que {{name}} inicie sessão novamente",
+    "throttled": "Em pausa pelo {{provider}} durante alguns minutos",
+    "failing": "Sem sincronizar — vamos continuar a tentar"
+  },
+  "disconnect": {
+    "question": "Desligar {{address}}? O Campbooks deixa de a sincronizar e abdica do acesso no {{provider}}. O correio que já está no Campbooks fica, e continua a poder iniciar sessão com esta conta.",
+    "confirm": "Desligar",
+    "cancel": "Manter",
+    "done": "{{address}} foi desligada",
+    "doneLead": "O correio dela fica aqui. Volte a ligá-la quando quiser.",
+    "failed": "Não foi possível desligar {{address}}. Tente novamente."
+  },
+  "connect": {
+    "title": "Ligar uma caixa de correio",
+    "lead": "Vai ao fornecedor para autorizar o acesso e depois volta aqui.",
+    "provider": "Ligar {{provider}}",
+    "none": "Este Campbooks ainda não tem nenhum fornecedor de correio configurado. Quem o gere pode adicionar o Gmail ou o Zoho Mail.",
+    "loading": "A carregar os fornecedores",
+    "loadError": "Não foi possível carregar os fornecedores que pode ligar. Recarregue a página para tentar novamente."
+  },
+  "connected": {
+    "title": "A sua caixa de correio está ligada",
+    "named": "{{provider}} {{address}} está ligada",
+    "lead": "O Campbooks está a trazer o correio dela agora."
+  },
+  "stepUp": {
+    "title": "Inicie sessão novamente primeiro",
+    "lead": "Ligar uma caixa de correio exige um início de sessão dos últimos dez minutos.",
+    "action": "Iniciar sessão novamente"
+  },
+  "refusal": {
+    "unsupported": "Este Campbooks não consegue ligar correio desse fornecedor.",
+    "rate_limited": "Demasiadas tentativas. Aguarde alguns minutos e comece de novo.",
+    "failed": "Não foi possível começar a ligar. Tente novamente."
+  },
+  "errors": {
+    "sign_in_again": {
+      "title": "A sua sessão terminou pelo caminho",
+      "lead": "Inicie sessão novamente e volte a ligar a caixa de correio."
+    },
+    "link_expired": {
+      "title": "Demorou demasiado",
+      "lead": "A ligação tem de terminar em dois minutos. Comece de novo."
+    },
+    "cancelled_at_provider": {
+      "title": "Cancelado no fornecedor",
+      "lead": "Nada foi ligado. Comece de novo quando quiser."
+    },
+    "login_failed": {
+      "title": "O fornecedor não o deixou entrar",
+      "lead": "Nada foi ligado. Tente novamente ou verifique a conta no fornecedor."
+    },
+    "provider_unavailable": {
+      "title": "O fornecedor não respondeu",
+      "lead": "Nada foi ligado. Tente novamente daqui a alguns minutos."
+    },
+    "consent_incomplete": {
+      "title": "O acesso ao correio não foi autorizado",
+      "lead": "O Campbooks precisa de autorização para ler e enviar este correio. Ligue novamente e deixe o acesso ao correio assinalado."
+    },
+    "account_mismatch": {
+      "title": "Era outra conta",
+      "lead": "Para voltar a ligar uma caixa de correio, inicie sessão no fornecedor com essa mesma conta."
+    },
+    "account_connected_by_another_member": {
+      "title": "Alguém aqui já a ligou",
+      "lead": "Outro membro deste espaço de trabalho ligou essa caixa de correio. Peça-lhe a ele, ou a um proprietário, se precisar dela."
+    },
+    "way_in_belongs_to_another_account": {
+      "title": "Essa conta pertence a outra conta do Campbooks",
+      "lead": "A caixa de correio dela só pode ser ligada com sessão iniciada nessa conta."
+    },
+    "mailbox_unsupported": {
+      "title": "Esta caixa de correio não pode ser ligada aqui",
+      "lead": "Este Campbooks não consegue sincronizar correio desse fornecedor."
+    },
+    "provider_not_configured": {
+      "title": "Esse fornecedor não está configurado aqui",
+      "lead": "Peça a quem gere este Campbooks que o configure."
+    },
+    "no_offline_access": {
+      "title": "O acesso contínuo não foi autorizado",
+      "lead": "O Campbooks precisa de continuar a sincronizar enquanto está ausente. Ligue novamente e autorize-o."
+    },
+    "unknown_data_centre": {
+      "title": "Essa região do Zoho não é suportada",
+      "lead": "O Campbooks ainda não consegue chegar ao correio nesse centro de dados do Zoho."
+    },
+    "no_mailbox": {
+      "title": "Essa conta não tem caixa de correio",
+      "lead": "O fornecedor diz que não há correio para ela. Confirme que o correio está ativo nessa conta."
+    },
+    "unknown": {
+      "title": "A caixa de correio não foi ligada",
+      "lead": "Algo correu mal pelo caminho. Tente novamente."
+    }
+  },
+  "shortcuts": {
+    "connect": "Ligar uma caixa de correio",
+    "reconnect": "Voltar a ligar a caixa de correio",
+    "disconnect": "Desligar a caixa de correio"
   }
 }

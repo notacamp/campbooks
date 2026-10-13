@@ -1,13 +1,141 @@
 {
-  "title": "Connected accounts",
-  "summary": "This module has no screens yet.",
+  "provider": {
+    "google": "Gmail",
+    "zoho": "Zoho Mail",
+    "microsoft": "Microsoft 365"
+  },
   "mail": {
     "title": "Your mail",
-    "health": {
-      "ok": "Connected",
-      "needs_reauth": "Needs you to sign in again",
-      "throttled": "Paused for a moment",
-      "failing": "Not syncing"
+    "manage": "Manage mailboxes"
+  },
+  "mailboxes": {
+    "title": "Mailboxes",
+    "lead": "The mailboxes Campbooks reads for {{workspace}}. Each one syncs on its own, and none of them changes how anyone signs in.",
+    "list": "Connected mailboxes",
+    "loading": "Loading the mailboxes",
+    "onlyYours": "You see the mailboxes you connected. Owners and admins see all of them.",
+    "empty": {
+      "title": "No mailboxes yet",
+      "lead": "Connect one below and Campbooks starts sorting its mail."
+    },
+    "loadError": {
+      "title": "The mailboxes didn't load",
+      "lead": "Nothing changed. Try again in a moment.",
+      "retry": "Try again"
     }
+  },
+  "row": {
+    "byYou": "Connected by you",
+    "by": "Connected by {{name}}",
+    "byAnother": "Connected by another member",
+    "reconnect": "Reconnect",
+    "reconnectLabel": "Reconnect {{address}}",
+    "disconnect": "Disconnect",
+    "disconnectLabel": "Disconnect {{address}}"
+  },
+  "health": {
+    "ok": "Syncing",
+    "needsYou": "Needs you to sign in again",
+    "needsThem": "Needs {{name}} to sign in again",
+    "throttled": "Paused by {{provider}} for a few minutes",
+    "failing": "Not syncing — we'll keep trying"
+  },
+  "disconnect": {
+    "question": "Disconnect {{address}}? Campbooks stops syncing it and gives up its access at {{provider}}. The mail already in Campbooks stays, and signing in with this account keeps working.",
+    "confirm": "Disconnect",
+    "cancel": "Keep it",
+    "done": "{{address}} is disconnected",
+    "doneLead": "Its mail stays here. Connect it again whenever you like.",
+    "failed": "{{address}} couldn't be disconnected. Try again."
+  },
+  "connect": {
+    "title": "Connect a mailbox",
+    "lead": "You'll go to the provider to allow access, then come back here.",
+    "provider": "Connect {{provider}}",
+    "none": "This Campbooks has no mail provider set up yet. Whoever runs it can add Gmail or Zoho Mail.",
+    "loading": "Loading the providers",
+    "loadError": "The providers you can connect didn't load. Reload the page to try again."
+  },
+  "connected": {
+    "title": "Your mailbox is connected",
+    "named": "{{provider}} {{address}} is connected",
+    "lead": "Campbooks is bringing in its mail now."
+  },
+  "stepUp": {
+    "title": "Sign in again first",
+    "lead": "Connecting a mailbox needs a sign-in from the last ten minutes.",
+    "action": "Sign in again"
+  },
+  "refusal": {
+    "unsupported": "This Campbooks can't connect mail from that provider.",
+    "rate_limited": "Too many tries. Wait a few minutes, then start again.",
+    "failed": "Connecting couldn't start. Try again."
+  },
+  "errors": {
+    "sign_in_again": {
+      "title": "You were signed out on the way",
+      "lead": "Sign in again, then connect the mailbox once more."
+    },
+    "link_expired": {
+      "title": "That took too long",
+      "lead": "Connecting has to finish within two minutes. Start again."
+    },
+    "cancelled_at_provider": {
+      "title": "Cancelled at the provider",
+      "lead": "Nothing was connected. Start again whenever you're ready."
+    },
+    "login_failed": {
+      "title": "The provider didn't let you in",
+      "lead": "Nothing was connected. Try again, or check the account at the provider."
+    },
+    "provider_unavailable": {
+      "title": "The provider didn't answer",
+      "lead": "Nothing was connected. Try again in a few minutes."
+    },
+    "consent_incomplete": {
+      "title": "Mail access wasn't allowed",
+      "lead": "Campbooks needs permission to read and send this mail. Connect again and leave mail access ticked."
+    },
+    "account_mismatch": {
+      "title": "That was a different account",
+      "lead": "To reconnect a mailbox, sign in at the provider with that same account."
+    },
+    "account_connected_by_another_member": {
+      "title": "Someone here already connected it",
+      "lead": "Another member of this workspace connected that mailbox. Ask them, or an owner, if you need it."
+    },
+    "way_in_belongs_to_another_account": {
+      "title": "That account belongs to another Campbooks account",
+      "lead": "Its mailbox can only be connected while signed in to that account."
+    },
+    "mailbox_unsupported": {
+      "title": "This mailbox can't be connected here",
+      "lead": "This Campbooks can't sync mail from that provider."
+    },
+    "provider_not_configured": {
+      "title": "That provider isn't set up here",
+      "lead": "Ask whoever runs this Campbooks to set it up."
+    },
+    "no_offline_access": {
+      "title": "Ongoing access wasn't allowed",
+      "lead": "Campbooks needs to keep syncing while you're away. Connect again and allow it."
+    },
+    "unknown_data_centre": {
+      "title": "That Zoho region isn't supported",
+      "lead": "Campbooks can't reach mail in that Zoho data centre yet."
+    },
+    "no_mailbox": {
+      "title": "That account has no mailbox",
+      "lead": "The provider says there is no mail for it. Check that mail is turned on for the account."
+    },
+    "unknown": {
+      "title": "The mailbox wasn't connected",
+      "lead": "Something went wrong on the way. Try again."
+    }
+  },
+  "shortcuts": {
+    "connect": "Connect a mailbox",
+    "reconnect": "Reconnect the mailbox",
+    "disconnect": "Disconnect the mailbox"
   }
 }

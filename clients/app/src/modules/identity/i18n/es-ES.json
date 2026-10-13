@@ -157,7 +157,8 @@
     "confirmForget": "¿Olvidar {{address}}? Campbooks borra el permiso que le dio Google. Podrás seguir iniciando sesión con esta cuenta.",
     "confirm": "Olvidarlo",
     "cancel": "Conservarlo",
-    "forgetFailed": "No se ha podido olvidar. Vuelve a intentarlo."
+    "forgetFailed": "No se ha podido olvidar. Vuelve a intentarlo.",
+    "other": "Conectar otro buzón"
   },
   "waysIn": {
     "title": "Formas de iniciar sesión",

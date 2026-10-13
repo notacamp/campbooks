@@ -4,12 +4,14 @@ import { normalizeBinding, parseBinding } from "./keys";
  * Where a shortcut is live. `global` works anywhere; `list` and `item` while a
  * list or a selected item binds a handler (often both at once); `compose`
  * while writing; `focus` on a page that asks one thing (signing in, a
- * first-run step), which never shows a list, an item or a composer. Two
+ * first-run step), which never shows a list, an item or a composer;
+ * `settings` on a settings page that manages its own rows (mailboxes),
+ * which never shows the inbox's list, item or composer either. Two
  * shortcuts conflict when they share keys, or one's keys start the other's
  * sequence, in scopes that can be live together: `global` overlaps every
  * scope, `list` and `item` overlap each other.
  */
-export type ShortcutScope = "global" | "list" | "item" | "compose" | "focus";
+export type ShortcutScope = "global" | "list" | "item" | "compose" | "focus" | "settings";
 
 /** Which heading the shortcut sheet and command menu list it under. */
 export type ShortcutGroup = "navigation" | "general" | "list" | "item" | "compose";

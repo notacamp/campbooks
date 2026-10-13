@@ -157,7 +157,8 @@
     "confirmForget": "Forget {{address}}? Campbooks deletes the permission Google gave it. You can still sign in with this account.",
     "confirm": "Forget it",
     "cancel": "Keep it",
-    "forgetFailed": "Couldn’t forget it. Try again."
+    "forgetFailed": "Couldn’t forget it. Try again.",
+    "other": "Connect a different mailbox"
   },
   "waysIn": {
     "title": "Ways to sign in",

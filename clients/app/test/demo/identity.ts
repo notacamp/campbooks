@@ -54,3 +54,24 @@ export const ZOHO_WAY_IN: Schema<"WayIn"> = {
 };
 
 export const ALL_PROVIDERS = ["google", "microsoft", "zoho"] as const;
+
+/** Ana's Zoho Mail mailbox in Duarte & Pessoa, waiting for her to sign in again. */
+export const ZOHO_CONNECTION: Schema<"ConnectionView"> = {
+  ...CONNECTION,
+  id: "0192f1a0-0000-7000-8000-0000000000c2",
+  provider: "zoho",
+  address: "ana.duarte@example.net",
+  health: "needs_reauth",
+  health_reason: "grant_revoked",
+};
+
+/** Sofia's Gmail mailbox, paused by Gmail for a few minutes. */
+export const SOFIA_CONNECTION: Schema<"ConnectionView"> = {
+  ...CONNECTION,
+  id: "0192f1a0-0000-7000-8000-0000000000c3",
+  address: "sofia@example.com",
+  display_name: "Sofia Pessoa",
+  granted_by: "0192f1a0-0000-7000-8000-0000000000a2",
+  health: "throttled",
+  health_reason: "rate_limited",
+};
