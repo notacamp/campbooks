@@ -1,7 +1,14 @@
-//! Which answers may act, per question and per source: the switch #59's
-//! evals flip. Changing an entry is a reviewed code change that cites the
-//! eval report showing the source is good enough at that threshold (ADR 0009
-//! note); it is not an operator setting.
+//! Which answers may act, per question and per source: the switch the
+//! decide evals flip (campbooks-cloud#59).
+//!
+//! [`Policy::baseline`] is the table measured by `cargo xtask eval decide`
+//! on mail-triage v1 (`crates/ai/evals/decide/mail-triage/reports/baseline.json`,
+//! commit `585a6c87`, `signals` strategy, `test` split): a question's rules
+//! answers act only where the operating point found on `dev` *holds* its
+//! target precision on `test`, and only at or above that point. Model
+//! answers have not been measured, so they never act. Changing an entry is a
+//! reviewed code change citing a newer report (ADR 0009 note); it is not an
+//! operator setting.
 
 use campbooks_ai::decide::Answer;
 
@@ -26,15 +33,70 @@ impl Switch {
     }
 }
 
-/// The switch for `question` answered by `source`.
-///
-/// In this change only rules may act, and only on the stream: zero-shot
-/// model answers are suggestions until a question has an eval set
-/// (campbooks-cloud#59).
-pub fn switch(question: &str, source: Source) -> Switch {
-    match (question, source) {
-        (questions::STREAM, Source::Rules) => Switch::ActAbove(0.8),
-        _ => Switch::Record,
+/// The switch of every (question, source); [`Switch::Record`] when absent.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Policy {
+    entries: Vec<(&'static str, Source, Switch)>,
+}
+
+impl Policy {
+    /// The measured table (mail-triage v1 baseline, `signals`):
+    ///
+    /// | Question | Target | Operating point | Precision on `test` | Holds | Rules |
+    /// | --- | --- | --- | --- | --- | --- |
+    /// | `stream` | 95% | 0.70 | 87% | no | record |
+    /// | `needs_reply` | 90% | 0.88 | 94% | yes | act ≥ 0.88 |
+    /// | `asks_action` | 90% | 0.75 | 95% | yes | act ≥ 0.75 |
+    /// | `has_deadline` | 90% | 0.75 | 90% | yes | act ≥ 0.75 |
+    /// | `urgency` | 85% | 0.75 | 93% | yes | act ≥ 0.75 |
+    /// | `suspicious` | 98% | 0.93 | 97% | no | record |
+    ///
+    /// So no conversation is sorted out of Primary by this table: the stream
+    /// answers are kept as suggestions until a strategy holds its target.
+    pub fn baseline() -> Self {
+        Self {
+            entries: vec![
+                (
+                    questions::NEEDS_REPLY,
+                    Source::Rules,
+                    Switch::ActAbove(0.88),
+                ),
+                (
+                    questions::ASKS_ACTION,
+                    Source::Rules,
+                    Switch::ActAbove(0.75),
+                ),
+                (
+                    questions::HAS_DEADLINE,
+                    Source::Rules,
+                    Switch::ActAbove(0.75),
+                ),
+                (questions::URGENCY, Source::Rules, Switch::ActAbove(0.75)),
+            ],
+        }
+    }
+
+    /// The same table with `switch` for `question` answered by `source`.
+    #[must_use]
+    pub fn with(mut self, question: &'static str, source: Source, switch: Switch) -> Self {
+        self.entries
+            .retain(|(q, s, _)| !(*q == question && *s == source));
+        self.entries.push((question, source, switch));
+        self
+    }
+
+    /// The switch for `question` answered by `source`.
+    pub fn switch(&self, question: &str, source: Source) -> Switch {
+        self.entries
+            .iter()
+            .find(|(q, s, _)| *q == question && *s == source)
+            .map_or(Switch::Record, |(_, _, switch)| *switch)
+    }
+}
+
+impl Default for Policy {
+    fn default() -> Self {
+        Self::baseline()
     }
 }
 
@@ -59,20 +121,46 @@ mod tests {
     }
 
     #[test]
-    fn only_confident_rules_sort_the_stream() {
-        let stream = switch(questions::STREAM, Source::Rules);
-        assert!(stream.accepts(&answer(0.95)));
-        assert!(!stream.accepts(&answer(0.5)));
-        assert!(!switch(questions::STREAM, Source::Model).accepts(&answer(0.999)));
+    fn the_baseline_lets_only_questions_that_hold_act() {
+        let policy = Policy::baseline();
+        // Stream and suspicious do not hold their target: suggestions only.
+        assert!(
+            !policy
+                .switch(questions::STREAM, Source::Rules)
+                .accepts(&answer(0.999))
+        );
+        assert_eq!(
+            policy.switch(questions::SUSPICIOUS, Source::Rules),
+            Switch::Record
+        );
+        let needs_reply = policy.switch(questions::NEEDS_REPLY, Source::Rules);
+        assert!(needs_reply.accepts(&answer(0.9)));
+        assert!(!needs_reply.accepts(&answer(0.87)));
         for question in [
+            questions::STREAM,
             questions::NEEDS_REPLY,
             questions::ASKS_ACTION,
             questions::HAS_DEADLINE,
             questions::URGENCY,
             questions::SUSPICIOUS,
         ] {
-            assert_eq!(switch(question, Source::Rules), Switch::Record);
-            assert_eq!(switch(question, Source::Model), Switch::Record);
+            assert_eq!(policy.switch(question, Source::Model), Switch::Record);
         }
+    }
+
+    #[test]
+    fn an_entry_can_be_replaced() {
+        let policy =
+            Policy::baseline().with(questions::STREAM, Source::Rules, Switch::ActAbove(0.9));
+        assert!(
+            policy
+                .switch(questions::STREAM, Source::Rules)
+                .accepts(&answer(0.95))
+        );
+        assert!(
+            !policy
+                .switch(questions::STREAM, Source::Rules)
+                .accepts(&answer(0.85))
+        );
     }
 }

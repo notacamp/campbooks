@@ -87,17 +87,22 @@ participants document (`ParticipantsDocument` v1), a blob the events point at.
 Every conversation SHALL be in exactly one stream: `primary`, `updates`,
 `receipts` or `newsletters`. A new conversation's stream SHALL be set from
 its first inbound message, only from an answer to the `stream` question that
-the question's switch accepts (in this version: a rules answer with
-confidence of at least 0.8); otherwise it SHALL be `primary`. Later messages
-SHALL never re-sort it, and a member's move SHALL stick.
+the policy accepts; otherwise it SHALL be `primary`. The shipped policy
+(`Policy::baseline`, from the decide eval baseline) SHALL let no stream answer
+act, since no strategy holds the stream target yet. Later messages SHALL
+never re-sort a conversation, and a member's move SHALL stick.
 
 #### Scenario: No rules strategy
 - **WHEN** the module runs with the rules strategy that abstains
 - **THEN** every conversation is in `primary` with stream source `default`
 
-#### Scenario: A confident rules answer
-- **WHEN** the rules answer `newsletters` for a message with mailing-list headers, at confidence 0.95
-- **THEN** its conversation is in `newsletters` with stream source `rules`, and the answer is stored as acted on with its explanation
+#### Scenario: The shipped policy
+- **WHEN** the rules answer `newsletters` for a message with mailing-list headers under `Policy::baseline`
+- **THEN** the conversation stays in `primary` and the answer is stored as a suggestion (`acted = false`)
+
+#### Scenario: A policy that lets rules place the stream
+- **WHEN** the policy accepts rules stream answers from 0.8 and the rules answer `newsletters` at 0.95
+- **THEN** the conversation is in `newsletters` with stream source `rules`, and the answer is stored as acted on with its explanation
 
 ### Requirement: The decide pass records suggestions
 Every answer of every strategy SHALL be stored in `decisions` with its
@@ -108,7 +113,8 @@ explanation, whether it acted, and the envelope version. The model pass
 `suspicious`) in one call per inbound message, only when the `decide` role is
 configured, only for messages sent within
 `CAMPBOOKS_CONVERSATIONS__DECIDE_BACKFILL_DAYS` (default 14), and once per
-message. In this version no model answer SHALL change anything. Provider
+message. Answers the policy accepts SHALL be marked `acted`; no model answer
+SHALL be accepted by the shipped policy. Provider
 failures SHALL be retried, recording only the kind of failure.
 
 #### Scenario: A confident but wrong model answer

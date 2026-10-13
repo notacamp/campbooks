@@ -42,8 +42,11 @@ pub mod scopes;
 mod testkit;
 
 pub use config::{ConversationsConfig, DEFAULT_DECIDE_BACKFILL_DAYS};
-pub use domain::decide::{
-    BoxFuture, Envelope, ModelStrategy, NoRules, STATE_VERSION, Source, Strategy, Verdict,
+pub use domain::{
+    decide::{
+        BoxFuture, Envelope, ModelStrategy, NoRules, STATE_VERSION, Source, Strategy, Verdict,
+    },
+    policy::{Policy, Switch},
 };
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
@@ -62,6 +65,8 @@ pub struct ConversationsDeps {
     pub config: ConversationsConfig,
     /// The rules strategy that sorts conversations as messages arrive.
     pub rules: Arc<dyn Strategy>,
+    /// Which answers may act, per question and source.
+    pub policy: Policy,
 }
 
 impl std::fmt::Debug for ConversationsDeps {
@@ -70,6 +75,7 @@ impl std::fmt::Debug for ConversationsDeps {
             .field("ai", &self.ai.is_some())
             .field("config", &self.config)
             .field("rules", &self.rules.name())
+            .field("policy", &self.policy)
             .finish()
     }
 }
@@ -82,6 +88,7 @@ impl ConversationsDeps {
             ai,
             config,
             rules: Arc::new(NoRules),
+            policy: Policy::baseline(),
         }
     }
 
@@ -95,6 +102,13 @@ impl ConversationsDeps {
     #[must_use]
     pub fn with_rules(mut self, rules: Arc<dyn Strategy>) -> Self {
         self.rules = rules;
+        self
+    }
+
+    /// The same dependencies acting on answers as `policy` allows.
+    #[must_use]
+    pub fn with_policy(mut self, policy: Policy) -> Self {
+        self.policy = policy;
         self
     }
 }
@@ -115,10 +129,14 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .publishes::<events::MessageSent>()
             .publishes::<events::ConversationChanged>()
             .publishes::<events::ChangesRequested>()
-            .handler(features::apply_changes::ApplyChanges::new(deps.rules))
+            .handler(features::apply_changes::ApplyChanges::new(
+                deps.rules,
+                deps.policy.clone(),
+            ))
             .consumer(features::decide_message::DecideMessage::new(
                 model,
                 deps.config.decide_backfill_days,
+                deps.policy,
             ))
             .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
             .job::<features::purge_workspace::PurgeWorkspace>(),

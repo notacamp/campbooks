@@ -7,7 +7,8 @@ use sqlx::PgConnection;
 
 use super::{
     decide::{STATE_VERSION, Source, Verdict},
-    policy,
+    policy::Policy,
+    questions,
 };
 use crate::model::{ConversationId, DecisionId, MessageId};
 
@@ -26,12 +27,14 @@ pub struct Recorded<'a> {
     pub questions: &'a [Question],
     /// One verdict (or abstention) per question.
     pub verdicts: &'a [Option<Verdict>],
+    /// Which answers may act.
+    pub policy: &'a Policy,
 }
 
 impl Recorded<'_> {
     /// The verdict for `question` that its switch lets act, if any.
     pub fn accepted(&self, question: &str) -> Option<&Verdict> {
-        let switch = policy::switch(question, self.source);
+        let switch = self.policy.switch(question, self.source);
         self.questions
             .iter()
             .zip(self.verdicts)
@@ -40,17 +43,24 @@ impl Recorded<'_> {
             .filter(|verdict| switch.accepts(&verdict.answer))
     }
 
-    /// Store every non-abstaining verdict; `acted` marks the questions whose
-    /// answer changed something. A verdict already stored for the same
-    /// message, question and source (a replayed delivery) is kept.
+    /// Store every non-abstaining verdict. An answer is marked `acted` when
+    /// the policy accepts it; the stream answer only when it actually placed
+    /// the conversation (`placed_stream`; later messages never re-sort). A
+    /// verdict already stored for the same message, question and source (a
+    /// replayed delivery) is kept.
     pub async fn store(
         &self,
         conn: &mut PgConnection,
         workspace: WorkspaceId,
-        acted: &[&str],
+        placed_stream: bool,
     ) -> Result<(), sqlx::Error> {
         for (question, verdict) in self.questions.iter().zip(self.verdicts) {
             let Some(verdict) = verdict else { continue };
+            let acted = if question.id == questions::STREAM {
+                placed_stream
+            } else {
+                self.accepted(&question.id).is_some()
+            };
             let answer = &verdict.answer;
             let latency_ms = i32::try_from(answer.latency.as_millis()).unwrap_or(i32::MAX);
             sqlx::query!(
@@ -77,7 +87,7 @@ impl Recorded<'_> {
                 answer.model_version,
                 latency_ms,
                 verdict.explanation,
-                acted.contains(&question.id.as_str()),
+                acted,
                 STATE_VERSION,
             )
             .execute(&mut *conn)

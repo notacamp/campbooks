@@ -189,28 +189,42 @@ on everything, so every conversation is Primary until #59 lands) and
 the rules are never forked into this crate. Tests use a stand-in rules
 strategy of their own that is not shipped.
 
-### Questions and the per-question switch
+### Questions and the per-question policy
 
-| Question | Type | Switch in this change |
-| --- | --- | --- |
-| `stream` | choice: primary, updates, receipts, newsletters | `rules` act (accepted rule answers set the stream); `model` answers recorded as suggestions |
-| `needs_reply` | noul | suggest (recorded only) |
-| `asks_action` | noul | suggest |
-| `has_deadline` | noul | suggest |
-| `urgency` | score: low, normal, high | suggest |
-| `suspicious` | noul | suggest |
+The policy (`domain::policy::Policy`, injected through `ConversationsDeps`)
+says, per question and source, whether an answer is only **recorded** or may
+**act** from a confidence (`answer.accept_if`). `Policy::baseline()` is the
+table measured by `cargo xtask eval decide` on mail-triage v1
+(`crates/ai/evals/decide/mail-triage/reports/baseline.json`, #59): rules act
+only where the operating point found on `dev` holds the question's target
+precision on `test`, from that point; model answers have no measured
+operating point yet and never act.
 
-The switch is per question in code (`domain::policy`): which sources may
-**act** (and above which threshold, via `answer.accept_if`) and which are only
-**recorded**. A stream is assigned only from an accepted answer; with none,
-the conversation goes to Primary (`stream_source = default`). Changing a
-question's switch is a reviewed code change carrying #59's eval evidence, not
-an operator setting. The stream is set from the conversation's first inbound
-message; later messages never re-sort it, and a member's move sticks
-(`stream_source = member`); `stream_source = rules` marks a rules placement,
-and the answer's explanation in `decisions` names the signal. Question ids
-match #59's eval set (`stream`, `needs_reply`, `asks_action`, `has_deadline`,
-`urgency`, `suspicious`).
+| Question | Type | Target | Rules (operating point, holds?) | Model |
+| --- | --- | --- | --- | --- |
+| `stream` | choice: primary, updates, receipts, newsletters | 95% | record (0.70: 87%, no) | record |
+| `needs_reply` | noul | 90% | act ≥ 0.88 (94%, yes) | record |
+| `asks_action` | noul | 90% | act ≥ 0.75 (95%, yes) | record |
+| `has_deadline` | noul | 90% | act ≥ 0.75 (90%, yes) | record |
+| `urgency` | score 0 to 2 | 85% | act ≥ 0.75 (93%, yes) | record |
+| `suspicious` | noul | 98% | record (0.93: 97%, no) | record |
+
+So, shipped as is, **no conversation is sorted out of Primary**: the stream
+answers are kept as suggestions (with their explanation) until a strategy
+holds its target; the placement code runs as soon as the table lets it (the
+tests enable it with a test policy). The other questions' accepted answers
+are marked `acted`, for the consumers that will use them (tasks, attention).
+Changing the table is a reviewed code change citing a newer report, not an
+operator setting.
+
+A stream is assigned only from an accepted answer; with none, the
+conversation goes to Primary (`stream_source = default`). The stream is set
+from the conversation's first inbound message; later messages never re-sort
+it, and a member's move sticks (`stream_source = member`);
+`stream_source = rules` marks a rules placement, and the answer's
+explanation in `decisions` names the signal. Question ids match #59's eval
+set (`stream`, `needs_reply`, `asks_action`, `has_deadline`, `urgency`,
+`suspicious`).
 
 The model pass (purpose `conversations.message_pass`, role `decide`, all
 questions in one call) runs as `conversations.decide_message` on
@@ -227,7 +241,8 @@ the job; a validation error is fatal.
 
 **AI summary (config rule):** role `decide`; fallback when not configured:
 rules only, no model rows; undo: no model answer is applied in this change,
-and a rule-placed stream is undone by a member's move.
+no stream is placed under the baseline policy, and any placement is undone by
+a member's move.
 
 ### Corrections
 

@@ -18,6 +18,7 @@ use crate::{
         blobs::read_text,
         decide::{BODY_CHARS, Envelope, ModelStrategy, Source, Strategy as _},
         decisions::Recorded,
+        policy::Policy,
         questions,
     },
     events::MessageReceived,
@@ -30,14 +31,17 @@ use crate::{
 pub struct DecideMessage {
     model: Option<ModelStrategy>,
     backfill: TimeDelta,
+    policy: Policy,
 }
 
 impl DecideMessage {
-    /// A pass asking `model`, for messages sent within `backfill_days`.
-    pub fn new(model: Option<ModelStrategy>, backfill_days: u32) -> Self {
+    /// A pass asking `model`, for messages sent within `backfill_days`,
+    /// marking the answers `policy` accepts.
+    pub fn new(model: Option<ModelStrategy>, backfill_days: u32, policy: Policy) -> Self {
         Self {
             model,
             backfill: TimeDelta::days(i64::from(backfill_days)),
+            policy,
         }
     }
 }
@@ -80,9 +84,12 @@ impl EventConsumer for DecideMessage {
             strategy: model.name(),
             questions: &questions,
             verdicts: &verdicts,
+            policy: &self.policy,
         };
         let tx = ctx.tx().await?;
-        recorded.store(tx, workspace, &[]).await?;
+        // The model pass never re-sorts: the stream was set when the message
+        // was stored.
+        recorded.store(tx, workspace, false).await?;
         Ok(())
     }
 }
@@ -188,8 +195,6 @@ struct Bodies {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use campbooks_ai::{AiConfig, Gateway, Protocol, ProviderConfig, Role};
     use campbooks_kernel::tenancy::WorkspaceId;
     use serde_json::{Value, json};
@@ -201,7 +206,7 @@ mod tests {
 
     use crate::{
         ConversationsConfig, ConversationsDeps,
-        testkit::{HeaderRules, Kit},
+        testkit::{Kit, sorting_deps},
     };
 
     /// A laya-serve answering every question the same way: the newsletter
@@ -234,13 +239,13 @@ mod tests {
             roles: [(Role::Decide, provider)].into(),
         })
         .unwrap();
-        let deps = ConversationsDeps::new(
-            Some(gateway),
-            ConversationsConfig {
+        let deps = ConversationsDeps {
+            ai: Some(gateway),
+            config: ConversationsConfig {
                 decide_backfill_days: backfill_days,
             },
-        )
-        .with_rules(Arc::new(HeaderRules));
+            ..sorting_deps()
+        };
         Kit::with_deps(db, deps).await
     }
 

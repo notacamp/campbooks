@@ -31,6 +31,7 @@ use crate::{
     domain::{
         blobs::read_text,
         decide::{BoxFuture, Envelope, Source, Strategy, Verdict},
+        policy::{Policy, Switch},
         questions,
     },
     ingest::MessageChangeBatch,
@@ -88,13 +89,11 @@ pub struct Kit {
 }
 
 impl Kit {
-    /// The module sorting with [`HeaderRules`], without AI.
+    /// The module sorting with [`HeaderRules`] under a policy that lets
+    /// confident rules place the stream (the shipped baseline does not yet;
+    /// [`Policy::baseline`]), without AI.
     pub async fn new(db: PgPool) -> Self {
-        Self::with_deps(
-            db,
-            ConversationsDeps::offline().with_rules(Arc::new(HeaderRules)),
-        )
-        .await
+        Self::with_deps(db, sorting_deps()).await
     }
 
     /// The module composed with `deps`.
@@ -288,6 +287,17 @@ impl Kit {
         .await
         .unwrap()
     }
+}
+
+/// [`HeaderRules`] with stream placement enabled at 0.8.
+pub fn sorting_deps() -> ConversationsDeps {
+    ConversationsDeps::offline()
+        .with_rules(Arc::new(HeaderRules))
+        .with_policy(Policy::baseline().with(
+            questions::STREAM,
+            Source::Rules,
+            Switch::ActAbove(0.8),
+        ))
 }
 
 /// `fixtures/<name>.json`.

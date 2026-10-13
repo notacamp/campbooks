@@ -41,10 +41,12 @@ Tracking issue: https://github.com/notacamp/campbooks-cloud/issues/37.
   (a member's change the provider should mirror).
 - **Streams:** the built-in Primary, Updates, Receipts and Newsletters.
   A conversation's stream is assigned only from an **accepted answer** to the
-  `stream` question, else Primary. This module writes no header or keyword
+  `stream` question, else Primary. The shipped policy comes from #59's eval
+  baseline, where no strategy holds the stream target yet, so stream answers
+  are suggestions for now. This module writes no header or keyword
   rules: it builds a compact `Envelope` from the stored message and asks the
   shared strategy in `campbooks_ai::decide` (signals and strategies owned and
-  evaluated by #59). In this change only rule answers may act on `stream`.
+  evaluated by #59). Which answers may act is a per-question policy table.
 - **The decide pass, as suggestions:** `conversations.decide_message`
   consumes `message_received` and asks six typed questions (stream, needs
   reply, asks for something, has a deadline, urgency, suspicious) through

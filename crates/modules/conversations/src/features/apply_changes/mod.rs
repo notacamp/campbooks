@@ -41,6 +41,7 @@ use crate::{
         conversation::{Changed, recount},
         decide::{BODY_CHARS, Envelope, Source, Strategy, Verdict},
         decisions::Recorded,
+        policy::Policy,
         questions,
     },
     events::{Change, MessageFacts, MessageReceived, MessageSent, Origin},
@@ -73,12 +74,14 @@ pub const ATTACHMENT_RECORD: &str = "conversations.attachment";
 /// strategy the module was composed with.
 pub struct ApplyChanges {
     rules: Arc<dyn Strategy>,
+    policy: Policy,
 }
 
 impl ApplyChanges {
-    /// A handler sorting with `rules`.
-    pub fn new(rules: Arc<dyn Strategy>) -> Self {
-        Self { rules }
+    /// A handler sorting with `rules`, acting on their answers as `policy`
+    /// allows.
+    pub fn new(rules: Arc<dyn Strategy>, policy: Policy) -> Self {
+        Self { rules, policy }
     }
 }
 
@@ -127,6 +130,7 @@ impl JobHandler for ApplyChanges {
             events: &events,
             workspace,
             ws: &ws,
+            policy: &self.policy,
             inbox: batch.inbox,
             touched: BTreeMap::new(),
             new_in: BTreeSet::new(),
@@ -290,6 +294,7 @@ struct Apply<'a> {
     events: &'a EventBus,
     workspace: WorkspaceId,
     ws: &'a str,
+    policy: &'a Policy,
     inbox: InboxId,
     /// Conversations whose existing messages changed or went: what changed
     /// and which messages, announced at the end.
@@ -432,7 +437,7 @@ impl Apply<'_> {
         let questions = questions::all();
         let inbound = message.direction == Direction::Inbound;
         let sort_to = if inbound {
-            accepted_stream(&questions, &prepared.verdicts)
+            accepted_stream(&questions, &prepared.verdicts, self.policy)
         } else {
             None
         };
@@ -450,9 +455,9 @@ impl Apply<'_> {
                 strategy: "rules",
                 questions: &questions,
                 verdicts: &prepared.verdicts,
+                policy: self.policy,
             };
-            let acted: &[&str] = if sorted { &[questions::STREAM] } else { &[] };
-            recorded.store(tx, self.workspace, acted).await?;
+            recorded.store(tx, self.workspace, sorted).await?;
         }
         for merged in &placement.merge {
             threading::merge(tx, *merged, conversation).await?;
@@ -751,7 +756,11 @@ impl Apply<'_> {
 }
 
 /// The stream the rules' verdicts may set, if their switch accepts one.
-fn accepted_stream(questions: &[Question], verdicts: &[Option<Verdict>]) -> Option<Stream> {
+fn accepted_stream(
+    questions: &[Question],
+    verdicts: &[Option<Verdict>],
+    policy: &Policy,
+) -> Option<Stream> {
     let recorded = Recorded {
         message: MessageId::new(),
         conversation: ConversationId::new(),
@@ -759,6 +768,7 @@ fn accepted_stream(questions: &[Question], verdicts: &[Option<Verdict>]) -> Opti
         strategy: "rules",
         questions,
         verdicts,
+        policy,
     };
     match &recorded.accepted(questions::STREAM)?.answer.value {
         AnswerValue::Choice(label) => label.parse().ok(),

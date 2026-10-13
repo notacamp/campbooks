@@ -230,6 +230,30 @@ async fn accepted_rules_answers_place_conversations_in_streams(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn under_the_baseline_policy_stream_answers_are_suggestions(db: PgPool) {
+    let deps =
+        ConversationsDeps::offline().with_rules(std::sync::Arc::new(crate::testkit::HeaderRules));
+    let kit = Kit::with_deps(db.clone(), deps).await;
+    let (workspace, inbox) = setup(&kit, "sam@example.com").await;
+    kit.ingest(workspace, inbox, "en").await;
+    // The newsletter's rules answer is on record, but the stream question
+    // does not hold its target yet: it stays in Primary.
+    assert_eq!(
+        kit.stream_of("en-3").await,
+        ("primary".to_owned(), "default".to_owned())
+    );
+    let (value, acted): (Value, bool) = sqlx::query_as(
+        "SELECT d.value, d.acted FROM conversations.decisions d
+           JOIN conversations.messages m ON m.id = d.message_id
+          WHERE m.provider_message_id = 'en-3' AND d.question = 'stream'",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!((value, acted), (serde_json::json!("newsletters"), false));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn without_rules_every_conversation_is_primary(db: PgPool) {
     let kit = Kit::with_deps(db.clone(), ConversationsDeps::offline()).await;
     let (workspace, inbox) = setup(&kit, "sam@example.com").await;

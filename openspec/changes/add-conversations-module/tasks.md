@@ -20,7 +20,7 @@
 
 - [x] 4.1 Schema `conversations` with forced row-level security on every table, grants, list and threading indexes
 - [x] 4.2 `apply_changes`: survey, prepare (participants document, rules), apply in order; threading with late-parent merges; blobs attached and detached; events
-- [x] 4.3 Decide seam: `Envelope`, `Strategy`, `NoRules`, `ModelStrategy`, per-question switch, `decisions`
+- [x] 4.3 Decide seam: `Envelope`, `Strategy`, `NoRules`, `ModelStrategy`, per-question policy from the eval baseline, `decisions`
 - [x] 4.4 `decide_message`: model pass as suggestions, backfill window setting, idempotent, provider errors without content
 - [x] 4.5 Operations: list inboxes, list / get conversations, message body, read / unread, star / unstar, archive / unarchive, move to stream (correction), labels add / remove; `changes_requested`
 - [x] 4.6 Workspace purge on `workspaces.workspace_deleting`
@@ -28,7 +28,7 @@
 
 ## 5. Follow-ups (not in this change)
 
-- [ ] 5.1 Swap the decide seam for campbooks-cloud#59's `campbooks_ai::decide` strategies and rules
+- [ ] 5.1 Swap the decide seam for campbooks-cloud#59's `campbooks_ai::decide` strategies and rules (#447), and test that `Policy::baseline` matches its `baseline.json`
 - [ ] 5.2 Consume `connectors.messages_changed` and `connectors.capability_granted` once #36 publishes them
 - [ ] 5.3 Custom streams, inbox sharing operations, `MessageDecided` / `AttachmentReceived`
 
