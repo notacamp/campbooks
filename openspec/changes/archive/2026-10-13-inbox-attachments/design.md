@@ -149,13 +149,16 @@ Alternatives considered:
 ### 4. Placeholder for blocked images
 
 The sanitiser's image policy already sees every remote `img[src]` and
-removes it. It now replaces it with one fixed `data:image/svg+xml` URL (a
+removes it. A last pass over ammonia's canonical output then gives every
+image left without a source (held back, or a `data:`/relative/unknown
+`cid:` source ammonia dropped) one fixed `data:image/svg+xml` URL: a
 neutral panel with a small picture glyph, centred, in the design system's
-light neutrals: mail is always on a white page) and keeps `width`,
-`height` and `alt`. With no declared size it shows as a 48 px square. It
-loads nothing remote; the frame's policy allows only `data:` images. The
-last fail-closed check now strips any image whose source is not one of the
-server's own `data:` URLs.
+light neutrals (mail is always on a white page). The SVG has no intrinsic
+size, so it takes the image's declared `width`/`height` (and `alt` is
+kept); an image that declares no size gets 48 × 48. It loads nothing
+remote; the frame's policy allows only `data:` images. The fail-closed
+check now strips every image when any `src` in a blocked render is not the
+placeholder or one of this message's inline `data:` URLs.
 
 Alternatives considered:
 
@@ -168,12 +171,15 @@ Alternatives considered:
 ### 5. UI
 
 `lib/ui` gains `AttachmentList` (name, size, type icon, Download, Preview
-for images and PDFs, a busy state, an error line) and `ImagePreview` (an
+for images and PDFs, a busy state, an error line; sizes in kB/MB, never
+"398 byte") and `ImagePreview` (an
 `Overlay` dialog with the picture, its name, Download and Close). File
 names shown in the app go through the same bidi/control-character
 stripping. `MessageCard` takes the list in a new `files` slot. The inbox's
-`ThreadMessage` hides parts shown in the body (inline images with a content
-id) from the list.
+`ThreadMessage` hides parts shown in the body from the list:
+`AttachmentView.in_body` (new) is true for an inline raster part with a
+content id, so a part the body cannot show (an old message, an SVG) stays
+downloadable.
 
 Keyboard: `inbox.next_attachment` (V, item scope) moves focus through the
 open message's attachments, wrapping; Enter opens the focused one (Preview
@@ -191,6 +197,7 @@ their merits.
   (`<ts>_conversations__attachment_content_id.sql`). No other table.
 - MessageChangeBatch v1: optional `content_id` on an attachment
   (backwards compatible; absent means none).
+- `AttachmentView` (in `conversations.get`) gains `in_body`.
 - No events published or consumed. No AI.
 - Scope: `conversations:read` for `conversations.get_attachment`.
 

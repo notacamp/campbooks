@@ -1,7 +1,10 @@
-/** A file size for people: "820 B", "1.4 kB", "3.2 MB", in `locale`. */
+/**
+ * A file size for people, in `locale`: "0.4 kB", "277.5 kB", "3.2 MB". Never
+ * in bytes, which read as "398 byte" in short form.
+ */
 export function formatSize(bytes: number, locale: string): string {
-  const units = ["byte", "kilobyte", "megabyte", "gigabyte"] as const;
-  let value = bytes;
+  const units = ["kilobyte", "megabyte", "gigabyte"] as const;
+  let value = bytes / 1024;
   let unit = 0;
   while (value >= 1024 && unit < units.length - 1) {
     value /= 1024;
@@ -11,6 +14,6 @@ export function formatSize(bytes: number, locale: string): string {
     style: "unit",
     unit: units[unit],
     unitDisplay: "short",
-    maximumFractionDigits: unit === 0 ? 0 : 1,
+    maximumFractionDigits: 1,
   }).format(value);
 }

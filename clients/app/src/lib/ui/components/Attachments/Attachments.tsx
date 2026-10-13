@@ -110,7 +110,9 @@ export function AttachmentList({
               >
                 <span className={styles["nameText"]}>{attachment.name}</span>
               </button>
-              <span className={styles["size"]}>{formatSize(attachment.size, i18n.language)}</span>
+              <span className={styles["size"]}>
+                {busy === attachment.id ? t("loading") : formatSize(attachment.size, i18n.language)}
+              </span>
               {previewable ? (
                 <IconButton
                   icon="preview"

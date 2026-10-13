@@ -40,7 +40,11 @@
 }
 
 .item[aria-busy="true"] {
-  opacity: var(--opacity-muted);
+  cursor: progress;
+}
+
+.item[aria-busy="true"] .size {
+  color: var(--text-secondary);
 }
 
 .name {

@@ -32,7 +32,7 @@ an attachment.
 
 #### Scenario: A malicious file name
 - **WHEN** an attachment is named `../../etc/pass\r\nwd‮gpj.exe`
-- **THEN** the header carries `etcpasswdgpj.exe`-like text with no separators, line breaks or bidi controls, and stays one valid header
+- **THEN** the header names it `etcpasswdgpj.exe`, with no separators, line breaks or bidirectional controls, as one valid header
 
 ## MODIFIED Requirements
 

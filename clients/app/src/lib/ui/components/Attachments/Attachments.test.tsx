@@ -11,6 +11,15 @@ const FILES = [
   { id: "a3", name: "statement.html", size: 920, kind: "file" as const },
 ];
 
+/** Row `index` of the list. */
+function row(index: number): HTMLElement {
+  const element = screen.getAllByRole("listitem")[index];
+  if (element === undefined) {
+    throw new Error(`no row ${String(index)}`);
+  }
+  return element;
+}
+
 describe("AttachmentList", () => {
   it("lists name, size and actions; only images and PDFs have a preview", () => {
     const onPreview = vi.fn();
@@ -21,9 +30,9 @@ describe("AttachmentList", () => {
     expect(items).toHaveLength(3);
     expect(items[0]).toHaveTextContent("harbour.jpg");
     expect(items[0]).toHaveTextContent("277.5 kB");
-    expect(within(items[0] as HTMLElement).getAllByRole("button")).toHaveLength(3);
+    expect(within(row(0)).getAllByRole("button")).toHaveLength(3);
     // HTML is download-only: its name downloads, and there is no preview.
-    const html = within(items[2] as HTMLElement);
+    const html = within(row(2));
     expect(html.queryByRole("button", { name: /^Preview/u })).toBeNull();
     fireEvent.click(html.getByRole("button", { name: "statement.html" }));
     expect(onDownload).toHaveBeenLastCalledWith("a3");
