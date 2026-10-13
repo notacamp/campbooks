@@ -8,6 +8,7 @@
     "invalid_return_to": "Après la connexion, Campbooks ne peut revenir qu’à l’une de ses propres pages.",
     "held_grant_not_found": "Aucune boîte mail n’attend d’être connectée.",
     "invalid_id_token_hint": "Cette demande de déconnexion n’est pas signée par Campbooks pour cette application ; rien n’a été fermé.",
-    "signup_invite_only": "Ce Campbooks n’accueille que les personnes invitées. Demandez à quelqu’un d’inviter cette adresse, puis reconnectez-vous."
+    "signup_invite_only": "Ce Campbooks n’accueille que les personnes invitées. Demandez à quelqu’un d’inviter cette adresse, puis reconnectez-vous.",
+    "step_up_required": "Reconnectez-vous d’abord : pour changer votre façon de vous connecter, il faut vous être connecté dans les dix dernières minutes."
   }
 }

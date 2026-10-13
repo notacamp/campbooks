@@ -161,6 +161,10 @@ pub struct Principal {
     /// authenticated in-process without a token. Long-lived responses (the
     /// change feed) end by then, so the caller is authorized again.
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// When the user last authenticated (`auth_time`), when the token says.
+    /// Operations that change how someone signs in ask for a recent one
+    /// (step-up). Always `None` for clients and in-process principals.
+    pub auth_time: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl Principal {
