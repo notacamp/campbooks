@@ -33,6 +33,7 @@
     "file_too_large": "The file is larger than the limit of {{limit}} bytes.",
     "upload_mismatch": "The uploaded file does not match what was expected. Upload it again.",
     "upload_failed": "Reading the upload failed. Try again.",
-    "too_many_streams": "You have too many live update connections open. Close some tabs or windows and try again."
+    "too_many_streams": "You have too many live update connections open. Close some tabs or windows and try again.",
+    "mailbox_unsupported": "Connecting this kind of mailbox is not available on this instance."
   }
 }

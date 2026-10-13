@@ -73,6 +73,7 @@ pub fn modules() -> Vec<Module> {
     vec![
         campbooks_system::module(),
         campbooks_workspaces::module(),
+        campbooks_identity::module(),
         // `cargo xtask new-module` inserts above this line.
     ]
 }
@@ -150,6 +151,7 @@ fn security_scheme() -> SecurityScheme {
         (name = "workspaces", description = "Workspaces, members and roles, invitations and the \
             security log. Workspace-owned resources live under `/api/v1/w/{workspace_id}/`; a \
             caller who is not a member (or a client token bound to another workspace) gets 404."),
+        (name = "identity", description = "The identity module."),
         // `cargo xtask new-module` inserts above this line.
         (name = "changes", description = "The change feed: a Server-Sent Events stream per \
             workspace of the records that changed (ids only), so clients refetch only what \

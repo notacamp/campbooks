@@ -6,7 +6,10 @@ use axum::extract::FromRef;
 use jsonwebtoken::{Algorithm, Validation, errors::ErrorKind};
 use serde::{Deserialize, de::DeserializeOwned};
 
-use super::{AuthFailure, Principal, PrincipalKind, Scope, jwks::Jwks};
+use super::{
+    AuthFailure, Principal, PrincipalKind, Scope,
+    jwks::{Jwks, KeySource},
+};
 use crate::{
     AppState, Error,
     clock::{Clock, SystemClock},
@@ -68,6 +71,35 @@ impl TokenVerifier {
             })
         });
         Self { inner }
+    }
+
+    /// A verifier for tokens of `issuer`, an issuer running in this process
+    /// whose signing keys `keys` hands over directly. Audience and leeway
+    /// come from `config`; its issuer and JWKS URL are not used.
+    pub fn in_process(config: &AuthConfig, issuer: &str, keys: Arc<dyn KeySource>) -> Self {
+        Self::in_process_with_clock(config, issuer, keys, Arc::new(SystemClock))
+    }
+
+    /// Like [`in_process`](Self::in_process), timing the key cache by `clock`.
+    pub fn in_process_with_clock(
+        config: &AuthConfig,
+        issuer: &str,
+        keys: Arc<dyn KeySource>,
+        clock: Arc<dyn Clock>,
+    ) -> Self {
+        Self {
+            inner: Some(Arc::new(Inner {
+                issuer: issuer.to_owned(),
+                audience: config.audience.trim().to_owned(),
+                leeway_seconds: config.leeway_seconds,
+                keys: Jwks::local(issuer, keys, clock),
+            })),
+        }
+    }
+
+    /// The issuer this verifier trusts, when one is configured.
+    pub fn issuer(&self) -> Option<&str> {
+        self.inner.as_ref().map(|inner| inner.issuer.as_str())
     }
 
     /// Whether an identity provider is configured.
