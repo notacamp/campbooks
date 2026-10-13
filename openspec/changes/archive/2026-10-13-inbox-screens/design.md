@@ -26,11 +26,17 @@ forms, frames, objects, `<base>`/`<meta>`, event handlers or comments; link
 schemes `http`, `https`, `mailto`, `tel`, relative URLs dropped (mail has no
 base); every link gets `target="_blank" rel="noopener noreferrer"`; `style`
 attributes keep only declarations without `url(`, `image-set(`, `@import`,
-`expression`, `behavior`, `-moz-binding` or a backslash escape. A second pass
-over ammonia's canonical output applies the image policy: tracking pixels (≤
-2×2, or hidden by style) are removed always; other remote images lose their
-`src` (marked `data-blocked="remote"`, counted in `remote_images`) unless the
-request says `show_images=true`.
+`expression`, `behavior`, `-moz-binding` or a backslash escape. Images are
+then handled in two more steps. Tracking pixels (≤ 2×2, or hidden by style)
+are dropped from ammonia's canonical output, best effort. ammonia then runs a
+second time with the image policy in its attribute filter: `data:` and
+relative sources are already gone, so every `img[src]` the HTML parser still
+sees is a remote image, whatever its case or surrounding whitespace
+(`HTTPS://…`, `" https://…"`). It is counted in `remote_images`, and its
+`src` is removed unless the request says `show_images=true`. The policy is
+not a string check on the input, because `Url::parse` accepts forms a prefix
+check misses. A last check strips every image if a source still survived a
+blocked render (fail closed).
 
 The client renders the result only through `lib/ui/safe-html` (`SafeHtml`):
 an `<iframe srcdoc>` with `sandbox="allow-popups
@@ -172,4 +178,8 @@ is configured). Every member action (move, archive, star, read) has an undo.
 - Estimated frame heights can leave a long message scrolling inside its
   frame.
 - ammonia 4.2.3 is newer than the two-week rule: it fixes RUSTSEC-2021-0157
-  and -0158, which `cargo deny` reports for 4.2.0.
+  and -0158, which `cargo deny` reports for 4.2.0. It is pinned (`=4.2.3`)
+  until 2026-10-27. Its MPL-2.0 dependencies (cssparser, dtoa-short) are
+  allowed per crate in `deny.toml`, not globally.
+- Tracking-pixel detection is best effort (size and visibility attributes).
+  Blocking remote images does not depend on it.

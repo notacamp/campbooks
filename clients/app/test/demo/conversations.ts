@@ -264,7 +264,7 @@ export function ledgerBody(shown: boolean) {
   const image = (src: string, alt: string) =>
     shown
       ? `<img src="${src}" alt="${alt}" width="560" height="120">`
-      : `<img alt="${alt}" width="560" height="120" data-blocked="remote">`;
+      : `<img alt="${alt}" width="560" height="120">`;
   return {
     text: LEDGER.snippet,
     html: `${image("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='560' height='120'%3E%3Crect width='560' height='120' fill='%232f5d50'/%3E%3C/svg%3E", "The Weekly Ledger")}<h1 style="font-size: 24px">Five tax dates before year end</h1><p>Mark these in your calendar, and read <a href="https://weekly-ledger.example/articles" target="_blank" rel="noopener noreferrer">what changes in 2027</a>.</p>`,
