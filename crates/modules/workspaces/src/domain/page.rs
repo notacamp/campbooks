@@ -74,7 +74,7 @@ impl<I: Display + FromStr> Cursor<I> {
 #[cfg(test)]
 mod tests {
     use campbooks_kernel::tenancy::UserId;
-    use chrono::Utc;
+    use chrono::{DateTime, Utc};
 
     use super::{Cursor, limit};
 
@@ -82,7 +82,8 @@ mod tests {
     fn a_cursor_round_trips_and_garbage_is_refused() {
         let cursor = Cursor {
             rank: 1,
-            at: Utc::now(),
+            // Postgres keeps microseconds.
+            at: DateTime::from_timestamp_micros(Utc::now().timestamp_micros()).unwrap(),
             id: UserId::new(),
         };
         assert_eq!(Cursor::<UserId>::decode(&cursor.encode()).unwrap(), cursor);
