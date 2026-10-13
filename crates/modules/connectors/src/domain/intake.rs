@@ -60,6 +60,7 @@ impl GrantIntake for Intake {
                 email_verified: false,
                 name: None,
                 expires_at: None,
+                auth_time: None,
             };
             let access = state
                 .membership

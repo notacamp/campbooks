@@ -5,4 +5,6 @@ pub mod clients;
 pub mod held_grants;
 pub mod keys;
 pub mod sessions;
+pub mod step_up;
 pub mod tokens;
+pub mod ways_in;
