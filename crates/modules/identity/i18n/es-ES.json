@@ -17,6 +17,17 @@
     "passkey_expired": "Esta solicitud de llave de acceso ha tardado demasiado o ya se ha usado. Inténtalo de nuevo.",
     "passkey_already_registered": "Esta llave de acceso ya da acceso a Campbooks.",
     "display_name_required": "Dinos cómo quieres que te llamemos.",
-    "passkey_name_required": "Ponle a la llave de acceso un nombre de 1 a 64 caracteres."
+    "passkey_name_required": "Ponle a la llave de acceso un nombre de 1 a 64 caracteres.",
+    "invalid_target": "Esta aplicación ha pedido acceso a algo que Campbooks no ofrece.",
+    "consent_request_not_found": "Esta solicitud para autorizar una aplicación ha caducado o ya se ha respondido. Vuelve a empezar desde la aplicación.",
+    "consent_needs_workspace": "Elige el espacio de trabajo que puede usar esta aplicación.",
+    "consent_wrong_workspace": "Esta aplicación pertenece a otro espacio de trabajo y solo se puede autorizar allí.",
+    "not_workspace_admin": "Solo los propietarios y administradores del espacio de trabajo pueden gestionar sus aplicaciones.",
+    "client_not_found": "No existe esa aplicación en este espacio de trabajo.",
+    "invalid_client_metadata": "Los datos de la aplicación no son aceptables: {{reason}}",
+    "client_needs_redirect": "Una aplicación de inicio de sesión necesita al menos una dirección de retorno https o de loopback.",
+    "client_scope_not_allowed": "No se puede dar el permiso {{scope}} a aplicaciones.",
+    "client_is_public": "Esta aplicación inicia sesión de personas y no tiene secreto que renovar.",
+    "client_name_reserved": "Solo las aplicaciones del propio Campbooks pueden llamarse Campbooks o Not A Camp. Elige otro nombre."
   }
 }

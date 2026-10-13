@@ -73,6 +73,46 @@ where
     }
 }
 
+/// [`Scoped<S>`] for routes outside any workspace that act on a person's
+/// whole account (their workspaces, their ways in, their connected apps): a
+/// person's token bound to one workspace (a third-party app they allowed
+/// there, [`Principal::bound_workspace`]) answers **404**, as if the route
+/// did not exist for it.
+pub struct Unbound<S: ScopeName> {
+    /// The authenticated caller.
+    pub principal: Principal,
+    scope: PhantomData<fn() -> S>,
+}
+
+impl<S: ScopeName> std::fmt::Debug for Unbound<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Unbound")
+            .field("scope", &S::NAME)
+            .field("principal", &self.principal)
+            .finish()
+    }
+}
+
+impl<S, St> FromRequestParts<St> for Unbound<S>
+where
+    S: ScopeName,
+    St: Send + Sync,
+    TokenVerifier: FromRef<St>,
+{
+    type Rejection = Error;
+
+    async fn from_request_parts(parts: &mut Parts, state: &St) -> Result<Self, Self::Rejection> {
+        let Scoped { principal, .. } = Scoped::<S>::from_request_parts(parts, state).await?;
+        if principal.bound_workspace().is_some() {
+            return Err(Error::NotFound);
+        }
+        Ok(Self {
+            principal,
+            scope: PhantomData,
+        })
+    }
+}
+
 /// The token of the request's single `Authorization: Bearer <token>` header.
 pub(crate) fn bearer_token(headers: &HeaderMap) -> Result<&str, Error> {
     let mut values = headers.get_all(header::AUTHORIZATION).iter();

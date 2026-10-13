@@ -14,6 +14,33 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- Apps other than Campbooks on the web can use your account, with your say
+  each time. A consent screen names the app, says whether anyone vouches for
+  it, lists what it will be able to do in plain words, and asks which
+  workspace it may use; an app on your device (the desktop app, a local
+  agent) is asked for every time and comes with a warning. Allow starts
+  unfocused, has no shortcut and waits a second after the page shows, so no
+  stray key press answers it; a remembered answer lasts 90 days for the same
+  return address. Settings → Apps and integrations lists what you allowed,
+  with Revoke, which ends the app's tokens at once. Allowing needs a sign-in
+  from the last ten minutes.
+- The desktop and mobile apps' sign-in is on (`campbooks-native`), always
+  through the consent screen.
+- A workspace's own apps: owners and admins register server-to-server apps
+  (`client_credentials`, a secret shown once, rotate, remove) and sign-in
+  apps under Settings → Apps and integrations. Their tokens work in that
+  workspace only.
+- MCP agents can connect: dynamic client registration (`/oauth2/register`,
+  off unless `CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION=on`,
+  rate-limited, public clients only, deleted after 30 days unused), client
+  metadata documents (off unless `CAMPBOOKS_OAUTH__CLIENT_METADATA_DOCUMENTS=on`;
+  an `https` client id, fetched with SSRF protection and cached up to a day), protected-resource metadata
+  (`/.well-known/oauth-protected-resource/api`), `resource_metadata` in the
+  API's `WWW-Authenticate`, and resource indicators. Apps that aren't
+  Campbooks' own can never hold an `identity:*`, `workspaces:write` or
+  `workspaces:admin` scope, get read scopes only unless they ask for more,
+  see only the workspace they were allowed in, and can't be called
+  Campbooks or Not A Camp.
 - Search over your mail (`GET /api/v1/w/{workspace_id}/search`, operation
   `search.query`, new scope `search:read`; screens follow). Words match in
   English, Portuguese, Spanish and French whatever language you type in, with
@@ -437,6 +464,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   ever recorded; a test enforces it. See `deploy/README.md` → Monitoring.
 
 ### Changed
+- Access tokens of the built-in issuer name `<CAMPBOOKS_PUBLIC_URL>/api` as their
+  audience (RFC 8707), which the API now expects; `CAMPBOOKS_AUTH__AUDIENCE` only
+  applies to an outside identity provider. Nothing to do: tokens last ten minutes, and
+  the next refresh gets the new one.
+- The token endpoint, client registration and the consent answer are rate-limited per
+  client address (`CAMPBOOKS_TRUSTED_PROXIES` behind a reverse proxy).
 - The members page's "copy invitation link" shortcut is now `Y` (`C` writes a
   new message everywhere).
 - The web app's Content-Security-Policy now allows inline `style` attributes

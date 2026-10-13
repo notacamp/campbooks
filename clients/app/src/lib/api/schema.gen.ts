@@ -21,6 +21,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/.well-known/oauth-protected-resource": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The same document at the root, for clients that look there. */
+        get: operations["identity.protected_resource_metadata_root"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/.well-known/oauth-protected-resource/api": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The API's protected-resource metadata (RFC 9728), at the path RFC 9728
+         *     §3.1 derives from its resource identifier, `<origin>/api`.
+         */
+        get: operations["identity.protected_resource_metadata"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/.well-known/openid-configuration": {
         parameters: {
             query?: never;
@@ -33,6 +70,40 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the apps you let in. */
+        get: operations["identity.list_consents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/consents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke an app's access. */
+        delete: operations["identity.revoke_consent"];
         options?: never;
         head?: never;
         patch?: never;
@@ -621,6 +692,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/identity/clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the workspace's own apps. */
+        get: operations["identity.list_clients"];
+        put?: never;
+        /** Register an app of the workspace's own. */
+        post: operations["identity.register_client"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/identity/clients/{client_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove one of the workspace's apps. */
+        delete: operations["identity.remove_client"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/identity/clients/{client_id}/secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rotate an app's secret. */
+        post: operations["identity.rotate_client_secret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/identity/held-grants/{id}/adopt": {
         parameters: {
             query?: never;
@@ -822,6 +945,24 @@ export interface paths {
         get: operations["identity.finish_sign_in"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/consent/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What the consent screen shows for the waiting request `id`. */
+        get: operations["identity.get_consent_request"];
+        put?: never;
+        /** Answer the waiting request `id`. */
+        post: operations["identity.answer_consent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1254,6 +1395,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/oauth2/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register a public client. */
+        post: operations["identity.register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/oauth2/revoke": {
         parameters: {
             query?: never;
@@ -1284,7 +1442,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Exchange an authorization code or a refresh token for tokens. */
+        /**
+         * Exchange an authorization code, a refresh token or a workspace client's
+         *     credentials for tokens.
+         */
         post: operations["identity.token"];
         delete?: never;
         options?: never;
@@ -1332,8 +1493,22 @@ export interface components {
             /** @description The connection's id (a `connectors.connection`). */
             connection: string;
         };
+        /** @description The person's answer. */
+        Answer: {
+            /** @description Allow or deny. */
+            decision: components["schemas"]["Decision"];
+            workspace_id?: components["schemas"]["WorkspaceId"] | null;
+        };
         /** @description An answer's value: a label (choice), a level (score) or yes/no. */
         AnswerView: boolean | number | string;
+        /** @description Where to go next. */
+        Answered: {
+            /**
+             * @description Navigate here: the app's redirect URI, with a code or
+             *     `error=access_denied`.
+             */
+            redirect: string;
+        };
         /** @description A filter the query applied, for chips. */
         AppliedFilter: {
             /** @description The operator (`from`, `has`, `in`, `is`, `label`, …). */
@@ -1436,6 +1611,52 @@ export interface components {
          */
         Channel: "email";
         /**
+         * @description How a workspace client signs in.
+         * @enum {string}
+         */
+        ClientType: "confidential" | "public";
+        /** @description An app the caller let in. */
+        ConnectedApp: {
+            /** @description The app's client id. */
+            client_id: string;
+            /** @description `first_party`, `workspace`, `dynamic` or `metadata_document`. */
+            client_kind?: string | null;
+            /** @description Its name; `null` when the app is gone (its tokens no longer work). */
+            client_name?: string | null;
+            /**
+             * Format: date-time
+             * @description When it was allowed.
+             */
+            granted_at: string;
+            /**
+             * Format: uuid
+             * @description The consent (what `identity.revoke_consent` takes).
+             */
+            id: string;
+            /**
+             * Format: date-time
+             * @description When it last got a token.
+             */
+            last_used_at?: string | null;
+            /** @description What it may do. */
+            scopes: string[];
+            /**
+             * @description Whether it is Campbooks' own app (a workspace's app says so by its
+             *     kind; every other name is its registrant's word).
+             */
+            verified: boolean;
+            /**
+             * Format: uuid
+             * @description The workspace it may use; `null` for Campbooks' own apps (all).
+             */
+            workspace_id?: string | null;
+        };
+        /** @description The apps the caller let in. */
+        ConnectedApps: {
+            /** @description Newest first. */
+            items: components["schemas"]["ConnectedApp"][];
+        };
+        /**
          * Format: uuid
          * @description ConnectionId (UUIDv7)
          */
@@ -1477,6 +1698,79 @@ export interface components {
             provider: components["schemas"]["Provider"];
             /** @description Its change streams. */
             streams: components["schemas"]["StreamView"][];
+        };
+        /** @description The app asking. */
+        ConsentClient: {
+            /**
+             * @description The redirect goes to an app on this device (loopback or a
+             *     private-use scheme): it is asked every time, and warned about.
+             */
+            device: boolean;
+            /** @description For a metadata-document client, the host serving its document. */
+            document_host?: string | null;
+            /** @description Its client id. */
+            id: string;
+            /** @description `first_party`, `workspace`, `dynamic` or `metadata_document`. */
+            kind: string;
+            /** @description Its logo (a workspace's own app only). */
+            logo_uri?: string | null;
+            /** @description Its name, as it registered it (only trustworthy when `verified`). */
+            name: string;
+            /**
+             * @description Where the browser goes next: the redirect URI's host (`None` for a
+             *     private-use scheme).
+             */
+            redirect_host?: string | null;
+            /**
+             * @description Whether it is Campbooks' own app. Every other app's name is its
+             *     registrant's word.
+             */
+            verified: boolean;
+            /**
+             * @description For a workspace's own app, the workspace that registered it (its
+             *     name, when the person belongs to it): what the screen says instead of
+             *     "verified".
+             */
+            workspace_name?: string | null;
+        };
+        /** @description What the consent screen shows. */
+        ConsentRequest: {
+            /** @description Their address. */
+            account_email?: string | null;
+            /** @description The signed-in person's name. */
+            account_name?: string | null;
+            /**
+             * @description Whether the person picks one workspace for it; `false` for
+             *     Campbooks' own apps, which work in all of them.
+             */
+            binds_workspace: boolean;
+            /** @description The app. */
+            client: components["schemas"]["ConsentClient"];
+            /** @description Whether "Allow" will be remembered (an exact `https` redirect). */
+            remembered: boolean;
+            /** @description What it asks to do. */
+            scopes: components["schemas"]["ConsentScope"][];
+            /**
+             * @description The workspaces it may be allowed in (a workspace's own app: its
+             *     workspace only).
+             */
+            workspaces: components["schemas"]["ConsentWorkspace"][];
+        };
+        /** @description One thing the app may do. */
+        ConsentScope: {
+            /** @description What it allows, in English (the screen translates by name). */
+            description: string;
+            /** @description The scope's name (`conversations:read`, `openid`…). */
+            name: string;
+        };
+        /** @description A workspace the person may let the app use. */
+        ConsentWorkspace: {
+            /** @description The workspace. */
+            id: components["schemas"]["WorkspaceId"];
+            /** @description Its name. */
+            name: string;
+            /** @description The person's role there. */
+            role: components["schemas"]["Role"];
         };
         /** @description A conversation and its newest messages, oldest first. */
         ConversationDetail: {
@@ -1614,6 +1908,11 @@ export interface components {
             /** @description `public-key`. */
             type: string;
         };
+        /**
+         * @description Allow or deny.
+         * @enum {string}
+         */
+        Decision: "allow" | "deny";
         /**
          * @description What kind of strategy gave an answer.
          * @enum {string}
@@ -2225,12 +2524,73 @@ export interface components {
              */
             type: string;
         };
+        /** @description What to register. */
+        RegisterClient: {
+            /** @description Its name, 1 to 100 characters. */
+            name: string;
+            /** @description A public app's redirect URIs: 1 to 10, `https` or loopback `http`. */
+            redirect_uris?: string[];
+            /** @description The API scopes it may ask for (never `identity:*`). */
+            scopes: string[];
+            /**
+             * @description Confidential (server to server, with a secret) or public (a sign-in
+             *     app).
+             */
+            type: components["schemas"]["ClientType"];
+        };
         /** @description The new passkey. */
         RegisterPasskey: {
             /** @description `PublicKeyCredential.toJSON()` of `navigator.credentials.create`. */
             credential: components["schemas"]["RegistrationCredential"];
             /** @description What to call it (default `Passkey`). */
             name?: string | null;
+        };
+        /** @description What a client sends (RFC 7591 §2; the fields read). */
+        RegisterRequest: {
+            /** @description A name to show on the consent screen (with "unverified"). */
+            client_name?: string | null;
+            /** @description `authorization_code` and optionally `refresh_token`. */
+            grant_types?: string[] | null;
+            /** @description Where codes may go: `https`, or loopback `http` (any port). */
+            redirect_uris?: string[];
+            /** @description `code`. */
+            response_types?: string[] | null;
+            /**
+             * @description Space-separated scopes it may ask for; missing means every scope a
+             *     third party may hold.
+             */
+            scope?: string | null;
+            /** @description Must be `none` (or missing). */
+            token_endpoint_auth_method?: string | null;
+        };
+        /** @description The registered client (RFC 7591 §3.2.1). */
+        Registered: {
+            /** @description The new client id. */
+            client_id: string;
+            /**
+             * Format: int64
+             * @description When it was issued (seconds since the epoch).
+             */
+            client_id_issued_at: number;
+            /** @description The name it will be shown with. */
+            client_name: string;
+            /** @description Its grant types. */
+            grant_types: string[];
+            /** @description Its redirect URIs. */
+            redirect_uris: string[];
+            /** @description `["code"]`. */
+            response_types: string[];
+            /** @description The scopes it may ask for. */
+            scope: string;
+            /** @description `none`. */
+            token_endpoint_auth_method: string;
+        };
+        /** @description The new app, with its secret for the only time. */
+        RegisteredClient: {
+            /** @description The app. */
+            client: components["schemas"]["WorkspaceClient"];
+            /** @description A confidential app's secret: shown now, never again. */
+            client_secret?: string | null;
         };
         /** @description `RegistrationResponseJSON`: a new passkey, as the browser returns it. */
         RegistrationCredential: {
@@ -2558,12 +2918,19 @@ export interface components {
             code?: string | null;
             /** @description The PKCE verifier. */
             code_verifier?: string | null;
-            /** @description `authorization_code` or `refresh_token`. */
+            /** @description `authorization_code`, `refresh_token` or `client_credentials`. */
             grant_type?: string | null;
             /** @description The redirect URI the code was issued for. */
             redirect_uri?: string | null;
             /** @description The refresh token. */
             refresh_token?: string | null;
+            /** @description The resource the token is for (RFC 8707): the API's resource URI. */
+            resource?: string | null;
+            /**
+             * @description Space-separated scopes (`client_credentials`: at most what the
+             *     client was given; missing means all of them).
+             */
+            scope?: string | null;
         };
         /** @description A successful token response (RFC 6749 §5.1). */
         TokenResponse: {
@@ -2655,6 +3022,39 @@ export interface components {
             /** @description The providers this instance offers, in display order. */
             providers: string[];
         };
+        /** @description A workspace client, as settings show it. Never its secret. */
+        WorkspaceClient: {
+            /** @description Its client id. */
+            client_id: string;
+            /**
+             * Format: date-time
+             * @description When it was registered.
+             */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @description When it last got a token.
+             */
+            last_used_at?: string | null;
+            /** @description Its name. */
+            name: string;
+            /** @description A public client's redirect URIs. */
+            redirect_uris: string[];
+            /** @description The scopes it may ask for. */
+            scopes: string[];
+            /**
+             * Format: date-time
+             * @description When its secret last changed.
+             */
+            secret_rotated_at?: string | null;
+            /** @description Confidential or public. */
+            type: components["schemas"]["ClientType"];
+        };
+        /** @description The workspace's apps. */
+        WorkspaceClients: {
+            /** @description Oldest first. */
+            items: components["schemas"]["WorkspaceClient"][];
+        };
         /** @description A deleted workspace. */
         WorkspaceDeletion: {
             /** @description The workspace. */
@@ -2731,6 +3131,60 @@ export interface operations {
             };
         };
     };
+    "identity.protected_resource_metadata_root": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The API's metadata. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.protected_resource_metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The API's metadata. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     "identity.openid_configuration": {
         parameters: {
             query?: never;
@@ -2755,6 +3209,101 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    "identity.list_consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's connected apps. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectedApps"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:read`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.revoke_consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The consent. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked; the app's tokens stop working. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not the caller's consent, or already revoked. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };
@@ -5059,6 +5608,230 @@ export interface operations {
             };
         };
     };
+    "identity.list_clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The workspace's apps. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceClients"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:clients`, or the caller is not an owner or admin (`not_workspace_admin`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a member of the workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.register_client": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterClient"];
+            };
+        };
+        responses: {
+            /** @description Registered; a confidential app's secret is shown this once. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisteredClient"];
+                };
+            };
+            /** @description A bad name, `client_name_reserved` (it reads as Campbooks), `client_scope_not_allowed` or `client_needs_redirect`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:clients`, the caller is not an owner or admin (`not_workspace_admin`), or the sign-in is more than ten minutes old (`step_up_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a member of the workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.remove_client": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The app. */
+                client_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed; its tokens stop working. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:clients`, or the caller is not an owner or admin (`not_workspace_admin`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such app in the workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.rotate_client_secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The app. */
+                client_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The new secret, shown this once. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisteredClient"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:clients`, the caller is not an owner or admin, or the sign-in is more than ten minutes old (`step_up_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such app in the workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A sign-in app has no secret (`client_is_public`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "identity.adopt_held_grant": {
         parameters: {
             query?: never;
@@ -5924,6 +6697,100 @@ export interface operations {
                 content?: never;
             };
             /** @description Unknown or unconfigured provider, or another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.get_consent_request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The `request` the consent screen was given. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentRequest"];
+                };
+            };
+            /** @description No such request waiting for this browser's person, or another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.answer_consent": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Must be `1`. */
+                "x-campbooks-csrf": string;
+            };
+            path: {
+                /** @description The `request` the consent screen was given. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Answer"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Answered"];
+                };
+            };
+            /** @description `consent_needs_workspace`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed`, `step_up_required` (sign in again: the sign-in is older than ten minutes), or `consent_wrong_workspace`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such request waiting for this browser's person, or a workspace the person does not belong to. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -7052,7 +7919,10 @@ export interface operations {
             query?: {
                 /** @description Must be `code`. */
                 response_type?: string;
-                /** @description The client. */
+                /**
+                 * @description The client: a registered id, or the `https` URL of its metadata
+                 *     document.
+                 */
                 client_id?: string;
                 /** @description One of the client's registered redirect URIs. */
                 redirect_uri?: string;
@@ -7070,6 +7940,8 @@ export interface operations {
                 prompt?: string;
                 /** @description Seconds since the person last authenticated, at most. */
                 max_age?: number;
+                /** @description The resource the token is for (RFC 8707): the API's resource URI. */
+                resource?: string;
             };
             header?: never;
             path?: never;
@@ -7077,7 +7949,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description To the client's redirect URI with `code` (signed in) or `error`, or to the sign-in screen. */
+            /** @description To the client's redirect URI with `code` (signed in, and no consent to ask) or `error`; to the sign-in screen; or to the consent screen. */
             303: {
                 headers: {
                     location?: string;
@@ -7100,6 +7972,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `rate_limited`: too many metadata-document clients looked up from this address. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };
@@ -7227,6 +8108,53 @@ export interface operations {
             };
         };
     };
+    "identity.register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterRequest"];
+            };
+        };
+        responses: {
+            /** @description Registered. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Registered"];
+                };
+            };
+            /** @description `invalid_redirect_uri` or `invalid_client_metadata`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Dynamic registration is off on this instance (`CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION`), or another identity provider serves it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "identity.revoke": {
         parameters: {
             query?: never;
@@ -7285,7 +8213,7 @@ export interface operations {
                     "application/json": components["schemas"]["TokenResponse"];
                 };
             };
-            /** @description `invalid_request`, `invalid_grant` or `unsupported_grant_type`. */
+            /** @description `invalid_request`, `invalid_grant`, `invalid_scope`, `invalid_target`, `unauthorized_client` or `unsupported_grant_type`. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -7305,6 +8233,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };

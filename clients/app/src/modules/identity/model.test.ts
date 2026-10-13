@@ -4,6 +4,7 @@ import { writeTabValue } from "~/lib/storage/tab";
 
 import {
   isInvitation,
+  isReturnAddress,
   linkResult,
   rememberedReturnTo,
   rememberReturnTo,
@@ -85,5 +86,27 @@ describe("linkResult", () => {
       "/bff/login?return_to=%2Fw%2F1%2Fsettings%2Fsign-in&max_age=600",
     );
     expect(stepUpUrl("https://evil.example.com")).toBe("/bff/login?return_to=%2F&max_age=600");
+  });
+});
+
+describe("isReturnAddress", () => {
+  it("takes https and loopback http, nothing else", () => {
+    for (const ok of [
+      "https://dashboard.example.com/cb",
+      "http://127.0.0.1:5555/callback",
+      "http://[::1]:8000/cb",
+      "http://localhost:3000/cb",
+    ]) {
+      expect(isReturnAddress(ok)).toBe(true);
+    }
+    for (const bad of [
+      "http://dashboard.example.com/cb",
+      "https://dashboard.example.com/cb#x",
+      "https://user:pw@dashboard.example.com/cb",
+      "com.example.app:/cb",
+      "not a url",
+    ]) {
+      expect(isReturnAddress(bad)).toBe(false);
+    }
   });
 });

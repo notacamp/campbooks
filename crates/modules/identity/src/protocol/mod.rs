@@ -8,14 +8,17 @@
 //! this process (another identity provider is configured), every one of them
 //! answers 404.
 //!
-//! The sign-in screens themselves are the web client's (`/sign-in`,
-//! `/sign-in/new`); these endpoints redirect there and answer their calls.
+//! The sign-in and consent screens themselves are the web client's
+//! (`/sign-in`, `/sign-in/new`, `/consent`); these endpoints redirect there
+//! and answer their calls.
 
 pub mod authorize;
+pub mod consent;
 pub mod discovery;
 pub mod end_session;
 mod link;
 pub mod passkey;
+pub mod register;
 pub mod sign_in;
 pub mod token;
 
@@ -85,6 +88,9 @@ fn openapi_router() -> OpenApiRouter<Ctx> {
         .routes(routes!(discovery::openid_configuration))
         .routes(routes!(discovery::authorization_server_metadata))
         .routes(routes!(discovery::jwks))
+        .routes(routes!(discovery::protected_resource))
+        .routes(routes!(discovery::protected_resource_root))
+        .routes(routes!(register::register))
         .routes(routes!(authorize::authorize))
         .routes(routes!(token::token))
         .routes(routes!(token::revoke))
@@ -96,6 +102,7 @@ fn openapi_router() -> OpenApiRouter<Ctx> {
         .routes(routes!(sign_in::start))
         .routes(routes!(sign_in::callback))
         .routes(routes!(sign_in::new_account, sign_in::create_account))
+        .routes(routes!(consent::get, consent::answer))
         .merge(passkey_routes())
 }
 

@@ -38,6 +38,13 @@ export const IDENTITY_SHORTCUTS = [
     label: "identity:shortcuts.passkey",
   },
   {
+    id: "identity.register_client",
+    keys: "shift+n",
+    scope: "list",
+    group: "general",
+    label: "identity:shortcuts.newApp",
+  },
+  {
     id: "identity.start_link",
     keys: "a",
     scope: "list",
