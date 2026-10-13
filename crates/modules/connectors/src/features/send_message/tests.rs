@@ -99,10 +99,12 @@ async fn publish(
     tx.commit().await.unwrap();
 }
 
-/// Run the jobs, then the ones waiting to retry, until none is left.
+/// Run the jobs, then (minutes later) the ones waiting to retry, until none
+/// is left.
 async fn settle(kit: &Kit) {
-    for _ in 0..10 {
+    for _ in 0..12 {
         kit.run_jobs().await;
+        kit.clock.advance(TimeDelta::minutes(2));
         let waiting = sqlx::query_scalar!(
             r#"UPDATE kernel.jobs SET run_at = now()
                 WHERE state = 'pending' AND kind = 'connectors.send_message' RETURNING id"#
@@ -281,4 +283,156 @@ async fn a_new_message_starts_a_thread(db: PgPool) {
     let sent = kit.google.sent();
     assert_eq!(sent.len(), 1);
     assert_ne!(sent[0].thread_id, thread);
+}
+
+/// The send's row: state, attempts, unclear.
+async fn row(kit: &Kit) -> (String, i32, bool) {
+    sqlx::query_as("SELECT state, attempts, unclear FROM connectors.sends")
+        .fetch_one(&kit.db)
+        .await
+        .unwrap()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_unreadable_answer_is_looked_up_not_refused(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    kit.google.garble_next_send_answer();
+    request(&kit, ws, inbox, Some(&thread)).await;
+    settle(&kit).await;
+    assert_eq!(kit.google.send_calls(), 1);
+    let done = completed(&kit, ws).await;
+    assert_eq!(done.len(), 1);
+    assert_eq!(done[0]["outcome"], "sent");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn no_second_call_while_an_earlier_one_may_still_run(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    kit.google.lose_next_send_answer();
+    request(&kit, ws, inbox, Some(&thread)).await;
+    kit.run_jobs().await;
+    kit.google.clear_calls();
+    // The retry comes round 30 s later on the queue's clock, but the call it
+    // follows may still be in flight (a lost lease): no lookup, no send.
+    sqlx::query!("UPDATE kernel.jobs SET run_at = now() WHERE kind = 'connectors.send_message' AND state = 'pending' AND payload->>'give_up' = 'false'")
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    kit.run_jobs().await;
+    assert!(kit.google.calls().is_empty(), "{:?}", kit.google.calls());
+    assert_eq!(row(&kit).await, ("pending".to_owned(), 1, true));
+    settle(&kit).await;
+    assert_eq!(kit.google.send_calls(), 0);
+    assert_eq!(completed(&kit, ws).await[0]["outcome"], "sent");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn after_an_attempt_that_may_have_sent_a_failure_is_unknown_not_refused(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    // The worker died after the call: the attempt is recorded, no outcome.
+    kit.google.lose_next_send_answer();
+    request(&kit, ws, inbox, Some(&thread)).await;
+    kit.run_jobs().await;
+    assert_eq!(row(&kit).await, ("pending".to_owned(), 1, true));
+    // Then the grant needs the member again: nothing proves it unsent.
+    sqlx::query!("UPDATE connectors.connections SET health = 'needs_reauth'")
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    settle(&kit).await;
+    let done = completed(&kit, ws).await;
+    assert_eq!(done[0]["outcome"], "failed");
+    assert_eq!(done[0]["reason"], "unknown_outcome");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_refusal_after_a_proven_miss_is_a_refusal(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    // A 503 that sent nothing, then (after the lookup proved it) a 400.
+    kit.google.refuse_next_send(503);
+    request(&kit, ws, inbox, Some(&thread)).await;
+    kit.run_jobs().await;
+    kit.google.refuse_next_send(400);
+    settle(&kit).await;
+    assert!(kit.google.sent().is_empty());
+    assert_eq!(completed(&kit, ws).await[0]["reason"], "rejected");
+    assert!(!row(&kit).await.2);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_send_out_of_attempts_before_calling_gmail_is_unavailable(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    // No budget left for a long while, and this is the job's last attempt.
+    sqlx::query!(
+        "UPDATE connectors.provider_budgets SET tokens = -1000000000, refilled_at = now()"
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    request(&kit, ws, inbox, Some(&thread)).await;
+    kit.run_jobs().await;
+    sqlx::query!("UPDATE kernel.jobs SET attempts = max_attempts - 1, run_at = now() WHERE kind = 'connectors.send_message' AND state = 'pending' AND payload->>'give_up' = 'false'")
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    kit.run_jobs().await;
+    assert_eq!(kit.google.send_calls(), 0);
+    let done = completed(&kit, ws).await;
+    assert_eq!(done[0]["outcome"], "failed");
+    assert_eq!(done[0]["reason"], "unavailable");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_check_behind_a_dead_send_settles_it(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    // The job dies after Gmail took the message (no outcome recorded).
+    kit.google.lose_next_send_answer();
+    request(&kit, ws, inbox, Some(&thread)).await;
+    kit.run_jobs().await;
+    sqlx::query!("UPDATE kernel.jobs SET state = 'failed' WHERE kind = 'connectors.send_message' AND state = 'pending' AND payload->>'give_up' = 'false'")
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    // Half an hour on, the check finds the message by its Message-ID.
+    kit.clock.advance(TimeDelta::minutes(31));
+    sqlx::query!("UPDATE kernel.jobs SET run_at = now() WHERE kind = 'connectors.send_message' AND state = 'pending'")
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    kit.run_jobs().await;
+    assert_eq!(kit.google.send_calls(), 1);
+    assert_eq!(completed(&kit, ws).await[0]["outcome"], "sent");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_check_behind_a_send_that_never_called_gmail_frees_its_draft(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (ws, inbox, thread) = connected(&kit).await;
+    // The send job waits for budget, then is lost before it called Gmail.
+    sqlx::query!(
+        "UPDATE connectors.provider_budgets SET tokens = -1000000000, refilled_at = now()"
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    request(&kit, ws, inbox, Some(&thread)).await;
+    kit.run_jobs().await;
+    sqlx::query!("UPDATE kernel.jobs SET state = 'failed' WHERE kind = 'connectors.send_message' AND payload->>'give_up' = 'false'")
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    sqlx::query!("UPDATE kernel.jobs SET run_at = now() WHERE kind = 'connectors.send_message' AND state = 'pending'")
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    kit.run_jobs().await;
+    assert_eq!(kit.google.send_calls(), 0);
+    let done = completed(&kit, ws).await;
+    assert_eq!(done[0]["reason"], "unavailable");
 }

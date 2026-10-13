@@ -17,6 +17,9 @@ use url::Url;
 
 pub use gmail::{Gmail, LabelInfo, MessageMeta, MessageRaw, RawFetch};
 
+/// The longest any call to Google may take.
+pub const HTTP_TIMEOUT: Duration = Duration::from_mins(1);
+
 /// The scope the `messages` capability needs: read mail and change labels,
 /// no permanent deletion.
 pub const GMAIL_SCOPE: &str = "https://www.googleapis.com/auth/gmail.modify";
@@ -169,7 +172,7 @@ impl Google {
     ) -> Result<Self, String> {
         let http = reqwest::Client::builder()
             .user_agent(concat!("campbooks/", env!("CARGO_PKG_VERSION")))
-            .timeout(Duration::from_mins(1))
+            .timeout(HTTP_TIMEOUT)
             .connect_timeout(Duration::from_secs(10))
             .build()
             .map_err(|e| format!("could not build the Google client: {e}"))?;

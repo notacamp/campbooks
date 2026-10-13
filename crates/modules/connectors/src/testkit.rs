@@ -557,6 +557,8 @@ enum SendFault {
     Refuse(u16),
     /// Send it, but answer 503, as when the answer is lost.
     LoseAnswer,
+    /// Send it, and answer 200 with a body that does not parse.
+    GarbleAnswer,
 }
 
 /// Google's OAuth and Gmail endpoints, faked over a mutable mailbox.
@@ -725,6 +727,11 @@ impl FakeGoogle {
         self.lock().calls.clone()
     }
 
+    /// Forget the calls seen so far.
+    pub fn clear_calls(&self) {
+        self.lock().calls.clear();
+    }
+
     /// The next send answers `status` and sends nothing.
     pub fn refuse_next_send(&self, status: u16) {
         self.lock().send_fault = Some(SendFault::Refuse(status));
@@ -733,6 +740,11 @@ impl FakeGoogle {
     /// The next send goes out, but its answer is lost (503).
     pub fn lose_next_send_answer(&self) {
         self.lock().send_fault = Some(SendFault::LoseAnswer);
+    }
+
+    /// The next send goes out, with an answer that cannot be read.
+    pub fn garble_next_send_answer(&self) {
+        self.lock().send_fault = Some(SendFault::GarbleAnswer);
     }
 
     /// The messages sent, oldest first: their thread and raw bytes.
@@ -906,6 +918,9 @@ fn send(mailbox: &mut Mailbox, request: &wiremock::Request) -> ResponseTemplate 
     mailbox.messages.insert(id.clone(), message);
     if fault == Some(SendFault::LoseAnswer) {
         return json(503, &serde_json::json!({"error": {"code": 503}}));
+    }
+    if fault == Some(SendFault::GarbleAnswer) {
+        return ResponseTemplate::new(200).set_body_string("{\"id\": ");
     }
     json(
         200,

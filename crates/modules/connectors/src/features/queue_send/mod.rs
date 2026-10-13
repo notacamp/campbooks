@@ -7,12 +7,13 @@ use campbooks_kernel::{
     Event, EventConsumer, JobContext, JobError, blobs::BlobOwner, jobs::EnqueueOptions,
     tenancy::WorkspaceId,
 };
+use chrono::Utc;
 use serde_json::json;
 
 use crate::{
     domain::model::{InboxId, SendId, StreamId},
     events::SendRequested,
-    features::send_message::{SEND_OWNER, SendMessage, SendMessagePayload},
+    features::send_message::{GIVE_UP_AFTER, SEND_OWNER, SendMessage, SendMessagePayload},
 };
 
 /// Records requested sends.
@@ -68,14 +69,32 @@ impl EventConsumer for QueueSend {
                 &BlobOwner::new(SEND_OWNER, requested.send_id),
             )
             .await?;
+        // The send, then a check behind it (same ordering key: it runs only
+        // once no earlier job for this send is alive) that settles it if
+        // that job died, so its draft never stays "sending".
+        let order = format!("send:{}", requested.send_id);
         campbooks_kernel::jobs::enqueue_to::<SendMessage>(
             tx,
             &SendMessagePayload {
                 send: requested.send_id,
+                give_up: false,
             },
             EnqueueOptions::for_workspace(requested.workspace.clone())
-                .unique(format!("send:{}", requested.send_id))
+                .unique(order.clone())
+                .ordered_by(order.clone())
                 .priority(10),
+        )
+        .await?;
+        campbooks_kernel::jobs::enqueue_to::<SendMessage>(
+            tx,
+            &SendMessagePayload {
+                send: requested.send_id,
+                give_up: true,
+            },
+            EnqueueOptions::for_workspace(requested.workspace.clone())
+                .unique(format!("give_up:{}", requested.send_id))
+                .ordered_by(order)
+                .run_at(Utc::now() + GIVE_UP_AFTER),
         )
         .await?;
         Ok(())

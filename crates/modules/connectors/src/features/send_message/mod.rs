@@ -22,7 +22,7 @@ use campbooks_kernel::{
     db::BeginFor as _,
     tenancy::{UserId, WorkspaceId},
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use futures_util::StreamExt as _;
 use serde::{Deserialize, Serialize};
 
@@ -40,7 +40,7 @@ use crate::{
     },
     events::{SendCompleted, SendOutcome},
     gmail::{self, compose},
-    google::{GoogleError, MessageMeta, MessageRaw},
+    google::{GoogleError, HTTP_TIMEOUT, MessageMeta, MessageRaw},
 };
 
 /// The blob owner type of a send (its outgoing document).
@@ -52,6 +52,10 @@ pub const MAX_MESSAGE_BYTES: usize = 35 * 1024 * 1024;
 /// How long an unclear attempt waits before the next one looks it up.
 pub const UNCLEAR_WAIT: Duration = Duration::from_secs(30);
 
+/// When the check behind a send settles it, if no job for it is alive by
+/// then.
+pub const GIVE_UP_AFTER: TimeDelta = TimeDelta::minutes(30);
+
 /// Gmail quota units of `messages.send` plus a lookup.
 const UNITS_PER_SEND: u32 = 100 + 10;
 
@@ -60,6 +64,10 @@ const UNITS_PER_SEND: u32 = 100 + 10;
 pub struct SendMessagePayload {
     /// The send.
     pub send: SendId,
+    /// Settle the send rather than send it: the check enqueued behind it,
+    /// which runs only once no earlier job for the send is alive.
+    #[serde(default)]
+    pub give_up: bool,
 }
 
 /// Sends messages through the provider.
@@ -81,8 +89,8 @@ struct Target {
     inbox: InboxId,
     document: BlobRef,
     state: String,
-    attempts: i32,
     unclear: bool,
+    attempted_at: Option<DateTime<Utc>>,
     stream: Option<StreamId>,
     connection: Option<ConnectionId>,
     provider: Option<String>,
@@ -110,6 +118,37 @@ impl JobHandler for SendMessage {
         if target.state != "pending" {
             return Ok(());
         }
+        match self
+            .attempt(ctx, workspace, send, target, payload.give_up)
+            .await
+        {
+            Ok(()) => Ok(()),
+            // Out of attempts, or stuck for good: settle the send rather
+            // than leave its draft "sending".
+            Err(err) if ctx.is_last_attempt() || matches!(err, JobError::Fatal(_)) => {
+                tracing::warn!(%workspace, %send, error = %err, "giving up on a send");
+                settle(ctx, workspace, send).await
+            }
+            Err(err) => Err(err),
+        }
+    }
+}
+
+impl SendMessage {
+    /// One attempt at send `send`. Errors are retried by the queue; the
+    /// caller settles the send when no attempt is left.
+    async fn attempt(
+        &self,
+        ctx: &mut JobContext,
+        workspace: WorkspaceId,
+        send: SendId,
+        mut target: Target,
+        give_up: bool,
+    ) -> Result<(), JobError> {
+        if give_up && !target.unclear {
+            // No attempt may have gone out: nothing was sent.
+            return finish_failed(ctx, workspace, send, &target, "unavailable").await;
+        }
         let (Some(stream), Some(connection), Some(google)) =
             (target.stream, target.connection, self.deps.google.clone())
         else {
@@ -121,6 +160,18 @@ impl JobHandler for SendMessage {
             return finish_failed(ctx, workspace, send, &target, "needs_reauth").await;
         }
         let now = self.deps.clock.now();
+        // A runner that lost its lease may still be in its call to Gmail:
+        // never call again before that call has surely ended.
+        if let Some(at) = target.attempted_at {
+            let quiet = TimeDelta::from_std(HTTP_TIMEOUT + UNCLEAR_WAIT).unwrap_or(TimeDelta::MAX);
+            let wait = at + quiet - now;
+            if wait > TimeDelta::zero() {
+                return Err(JobError::retry_after(
+                    "waiting for an earlier attempt to end",
+                    wait.to_std().unwrap_or(UNCLEAR_WAIT),
+                ));
+            }
+        }
 
         let Some(token) = self
             .token(ctx, workspace, send, &target, connection)
@@ -128,7 +179,6 @@ impl JobHandler for SendMessage {
         else {
             return Ok(());
         };
-
         let document = read_document(ctx, workspace, &target.document).await?;
         let Some(raw) = message_bytes(ctx, workspace, &document).await? else {
             return finish_failed(ctx, workspace, send, &target, "too_large").await;
@@ -145,8 +195,8 @@ impl JobHandler for SendMessage {
             ));
         }
 
-        // An earlier attempt may have reached Gmail: never send twice.
-        if target.attempts > 0 {
+        // An earlier attempt may have reached Gmail: look before sending.
+        if target.unclear {
             match gmail.find_by_message_id(&document.rfc_message_id).await {
                 Ok(Some(meta)) => {
                     tracing::info!(%workspace, %send, "an earlier attempt was sent");
@@ -155,12 +205,26 @@ impl JobHandler for SendMessage {
                         .finish_sent(ctx, workspace, send, &target, stream, accepted, raw, now)
                         .await;
                 }
-                Ok(None) => {}
-                Err(err) => return self.not_sent(ctx, workspace, send, &target, &err).await,
+                Ok(None) => {
+                    // Proven not sent.
+                    set_unclear(ctx, workspace, send, false).await?;
+                    target.unclear = false;
+                }
+                Err(err) => {
+                    return Err(JobError::retry_after(
+                        format!("looking up an earlier attempt: {err}"),
+                        UNCLEAR_WAIT,
+                    ));
+                }
             }
         }
+        if give_up {
+            return finish_failed(ctx, workspace, send, &target, "unavailable").await;
+        }
 
+        // From here until Gmail answers, the message may be out.
         record_attempt(ctx, workspace, send, now).await?;
+        target.unclear = true;
         match gmail.send(&raw, document.thread_key.as_deref()).await {
             Ok(answer) => {
                 let accepted = Accepted {
@@ -174,19 +238,18 @@ impl JobHandler for SendMessage {
             }
             Err(GoogleError::Unavailable(reason)) => {
                 // Gmail may have it: look it up before trying again.
-                mark_unclear(ctx, workspace, send).await?;
                 tracing::warn!(%workspace, %send, %reason, "send ended unclearly");
-                if ctx.is_last_attempt() {
-                    let mut target = target;
-                    target.unclear = true;
-                    return finish_failed(ctx, workspace, send, &target, "unknown_outcome").await;
-                }
                 Err(JobError::retry_after(
                     "the send ended unclearly; looking it up next time",
                     UNCLEAR_WAIT,
                 ))
             }
-            Err(err) => self.not_sent(ctx, workspace, send, &target, &err).await,
+            Err(err) => {
+                // A definite answer: this attempt did not send it.
+                set_unclear(ctx, workspace, send, false).await?;
+                target.unclear = false;
+                self.refused(ctx, workspace, send, &target, &err).await
+            }
         }
     }
 }
@@ -242,16 +305,15 @@ impl SendMessage {
                 Ok(None)
             }
             Err(TokenError::Provider(err)) => {
-                self.not_sent(ctx, workspace, send, target, &err).await?;
-                Ok(None)
+                Err(JobError::retry(format!("no access token: {err}")))
             }
             Err(TokenError::Database(err)) => Err(err.into()),
         }
     }
 
-    /// Gmail did not send it (or could not be asked): try again later, or
-    /// fail for good on a refusal or once the attempts run out.
-    async fn not_sent(
+    /// Gmail answered the send with a definite refusal: try again later
+    /// (a refused token, a rate limit) or fail the send for good.
+    async fn refused(
         &self,
         ctx: &mut JobContext,
         workspace: WorkspaceId,
@@ -259,32 +321,27 @@ impl SendMessage {
         target: &Target,
         err: &GoogleError,
     ) -> Result<(), JobError> {
-        let retry = match err {
-            GoogleError::RateLimited { retry_after } => JobError::retry_after(
+        match err {
+            GoogleError::RateLimited { retry_after } => Err(JobError::retry_after(
                 "rate limited by the provider",
                 retry_after.unwrap_or(Duration::from_secs(30)),
-            ),
+            )),
             GoogleError::Unauthorized => {
                 if let Some(connection) = target.connection {
                     let mut tx = ctx.pool().begin_for(workspace).await?;
                     credentials::forget_access_token(&mut tx, connection).await?;
                     tx.commit().await?;
                 }
-                JobError::retry("the access token was refused")
+                Err(JobError::retry("the access token was refused"))
             }
-            GoogleError::Unavailable(_) => JobError::retry("the provider is unavailable"),
             GoogleError::InvalidGrant => {
-                return finish_failed(ctx, workspace, send, target, "needs_reauth").await;
+                finish_failed(ctx, workspace, send, target, "needs_reauth").await
             }
-            GoogleError::NotFound | GoogleError::Unexpected(_) => {
+            GoogleError::Unavailable(_) | GoogleError::NotFound | GoogleError::Unexpected(_) => {
                 tracing::warn!(%workspace, %send, error = %err, "the provider refused the message");
-                return finish_failed(ctx, workspace, send, target, "rejected").await;
+                finish_failed(ctx, workspace, send, target, "rejected").await
             }
-        };
-        if ctx.is_last_attempt() {
-            return finish_failed(ctx, workspace, send, target, "unavailable").await;
         }
-        Err(retry)
     }
 
     /// Gmail has the message: index it, announce it, mark the send sent.
@@ -348,6 +405,21 @@ impl SendMessage {
         let batch = state.blobs.put(&ws, bytes, BATCH_CONTENT_TYPE).await?;
 
         let tx = ctx.tx().await?;
+        // Settled already (another runner, or the check): announce it once.
+        let first = sqlx::query_scalar!(
+            r#"UPDATE connectors.sends
+                  SET state = 'sent', provider_message_id = $2, thread_key = $3, updated_at = now()
+                WHERE id = $1 AND state <> 'sent'
+            RETURNING id"#,
+            send as SendId,
+            accepted.id,
+            accepted.thread_id,
+        )
+        .fetch_optional(&mut **tx)
+        .await?;
+        if first.is_none() {
+            return Ok(());
+        }
         emit::apply_index(tx, &state, workspace, stream, vec![op]).await?;
         emit::store_batch(
             tx,
@@ -360,16 +432,6 @@ impl SendMessage {
             1,
             now,
         )
-        .await?;
-        sqlx::query!(
-            r#"UPDATE connectors.sends
-                  SET state = 'sent', provider_message_id = $2, thread_key = $3, updated_at = now()
-                WHERE id = $1"#,
-            send as SendId,
-            accepted.id,
-            accepted.thread_id,
-        )
-        .execute(&mut **tx)
         .await?;
         state
             .blobs
@@ -404,7 +466,7 @@ async fn load(
 ) -> Result<Option<Target>, JobError> {
     let mut tx = ctx.pool().begin_for(workspace).await?;
     let row = sqlx::query!(
-        r#"SELECT s.inbox_id AS "inbox: InboxId", s.document, s.state, s.attempts, s.unclear,
+        r#"SELECT s.inbox_id AS "inbox: InboxId", s.document, s.state, s.unclear, s.attempted_at,
                   st.id AS "stream?: StreamId", st.paused AS "paused?", st.cursor AS "cursor?",
                   c.id AS "connection?: ConnectionId", c.provider AS "provider?",
                   c.granted_by AS "granted_by?: UserId", c.health AS "health?"
@@ -426,8 +488,8 @@ async fn load(
         inbox: row.inbox,
         document,
         state: row.state,
-        attempts: row.attempts,
         unclear: row.unclear,
+        attempted_at: row.attempted_at,
         stream: row.stream,
         connection: row.connection,
         provider: row.provider,
@@ -518,7 +580,8 @@ async fn record_attempt(
 ) -> Result<(), JobError> {
     let mut tx = ctx.pool().begin_for(workspace).await?;
     sqlx::query!(
-        r#"UPDATE connectors.sends SET attempts = attempts + 1, attempted_at = $2, updated_at = now()
+        r#"UPDATE connectors.sends
+              SET attempts = attempts + 1, attempted_at = $2, unclear = true, updated_at = now()
             WHERE id = $1"#,
         send as SendId,
         now,
@@ -529,16 +592,18 @@ async fn record_attempt(
     Ok(())
 }
 
-/// Remember that an attempt ended unclearly.
-async fn mark_unclear(
+/// Record whether an attempt may have reached Gmail without an answer.
+async fn set_unclear(
     ctx: &JobContext,
     workspace: WorkspaceId,
     send: SendId,
+    unclear: bool,
 ) -> Result<(), JobError> {
     let mut tx = ctx.pool().begin_for(workspace).await?;
     sqlx::query!(
-        "UPDATE connectors.sends SET unclear = true, updated_at = now() WHERE id = $1",
+        "UPDATE connectors.sends SET unclear = $2, updated_at = now() WHERE id = $1",
         send as SendId,
+        unclear,
     )
     .execute(&mut *tx)
     .await?;
@@ -546,8 +611,9 @@ async fn mark_unclear(
     Ok(())
 }
 
-/// The send failed for good: say so to the conversations module. A send
-/// whose earlier attempt ended unclearly may have gone: `unknown_outcome`.
+/// The send failed for good: say so to the conversations module. After an
+/// attempt that may have reached Gmail (and no lookup proving otherwise),
+/// whatever the reason, it may have gone: `unknown_outcome`.
 async fn finish_failed(
     ctx: &mut JobContext,
     workspace: WorkspaceId,
@@ -555,22 +621,39 @@ async fn finish_failed(
     target: &Target,
     reason: &'static str,
 ) -> Result<(), JobError> {
-    let reason = if target.unclear && matches!(reason, "unavailable" | "rejected") {
+    let reason = if target.unclear {
         "unknown_outcome"
     } else {
         reason
     };
     let state = ctx.state().clone();
-    let ws = workspace.to_string();
     let tx = ctx.tx().await?;
-    sqlx::query!(
+    fail(tx, &state, workspace, send, target.inbox, reason).await
+}
+
+/// Mark a pending send failed with `reason`, release its document and
+/// announce it, in `tx`. Does nothing to a send already settled.
+async fn fail(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    state: &campbooks_kernel::AppState,
+    workspace: WorkspaceId,
+    send: SendId,
+    inbox: InboxId,
+    reason: &str,
+) -> Result<(), JobError> {
+    let ws = workspace.to_string();
+    let failed = sqlx::query_scalar!(
         r#"UPDATE connectors.sends SET state = 'failed', failure_reason = $2, updated_at = now()
-            WHERE id = $1"#,
+            WHERE id = $1 AND state = 'pending'
+        RETURNING id"#,
         send as SendId,
         reason,
     )
-    .execute(&mut **tx)
+    .fetch_optional(&mut **tx)
     .await?;
+    if failed.is_none() {
+        return Ok(());
+    }
     state
         .blobs
         .detach_owner(tx, &ws, &BlobOwner::new(SEND_OWNER, send))
@@ -581,7 +664,7 @@ async fn finish_failed(
             tx,
             &SendCompleted {
                 workspace: ws,
-                inbox_id: target.inbox,
+                inbox_id: inbox,
                 send_id: send,
                 outcome: SendOutcome::Failed,
                 provider_message_id: None,
@@ -590,6 +673,33 @@ async fn finish_failed(
         )
         .await?;
     tracing::info!(%workspace, %send, reason, "send failed");
+    Ok(())
+}
+
+/// Settle a send no attempt is left for, in a transaction of its own (the
+/// job's may have failed): `unknown_outcome` when an attempt may have
+/// reached Gmail, else `unavailable` (nothing was sent; the draft is
+/// editable again).
+async fn settle(ctx: &JobContext, workspace: WorkspaceId, send: SendId) -> Result<(), JobError> {
+    let state = ctx.state().clone();
+    let mut tx = ctx.pool().begin_for(workspace).await?;
+    let Some(row) = sqlx::query!(
+        r#"SELECT inbox_id AS "inbox: InboxId", unclear FROM connectors.sends
+            WHERE id = $1 AND state = 'pending' FOR UPDATE"#,
+        send as SendId,
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    else {
+        return Ok(());
+    };
+    let reason = if row.unclear {
+        "unknown_outcome"
+    } else {
+        "unavailable"
+    };
+    fail(&mut tx, &state, workspace, send, row.inbox, reason).await?;
+    tx.commit().await?;
     Ok(())
 }
 

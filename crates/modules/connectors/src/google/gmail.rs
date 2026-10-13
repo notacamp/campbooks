@@ -332,7 +332,13 @@ impl<'a> Gmail<'a> {
             .send()
             .await
             .map_err(transport)?;
-        json(response).await
+        if !response.status().is_success() {
+            return Err(failure(response).await);
+        }
+        // Accepted: an answer we cannot read must not count as a refusal.
+        response.json().await.map_err(|e| {
+            GoogleError::Unavailable(format!("unreadable answer to a send: {}", e.without_url()))
+        })
     }
 
     /// The message with RFC 5322 `Message-ID` `rfc_message_id` (without
