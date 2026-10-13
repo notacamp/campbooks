@@ -21,6 +21,7 @@ use campbooks_kernel::{
     AppState, Error, Module, Problem,
     auth::ScopeInfo,
     events::EventCatalogue,
+    i18n,
     jobs::{Registry, RegistryError},
     operations,
 };
@@ -71,9 +72,12 @@ pub fn modules() -> Vec<Module> {
 }
 
 /// `state` with the ports modules implement for the kernel registered: the
-/// `workspaces` module answers who belongs to which workspace.
+/// `workspaces` module answers who belongs to which workspace and which
+/// language each user chose.
 pub fn with_ports(state: AppState) -> AppState {
-    state.with_membership(campbooks_workspaces::membership())
+    state
+        .with_membership(campbooks_workspaces::membership())
+        .with_locales(campbooks_workspaces::locale_preference())
 }
 
 /// Every job kind, event handler and schedule of every module, plus the
@@ -161,11 +165,12 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
     api().into_openapi()
 }
 
-/// The full HTTP application: module routes (behind the idempotency layer),
-/// `/openapi.json`, the interim `/bff/api/*` passthrough, the web client
-/// (when `CAMPBOOKS_WEB_DIR` is set) or else a problem+json 404 fallback, and
-/// the middleware stack (security headers, request id, tracing, timeout,
-/// compression).
+/// The full HTTP application: module routes (behind the idempotency and
+/// localization layers), `/openapi.json`, the interim `/bff/api/*`
+/// passthrough, the web client (when `CAMPBOOKS_WEB_DIR` is set) or else a
+/// problem+json 404 fallback, and the middleware stack (security headers,
+/// request id, tracing, timeout, compression, and problem+json rendered in
+/// the request's locale).
 ///
 /// The same module routes are installed in the state's
 /// [`Operations`](operations::Operations), so automation and the assistant invoke operations by id
@@ -206,6 +211,9 @@ pub fn router(state: AppState) -> Router {
         SetResponseHeaderLayer::overriding(name, HeaderValue::from_static(value))
     });
 
+    // Innermost, so fallback 404s are localized before compression wraps
+    // the body.
+    let localize = axum::middleware::from_fn_with_state(state.clone(), i18n::localize);
     routes.with_state(state).layer(
         ServiceBuilder::new()
             .layer(nosniff)
@@ -235,7 +243,8 @@ pub fn router(state: AppState) -> Router {
                 StatusCode::SERVICE_UNAVAILABLE,
                 REQUEST_TIMEOUT,
             ))
-            .layer(CompressionLayer::new()),
+            .layer(CompressionLayer::new())
+            .layer(localize),
     )
 }
 
@@ -536,6 +545,46 @@ mod tests {
             response.content_type.as_deref(),
             Some("application/problem+json")
         );
+    }
+
+    async fn localized(
+        uri: &str,
+        accept_language: &str,
+    ) -> (StatusCode, Option<String>, serde_json::Value) {
+        let request = Request::get(uri)
+            .header(header::ACCEPT_LANGUAGE, accept_language)
+            .body(Body::empty())
+            .unwrap();
+        let response = app().oneshot(request).await.unwrap();
+        let status = response.status();
+        let language = response
+            .headers()
+            .get(header::CONTENT_LANGUAGE)
+            .map(|v| v.to_str().unwrap().to_owned());
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, language, serde_json::from_slice(&bytes).unwrap())
+    }
+
+    #[tokio::test]
+    async fn fallback_404s_speak_the_callers_language() {
+        for uri in ["/api/v1/nope", "/bff/api/v1/nope"] {
+            let (status, language, body) = localized(uri, "es-MX,es;q=0.9").await;
+            assert_eq!(status, StatusCode::NOT_FOUND);
+            assert_eq!(language.as_deref(), Some("es-ES"));
+            assert_eq!(body["code"], "not_found");
+            assert_eq!(body["title"], "No encontrado");
+        }
+    }
+
+    #[tokio::test]
+    async fn token_errors_speak_the_callers_language() {
+        let (status, language, body) = localized("/api/v1/workspaces", "fr-CA").await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED);
+        assert_eq!(language.as_deref(), Some("fr"));
+        assert_eq!(body["code"], "auth_not_configured");
+        assert_eq!(body["title"], "Non authentifié");
     }
 
     #[tokio::test]

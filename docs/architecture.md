@@ -248,6 +248,29 @@ stores a `kernel::RecordRef { type, id }`, with `type` =
    API, add `[[allow]] from = "x" to = "y" reason = "…"` to
    `architecture.toml`. Reviewed like an ADR.
 
+### Languages (server side)
+
+The server speaks the caller's language (`en`, `pt-PT`, `es-ES`, `fr`).
+`kernel::i18n::Locale` is resolved per request, lazily: the user's saved
+choice (the `LocalePreference` port, implemented by `workspaces` over
+`users.locale`; `NULL` until they choose), then the first
+`Accept-Language` entry we ship (`pt-BR` → `pt-PT`, `es-MX` → `es-ES`),
+then `en`. A handler that renders text takes `locale: Locale` as an
+extractor; jobs have no request, so a job that renders text carries the
+recipient's `Locale` in its payload.
+
+Text lives in one catalogue per crate, `i18n/<locale>.json` next to its
+`Cargo.toml`, in the client's i18next format (nested keys, `{{name}}`,
+plural forms `_one`/`_many`/`_other` chosen by `count` with CLDR rules),
+embedded with `pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!("<module>")`
+and rendered with `MESSAGES.t(locale, "key", &[("name", value.into())])`
+(falling back to English, then to the key). Errors carry a `Reason`,
+`MESSAGES.reason("last_owner")`: problem+json then has a stable `code`, and
+the kernel's `localize` middleware (installed by `compose` around the
+idempotency layer, and by the server for its fallbacks) renders `title` and
+`detail` in the request's locale with `Content-Language`. `cargo xtask i18n`
+keeps every catalogue at parity.
+
 ### Background work
 
 Anything that should not run inside a request — provider sync, the AI pass,

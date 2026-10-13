@@ -130,6 +130,10 @@ async fn delete_note(
     Json(json!({ "workspace": workspace, "id": id }))
 }
 
+/// Reasons of the test operations.
+static TEST_MESSAGES: crate::i18n::Catalogue =
+    crate::i18n::Catalogue::new("test", [r#"{"errors": {"flaky": "Busy ({{run}})"}}"#; 4]);
+
 /// Always fails with 503.
 #[utoipa::path(
     post,
@@ -140,7 +144,11 @@ async fn delete_note(
     responses((status = SERVICE_UNAVAILABLE)),
 )]
 async fn flaky(_: Scoped<TestWrite>) -> crate::Error {
-    crate::Error::Unavailable(uuid::Uuid::now_v7().to_string())
+    crate::Error::Unavailable(
+        TEST_MESSAGES
+            .reason("flaky")
+            .arg("run", uuid::Uuid::now_v7().to_string()),
+    )
 }
 
 fn api() -> OpenApiRouter<AppState> {
@@ -312,7 +320,7 @@ async fn a_missing_scope_fails_as_over_http() {
     let InvokeError::Failed { problem, .. } = error else {
         unreachable!()
     };
-    assert_eq!(problem["detail"], "insufficient_scope");
+    assert_eq!(problem["code"], "insufficient_scope");
 }
 
 #[tokio::test]

@@ -74,7 +74,7 @@ impl Reply {
             self.headers[header::CONTENT_TYPE],
             "application/problem+json"
         );
-        assert_eq!(self.json["detail"], code);
+        assert_eq!(self.json["code"], code);
     }
 
     fn assert_invalid(&self) {
@@ -407,7 +407,7 @@ async fn missing_scope_is_403_naming_it() {
     let app = app(verifier(&idp).0);
     let reply = call_with(&app, &idp.token(&idp.claims("test:write other:read"))).await;
     assert_eq!(reply.status, StatusCode::FORBIDDEN);
-    assert_eq!(reply.json["detail"], "insufficient_scope");
+    assert_eq!(reply.json["code"], "insufficient_scope");
     assert_eq!(
         reply.challenge(),
         r#"Bearer error="insufficient_scope", scope="test:read""#

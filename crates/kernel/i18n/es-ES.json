@@ -1,0 +1,36 @@
+{
+  "status": {
+    "400": "Solicitud incorrecta",
+    "401": "No autenticado",
+    "403": "Acceso denegado",
+    "404": "No encontrado",
+    "409": "Conflicto",
+    "413": "Contenido demasiado grande",
+    "422": "Contenido no procesable",
+    "500": "Error interno del servidor",
+    "503": "Servicio no disponible"
+  },
+  "errors": {
+    "not_found": "Este recurso no existe o no tienes permiso para verlo.",
+    "forbidden": "No tienes permiso para hacer esto.",
+    "internal_error": "Algo ha fallado por nuestra parte. Vuelve a intentarlo.",
+    "insufficient_scope": "Este token de acceso no tiene el permiso {{scope}}.",
+    "auth_not_configured": "Este servidor no tiene configurado el inicio de sesión, así que no puede aceptar tokens de acceso.",
+    "missing_token": "Inicia sesión para continuar: la solicitud no incluye ningún token de acceso.",
+    "invalid_token": "El token de acceso no es válido. Vuelve a iniciar sesión.",
+    "token_expired": "Tu sesión ha caducado. Vuelve a iniciar sesión.",
+    "idp_unavailable": "No se puede contactar con el servicio de inicio de sesión en este momento. Vuelve a intentarlo en un rato.",
+    "missing_json_content_type": "El cuerpo de la solicitud debe ser JSON (Content-Type: application/json).",
+    "invalid_json": "El cuerpo de la solicitud no es JSON válido: {{reason}}",
+    "invalid_body": "El cuerpo de la solicitud no es lo que espera esta operación: {{reason}}",
+    "invalid_query": "Los parámetros de la solicitud no son los que espera esta operación: {{reason}}",
+    "idempotency_key_invalid": "La Idempotency-Key debe tener entre 1 y {{max}} caracteres ASCII visibles.",
+    "idempotency_key_reused": "Esta Idempotency-Key ya se usó en otra solicitud.",
+    "idempotency_key_in_flight": "Todavía se está procesando una solicitud con esta Idempotency-Key.",
+    "idempotency_body_too_large": "El cuerpo de la solicitud es demasiado grande para usarlo con una Idempotency-Key.",
+    "database_unavailable": "La base de datos no está disponible en este momento. Vuelve a intentarlo en un rato.",
+    "file_too_large": "El archivo supera el límite de {{limit}} bytes.",
+    "upload_mismatch": "El archivo subido no coincide con lo esperado. Vuelve a subirlo.",
+    "upload_failed": "No se ha podido leer la subida. Vuelve a intentarlo."
+  }
+}

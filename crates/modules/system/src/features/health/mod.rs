@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use utoipa::ToSchema;
 
+use crate::MESSAGES;
+
 /// How long the database gets to answer before the instance counts as down.
 const DATABASE_TIMEOUT: Duration = Duration::from_secs(3);
 
@@ -55,11 +57,11 @@ pub async fn handler(State(state): State<AppState>) -> Result<Json<HealthRespons
         Ok(Ok(())) => Ok(Json(HealthResponse::ok())),
         Ok(Err(error)) => {
             tracing::warn!(%error, "health check: database unreachable");
-            Err(Error::Unavailable("database unreachable".to_owned()))
+            Err(Error::Unavailable(MESSAGES.reason("database_unreachable")))
         }
         Err(_) => {
             tracing::warn!("health check: database timed out");
-            Err(Error::Unavailable("database timed out".to_owned()))
+            Err(Error::Unavailable(MESSAGES.reason("database_timeout")))
         }
     }
 }
@@ -100,6 +102,26 @@ mod tests {
             Some("application/problem+json")
         );
         assert_eq!(response.json["status"], 503);
-        assert_eq!(response.json["title"], "Service Unavailable");
+        assert_eq!(response.json["title"], "Service unavailable");
+        assert_eq!(response.json["code"], "database_unreachable");
+    }
+
+    #[tokio::test]
+    async fn the_problem_speaks_the_callers_language() {
+        let app = testing::app(crate::module(), testing::state(testing::unreachable_pool()));
+        let request = axum::http::Request::get("/api/v1/system/health")
+            .header("accept-language", "pt-PT,pt;q=0.9")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let response = testing::send(&app, request).await;
+        assert_eq!(response.status, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(response.json["code"], "database_unreachable");
+        assert_eq!(response.json["title"], "Serviço indisponível");
+        assert!(
+            response.json["detail"]
+                .as_str()
+                .unwrap()
+                .starts_with("Não é possível contactar a base de dados")
+        );
     }
 }

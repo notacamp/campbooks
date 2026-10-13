@@ -21,6 +21,8 @@ bytes.workspace = true
 chrono.workspace = true
 figment.workspace = true
 futures-util.workspace = true
+icu_locale_core.workspace = true
+icu_plurals.workspace = true
 http-body-util = { workspace = true, optional = true }
 jsonwebtoken.workspace = true
 object_store.workspace = true

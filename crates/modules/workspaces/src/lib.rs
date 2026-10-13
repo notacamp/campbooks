@@ -16,7 +16,7 @@
 
 #![forbid(unsafe_code)]
 
-use campbooks_kernel::{Background, Module};
+use campbooks_kernel::{Background, Module, i18n::Catalogue};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 mod domain;
@@ -24,16 +24,27 @@ pub mod events;
 mod features;
 #[cfg(test)]
 mod rls_tests;
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn catalogue_is_at_parity() {
+        assert_eq!(super::MESSAGES.check(), Vec::<String>::new());
+    }
+}
 pub mod scopes;
 #[cfg(test)]
 mod testkit;
 
 pub use domain::model::{Accent, Kind};
 pub use features::delete_workspace::PurgeWorkspace;
+pub use features::locale_preference::locale_preference;
 pub use features::membership::membership;
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "workspaces";
+
+/// The module's messages (`i18n/<locale>.json`): the reasons of its errors.
+pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 
 /// The workspaces module, ready for the server to mount.
 pub fn module() -> Module {

@@ -80,9 +80,17 @@ pub fn unreachable_pool() -> PgPool {
         .unwrap_or_else(|e| unreachable!("static URL parses: {e}"))
 }
 
-/// A module's routes as a plain router over `state`.
+/// A module's routes as a plain router over `state`, behind the
+/// [`localize`](crate::i18n::localize) layer (so problems answer in the
+/// request's locale, as in the server).
 pub fn app(module: Module, state: AppState) -> Router {
-    module.router.with_state(state).into()
+    let router: Router<AppState> = module.router.into();
+    router
+        .route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::i18n::localize,
+        ))
+        .with_state(state)
 }
 
 /// A response, read to the end.

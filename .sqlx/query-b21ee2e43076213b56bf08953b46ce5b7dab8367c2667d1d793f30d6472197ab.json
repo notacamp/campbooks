@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT locale FROM workspaces.users WHERE idp_subject = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "locale",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces.users",
+            "name": "locale"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "b21ee2e43076213b56bf08953b46ce5b7dab8367c2667d1d793f30d6472197ab"
+}

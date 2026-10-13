@@ -307,20 +307,31 @@ export interface components {
         /**
          * @description RFC 9457 problem details.
          * @example {
+         *       "code": "not_found",
+         *       "detail": "This resource does not exist, or you cannot see it.",
          *       "status": 404,
-         *       "title": "Not Found",
+         *       "title": "Not found",
          *       "type": "about:blank"
          *     }
          */
         Problem: {
-            /** @description Human-readable explanation specific to this occurrence. */
-            detail?: string | null;
+            /**
+             * @description Stable machine-readable reason (`not_found`, `invalid_token`,
+             *     `last_owner`, …); the same in every locale. Match on this, never on
+             *     `title` or `detail`.
+             */
+            code: string;
+            /** @description What went wrong in this occurrence, in the request's locale. */
+            detail: string;
             /**
              * Format: int32
              * @description HTTP status code.
              */
             status: number;
-            /** @description Short, human-readable summary of the problem type. */
+            /**
+             * @description Short summary of the problem type, in the request's locale
+             *     (`Content-Language`).
+             */
             title: string;
             /**
              * @description URI identifying the problem type; `about:blank` when the HTTP status

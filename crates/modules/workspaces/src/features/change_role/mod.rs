@@ -177,7 +177,7 @@ mod tests {
             .patch(&ana, &uri, serde_json::json!({ "role": "admin" }))
             .await;
         assert_eq!(response.status, StatusCode::CONFLICT);
-        assert_eq!(response.json["detail"], "last_owner");
+        assert_eq!(response.json["code"], "last_owner");
 
         // With a second owner, the first may step down.
         kit.join(&ana, ws, "bea", "admin").await;
