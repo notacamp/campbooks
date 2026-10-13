@@ -13,6 +13,7 @@ pub mod db;
 pub mod error;
 pub mod events;
 pub mod extract;
+pub mod i18n;
 pub mod idempotency;
 pub mod ids;
 pub mod jobs;

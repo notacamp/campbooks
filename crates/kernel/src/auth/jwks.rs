@@ -117,7 +117,7 @@ impl Jwks {
         }
         if !keys.loaded() {
             return Err(Error::Unavailable(
-                "the identity provider's signing keys are unavailable".to_owned(),
+                crate::i18n::MESSAGES.reason("idp_unavailable"),
             ));
         }
         Ok(keys.find(kid, alg))

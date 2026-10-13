@@ -1,0 +1,6 @@
+{
+  "errors": {
+    "database_unreachable": "No se puede contactar con la base de datos. La instancia no está lista para atender solicitudes.",
+    "database_timeout": "La base de datos no ha respondido a tiempo. La instancia no está lista para atender solicitudes."
+  }
+}

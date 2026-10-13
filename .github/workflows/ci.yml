@@ -60,6 +60,9 @@ jobs:
       - name: Events catalogue drift
         if: always()
         run: cargo xtask events --check
+      - name: Translations at parity (server)
+        if: always()
+        run: cargo xtask i18n
       - name: Tests
         if: always()
         run: cargo nextest run --workspace --no-tests=warn && cargo test --workspace --doc

@@ -22,12 +22,12 @@ use axum::{
     middleware::Next,
     response::{IntoResponse as _, Response},
 };
-use campbooks_kernel::Problem;
+use campbooks_kernel::error::LocalizableProblem;
 
 /// The header the web client sends on every request.
 pub const CSRF_HEADER: &str = "x-campbooks-csrf";
 
-/// The problem `detail` of a refused request.
+/// The problem `code` of a refused request.
 pub const CSRF_FAILED: &str = "csrf_check_failed";
 
 /// Middleware: refuse unsafe requests that fail the check.
@@ -36,7 +36,8 @@ pub async fn check(State(origin): State<Arc<str>>, request: Request, next: Next)
         next.run(request).await
     } else {
         tracing::info!(method = %request.method(), "refused a request failing the CSRF check");
-        Problem::new(StatusCode::FORBIDDEN, Some(CSRF_FAILED.to_owned())).into_response()
+        LocalizableProblem::new(StatusCode::FORBIDDEN, crate::MESSAGES.reason(CSRF_FAILED))
+            .into_response()
     }
 }
 

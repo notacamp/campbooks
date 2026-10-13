@@ -342,7 +342,7 @@ impl Inner {
                     self.open_access(session.id, &tokens.access_token).await
                 } else {
                     Err(AccessError::Failed(Error::Unavailable(
-                        "the identity provider is unavailable".to_owned(),
+                        campbooks_kernel::i18n::MESSAGES.reason("idp_unavailable"),
                     )))
                 }
             }

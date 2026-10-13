@@ -2163,15 +2163,18 @@
         "required": [
           "type",
           "title",
-          "status"
+          "status",
+          "detail",
+          "code"
         ],
         "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable reason (`not_found`, `invalid_token`,\n`last_owner`, …); the same in every locale. Match on this, never on\n`title` or `detail`."
+          },
           "detail": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Human-readable explanation specific to this occurrence."
+            "type": "string",
+            "description": "What went wrong in this occurrence, in the request's locale."
           },
           "status": {
             "type": "integer",
@@ -2181,7 +2184,7 @@
           },
           "title": {
             "type": "string",
-            "description": "Short, human-readable summary of the problem type."
+            "description": "Short summary of the problem type, in the request's locale\n(`Content-Language`)."
           },
           "type": {
             "type": "string",
@@ -2189,8 +2192,10 @@
           }
         },
         "example": {
+          "code": "not_found",
+          "detail": "This resource does not exist, or you cannot see it.",
           "status": 404,
-          "title": "Not Found",
+          "title": "Not found",
           "type": "about:blank"
         }
       },
