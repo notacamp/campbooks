@@ -60,6 +60,7 @@ pub fn module(deps: Deps) -> Module {
         name: NAME,
         scopes: scopes::ALL,
         router: router().layer(Extension(deps)),
+        admin_router: None,
         background: Background::new()
             .publishes::<events::AccountCreated>()
             .publishes::<events::SignedIn>()

@@ -190,13 +190,30 @@ async fn html_and_svg_are_never_served_as_themselves(db: PgPool) {
         "en-1",
         "photo.jpg",
         "image/jpeg",
-        b"\xff\xd8",
+        b"\xff\xd8\xff\xe0",
     )
     .await;
     let uri = uri_of(&kit, &ws, "en-1", &photo).await;
     let (_, headers, _) = kit.get_raw(&sam, &format!("{uri}?inline=true")).await;
     assert_eq!(header(&headers, &header::CONTENT_TYPE), "image/jpeg");
     assert!(header(&headers, &header::CONTENT_DISPOSITION).starts_with("inline; "));
+    // Sent as a picture, but markup: an opaque download, never inline.
+    let fake = add_attachment(
+        &kit,
+        workspace,
+        "en-1",
+        "photo.png",
+        "image/png",
+        b"<html><script>alert(1)</script></html>",
+    )
+    .await;
+    let uri = uri_of(&kit, &ws, "en-1", &fake).await;
+    let (_, headers, _) = kit.get_raw(&sam, &format!("{uri}?inline=true")).await;
+    assert_eq!(
+        header(&headers, &header::CONTENT_TYPE),
+        "application/octet-stream"
+    );
+    assert!(header(&headers, &header::CONTENT_DISPOSITION).starts_with("attachment; "));
     let notes = add_attachment(&kit, workspace, "en-1", "notes.txt", "text/plain", b"hi").await;
     let uri = uri_of(&kit, &ws, "en-1", &notes).await;
     let (_, headers, _) = kit.get_raw(&sam, &format!("{uri}?inline=true")).await;

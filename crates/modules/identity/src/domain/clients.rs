@@ -31,6 +31,11 @@ pub enum Authentication {
 pub struct Client {
     /// `client_id`.
     pub id: &'static str,
+    /// Whether it is one of Campbooks' own apps (the web BFF, the native
+    /// app). Only first-party clients may be granted `admin:access`
+    /// (ADR 0015); every client registered by a workspace or dynamically is
+    /// not.
+    pub first_party: bool,
     /// Whether it may get codes and tokens. The native client is defined but
     /// off until native sign-in ships with its own safeguards (slice S4): a
     /// signed-in browser would otherwise hand a code to any local process
@@ -93,6 +98,12 @@ impl Client {
         }
     }
 
+    /// Whether the client may be granted `scope`: anything but
+    /// `admin:access`, which only first-party clients get.
+    pub fn may_request(&self, scope: &str) -> bool {
+        self.first_party || scope != campbooks_kernel::admin::ACCESS_SCOPE
+    }
+
     /// Whether it is a confidential client.
     pub fn is_confidential(&self) -> bool {
         matches!(self.authentication, Authentication::Secret(_))
@@ -112,6 +123,7 @@ impl Clients {
             clients: vec![
                 Client {
                     id: WEB_CLIENT_ID,
+                    first_party: true,
                     active: true,
                     authentication: Authentication::Secret(web_secret),
                     redirect_uris: vec![format!("{origin}/bff/callback")],
@@ -122,6 +134,7 @@ impl Clients {
                 },
                 Client {
                     id: NATIVE_CLIENT_ID,
+                    first_party: true,
                     active: false,
                     authentication: Authentication::None,
                     redirect_uris: vec![NATIVE_SCHEME_REDIRECT.to_owned()],
@@ -193,6 +206,28 @@ mod tests {
         ] {
             assert!(!native.accepts_redirect(bad), "{bad}");
         }
+    }
+
+    #[test]
+    fn only_first_party_clients_may_request_admin_access() {
+        let clients = clients();
+        let web = clients.get(WEB_CLIENT_ID).unwrap();
+        assert!(web.first_party);
+        assert!(web.may_request("admin:access"));
+        let third_party = Client {
+            id: "acme-app",
+            first_party: false,
+            active: true,
+            authentication: Authentication::None,
+            redirect_uris: vec!["https://acme.example.com/cb".to_owned()],
+            loopback_any_port: false,
+            post_logout_redirect_uris: Vec::new(),
+            refresh_idle: chrono::TimeDelta::days(1),
+            refresh_absolute: chrono::TimeDelta::days(1),
+        };
+        assert!(!third_party.may_request("admin:access"));
+        assert!(third_party.may_request("conversations:read"));
+        assert!(third_party.may_request("openid"));
     }
 
     #[test]

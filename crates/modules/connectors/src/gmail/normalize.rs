@@ -98,6 +98,10 @@ pub struct ParsedAttachment {
     pub content_id: Option<String>,
 }
 
+/// Longest `Content-ID` kept, in characters (the `MessageChangeBatch` v1
+/// limit); a longer one names no image anyone wrote, and is left out.
+pub const MAX_CONTENT_ID_CHARS: usize = 255;
+
 /// What a message without a usable `From` is attributed to (RFC 2606's
 /// reserved `.invalid` domain: never a real address).
 pub const UNKNOWN_SENDER: &str = "unknown@sender.invalid";
@@ -149,7 +153,7 @@ pub fn parse(raw: &[u8]) -> Parsed {
                 content_id: part
                     .content_id()
                     .map(strip_angles)
-                    .filter(|id| !id.is_empty()),
+                    .filter(|id| !id.is_empty() && id.chars().count() <= MAX_CONTENT_ID_CHARS),
             }
         })
         .collect();
@@ -391,6 +395,12 @@ mod tests {
         let logo = &parsed.attachments[0];
         assert!(logo.inline);
         assert_eq!(logo.content_id.as_deref(), Some("logo@example.com"));
+
+        let long = raw.replace(
+            "logo@example.com>",
+            &format!("{}@example.com>", "x".repeat(300)),
+        );
+        assert_eq!(parse(long.as_bytes()).attachments[0].content_id, None);
         assert_eq!(logo.content_type, "image/png");
     }
 

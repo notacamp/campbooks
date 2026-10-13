@@ -143,6 +143,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
         router: router().layer(Extension(features::send_draft::SendSettings {
             undo: chrono::TimeDelta::seconds(i64::from(deps.config.undo_send_seconds)),
         })),
+        admin_router: None,
         background: Background::new()
             .publishes::<events::MessageReceived>()
             .publishes::<events::MessageSent>()

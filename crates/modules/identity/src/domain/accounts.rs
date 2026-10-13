@@ -255,3 +255,36 @@ pub async fn audit(
     .await?;
     Ok(())
 }
+
+/// The accounts an operator may mean by `email`: those whose primary
+/// address, or the address of one of whose ways in, is `email` (compared
+/// lower-cased) and verified. For the server's CLI only
+/// (`campbooks-server admin grant --email`), which refuses anything but
+/// exactly one match; never used to sign in or to link a way in.
+pub async fn operator_lookup(conn: &mut PgConnection, email: &str) -> Result<Vec<Uuid>> {
+    Ok(sqlx::query_scalar(
+        "SELECT a.id FROM identity.accounts a
+          WHERE lower(a.primary_email) = lower($1) AND a.primary_email_verified
+         UNION
+         SELECT p.account_id FROM identity.provider_identities p
+          WHERE lower(p.email_at_link) = lower($1) AND p.email_verified_at_link
+         ORDER BY 1",
+    )
+    .bind(email.trim())
+    .fetch_all(conn)
+    .await?)
+}
+
+/// The display name and primary address of account `id` (disabled or not),
+/// for the server's CLI to show whom a profile belongs to.
+pub async fn describe(
+    conn: &mut PgConnection,
+    id: Uuid,
+) -> Result<Option<(Option<String>, Option<String>)>> {
+    Ok(
+        sqlx::query_as("SELECT display_name, primary_email FROM identity.accounts WHERE id = $1")
+            .bind(id)
+            .fetch_optional(conn)
+            .await?,
+    )
+}

@@ -65,6 +65,11 @@ pub const MAX_BATCH_BYTES: usize = 16 * 1024 * 1024;
 /// Characters of a message's snippet.
 pub const SNIPPET_CHARS: usize = 200;
 
+/// Longest `Content-ID` stored, in characters (the `MessageChangeBatch` v1
+/// limit); a longer one is dropped, never cut (a cut id could name another
+/// part).
+pub const MAX_CONTENT_ID_CHARS: usize = 255;
+
 /// Record type of an attachment, for blob references.
 pub const ATTACHMENT_RECORD: &str = "conversations.attachment";
 /// Record type holding a pending change batch (owner id: its inbox), so the
@@ -620,7 +625,10 @@ impl Apply<'_> {
                 size,
                 attachment.inline,
                 json!(attachment.blob),
-                attachment.content_id,
+                attachment
+                    .content_id
+                    .as_deref()
+                    .filter(|id| id.chars().count() <= MAX_CONTENT_ID_CHARS),
             )
             .execute(&mut **tx)
             .await?;

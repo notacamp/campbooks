@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO admin.actions (id, at, actor, via, operation, target)\n         VALUES ($1, $2, session_user, 'cli', $3, $4)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b3cc5ce3f6a2ba86b2e8bfae99ba394ed4d574aabaf339bfc83c9dae33c69195"
+}

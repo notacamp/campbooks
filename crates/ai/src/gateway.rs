@@ -299,6 +299,8 @@ pub struct Gateway {
     http: Client,
     retry: RetryPolicy,
     instruments: Instruments,
+    /// Recent reachability probes ([`Gateway::health`]).
+    pub(crate) probes: crate::health::Probes,
 }
 
 impl Gateway {
@@ -323,6 +325,7 @@ impl Gateway {
             http,
             retry: RetryPolicy::default(),
             instruments: Instruments::new(),
+            probes: crate::health::Probes::default(),
         })
     }
 
@@ -331,6 +334,11 @@ impl Gateway {
     pub fn with_retry(mut self, retry: RetryPolicy) -> Self {
         self.retry = retry;
         self
+    }
+
+    /// The HTTP client every call uses.
+    pub(crate) fn http(&self) -> &Client {
+        &self.http
     }
 
     /// The configuration in use.
@@ -570,7 +578,7 @@ impl Gateway {
 
 /// `base_url` + `path`, treating `base_url` as a directory whether or not it
 /// ends with a slash.
-fn endpoint(base_url: &Url, path: &str) -> Result<Url, Error> {
+pub(crate) fn endpoint(base_url: &Url, path: &str) -> Result<Url, Error> {
     let mut base = base_url.clone();
     if !base.path().ends_with('/') {
         let with_slash = format!("{}/", base.path());

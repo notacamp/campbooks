@@ -18,18 +18,21 @@ use axum::{
 };
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result,
-    blobs::BlobRef,
+    blobs::{BlobError, BlobRef},
     db::BeginFor as _,
     extract,
     tenancy::{Workspace, WorkspaceId},
 };
+use futures_util::StreamExt as _;
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
 
 use crate::{
     domain::{
         access::visible_inboxes,
-        attachments::{content_disposition, may_be_inline, safe_filename, served_type},
+        attachments::{
+            OCTET_STREAM, content_disposition, may_be_inline, safe_filename, served_type, sniff,
+        },
         paths::AttachmentPath,
     },
     model::{AttachmentId, ConversationId, InboxId, MessageId},
@@ -115,12 +118,23 @@ pub async fn handler(
     tx.commit().await?;
     let blob: BlobRef = serde_json::from_value(row.blob)
         .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
-    let stream = state
+    let mut stream = state
         .blobs
         .get(&access.workspace.to_string(), &blob)
         .await?;
 
-    let served = served_type(&row.content_type);
+    // A type that may be shown inline must also look like one: its first
+    // bytes decide which (an image sent as another is served as itself),
+    // and anything else becomes an opaque download.
+    let declared = served_type(&row.content_type);
+    let (served, body) = if may_be_inline(declared) {
+        let first = stream.next().await.transpose()?;
+        let served = first.as_deref().and_then(sniff).unwrap_or(OCTET_STREAM);
+        let head = futures_util::stream::iter(first.map(Ok::<_, BlobError>));
+        (served, Body::from_stream(head.chain(stream)))
+    } else {
+        (declared, Body::from_stream(stream))
+    };
     let inline = query.inline && may_be_inline(served);
     let name = safe_filename(&row.filename);
     let headers = [
@@ -148,7 +162,7 @@ pub async fn handler(
         ),
         (header::ACCEPT_RANGES, HeaderValue::from_static("none")),
     ];
-    Ok((headers, Body::from_stream(stream)).into_response())
+    Ok((headers, body).into_response())
 }
 
 #[cfg(test)]

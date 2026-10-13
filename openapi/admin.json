@@ -1,0 +1,431 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Campbooks admin API",
+    "description": "Instance administration. Every operation answers 404 (as for a route that does not exist) unless the caller is a user whose bearer token carries the `admin:access` scope and whose admin profile grants the operation's permission (`x-campbooks-admin.permission`; `super` grants all). Then a token whose last sign-in (`auth_time`) is more than 12 hours old answers 401 `admin_reauth_required`. Every request past the profile check is recorded in the audit trail. These operations are not part of the operation catalogue (`/openapi.json`): automation and the assistant cannot call them. Admin profiles are managed only with the server's CLI (`campbooks-server admin`), never over HTTP. The web app reaches this API through `/bff/admin/*`.",
+    "license": {
+      "name": "Sustainable Use License",
+      "identifier": "LicenseRef-Sustainable-Use"
+    },
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/admin/v1/system/overview": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "See the instance's version, health and configuration.",
+        "operationId": "system.admin_overview",
+        "responses": {
+          "200": {
+            "description": "The overview.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOverview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again (the last sign-in is more than 12 hours old).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not an administrator with `system.read` (the same answer as an unknown route).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": false,
+          "permission": "system.read"
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AdminOverview": {
+        "type": "object",
+        "description": "The instance at a glance, for administrators.",
+        "required": [
+          "version",
+          "started_at",
+          "uptime_seconds",
+          "database",
+          "configuration",
+          "services",
+          "ai"
+        ],
+        "properties": {
+          "ai": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiRoleStatus"
+            },
+            "description": "Each AI role: configured or not, model, provider and whether it\nanswers."
+          },
+          "commit": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Git commit the build came from, when known."
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/ConfigSummary",
+            "description": "The effective configuration: enumerated facts only, no secret."
+          },
+          "database": {
+            "$ref": "#/components/schemas/DatabaseStatus",
+            "description": "Whether the database answers, and its migrations."
+          },
+          "services": {
+            "$ref": "#/components/schemas/Facts",
+            "description": "Who signs people in, and which providers are set up."
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When this server process started."
+          },
+          "uptime_seconds": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Seconds since then."
+          },
+          "version": {
+            "type": "string",
+            "description": "Semantic version of the server.",
+            "example": "0.1.0"
+          }
+        }
+      },
+      "AiProtocol": {
+        "type": "string",
+        "description": "The protocol a provider speaks.",
+        "enum": [
+          "openai",
+          "laya"
+        ]
+      },
+      "AiRole": {
+        "type": "string",
+        "description": "An AI role (ADR 0005).",
+        "enum": [
+          "decide",
+          "embed",
+          "complete",
+          "vision"
+        ]
+      },
+      "AiRoleStatus": {
+        "type": "object",
+        "description": "One AI role, without a secret: the provider is shown as scheme, host\nand port only, and keys never.",
+        "required": [
+          "role",
+          "configured"
+        ],
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "description": "Whether a provider is configured for it."
+          },
+          "endpoint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The provider's scheme, host and port.",
+            "example": "http://ollama:11434"
+          },
+          "model": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The model it calls."
+          },
+          "protocol": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AiProtocol",
+                "description": "The protocol it speaks."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reachable": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether the provider answered a probe within 3 seconds (probes are\nreused for a minute); `null` when not configured."
+          },
+          "role": {
+            "$ref": "#/components/schemas/AiRole",
+            "description": "The role."
+          }
+        }
+      },
+      "BlobBackend": {
+        "type": "string",
+        "description": "Which object store holds the blobs.",
+        "enum": [
+          "fs",
+          "s3"
+        ]
+      },
+      "ConfigSummary": {
+        "type": "object",
+        "description": "The non-secret facts of a [`Config`] an administrator sees\n([`Config::summary`]).",
+        "required": [
+          "environment",
+          "signup_policy",
+          "blob_store",
+          "database_logins",
+          "migrations",
+          "serves_web_client",
+          "exports_telemetry",
+          "metrics_endpoint"
+        ],
+        "properties": {
+          "blob_store": {
+            "$ref": "#/components/schemas/BlobBackend",
+            "description": "`CAMPBOOKS_BLOBS__BACKEND`."
+          },
+          "database_logins": {
+            "$ref": "#/components/schemas/DatabaseLogins",
+            "description": "Whether migrations use a login of their own."
+          },
+          "environment": {
+            "$ref": "#/components/schemas/Environment",
+            "description": "`CAMPBOOKS_ENV`."
+          },
+          "exports_telemetry": {
+            "type": "boolean",
+            "description": "Whether traces and metrics are exported over OTLP."
+          },
+          "metrics_endpoint": {
+            "type": "boolean",
+            "description": "Whether a Prometheus endpoint is open."
+          },
+          "migrations": {
+            "$ref": "#/components/schemas/Migrations",
+            "description": "When migrations run (`CAMPBOOKS_RUN_MIGRATIONS`)."
+          },
+          "public_origin": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The scheme, host and port of `CAMPBOOKS_PUBLIC_URL`."
+          },
+          "serves_web_client": {
+            "type": "boolean",
+            "description": "Whether the server serves the web client (`CAMPBOOKS_WEB_DIR`)."
+          },
+          "signup_policy": {
+            "$ref": "#/components/schemas/SignupPolicy",
+            "description": "`CAMPBOOKS_SIGNUP__POLICY` (never the codes)."
+          }
+        }
+      },
+      "DatabaseLogins": {
+        "type": "string",
+        "description": "How the server signs in to the database (`deploy/README.md`).",
+        "enum": [
+          "single",
+          "split"
+        ]
+      },
+      "DatabaseStatus": {
+        "type": "object",
+        "description": "The database, as this server sees it.",
+        "required": [
+          "reachable"
+        ],
+        "properties": {
+          "latency_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "How long a trivial query took, in milliseconds.",
+            "minimum": 0
+          },
+          "latest_migration": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The newest applied migration's version (`YYYYMMDDHHMMSS`)."
+          },
+          "latest_migration_description": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The newest applied migration's description."
+          },
+          "migrations_applied": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "How many schema migrations are applied."
+          },
+          "reachable": {
+            "type": "boolean",
+            "description": "Whether it answered within 3 seconds."
+          }
+        }
+      },
+      "Environment": {
+        "type": "string",
+        "description": "The kind of deployment (`CAMPBOOKS_ENV`).",
+        "enum": [
+          "production",
+          "development"
+        ]
+      },
+      "Facts": {
+        "type": "object",
+        "description": "Who signs people in, and the outside providers set up, by name only.",
+        "required": [
+          "identity_provider",
+          "sign_in_providers",
+          "mail_providers"
+        ],
+        "properties": {
+          "identity_provider": {
+            "$ref": "#/components/schemas/IdentityProvider",
+            "description": "Which identity provider issues tokens."
+          },
+          "mail_providers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The mail providers mailboxes can be connected from (`google`, …)."
+          },
+          "sign_in_providers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The providers people can sign in with (`google`, …)."
+          }
+        }
+      },
+      "IdentityProvider": {
+        "type": "string",
+        "description": "Which identity provider issues this instance's tokens (ADR 0014).",
+        "enum": [
+          "built_in",
+          "external",
+          "none"
+        ]
+      },
+      "Migrations": {
+        "type": "string",
+        "description": "When schema migrations run.",
+        "enum": [
+          "on_start",
+          "separately"
+        ]
+      },
+      "Problem": {
+        "type": "object",
+        "description": "RFC 9457 problem details.",
+        "required": [
+          "type",
+          "title",
+          "status",
+          "detail",
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable reason (`not_found`, `invalid_token`,\n`last_owner`, …); the same in every locale. Match on this, never on\n`title` or `detail`."
+          },
+          "detail": {
+            "type": "string",
+            "description": "What went wrong in this occurrence, in the request's locale."
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "description": "HTTP status code.",
+            "minimum": 0
+          },
+          "title": {
+            "type": "string",
+            "description": "Short summary of the problem type, in the request's locale\n(`Content-Language`)."
+          },
+          "type": {
+            "type": "string",
+            "description": "URI identifying the problem type; `about:blank` when the HTTP status\nsays it all."
+          }
+        },
+        "example": {
+          "code": "not_found",
+          "detail": "This resource does not exist, or you cannot see it.",
+          "status": 404,
+          "title": "Not found",
+          "type": "about:blank"
+        }
+      },
+      "SignupPolicy": {
+        "type": "string",
+        "description": "Who may create a workspace when they are not a member of any yet.",
+        "enum": [
+          "open",
+          "invite_only",
+          "approval",
+          "code"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "admin": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "An OAuth 2.1 access token for a person (not a client), issued to one of Campbooks' own apps with the `admin:access` scope, whose account has an admin profile."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "system",
+      "description": "The instance's version, health and configuration."
+    }
+  ]
+}

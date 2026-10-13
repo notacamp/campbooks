@@ -11,7 +11,7 @@ import {
   CONVERSATIONS_SHORTCUTS,
 } from "~/modules/conversations";
 import { buildIdentityRoutes, IDENTITY_SHORTCUTS, MailboxStep } from "~/modules/identity";
-import { buildSystemRoutes } from "~/modules/system";
+import { buildSystemAdminRoutes, buildSystemRoutes, SYSTEM_ADMIN_SECTION } from "~/modules/system";
 import { buildWorkspacesRoutes, WORKSPACES_SHORTCUTS } from "~/modules/workspaces";
 
 export interface ModuleRouteParents<
@@ -51,6 +51,18 @@ export function buildModuleRoutes<
     ],
   } as const;
 }
+
+/**
+ * The admin section's pages (`/admin/...`, ADR 0015): each module mounts
+ * its panels under the admin layout, mirroring the server, where each
+ * module contributes its own admin operations.
+ */
+export function buildModuleAdminRoutes<TAdmin extends AnyRoute>(admin: TAdmin) {
+  return [...buildSystemAdminRoutes(admin)] as const;
+}
+
+/** The admin sidebar, one entry per module panel (named `admin.sections.<id>`). */
+export const ADMIN_SECTIONS = [SYSTEM_ADMIN_SECTION] as const;
 
 /** Shortcuts modules define for their operations (keyed by operationId, ADR 0013). */
 export const MODULE_SHORTCUTS: readonly ShortcutDefinition[] = [

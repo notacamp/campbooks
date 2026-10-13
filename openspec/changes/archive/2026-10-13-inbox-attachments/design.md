@@ -40,6 +40,12 @@ Response headers:
   OpenDocument formats, `audio/mpeg`, `audio/ogg`, `audio/wav`,
   `video/mp4`, `video/webm`. HTML, XHTML, SVG, XML, JavaScript and every
   unknown type become `application/octet-stream`.
+- For a type that may be shown inline (a raster image or a PDF), the
+  first bytes must agree: the served type is what their magic numbers say
+  (a JPEG sent as `image/png` goes out as `image/jpeg`), and bytes that are
+  neither (markup sent as `image/png`) go out as `application/octet-stream`
+  and as an attachment. The first chunk of the stream is read for this, so
+  it costs nothing extra.
 - `Content-Disposition: attachment; filename="<ASCII fallback>";
   filename*=UTF-8''<percent-encoded>` (RFC 6266 / 8187). The name is
   sanitised first: path separators, control characters (C0, C1, DEL) and
@@ -123,11 +129,14 @@ An inline part is part of the message, not a remote resource: showing it
 reveals nothing to the sender, so it is shown without "Show images" (as
 mail clients do). The connectors' parser keeps each part's `Content-ID`
 (angle brackets stripped); MessageChangeBatch v1 gains an optional
-`content_id`, and `conversations.attachments` a nullable `content_id`
-column. `get_message_body` loads, only when the HTML mentions `cid:`, the
+`content_id` of at most 255 characters, and `conversations.attachments` a
+nullable `content_id` column. A longer id is dropped (never cut, which
+could make it name another part) by the parser and again when the batch is
+applied. `get_message_body` loads, only when the HTML mentions `cid:`, the
 message's parts that have a content id and a raster type, up to 2 MiB each
 and 6 MiB in all, and hands the sanitiser a map from content id to a
-`data:<type>;base64,…` URL. The sanitiser allows the `cid` scheme only for
+`data:<type>;base64,…` URL, whose type is what the part's magic bytes say
+(a part whose bytes are no picture is left out). The sanitiser allows the `cid` scheme only for
 `img[src]` (links with `cid:` are dropped) and its image policy replaces a
 known `cid:` source with its `data:` URL; an unknown or oversized one
 becomes the placeholder (decision 4). Every `data:` source in the output is

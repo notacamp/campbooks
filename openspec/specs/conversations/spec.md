@@ -245,7 +245,8 @@ kept) unless the request asks `show_images=true`, and the response SHALL say
 how many remote images the message has (`remote_images`) and whether they
 were kept (`images_shown`). An image whose source is `cid:<id>` SHALL be
 shown, whether or not images are shown, as a `data:` URL of the message's
-inline part with that `Content-ID` when that part has a raster image type
+inline part with that `Content-ID` (at most 255 characters; a longer one
+is not stored) when that part has a raster image type its bytes confirm
 and fits the size limits, and as the placeholder otherwise. No other `data:`
 source survives.
 
@@ -411,9 +412,10 @@ at most 150 characters, `attachment` when nothing is left) as both an ASCII
 on the safe list, else `application/octet-stream`; `X-Content-Type-Options:
 nosniff`; `Content-Security-Policy` starting with `sandbox`;
 `Cross-Origin-Resource-Policy: same-origin`; `Cache-Control: private,
-no-store`; and `Accept-Ranges: none`. With `inline=true` the disposition
-SHALL be `inline` only for raster images and PDFs; every other type stays
-an attachment.
+no-store`; and `Accept-Ranges: none`. A raster image or PDF SHALL be served as the type its first bytes show,
+and as `application/octet-stream` when they show neither. With
+`inline=true` the disposition SHALL be `inline` only for raster images and
+PDFs; every other type stays an attachment.
 
 #### Scenario: A member downloads a PDF
 - **WHEN** a member of the inbox requests a message's PDF attachment

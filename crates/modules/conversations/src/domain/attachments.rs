@@ -75,6 +75,31 @@ pub fn may_be_inline(served: &str) -> bool {
     served == "application/pdf" || RASTER_IMAGES.contains(&served)
 }
 
+/// The raster image or PDF `bytes` are, by their first bytes (magic
+/// numbers), whatever type they were sent as; `None` for anything else.
+/// A cheap second check on top of the safe list: a part sent as
+/// `image/png` that holds markup is served as an opaque download.
+pub fn sniff(bytes: &[u8]) -> Option<&'static str> {
+    let at = |offset: usize, magic: &[u8]| bytes.get(offset..offset + magic.len()) == Some(magic);
+    if at(0, b"\x89PNG\r\n\x1a\n") {
+        Some("image/png")
+    } else if at(0, b"\xff\xd8\xff") {
+        Some("image/jpeg")
+    } else if at(0, b"GIF87a") || at(0, b"GIF89a") {
+        Some("image/gif")
+    } else if at(0, b"RIFF") && at(8, b"WEBP") {
+        Some("image/webp")
+    } else if at(4, b"ftypavif") || at(4, b"ftypavis") {
+        Some("image/avif")
+    } else if at(0, b"BM") && bytes.len() >= 26 {
+        Some("image/bmp")
+    } else if at(0, b"%PDF-") {
+        Some("application/pdf")
+    } else {
+        None
+    }
+}
+
 fn essence(content_type: &str) -> String {
     content_type
         .split(';')
@@ -185,6 +210,25 @@ mod tests {
             "nonsense",
         ] {
             assert_eq!(served_type(unsafe_type), OCTET_STREAM, "{unsafe_type}");
+        }
+    }
+
+    #[test]
+    fn sniffing_names_raster_images_and_pdfs_by_their_magic_bytes() {
+        assert_eq!(sniff(b"\x89PNG\r\n\x1a\n...."), Some("image/png"));
+        assert_eq!(sniff(b"\xff\xd8\xff\xe0"), Some("image/jpeg"));
+        assert_eq!(sniff(b"GIF89a.."), Some("image/gif"));
+        assert_eq!(sniff(b"RIFF\0\0\0\0WEBPVP8 "), Some("image/webp"));
+        assert_eq!(sniff(b"\0\0\0\x1cftypavif"), Some("image/avif"));
+        assert_eq!(sniff(b"%PDF-1.7"), Some("application/pdf"));
+        for other in [
+            &b"<html><script>alert(1)</script>"[..],
+            b"<svg xmlns='http://www.w3.org/2000/svg'/>",
+            b"\xff\xd8",
+            b"BM",
+            b"",
+        ] {
+            assert_eq!(sniff(other), None, "{other:?}");
         }
     }
 
