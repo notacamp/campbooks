@@ -94,7 +94,7 @@ async fn a_person_adds_zoho_as_a_way_in_then_signs_in_with_it(db: PgPool) {
     let shown = kit.get(&format!("/auth/requests/{request}")).await;
     assert_eq!(
         shown.json["providers"],
-        json!(["google", "microsoft", "zoho"])
+        json!(["google", "microsoft", "zoho", "passkey"])
     );
     let signed_in = kit.round_trip_with(Provider::Zoho, Some(&request)).await;
     assert!(

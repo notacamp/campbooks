@@ -80,8 +80,19 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(features::list_ways_in::handler))
         .routes(routes!(features::remove_way_in::handler))
         .routes(routes!(features::start_link::handler))
+        .routes(routes!(
+            features::list_passkeys::handler,
+            features::register_passkey::handler
+        ))
+        .routes(routes!(features::start_passkey_registration::handler))
+        .routes(routes!(
+            features::rename_passkey::handler,
+            features::remove_passkey::handler
+        ))
 }
 
+#[cfg(test)]
+mod passkey_tests;
 #[cfg(test)]
 mod testkit;
 #[cfg(test)]

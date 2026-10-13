@@ -15,6 +15,7 @@ pub mod authorize;
 pub mod discovery;
 pub mod end_session;
 mod link;
+pub mod passkey;
 pub mod sign_in;
 pub mod token;
 
@@ -91,6 +92,10 @@ fn openapi_router() -> OpenApiRouter<Ctx> {
         .routes(routes!(sign_in::start))
         .routes(routes!(sign_in::callback))
         .routes(routes!(sign_in::new_account, sign_in::create_account))
+        .routes(routes!(passkey::sign_in_options))
+        .routes(routes!(passkey::sign_in))
+        .routes(routes!(passkey::sign_up_options))
+        .routes(routes!(passkey::sign_up))
 }
 
 /// The protocol endpoints over `state` and `deps`, ready to merge into the

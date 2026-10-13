@@ -81,6 +81,63 @@ pub async fn start(
     })
 }
 
+/// Start a session for `account_id`, signed in with passkey `passkey_id`;
+/// `amr` is what its tokens report (RFC 8176: `hwk` or `swk`, and `user`).
+pub async fn start_with_passkey(
+    conn: &mut PgConnection,
+    account_id: Uuid,
+    passkey_id: Uuid,
+    amr: &[&str],
+    user_agent: Option<&str>,
+    now: DateTime<Utc>,
+) -> Result<Started> {
+    let token = random_token();
+    let id = Uuid::now_v7();
+    let user_agent = user_agent.map(|ua| ua.chars().take(MAX_USER_AGENT_CHARS).collect::<String>());
+    sqlx::query(
+        "INSERT INTO identity.sessions
+             (id, token_hash, account_id, method, passkey_id, amr, auth_time, user_agent,
+              created_at, last_seen_at, idle_expires_at, expires_at)
+         VALUES ($1, $2, $3, 'passkey', $4, $5, $6, $7, $6, $6, $8, $9)",
+    )
+    .bind(id)
+    .bind(hash(&token))
+    .bind(account_id)
+    .bind(passkey_id)
+    .bind(amr)
+    .bind(now)
+    .bind(user_agent)
+    .bind(now + IDLE)
+    .bind(now + ABSOLUTE)
+    .execute(conn)
+    .await?;
+    Ok(Started {
+        session: Session {
+            id,
+            account_id,
+            auth_time: now,
+            last_seen_at: now,
+        },
+        token,
+    })
+}
+
+/// The authentication methods session `id` reports (`amr`); `fed` (a
+/// provider) when the session is gone.
+pub async fn amr(db: &PgPool, id: Option<Uuid>) -> Result<Vec<String>> {
+    let Some(id) = id else {
+        return Ok(vec!["fed".to_owned()]);
+    };
+    let amr: Option<Vec<String>> =
+        sqlx::query_scalar("SELECT amr FROM identity.sessions WHERE id = $1")
+            .bind(id)
+            .fetch_optional(db)
+            .await?;
+    Ok(amr
+        .filter(|amr| !amr.is_empty())
+        .unwrap_or_else(|| vec!["fed".to_owned()]))
+}
+
 /// The live session `token` names, recording its use.
 pub async fn current(db: &PgPool, token: &str, now: DateTime<Utc>) -> Result<Option<Session>> {
     let session: Option<Session> = sqlx::query_as(
@@ -164,13 +221,45 @@ pub async fn end_signed_in_with(
     .bind(now)
     .fetch_all(&mut *conn)
     .await?;
+    revoke_families_of(conn, &ended, now).await?;
+    Ok(ended.len())
+}
+
+/// End every live session signed in with passkey `passkey_id` and revoke
+/// the refresh tokens issued in them (the passkey is being removed). How
+/// many ended.
+pub async fn end_signed_in_with_passkey(
+    conn: &mut PgConnection,
+    passkey_id: Uuid,
+    now: DateTime<Utc>,
+) -> Result<usize> {
+    let ended: Vec<Uuid> = sqlx::query_scalar(
+        "UPDATE identity.sessions SET ended_at = $2
+          WHERE passkey_id = $1 AND ended_at IS NULL
+         RETURNING id",
+    )
+    .bind(passkey_id)
+    .bind(now)
+    .fetch_all(&mut *conn)
+    .await?;
+    revoke_families_of(conn, &ended, now).await?;
+    Ok(ended.len())
+}
+
+/// Revoke the refresh-token families issued in `sessions` (a way in was
+/// removed).
+async fn revoke_families_of(
+    conn: &mut PgConnection,
+    sessions: &[Uuid],
+    now: DateTime<Utc>,
+) -> Result<()> {
     sqlx::query(
         "UPDATE identity.refresh_families SET revoked_at = $2, revoke_reason = 'way_in_removed'
           WHERE session_id = ANY($1) AND revoked_at IS NULL",
     )
-    .bind(&ended)
+    .bind(sessions)
     .bind(now)
     .execute(conn)
     .await?;
-    Ok(ended.len())
+    Ok(())
 }

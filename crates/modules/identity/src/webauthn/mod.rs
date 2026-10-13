@@ -24,7 +24,7 @@ mod options;
 mod verify;
 
 #[cfg(test)]
-pub mod authenticator;
+pub(crate) mod authenticator;
 #[cfg(test)]
 mod tests;
 

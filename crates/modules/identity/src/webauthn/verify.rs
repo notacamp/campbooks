@@ -235,10 +235,18 @@ fn entry<'a>(
         .find_map(|(k, v)| (k.as_text() == Some(key)).then_some(v))
 }
 
+/// An attestation object's parts (§6.5).
+struct AttestationObject {
+    /// `fmt`.
+    fmt: String,
+    /// `attStmt`, a CBOR map.
+    statement: Vec<(ciborium::Value, ciborium::Value)>,
+    /// `authData`.
+    auth_data: Vec<u8>,
+}
+
 /// The attestation object's `fmt`, `attStmt` and `authData` (§6.5).
-fn attestation_object(
-    bytes: &[u8],
-) -> Result<(String, Vec<(ciborium::Value, ciborium::Value)>, Vec<u8>), Refusal> {
+fn attestation_object(bytes: &[u8]) -> Result<AttestationObject, Refusal> {
     let mut rest = bytes;
     let value: ciborium::Value =
         ciborium::de::from_reader(&mut rest).map_err(|_| Refusal("attestation_not_cbor"))?;
@@ -260,7 +268,11 @@ fn attestation_object(
         .and_then(ciborium::Value::as_bytes)
         .ok_or(Refusal("attestation_without_auth_data"))?
         .clone();
-    Ok((fmt, statement, auth_data))
+    Ok(AttestationObject {
+        fmt,
+        statement,
+        auth_data,
+    })
 }
 
 /// The attestation statement formats WebAuthn registers (§8, IANA). Their
@@ -291,7 +303,11 @@ impl RelyingParty {
             &credential.response.attestation_object,
             "attestation_not_base64url",
         )?;
-        let (fmt, statement, auth_data) = attestation_object(&object)?;
+        let AttestationObject {
+            fmt,
+            statement,
+            auth_data,
+        } = attestation_object(&object)?;
         if !KNOWN_FORMATS.contains(&fmt.as_str()) {
             return refuse("attestation_format_unknown");
         }

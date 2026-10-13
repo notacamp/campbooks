@@ -193,8 +193,8 @@ mod tests {
             okp(6, vec![1; 32]),
         );
         assert_eq!(parse(&mismatched), refuse("cose_key_unsupported"));
-        let es384 = key(iana::KeyType::EC2, Some(iana::Algorithm::ES384), Vec::new());
-        assert_eq!(parse(&es384), refuse("cose_key_unsupported"));
+        let p384 = key(iana::KeyType::EC2, Some(iana::Algorithm::ES384), Vec::new());
+        assert_eq!(parse(&p384), refuse("cose_key_unsupported"));
         let compressed = key(
             iana::KeyType::EC2,
             Some(iana::Algorithm::ES256),

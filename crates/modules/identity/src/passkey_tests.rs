@@ -1,0 +1,756 @@
+//! End to end through the issuer, slice S3: a passkey-only sign-up, signing
+//! in with a passkey, adding and removing one while signed in; with every
+//! refusal, one by one. The browser and its authenticator are the software
+//! authenticator of `webauthn::authenticator`.
+
+use axum::http::{Method, StatusCode};
+use campbooks_kernel::config::SignupPolicy;
+use serde_json::{Value, json};
+use sqlx::PgPool;
+
+use crate::{
+    testkit::{Kit, ORIGIN, Response, query},
+    webauthn::authenticator::{Alg, Authenticator, UP},
+};
+
+/// What the sign-in screens send with every action.
+const SCREEN: [(&str, &str); 3] = [
+    ("x-campbooks-csrf", "1"),
+    ("sec-fetch-site", "same-origin"),
+    ("content-type", "application/json"),
+];
+
+fn device() -> Authenticator {
+    Authenticator::new(ORIGIN, "localhost")
+}
+
+async fn count(kit: &Kit, sql: &'static str) -> i64 {
+    sqlx::query_scalar(sql)
+        .fetch_one(&kit.state.db)
+        .await
+        .unwrap()
+}
+
+/// A sign-in screen action: POST `body` as JSON with the CSRF header.
+async fn screen(kit: &Kit, path: &str, body: &Value) -> Response {
+    kit.request(Method::POST, path, &SCREEN, Some(body.to_string()))
+        .await
+}
+
+/// The web client's authorization request: the sign-in screen's `request`
+/// and the PKCE verifier.
+async fn waiting_request(kit: &Kit) -> (String, String) {
+    let (url, verifier) = Kit::web_authorize();
+    let to_sign_in = kit.get(&url).await;
+    (to_sign_in.location_query()["request"].clone(), verifier)
+}
+
+/// Create an account with a passkey alone, from the sign-in screen: the
+/// `redirect` the screen is told to follow.
+async fn sign_up_with_passkey(kit: &Kit, device: &mut Authenticator, request: &str) -> String {
+    let options = screen(
+        kit,
+        "/auth/passkey/sign-up/options",
+        &json!({ "display_name": "Ana Lima", "request": request }),
+    )
+    .await;
+    assert_eq!(options.status, StatusCode::OK, "{options:?}");
+    let made = device.create(&options.json, Alg::Ed25519);
+    let created = screen(kit, "/auth/passkey/sign-up", &made).await;
+    assert_eq!(created.status, StatusCode::CREATED, "{created:?}");
+    created.json["redirect"].as_str().unwrap().to_owned()
+}
+
+/// Sign in with the device's passkey `index` from the sign-in screen.
+async fn sign_in_with_passkey(
+    kit: &Kit,
+    device: &mut Authenticator,
+    index: usize,
+    request: &str,
+) -> Response {
+    let options = screen(
+        kit,
+        "/auth/passkey/sign-in/options",
+        &json!({ "request": request }),
+    )
+    .await;
+    assert_eq!(options.status, StatusCode::OK, "{options:?}");
+    let signed = device.get(&options.json, index);
+    screen(kit, "/auth/passkey/sign-in", &signed).await
+}
+
+/// Redeem the code in `redirect`: the token response.
+async fn redeem(kit: &Kit, redirect: &str, verifier: &str) -> Value {
+    let tokens = kit.redeem(&query(redirect)["code"], verifier).await;
+    assert_eq!(tokens.status, StatusCode::OK, "{tokens:?}");
+    tokens.json
+}
+
+/// Add a passkey to the account `access` belongs to: the API's answer.
+async fn add_passkey(kit: &Kit, access: &str, device: &mut Authenticator, alg: Alg) -> Response {
+    let options = kit
+        .api(
+            Method::POST,
+            "/api/v1/identity/passkeys/registrations",
+            access,
+        )
+        .await;
+    assert_eq!(options.status, StatusCode::CREATED, "{options:?}");
+    let made = device.create(&options.json, alg);
+    kit.api_json(
+        Method::POST,
+        "/api/v1/identity/passkeys",
+        access,
+        &json!({ "credential": made, "name": "  Laptop\n" }),
+    )
+    .await
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_new_person_signs_up_with_a_passkey_alone_and_signs_in_with_it(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (request, verifier) = waiting_request(&kit).await;
+    let shown = kit.get(&format!("/auth/requests/{request}")).await;
+    assert_eq!(
+        shown.json["providers"],
+        json!(["google", "microsoft", "zoho", "passkey"])
+    );
+    assert_eq!(shown.json["passkey_sign_up"], true);
+
+    let mut device = device();
+    let redirect = sign_up_with_passkey(&kit, &mut device, &request).await;
+    assert!(
+        redirect.starts_with(&format!("{ORIGIN}/bff/callback?code=")),
+        "{redirect}"
+    );
+    let tokens = redeem(&kit, &redirect, &verifier).await;
+    let (_, id) = Kit::decode(tokens["id_token"].as_str().unwrap());
+    assert_eq!(id["amr"], json!(["hwk", "user"]));
+    assert_eq!(id["name"], "Ana Lima");
+    assert!(id.get("email").is_none(), "a passkey proves no address");
+    let (_, access) = Kit::decode(tokens["access_token"].as_str().unwrap());
+    assert_eq!(access["email_verified"], false);
+    assert_eq!(
+        count(
+            &kit,
+            "SELECT count(*) FROM kernel.events WHERE name = 'identity.account_created'"
+        )
+        .await,
+        1
+    );
+    assert_eq!(
+        count(
+            &kit,
+            "SELECT count(*) FROM kernel.events WHERE name = 'identity.way_in_added'"
+        )
+        .await,
+        1
+    );
+
+    // Another browser, the same passkey: the same account.
+    kit.new_browser();
+    let (request, verifier) = waiting_request(&kit).await;
+    let signed_in = sign_in_with_passkey(&kit, &mut device, 0, &request).await;
+    assert_eq!(signed_in.status, StatusCode::OK, "{signed_in:?}");
+    let again = redeem(
+        &kit,
+        signed_in.json["redirect"].as_str().unwrap(),
+        &verifier,
+    )
+    .await;
+    let (_, again) = Kit::decode(again["id_token"].as_str().unwrap());
+    assert_eq!(again["sub"], id["sub"]);
+    assert!(
+        signed_in
+            .headers
+            .get_all("set-cookie")
+            .iter()
+            .any(|c| c.to_str().unwrap().starts_with("campbooks_webauthn=;")),
+        "the ceremony cookie is cleared"
+    );
+    let last_used: Option<chrono::DateTime<chrono::Utc>> =
+        sqlx::query_scalar("SELECT last_used_at FROM identity.passkeys")
+            .fetch_one(&kit.state.db)
+            .await
+            .unwrap();
+    assert!(last_used.is_some());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_signed_in_person_adds_a_passkey_and_signs_in_with_it(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let mut device = device();
+    let added = add_passkey(&kit, &access, &mut device, Alg::P256).await;
+    assert_eq!(added.status, StatusCode::CREATED, "{added:?}");
+    assert_eq!(added.json["name"], "Laptop");
+    assert_eq!(added.json["synced"], false);
+    let listed = kit
+        .api(Method::GET, "/api/v1/identity/passkeys", &access)
+        .await;
+    assert_eq!(listed.json["items"].as_array().unwrap().len(), 1);
+
+    // The second registration excludes the first.
+    let options = kit
+        .api(
+            Method::POST,
+            "/api/v1/identity/passkeys/registrations",
+            &access,
+        )
+        .await;
+    assert_eq!(
+        options.json["excludeCredentials"].as_array().unwrap().len(),
+        1
+    );
+    assert_eq!(options.json["user"]["name"], "test-user@example.com");
+
+    kit.new_browser();
+    let (request, verifier) = waiting_request(&kit).await;
+    let signed_in = sign_in_with_passkey(&kit, &mut device, 0, &request).await;
+    assert_eq!(signed_in.status, StatusCode::OK, "{signed_in:?}");
+    let tokens = redeem(
+        &kit,
+        signed_in.json["redirect"].as_str().unwrap(),
+        &verifier,
+    )
+    .await;
+    let (_, mine) = Kit::decode(&access);
+    let (_, now) = Kit::decode(tokens["access_token"].as_str().unwrap());
+    assert_eq!(now["sub"], mine["sub"]);
+    assert_eq!(now["email"], "test-user@example.com");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn every_algorithm_and_a_synced_passkey_sign_in(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let mut device = device();
+    for alg in [Alg::Ed25519, Alg::P256, Alg::Rsa] {
+        let added = add_passkey(&kit, &access, &mut device, alg).await;
+        assert_eq!(added.status, StatusCode::CREATED, "{alg:?}: {added:?}");
+    }
+    for index in 0..3 {
+        kit.new_browser();
+        let (request, verifier) = waiting_request(&kit).await;
+        let signed_in = sign_in_with_passkey(&kit, &mut device, index, &request).await;
+        assert_eq!(signed_in.status, StatusCode::OK, "{index}: {signed_in:?}");
+        redeem(
+            &kit,
+            signed_in.json["redirect"].as_str().unwrap(),
+            &verifier,
+        )
+        .await;
+    }
+
+    // A synced passkey reports `swk`.
+    let options = kit
+        .api(
+            Method::POST,
+            "/api/v1/identity/passkeys/registrations",
+            &access,
+        )
+        .await;
+    let ceremony = device.ceremony(
+        "webauthn.create",
+        options.json["challenge"].as_str().unwrap(),
+    );
+    let made = device.create_with(&options.json, Alg::P256, true, &ceremony, "none");
+    let added = kit
+        .api_json(
+            Method::POST,
+            "/api/v1/identity/passkeys",
+            &access,
+            &json!({ "credential": made }),
+        )
+        .await;
+    assert_eq!(added.json["synced"], true);
+    assert_eq!(added.json["name"], "Passkey");
+    kit.new_browser();
+    let (request, verifier) = waiting_request(&kit).await;
+    let signed_in = sign_in_with_passkey(&kit, &mut device, 3, &request).await;
+    let tokens = redeem(
+        &kit,
+        signed_in.json["redirect"].as_str().unwrap(),
+        &verifier,
+    )
+    .await;
+    let (_, id) = Kit::decode(tokens["id_token"].as_str().unwrap());
+    assert_eq!(id["amr"], json!(["swk", "user"]));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn adding_or_removing_a_passkey_needs_a_recent_sign_in(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let mut device = device();
+    add_passkey(&kit, &access, &mut device, Alg::Ed25519).await;
+    let passkey = kit
+        .api(Method::GET, "/api/v1/identity/passkeys", &access)
+        .await
+        .json["items"][0]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let stale = kit.stale(&access).await;
+    for (method, path) in [
+        (
+            Method::POST,
+            "/api/v1/identity/passkeys/registrations".to_owned(),
+        ),
+        (
+            Method::DELETE,
+            format!("/api/v1/identity/passkeys/{passkey}"),
+        ),
+    ] {
+        let refused = kit.api(method, &path, &stale).await;
+        assert_eq!(refused.status, StatusCode::FORBIDDEN, "{path}: {refused:?}");
+        assert_eq!(refused.json["code"], "step_up_required", "{path}");
+    }
+    let refused = kit
+        .api_json(
+            Method::POST,
+            "/api/v1/identity/passkeys",
+            &stale,
+            &json!({ "credential": device.create(&json!({"challenge": "x", "user": {"id": "AA"}}), Alg::Ed25519) }),
+        )
+        .await;
+    assert_eq!(refused.json["code"], "step_up_required");
+    // Renaming changes no way in: no step-up.
+    let renamed = kit
+        .api_json(
+            Method::PATCH,
+            &format!("/api/v1/identity/passkeys/{passkey}"),
+            &stale,
+            &json!({ "name": "Phone" }),
+        )
+        .await;
+    assert_eq!(renamed.status, StatusCode::OK, "{renamed:?}");
+    assert_eq!(renamed.json["name"], "Phone");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_last_way_in_stays_and_removing_a_passkey_signs_out_whoever_used_it(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (request, verifier) = waiting_request(&kit).await;
+    let mut device = device();
+    let redirect = sign_up_with_passkey(&kit, &mut device, &request).await;
+    let tokens = redeem(&kit, &redirect, &verifier).await;
+    let access = tokens["access_token"].as_str().unwrap().to_owned();
+    let refresh = tokens["refresh_token"].as_str().unwrap().to_owned();
+    let first = kit
+        .api(Method::GET, "/api/v1/identity/passkeys", &access)
+        .await
+        .json["items"][0]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let refused = kit
+        .api(
+            Method::DELETE,
+            &format!("/api/v1/identity/passkeys/{first}"),
+            &access,
+        )
+        .await;
+    assert_eq!(refused.status, StatusCode::CONFLICT, "{refused:?}");
+    assert_eq!(refused.json["code"], "last_way_in");
+
+    // With a second passkey, the first can go, and its sign-in with it.
+    let added = add_passkey(&kit, &access, &mut device, Alg::P256).await;
+    assert_eq!(added.status, StatusCode::CREATED, "{added:?}");
+    let removed = kit
+        .api(
+            Method::DELETE,
+            &format!("/api/v1/identity/passkeys/{first}"),
+            &access,
+        )
+        .await;
+    assert_eq!(removed.status, StatusCode::NO_CONTENT, "{removed:?}");
+    let refreshed = kit.refresh(&refresh).await;
+    assert_eq!(refreshed.json["error"], "invalid_grant", "{refreshed:?}");
+    assert_eq!(
+        count(
+            &kit,
+            "SELECT count(*) FROM kernel.events WHERE name = 'identity.way_in_removed'"
+        )
+        .await,
+        1
+    );
+
+    // The authenticator still holds it, but it is no way in any more.
+    kit.new_browser();
+    let (request, _) = waiting_request(&kit).await;
+    let gone = sign_in_with_passkey(&kit, &mut device, 0, &request).await;
+    assert_eq!(gone.status, StatusCode::FORBIDDEN, "{gone:?}");
+    assert_eq!(gone.json["code"], "passkey_not_accepted");
+    let gone_again = kit
+        .api(
+            Method::DELETE,
+            &format!("/api/v1/identity/passkeys/{first}"),
+            &access,
+        )
+        .await;
+    assert_eq!(gone_again.status, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_provider_way_in_can_go_when_a_passkey_remains(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let google = kit.ways_in(&access).await["items"][0]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let refused = kit
+        .api(
+            Method::DELETE,
+            &format!("/api/v1/identity/ways-in/{google}"),
+            &access,
+        )
+        .await;
+    assert_eq!(refused.json["code"], "last_way_in");
+    add_passkey(&kit, &access, &mut device(), Alg::Ed25519).await;
+    let removed = kit
+        .api(
+            Method::DELETE,
+            &format!("/api/v1/identity/ways-in/{google}"),
+            &access,
+        )
+        .await;
+    assert_eq!(removed.status, StatusCode::NO_CONTENT, "{removed:?}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn ceremonies_are_single_use_and_bound_to_their_browser(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (request, _) = waiting_request(&kit).await;
+    let mut device = device();
+    sign_up_with_passkey(&kit, &mut device, &request).await;
+    kit.new_browser();
+
+    // Options in one browser, the assertion from another: no ceremony there.
+    let options = screen(&kit, "/auth/passkey/sign-in/options", &json!({})).await;
+    let signed = device.get(&options.json, 0);
+    kit.new_browser();
+    let elsewhere = screen(&kit, "/auth/passkey/sign-in", &signed).await;
+    assert_eq!(elsewhere.status, StatusCode::CONFLICT, "{elsewhere:?}");
+    assert_eq!(elsewhere.json["code"], "passkey_expired");
+
+    // In the right browser it works once; replayed, it is expired.
+    let options = screen(&kit, "/auth/passkey/sign-in/options", &json!({})).await;
+    let signed = device.get(&options.json, 0);
+    let first = screen(&kit, "/auth/passkey/sign-in", &signed).await;
+    assert_eq!(first.status, StatusCode::OK, "{first:?}");
+    assert_eq!(first.json["redirect"], "/");
+    let options = screen(&kit, "/auth/passkey/sign-in/options", &json!({})).await;
+    let fresh = device.get(&options.json, 0);
+    let replayed = screen(&kit, "/auth/passkey/sign-in", &signed).await;
+    assert_eq!(replayed.json["code"], "passkey_expired", "{replayed:?}");
+    // A failed attempt spends its challenge too.
+    let mut tampered = fresh.clone();
+    tampered["response"]["signature"] = json!("AAAA");
+    let bad = screen(&kit, "/auth/passkey/sign-in", &tampered).await;
+    assert_eq!(bad.json["code"], "passkey_not_accepted", "{bad:?}");
+    let after = screen(&kit, "/auth/passkey/sign-in", &fresh).await;
+    assert_eq!(after.json["code"], "passkey_expired", "{after:?}");
+
+    // A sign-up challenge does not sign in.
+    let options = screen(
+        &kit,
+        "/auth/passkey/sign-up/options",
+        &json!({ "display_name": "Bo" }),
+    )
+    .await;
+    let wrong = device.get(&json!({ "challenge": options.json["challenge"] }), 0);
+    let refused = screen(&kit, "/auth/passkey/sign-in", &wrong).await;
+    assert_eq!(refused.json["code"], "passkey_expired", "{refused:?}");
+
+    // Expired ceremonies are refused.
+    let options = screen(&kit, "/auth/passkey/sign-in/options", &json!({})).await;
+    sqlx::query("UPDATE identity.webauthn_challenges SET expires_at = now() - interval '1 second'")
+        .execute(&kit.state.db)
+        .await
+        .unwrap();
+    let late = screen(&kit, "/auth/passkey/sign-in", &device.get(&options.json, 0)).await;
+    assert_eq!(late.json["code"], "passkey_expired", "{late:?}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn sign_in_refusals_one_by_one(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (request, _) = waiting_request(&kit).await;
+    let mut device = device();
+    sign_up_with_passkey(&kit, &mut device, &request).await;
+
+    // Without the CSRF header, or from another site.
+    for headers in [
+        vec![("content-type", "application/json")],
+        vec![
+            ("x-campbooks-csrf", "1"),
+            ("sec-fetch-site", "cross-site"),
+            ("content-type", "application/json"),
+        ],
+    ] {
+        let refused = kit
+            .request(
+                Method::POST,
+                "/auth/passkey/sign-in/options",
+                &headers,
+                Some("{}".to_owned()),
+            )
+            .await;
+        assert_eq!(refused.status, StatusCode::FORBIDDEN, "{refused:?}");
+        assert_eq!(refused.json["code"], "csrf_check_failed");
+    }
+    let bad_return = screen(
+        &kit,
+        "/auth/passkey/sign-in/options",
+        &json!({ "return_to": "https://evil.example.com" }),
+    )
+    .await;
+    assert_eq!(bad_return.json["code"], "invalid_return_to");
+
+    // A passkey nobody registered here.
+    let mut stranger = Authenticator::new(ORIGIN, "localhost");
+    let options = screen(
+        &kit,
+        "/auth/passkey/sign-up/options",
+        &json!({ "display_name": "X" }),
+    )
+    .await;
+    stranger.create(&options.json, Alg::P256);
+    let options = screen(&kit, "/auth/passkey/sign-in/options", &json!({})).await;
+    let unknown = screen(
+        &kit,
+        "/auth/passkey/sign-in",
+        &stranger.get(&options.json, 0),
+    )
+    .await;
+    assert_eq!(unknown.json["code"], "passkey_not_accepted", "{unknown:?}");
+
+    // A user handle that is not the passkey's account.
+    let options = screen(&kit, "/auth/passkey/sign-in/options", &json!({})).await;
+    let mut other_user = device.get(&options.json, 0);
+    other_user["response"]["userHandle"] = json!("AAAAAAAAAAAAAAAAAAAAAA");
+    let refused = screen(&kit, "/auth/passkey/sign-in", &other_user).await;
+    assert_eq!(refused.json["code"], "passkey_not_accepted", "{refused:?}");
+
+    // Without user verification.
+    let options = screen(&kit, "/auth/passkey/sign-in/options", &json!({})).await;
+    let mut ceremony = device.ceremony("webauthn.get", options.json["challenge"].as_str().unwrap());
+    ceremony.flags = UP;
+    let unverified = screen(
+        &kit,
+        "/auth/passkey/sign-in",
+        &device.get_with(0, &ceremony),
+    )
+    .await;
+    assert_eq!(
+        unverified.json["code"], "passkey_not_accepted",
+        "{unverified:?}"
+    );
+
+    // From another origin (a phishing page relaying the challenge).
+    let options = screen(&kit, "/auth/passkey/sign-in/options", &json!({})).await;
+    let mut ceremony = device.ceremony("webauthn.get", options.json["challenge"].as_str().unwrap());
+    ceremony.origin = "https://campbooks.example.net".to_owned();
+    let phished = screen(
+        &kit,
+        "/auth/passkey/sign-in",
+        &device.get_with(0, &ceremony),
+    )
+    .await;
+    assert_eq!(phished.json["code"], "passkey_not_accepted", "{phished:?}");
+
+    // Nothing of it reached a session.
+    assert_eq!(
+        count(
+            &kit,
+            "SELECT count(*) FROM identity.sessions WHERE method = 'passkey'"
+        )
+        .await,
+        1,
+        "only the sign-up's"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_counter_that_goes_backwards_is_recorded_not_refused(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (request, _) = waiting_request(&kit).await;
+    let mut device = device();
+    sign_up_with_passkey(&kit, &mut device, &request).await;
+    device.passkeys[0].count = 9;
+    let options = screen(&kit, "/auth/passkey/sign-in/options", &json!({})).await;
+    let first = screen(&kit, "/auth/passkey/sign-in", &device.get(&options.json, 0)).await;
+    assert_eq!(first.status, StatusCode::OK);
+    // A clone that still says 10.
+    device.passkeys[0].count = 9;
+    let options = screen(&kit, "/auth/passkey/sign-in/options", &json!({})).await;
+    let clone = screen(&kit, "/auth/passkey/sign-in", &device.get(&options.json, 0)).await;
+    assert_eq!(clone.status, StatusCode::OK, "{clone:?}");
+    assert_eq!(
+        count(
+            &kit,
+            "SELECT count(*) FROM identity.audit_events WHERE kind = 'passkey_sign_count_regressed'"
+        )
+        .await,
+        1
+    );
+    let stored: i64 = sqlx::query_scalar("SELECT sign_count FROM identity.passkeys")
+        .fetch_one(&kit.state.db)
+        .await
+        .unwrap();
+    assert_eq!(stored, 10, "the counter never moves back");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_invite_only_instance_takes_no_passkey_sign_ups(db: PgPool) {
+    let kit = Kit::with_signup(db, SignupPolicy::InviteOnly, &["ana@example.com"]).await;
+    let (request, _) = waiting_request(&kit).await;
+    let shown = kit.get(&format!("/auth/requests/{request}")).await;
+    assert_eq!(shown.json["passkey_sign_up"], false);
+    let refused = screen(
+        &kit,
+        "/auth/passkey/sign-up/options",
+        &json!({ "display_name": "Ana", "request": request }),
+    )
+    .await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{refused:?}");
+    assert_eq!(refused.json["code"], "signup_invite_only");
+    assert_eq!(
+        count(&kit, "SELECT count(*) FROM identity.webauthn_challenges").await,
+        0
+    );
+    assert_eq!(
+        count(&kit, "SELECT count(*) FROM identity.accounts").await,
+        0
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn registrations_are_the_accounts_own_and_credentials_unique(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let ana = kit.signed_up().await;
+    kit.new_browser();
+    kit.google.set_user(campbooks_kernel::testing::TestUser {
+        subject: "bo".to_owned(),
+        name: "Bo".to_owned(),
+        email: "bo@example.com".to_owned(),
+    });
+    let bo = kit.signed_up().await;
+
+    // Ana's challenge, finished by Bo: no registration waits for Bo.
+    let options = kit
+        .api(
+            Method::POST,
+            "/api/v1/identity/passkeys/registrations",
+            &ana,
+        )
+        .await;
+    let mut device = device();
+    let made = device.create(&options.json, Alg::Ed25519);
+    let stolen = kit
+        .api_json(
+            Method::POST,
+            "/api/v1/identity/passkeys",
+            &bo,
+            &json!({ "credential": made }),
+        )
+        .await;
+    assert_eq!(stolen.status, StatusCode::CONFLICT, "{stolen:?}");
+    assert_eq!(stolen.json["code"], "passkey_expired");
+
+    // Registered by Ana, then offered again by Bo: refused.
+    let added = add_passkey(&kit, &ana, &mut device, Alg::Ed25519).await;
+    assert_eq!(added.status, StatusCode::CREATED);
+    let id = added.json["id"].as_str().unwrap().to_owned();
+    let options = kit
+        .api(Method::POST, "/api/v1/identity/passkeys/registrations", &bo)
+        .await;
+    let ceremony = device.ceremony(
+        "webauthn.create",
+        options.json["challenge"].as_str().unwrap(),
+    );
+    let mut again = device.create_with(&options.json, Alg::Ed25519, false, &ceremony, "none");
+    // The same credential id as Ana's (an authenticator ignoring
+    // excludeCredentials).
+    let anas = base64::Engine::encode(
+        &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+        &device.passkeys[1].id,
+    );
+    let duplicate = rewrite_credential_id(&mut again, &anas);
+    let refused = kit
+        .api_json(
+            Method::POST,
+            "/api/v1/identity/passkeys",
+            &bo,
+            &json!({ "credential": duplicate }),
+        )
+        .await;
+    assert_eq!(refused.status, StatusCode::CONFLICT, "{refused:?}");
+    assert_eq!(refused.json["code"], "passkey_already_registered");
+
+    // Ana's passkey is invisible to Bo.
+    assert_eq!(
+        kit.api(Method::GET, "/api/v1/identity/passkeys", &bo)
+            .await
+            .json["items"],
+        json!([])
+    );
+    for (method, body) in [
+        (Method::PATCH, Some(json!({ "name": "Mine" }))),
+        (Method::DELETE, None),
+    ] {
+        let path = format!("/api/v1/identity/passkeys/{id}");
+        let answer = match body {
+            Some(body) => kit.api_json(method, &path, &bo, &body).await,
+            None => kit.api(method, &path, &bo).await,
+        };
+        assert_eq!(answer.status, StatusCode::NOT_FOUND, "{answer:?}");
+    }
+    let blank = kit
+        .api_json(
+            Method::PATCH,
+            &format!("/api/v1/identity/passkeys/{id}"),
+            &ana,
+            &json!({ "name": " \n" }),
+        )
+        .await;
+    assert_eq!(blank.json["code"], "passkey_name_required");
+}
+
+/// `credential` (a registration from the software authenticator) with its
+/// credential id replaced by `id` everywhere: `id`, `rawId` and the
+/// attested credential data.
+fn rewrite_credential_id(credential: &mut Value, id: &str) -> Value {
+    use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+    let object = URL_SAFE_NO_PAD
+        .decode(
+            credential["response"]["attestationObject"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+    let mut value: ciborium::Value = ciborium::de::from_reader(object.as_slice()).unwrap();
+    let new_id = URL_SAFE_NO_PAD.decode(id).unwrap();
+    if let ciborium::Value::Map(entries) = &mut value {
+        for (key, entry) in entries.iter_mut() {
+            if key.as_text() == Some("authData")
+                && let ciborium::Value::Bytes(data) = entry
+            {
+                let len = usize::from(u16::from_be_bytes([data[53], data[54]]));
+                let mut rewritten = data[..53].to_vec();
+                rewritten.extend_from_slice(&u16::try_from(new_id.len()).unwrap().to_be_bytes());
+                rewritten.extend_from_slice(&new_id);
+                rewritten.extend_from_slice(&data[55 + len..]);
+                *data = rewritten;
+            }
+        }
+    }
+    let mut encoded = Vec::new();
+    ciborium::ser::into_writer(&value, &mut encoded).unwrap();
+    credential["response"]["attestationObject"] = json!(URL_SAFE_NO_PAD.encode(encoded));
+    credential["id"] = json!(id);
+    credential["rawId"] = json!(id);
+    credential.clone()
+}
