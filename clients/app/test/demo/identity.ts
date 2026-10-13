@@ -75,3 +75,20 @@ export const SOFIA_CONNECTION: Schema<"ConnectionView"> = {
   health: "throttled",
   health_reason: "rate_limited",
 };
+
+/** Ana's passkeys: a synced one on her Mac, and one kept on her phone. */
+export const LAPTOP_PASSKEY: Schema<"PasskeyView"> = {
+  id: "0192f1a0-0000-7000-8000-0000000000e1",
+  name: "Passkey on Mac",
+  synced: true,
+  created_at: "2026-10-02T09:00:00Z",
+  last_used_at: "2026-10-13T08:30:00Z",
+};
+
+export const PHONE_PASSKEY: Schema<"PasskeyView"> = {
+  id: "0192f1a0-0000-7000-8000-0000000000e2",
+  name: "Phone",
+  synced: false,
+  created_at: "2026-10-05T18:00:00Z",
+  last_used_at: null,
+};

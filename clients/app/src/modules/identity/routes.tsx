@@ -9,6 +9,7 @@ import {
 import { useEffect, useState } from "react";
 
 import { NewAccountScreen } from "./components/NewAccount/NewAccount";
+import { PasskeySignUpScreen } from "./components/PasskeySignUp/PasskeySignUp";
 import { SignInScreen } from "./components/SignIn/SignInScreen";
 import { WaysInPage } from "./components/WaysIn/WaysInPage";
 import { WAY_IN_SECTIONS } from "./components/WaysIn/sections";
@@ -86,8 +87,9 @@ export interface IdentityRouteParents<TPublic extends AnyRoute, TWorkspace exten
 }
 
 /**
- * `/sign-in` and `/sign-in/new`, public: they are how a browser gets a
- * session; and Settings → Ways to sign in, inside a workspace.
+ * `/sign-in`, `/sign-in/new` and `/sign-in/passkey` (a new account with a
+ * passkey alone), public: they are how a browser gets a session; and
+ * Settings → Ways to sign in, inside a workspace.
  */
 export function buildIdentityRoutes<TPublic extends AnyRoute, TWorkspace extends AnyRoute>(
   parents: IdentityRouteParents<TPublic, TWorkspace>,
@@ -113,11 +115,23 @@ export function buildIdentityRoutes<TPublic extends AnyRoute, TWorkspace extends
       return <NewAccountScreen request={search.request} />;
     },
   });
+  const passkeySignUp = createRoute({
+    getParentRoute: () => parent,
+    path: "/sign-in/passkey",
+    validateSearch: validateSignInSearch,
+    component: function PasskeySignUpRoute() {
+      const search: SignInSearch = useSearch({ strict: false });
+      return <PasskeySignUpScreen request={search.request} />;
+    },
+  });
   const waysIn = createRoute({
     getParentRoute: () => parents.workspace,
     path: "/settings/sign-in",
     validateSearch: validateWaysInSearch,
     component: WaysInRoute,
   });
-  return { public: [signIn, newAccount] as const, workspace: [waysIn] as const };
+  return {
+    public: [signIn, newAccount, passkeySignUp] as const,
+    workspace: [waysIn] as const,
+  };
 }

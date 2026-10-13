@@ -28,7 +28,15 @@ export const SEMANTIC_TOKENS = {
     "signal-review",
     "signal-sort",
   ],
-  visor: ["visor-glass-top", "visor-glass-bottom", "visor-eye", "visor-eye-glow", "visor-rim"],
+  visor: [
+    "visor-glass-top",
+    "visor-glass-bottom",
+    "visor-eye",
+    "visor-eye-glow",
+    "visor-rim",
+    "visor-tint-star",
+    "visor-tint-heart",
+  ],
   elevation: ["shadow-color", "shadow-overlay"],
 } as const;
 
