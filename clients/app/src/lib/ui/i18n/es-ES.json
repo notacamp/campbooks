@@ -89,5 +89,13 @@
     "discard": "Descartar",
     "send": "Enviar",
     "close": "Cerrar"
+  },
+  "attachments": {
+    "label": "Adjuntos",
+    "count_one": "{{count}} adjunto",
+    "count_other": "{{count}} adjuntos",
+    "previewOf": "Vista previa de {{name}}",
+    "downloadOf": "Descargar {{name}}",
+    "previewTitle": "Vista previa de {{name}}"
   }
 }
