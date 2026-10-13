@@ -70,6 +70,7 @@ pub fn module(deps: Deps) -> Module {
             .publishes::<events::RefreshReuseDetected>()
             .publishes::<events::WayInAdded>()
             .publishes::<events::WayInRemoved>()
+            .publishes::<events::SignedOutEverywhere>()
             .publishes::<events::ClientRegistered>()
             .publishes::<events::ClientRemoved>()
             .publishes::<events::ConsentGranted>()
@@ -90,6 +91,7 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(features::list_ways_in::handler))
         .routes(routes!(features::remove_way_in::handler))
         .routes(routes!(features::start_link::handler))
+        .routes(routes!(features::sign_out_everywhere::handler))
         .routes(routes!(features::list_consents::handler))
         .routes(routes!(features::revoke_consent::handler))
         .routes(routes!(

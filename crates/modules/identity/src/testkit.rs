@@ -638,6 +638,50 @@ impl Kit {
             peer.map(|p| p.parse().unwrap_or_else(|e| panic!("{p}: {e}")));
     }
 
+    /// An access token like `access` (its account, client, session and
+    /// scopes) but bound to `workspace`, as an app allowed there holds one.
+    /// Minted directly: no app may be granted `identity:*`, so this is the
+    /// only way to see a bound token that has the scope refused for being
+    /// bound.
+    pub async fn bound(&self, access: &str, workspace: uuid::Uuid) -> String {
+        let (_, claims) = Self::decode(access);
+        let text = |name: &str| claims[name].as_str().unwrap_or_default().to_owned();
+        let account: uuid::Uuid = text("sub").parse().unwrap_or_else(|e| panic!("sub: {e}"));
+        let grant = crate::domain::tokens::Grant {
+            client_id: text("client_id"),
+            account_id: account,
+            session_id: text("sid").parse().ok(),
+            scope: text("scope"),
+            auth_time: chrono::DateTime::from_timestamp(
+                claims["auth_time"].as_i64().unwrap_or_default(),
+                0,
+            )
+            .unwrap_or_default(),
+            resource: text("aud"),
+            workspace: Some(workspace),
+        };
+        let issuer = self.deps.issuer.clone().unwrap_or_else(|| panic!("issuer"));
+        let profile = crate::domain::accounts::profile(&self.state.db, account)
+            .await
+            .unwrap_or_else(|e| panic!("profile: {e}"))
+            .unwrap_or_else(|| panic!("no account"));
+        let signer = issuer
+            .keys
+            .signer(&self.state.db)
+            .await
+            .unwrap_or_else(|e| panic!("signer: {e}"));
+        crate::domain::tokens::Mint {
+            issuer: &issuer.url,
+            signer: &signer,
+            grant: &grant,
+            profile: &profile,
+            amr: &[],
+            now: chrono::Utc::now(),
+        }
+        .access_token()
+        .unwrap_or_else(|e| panic!("minting: {e}"))
+    }
+
     /// Run every job that is ready (event deliveries included).
     pub async fn run_jobs(&self) {
         campbooks_kernel::jobs::Worker::new(self.state.clone())
@@ -840,12 +884,19 @@ impl Kit {
     /// An access token for the account `access` names whose sign-in is an
     /// hour old (as if the person had signed in long ago).
     pub async fn stale(&self, access: &str) -> String {
+        self.signed_in_ago(access, chrono::TimeDelta::hours(1))
+            .await
+    }
+
+    /// An access token for the account `access` names whose sign-in is
+    /// `ago` old.
+    pub async fn signed_in_ago(&self, access: &str, ago: chrono::TimeDelta) -> String {
         let (_, claims) = Self::decode(access);
         let account: uuid::Uuid = claims["sub"]
             .as_str()
             .and_then(|s| s.parse().ok())
             .unwrap_or_else(|| panic!("sub"));
-        let stale = chrono::Utc::now() - chrono::TimeDelta::hours(1);
+        let stale = chrono::Utc::now() - ago;
         for sql in [
             "UPDATE identity.sessions SET auth_time = $2 WHERE account_id = $1",
             "UPDATE identity.refresh_families SET auth_time = $2 WHERE account_id = $1",

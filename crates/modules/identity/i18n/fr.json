@@ -28,7 +28,8 @@
     "client_needs_redirect": "Une application de connexion a besoin d’au moins une adresse de retour https ou de bouclage local.",
     "client_scope_not_allowed": "Impossible de donner l’autorisation {{scope}} à des applications.",
     "client_is_public": "Cette application connecte des personnes et n’a pas de secret à renouveler.",
-    "client_name_reserved": "Seules les applications de Campbooks peuvent s’appeler Campbooks ou Not A Camp. Choisissez un autre nom."
+    "client_name_reserved": "Seules les applications de Campbooks peuvent s’appeler Campbooks ou Not A Camp. Choisissez un autre nom.",
+    "fresh_sign_in_required": "Reconnectez-vous d’abord : ajouter une clé d’accès demande une connexion de moins de cinq minutes."
   },
   "notices": {
     "way_in_added": {

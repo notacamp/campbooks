@@ -95,6 +95,25 @@ impl DomainEvent for WayInAdded {
     }
 }
 
+/// A person signed out everywhere: every issuer session of the account
+/// ended and every refresh token it held was revoked. The web BFF ends its
+/// own sessions of the account on it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SignedOutEverywhere {
+    /// The account (the `sub` of its tokens).
+    pub account: Uuid,
+}
+
+impl DomainEvent for SignedOutEverywhere {
+    const NAME: &'static str = "identity.signed_out_everywhere";
+    const VERSION: u16 = 1;
+    const WORKSPACE_SCOPED: bool = false;
+
+    fn workspace(&self) -> Option<&str> {
+        None
+    }
+}
+
 /// An account lost a way in.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct WayInRemoved {

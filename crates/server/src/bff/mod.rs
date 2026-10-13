@@ -269,11 +269,19 @@ impl Inner {
         };
         let now = Utc::now();
         let token_hash = hash(&token);
-        let Some(session) =
-            store::find_session(&self.db, &token_hash, now, now - ROTATION_GRACE).await?
-        else {
+        let Some(session) = store::find_session(&self.db, &token_hash, now).await? else {
             return Ok(None);
         };
+        if !session.current && session.rotated_at <= now - ROTATION_GRACE {
+            // A token rotated away minutes ago, presented again: the cookie
+            // was copied, and either copy may be the thief's. The session
+            // ends everywhere it reaches.
+            tracing::warn!(
+                "a rotated-away web session token was presented again; the session ends"
+            );
+            self.terminate(session.id).await?;
+            return Ok(None);
+        }
         if now - session.last_seen_at >= TOUCH_EVERY {
             let idle_until = (now + self.timeouts.idle).min(session.expires_at);
             store::touch(&self.db, session.id, now, idle_until).await?;
@@ -382,6 +390,44 @@ impl Inner {
              changed?); the session ends"
         );
         self.end(id).await
+    }
+
+    /// End session `id` everywhere it reaches: delete it, revoke its
+    /// refresh token at the identity provider, and end the in-process
+    /// issuer's session (its ID token is the proof). Whether the issuer
+    /// session was ended here. Failures past the deletion are logged: the
+    /// web session is gone either way.
+    async fn terminate(&self, id: Uuid) -> sqlx::Result<bool> {
+        let Some((refresh_token, id_token)) =
+            store::delete_session(&mut *self.db.acquire().await?, id).await?
+        else {
+            return Ok(false);
+        };
+        if let Some(sealed) = refresh_token {
+            match self.cipher.open(&sealed, &sealed_for(id, "refresh_token")) {
+                Ok(refresh_token) => {
+                    if let Err(err) = self.oidc.revoke(&refresh_token).await {
+                        tracing::warn!(error = %err, "could not revoke an ended session's refresh token");
+                    }
+                }
+                Err(_) => {
+                    tracing::warn!("an ended session's refresh token could not be decrypted");
+                }
+            }
+        }
+        // The in-process issuer's session ends here, with the ID token as
+        // proof (ADR 0014): nothing for the browser to visit or forge.
+        if self.oidc.in_process()
+            && let Ok(id_token) = self.cipher.open(&id_token, &sealed_for(id, "id_token"))
+        {
+            match self.oidc.end_issuer_session(&id_token).await {
+                Ok(()) => return Ok(true),
+                Err(err) => {
+                    tracing::warn!(error = %err, "could not end the issuer session of an ended web session");
+                }
+            }
+        }
+        Ok(false)
     }
 
     async fn end(&self, id: Uuid) -> Result<String, AccessError> {

@@ -761,6 +761,43 @@ async fn workspace_clients_are_for_admins_with_a_recent_sign_in(db: PgPool) {
     let refused = kit.api_json(Method::POST, &clients, &stale, &body).await;
     assert_eq!(refused.status, StatusCode::FORBIDDEN);
     assert_eq!(refused.json["code"], "step_up_required");
+
+    // A token bound to this very workspace (an app let in here) manages
+    // none of its apps, nor adopts a mailbox into it: 404.
+    let created = kit.api_json(Method::POST, &clients, &web, &body).await;
+    assert_eq!(created.status, StatusCode::CREATED, "{created:?}");
+    let client = created.json["client"]["client_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let bound = kit.bound(&web, HOME).await;
+    for (method, path) in [
+        (Method::GET, clients.clone()),
+        (Method::POST, clients.clone()),
+        (Method::POST, format!("{clients}/{client}/secret")),
+        (Method::DELETE, format!("{clients}/{client}")),
+        (
+            Method::POST,
+            format!(
+                "/api/v1/w/{HOME}/identity/held-grants/{}/adopt",
+                uuid::Uuid::now_v7()
+            ),
+        ),
+    ] {
+        let refused = kit.api_json(method.clone(), &path, &bound, &body).await;
+        assert_eq!(
+            refused.status,
+            StatusCode::NOT_FOUND,
+            "{method} {path}: {refused:?}"
+        );
+    }
+    let listed = kit.api(Method::GET, &clients, &web).await;
+    assert_eq!(
+        listed.json["items"].as_array().map(Vec::len),
+        Some(1),
+        "nothing registered or removed: {listed:?}"
+    );
+    assert_eq!(listed.json["items"][0]["client_id"], client.as_str());
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

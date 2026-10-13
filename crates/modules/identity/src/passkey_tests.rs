@@ -292,20 +292,36 @@ async fn adding_or_removing_a_passkey_needs_a_recent_sign_in(db: PgPool) {
         .unwrap()
         .to_owned();
     let stale = kit.stale(&access).await;
-    for (method, path) in [
+    for (method, path, code) in [
         (
             Method::POST,
             "/api/v1/identity/passkeys/registrations".to_owned(),
+            "fresh_sign_in_required",
         ),
         (
             Method::DELETE,
             format!("/api/v1/identity/passkeys/{passkey}"),
+            "step_up_required",
         ),
     ] {
         let refused = kit.api(method, &path, &stale).await;
         assert_eq!(refused.status, StatusCode::FORBIDDEN, "{path}: {refused:?}");
-        assert_eq!(refused.json["code"], "step_up_required", "{path}");
+        assert_eq!(refused.json["code"], code, "{path}");
     }
+    // Adding a passkey asks for a sign-in from the last five minutes: one
+    // seven minutes old still removes a passkey, but adds none.
+    let recent = kit
+        .signed_in_ago(&access, chrono::TimeDelta::minutes(7))
+        .await;
+    let refused = kit
+        .api(
+            Method::POST,
+            "/api/v1/identity/passkeys/registrations",
+            &recent,
+        )
+        .await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{refused:?}");
+    assert_eq!(refused.json["code"], "fresh_sign_in_required");
     let refused = kit
         .api_json(
             Method::POST,

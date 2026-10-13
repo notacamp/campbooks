@@ -18,6 +18,7 @@ pub mod remove_way_in;
 pub mod rename_passkey;
 pub mod revoke_consent;
 pub mod rotate_client_secret;
+pub mod sign_out_everywhere;
 pub mod start_link;
 pub mod start_passkey_registration;
 pub mod workspace_deleting;
@@ -46,8 +47,13 @@ pub struct PasskeyPath {
 }
 
 /// The in-process issuer and the caller's account. 404 when another
-/// identity provider serves the instance (its subjects are not accounts).
+/// identity provider serves the instance (its subjects are not accounts),
+/// and for a token bound to a workspace: an app a person let into one
+/// workspace never manages their account, nor that workspace's apps.
 fn account(deps: &Deps, principal: &Principal) -> Result<(Arc<Issuer>, Uuid)> {
+    if principal.bound_workspace().is_some() {
+        return Err(Error::NotFound);
+    }
     let issuer = deps.issuer.clone().ok_or(Error::NotFound)?;
     let account = principal.subject.parse().map_err(|_| Error::NotFound)?;
     Ok((issuer, account))

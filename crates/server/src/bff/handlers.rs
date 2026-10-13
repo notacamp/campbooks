@@ -515,36 +515,7 @@ pub async fn logout(State(bff): State<Bff>, headers: HeaderMap) -> Result<Respon
     };
     let mut ended_here = false;
     if let Some(current) = inner.current(&headers).await? {
-        let id = current.session.id;
-        let deleted = store::delete_session(&mut *inner.db.acquire().await?, id).await?;
-        if let Some((refresh_token, id_token)) = deleted {
-            if let Some(sealed) = refresh_token {
-                match inner.cipher.open(&sealed, &sealed_for(id, "refresh_token")) {
-                    Ok(refresh_token) => {
-                        if let Err(err) = inner.oidc.revoke(&refresh_token).await {
-                            tracing::warn!(error = %err, "could not revoke a signed-out session's refresh token");
-                        }
-                    }
-                    Err(_) => {
-                        tracing::warn!(
-                            "a signed-out session's refresh token could not be decrypted"
-                        );
-                    }
-                }
-            }
-            // The in-process issuer's session ends here, with the ID token as
-            // proof (ADR 0014): nothing for the browser to visit or forge.
-            if inner.oidc.in_process()
-                && let Ok(id_token) = inner.cipher.open(&id_token, &sealed_for(id, "id_token"))
-            {
-                match inner.oidc.end_issuer_session(&id_token).await {
-                    Ok(()) => ended_here = true,
-                    Err(err) => {
-                        tracing::warn!(error = %err, "could not end the issuer session of a sign-out");
-                    }
-                }
-            }
-        }
+        ended_here = inner.terminate(current.session.id).await?;
         tracing::info!("web sign-out");
     }
     let logout_url = if ended_here || inner.oidc.in_process() {
