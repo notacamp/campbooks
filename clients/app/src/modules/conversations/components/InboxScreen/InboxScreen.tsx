@@ -100,7 +100,11 @@ export function InboxScreen({
 
   const current = conversationId ?? cursor ?? ids[0];
   const step = (by: number) => {
-    const index = current === undefined ? -1 : ids.indexOf(current);
+    // The first J or K in a list lands on its first row.
+    const index =
+      current === undefined || (conversationId === undefined && cursor === undefined)
+        ? -by
+        : ids.indexOf(current);
     const next = ids[Math.min(ids.length - 1, Math.max(0, index + by))];
     if (next === undefined) {
       return;
@@ -245,7 +249,7 @@ export function InboxScreen({
               void list.fetchNextPage();
             }}
             openId={conversationId}
-            cursorId={current}
+            cursorId={cursor}
             onOpen={(conversation) => {
               open(conversation.id);
             }}

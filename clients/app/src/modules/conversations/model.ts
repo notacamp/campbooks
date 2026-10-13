@@ -109,7 +109,7 @@ function holds(decision: DecisionView): boolean {
 }
 
 /** The yes answers among `decisions`, in asking order. */
-export function flagsOf(decisions: readonly DecisionView[]) {
+function flagsOf(decisions: readonly DecisionView[]) {
   return FLAGS.flatMap((flag) => {
     const decision = decisions.find((d) => d.question === flag.question);
     return decision !== undefined && holds(decision) ? [{ ...flag, decision }] : [];

@@ -64,7 +64,7 @@ export const LEDGER: Summary = {
   },
 };
 
-export const NDA: Summary = {
+const NDA: Summary = {
   ...base,
   id: "0192f1a0-0000-7000-8000-0000000000c3",
   subject: "NDA before Friday’s kickoff",
@@ -93,7 +93,7 @@ export const INVOICE: Summary = {
 };
 
 /** A long Portuguese row, for truncation. */
-export const LONG: Summary = {
+const LONG: Summary = {
   ...base,
   id: "0192f1a0-0000-7000-8000-0000000000c5",
   subject:

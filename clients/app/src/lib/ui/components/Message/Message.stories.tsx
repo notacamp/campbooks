@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { Attachment, MessageCard, MetaLine } from "./Message";
+import { Attachment, FoldedMessage, MessageCard, MetaLine } from "./Message";
 
 const meta = {
   title: "Components/Message",
@@ -46,3 +46,26 @@ export const Meta_: Story = {
 };
 
 export const AttachmentOnly: Story = { render: () => <Attachment name="CH-20418.pdf" /> };
+
+/** Recipients, several files and a per-message action. */
+export const Full: Story = {
+  args: {
+    recipients: "To Sam Rivera, cc Leo Brandt",
+    attachments: ["q4-plan-v3.pdf", "budget.xlsx"],
+    actions: <span>1 remote image hidden</span>,
+  },
+};
+
+/** An older message, folded to one line. */
+export const Folded: Story = {
+  render: () => (
+    <FoldedMessage
+      from="Sofia Pessoa"
+      time="Tue 10:14"
+      snippet="Hi Ana, here is the first draft of the Q4 proposal. Let me know what you think."
+      onOpen={() => {
+        // Demo only.
+      }}
+    />
+  ),
+};

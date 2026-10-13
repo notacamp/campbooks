@@ -33,7 +33,7 @@ const BODY_STYLE = [
 ].join("; ");
 
 /** The document the frame shows. */
-export function frameDocument(html: string, remoteImages: boolean): string {
+function frameDocument(html: string, remoteImages: boolean): string {
   return [
     "<!doctype html><html><head>",
     '<meta charset="utf-8">',
