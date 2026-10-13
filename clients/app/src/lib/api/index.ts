@@ -11,4 +11,5 @@ export { adminApi, api, createAdminClient, createApiClient } from "./client";
 export { ApiError, errorStatus, problemCode, unwrap, unwrapEmpty } from "./errors";
 export { signOut, signOutAndLeave, useSession } from "./session";
 export { ADMIN_REAUTH_REQUIRED, loginUrl, type Transport } from "./transport";
+export { webRoutes } from "./web";
 export type { AdminSchema, Schema } from "./schema";

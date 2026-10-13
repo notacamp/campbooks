@@ -18,7 +18,7 @@ import {
   SOFIA,
 } from "../../test/demo/workspaces";
 
-import { mockFetch, type MockRoute } from "./mock-fetch";
+import { mockFetch, saveThemeFromGlobals, type MockRoute } from "./mock-fetch";
 
 // The real app (router, session gate, shell, screens) against in-memory demo
 // data: every new first-run screen, tested with axe in light and dark.
@@ -59,29 +59,18 @@ interface ScreenArgs {
 const meta = {
   title: "Screens/First run",
   parameters: { layout: "fullscreen" },
-  beforeEach: ({ args }) => mockFetch(args.api),
+  beforeEach: ({ args, globals }) => {
+    saveThemeFromGlobals(globals);
+    return mockFetch(args.api);
+  },
   render: ({ path }) => <AppAt path={path} />,
 } satisfies Meta<ScreenArgs>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Signed out: the landing, at whatever URL was asked for. */
-export const SignedOut: Story = {
-  args: { path: "/", api: { "GET /bff/session": { body: { authenticated: false } } } },
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await expect(await canvas.findByRole("link", { name: "Sign in" })).toBeVisible();
-  },
-};
-
-/** The invitation link, signed out: invitation copy, sign-in comes back here. */
-export const InvitedSignedOut: Story = {
-  args: {
-    path: "/invitations/accept?token=demo",
-    api: { "GET /bff/session": { body: { authenticated: false } } },
-  },
-};
+// Signed out, the app goes to the sign-in screen (which leaves for the BFF):
+// its states are in "Screens/Sign in".
 
 /** The server can't be reached. */
 export const Unreachable: Story = {

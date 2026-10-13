@@ -5,6 +5,7 @@ import {
   useSearch,
   type AnyRoute,
 } from "@tanstack/react-router";
+import type { ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 
 import { signOutAndLeave } from "~/lib/api";
@@ -12,7 +13,10 @@ import { FocusPage, Visor } from "~/lib/ui";
 
 import { useWorkspaces } from "./api/queries";
 import { AcceptInvitation } from "./components/AcceptInvitation/AcceptInvitation";
-import { CreateWorkspace } from "./components/CreateWorkspace/CreateWorkspace";
+import {
+  CreateWorkspace,
+  type AfterCreateProps,
+} from "./components/CreateWorkspace/CreateWorkspace";
 import { MembersPage } from "./components/MembersPage/MembersPage";
 
 const leave = () => {
@@ -24,7 +28,11 @@ function Waiting() {
   return <FocusPage leading={<Visor state="thinking" size="xl" announce />} title={t("loading")} />;
 }
 
-function CreateWorkspaceRoute() {
+function CreateWorkspaceRoute({
+  afterCreate,
+}: {
+  afterCreate: ComponentType<AfterCreateProps> | undefined;
+}) {
   const navigate = useNavigate();
   const workspaces = useWorkspaces();
   if (workspaces.isPending) {
@@ -34,6 +42,7 @@ function CreateWorkspaceRoute() {
   return (
     <CreateWorkspace
       firstRun={firstRun}
+      afterCreate={afterCreate}
       onSignOut={leave}
       onCancel={
         firstRun
@@ -84,16 +93,21 @@ export interface WorkspacesRouteParents<TRoot extends AnyRoute, TWorkspace exten
   root: TRoot;
   /** The `/w/$workspaceId` layout. */
   workspace: TWorkspace;
+  /** A step another module adds once a workspace is created. */
+  afterCreate?: ComponentType<AfterCreateProps> | undefined;
 }
 
 export function buildWorkspacesRoutes<TRoot extends AnyRoute, TWorkspace extends AnyRoute>({
   root,
   workspace,
+  afterCreate,
 }: WorkspacesRouteParents<TRoot, TWorkspace>) {
   const create = createRoute({
     getParentRoute: () => root,
     path: "/welcome",
-    component: CreateWorkspaceRoute,
+    component: function Welcome() {
+      return <CreateWorkspaceRoute afterCreate={afterCreate} />;
+    },
   });
   const accept = createRoute({
     getParentRoute: () => root,

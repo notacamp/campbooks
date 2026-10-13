@@ -157,4 +157,32 @@ describe("CreateWorkspace", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onCancel).toHaveBeenCalled();
   });
+
+  it("hands the new workspace to a step added after creating it", async () => {
+    mockApi({ [CREATE]: { status: 201, body: HOUSEHOLD } });
+    const onOpen = vi.fn();
+    renderWithProviders(
+      <CreateWorkspace
+        firstRun
+        onOpen={onOpen}
+        onInvite={vi.fn()}
+        onSignOut={vi.fn()}
+        afterCreate={({ workspace, onContinue, children }) => (
+          <>
+            <button type="button" onClick={onContinue}>
+              {`Next for ${workspace.name}`}
+            </button>
+            {children}
+          </>
+        )}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Skip" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Skip" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Next for Household" }));
+
+    expect(onOpen).toHaveBeenCalledWith(HOUSEHOLD);
+    expect(screen.getByRole("heading", { level: 1, name: "Household is ready" })).toBeVisible();
+  });
 });

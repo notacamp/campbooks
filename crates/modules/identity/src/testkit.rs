@@ -40,7 +40,11 @@ use url::Url;
 use crate::{
     deps::{ClientSecret, Deps, WEB_CLIENT_SECRET_PURPOSE},
     domain::{clients::WEB_CLIENT_ID, keys::LocalKeys},
-    upstream::google::{Google, GoogleEndpoints},
+    upstream::{
+        Provider,
+        google::{Google, GoogleEndpoints},
+        redirect_uri,
+    },
 };
 
 /// The instance under test.
@@ -188,6 +192,21 @@ impl Kit {
     /// A fresh world whose instance has signup `policy`, where `invited`
     /// addresses have a pending invitation.
     pub async fn with_signup(db: PgPool, policy: SignupPolicy, invited: &[&str]) -> Self {
+        Self::build(db, policy, invited, None).await
+    }
+
+    /// A fresh world whose Google client was registered with the callback
+    /// path `redirect_path` (`CAMPBOOKS_GOOGLE__REDIRECT_PATH`).
+    pub async fn with_google_redirect_path(db: PgPool, redirect_path: &str) -> Self {
+        Self::build(db, SignupPolicy::Open, &[], Some(redirect_path)).await
+    }
+
+    async fn build(
+        db: PgPool,
+        policy: SignupPolicy,
+        invited: &[&str],
+        redirect_path: Option<&str>,
+    ) -> Self {
         let google = TestIdp::start().await;
         let pool = testing::app_role_pool(&db).await;
         let mut config = testing::config("postgres://test@localhost/test");
@@ -217,7 +236,8 @@ impl Kit {
             Google::new(
                 FAKE_GOOGLE_CLIENT.to_owned(),
                 ClientSecret::Inline(SecretString::from(FAKE_GOOGLE_SECRET)),
-                ORIGIN,
+                redirect_uri(Provider::Google, ORIGIN, redirect_path)
+                    .unwrap_or_else(|e| panic!("{e}")),
                 GoogleEndpoints {
                     issuer: base.to_owned(),
                     authorize: Url::parse(&format!("{base}oidc/authorize"))
