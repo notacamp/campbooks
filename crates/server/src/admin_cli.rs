@@ -65,9 +65,10 @@ pub struct Who {
     /// one account has it.
     #[arg(long)]
     email: Option<String>,
-    /// The account id (the `sub` of their tokens; `list` shows them).
+    /// The account id: the `sub` of their tokens (`list` shows them; a
+    /// signed-in browser sees its own at `/bff/session`).
     #[arg(long)]
-    account: Option<Uuid>,
+    account: Option<String>,
 }
 
 fn parse_permission(name: &str) -> Result<Permission, String> {
@@ -134,15 +135,9 @@ async fn grant(
             names.join(", ")
         ),
     )?;
-    let profile = cli::grant(
-        conn,
-        &account.id.to_string(),
-        permissions,
-        note,
-        chrono::Utc::now(),
-    )
-    .await
-    .map_err(|e| format!("could not grant: {e}"))?;
+    let profile = cli::grant(conn, &account.id, permissions, note, chrono::Utc::now())
+        .await
+        .map_err(|e| format!("could not grant: {e}"))?;
     say(&format!(
         "granted: {} is an administrator with {}",
         account.label,
@@ -168,14 +163,9 @@ async fn revoke(
             .join(", ")
     };
     confirm(yes, &format!("Take {what} away from {}?", account.label))?;
-    let outcome = cli::revoke(
-        conn,
-        &account.id.to_string(),
-        permissions,
-        chrono::Utc::now(),
-    )
-    .await
-    .map_err(|e| format!("could not revoke: {e}"))?;
+    let outcome = cli::revoke(conn, &account.id, permissions, chrono::Utc::now())
+        .await
+        .map_err(|e| format!("could not revoke: {e}"))?;
     say(&match outcome {
         Revoked::NotAnAdmin => format!("unchanged: {} is not an administrator", account.label),
         Revoked::Removed => format!("revoked: {} is no longer an administrator", account.label),
@@ -246,23 +236,24 @@ async fn connect(config: &Config) -> Result<PgConnection, String> {
 
 /// The account a command is about, and how to name it on screen.
 struct Account {
-    id: Uuid,
+    id: String,
     label: String,
 }
 
 async fn resolve(conn: &mut PgConnection, who: &Who) -> Result<Account, String> {
     let id = match (&who.account, &who.email) {
-        (Some(id), _) => *id,
+        (Some(id), _) => id.trim().to_owned(),
         (None, Some(email)) => {
             let found = campbooks_identity::domain::accounts::operator_lookup(conn, email)
                 .await
                 .map_err(|e| format!("could not look the address up: {e}"))?;
             match found.as_slice() {
-                [id] => *id,
+                [id] => id.to_string(),
                 [] => {
                     return Err(format!(
                         "no account has the verified address {email}; the person must sign in \
-                         once first"
+                         once first (with another identity provider, use --account with the \
+                         `sub` of their tokens)"
                     ));
                 }
                 several => {
@@ -277,29 +268,39 @@ async fn resolve(conn: &mut PgConnection, who: &Who) -> Result<Account, String> 
         }
         (None, None) => return Err("say who: --email or --account".to_owned()),
     };
-    match campbooks_identity::domain::accounts::describe(conn, id)
-        .await
-        .map_err(|e| format!("could not read the account: {e}"))?
-    {
-        Some((name, email)) => Ok(Account {
-            id,
-            label: label(id, name.as_deref(), email.as_deref()),
-        }),
-        None => Err(format!("no account has the id {id}")),
+    if id.is_empty() {
+        return Err("--account is empty".to_owned());
     }
+    let known = match id.parse::<Uuid>() {
+        Ok(uuid) => campbooks_identity::domain::accounts::describe(conn, uuid)
+            .await
+            .map_err(|e| format!("could not read the account: {e}"))?,
+        Err(_) => None,
+    };
+    let label = if let Some((name, email)) = known {
+        label(&id, name.as_deref(), email.as_deref())
+    } else {
+        warn(&format!(
+            "no Campbooks account has the id {id}: fine when another identity provider \
+             (CAMPBOOKS_AUTH__ISSUER) issues the tokens, otherwise check the id"
+        ));
+        id.clone()
+    };
+    Ok(Account { id, label })
 }
 
 async fn describe(conn: &mut PgConnection, profile: &Profile) -> String {
-    let Ok(id) = profile.account_id.parse::<Uuid>() else {
-        return profile.account_id.clone();
+    let id = &profile.account_id;
+    let Ok(uuid) = id.parse::<Uuid>() else {
+        return id.clone();
     };
-    match campbooks_identity::domain::accounts::describe(conn, id).await {
+    match campbooks_identity::domain::accounts::describe(conn, uuid).await {
         Ok(Some((name, email))) => label(id, name.as_deref(), email.as_deref()),
-        _ => format!("{id} (no such account)"),
+        _ => id.clone(),
     }
 }
 
-fn label(id: Uuid, name: Option<&str>, email: Option<&str>) -> String {
+fn label(id: &str, name: Option<&str>, email: Option<&str>) -> String {
     match (name, email) {
         (Some(name), Some(email)) => format!("{id} ({name} <{email}>)"),
         (None, Some(email)) => format!("{id} (<{email}>)"),
@@ -328,6 +329,10 @@ fn confirm(yes: bool, question: &str) -> Result<(), String> {
     }
 }
 
+fn warn(line: &str) {
+    let _ = writeln!(std::io::stderr(), "warning: {line}");
+}
+
 fn say(line: &str) {
     let _ = writeln!(std::io::stdout(), "{line}");
 }
@@ -351,12 +356,11 @@ mod tests {
 
     #[test]
     fn labels_name_the_person_when_known() {
-        let id = Uuid::nil();
         assert_eq!(
-            label(id, Some("Ana"), Some("ana@example.com")),
-            format!("{id} (Ana <ana@example.com>)")
+            label("a-1", Some("Ana"), Some("ana@example.com")),
+            "a-1 (Ana <ana@example.com>)"
         );
-        assert_eq!(label(id, None, None), id.to_string());
+        assert_eq!(label("a-1", None, None), "a-1");
     }
 
     #[sqlx::test(migrations = "../../migrations")]
@@ -368,11 +372,16 @@ mod tests {
         };
         let err = resolve(&mut conn, &by_email).await.err().unwrap();
         assert!(err.contains("sign in once first"), "{err}");
+        // An id no Campbooks account has (another identity provider's
+        // `sub`) is taken as it is, with a warning.
         let by_id = Who {
             email: None,
-            account: Some(Uuid::now_v7()),
+            account: Some(" rauthy-user-7 ".to_owned()),
         };
-        let err = resolve(&mut conn, &by_id).await.err().unwrap();
-        assert!(err.contains("no account has the id"), "{err}");
+        let account = resolve(&mut conn, &by_id).await.unwrap();
+        assert_eq!(
+            (account.id.as_str(), account.label.as_str()),
+            ("rauthy-user-7", "rauthy-user-7")
+        );
     }
 }

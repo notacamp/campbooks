@@ -139,6 +139,13 @@ pub async fn migration_status(pool: &PgPool) -> Result<MigrationStatus, sqlx::Er
     )
     .fetch_one(pool)
     .await
+    .map(|status| MigrationStatus {
+        // `admin__init.sql` is described as "admin  init".
+        latest_description: status
+            .latest_description
+            .map(|d| d.split_whitespace().collect::<Vec<_>>().join(" ")),
+        ..status
+    })
 }
 
 /// `options` whose every new connection switches to `role` (`SET ROLE`)

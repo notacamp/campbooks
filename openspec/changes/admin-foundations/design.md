@@ -22,11 +22,14 @@ ADR 0015 is the decision record; this file covers the details of slice S0.
 
 ## Authorisation (`kernel::admin::Admin<P>`)
 
-Order: bearer token verified → principal is a `User` → scope `admin:access`
-→ `AdminProfiles::permissions_of(sub)` contains `P` or `super` → otherwise
-**404** (`kernel::Error::NotFound`). Then `auth_time` ≤ 12 h old, otherwise
-**401** with code `admin_reauth_required` (`WWW-Authenticate` error
-`insufficient_user_authentication`, `max_age=43200`, RFC 9470). The BFF on a
+Order: bearer token verified (a token only; never a principal authenticated
+in-process) → principal is a `User` → scope `admin:access` →
+`AdminProfiles::permissions_of(sub)` contains `P` or `super` → otherwise
+**404** (`kernel::Error::NotFound`; token failures too). Then `auth_time` ≤
+12 h old, otherwise **401** with code `admin_reauth_required`
+(`WWW-Authenticate` error `insufficient_user_authentication`,
+`max_age=43200`, RFC 9470). A token without `auth_time` counts as stale (fail
+closed): `Principal` gains `auth_time`, read from user tokens only. The BFF on a
 401 with that code answers the client with the same problem; the client
 redirects to `/bff/login?max_age=0&return_to=/admin…` (the BFF passes
 `max_age`/`prompt=login` to the issuer).
@@ -43,10 +46,12 @@ scope list includes it.
 
 ## Admin router and documents
 
-`kernel::Module` gains `admin_router: Option<OpenApiRouter<AppState>>`. The
-server nests each under `/admin/v1/<module>` (the module's paths are relative),
-adds the audit layer and the `admin` security scheme (bearer, scope
-`admin:access`), and serves the result at `/admin/v1/*` — **not** through
+`kernel::Module` gains `admin_router: Option<OpenApiRouter<AppState>>`. A
+module's admin routes declare their full path (`/admin/v1/<module>/…`, like
+the API's `/api/v1/<module>/…`; `cargo xtask arch` checks the prefix against
+the router that serves them). The server merges them, adds the audit layer
+and the `admin` security scheme (bearer, scope `admin:access`), and serves
+the result at `/admin/v1/*` — **not** through
 `operations::compose`, so `invoke` and the idempotency layer of the catalogue
 don't see it (admin mutations are idempotent by design or carry their own
 `Idempotency-Key` handling in their slice). `campbooks_server::admin_openapi()`
@@ -56,10 +61,16 @@ builds the document; `cargo xtask openapi [--check]` writes/compares
 
 Each admin operation carries `x-campbooks-admin: { permission, mutates }`.
 
-The audit layer runs after the extractor has resolved (it reads the
-`AdminGrant` from request extensions placed by the extractor) and records
-every request that reached a handler; requests that 404 before the profile
-check are not recorded (no actor).
+The audit layer (`kernel::admin::audit`, a `route_layer`) puts a
+kernel-private slot in the request's extensions; `Admin<P>` fills it with the
+`AdminGrant` as soon as the profile check passes (before the `auth_time`
+check, so a 401 `admin_reauth_required` is recorded too), and the layer
+records the row after the handler answered, with the response status.
+Requests that 404 before the profile check leave no row (no actor). If the
+row cannot be written, the answer is replaced by a 500: no admin answer
+leaves unrecorded. `Admin<P>` answers 404 on a route that is not behind the
+layer (no slot), so a module cannot serve an admin handler from its normal
+router by mistake.
 
 ## Cross-workspace reads
 
@@ -72,12 +83,19 @@ pinned allowlist test starts empty.
 
 `system` gains `features/admin_overview` with `GET /admin/v1/system/overview`
 (operationId `system.admin_overview`, permission `system.read`). Sources:
-`kernel::config` (redacted view — a new `Config::summary()` that returns only
-non-secret, enumerated facts), `_sqlx_migrations` (latest version + count),
-process start time, `campbooks-ai` gateway (`roles()` + a reachability probe
-per configured role: `GET {base}/models` with a 3 s timeout, cached 60 s in
-memory). No secret, URL credential or API key ever appears; base URLs are
-reduced to scheme + host.
+`kernel::config` (redacted view — `Config::summary()` returns only
+enumerated facts: environment, public origin, signup policy, blob store,
+database logins single/split, migrations on start, web client, telemetry
+export, metrics endpoint), `kernel::db::migration_status` over
+`_sqlx_migrations` (latest version, description, count; a kernel migration
+grants the runtime role `SELECT` on it), process start time, the facts only
+the server's composition knows (`campbooks_system::Facts`: identity provider
+built-in/external/none, sign-in providers, mail providers, by name), and the
+`campbooks-ai` gateway (`Gateway::health()`: a reachability probe per
+configured role, `GET {base}/models` with a 3 s timeout, any non-5xx answer
+counting as reachable, cached 60 s in memory; `campbooks_ai::unconfigured()`
+without a gateway). No secret, URL credential or API key ever appears; base
+URLs are reduced to scheme + host + port (`kernel::config::origin_of`).
 
 ## Client
 
@@ -92,6 +110,23 @@ reduced to scheme + host.
   `system.admin_overview`, `retry: false`, 404 ⇒ hidden).
 - `admin_reauth_required` → full-page notice with a "Sign in again" button.
 - Every string in en, pt-PT, es-ES, fr.
+
+## CLI details
+
+- `campbooks-server admin grant (--email E | --account ID) --permission P…
+  [--note N] [--yes]` adds permissions (a union), `revoke (--email|--account)
+  [--permission P…] [--yes]` removes some or the whole profile (nothing left
+  ⇒ no profile), `list` shows profiles with the person's name and address,
+  `log [--limit N]` shows the audit trail. Without `--yes` the command names
+  the account and asks.
+- `--email` looks up accounts whose verified primary address or way-in
+  address is E (`campbooks_identity::domain::accounts::operator_lookup`, the
+  server composing both modules), refusing none or several. `--account`
+  takes any token `sub`: an id the built-in identity provider does not know
+  is accepted with a warning, so instances still on an external identity
+  provider can grant profiles too.
+- CLI changes are recorded with `via = 'cli'` and the database login
+  (`session_user`) as the actor.
 
 ## Alternatives considered
 
