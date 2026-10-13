@@ -983,3 +983,35 @@ async fn the_in_process_issuer_requires_at_jwt_on_access_tokens() {
         StatusCode::OK
     );
 }
+
+async fn account(super::Unbound { principal, .. }: super::Unbound<TestRead>) -> Json<Value> {
+    Json(json!({ "subject": principal.subject }))
+}
+
+#[tokio::test]
+async fn a_token_bound_to_one_workspace_never_reaches_account_wide_routes() {
+    let idp = TestIdp::start().await;
+    let local = Arc::new(Local {
+        idp: idp.clone(),
+        reads: 0.into(),
+        broken: false.into(),
+    });
+    let app = Router::new()
+        .route("/whoami", get(account))
+        .with_state(TokenVerifier::in_process(
+            &AuthConfig::default(),
+            idp.issuer(),
+            local,
+        ));
+    let call = |claims: Value| {
+        let app = app.clone();
+        let token = idp.token(&claims);
+        async move { call_with(&app, &token).await }
+    };
+    let unbound = idp.claims("test:read");
+    assert_eq!(call(unbound.clone()).await.status, StatusCode::OK);
+    let mut bound = unbound;
+    bound["azp"] = "an-agent".into();
+    bound["workspace_id"] = "0192f1a0-0000-7000-8000-000000000001".into();
+    assert_eq!(call(bound).await.status, StatusCode::NOT_FOUND);
+}

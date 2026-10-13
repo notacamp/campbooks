@@ -15,7 +15,7 @@ use std::time::Duration;
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result, Risk,
-    auth::{Principal, Scoped},
+    auth::{Principal, Unbound},
     rate_limit::{Limit, RateKey},
     tenancy::WorkspaceId,
 };
@@ -119,7 +119,7 @@ pub struct StartedLink {
 pub async fn handler(
     State(state): State<AppState>,
     Extension(deps): Extension<Deps>,
-    Scoped { principal, .. }: Scoped<IdentityWrite>,
+    Unbound { principal, .. }: Unbound<IdentityWrite>,
     Json(input): Json<StartLink>,
 ) -> Result<(StatusCode, Json<StartedLink>)> {
     let started = execute(&state, &deps, &principal, input).await?;

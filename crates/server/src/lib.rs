@@ -107,9 +107,8 @@ impl Composition {
         } else {
             Some(campbooks_ai::Gateway::new(ai).map_err(|e| e.to_string())?)
         };
-        let scopes: Vec<&str> = scope_catalogue().iter().map(|scope| scope.name).collect();
         let connectors = campbooks_connectors::Deps::from_env(config)?;
-        let identity = campbooks_identity::Deps::from_env(config, &scopes)?;
+        let identity = campbooks_identity::Deps::from_env(config, &scope_catalogue())?;
         let system = campbooks_system::Deps {
             ai: gateway.clone(),
             facts: facts(config, &identity, &connectors),
@@ -215,8 +214,12 @@ pub fn with_composed_ports(state: AppState, composition: &Composition) -> AppSta
                 db: state.db.clone(),
                 keys: Arc::clone(&issuer.keys),
             };
+            // Its access tokens are for the API's resource URI (RFC 8707);
+            // `CAMPBOOKS_AUTH__AUDIENCE` is what an outside IdP sends.
+            let mut auth = state.config.auth.clone();
+            auth.audience.clone_from(&issuer.resource);
             let verifier = campbooks_kernel::auth::TokenVerifier::in_process(
-                &state.config.auth,
+                &auth,
                 &issuer.url,
                 Arc::new(keys),
             );
@@ -485,7 +488,19 @@ pub fn router_with(
         .with_state(state.clone());
     let bff = bff::Bff::new(bff, &state, api_only, admin_only, identity.clone());
 
-    compose(state, routes.merge(admin_routes), spec, &bff, identity)
+    // RFC 9728: every Bearer challenge of the API names its metadata, so an
+    // agent that knows only the API's URL finds the issuer.
+    let routes = routes.merge(admin_routes);
+    let routes = match &composition.identity.issuer {
+        Some(issuer) => routes.layer(axum::middleware::from_fn_with_state(
+            Arc::<str>::from(
+                campbooks_identity::protocol::discovery::resource_metadata_url(issuer),
+            ),
+            campbooks_kernel::auth::challenge_with_resource_metadata,
+        )),
+        None => routes,
+    };
+    compose(state, routes, spec, &bff, identity)
 }
 
 /// Assemble the application from the API routes, the OpenAPI document and

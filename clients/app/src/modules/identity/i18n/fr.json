@@ -10,7 +10,8 @@
     "choice3": "Se connecter avec la troisième option",
     "passkey": "Se connecter avec une clé d’accès",
     "addWayIn": "Ajouter un moyen de connexion",
-    "addPasskey": "Ajouter une clé d’accès"
+    "addPasskey": "Ajouter une clé d’accès",
+    "newApp": "Nouvelle application"
   },
   "signIn": {
     "title": "Se connecter à Campbooks",
@@ -374,6 +375,177 @@
       "failed": {
         "title": "Impossible d’ajouter une clé d’accès.",
         "lead": "Rien n’a été ajouté. Réessayez."
+      }
+    }
+  },
+  "consent": {
+    "loading": "Chargement de ce que demande l’application…",
+    "eyebrow": "Autoriser l’accès",
+    "title": "{{app}} veut utiliser votre compte Campbooks",
+    "lead": "Vous êtes connecté en tant que {{email}}.",
+    "leadNoEmail": "Vous êtes connecté à Campbooks.",
+    "app": "L’application",
+    "unverified": "Non vérifiée",
+    "kind": {
+      "first_party": "Application de Campbooks.",
+      "workspace": "Enregistrée par un administrateur de {{workspace}}.",
+      "dynamic": "Elle s’est enregistrée seule. Personne n’a vérifié qui l’a faite.",
+      "metadata_document": "Décrite par {{host}}. Personne n’a vérifié qui l’a faite."
+    },
+    "can": "Elle pourra",
+    "workspace": "Quel espace de travail peut-elle utiliser ?",
+    "workspaceLead": "Elle ne voit et ne modifie que cet espace de travail.",
+    "allWorkspaces": "Elle fonctionnera dans tous vos espaces de travail, comme Campbooks sur le web.",
+    "role": {
+      "owner": "Propriétaire",
+      "admin": "Administrateur",
+      "member": "Membre"
+    },
+    "noWorkspace": {
+      "title": "Rejoignez d’abord un espace de travail",
+      "lead": "Cette application fonctionne dans un espace de travail, et vous n’en avez pas encore."
+    },
+    "goesTo": "Ensuite, vous irez sur {{host}}.",
+    "goesToDevice": "Ensuite, vous reviendrez à une application de cet appareil.",
+    "device": {
+      "title": "Seulement si vous venez de le lancer",
+      "lead": "Une application de cet appareil a demandé ceci. Autorisez-la seulement si vous venez vous-même de vous connecter depuis cette application : n’importe quelle application de cet appareil peut le demander, et elle agirait en votre nom."
+    },
+    "unverifiedNote": {
+      "title": "N’importe qui peut enregistrer une application sous n’importe quel nom",
+      "lead": "Autorisez-la seulement si vous faites confiance au site d’où vous venez."
+    },
+    "remembered": "Nous ne vous le redemanderons pas pour cette application. Révoquez-la quand vous voulez dans Réglages → Applications et intégrations.",
+    "everyTime": "Nous vous le demanderons chaque fois que cette application se connecte. Révoquez-la quand vous voulez dans Réglages → Applications et intégrations.",
+    "allow": "Autoriser",
+    "allowing": "Autorisation…",
+    "deny": "Refuser",
+    "stepUp": {
+      "title": "Reconnectez-vous d’abord",
+      "lead": "Autoriser une application nécessite une connexion datant de moins de dix minutes.",
+      "action": "Se reconnecter"
+    },
+    "gone": {
+      "title": "Cette demande n’attend plus",
+      "lead": "Elle a expiré, a déjà reçu une réponse ou était destinée à quelqu’un d’autre. Recommencez depuis l’application."
+    },
+    "home": "Aller sur Campbooks",
+    "failed": {
+      "title": "Impossible de charger cette demande",
+      "lead": "Campbooks n’a pas répondu. Vérifiez votre connexion, puis réessayez."
+    },
+    "retry": "Réessayer",
+    "answerFailed": {
+      "title": "Cela n’a pas abouti",
+      "lead": "Rien n’a été autorisé. Réessayez."
+    },
+    "campbooks": "Campbooks",
+    "workspaceApp": "Application de {{workspace}}",
+    "yourWorkspace": "votre espace de travail"
+  },
+  "scopes": {
+    "openid": "Savoir qui vous êtes sur Campbooks",
+    "profile": "Voir votre nom",
+    "email": "Voir votre adresse e-mail",
+    "offline_access": "Rester connectée en votre absence, jusqu’à ce que vous la révoquiez",
+    "system_read": "Voir si ce Campbooks fonctionne",
+    "workspaces_read": "Voir vos espaces de travail et leurs membres",
+    "workspaces_write": "Créer des espaces de travail et modifier leurs réglages",
+    "workspaces_admin": "Gérer les membres et les invitations",
+    "connectors_read": "Voir les boîtes mail connectées à un espace de travail",
+    "connectors_write": "Connecter, synchroniser et déconnecter des boîtes mail",
+    "conversations_read": "Lire vos conversations et messages",
+    "conversations_write": "Répondre, envoyer, archiver et trier vos conversations",
+    "identity_read": "Voir votre compte et vos moyens de connexion",
+    "identity_write": "Modifier vos moyens de connexion",
+    "identity_clients": "Gérer les applications d’un espace de travail",
+    "conversations_send": "Envoyer du courrier depuis vos boîtes mail"
+  },
+  "apps": {
+    "title": "Applications et intégrations",
+    "lead": "Les applications que vous avez laissées entrer dans votre compte, et les applications de cet espace de travail.",
+    "loading": "Chargement des applications…",
+    "loadError": {
+      "title": "Impossible de charger vos applications",
+      "lead": "Campbooks n’a pas répondu. Réessayez dans un instant.",
+      "retry": "Réessayer"
+    },
+    "connected": {
+      "title": "Applications connectées",
+      "lead": "Les applications qui peuvent agir en votre nom. En révoquer une l’arrête aussitôt.",
+      "list": "Applications que vous avez laissées entrer",
+      "empty": "Aucune application ne peut agir en votre nom.",
+      "allWorkspaces": "Tous vos espaces de travail",
+      "in": "Dans {{workspace}}",
+      "elsewhere": "Dans un espace de travail que vous avez quitté",
+      "granted": "Autorisée le {{date}}",
+      "lastUsed": "dernière utilisation le {{date}}",
+      "removedApp": "Une application supprimée",
+      "revoke": "Révoquer",
+      "revokeLabel": "Révoquer {{app}}",
+      "confirmRevoke": "{{app}} cesse de fonctionner aussitôt, jusqu’à ce que vous l’autorisiez de nouveau.",
+      "cancel": "Annuler",
+      "revokeFailed": "Impossible de la révoquer. Réessayez.",
+      "workspaceApp": "Application de l’espace de travail"
+    },
+    "workspace": {
+      "title": "Applications de cet espace de travail",
+      "lead": "Intégrations de {{workspace}} : applications de serveur à serveur avec un secret, et applications de connexion que chacun autorise.",
+      "list": "Applications de {{workspace}}",
+      "notAdmin": "Seuls les propriétaires et les administrateurs peuvent gérer les applications de cet espace de travail.",
+      "empty": "Aucune application pour l’instant.",
+      "new": "Nouvelle application",
+      "name": "Nom",
+      "namePlaceholder": "Export nocturne",
+      "type": "Quel type d’application",
+      "types": {
+        "confidential": "Serveur à serveur",
+        "public": "Application de connexion"
+      },
+      "typeLeads": {
+        "confidential": "Tourne sur un serveur avec un secret et agit pour l’espace de travail (identifiants client).",
+        "public": "Chacun s’y connecte et l’autorise, une personne à la fois."
+      },
+      "access": "Ce qu’elle peut faire",
+      "accessOptions": {
+        "read": "Lire",
+        "write": "Lire et modifier"
+      },
+      "accessLeads": {
+        "read": "Voir le courrier et les réglages de l’espace de travail.",
+        "write": "Aussi répondre, envoyer, trier et connecter des boîtes mail."
+      },
+      "redirect": "Adresse de retour",
+      "redirectHint": "Où l’on revient après l’avoir autorisée : https://… ou http://127.0.0.1:port/…",
+      "create": "Créer l’application",
+      "creating": "Création…",
+      "cancel": "Annuler",
+      "created": "Créée le {{date}}",
+      "lastUsed": "dernière utilisation le {{date}}",
+      "neverUsed": "jamais utilisée",
+      "secretTitle": "Copiez le secret maintenant",
+      "secretLead": "Il n’est affiché que cette fois. Gardez-le en lieu sûr ; si vous le perdez, renouvelez-le.",
+      "clientId": "ID client",
+      "secret": "Secret client",
+      "copy": "Copier",
+      "copied": "Copié",
+      "copyFailed": "Sélectionnez-le et copiez-le",
+      "done": "Terminé",
+      "rotate": "Renouveler le secret",
+      "rotateLabel": "Renouveler le secret de {{app}}",
+      "confirmRotate": "Le secret actuel de {{app}} cesse de fonctionner aussitôt.",
+      "remove": "Supprimer",
+      "removeLabel": "Supprimer {{app}}",
+      "confirmRemove": "{{app}} et tous ses jetons cessent de fonctionner.",
+      "errors": {
+        "name": "Donnez-lui un nom.",
+        "redirect": "Utilisez une adresse https, ou http://127.0.0.1 avec un port.",
+        "failed": "Cela n’a pas fonctionné. Réessayez."
+      },
+      "stepUp": {
+        "title": "Reconnectez-vous d’abord",
+        "lead": "Créer ou renouveler un secret nécessite une connexion datant de moins de dix minutes.",
+        "action": "Se reconnecter"
       }
     }
   }

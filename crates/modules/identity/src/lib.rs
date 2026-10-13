@@ -37,6 +37,7 @@ pub mod deps;
 pub mod domain;
 pub mod events;
 mod features;
+pub mod metadata;
 pub mod protocol;
 mod prune;
 pub mod scopes;
@@ -69,6 +70,12 @@ pub fn module(deps: Deps) -> Module {
             .publishes::<events::RefreshReuseDetected>()
             .publishes::<events::WayInAdded>()
             .publishes::<events::WayInRemoved>()
+            .publishes::<events::ClientRegistered>()
+            .publishes::<events::ClientRemoved>()
+            .publishes::<events::ConsentGranted>()
+            .publishes::<events::ConsentRevoked>()
+            .consumer(features::member_left::RevokeDepartedConsents)
+            .consumer(features::workspace_deleting::RemoveWorkspaceClients)
             .schedule::<Prune>(PRUNE_EVERY),
     }
 }
@@ -82,6 +89,14 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(features::list_ways_in::handler))
         .routes(routes!(features::remove_way_in::handler))
         .routes(routes!(features::start_link::handler))
+        .routes(routes!(features::list_consents::handler))
+        .routes(routes!(features::revoke_consent::handler))
+        .routes(routes!(
+            features::list_clients::handler,
+            features::register_client::handler
+        ))
+        .routes(routes!(features::rotate_client_secret::handler))
+        .routes(routes!(features::remove_client::handler))
         .merge(passkey_routes())
 }
 
@@ -103,6 +118,8 @@ fn passkey_routes() -> OpenApiRouter<AppState> {
         ))
 }
 
+#[cfg(test)]
+mod clients_tests;
 #[cfg(test)]
 mod passkey_tests;
 #[cfg(test)]
